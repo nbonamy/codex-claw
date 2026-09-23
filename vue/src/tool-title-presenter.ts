@@ -57,6 +57,8 @@ const TOOL_KEYS: Record<string, string> = {
   'write-mission-artifact': 'writeMissionArtifact',
   'submit-mission-result': 'submitMissionResult',
   'upsert-mission-ticket': 'upsertMissionTicket',
+  'report-mission-review-finding': 'reportMissionReviewFinding',
+  'update-mission-review-finding': 'updateMissionReviewFinding',
   'mark-finding-complete': 'markFindingComplete',
   'report-finding': 'reportFinding',
   'update-work-item': 'updateWorkItem',

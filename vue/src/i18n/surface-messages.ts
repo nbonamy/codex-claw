@@ -225,6 +225,7 @@ export const surfaceMessages = {
     "pending": "pending",
     "fixing": "fixing",
     "fixed": "fixed",
+    "fixedEvidence": "Fixed evidence",
     "reviewInProgress": "Review in progress",
     "inspectingUncommitted": "Inspecting uncommitted changes.",
     "inspectingBranch": "Inspecting {branch} against {base}.",

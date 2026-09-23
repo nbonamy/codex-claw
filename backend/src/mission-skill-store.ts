@@ -48,11 +48,11 @@ Convert the accepted requirements into a small, ordered backlog that Mission age
 2. Draft tracer-bullet vertical slices. Each ticket must deliver independently verifiable behavior, fit one agent context, name exactly one represented repository, and include acceptance criteria plus meaningful verification.
 3. Record real blocking edges only. Use an expand-migrate-contract sequence for a wide mechanical refactor that cannot land as independent vertical slices.
 4. Upsert each draft through \`codex_claw.upsert-mission-ticket\` as soon as it is coherent, then revise it through the same tool as the breakdown improves. Use the stable Mission ticket IDs returned by the tool for dependencies.
-5. Review dependencies and repository assignment with the user. Implementation results flow automatically into the explicit Review stage; do not ask the user to choose another review policy.
-6. When an existing tracker and its repository instructions are already configured, preserve its labels and publish only after review. Otherwise keep Mission tickets as the canonical backlog and continue without tracker setup.
+5. Review dependencies and repository assignment yourself before submission. Implementation results flow automatically into the explicit Review stage. User review happens manually in the Mission workspace after submission; do not ask the user to confirm the breakdown in chat.
+6. When an existing tracker and its repository instructions are already configured, preserve its labels but do not publish tickets during this stage. Otherwise keep Mission tickets as the canonical backlog and continue without tracker setup.
 7. Submit the complete proposal with \`codex_claw.submit-mission-result\`.
 
-The ticket stage is done when every ticket has one represented repository, the dependency frontier is valid, the user has reviewed the breakdown, and the proposal is waiting for approval.
+The ticket stage is done when every ticket has one represented repository, the dependency frontier is valid, and the proposal is waiting for manual user review.
 `,
   },
   implementation: {
@@ -90,8 +90,9 @@ Assess the completed implementation against the accepted Mission artifacts.
 
 1. Read the accepted requirements, tickets, implementation evidence, and repository instructions.
 2. Inspect the actual changes in every affected Mission worktree and run checks needed to validate material claims.
-3. Report concrete findings with severity, evidence, and affected repository. Separate blocking findings from residual risks.
+3. Report every actionable issue immediately with \`codex_claw.report-mission-review-finding\`. Include its priority, exact represented repository path, and file/line when available. Do not hide actionable findings in prose.
 4. Write the review artifact with \`codex_claw.write-mission-artifact\`, then submit the delivery recommendation through \`codex_claw.submit-mission-result\`.
+5. If the user later starts remediation, fix only the selected findings and mark each verified fix with \`codex_claw.update-mission-review-finding\`, including concise evidence.
 
 The review is done when every affected repository is accounted for and the user has enough evidence to approve fixes or continue to Ship.
 `,

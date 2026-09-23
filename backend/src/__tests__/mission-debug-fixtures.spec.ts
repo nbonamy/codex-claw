@@ -43,6 +43,17 @@ describe('Mission debug fixtures', () => {
       } else if (stage === 'review') {
         expect(currentRun).toMatchObject({ stage, status: 'awaitingReview', proposal: { review: { summary: expect.stringContaining('approved requirements') } } });
         expect(mission.artifacts.tickets.every(ticket => ticket.done)).toBe(true);
+        expect(mission.artifacts.review.findings).toMatchObject([
+          { priority: 'p1', repositoryPath: '/repo/api', selected: true, remediation: { state: 'open' } },
+          { priority: 'p2', repositoryPath: '/repo/web', selected: false, remediation: { state: 'open' } },
+        ]);
+        expect(mission.execution!.workspaces?.map(workspace => workspace.repositoryPath)).toStrictEqual(['/repo/api', '/repo/web']);
+
+        applyMissionDebugFixture(snapshot, mission.id, stage, '2026-09-19T12:00:00.000Z', 'remediated');
+        expect(mission.artifacts.review.findings).toMatchObject([
+          { selected: true, remediation: { state: 'fixed', evidence: 'Focused Mission workflow tests passed.' } },
+          { selected: false, remediation: { state: 'skipped' } },
+        ]);
       } else {
         expect(currentRun).toMatchObject({ stage: 'review', status: 'accepted' });
         expect(mission.execution!.deliveries).toStrictEqual([
@@ -51,7 +62,7 @@ describe('Mission debug fixtures', () => {
         ]);
       }
     }
-    expect(mission.revision).toBe(5);
+    expect(mission.revision).toBe(6);
   });
 
   it('requires an existing Mission with at least one team agent', () => {

@@ -1,8 +1,8 @@
 import { createEntityId } from '@codex-claw/core/ids';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { isMissionArtifacts, type Mission, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
+import { isMissionArtifacts, type Mission, type MissionReviewFinding, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
 import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionReviewFindingInput, type MissionReviewFindingUpdateInput, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { missionTeamRepositories } from './mission-execution-policy';
 
@@ -27,6 +27,15 @@ export class MissionAgentTools {
         run.workerId === agentId && ['running', 'awaitingReview'].includes(run.status) && run.stage === mission.stage
       ));
       if (run) return { missionId: mission.id, runId: run.id, stage: run.stage };
+      if (mission.stage !== 'review') continue;
+      const remediationRepository = mission.artifacts.review.findings?.find(finding => (
+        finding.remediation.state === 'fixing' && this.implementationWorkerId(mission, finding.repositoryPath) === agentId
+      ))?.repositoryPath;
+      if (!remediationRepository) continue;
+      const reviewRun = mission.execution?.runs.slice().reverse().find(candidate => (
+        candidate.stage === 'review' && ['running', 'awaitingReview'].includes(candidate.status)
+      ));
+      if (reviewRun) return { missionId: mission.id, runId: reviewRun.id, stage: 'review' };
     }
     return undefined;
   }
@@ -168,11 +177,101 @@ export class MissionAgentTools {
     return { success: true, repoPath: normalized };
   }
 
+  async reportReviewFinding(agentId: string, input: MissionReviewFindingInput): Promise<MissionReviewFinding> {
+    const context = this.requireReviewContext(agentId);
+    const title = input.title.trim();
+    const body = input.body.trim();
+    const repositoryPath = input.repositoryPath.trim();
+    if (!title || title.length > 80 || !body || !repositoryPath) throw new Error('Mission review finding is invalid.');
+    const mission = this.requireMission(context.missionId);
+    if (!mission.execution?.workspaces?.some(workspace => workspace.repositoryPath === repositoryPath)) {
+      throw new Error('Choose a repository represented in this Mission.');
+    }
+    let finding!: MissionReviewFinding;
+    await this.ports.missions.change(context.missionId, current => {
+      this.requireOwnedReviewRun(current, context.runId, agentId);
+      const now = new Date().toISOString();
+      finding = {
+        id: createEntityId('mission-finding'),
+        priority: input.priority,
+        title,
+        body,
+        repositoryPath,
+        ...(input.location ? { location: { ...input.location } } : {}),
+        selected: true,
+        remediation: { state: 'open' },
+        createdAt: now,
+        updatedAt: now,
+      };
+      (current.artifacts.review.findings ??= []).push(finding);
+    });
+    await this.ports.publish();
+    return structuredClone(finding);
+  }
+
+  async updateReviewFinding(agentId: string, input: MissionReviewFindingUpdateInput): Promise<MissionReviewFinding> {
+    const context = this.requireReviewContext(agentId);
+    const repositoryPath = input.repositoryPath?.trim();
+    if (input.repositoryPath !== undefined && !repositoryPath) throw new Error('Mission review finding repository is invalid.');
+    let updated!: MissionReviewFinding;
+    await this.ports.missions.change(context.missionId, current => {
+      const finding = current.artifacts.review.findings?.find(candidate => candidate.id === input.findingId);
+      if (!finding) throw new Error('Mission review finding was not found.');
+      const ownsReview = this.ownsReviewRun(current, context.runId, agentId);
+      const ownsRemediation = current.stage === 'review' && finding.remediation.state === 'fixing'
+        && this.implementationWorkerId(current, finding.repositoryPath) === agentId;
+      if (!ownsReview && !ownsRemediation) throw new Error('This agent cannot update this Mission Review finding.');
+      if (ownsRemediation && !ownsReview && (input.status !== 'fixed' || input.priority !== undefined || input.title !== undefined
+        || input.body !== undefined || input.repositoryPath !== undefined || input.location !== undefined)) {
+        throw new Error('A remediation worker can only mark its assigned finding fixed with evidence.');
+      }
+      if (input.status === 'fixed' && finding.remediation.state !== 'fixing') throw new Error('Only a finding being remediated can be marked fixed.');
+      if (repositoryPath && !current.execution?.workspaces?.some(workspace => workspace.repositoryPath === repositoryPath)) {
+        throw new Error('Choose a repository represented in this Mission.');
+      }
+      if (input.priority) finding.priority = input.priority;
+      if (input.title?.trim()) finding.title = input.title.trim();
+      if (input.body?.trim()) finding.body = input.body.trim();
+      if (repositoryPath) finding.repositoryPath = repositoryPath;
+      if (input.location) finding.location = { ...input.location };
+      const now = new Date().toISOString();
+      if (input.status === 'fixed') finding.remediation = { state: 'fixed', completedAt: now, ...(input.evidence?.trim() ? { evidence: input.evidence.trim() } : {}) };
+      finding.updatedAt = now;
+      updated = structuredClone(finding);
+    });
+    await this.ports.publish();
+    return updated;
+  }
+
 
   private requireContext(agentId: string): MissionToolContext {
     const context = this.contextForAgent(agentId);
     if (!context) throw new Error('This agent is not working on an active mission run.');
     return context;
+  }
+
+  private requireReviewContext(agentId: string): MissionToolContext {
+    const context = this.requireContext(agentId);
+    if (context.stage !== 'review') throw new Error('Mission review finding tools are available only during Review.');
+    return context;
+  }
+
+  private requireOwnedReviewRun(mission: Mission, runId: string, agentId: string): void {
+    if (!this.ownsReviewRun(mission, runId, agentId)) {
+      throw new Error('This agent is not working on the active Mission Review stage.');
+    }
+  }
+
+  private ownsReviewRun(mission: Mission, runId: string, agentId: string): boolean {
+    const run = mission.execution?.runs.find(candidate => candidate.id === runId);
+    return !!run && run.workerId === agentId && run.stage === 'review'
+      && ['running', 'awaitingReview'].includes(run.status) && mission.stage === 'review';
+  }
+
+  private implementationWorkerId(mission: Mission, repositoryPath: string): string | undefined {
+    return mission.execution?.runs.slice().reverse().find(run => (
+      run.stage === 'implementation' && run.repositoryPath === repositoryPath && run.status === 'accepted' && run.workerId
+    ))?.workerId;
   }
 
   private requireMission(id: string): Mission {

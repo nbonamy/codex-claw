@@ -1,7 +1,7 @@
 import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import type { VisualizeDebugScenario } from '@codex-claw/core/visualize';
-import { featureStages, type MissionStage } from '@codex-claw/core/missions';
+import type { MissionReviewDebugState, MissionStage } from '@codex-claw/core/missions';
 import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
@@ -23,7 +23,8 @@ export type AppMenuCallbacks = {
   injectDebugPlanReview?: () => void;
   populateDebugVisualize?: (scenario: VisualizeDebugScenario) => void;
   getDebugMissionStage?: () => MissionStage | undefined;
-  setDebugMissionStage?: (stage: MissionStage) => void;
+  getDebugMissionReviewState?: () => MissionReviewDebugState | undefined;
+  setDebugMissionStage?: (stage: MissionStage, reviewState?: MissionReviewDebugState) => void;
   injectDebugCodeReview?: (scenario: DebugCodeReviewScenario) => void;
   isDebugThreadFlagSet?: (id: ThreadFlagId) => boolean;
   setDebugThreadFlag?: (id: ThreadFlagId, value: boolean) => void;
@@ -32,7 +33,7 @@ export type AppMenuCallbacks = {
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -47,6 +48,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     injectDebugPlanReview: options.injectDebugPlanReview,
     populateDebugVisualize: options.populateDebugVisualize,
     getDebugMissionStage: options.getDebugMissionStage,
+    getDebugMissionReviewState: options.getDebugMissionReviewState,
     setDebugMissionStage: options.setDebugMissionStage,
     injectDebugCodeReview: options.injectDebugCodeReview,
     isDebugThreadFlagSet: options.isDebugThreadFlagSet,
@@ -156,19 +158,20 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
 }
 
 function buildDebugMissionFixtures(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
-  const labels: Record<MissionStage, string> = {
-    requirements: 'Requirements',
-    tickets: 'Tickets',
-    implementation: 'Implementation',
-    review: 'Review',
-    ship: 'Ship',
-  };
-  return featureStages.map(stage => ({
-    label: labels[stage],
+  const fixtures: Array<{ label: string; stage: MissionStage; reviewState?: MissionReviewDebugState }> = [
+    { label: 'Requirements', stage: 'requirements' },
+    { label: 'Tickets', stage: 'tickets' },
+    { label: 'Implementation', stage: 'implementation' },
+    { label: 'Review — Findings Identified', stage: 'review', reviewState: 'identified' },
+    { label: 'Review — Findings Remediated', stage: 'review', reviewState: 'remediated' },
+    { label: 'Ship', stage: 'ship' },
+  ];
+  return fixtures.map(({ label, stage, reviewState }) => ({
+    label,
     type: 'radio',
-    checked: callbacks.getDebugMissionStage?.() === stage,
+    checked: callbacks.getDebugMissionStage?.() === stage && (stage !== 'review' || callbacks.getDebugMissionReviewState?.() === reviewState),
     enabled: Boolean(callbacks.setDebugMissionStage && callbacks.getDebugMissionStage?.()),
-    click: () => callbacks.setDebugMissionStage?.(stage),
+    click: () => callbacks.setDebugMissionStage?.(stage, reviewState),
   }));
 }
 

@@ -1,8 +1,9 @@
 <template>
   <OpenInControl
-    v-if="available && catalog.applications.length > 0"
+    v-if="showUnavailable || (available && catalog.applications.length > 0)"
     :application="effectiveOpenInApplication(agent, catalog)"
     :catalog="catalog"
+    :disabled="!available || catalog.applications.length === 0"
     @open="emit('open', { agentId: agent.id, application: $event, path: workspacePath })"
   />
 </template>
@@ -22,6 +23,7 @@ defineProps<{
   agent: Agent;
   available?: boolean;
   catalog: OpenInApplicationCatalog;
+  showUnavailable?: boolean;
   workspacePath: string;
 }>();
 

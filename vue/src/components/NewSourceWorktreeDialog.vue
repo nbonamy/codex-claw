@@ -95,8 +95,8 @@
       > {{ existingWorktree ? $t('worktreeReuse.action') : $t('surface.newSourceWorktreeDialog.create') }} </button>
     </template>
   </FormDialog>
-  <AgentCreationProgressDialog
-    :progress="creationProgress"
+  <WorkspaceProvisioningProgressDialog
+    :operation="creationProgress ? { mode: 'single', progress: creationProgress } : null"
     @close="completeCreation"
   />
 </template>
@@ -107,7 +107,7 @@ import type { AgentCreationProgress, CreateSourceWorktreeInput, SourceBranch, So
 import { FolderIcon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
-import AgentCreationProgressDialog from './AgentCreationProgressDialog.vue';
+import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 
 const props = withDefaults(defineProps<{

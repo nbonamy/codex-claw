@@ -58,6 +58,7 @@ const rendererEventTypes = [
   'client.markdownDisplayRequested',
   'client.celebrationRequested',
   'agentCreation.progress',
+  'mission.implementationStartProgress',
   'git.operationProgress',
   'browser.annotationCreated',
   'conversation.modeUpdated',
@@ -220,6 +221,16 @@ const rendererOnlyEvents = [
       repositoryName: 'repo',
       createWorktree: true,
       hasPrompt: true,
+    },
+  },
+  {
+    ...base,
+    type: 'mission.implementationStartProgress',
+    payload: {
+      missionId: 'mission-1',
+      phase: 'creatingWorktrees',
+      repositoryCount: 2,
+      ticketCount: 3,
     },
   },
   {

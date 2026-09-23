@@ -9,7 +9,7 @@
       type="button"
       :aria-label="currentApplication ? $t('dynamic.openIn', { application: currentApplication.label }) : $t('surface.openInControl.openInApplication')"
       :title="currentApplication ? $t('dynamic.openIn', { application: currentApplication.label }) : $t('surface.openInControl.openInApplication')"
-      :disabled="!currentApplication"
+      :disabled="disabled || !currentApplication"
       @click="openCurrentApplication"
     >
       <img
@@ -25,7 +25,7 @@
       :aria-label="$t('surface.openInControl.chooseOpenInApplication')"
       :title="$t('surface.openInControl.chooseApplication')"
       :aria-expanded="menuOpen"
-      :disabled="catalog.applications.length === 0"
+      :disabled="disabled || catalog.applications.length === 0"
       @click.stop="menuOpen = !menuOpen"
     >
       <ChevronDown aria-hidden="true" />
@@ -50,6 +50,7 @@ import { openInApplicationFromMenuItem, openInMenuItems } from './open-in';
 const props = defineProps<{
   application: OpenInApplication;
   catalog: OpenInApplicationCatalog;
+  disabled?: boolean;
   variant?: 'default' | 'compact';
 }>();
 
@@ -71,10 +72,11 @@ onMounted(() => document.addEventListener('click', closeMenuOnOutsideClick));
 onBeforeUnmount(() => document.removeEventListener('click', closeMenuOnOutsideClick));
 
 function openCurrentApplication(): void {
-  if (currentApplication.value) emit('open', currentApplication.value.id);
+  if (!props.disabled && currentApplication.value) emit('open', currentApplication.value.id);
 }
 
 function selectApplication(itemId: string): void {
+  if (props.disabled) return;
   const application = openInApplicationFromMenuItem(itemId);
   if (!application) return;
   menuOpen.value = false;

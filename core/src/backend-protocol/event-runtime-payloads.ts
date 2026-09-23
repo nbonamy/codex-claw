@@ -237,6 +237,18 @@ function expectAgentCreationProgress(value: unknown, path: string): void {
   );
 }
 
+function expectMissionImplementationStartProgress(value: unknown, path: string): void {
+  expectRecord(value, path);
+  expectString(value.missionId, `${path}.missionId`);
+  expectLiteral(
+    value.phase,
+    ['creatingWorktrees', 'initializingWorkspaces', 'startingAgents'],
+    `${path}.phase`,
+  );
+  expectNumber(value.repositoryCount, `${path}.repositoryCount`);
+  expectNumber(value.ticketCount, `${path}.ticketCount`);
+}
+
 function expectBrowserAnnotation(value: unknown, path: string): void {
   expectRecord(value, path);
   ['id', 'agentId', 'browserId', 'url'].forEach((key) =>
@@ -423,6 +435,7 @@ export const runtimePayloadValidators = {
     );
   },
   'agentCreation.progress': expectAgentCreationProgress,
+  'mission.implementationStartProgress': expectMissionImplementationStartProgress,
   'git.operationProgress': (value, path) => {
     expectRecord(value, path);
     expectLiteral(

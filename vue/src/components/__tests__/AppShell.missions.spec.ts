@@ -171,6 +171,61 @@ describe('AppShell missions', () => {
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('agent').id).toBe(snapshot.agents[1]!.id);
   });
 
+  it('renders the Debug Mission Review fixture through the composed Vue review surface', async () => {
+    const snapshot = createInitialSnapshot();
+    const [apiAgent, webAgent] = snapshot.agents;
+    if (!apiAgent || !webAgent) throw new Error('Expected seeded agents.');
+    const mission = createMission(snapshot, {
+      outcome: 'Debug Mission Review', workflowType: 'shapeAndShipFeature',
+      teamId: snapshot.teams[0]!.id, orchestratorMemberId: apiAgent.id,
+    });
+    mission.stage = 'review';
+    mission.artifacts.review.findings = [{
+      id: 'debug-finding', priority: 'p1', title: 'Persist review state', body: 'Selection should survive reload.',
+      repositoryPath: '/repo/api', selected: true, remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
+    }];
+    mission.execution = {
+      teamId: mission.teamId,
+      debugFixture: true,
+      memberIds: [apiAgent.id, webAgent.id],
+      workspaces: [
+        { repositoryPath: '/repo/api', path: '/mission/api', branch: 'mission/debug' },
+        { repositoryPath: '/repo/web', path: '/mission/web', branch: 'mission/debug' },
+      ],
+      runs: [
+        { id: 'run-api', stage: 'implementation', memberId: apiAgent.id, workerId: apiAgent.id, repositoryPath: '/repo/api', status: 'accepted', skills: [], feedback: '', startedAt: 'now' },
+        { id: 'run-web', stage: 'implementation', memberId: webAgent.id, workerId: webAgent.id, repositoryPath: '/repo/web', status: 'accepted', skills: [], feedback: '', startedAt: 'now' },
+        {
+          id: 'run-review', stage: 'review', memberId: apiAgent.id, workerId: apiAgent.id, status: 'awaitingReview', skills: [], feedback: '', startedAt: 'now',
+          proposal: { ...structuredClone(mission.artifacts), review: { summary: 'Debug review prose.', pullRequestUrl: '', findings: [] } },
+        },
+      ],
+    };
+    const getAgentGitDiff = vi.fn().mockResolvedValue({
+      diff: '', summary: { addedLines: 0, removedLines: 0, changedFiles: 0 }, sections: [], target: { type: 'branch' },
+    });
+    const wrapper = mountShell({ snapshot, getAgentGitDiff });
+
+    await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
+
+    const review = wrapper.getComponent({ name: 'MissionCodeReview' });
+    expect(review.props('readOnly')).toBe(false);
+    expect(review.text()).toContain('Persist review state');
+    expect(review.text()).toContain('Debug review prose.');
+    expect(review.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['Review', 'Changes']);
+    expect(review.findComponent({ name: 'ElSwitch' }).exists()).toBe(true);
+    expect(review.findAll('button').some(button => button.text().includes('Fix 1 selected'))).toBe(true);
+
+    await review.get('[aria-label="Chat about finding"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.emitted('update:composerState')).toStrictEqual([[expect.objectContaining({
+      agentId: apiAgent.id,
+      state: expect.objectContaining({ text: expect.stringContaining('Persist review state') }),
+    })]]);
+    expect(getAgentGitDiff).not.toHaveBeenCalled();
+  });
+
   it('wires repository delivery controls into the Ship stage', async () => {
     const snapshot = createInitialSnapshot();
     const repositoryPath = snapshot.agents[0]!.folder!;

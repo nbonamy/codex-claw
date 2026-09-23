@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import { createInitialSnapshot } from '../snapshot-construction';
 import { createMission, isMission, isMissionArtifacts, missionTicketReady, updateMission } from '../missions';
 import { missionDeveloperInstructions, pendingMissionRun, type MissionRun } from '../mission-execution';
+import { missionWorkflow } from '../mission-workflows';
 
 it('carries the assigned stage, accepted artifacts, workspace, skills and revision feedback into the provider handoff', () => {
   const snapshot = createInitialSnapshot();
@@ -33,12 +34,39 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
       expect(prompt).toContain('coherent local commits');
       expect(prompt).toContain('commit SHAs');
     }
-    if (stage === 'implementation') expect(prompt).toContain('explicit Review stage');
-    else expect(prompt).toContain('does not approve a stage');
+    if (stage === 'review') {
+      expect(prompt).toContain('may inspect every listed isolated Mission worktree');
+      expect(prompt).not.toContain('Do not edit source checkouts or other Mission worktrees');
+    }
     expect(prompt).toContain('Claw-owned Mission skill');
     expect(prompt).toContain('already visible in the Mission workspace');
     expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('no agent-run skill');
   }
+});
+
+it('allows Review approval independently of optional finding remediation', () => {
+  const snapshot = createInitialSnapshot();
+  const artifacts = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id }).artifacts;
+  artifacts.review = {
+    summary: 'Reviewed',
+    pullRequestUrl: '',
+    findings: [{
+      id: 'finding-1', priority: 'p2', title: 'Keep selection durable', body: 'Selection is lost on reload.', repositoryPath: '/repo', selected: true,
+      remediation: { state: 'open' }, createdAt: 'now', updatedAt: 'now',
+    }],
+  };
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  artifacts.review.findings![0]!.selected = false;
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  artifacts.review.findings![0]!.priority = 'p1';
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  artifacts.review.findings![0]!.selected = true;
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  artifacts.review.findings![0]!.remediation = { state: 'fixed', completedAt: 'later', evidence: 'Test passed.' };
+  expect(missionWorkflow('shapeAndShipFeature').stageReady('review', artifacts)).toBe(true);
+  expect(isMissionArtifacts(artifacts)).toBe(true);
+  artifacts.review.findings![0]!.remediation = { state: 'skipped', startedAt: 'later' };
+  expect(isMissionArtifacts(artifacts)).toBe(true);
 });
 
 it('validates persisted execution records and dependency graphs before admitting them into app state', () => {

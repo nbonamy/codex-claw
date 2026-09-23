@@ -475,6 +475,12 @@ describe('ClawBackendServer', () => {
     expect(result).toMatchObject({ result: { missions: [{ id: mission.id, stage: 'implementation', execution: { debugFixture: true } }] } });
     expect(saveSnapshot).toHaveBeenCalledOnce();
     await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'debug-mission-review', method: backendMethods.debugMissionStageSet,
+      params: { missionId: mission.id, stage: 'review', reviewState: 'remediated' },
+    })).resolves.toMatchObject({ result: { missions: [{ artifacts: { review: { findings: [
+      { remediation: { state: 'fixed' } }, { remediation: { state: 'skipped' } },
+    ] } } }] } });
+    await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'debug-mission-invalid', method: backendMethods.debugMissionStageSet,
       params: { missionId: mission.id, stage: 'unknown' },
     })).resolves.toMatchObject({ error: { code: -32602 } });

@@ -2,12 +2,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import type { ReviewToolContext } from '../review/review-tool-registry';
 import { errorToolResult, structuredToolResult } from './tool-result';
+import { findingBodySchema, findingPrioritySchema, findingTitleSchema } from './finding-tool-schemas';
 
-const priority = z.enum(['p0', 'p1', 'p2', 'p3']).describe(
-  'P0: drop everything; universally blocks release, operations, or major usage. P1: urgent; fix in the next cycle. P2: normal; fix eventually. P3: low; nice to have.',
-);
-const findingTitle = z.string().trim().min(1).max(80).describe('Imperative finding title, at most 80 characters.');
-const findingBody = z.string().trim().min(1).describe('One concise Markdown paragraph explaining why this is a problem.');
+const priority = findingPrioritySchema;
+const findingTitle = findingTitleSchema;
+const findingBody = findingBodySchema;
 
 export function registerReviewTools(server: McpServer, context: ReviewToolContext): void {
   server.registerTool('report_finding', {

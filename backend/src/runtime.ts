@@ -95,6 +95,8 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       listArtifacts: agentId => server.listMissionArtifacts(agentId),
       readArtifact: (agentId, stage) => server.readMissionArtifact(agentId, stage),
       writeArtifact: (agentId, input) => server.writeMissionArtifact(agentId, input),
+      reportReviewFinding: (agentId, input) => server.reportMissionReviewFinding(agentId, input),
+      updateReviewFinding: (agentId, input) => server.updateMissionReviewFinding(agentId, input),
     },
     snapshot,
     computerUse: computerUseAvailable ? {

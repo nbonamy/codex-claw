@@ -610,6 +610,29 @@ describe('agent git service parsers', () => {
     expect(runGit).not.toHaveBeenCalled();
   });
 
+  it('force-removes a linked worktree when the caller explicitly discards its changes', async () => {
+    const runGit = vi.fn().mockResolvedValue({ stdout: 'worktree /repo\n\nworktree /repo-fix-gh-22\n' });
+    const service = new AgentGitService(() => new Date(), runGit);
+    vi.spyOn(service, 'workflow').mockResolvedValue({
+      repository: 'owner/repo',
+      folder: '/repo-fix-gh-22',
+      isLinkedWorktree: true,
+      branch: 'fix/gh-22',
+      detached: false,
+      ahead: 0,
+      behind: 0,
+      files: [{ path: 'src/index.ts', indexStatus: ' ', worktreeStatus: 'M' }],
+      stagedFiles: [],
+      unstagedFiles: ['src/index.ts'],
+    });
+
+    await service.validateLinkedWorktreeDeletion('/repo-fix-gh-22', false, undefined, true);
+    await service.deleteLinkedWorktree('/repo-fix-gh-22', false, undefined, true);
+
+    expect(runGit).toHaveBeenCalledWith('/repo', ['worktree', 'remove', '--force', '/repo-fix-gh-22']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'fix/gh-22']);
+  });
+
   it('refuses merged pull-request cleanup after new local commits were added', async () => {
     const runGit = vi.fn().mockResolvedValue({ stdout: 'newer-local-head\n' });
     const service = new AgentGitService(() => new Date(), runGit);

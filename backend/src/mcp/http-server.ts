@@ -11,6 +11,7 @@ import type { HostedMcpGateway, HostedMcpServerId } from './hosted-mcp-gateway';
 import type { ReviewToolRegistry } from '../review/review-tool-registry';
 import { createCollaborationToolModuleProvider } from './collaboration-tools';
 import { createMissionToolModuleProvider } from './mission-tools';
+import { createMissionReviewToolModuleProvider } from './mission-review-tools';
 import {
   createBrowserToolModuleProvider,
   createComputerUseToolModuleProvider,
@@ -48,6 +49,7 @@ export class ClawMcpHttpServer {
     this.toolModuleProviders = [
       createCollaborationToolModuleProvider(this.coordinator),
       createMissionToolModuleProvider(this.coordinator),
+      createMissionReviewToolModuleProvider(this.coordinator),
       createComputerUseToolModuleProvider(options.computerUse, computerUseEnabled),
       createBrowserToolModuleProvider(options.browser),
       createReviewToolModuleProvider(options.reviewTools),

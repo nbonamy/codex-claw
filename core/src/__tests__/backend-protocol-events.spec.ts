@@ -290,6 +290,16 @@ function createFixtures(): EventFixtures {
         hasPrompt: true,
       },
     },
+    'mission.implementationStartProgress': {
+      ...base,
+      type: 'mission.implementationStartProgress',
+      payload: {
+        missionId: 'mission-1',
+        phase: 'initializingWorkspaces',
+        repositoryCount: 2,
+        ticketCount: 3,
+      },
+    },
     'git.operationProgress': {
       ...agent,
       type: 'git.operationProgress',

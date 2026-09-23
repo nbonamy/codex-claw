@@ -19,6 +19,7 @@ export const snapshotEventOwnership = {
   'plan.reviewResolved': 'coordination',
   'client.celebrationRequested': 'renderer',
   'agentCreation.progress': 'renderer',
+  'mission.implementationStartProgress': 'renderer',
   'git.operationProgress': 'renderer',
   'browser.annotationCreated': 'renderer',
   'workItem.assignmentUpdated': 'runtime',

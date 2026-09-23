@@ -16,7 +16,7 @@ export const shapeAndShipFeatureWorkflow: MissionWorkflowDefinition = {
     requirements: { problem: '', acceptance: '' },
     tickets: [],
     implementation: { changes: '', tests: '' },
-    review: { summary: '', pullRequestUrl: '' },
+    review: { summary: '', pullRequestUrl: '', findings: [] },
   }),
   stageReady(stage, artifacts) {
     switch (stage) {

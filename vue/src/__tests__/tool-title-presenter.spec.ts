@@ -31,6 +31,8 @@ describe('Claw tool title presenter', () => {
     ['codex_claw.send-message', { to: 'computer-use' }, 'completed', 'Sent message to computer-use'],
     ['codex_claw.list-agents', {}, 'completed', 'Listed agents'],
     ['codex_claw.report_finding', { title: 'Keep tool copy product-facing' }, 'running', 'Reporting finding'],
+    ['codex_claw.report-mission-review-finding', { title: 'Persist selection' }, 'completed', 'Reported Mission finding'],
+    ['codex_claw.update-mission-review-finding', { findingId: 'finding-1' }, 'completed', 'Updated Mission finding'],
     ['codex_claw.report_finding', { title: 'Keep tool copy product-facing' }, 'completed', 'Reported finding'],
     ['codex_claw.update_finding', { findingId: 'finding-1' }, 'completed', 'Updated finding'],
     ['codex_claw.mark_finding_complete', { findingId: 'finding-1' }, 'completed', 'Verified finding fix'],

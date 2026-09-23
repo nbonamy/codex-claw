@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue';
 import type { PlanReviewResolution } from '@codex-claw/core/plan-review';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
+import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
 import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { selectTeam as selectTeamInSnapshot } from '@codex-claw/core/team-manager';
@@ -54,6 +55,7 @@ const daemonStatusError = ref<string | null>(null);
 const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
 const backendRestartInProgress = ref(false);
 const agentCreationProgress = ref<AgentCreationProgress | null>(null);
+const missionImplementationStartProgress = ref<MissionImplementationStartProgress | null>(null);
 const codexConversationFramesByAgentId = ref<Record<string, {
   replica: CodexConversationReplica;
   revision: number;
@@ -1470,6 +1472,7 @@ export function useAppState() {
     codexResourceSharingStatus,
     backendRestartInProgress,
     agentCreationProgress,
+    missionImplementationStartProgress,
     loadBackendModels: loadBackendModelsForActiveAgent,
     loadBackendPlugins: loadBackendPluginsForActiveAgent,
     loadBackendSkills: loadBackendSkillsForActiveAgent,
@@ -1889,6 +1892,9 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
       return;
     case 'agentCreation.progress':
       syncAgentCreationProgressFromMainEvent(event);
+      return;
+    case 'mission.implementationStartProgress':
+      missionImplementationStartProgress.value = event.payload;
       return;
     case 'workspace.fileActivityDetected':
       syncFileActivityFromMainEvent(event);

@@ -1,0 +1,7 @@
+import * as z from 'zod/v4';
+
+export const findingPrioritySchema = z.enum(['p0', 'p1', 'p2', 'p3']).describe(
+  'P0: drop everything; universally blocks release, operations, or major usage. P1: urgent; fix in the next cycle. P2: normal; fix eventually. P3: low; nice to have.',
+);
+export const findingTitleSchema = z.string().trim().min(1).max(80).describe('Imperative finding title, at most 80 characters.');
+export const findingBodySchema = z.string().trim().min(1).max(100_000).describe('One concise Markdown paragraph explaining why this is a problem.');

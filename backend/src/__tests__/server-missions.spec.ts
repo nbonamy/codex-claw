@@ -66,12 +66,12 @@ describe('mission backend boundary', () => {
       } });
 
       expect(validateLinkedWorktreeDeletion.mock.calls).toEqual([
-        ['/src/api-add-billing'],
-        ['/src/web-add-billing'],
+        ['/src/api-add-billing', false, undefined, true],
+        ['/src/web-add-billing', false, undefined, true],
       ]);
       expect(deleteLinkedWorktree.mock.calls).toEqual([
-        ['/src/api-add-billing'],
-        ['/src/web-add-billing'],
+        ['/src/api-add-billing', false, undefined, true],
+        ['/src/web-add-billing', false, undefined, true],
       ]);
       expect(deleteMissionHome).toHaveBeenCalledWith(mission.id);
       expect(snapshot.missions).toStrictEqual([]);
@@ -107,7 +107,7 @@ describe('mission backend boundary', () => {
     } finally { await server.close(); }
   });
 
-  it('keeps the Mission and its data when a tracked worktree is unsafe to delete', async () => {
+  it('keeps the Mission and its data when a tracked worktree cannot be deleted', async () => {
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, {
       outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
@@ -121,7 +121,7 @@ describe('mission backend boundary', () => {
     const deleteLinkedWorktree = vi.fn();
     const validateLinkedWorktreeDeletion = vi.fn()
       .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('Commit or discard the worktree changes before deleting it.'));
+      .mockRejectedValueOnce(new Error('The current folder is not a linked worktree.'));
     const server = new ClawBackendServer({
       version: 'test', snapshot,
       agentGitService: {
@@ -135,7 +135,7 @@ describe('mission backend boundary', () => {
     try {
       await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'mission/delete', params: {
         input: { id: mission.id, revision: mission.revision, deleteWorktrees: true, confirmed: true },
-      } })).rejects.toThrow('Commit or discard');
+      } })).rejects.toThrow('not a linked worktree');
       expect(validateLinkedWorktreeDeletion).toHaveBeenCalledTimes(2);
       expect(deleteLinkedWorktree).not.toHaveBeenCalled();
       expect(snapshot.missions).toStrictEqual([mission]);

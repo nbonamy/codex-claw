@@ -8,6 +8,7 @@ import type {
   WorkBacklogAssignment, WorkBacklogAssignmentPolicy, WorkBacklogAssignmentStatus
 } from '../contracts';
 import type { CodexConversationEvent, CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
+import type { MissionImplementationStartProgress } from '../mission-execution';
 
 type EventEnvelope = {
   seq: number;
@@ -159,6 +160,10 @@ type AppEvent =
       type: 'agentCreation.progress';
       agentId: string;
       payload: AgentCreationProgress;
+    }>
+  | EventWith<{
+      type: 'mission.implementationStartProgress';
+      payload: MissionImplementationStartProgress;
     }>
   | EventWith<{
       type: 'git.operationProgress';

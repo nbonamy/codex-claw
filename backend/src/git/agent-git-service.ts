@@ -439,28 +439,28 @@ export class AgentGitService {
     return folder;
   }
 
-  async deleteLinkedWorktree(folder: string, deleteRemoteBranch = false, expectedHeadSha?: string): Promise<void> {
-    const { current, target } = await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch, expectedHeadSha);
+  async deleteLinkedWorktree(folder: string, deleteRemoteBranch = false, expectedHeadSha?: string, discardChanges = false): Promise<void> {
+    const { current, target } = await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch, expectedHeadSha, discardChanges);
 
     if (deleteRemoteBranch) {
       await this.runGit(target.path, ['push', current.remote!, '--delete', current.upstream!.slice(current.remote!.length + 1)]);
     }
-    await this.runGit(target.path, ['worktree', 'remove', current.folder]);
+    await this.runGit(target.path, ['worktree', 'remove', ...(discardChanges ? ['--force'] : []), current.folder]);
     await this.runGit(target.path, ['branch', '-D', current.branch!]);
   }
 
-  async validateLinkedWorktreeDeletion(folder: string, deleteRemoteBranch = false, expectedHeadSha?: string): Promise<void> {
-    await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch, expectedHeadSha);
+  async validateLinkedWorktreeDeletion(folder: string, deleteRemoteBranch = false, expectedHeadSha?: string, discardChanges = false): Promise<void> {
+    await this.linkedWorktreeDeletionPlan(folder, deleteRemoteBranch, expectedHeadSha, discardChanges);
   }
 
-  private async linkedWorktreeDeletionPlan(folder: string, deleteRemoteBranch: boolean, expectedHeadSha?: string): Promise<{
+  private async linkedWorktreeDeletionPlan(folder: string, deleteRemoteBranch: boolean, expectedHeadSha?: string, discardChanges = false): Promise<{
     current: Omit<AgentGitWorkflow, 'githubConnected' | 'existingPullRequest'>;
     target: { path: string; branch?: string };
   }> {
     const current = await this.workflow(folder);
     if (!current.isLinkedWorktree) throw new Error('The current folder is not a linked worktree.');
     if (!current.branch || current.detached) throw new Error('The linked worktree does not have a local branch to delete.');
-    if (current.files.length > 0) throw new Error('Commit or discard the worktree changes before deleting it.');
+    if (current.files.length > 0 && !discardChanges) throw new Error('Commit or discard the worktree changes before deleting it.');
     if (expectedHeadSha) {
       const headSha = (await this.runGit(folder, ['rev-parse', 'HEAD'])).stdout.trim();
       if (headSha !== expectedHeadSha) {

@@ -34,6 +34,7 @@ vi.mock('../../log', () => ({
 import { createClawMcpServer } from '../tools';
 import { createCollaborationToolModuleProvider } from '../collaboration-tools';
 import { createMissionToolModuleProvider } from '../mission-tools';
+import { createMissionReviewToolModuleProvider } from '../mission-review-tools';
 import { createBrowserToolModuleProvider, createComputerUseToolModuleProvider } from '../adapter-tool-modules';
 import type { ComputerUseClient } from '../computer-use-tools';
 import type { InAppBrowserClient } from '../browser-tools';
@@ -58,6 +59,8 @@ describe('Codex Claw MCP tool registration', () => {
     listMissionArtifacts: vi.fn(),
     readMissionArtifact: vi.fn(),
     writeMissionArtifact: vi.fn(),
+    reportMissionReviewFinding: vi.fn(),
+    updateMissionReviewFinding: vi.fn(),
     listSourceRepositories: vi.fn(),
     listSourceWorktrees: vi.fn(),
     createSourceWorktree: vi.fn(),
@@ -216,6 +219,21 @@ describe('Codex Claw MCP tool registration', () => {
     expect(coordinator.upsertMissionTicket).toHaveBeenCalledWith('agent-dina', draft);
   });
 
+  it('exposes finding tools only for the authenticated Mission Review stage', async () => {
+    coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-1', stage: 'review' });
+    createServer();
+    expect([...handlers.keys()]).toEqual(expect.arrayContaining(['report-mission-review-finding', 'update-mission-review-finding']));
+    coordinator.reportMissionReviewFinding.mockResolvedValue({ id: 'finding-1' });
+    await handlers.get('report-mission-review-finding')!({ priority: 'p1', title: 'Fix persistence', body: 'Selection is lost.', repositoryPath: '/repo', file: 'src/review.ts', line: 42 });
+    expect(coordinator.reportMissionReviewFinding).toHaveBeenCalledWith('agent-dina', {
+      priority: 'p1', title: 'Fix persistence', body: 'Selection is lost.', repositoryPath: '/repo', location: { file: 'src/review.ts', line: 42 },
+    });
+    handlers.clear();
+    coordinator.missionContext.mockReturnValue({ missionId: 'mission-1', runId: 'run-2', stage: 'tickets' });
+    createServer();
+    expect([...handlers.keys()]).not.toContain('report-mission-review-finding');
+  });
+
   it('preserves every optional creation and display field', async () => {
     createServer();
     coordinator.createSourceWorktree.mockResolvedValue({ path: '/src/claw-tests' });
@@ -280,6 +298,7 @@ describe('Codex Claw MCP tool registration', () => {
     }, [
       createCollaborationToolModuleProvider(typedCoordinator),
       createMissionToolModuleProvider(typedCoordinator),
+      createMissionReviewToolModuleProvider(typedCoordinator),
       createComputerUseToolModuleProvider(computerUse, () => true),
       createBrowserToolModuleProvider(browser),
     ]);

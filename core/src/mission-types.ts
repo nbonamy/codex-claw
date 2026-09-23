@@ -1,5 +1,6 @@
 export type MissionWorkflowType = 'shapeAndShipFeature';
 export type MissionStage = 'requirements' | 'tickets' | 'implementation' | 'review' | 'ship';
+export type MissionReviewDebugState = 'identified' | 'remediated';
 
 export type MissionTicket = {
   id?: string;
@@ -10,11 +11,23 @@ export type MissionTicket = {
   reference?: string;
   dependsOn?: number[];
 };
+export type MissionReviewFinding = {
+  id: string;
+  priority: import('./code-review').CodeReviewPriority;
+  title: string;
+  body: string;
+  repositoryPath: string;
+  location?: import('./code-review').CodeReviewLocation;
+  selected: boolean;
+  remediation: { state: 'open' } | { state: 'skipped'; startedAt: string } | { state: 'fixing'; startedAt: string } | { state: 'fixed'; completedAt: string; evidence?: string };
+  createdAt: string;
+  updatedAt: string;
+};
 export type MissionArtifacts = {
   requirements: { problem: string; acceptance: string };
   tickets: MissionTicket[];
   implementation: { changes: string; tests: string };
-  review: { summary: string; pullRequestUrl: string };
+  review: { summary: string; pullRequestUrl: string; findings?: MissionReviewFinding[] };
 };
 export type MissionArtifactFile = {
   revision: number;
@@ -91,11 +104,26 @@ export type MissionExecutionInput = { id: string; revision: number } & (
   | { action: 'attachRepository'; repoPath: string }
   | { action: 'run'; memberId?: string; ticketIndex?: number; feedback?: string }
   | { action: 'accept'; runId: string }
+  | { action: 'continueToReview' }
   | { action: 'cancel'; runId: string }
+  | { action: 'selectReviewFinding'; findingId: string; selected: boolean }
+  | { action: 'fixSelectedReviewFindings' }
+  | { action: 'rerunReview' }
   | { action: 'recordDelivery'; repositoryPath: string; result: { kind: 'pullRequest'; number: number; url: string } | { kind: 'merge' } }
   | { action: 'reopen'; stage: MissionStage }
 );
 export type MissionResultInput = { artifacts: MissionArtifacts; summary: string };
+export type MissionReviewFindingInput = Pick<MissionReviewFinding, 'priority' | 'title' | 'body' | 'repositoryPath'> & { location?: MissionReviewFinding['location'] };
+export type MissionReviewFindingUpdateInput = {
+  findingId: string;
+  priority?: MissionReviewFinding['priority'];
+  title?: string;
+  body?: string;
+  repositoryPath?: string;
+  location?: MissionReviewFinding['location'];
+  status?: 'fixed';
+  evidence?: string;
+};
 export type MissionToolContext = { missionId: string; runId: string; stage: MissionStage };
 export type MissionArtifactWriteInput = { stage: MissionStage; content: string; expectedRevision?: number };
 export type MissionArtifactReadResult = { stage: MissionStage; content: string; revision: number; updatedAt: string };
