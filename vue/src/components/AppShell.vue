@@ -518,7 +518,6 @@ import MissionDeleteDialog from './MissionDeleteDialog.vue';
 import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 import ConversationPane from './ConversationPane.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
-import { IconCircleDot as IssueIcon } from '@tabler/icons-vue';
 import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
 import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
@@ -545,7 +544,7 @@ import {
 } from '@codex-app-sdk/vue';
 import type { CodexConversationSnapshot, SurfaceMessage } from '@codex-app-sdk/core/surface';
 import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
-import { BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
+import { BacklogIcon, BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import {
   copyModelFavorite,
   modelFavoriteEffortLabel,
@@ -929,7 +928,7 @@ const missionIssueItems = ref<WorkItem[]>([]);
 const missionIssueLoading = ref(false);
 const missionIssueError = ref<string | null>(null);
 let missionIssueRequestId = 0;
-const missionSourceMenuItems = computed(() => [{ id: 'issue', type: 'action' as const, label: t('missions.chooseIssue'), icon: IssueIcon }]);
+const missionSourceMenuItems = computed(() => [{ id: 'issue', type: 'action' as const, label: t('missions.chooseIssue'), icon: BacklogIcon }]);
 
 function missionIssueLocation(): AutomationLocation | undefined {
   const team = props.snapshot.teams.find(candidate => candidate.id === selectedMission.value?.teamId);
@@ -979,10 +978,12 @@ async function openMissionIssuePicker(): Promise<void> {
     const repositories = await props.loadWorkRepositories('github', missionIssueLocation()) ?? [];
     if (requestId === missionIssueRequestId) {
       const represented = missionIssueRepositoryIdentities(mission);
-      missionIssueRepositories.value = repositories.filter(repository => {
+      const availableRepositories = repositories.filter(repository => {
         const identity = canonicalGitRemoteIdentity(repository.url);
         return identity && represented.has(identity.toLocaleLowerCase());
       });
+      missionIssueRepositories.value = availableRepositories;
+      if (availableRepositories[0]) await selectMissionIssueRepository(availableRepositories[0].id);
     }
   } catch (caught) {
     if (requestId === missionIssueRequestId) missionIssueError.value = localizedErrorMessage(caught, t);

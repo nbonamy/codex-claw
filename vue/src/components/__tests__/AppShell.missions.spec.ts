@@ -70,6 +70,7 @@ describe('AppShell missions', () => {
 
     wrapper.getComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
     await flushPromises();
+    expect(wrapper.get('.conversation-pane [role="menuitem"]').findComponent({ name: 'BacklogIcon' }).exists()).toBe(true);
     await wrapper.get('.conversation-pane [role="menuitem"]').trigger('click');
     await flushPromises();
 
@@ -78,13 +79,13 @@ describe('AppShell missions', () => {
     expect(picker.props('visible')).toBe(true);
     expect(picker.props('repositories')).toStrictEqual([repositories[1]]);
     expect(loadWorkRepositories).toHaveBeenCalledWith('github', undefined);
+    expect(picker.props('selectedRepositoryId')).toBe('second');
+    expect(loadWorkItems).toHaveBeenCalledExactlyOnceWith('github', 'second', undefined, { kind: 'issue', state: 'open' });
+    expect(picker.props('workItems')).toStrictEqual([issue]);
 
     picker.vm.$emit('select-repository', 'first');
     await flushPromises();
-    expect(loadWorkItems).not.toHaveBeenCalled();
-    picker.vm.$emit('select-repository', 'second');
-    await flushPromises();
-    expect(loadWorkItems).toHaveBeenCalledWith('github', 'second', undefined, { kind: 'issue', state: 'open' });
+    expect(loadWorkItems).toHaveBeenCalledTimes(1);
     expect(picker.props('workItems')).toStrictEqual([issue]);
 
     picker.vm.$emit('select-work-item', { ...issue, repositoryId: 'first' });
@@ -95,6 +96,25 @@ describe('AppShell missions', () => {
     expect(picker.props('visible')).toBe(false);
     expect(sendPromptAction).toHaveBeenCalledWith(expect.stringContaining(issue.url), undefined);
     expect(sendPromptAction.mock.calls[0]?.[0]).toContain(issue.body);
+  });
+
+  it('leaves the issue picker unselected when this team has no available GitHub repository', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    prepareMissionLead(mission, snapshot.agents[0]!.id);
+    const loadWorkItems = vi.fn();
+    const wrapper = mountShell({ snapshot, loadWorkRepositories: vi.fn().mockResolvedValue([]), loadWorkItems });
+
+    wrapper.getComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
+    await wrapper.get('.conversation-pane [role="menuitem"]').trigger('click');
+    await flushPromises();
+
+    const picker = wrapper.findAllComponents({ name: 'RepositorySessionSourceDialog' })
+      .find(candidate => candidate.props('purpose') === 'missionIssue')!;
+    expect(picker.props('visible')).toBe(true);
+    expect(picker.props('selectedRepositoryId')).toBeNull();
+    expect(loadWorkItems).not.toHaveBeenCalled();
   });
 
   it('keeps the issue chooser open when starting the Mission fails', async () => {
@@ -115,8 +135,7 @@ describe('AppShell missions', () => {
     await flushPromises();
     const picker = wrapper.findAllComponents({ name: 'RepositorySessionSourceDialog' })
       .find(candidate => candidate.props('purpose') === 'missionIssue')!;
-    picker.vm.$emit('select-repository', 'repo');
-    await flushPromises();
+    expect(picker.props('selectedRepositoryId')).toBe('repo');
     picker.vm.$emit('select-work-item', issue);
     await flushPromises();
 
