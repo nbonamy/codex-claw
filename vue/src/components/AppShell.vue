@@ -424,8 +424,8 @@
       @image-error="handleImageAnnotationError"
       @save="saveImageAnnotation"
     />
-    <AgentCreationProgressDialog
-      :progress="debugAgentCreationProgress"
+    <WorkspaceProvisioningProgressDialog
+      :operation="debugAgentCreationProgress ? { mode: 'single', progress: debugAgentCreationProgress } : null"
       @close="closeDebugAgentCreationProgress"
     />
     <MissionDeleteDialog
@@ -475,7 +475,7 @@ import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { projectAgentMentionLabels } from '@codex-claw/core/workspace-sidebar';
 import { codexClawApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
-import AgentCreationProgressDialog from './AgentCreationProgressDialog.vue';
+import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
 import { resolveRepositorySessionContext, type RepositorySessionSource } from './repository-session-context';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';

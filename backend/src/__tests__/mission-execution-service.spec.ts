@@ -320,7 +320,7 @@ describe('mission execution', () => {
     expect(h.current().artifacts.review.findings?.[0]?.remediation.state).toBe('fixing');
   });
 
-  it('moves legacy ticket approvals into the explicit Review stage during recovery', async () => {
+  it('accepts legacy ticket results during recovery but waits for user confirmation before Review', async () => {
     const h = setup();
     await h.store.change(h.current().id, mission => {
       mission.stage = 'implementation';
@@ -342,6 +342,10 @@ describe('mission execution', () => {
 
     expect(h.current().artifacts.tickets[0]!.done).toBe(true);
     expect(h.current().execution!.runs[0]!.status).toBe('accepted');
+    expect(h.current().stage).toBe('implementation');
+    expect(h.current().execution!.runs).toHaveLength(1);
+    await h.command({ action: 'continueToReview' });
+    await h.service.waitForLaunches();
     expect(h.current().stage).toBe('review');
     expect(h.current().execution!.runs.at(-1)).toMatchObject({ stage: 'review', status: 'running' });
   });
@@ -522,6 +526,10 @@ describe('mission execution', () => {
     expect(h.current().artifacts.requirements.problem).toBe('Billing');
     expect(h.current().artifacts.implementation.tests).toContain('Tests for 0 passed');
     expect(h.current().artifacts.implementation.tests).toContain('Tests for 1 passed');
+    expect(h.current().stage).toBe('implementation');
+    expect(h.current().execution!.runs.filter(run => run.stage === 'review')).toHaveLength(0);
+    await h.command({ action: 'continueToReview' });
+    await h.service.waitForLaunches();
     expect(h.current().stage).toBe('review');
     expect(h.current().execution!.runs.at(-1)).toMatchObject({
       stage: 'review', status: 'running', workerId: ticketsRun.workerId,
@@ -575,6 +583,8 @@ describe('mission execution', () => {
     expect(implementationRuns[0]).toMatchObject({ status: 'accepted', ticketIndex: 0 });
     expect(implementationRuns[1]).toMatchObject({ status: 'running', ticketIndex: 1 });
     expect(implementationRuns[1]!.workerId).toBe(implementationWorkerId);
+    await expect(h.command({ action: 'continueToReview' })).rejects.toThrow('Complete every implementation ticket');
+    expect(h.current().stage).toBe('implementation');
     expect(h.ports.continueStage.mock.calls.slice(-2)).toStrictEqual([
       [implementationWorkerId, '/compact'],
       [implementationWorkerId, expect.stringContaining('ticket 2')],
@@ -590,8 +600,13 @@ describe('mission execution', () => {
     await h.service.agentFinished(implementationWorkerId!);
     await h.service.waitForLaunches();
 
+    expect(h.current().stage).toBe('implementation');
+    expect(h.current().execution!.runs.filter(run => run.stage === 'review')).toHaveLength(0);
+    await h.command({ action: 'continueToReview' });
+    await h.service.waitForLaunches();
     expect(h.current().stage).toBe('review');
     expect(h.current().execution!.runs.at(-1)).toMatchObject({ stage: 'review', status: 'running' });
+    await expect(h.command({ action: 'continueToReview' })).rejects.toThrow('Only Implementation');
     expect(h.current().artifactFiles?.implementation?.revision).toBe(2);
   });
 

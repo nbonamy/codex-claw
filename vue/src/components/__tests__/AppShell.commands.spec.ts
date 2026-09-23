@@ -639,27 +639,34 @@ describe('AppShell dialogs and commands', () => {
     listener({ type: 'debug-operation-progress', kind: 'worktreeInitialization' });
     await nextTick();
 
-    const dialog = wrapper.findAllComponents({ name: 'AgentCreationProgressDialog' })
-      .find((candidate) => candidate.props('progress') !== null);
+    const dialog = wrapper.findAllComponents({ name: 'WorkspaceProvisioningProgressDialog' })
+      .find((candidate) => candidate.props('operation') !== null);
     if (!dialog) throw new Error('Expected active agent creation progress dialog.');
-    expect(dialog.props('progress')).toMatchObject({
-      state: 'running',
-      createWorktree: true,
-      phase: 'creatingWorktree',
-      branchName: 'debug/worktree-preview',
+    expect(dialog.props('operation')).toMatchObject({
+      mode: 'single',
+      progress: {
+        state: 'running',
+        createWorktree: true,
+        phase: 'creatingWorktree',
+        branchName: 'debug/worktree-preview',
+      },
     });
     expect(wrapper.text()).toContain('Building an isolated home in codex-claw');
 
     await vi.advanceTimersByTimeAsync(1_200);
-    expect(dialog.props('progress')).toMatchObject({
-      phase: 'initializingWorktree',
-      initializationDetail: 'Repository instructions · npm install',
+    expect(dialog.props('operation')).toMatchObject({
+      progress: {
+        phase: 'initializingWorktree',
+        initializationDetail: 'Repository instructions · npm install',
+      },
     });
 
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(dialog.props('progress')).toMatchObject({
-      state: 'success',
-      agentName: 'debug/worktree-preview',
+    expect(dialog.props('operation')).toMatchObject({
+      progress: {
+        state: 'success',
+        agentName: 'debug/worktree-preview',
+      },
     });
   });
 

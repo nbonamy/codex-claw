@@ -26,6 +26,17 @@
               <span>{{ activeStageStatus }}</span>
             </div>
             <button
+              v-else-if="viewedStage === 'implementation' && mission.stage === 'implementation' && implementationReady"
+              class="claw-button claw-button--primary"
+              type="button"
+              :aria-busy="busy"
+              :disabled="busy || !executeMission || debugFixture"
+              @click="continueToReview"
+            >
+              {{ t('missions.continueToReview') }}
+              <ArrowRightIcon aria-hidden="true" />
+            </button>
+            <button
               v-else-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal"
               class="claw-button claw-button--primary"
               type="button"
@@ -131,12 +142,7 @@
       </MissionConversationRail>
     </div>
   </section>
-  <MissionImplementationStartDialog
-    v-if="implementationStarting"
-    :phase="implementationStartProgress?.missionId === mission.id ? implementationStartProgress.phase : undefined"
-    :repositories="implementationStartRepositories"
-    :ticket-count="implementationStartTicketCount"
-  />
+  <WorkspaceProvisioningProgressDialog :operation="implementationOperation" />
 </template>
 
 <script setup lang="ts">
@@ -150,7 +156,7 @@ import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayI
 import MarkdownPanel from './MarkdownPanel.vue';
 import MissionConversationRail from './MissionConversationRail.vue';
 import MissionImplementationBoard from './MissionImplementationBoard.vue';
-import MissionImplementationStartDialog from './MissionImplementationStartDialog.vue';
+import WorkspaceProvisioningProgressDialog, { type WorkspaceProvisioningOperation } from './WorkspaceProvisioningProgressDialog.vue';
 import MissionRequirementReview, { type MissionRequirementComment } from './MissionRequirementReview.vue';
 import MissionStageRail from './MissionStageRail.vue';
 import MissionTicketBoard, { type MissionTicketComment } from './MissionTicketBoard.vue';
@@ -185,6 +191,16 @@ const feedbackReset = ref(0);
 const implementationStarting = ref(false);
 const implementationStartRepositories = ref<string[]>([]);
 const implementationStartTicketCount = ref(0);
+const implementationOperation = computed<WorkspaceProvisioningOperation | null>(() => implementationStarting.value ? {
+  mode: 'multiple',
+  id: props.mission.id,
+  state: 'running',
+  repositories: implementationStartRepositories.value,
+  ticketCount: implementationStartTicketCount.value,
+  phase: props.implementationStartProgress?.missionId === props.mission.id
+    ? props.implementationStartProgress.phase
+    : undefined,
+} : null);
 const viewedStage = ref<MissionStage>(props.mission.stage);
 const canonicalArtifact = ref('');
 let artifactRead = 0;
@@ -210,6 +226,7 @@ const stageHeadingTitle = computed(() => (
     : t(`missions.artifactTitle.${viewedStage.value}`)
 ));
 const workflow = computed(() => missionWorkflow(props.mission.workflow.type));
+const implementationReady = computed(() => workflow.value.stageReady('implementation', props.mission.artifacts) && !activeRun.value);
 const currentIndex = computed(() => workflow.value.stages.indexOf(props.mission.stage));
 const codeAgentId = computed(() => props.mission.execution?.runs.slice().reverse().find(run => run.workerId)?.workerId);
 const conversationAgentId = ref('');
@@ -318,6 +335,13 @@ async function continueMission(): Promise<void> {
   if (!props.executeMission) return;
   busy.value = true; error.value = '';
   try { await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'run' }); }
+  catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
+  finally { busy.value = false; }
+}
+async function continueToReview(): Promise<void> {
+  if (!props.executeMission) return;
+  busy.value = true; error.value = '';
+  try { await props.executeMission({ id: props.mission.id, revision: props.mission.revision, action: 'continueToReview' }); }
   catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
   finally { busy.value = false; }
 }

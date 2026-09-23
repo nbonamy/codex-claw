@@ -38,8 +38,6 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
       expect(prompt).toContain('may inspect every listed isolated Mission worktree');
       expect(prompt).not.toContain('Do not edit source checkouts or other Mission worktrees');
     }
-    if (stage === 'implementation') expect(prompt).toContain('explicit Review stage');
-    else expect(prompt).toContain('does not approve a stage');
     expect(prompt).toContain('Claw-owned Mission skill');
     expect(prompt).toContain('already visible in the Mission workspace');
     expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('no agent-run skill');

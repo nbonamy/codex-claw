@@ -45,6 +45,7 @@ export const messages = {
       artifactTitle: { requirements: 'Mission brief', tickets: 'Implementation backlog', implementation: 'Implementation evidence', review: 'Review findings', ship: 'Repository delivery' },
       stageActivity: { requirements: 'Shaping requirements', tickets: 'Shaping tickets', implementation: 'Building tickets', review: 'Reviewing the work', ship: 'Shipping changes' },
       approveAndContinue: 'Approve and continue', reviewInConversation: 'Review the artifact or ask for changes in chat.',
+      continueToReview: 'Continue to Review',
       implementationStartEyebrow: 'Starting implementation', implementationStartTitle: 'Preparing Mission worktrees', implementationStartComplete: 'Implementation is ready',
       implementationStartWorktrees: 'Creating isolated worktrees', implementationStartWorktreesDetail: '{count} repository | {count} repositories',
       implementationStartInitialize: 'Initializing repository workspaces', implementationStartAgents: 'Starting implementation agents', implementationStartAgentsDetail: '{count} ticket | {count} tickets',

@@ -287,7 +287,7 @@ export class MissionExecutionService {
           if (run.stage === 'review') current.artifacts.review.findings = reviewFindings;
           run.status = 'accepted';
         }
-        if (workflow.stageReady(current.stage, current.artifacts)) {
+        if (current.stage !== 'implementation' && workflow.stageReady(current.stage, current.artifacts)) {
           current.stage = workflow.stages[workflow.stages.indexOf(current.stage) + 1]!;
           if (current.stage === 'implementation') {
             await this.workspaces.provisionImplementationWorkspaces(current, reportImplementationStartProgress);
@@ -298,6 +298,18 @@ export class MissionExecutionService {
         nextRunIds = this.enqueueRuns(current, {});
       });
       for (const runId of nextRunIds) void this.startLaunch(input.id, runId);
+      return;
+    }
+    if (input.action === 'continueToReview') {
+      let runId: string | undefined;
+      await this.change(input, current => {
+        if (current.stage !== 'implementation') throw new Error('Only Implementation can continue to Review.');
+        if (!missionWorkflow(current.workflow.type).stageReady('implementation', current.artifacts)) throw new Error('Complete every implementation ticket before continuing to Review.');
+        if (pendingMissionRun(current)) throw new Error('Wait for the current implementation run to finish.');
+        current.stage = 'review';
+        runId = this.enqueueRun(current, {});
+      });
+      if (runId) void this.startLaunch(input.id, runId);
       return;
     }
     if (input.action === 'reopen') {
@@ -436,7 +448,6 @@ export class MissionExecutionService {
         this.acceptImplementationResult(mission, run);
         await this.persistImplementationArtifact(mission);
         status = 'accepted';
-        if (workflow.stageReady('implementation', mission.artifacts)) mission.stage = 'review';
         nextRunIds = this.enqueueRuns(mission, {});
       }
     });

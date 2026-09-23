@@ -5,7 +5,7 @@ import { createMission, type Mission } from '@codex-claw/core/missions';
 import type { MissionArtifactReadResult, MissionExecutionInput, MissionImplementationStartProgress, MissionRun } from '@codex-claw/core/mission-execution';
 import type { Agent, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
-import MissionImplementationStartDialog from '../MissionImplementationStartDialog.vue';
+import WorkspaceProvisioningProgressDialog from '../WorkspaceProvisioningProgressDialog.vue';
 import MissionTicketBoard, { type MissionTicketComment } from '../MissionTicketBoard.vue';
 
 function missionWithRun(status: MissionRun['status'], proposal = false): Mission {
@@ -61,6 +61,32 @@ function mountWorkspace(mission: Mission, options: {
 }
 
 describe('MissionWorkspace', () => {
+  it('waits for the user to move completed Implementation into Review', async () => {
+    const mission = missionWithRun('accepted', true);
+    mission.stage = 'implementation';
+    mission.artifacts.tickets = [{ title: 'Checkout', repositoryPath: '/src/billing-service', done: true }];
+    mission.artifacts.implementation = { changes: 'Checkout implemented.', tests: 'Tests pass.' };
+    mission.execution!.runs = [{
+      id: 'implementation-run', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina',
+      ticketIndex: 0, repositoryPath: '/src/billing-service', status: 'accepted', skills: [], feedback: '', startedAt: 'now',
+    }];
+    const executeMission = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountWorkspace(mission, { executeMission });
+
+    const continueButton = wrapper.get('.mission-workspace__stage-header .claw-button');
+    expect(continueButton.text()).toContain('Continue to Review');
+    expect(executeMission).not.toHaveBeenCalled();
+    await continueButton.trigger('click');
+    await flushPromises();
+    expect(executeMission).toHaveBeenCalledExactlyOnceWith({
+      id: mission.id, revision: mission.revision, action: 'continueToReview',
+    });
+
+    mission.artifacts.tickets[0]!.done = false;
+    await wrapper.setProps({ mission: structuredClone(mission) });
+    expect(wrapper.find('.mission-workspace__stage-header .claw-button').exists()).toBe(false);
+  });
+
   it('keeps Review approval available when selected findings remain unresolved', async () => {
     const mission = missionWithRun('awaitingReview', true);
     mission.stage = 'review';
@@ -160,17 +186,17 @@ describe('MissionWorkspace', () => {
     await continueButton.trigger('click');
 
     expect(continueButton.attributes('aria-busy')).toBe('true');
-    const progress = wrapper.getComponent(MissionImplementationStartDialog);
+    const progress = wrapper.getComponent(WorkspaceProvisioningProgressDialog);
     expect(progress.text()).toContain('Preparing Mission worktrees');
     expect(progress.text()).toContain('2 repositories');
     expect(progress.text()).toContain('billing-api, billing-web');
     expect(progress.text()).toContain('2 tickets');
-    expect(progress.props('phase')).toBe('initializingWorkspaces');
+    expect(progress.props('operation')).toMatchObject({ mode: 'multiple', phase: 'initializingWorkspaces' });
 
     finish();
     await flushPromises();
 
-    expect(wrapper.findComponent(MissionImplementationStartDialog).exists()).toBe(false);
+    expect(wrapper.getComponent(WorkspaceProvisioningProgressDialog).props('operation')).toBeNull();
   });
 
   it('sends selected requirement comments to the stage conversation as one revision request', async () => {

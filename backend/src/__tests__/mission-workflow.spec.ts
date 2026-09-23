@@ -84,6 +84,11 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
         } else artifacts.review = { summary: 'Acceptance checked against the mission baseline and both commits.', pullRequestUrl: '' };
         await submit(artifacts);
       }
+      if (stage === 'implementation') {
+        expect(current().stage).toBe('implementation');
+        expect(current().execution!.runs.filter(run => run.stage === 'review')).toHaveLength(0);
+        await command({ action: 'continueToReview' });
+      }
     }
     expect(current().stage).toBe('ship');
     expect(current().status).toBe('active');

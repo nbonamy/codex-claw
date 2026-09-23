@@ -206,8 +206,8 @@
     @close="cancelPullRequestCleanup"
     @confirm="confirmPullRequestCleanup"
   />
-  <AgentCreationProgressDialog
-    :progress="agentCreationProgress"
+  <WorkspaceProvisioningProgressDialog
+    :operation="agentCreationProgress ? { mode: 'single', progress: agentCreationProgress } : null"
     @close="clearAgentCreationProgress"
   />
   <ConfettiOverlay />
@@ -238,7 +238,7 @@ import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/c
 import AppShell from './components/AppShell.vue';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from './components/PullRequestCleanupDialog.vue';
-import AgentCreationProgressDialog from './components/AgentCreationProgressDialog.vue';
+import WorkspaceProvisioningProgressDialog from './components/WorkspaceProvisioningProgressDialog.vue';
 import SessionCompressionDialog from './components/SessionCompressionDialog.vue';
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';

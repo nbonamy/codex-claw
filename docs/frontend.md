@@ -143,6 +143,7 @@ component is single-use.
 | Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow`, `SettingsTextareaField` | `vue/src/components/Settings*.vue` |
 | Dense structured data | `AppDataList` | `vue/src/components/AppDataList.vue` |
 | Operation feedback | `GitOperationFeedback` | `vue/src/components/GitOperationFeedback.vue` |
+| Worktree provisioning progress, single or multiple | `WorkspaceProvisioningProgressDialog` | `vue/src/components/WorkspaceProvisioningProgressDialog.vue` |
 
 `IdentityPicker` is a reusable product component despite its current path: it
 depends on avatar-specific product leaves. Keep new product dependencies out of

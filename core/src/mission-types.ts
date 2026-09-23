@@ -104,6 +104,7 @@ export type MissionExecutionInput = { id: string; revision: number } & (
   | { action: 'attachRepository'; repoPath: string }
   | { action: 'run'; memberId?: string; ticketIndex?: number; feedback?: string }
   | { action: 'accept'; runId: string }
+  | { action: 'continueToReview' }
   | { action: 'cancel'; runId: string }
   | { action: 'selectReviewFinding'; findingId: string; selected: boolean }
   | { action: 'fixSelectedReviewFindings' }
