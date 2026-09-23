@@ -24,7 +24,7 @@ When a product screenshot is ready, replace the `.product-window` element inside
 />
 ```
 
-Keep the screenshot free of private repository names, issue content, messages, and account details. The core website story should remain repository → durable session → isolated worktree → reviewed change; Cockpit and Automations are supporting surfaces.
+Keep the screenshot free of private repository names, issue content, messages, and account details. The website positions Claw as a workspace for agentic software engineering workflows. Missions, direct repository sessions, Review, and Visualize support that story; the page should explain their value without becoming a release changelog.
 
 Run the static-site checks with:
 
