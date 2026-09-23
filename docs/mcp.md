@@ -708,11 +708,12 @@ main-process implementation.
 
 ### Visualize tools
 
-The Visualize module is registered only while the authenticated agent owns an
-open Visualize session for its current provider conversation. Stable developer
-instructions tell every backend how to use the family when it is present;
-live selection and content are discovered through the tools instead of being
-captured in session-start instructions.
+The Visualize tools are advertised from session start because provider clients
+may cache their tool catalogs. Calls are accepted only while the authenticated
+agent owns an open Visualize session for its current provider conversation.
+Stable developer instructions explain that tool availability alone does not
+activate Visualize mode; live selection and content are discovered through the
+tools instead of being captured in session-start instructions.
 
 `suggest-visualizations` replaces the pane's suggestions with one to four
 bounded title/description pairs. `add-visualization` publishes and selects a

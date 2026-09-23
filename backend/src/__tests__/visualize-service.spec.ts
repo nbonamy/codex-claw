@@ -37,7 +37,6 @@ describe('VisualizeService', () => {
     expect(entered.created).toBe(true);
     expect(entered.visualize.isOpen).toBe(true);
     expect(entered.visualize.conversationRef).toStrictEqual({ backend: 'codex', threadId: 'thread-visualize' });
-    expect(service.developerInstructions()).toMatch(/When those tools are available,[\s\S]*list-visualizations/u);
 
     const suggested = await service.suggest(agent.id, [
       { title: 'System map', description: 'Show services and data movement.' },
@@ -75,7 +74,7 @@ describe('VisualizeService', () => {
     expect(publish).toHaveBeenCalledTimes(6);
   });
 
-  it('lists and deletes visualizations, hides tools when closed, and restarts suggestions after the last deletion', async () => {
+  it('lists and deletes visualizations, rejects calls when closed, and restarts suggestions after the last deletion', async () => {
     const snapshot = createInitialSnapshot();
     const persist = vi.fn().mockResolvedValue(undefined);
     const service = new VisualizeService({
@@ -114,7 +113,7 @@ describe('VisualizeService', () => {
 
     await service.setOpen(agentId, false);
     expect(service.contextForAgent(agentId)).toBeUndefined();
-    expect(service.developerInstructions()).toMatch(/When the Visualize tools are unavailable/u);
+    expect(() => service.list(agentId)).toThrow('Visualize mode is not active for this conversation.');
 
     const reopened = await service.enter(agentId);
     expect(reopened).toMatchObject({ created: true, visualize: { isOpen: true, suggestions: [] } });

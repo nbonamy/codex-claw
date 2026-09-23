@@ -19,10 +19,10 @@ const visualizationContent = z.discriminatedUnion('kind', [
 export function createVisualizeToolModuleProvider(visualize: VisualizeService): ClawMcpToolModuleProvider {
   return {
     id: 'visualize',
-    resolve: ({ agentId }) => visualize.contextForAgent(agentId) ? {
+    resolve: ({ agentId }) => ({
       id: 'visualize',
       register: server => registerVisualizeTools(server, visualize, agentId),
-    } : undefined,
+    }),
   };
 }
 

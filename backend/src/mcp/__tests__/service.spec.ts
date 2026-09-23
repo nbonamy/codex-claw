@@ -5,10 +5,12 @@ import type { Agent, AppSnapshot, Automation, BackendPublishedEvent } from '@cod
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
 import { BackendDriverRpc } from '../../driver-rpc';
+import { VisualizeService } from '../../visualize-service';
 import { WorktreeManager } from '../../worktrees/worktree-manager';
 import { ClawMcpService } from '../service';
 import { HostedMcpGateway } from '../hosted-mcp-gateway';
 import { structuredToolResult } from '../tool-result';
+import { createVisualizeToolModuleProvider } from '../visualize-tools';
 
 describe('ClawMcpService', () => {
   let service: ClawMcpService | null = null;
@@ -415,6 +417,49 @@ describe('ClawMcpService', () => {
       .toContain('record-design-decision');
     expect(ordinaryAgent.result.tools.map((tool: { name: string }) => tool.name))
       .not.toContain('record-design-decision');
+  });
+
+  it('advertises Visualize tools before the pane opens while rejecting inactive calls', async () => {
+    const snapshot = createInitialSnapshot();
+    const visualize = new VisualizeService({
+      snapshot,
+      generatedImagesRoot: process.cwd(),
+      persist: async () => undefined,
+      publish: () => undefined,
+    });
+    service = new ClawMcpService({
+      snapshot,
+      toolModuleProviders: [createVisualizeToolModuleProvider(visualize)],
+    });
+    const url = await service.start();
+    const callerUrl = agentUrl(url, 'agent-dina');
+    const listTools = async () => postJson(callerUrl, {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    const publishSuggestion = async () => postJson(callerUrl, {
+      jsonrpc: '2.0', id: 2, method: 'tools/call',
+      params: { name: 'suggest-visualizations', arguments: {
+        suggestions: [{ title: 'Flow', description: 'Show the workflow.' }],
+      } },
+    });
+
+    const initial = await listTools();
+    expect(initial.result.tools.map((tool: { name: string }) => tool.name))
+      .toContain('suggest-visualizations');
+    expect((await publishSuggestion()).result.isError).toBe(true);
+    expect(snapshot.agents[0].visualize).toBeUndefined();
+
+    await visualize.enter('agent-dina');
+    const published = (await publishSuggestion()).result.structuredContent;
+    expect(published).toMatchObject({
+      success: true,
+      suggestions: [{ title: 'Flow', description: 'Show the workflow.' }],
+    });
+    expect(snapshot.agents[0].visualize?.suggestions).toStrictEqual(published.suggestions);
+
+    await visualize.setOpen('agent-dina', false);
+    expect((await publishSuggestion()).result.isError).toBe(true);
+    expect(snapshot.agents[0].visualize?.suggestions).toStrictEqual(published.suggestions);
   });
 
   it('exposes the same message delivery path to backend-owned debug fixtures', async () => {

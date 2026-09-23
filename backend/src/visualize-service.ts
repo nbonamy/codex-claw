@@ -65,12 +65,12 @@ export class VisualizeService {
 
   developerInstructions(): string {
     return [
-      'Codex Claw may expose contextual Visualize MCP tools for the current conversation.',
-      'When those tools are available, Visualize mode is active: publish diagrams and suggestions through them and keep chat secondary.',
+      'Codex Claw exposes Visualize MCP tools for the current conversation, but they work only while its Visualize pane is open.',
+      'Use them for Visualize requests to publish diagrams and suggestions, and keep chat secondary. Tool availability alone does not mean Visualize mode is active.',
       'Use list-visualizations to discover the current selection and get-visualization before replacing an existing visualization. Use add-visualization when the user asks for a new one.',
       SUPPORTED_MERMAID_GUIDANCE,
       'Use the current conversation and existing visualizations as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research unless the user explicitly asks for outside evidence.',
-      'When the Visualize tools are unavailable, handle the conversation normally and do not claim that Visualize mode is active.',
+      'If the Visualize pane is closed, handle the conversation normally and do not claim that Visualize mode is active.',
     ].join(' ');
   }
 

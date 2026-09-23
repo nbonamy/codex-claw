@@ -3,9 +3,8 @@ import type { VisualizeService } from '../../visualize-service';
 import { createVisualizeToolModuleProvider } from '../visualize-tools';
 
 describe('Visualize MCP tool module', () => {
-  it('registers only while the owning Visualize pane is open and delegates domain inputs', async () => {
+  it('registers for every agent and delegates domain inputs to the owning session', async () => {
     const service = {
-      contextForAgent: vi.fn((agentId: string) => agentId === 'agent-visualize' ? { id: 'visualize-1' } : undefined),
       suggest: vi.fn().mockResolvedValue({ success: true, suggestions: [] }),
       add: vi.fn().mockResolvedValue({ success: true, visualizationId: 'visualization-1', title: 'System' }),
       get: vi.fn().mockReturnValue({ success: true, visualization: { id: 'visualization-1' } }),
@@ -15,7 +14,7 @@ describe('Visualize MCP tool module', () => {
     } as unknown as VisualizeService;
     const provider = createVisualizeToolModuleProvider(service);
 
-    expect(provider.resolve({ agentId: 'agent-other', url: new URL('http://localhost/mcp') })).toBeUndefined();
+    expect(provider.resolve({ agentId: 'agent-other', url: new URL('http://localhost/mcp') })).toBeDefined();
     const module = provider.resolve({ agentId: 'agent-visualize', url: new URL('http://localhost/mcp') });
     const handlers = new Map<string, (input: never) => Promise<{ structuredContent?: unknown }>>();
     module?.register({
