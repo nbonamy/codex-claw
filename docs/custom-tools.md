@@ -219,8 +219,11 @@ state rather than presentation. The payload-free flags are:
   skip it for explicit immediate commit/push requests.
 
 Passing a new flag replaces the current proposal; omitting it preserves any
-existing proposal. Claw clears a flag after its accepted action succeeds or on
-manual dismissal. Failed actions keep the flag active for retry. Headless
+existing proposal. Claw clears `ready_for_review` when a new user prompt is
+submitted, because the earlier review proposal no longer describes the pending
+work; the agent can propose review again after validating the new result.
+Other flags remain until their accepted action succeeds or the user dismisses
+them. Failed actions keep the flag active for retry. Headless
 clients can ignore or act on the same durable state without a UI-specific
 contract. Its optional effects remain transient:
 

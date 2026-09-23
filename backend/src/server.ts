@@ -1511,8 +1511,10 @@ export class ClawBackendServer {
             prompt,
             options: params.options as SendPromptOptions | undefined,
           },
-          async () => {
-            const result = this.agentPrompts.send(agentId, prompt, params.options as SendPromptOptions | undefined);
+          async (agent) => {
+            const options = params.options as SendPromptOptions | undefined;
+            const result = this.agentPrompts.send(agentId, prompt, options);
+            if (prompt.trim() || options?.attachments?.length) this.clearReviewReadinessForNewPrompt(agent);
             await this.persistSnapshotOnly();
             return result;
           },
@@ -1529,6 +1531,7 @@ export class ClawBackendServer {
           }
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverPromptSteer, { agent, prompt, options }) as BackendSendResult;
           agent.backendSession = result.backendSession;
+          this.clearReviewReadinessForNewPrompt(agent);
           await this.persistSnapshotOnly();
           return this.snapshot;
         });
@@ -2522,6 +2525,21 @@ export class ClawBackendServer {
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);
     this.onBackendEventApplied?.(fullEvent);
+  }
+
+  private clearReviewReadinessForNewPrompt(agent: Agent): void {
+    if (agent.threadFlags?.ready_for_review !== true) return;
+    const threadFlags = { ...agent.threadFlags };
+    delete threadFlags.ready_for_review;
+    this.applyAndEmitBackendEvent({
+      agentId: agent.id,
+      type: 'agent.updated',
+      payload: {
+        id: agent.id,
+        threadFlags: Object.keys(threadFlags).length > 0 ? threadFlags : null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {

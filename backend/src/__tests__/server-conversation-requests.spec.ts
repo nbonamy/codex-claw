@@ -11,7 +11,7 @@ import {
 
 describe('ClawBackendServer', () => {
 
-  it('owns prompt dispatch and conversation title assignment', async () => {
+  it('clears stale review readiness when admitting a user prompt and assigns the conversation title', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 10, 15, 42));
     try {
@@ -24,6 +24,7 @@ describe('ClawBackendServer', () => {
         folder: '/Users/nbonamy/src/codex-claw',
         backend: 'codex',
         status: { type: 'idle' },
+        threadFlags: { ready_for_review: true, delegate_to_worktree: true },
         createdAt: '2026-06-13T00:00:00.000Z',
         updatedAt: '2026-06-13T00:00:00.000Z',
       }];
@@ -58,17 +59,18 @@ describe('ClawBackendServer', () => {
         jsonrpc: '2.0',
         id: 'send',
         method: 'agent/prompt/send',
-        params: { agentId: 'agent-dina', prompt: ' hello codex ' },
+        params: { agentId: 'agent-dina', prompt: ' revert everything ' },
       });
       expect(response).toMatchObject({
         result: {
-          agents: [{ id: 'agent-dina', status: { type: 'working' } }],
+          agents: [{ id: 'agent-dina', status: { type: 'working' }, threadFlags: { delegate_to_worktree: true } }],
         },
       });
+      expect((response as { result: AppSnapshot }).result.agents[0]?.threadFlags).toStrictEqual({ delegate_to_worktree: true });
       expect((response as { result: Record<string, unknown> }).result).not.toHaveProperty('messages');
       await flushMicrotasks();
 
-      expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'hello codex', undefined);
+      expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'revert everything', undefined);
       expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
       expect(snapshot.agents[0]?.conversationTitle).toBe('Dina');
       expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'working' });
@@ -78,12 +80,59 @@ describe('ClawBackendServer', () => {
       );
       expect(events).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'agent.statusChanged', payload: { type: 'working' } }),
+        expect.objectContaining({ type: 'agent.updated', payload: expect.objectContaining({ id: 'agent-dina', threadFlags: { delegate_to_worktree: true } }) }),
         expect.objectContaining({ type: 'backend.statusChanged', payload: expect.objectContaining({ backend: 'codex', status: 'starting' }) }),
       ]));
       await server.close();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('withdraws review readiness after a successful steer but keeps it when steering fails', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    snapshot.agents = [{
+      id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/workspace/dina', backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-dina' }, status: { type: 'working' },
+      threadFlags: { ready_for_review: true },
+      createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const steerPrompt = vi.fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'thread-dina' }, turnId: 'turn-steered' });
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: vi.fn(),
+      steerPrompt,
+      interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
+      respondToAgentRequest: async () => undefined,
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const events: Array<{ type: string; payload: unknown }> = [];
+    const server = new ClawBackendServer({
+      version: 'test-version', pid: 123, snapshot,
+      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      onEvent: event => events.push(event),
+    });
+    const request = (id: string) => ({
+      jsonrpc: '2.0' as const, id, method: 'agent/prompt/steer',
+      params: { agentId: 'agent-dina', prompt: 'revert everything' },
+    });
+
+    await expect(server.handleMessage(request('failed'))).rejects.toThrow('offline');
+    expect(snapshot.agents[0]?.threadFlags).toStrictEqual({ ready_for_review: true });
+    expect(events.some(event => event.type === 'agent.updated')).toBe(false);
+
+    const response = await server.handleMessage(request('accepted'));
+    expect((response as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'agent.updated', payload: expect.objectContaining({ id: 'agent-dina', threadFlags: null }),
+    }));
+    await server.close();
   });
 
   it('renames the active conversation when the Claw agent name changes', async () => {
@@ -241,6 +290,7 @@ describe('ClawBackendServer', () => {
     snapshot.agents = [{
       id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/workspace/dina', backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-dina' }, status: { type: 'working' },
+      threadFlags: { ready_for_review: true },
       createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
     }];
     let acceptPrompt!: (value: { backendSession: { kind: 'codex'; threadId: string }; turnId: string }) => void;
@@ -283,6 +333,7 @@ describe('ClawBackendServer', () => {
         inputMethod: 'dictated',
       },
     })]);
+    expect(snapshot.agents[0]?.threadFlags).toBeUndefined();
     expect(sendPrompt).not.toHaveBeenCalled();
     expect(onPromptStarting).not.toHaveBeenCalled();
 

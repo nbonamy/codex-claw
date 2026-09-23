@@ -417,12 +417,13 @@ Input:
 
 The operation always clears `agent.statusText` and emits one `agent.updated`
 event. Passing `flag` replaces the current proposal; omitting it leaves an
-existing proposal untouched. Claw renders a proposal as a compact
-composer-shelf action. Activating delegation submits an app-owned prompt
-through the existing worktree/co-agent workflow. Activating review readiness
-opens Claw's review setup after the backend accepts and clears the flag. A
-failed action leaves its flag available for retry. The user can dismiss either
-flag.
+existing proposal untouched. A new user prompt clears `ready_for_review`
+automatically, without clearing other proposed actions. Claw renders a
+proposal as a compact composer-shelf action. Activating delegation submits an
+app-owned prompt through the existing worktree/co-agent workflow. Activating
+review readiness opens Claw's review setup after the backend accepts and clears
+the flag. A failed action leaves its flag available for retry. The user can
+dismiss either flag.
 
 Developer instructions make `finish_turn` mandatory as the final tool action
 of a substantive turn and combine its optional completion effects into that
