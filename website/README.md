@@ -52,6 +52,14 @@ The render writes `videos/assets/mission-film.mp4` and `videos/assets/mission-fi
 node videos/render-mission-film.mjs review-film
 ```
 
+## Worktree delegation product film
+
+`videos/delegation-film.html` is a separate, illustrative 46-second film: a feature conversation leads to Claw's “Start implementation in a worktree?” proposal, visible worktree provisioning, follow-up work with the delegated agent, and a merge with worktree cleanup that closes the agent. Preview it at <http://127.0.0.1:4174/videos/delegation-film.html> and export its ignored MP4 and poster with:
+
+```bash
+node videos/render-mission-film.mjs delegation-film
+```
+
 ## Deploy
 
 The deploy helper streams the static site over SSH, provisions the Let’s Encrypt certificate if this is the first deploy, and installs the matching nginx site on `joshua`:
