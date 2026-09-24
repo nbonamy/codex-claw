@@ -108,7 +108,7 @@ describe('app menu', () => {
     ]);
     expect(editItems[1]?.accelerator).toBe('CommandOrControl+E');
     expect(editItems[2]?.accelerator).toBe('CommandOrControl+D');
-    expect(editItems[3]?.accelerator).toBe('CommandOrControl+R');
+    expect(editItems[3]?.accelerator).toBeUndefined();
   });
 
   it('sends app commands from menu items', () => {

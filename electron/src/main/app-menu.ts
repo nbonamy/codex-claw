@@ -408,7 +408,6 @@ function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): 
     },
     {
       label: mainT('menu.restartAgent'),
-      accelerator: 'CommandOrControl+R',
       click: () => callbacks.sendAppCommand({ type: 'restart-active-agent' }),
     },
   ].forEach((item) => editMenu.append(new MenuItem(item)));

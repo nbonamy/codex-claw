@@ -26,7 +26,7 @@ describe('appCommandFromInput', () => {
     })).toStrictEqual({ type: 'cycle-teams' });
   });
 
-  it('maps command g and b to workspace tabs while preserving agent shortcuts', () => {
+  it('maps command g and b to workspace tabs without restarting an agent on command r', () => {
     expect(appCommandFromInput({
       type: 'keyDown',
       meta: true,
@@ -49,7 +49,7 @@ describe('appCommandFromInput', () => {
       type: 'keyDown',
       meta: true,
       key: 'r',
-    })).toStrictEqual({ type: 'restart-active-agent' });
+    })).toBeNull();
   });
 
   it('maps file and edit menu command shortcuts', () => {

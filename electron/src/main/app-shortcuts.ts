@@ -74,10 +74,6 @@ export function appCommandFromInput(input: AppShortcutInput): AppCommand | null 
       if (key === 'b') {
         return { type: 'open-browser' };
       }
-
-      if (key === 'r') {
-        return { type: 'restart-active-agent' };
-      }
     }
   }
 
