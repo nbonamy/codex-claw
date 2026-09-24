@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.20.2",
+  "currentVersion": "0.20.3",
   "releases": [
+    {
+      "version": "0.20.3",
+      "releasedAt": "2026-09-23",
+      "sourceSha256": "22800e5b08e8da76d1094d3888cdbcc9b9afd9b01d2d5c9d84a43b7aaccfb4c9",
+      "markdown": "### Improvements and fixes\n\n- Removed the Command-R shortcut for Restart Agent to prevent accidental restarts;\n  the action remains available from the menu.\n- Increased the backend event buffer to reduce the chance of losing a large\n  conversation update during a burst. Recovery from a fully saturated buffer\n  remains a separate issue."
+    },
     {
       "version": "0.20.2",
       "releasedAt": "2026-09-23",

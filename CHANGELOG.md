@@ -4,6 +4,16 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.3] - 2026-09-23
+
+### Improvements and fixes
+
+- Removed the Command-R shortcut for Restart Agent to prevent accidental restarts;
+  the action remains available from the menu.
+- Increased the backend event buffer to reduce the chance of losing a large
+  conversation update during a burst. Recovery from a fully saturated buffer
+  remains a separate issue.
+
 ## [0.20.2] - 2026-09-23
 
 ### Improvements and fixes
