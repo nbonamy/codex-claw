@@ -18,7 +18,8 @@
     "postcss-html": "^1.8.1",
     "prettier": "^3.8.3",
     "stylelint-config-recommended": "^18.0.0",
-    "stylelint-config-recommended-vue": "^1.6.1"
+    "stylelint-config-recommended-vue": "^1.6.1",
+    "typescript": "^6.0.3"
   },
   "workspaces": [
     "core",
@@ -48,7 +49,8 @@
     "dev:web": "npm run build:sdk && npm run build -w @codex-claw/backend && npm run dev -w @codex-claw/web",
     "format:vue-styles": "node scripts/format-vue-styles.mjs",
     "format:vue-styles:check": "node scripts/format-vue-styles.mjs --check",
-    "lint": "npm run lint --workspaces && npm run lint:dead-code",
+    "lint": "npm run lint:architecture && npm run lint --workspaces && npm run lint:dead-code",
+    "lint:architecture": "node scripts/check-architecture.mjs",
     "lint:css": "npm run lint:css -w @codex-claw/vue",
     "lint:dead-code": "knip",
     "lint:electron": "npm run lint -w @codex-claw/electron",

@@ -1,0 +1,88 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { test } from "node:test";
+
+const script = fileURLToPath(
+  new URL("./check-architecture.mjs", import.meta.url),
+);
+const directories = [
+  "core/src",
+  "backend/src",
+  "electron/src/main",
+  "electron/src/preload",
+];
+
+async function checkFixture(files) {
+  const root = await mkdtemp(path.join(tmpdir(), "claw-architecture-"));
+  try {
+    await Promise.all(
+      directories.map((directory) =>
+        mkdir(path.join(root, directory), { recursive: true }),
+      ),
+    );
+    for (const [file, source] of Object.entries(files)) {
+      const target = path.join(root, file);
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, source);
+    }
+    return spawnSync(process.execPath, [script], {
+      cwd: root,
+      encoding: "utf8",
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test("architecture lint accepts legitimate host imports and ignores source-like strings", async () => {
+  const result = await checkFixture({
+    "core/src/runtime-discovery.ts":
+      "import { readFileSync } from 'node:fs';\n",
+    "core/src/example.ts": "const example = \"from 'electron'\";\n",
+    "electron/src/main/native.ts":
+      "import { readFile } from 'node:fs/promises';\n",
+  });
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("architecture lint rejects imports across owned process boundaries", async () => {
+  const result = await checkFixture({
+    "core/src/ui.ts": "import type { Ref } from 'vue';\n",
+    "core/src/read.ts": "import fs from 'node:fs';\n",
+    "core/src/nested/runtime-discovery.ts": "import fs from 'node:fs';\n",
+    "backend/src/host.ts": "await import('electron');\n",
+    "backend/src/types.ts": "type App = import('electron').App;\n",
+    "electron/src/main/driver.ts":
+      "import { driver } from '@codex-claw/backend';\n",
+    "electron/src/main/relative.ts":
+      "import { driver } from '../../../backend/src/server';\n",
+    "electron/src/preload/files.ts": "const fs = require('node:fs');\n",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  for (const [file, reason] of [
+    ["core/src/ui.ts", "core cannot depend on desktop or UI packages"],
+    ["core/src/read.ts", "core cannot use Node filesystem APIs"],
+    [
+      "core/src/nested/runtime-discovery.ts",
+      "core cannot use Node filesystem APIs",
+    ],
+    ["backend/src/host.ts", "backend cannot depend on Electron"],
+    ["backend/src/types.ts", "backend cannot depend on Electron"],
+    [
+      "electron/src/main/driver.ts",
+      "Electron main must use the clawd protocol",
+    ],
+    [
+      "electron/src/main/relative.ts",
+      "Electron main must use the clawd protocol",
+    ],
+    ["electron/src/preload/files.ts", "preload cannot use raw filesystem"],
+  ]) {
+    assert.ok(result.stderr.includes(file), `${file}: ${result.stderr}`);
+    assert.ok(result.stderr.includes(reason), `${file}: ${result.stderr}`);
+  }
+});
