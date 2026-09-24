@@ -214,14 +214,16 @@ state rather than presentation. The payload-free flags are:
 
 - `delegate_to_worktree`, which submits a fixed delegation prompt through the
   normal app-owned prompt path when the user accepts it;
-- `ready_for_review`, a pre-commit affordance set only when the intended
-  uncommitted diff is complete, validated, and ready for user review. Agents
-  skip it for explicit immediate commit/push requests.
+- `ready_for_review`, a pre-commit affordance. At every substantive turn
+  handoff, agents select it when the intended uncommitted diff is complete,
+  validated, and ready for user review. They do not wait for a review request
+  and skip it when review was deferred or immediate commit/push was requested.
 
 Passing a new flag replaces the current proposal; omitting it preserves any
 existing proposal. Claw clears `ready_for_review` when a new user prompt is
 submitted, because the earlier review proposal no longer describes the pending
-work; the agent can propose review again after validating the new result.
+work; the agent reassesses and proposes review again when the diff remains
+ready, including turns that made no code changes.
 Other flags remain until their accepted action succeeds or the user dismisses
 them. Failed actions keep the flag active for retry. Headless
 clients can ignore or act on the same durable state without a UI-specific

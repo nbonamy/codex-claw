@@ -428,9 +428,10 @@ dismiss either flag.
 Developer instructions make `finish_turn` mandatory as the final tool action
 of a substantive turn and combine its optional completion effects into that
 single round trip. They forbid selecting `delegate_to_worktree` and then
-continuing the implementation, reserve `ready_for_review` for a complete and
-validated uncommitted diff, and omit a review proposal for an explicit
-immediate commit/push request.
+continuing the implementation. At every substantive handoff they assess
+whether a complete, validated uncommitted diff should be offered for review,
+including after a new prompt clears earlier readiness. They omit that proposal
+when the user defers review or requests immediate commit/push.
 
 Flags are persisted app state and are cleared with the agent's conversation
 runtime when that conversation is restarted or replaced. Clients may present,
