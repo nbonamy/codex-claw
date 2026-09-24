@@ -4,6 +4,20 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.4] - 2026-09-24
+
+### New features
+
+- Right-click workspace tabs to copy a file path, close that tab, or close the
+  other tabs.
+
+### Improvements and fixes
+
+- Workspace tabs shrink to icons before scrolling is needed, with navigation
+  controls for overflow and a full-title tooltip on hover.
+- Browser menus and tab menus now appear above the native browser view instead
+  of being hidden behind it.
+
 ## [0.20.3] - 2026-09-23
 
 ### Improvements and fixes

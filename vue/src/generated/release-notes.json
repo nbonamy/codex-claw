@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.20.3",
+  "currentVersion": "0.20.4",
   "releases": [
+    {
+      "version": "0.20.4",
+      "releasedAt": "2026-09-24",
+      "sourceSha256": "ad37164b6623d567cd8976519a3e811906192756b43cf99aac795c3690e05bce",
+      "markdown": "### New features\n\n- Right-click workspace tabs to copy a file path, close that tab, or close the\n  other tabs.\n\n### Improvements and fixes\n\n- Workspace tabs shrink to icons before scrolling is needed, with navigation\n  controls for overflow and a full-title tooltip on hover.\n- Browser menus and tab menus now appear above the native browser view instead\n  of being hidden behind it."
+    },
     {
       "version": "0.20.3",
       "releasedAt": "2026-09-23",
