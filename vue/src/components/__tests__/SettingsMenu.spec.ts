@@ -1,16 +1,20 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import SettingsMenu from '../SettingsMenu.vue';
 import type { AccountRateLimits, CodexAccount } from '@codex-claw/core/contracts';
 import { setElectronTestClient } from '../../test/client';
 
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   document.body.innerHTML = '';
 });
 
 describe('SettingsMenu', () => {
   it('renders primary and weekly rate-limit rows', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_781_140_878_000 - 29 * 60 * 60 * 1000);
     const wrapper = mountMenu({
       limitId: 'codex',
       limitName: null,
@@ -42,11 +46,16 @@ describe('SettingsMenu', () => {
     }).format(new Date(1_780_756_682 * 1000)));
     expect(rows[1]?.text()).toContain('Weekly');
     expect(rows[1]?.text()).toContain('50%');
-    expect(rows[1]?.text()).toContain(new Intl.DateTimeFormat(undefined, {
-      day: 'numeric',
-      month: 'short',
-    }).format(new Date(1_781_140_878 * 1000)));
+    expect(rows[1]?.get('.settings-menu__rate-limit-reset').text()).toBe('1d 5h');
     expect(wrapper.get('[aria-label="Usage actions divider"]').attributes('role')).toBe('separator');
+
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    await nextTick();
+    expect(rows[1]?.get('.settings-menu__rate-limit-reset').text()).toBe('1d 4h');
+
+    vi.advanceTimersByTime((26 * 60 + 22) * 60 * 1000);
+    await nextTick();
+    expect(rows[1]?.get('.settings-menu__rate-limit-reset').text()).toBe('1h 38m');
   });
 
   it('always exposes logout in the lower-left menu and emits menu actions', async () => {

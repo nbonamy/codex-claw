@@ -2,7 +2,6 @@
   <div
     ref="root"
     class="git-diff-control"
-    :class="{ 'git-diff-control--menu-only': !hasSelectedChanges }"
   >
     <button
       v-if="hasSelectedChanges"
@@ -25,6 +24,7 @@
         :value="selectedSummary.removedLines"
       />
     </button>
+    <span v-else class="git-diff-control__empty">{{ $t('surface.agentHeader.noChanges') }}</span>
     <button
       class="git-diff-control__menu-trigger"
       type="button"
@@ -235,12 +235,18 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
   color: var(--color-text);
 }
 
-.git-diff-control__open {
+.git-diff-control__open,
+.git-diff-control__empty {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
   padding: 0 var(--space-6);
   border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+.git-diff-control__empty {
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .git-diff-control__menu-trigger {
@@ -250,12 +256,6 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
   padding: 0;
   border-left: 1px solid var(--color-border) !important;
   border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-}
-
-.git-diff-control--menu-only .git-diff-control__menu-trigger {
-  width: 32px;
-  border-left: 0 !important;
-  border-radius: var(--radius-lg);
 }
 
 .git-diff-control__menu-trigger svg {

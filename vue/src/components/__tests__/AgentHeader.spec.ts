@@ -279,6 +279,7 @@ describe('AgentHeader', () => {
     expect(wrapper.find('.git-workflow-control').exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(false);
     expect(wrapper.find('.git-diff-control__open').exists()).toBe(false);
+    expect(wrapper.get('.git-diff-control__empty').text()).toBe('No changes');
     expect(wrapper.find('.git-diff-control__menu-trigger').exists()).toBe(true);
   });
 

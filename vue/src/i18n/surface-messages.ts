@@ -92,6 +92,7 @@ export const surfaceMessages = {
     "noAgent": "No agent",
     "openRepositoryDiff": "Open repository diff",
     "chooseRepositoryDiff": "Choose repository diff",
+    "noChanges": "No changes",
     "branchChanges": "Branch",
     "changesVsBranch": "Changes vs {branch}",
     "uncommittedChanges": "Uncommitted",

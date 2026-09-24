@@ -62,7 +62,7 @@
 
 <script setup lang="ts">
 import { translate } from '../i18n';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { AccountRateLimitWindow, AccountRateLimits, CodexAccount } from '@codex-claw/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -84,6 +84,13 @@ const emit = defineEmits<{
   quit: [];
 }>();
 const popoverVisible = ref(false);
+const nowMs = ref(Date.now());
+watch(popoverVisible, (visible, _previous, onCleanup) => {
+  if (!visible) return;
+  nowMs.value = Date.now();
+  const timer = window.setInterval(() => { nowMs.value = Date.now(); }, 60_000);
+  onCleanup(() => window.clearInterval(timer));
+});
 const menuItems = computed<AppMenuItem[]>(() => [
   {
     id: 'open-settings',
@@ -171,16 +178,19 @@ function rateLimitRemaining(window: AccountRateLimitWindow): string {
 }
 
 function rateLimitReset(window: AccountRateLimitWindow): string {
-  if (typeof window.resetsAt !== 'number') {
+  if (typeof window.resetsAt !== 'number' || !Number.isFinite(window.resetsAt)) {
     return '';
   }
 
   const date = new Date(window.resetsAt * 1000);
   if (window.windowDurationMins === 10_080 || (window.windowDurationMins ?? 0) >= 24 * 60) {
-    return new Intl.DateTimeFormat(undefined, {
-      day: 'numeric',
-      month: 'short',
-    }).format(date);
+    const remainingMinutes = Math.max(0, Math.ceil((date.getTime() - nowMs.value) / 60_000));
+    const days = Math.floor(remainingMinutes / 1_440);
+    const hours = Math.floor((remainingMinutes % 1_440) / 60);
+    const minutes = remainingMinutes % 60;
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
   }
 
   return new Intl.DateTimeFormat(undefined, {
