@@ -137,7 +137,7 @@
         <IconChecklist aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.review') }}</span>
       </button>
-      <button v-if="agent.visualize" type="button" @click="emit('openTab', 'visualize')">
+      <button type="button" @click="emit('openTab', 'visualize')">
         <IconSitemap aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.visualize') }}</span>
       </button>
@@ -500,7 +500,7 @@ const activeProjectFilePath = computed(() => {
 });
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'codeReview', type: 'action', label: translate('surface.rightWorkspacePanel.review'), icon: IconChecklist },
-  ...(props.agent.visualize ? [{ id: 'visualize', type: 'action', label: translate('surface.rightWorkspacePanel.visualize'), icon: IconSitemap } satisfies AppMenuItem] : []),
+  { id: 'visualize', type: 'action', label: translate('surface.rightWorkspacePanel.visualize'), icon: IconSitemap },
   { id: 'review', type: 'action', label: translate('surface.rightWorkspacePanel.changes'), icon: FileDiffIcon },
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: translate('surface.rightWorkspacePanel.browser'), icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: translate('surface.rightWorkspacePanel.files'), icon: FoldersIcon },
@@ -733,7 +733,7 @@ function sourceFilePanel(tab: RightWorkspaceFileTab): SidePanelSourceState | nul
 
 function openTabFromMenu(tab: string): void {
   addMenuOpen.value = false;
-  if ((tab === 'backlog' && props.githubRepository) || tab === 'codeReview' || (tab === 'visualize' && props.agent.visualize) || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
+  if ((tab === 'backlog' && props.githubRepository) || tab === 'codeReview' || tab === 'visualize' || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
     emit('openTab', tab);
   }
 }

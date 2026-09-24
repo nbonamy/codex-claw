@@ -288,7 +288,7 @@
         :finish-code-review="props.finishCodeReview"
         :discard-code-review="props.discardCodeReview"
         :review-code-again="props.reviewCodeAgain"
-        :set-visualize-open="props.setVisualizeOpen"
+        :start-visualize="startVisualizeForAgent"
         :generate-visualization-suggestion="props.generateVisualizationSuggestion"
         :select-visualization="props.selectVisualization"
         :delete-visualization="props.deleteVisualization"
@@ -1478,6 +1478,17 @@ function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {
   openRightWorkspaceTabLocal(tab, agentId);
 }
 
+async function startVisualizeForAgent(agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput): Promise<void> {
+  const alreadyOpen = rightWorkspaceFor(agentId).tabs.includes('visualize');
+  openRightWorkspaceTab('visualize', agentId);
+  try {
+    await props.startVisualize(agentId, input);
+  } catch (error) {
+    if (!alreadyOpen) closeRightWorkspaceTabLocal(agentId, 'visualize');
+    throw error;
+  }
+}
+
 function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   closeRightWorkspaceTabLocal(agentId, tab);
   const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
@@ -2567,8 +2578,7 @@ function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): voi
   const visualizeCommand = prompt.match(/^\/visualize(?:\s+([\s\S]*))?$/u);
   if (visualizeCommand && !options?.attachments?.length && currentAgent.value) {
     const direction = visualizeCommand[1]?.trim();
-    openRightWorkspaceTab('visualize');
-    return props.startVisualize(currentAgent.value.id, direction ? { prompt: direction } : undefined).then(() => undefined);
+    return startVisualizeForAgent(currentAgent.value.id, direction ? { prompt: direction } : undefined);
   }
   if (prompt.trim() === '/review' && !options?.attachments?.length) {
     openRightWorkspaceTab('codeReview');

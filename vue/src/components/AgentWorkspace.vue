@@ -278,7 +278,7 @@ const props = defineProps<{
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   generateVisualizationSuggestion: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
-  setVisualizeOpen: (agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
+  startVisualize: (agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => Promise<void>;
   selectVisualization: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
   deleteVisualization: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
   readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
@@ -637,6 +637,12 @@ function loadSubagentMessages(agentId: string, conversationId: string): Promise<
 }
 
 function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab): void {
+  if (tab === 'visualize') {
+    void props.startVisualize(agentId).catch(error => {
+      ElMessage.error(localizedErrorMessage(error, translate));
+    });
+    return;
+  }
   if (tab === 'backlog') {
     void openRepositoryBacklog(agentId);
     return;
@@ -649,13 +655,6 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
     rightWorkspaceFor(agentId).filesPaneOpen = true;
   }
   openRightWorkspaceTab(tab, agentId);
-  const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
-  if (tab === 'visualize' && visualize && !visualize.isOpen) {
-    void props.setVisualizeOpen(agentId, { open: true }).catch(error => {
-      props.closeRightWorkspaceTab(agentId, 'visualize');
-      ElMessage.error(localizedErrorMessage(error, translate));
-    });
-  }
 }
 
 async function openRepositoryBacklog(agentId: string): Promise<void> {

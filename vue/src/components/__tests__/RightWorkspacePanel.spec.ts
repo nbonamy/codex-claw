@@ -71,18 +71,24 @@ describe('RightWorkspacePanel', () => {
     const wrapper = mountPanel([], null);
 
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Review');
+    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Visualize');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Changes');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Browser');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Files');
     expect(wrapper.findAll('.right-workspace-panel__launcher kbd').map((shortcut) => shortcut.text())).toStrictEqual(['⌘G', '⌘B']);
     expect(wrapper.text()).not.toContain('Terminal');
 
-    await wrapper.findAll('.right-workspace-panel__launcher button')[0]?.trigger('click');
-    await wrapper.findAll('.right-workspace-panel__launcher button')[1]?.trigger('click');
-    await wrapper.findAll('.right-workspace-panel__launcher button')[2]?.trigger('click');
-    await wrapper.findAll('.right-workspace-panel__launcher button')[3]?.trigger('click');
+    for (const button of wrapper.findAll('.right-workspace-panel__launcher button')) {
+      await button.trigger('click');
+    }
 
-    expect(wrapper.emitted('openTab')).toStrictEqual([['codeReview'], ['review'], ['browser'], ['files']]);
+    expect(wrapper.emitted('openTab')).toStrictEqual([['codeReview'], ['visualize'], ['review'], ['browser'], ['files']]);
+
+    await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
+    const visualizeMenuItem = wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Visualize');
+    expect(visualizeMenuItem).toBeDefined();
+    await visualizeMenuItem!.trigger('click');
+    expect(wrapper.emitted('openTab')?.at(-1)).toStrictEqual(['visualize']);
   });
 
   it('switches and closes Browser and Review tabs', async () => {
@@ -215,7 +221,7 @@ describe('RightWorkspacePanel', () => {
     const wrapper = mountPanel();
 
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
-    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['Review', 'Changes', 'Browser', 'Files']);
+    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['Review', 'Visualize', 'Changes', 'Browser', 'Files']);
     await wrapper.findAll('.app-menu__item')[0]?.trigger('click');
 
     expect(wrapper.emitted('openTab')).toStrictEqual([['codeReview']]);
@@ -256,7 +262,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Review');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).not.toContain('Browser');
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
-    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['Review', 'Changes', 'Files']);
+    expect(wrapper.findAll('.app-menu__item').map((item) => item.text())).toStrictEqual(['Review', 'Visualize', 'Changes', 'Files']);
   });
 
   it('renders file previews as independently closable workspace tabs', async () => {

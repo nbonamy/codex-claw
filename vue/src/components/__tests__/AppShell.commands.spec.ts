@@ -43,6 +43,40 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it('starts Visualize from an empty workspace before any Visualize session exists', async () => {
+    const snapshot = createInitialSnapshot();
+    const startVisualize = vi.fn().mockResolvedValue(snapshot);
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, startVisualize, sendPromptAction, stubAgentWorkspace: false });
+
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    const visualizeButton = wrapper.findAll('.right-workspace-panel__launcher button')
+      .find(button => button.text() === 'Visualize');
+    expect(visualizeButton).toBeDefined();
+    await visualizeButton!.trigger('click');
+    await flushPromises();
+
+    expect(startVisualize).toHaveBeenCalledExactlyOnceWith('agent-dina', undefined);
+    expect(sendPromptAction).not.toHaveBeenCalled();
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toContain('Visualize');
+    wrapper.unmount();
+  });
+
+  it('removes a newly opened Visualize tab when activation fails', async () => {
+    const startVisualize = vi.fn().mockRejectedValue(new Error('Cannot start Visualize'));
+    const wrapper = mountShell({ startVisualize, stubAgentWorkspace: false });
+
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    const visualizeButton = wrapper.findAll('.right-workspace-panel__launcher button')
+      .find(button => button.text() === 'Visualize');
+    await visualizeButton!.trigger('click');
+    await flushPromises();
+
+    expect(startVisualize).toHaveBeenCalledExactlyOnceWith('agent-dina', undefined);
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).not.toContain('Visualize');
+    wrapper.unmount();
+  });
+
   it('routes /visualize into the dedicated workspace without sending prose to chat', async () => {
     const snapshot = createInitialSnapshot();
     const next = structuredClone(snapshot);
