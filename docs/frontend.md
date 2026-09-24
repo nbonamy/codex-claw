@@ -223,6 +223,8 @@ follow [Custom MCP Tools](custom-tools.md).
   owning wrapper.
 - Bridge themes into the SDK through documented `--codex-*` variables and
   `data-codex-theme`; do not restyle SDK internals.
+- Keep app chrome such as buttons, menus, and headers nonselectable while
+  conversation and document content remains selectable.
 - Use the native system sans stack and restrained weights.
 - Make reachable loading, working, awaiting-input, empty, offline, error, and
   interrupted states explicit near the action or content they affect.

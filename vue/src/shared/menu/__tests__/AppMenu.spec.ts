@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PencilIcon, SwitchHorizontalIcon } from '../../icons/app-icons';
 import AppMenu from '../AppMenu.vue';
 import type { AppMenuItem } from '../app-menu';
+import '../../../styles/base.css';
 
 describe('AppMenu', () => {
   it('renders actions, separators, selected radio state, and submenu chevrons consistently', () => {
@@ -39,6 +40,7 @@ describe('AppMenu', () => {
     expect(wrapper.find('.app-menu__chevron').exists()).toBe(true);
     expect(wrapper.get('[role="menuitemradio"]').attributes('aria-checked')).toBe('true');
     expect(wrapper.text()).toContain('Team A • Current team');
+    expect(getComputedStyle(wrapper.get('[role="menuitem"]').element).userSelect).toBe('none');
   });
 
   it('emits selected item ids for root and nested items', async () => {

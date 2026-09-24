@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
 import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
+import '../../styles/base.css';
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -280,6 +281,7 @@ describe('AgentHeader', () => {
     expect(wrapper.findComponent({ name: 'ChatAnimatedDiffStat' }).exists()).toBe(false);
     expect(wrapper.find('.git-diff-control__open').exists()).toBe(false);
     expect(wrapper.get('.git-diff-control__empty').text()).toBe('No changes');
+    expect(getComputedStyle(wrapper.get('.agent-header').element).userSelect).toBe('none');
     expect(wrapper.find('.git-diff-control__menu-trigger').exists()).toBe(true);
   });
 

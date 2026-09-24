@@ -33,6 +33,15 @@ button {
   outline: none;
 }
 
+button,
+[role='button'],
+.app-menu,
+.agent-header,
+.claw-dialog__header,
+.claw-form-dialog__header {
+  user-select: none;
+}
+
 .claw-dialog.el-dialog {
   overflow: visible;
   border-radius: var(--radius-xl);
