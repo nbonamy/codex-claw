@@ -985,17 +985,6 @@ export const messages = {
               failed: 'Failed sending message to {target}',
               running: 'Sending message to {target}',
             },
-            setStatus: {
-              cleared: 'Cleared status',
-              completed: 'Updated status',
-              failed: 'Failed updating status',
-              running: 'Updating status',
-            },
-            finishTurn: {
-              completed: 'Finished turn',
-              failed: 'Failed finishing turn',
-              running: 'Finishing turn',
-            },
             toggleThreadFlag: {
               completed: 'Updated thread flag',
               failed: 'Failed updating thread flag',

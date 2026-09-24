@@ -64,8 +64,6 @@ const TOOL_KEYS: Record<string, string> = {
   'update-work-item': 'updateWorkItem',
   'register-agent': 'registerAgent',
   'send-message': 'sendMessage',
-  'set-status': 'setStatus',
-  'finish-turn': 'finishTurn',
   // Retained so older conversations keep a useful title after the tool rename.
   'toggle-thread-flag': 'toggleThreadFlag',
   'update-finding': 'updateFinding',
@@ -76,30 +74,27 @@ export function presentClawToolTitle({
   toolCall,
   translate,
 }: CodexToolTitlePresenterContext, resolveAgentName?: AgentNameResolver): string | undefined {
-  const identity = clawToolIdentity(toolCall.function, descriptor?.params?.tool, toolCall.kind, toolCall.metadata);
-  if (!identity) return undefined;
+  const tool = clawToolName(toolCall.function, toolCall.kind, toolCall.metadata, descriptor?.params?.tool);
+  if (!tool) return undefined;
 
-  const key = TOOL_KEYS[identity.tool];
+  const key = TOOL_KEYS[tool];
   if (!key) return undefined;
 
   const args = isRecord(toolCall.args) ? toolCall.args : {};
   const phase = toolPhase(descriptor?.phase, toolCall.state);
-  if (identity.tool === 'set-status' && phase === 'completed' && args.status === '') {
-    return translate('chat.tool.mcp.codexClaw.setStatus.cleared');
-  }
   return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
-    target: toolTarget(identity.tool, args, toolCall.result, phase, resolveAgentName),
+    target: toolTarget(tool, args, toolCall.result, phase, resolveAgentName),
   });
 }
 
-function clawToolIdentity(
+export function clawToolName(
   functionName: string,
-  descriptorTool: unknown,
   kind?: string,
   metadata?: Readonly<Record<string, unknown>>,
-): { tool: string } | undefined {
+  descriptorTool?: unknown,
+): string | undefined {
   const metadataTool = clawMcpToolName(kind, metadata);
-  if (metadataTool) return { tool: metadataTool };
+  if (metadataTool) return metadataTool;
 
   const rawName = typeof descriptorTool === 'string' ? descriptorTool : functionName;
   const toolName = rawName.startsWith('mcp__codex_claw__')
@@ -107,7 +102,7 @@ function clawToolIdentity(
     : /^(?:codex_claw)[._](.+)$/.exec(rawName)?.[1];
   if (!toolName) return undefined;
 
-  return { tool: toolName.replaceAll('_', '-') };
+  return toolName.replaceAll('_', '-');
 }
 
 export function clawMcpToolName(

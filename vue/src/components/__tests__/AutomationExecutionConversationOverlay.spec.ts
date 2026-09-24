@@ -45,7 +45,7 @@ describe('AutomationExecutionConversationOverlay', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
 
-  it('uses Claw presentation for internal MCP tools in execution transcripts', () => {
+  it('shows useful tool activity but hides housekeeping calls in execution transcripts', () => {
     const wrapper = mount(AutomationExecutionConversationOverlay, {
       props: {
         agentName: 'Dina',
@@ -62,6 +62,20 @@ describe('AutomationExecutionConversationOverlay', () => {
             title: 'codex_claw.browser-screenshot',
             status: 'completed',
             metadata: { server: 'codex_claw', tool: 'browser-screenshot' },
+          }, {
+            type: 'tool',
+            id: 'set-status',
+            kind: 'mcp',
+            title: 'codex_claw.set-status',
+            status: 'completed',
+            metadata: { server: 'codex_claw', tool: 'set-status' },
+          }, {
+            type: 'tool',
+            id: 'finish-turn',
+            kind: 'mcp',
+            title: 'codex_claw.finish_turn',
+            status: 'completed',
+            metadata: { server: 'codex_claw', tool: 'finish_turn' },
           }],
         }],
         ticket: 'github:nbonamy/codex-claw#12',
@@ -71,5 +85,7 @@ describe('AutomationExecutionConversationOverlay', () => {
 
     expect(wrapper.text()).toContain('Captured page screenshot');
     expect(wrapper.find('.tabler-icon-browser').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('Updated status');
+    expect(wrapper.text()).not.toContain('Finished turn');
   });
 });

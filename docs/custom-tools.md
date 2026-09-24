@@ -32,8 +32,8 @@ semantics remain provider-neutral.
 6. Cover every boundary the tool crosses.
 
 The implementation is complete when the tool is model-discoverable, its result
-is bounded and useful, its UI effect is observable, and its live and restored
-tool rows render the same meaning.
+is bounded and useful, and its UI effect is observable. If the tool has a
+conversation row, live and restored rows must render the same meaning.
 
 ## Registering a tool
 
@@ -119,15 +119,17 @@ rendered.
 
 ### Tool-call lifecycle
 
-Every MCP call also has a presentation lifecycle:
+MCP calls have a presentation lifecycle:
 
 - `running`: the call is in progress;
 - `completed`: the call returned successfully;
 - `failed`: the call returned an error.
 
-This lifecycle belongs to the conversation tool row. It does not update
-`agent.statusText`. Without a Claw presenter, the SDK uses a generic title such
-as `Ran codex_claw.example-tool`.
+This lifecycle belongs to the conversation tool row when one is shown. It does
+not update `agent.statusText`. Claw hides `set-status` and `finish_turn` from
+the conversation because their effects have dedicated UI; the calls still run
+and remain in the provider transcript. Without a Claw presenter, the SDK uses
+a generic title such as `Ran codex_claw.example-tool`.
 
 ## Structured results and bounded presentation data
 
@@ -169,8 +171,9 @@ Claw extends the SDK presentation surface in:
 - `vue/src/i18n/surface-messages.ts`: localized running, completed, and failed
   strings.
 
-Add the tool to `TOOL_KEYS`, assign its semantic icon group, and provide all
-three lifecycle strings. Titles should describe the action and a short target:
+For a visible tool row, add the tool to `TOOL_KEYS`, assign its semantic icon
+group, and provide all three lifecycle strings. Titles should describe the
+action and a short target:
 
 ```text
 Creating worktree feature/review-flow
@@ -198,9 +201,7 @@ effect in one model round trip:
 - `agent.updated` emission in `ClawMcpService`;
 - optional bounded announcement validation and native queueing through the same
   coordinator call;
-- automatic cleanup from the provider-independent `turn.completed` lifecycle;
-- a special completed title for clearing status in
-  `vue/src/tool-title-presenter.ts`.
+- automatic cleanup from the provider-independent `turn.completed` lifecycle.
 
 Its MCP result confirms the operation. The visible agent status comes from the
 app event, not from the result text.

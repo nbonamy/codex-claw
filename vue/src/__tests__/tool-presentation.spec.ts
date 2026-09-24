@@ -35,7 +35,6 @@ describe('Claw tool presentation', () => {
     ['report-finding', MessageReportIcon, 'Reported finding'],
     ['report-mission-review-finding', MessageReportIcon, 'Reported Mission finding'],
     ['list-agents', UsersIcon, 'Listed agents'],
-    ['finish_turn', UsersIcon, 'Finished turn'],
     ['toggle_thread_flag', UsersIcon, 'Updated thread flag'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],

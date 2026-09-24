@@ -16,6 +16,7 @@
       <CodexMessageList
         v-else
         :messages="messages"
+        :tool-visibility="isClawToolVisible"
         :reset-key="conversationId"
         :actions-disabled="true"
         :can-delete-message="false"
@@ -37,7 +38,7 @@ import { CodexMessageList, type CodexConversationLink } from '@codex-app-sdk/vue
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentSubagentTree, RendererMessage } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { provideClawToolPresentation } from '../tool-presentation';
+import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
 
 const props = withDefaults(defineProps<{
   agents?: readonly Agent[];

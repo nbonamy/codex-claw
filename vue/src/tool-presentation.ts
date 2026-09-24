@@ -2,6 +2,7 @@ import {
   provideCodexToolPresentation,
   type CodexToolPresentation,
   type CodexToolPresentationContext,
+  type CodexToolVisibility,
   type CodexToolTitlePresenterContext,
 } from '@codex-app-sdk/vue';
 import {
@@ -16,7 +17,7 @@ import {
   IconSitemap as SitemapIcon,
   IconUsers as UsersIcon,
 } from '@tabler/icons-vue';
-import { clawMcpToolName, presentClawToolTitle } from './tool-title-presenter';
+import { clawMcpToolName, clawToolName, presentClawToolTitle } from './tool-title-presenter';
 
 type Translate = CodexToolTitlePresenterContext['translate'];
 type ToolIcon = Exclude<CodexToolPresentation['icon'], null | undefined>;
@@ -74,8 +75,12 @@ const COMPUTER_USE_TOOLS = new Set([
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
 const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding', 'report-mission-review-finding', 'update-mission-review-finding']);
 const VISUALIZE_TOOLS = new Set(['suggest-visualizations', 'add-visualization', 'get-visualization', 'list-visualizations', 'delete-visualization', 'replace-visualization']);
-const AGENT_TOOLS = new Set(['create-agent', 'finish-turn', 'toggle-thread-flag', 'list-agents', 'register-agent', 'set-status']);
+const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent']);
 const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-worktree', 'list-repos', 'list-worktrees']);
+const HIDDEN_HOUSEKEEPING_TOOLS = new Set(['set-status', 'finish-turn']);
+
+export const isClawToolVisible: CodexToolVisibility = (toolCall) =>
+  !HIDDEN_HOUSEKEEPING_TOOLS.has(clawToolName(toolCall.function, toolCall.kind, toolCall.metadata) ?? '');
 
 export function presentClawTool(
   context: CodexToolPresentationContext,

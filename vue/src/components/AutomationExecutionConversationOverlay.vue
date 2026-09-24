@@ -45,6 +45,7 @@
         :can-retry-message="false"
         follow-ups-disabled
         :messages="messages"
+        :tool-visibility="isClawToolVisible"
       />
       <div
         v-else
@@ -59,7 +60,7 @@ import type { RendererMessage } from '@codex-claw/core/contracts';
 import { CodexMessageList } from '@codex-app-sdk/vue';
 import { useI18n } from 'vue-i18n';
 import { X } from '../shared/icons/app-icons';
-import { provideClawToolPresentation } from '../tool-presentation';
+import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
 
 const { t } = useI18n();
 provideClawToolPresentation((key, params) => t(key, params ?? {}));

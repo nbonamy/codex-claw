@@ -13,6 +13,7 @@
       :has-composer-context="textAnnotations.length > 0"
       :message-text-selection="true"
       :transform-message="transformConversationMessage"
+      :tool-visibility="isClawToolVisible"
       @message-text-selection-change="messageTextSelection = $event"
     >
       <template #empty>
@@ -134,7 +135,7 @@ import {
   presentRendererCollaborationMessage,
   type CollaborationMessagePresentation,
 } from '../shared/collaboration-message';
-import { provideClawToolPresentation } from '../tool-presentation';
+import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
 
 const { t, te } = useI18n();
 const agentMentionGroupId = 'agents';

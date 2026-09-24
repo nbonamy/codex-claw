@@ -87,7 +87,7 @@ describe('SubagentPanel', () => {
     expect(wrapper.find('[role="tablist"]').exists()).toBe(false);
   });
 
-  it('uses Claw tool presentation for child conversation activity', async () => {
+  it('hides housekeeping calls but retains other child tool activity', async () => {
     const toolMessage: RendererMessage = {
       id: 'message-tool',
       agentId: 'agent-dina',
@@ -102,6 +102,30 @@ describe('SubagentPanel', () => {
         status: 'completed',
         input: { status: 'Reviewing changes' },
         metadata: { server: 'codex_claw', tool: 'set-status' },
+      }, {
+        type: 'tool',
+        id: 'call-finish-turn',
+        kind: 'mcp',
+        title: 'codex_claw.finish_turn',
+        status: 'completed',
+        input: {},
+        metadata: { server: 'codex_claw', tool: 'finish_turn' },
+      }, {
+        type: 'tool',
+        id: 'call-report-finding',
+        kind: 'mcp',
+        title: 'codex_claw.report_finding',
+        status: 'completed',
+        input: { title: 'Keep this visible' },
+        metadata: { server: 'codex_claw', tool: 'report_finding' },
+      }, {
+        type: 'tool',
+        id: 'call-other-finish-turn',
+        kind: 'mcp',
+        title: 'github.finish_turn',
+        status: 'completed',
+        input: {},
+        metadata: { server: 'github', tool: 'finish_turn' },
       }],
     };
     const wrapper = mount(SubagentPanel, {
@@ -110,7 +134,10 @@ describe('SubagentPanel', () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Updated status');
+    expect(wrapper.text()).not.toContain('Updated status');
+    expect(wrapper.text()).not.toContain('Finished turn');
+    expect(wrapper.text()).toContain('Reported finding');
+    expect(wrapper.text()).toContain('github.finish_turn');
     expect(wrapper.text()).not.toContain('codex_claw.set-status');
   });
 

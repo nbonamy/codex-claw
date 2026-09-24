@@ -436,7 +436,7 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).not.toContain('Update your status');
   });
 
-  it('renders Claw tool activity with translated user-facing titles', () => {
+  it('hides finish-turn activity without leaving an empty assistant row', () => {
     const wrapper = mountPane({
       controller: controllerFor([{
         id: 'message-tool',
@@ -451,15 +451,14 @@ describe('ConversationPane', () => {
           title: 'codex_claw.finish_turn',
           status: 'completed',
           input: { flag: 'ready_for_review' },
-          metadata: { server: 'codex_claw', tool: 'finish_turn' },
         }],
       }]),
       agent,
     });
 
-    expect(wrapper.text()).toContain('Finished turn');
+    expect(wrapper.text()).not.toContain('Finished turn');
     expect(wrapper.text()).not.toContain('codex_claw.finish_turn');
-    expect(wrapper.find('.tabler-icon-users').exists()).toBe(true);
+    expect(wrapper.find('.chat-message--assistant').exists()).toBe(false);
   });
 
   it('renders review tool activity as finding actions instead of raw MCP names', () => {
