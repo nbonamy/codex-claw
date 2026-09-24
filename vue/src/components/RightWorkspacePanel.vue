@@ -27,7 +27,7 @@
               :class="{ 'right-workspace-panel__tab--active': activeTab === tab }"
               @contextmenu="openTabContextMenu(tab, $event)"
             >
-              <el-tooltip :content="tabLabel(tab)" placement="top" :show-after="300">
+              <el-tooltip :content="tabLabel(tab)" placement="top" :show-after="800">
                 <button
                   class="right-workspace-panel__tab-select"
                   type="button"
@@ -144,17 +144,16 @@
       <button type="button" @click="emit('openTab', 'review')">
         <FileDiffIcon aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.changes') }}</span>
-        <kbd>{{ $t('surface.rightWorkspacePanel.g') }}</kbd>
+        <kbd>{{ workspaceShortcuts.changes }}</kbd>
       </button>
       <button v-if="browserAvailable" type="button" @click="emit('openTab', 'browser')">
         <IconWorld aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.browser') }}</span>
-        <kbd>{{ $t('surface.rightWorkspacePanel.b') }}</kbd>
+        <kbd>{{ workspaceShortcuts.browser }}</kbd>
       </button>
       <button type="button" @click="emit('openTab', 'files')">
         <FoldersIcon aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.files') }}</span>
-        <kbd>{{ $t('surface.rightWorkspacePanel.p') }}</kbd>
       </button>
         </nav>
 
@@ -375,6 +374,8 @@ import {
   type RightWorkspaceSubagentTab,
   type RightWorkspaceTab,
 } from './right-workspace';
+
+const workspaceShortcuts = { changes: '⌘G', browser: '⌘B' } as const;
 
 const props = withDefaults(defineProps<{
   activeTab: RightWorkspaceTab | null;
@@ -632,10 +633,14 @@ function filePanel(tab: RightWorkspaceTab): RightWorkspaceFilePanel | undefined 
 }
 
 function menuItemsForTab(tab: RightWorkspaceTab): AppMenuItem[] {
-  const path = filePanel(tab)?.subtitle;
-  const specificItems: AppMenuItem[] = path?.trim()
-    ? [{ id: 'copy-path', type: 'action', label: translate('surface.rightWorkspacePanel.copyPath'), icon: CopyIcon }]
-    : [];
+  const specificItems: AppMenuItem[] = [
+    ...(absoluteFilePathForTab(tab)
+      ? [{ id: 'copy-path', type: 'action', label: translate('surface.rightWorkspacePanel.copyPath'), icon: CopyIcon } satisfies AppMenuItem]
+      : []),
+    ...(relativeFilePathForTab(tab)
+      ? [{ id: 'copy-relative-path', type: 'action', label: translate('surface.rightWorkspacePanel.copyRelativePath'), icon: CopyIcon } satisfies AppMenuItem]
+      : []),
+  ];
   return [
     ...specificItems,
     ...(specificItems.length ? [{ id: 'tab-actions-divider', type: 'separator' } satisfies AppMenuItem] : []),
@@ -679,14 +684,37 @@ async function selectTabContextMenuItem(itemId: string): Promise<void> {
     }
     return;
   }
-  if (itemId !== 'copy-path') return;
-  const path = filePanel(tab)?.subtitle;
-  if (!path?.trim()) return;
+  const path = itemId === 'copy-path'
+    ? absoluteFilePathForTab(tab)
+    : itemId === 'copy-relative-path'
+      ? relativeFilePathForTab(tab)
+      : null;
+  if (!path) return;
   try {
     await navigator.clipboard.writeText(path);
   } catch {
     ElMessage.error(translate('surface.rightWorkspacePanel.copyPathFailed'));
   }
+}
+
+function absoluteFilePathForTab(tab: RightWorkspaceTab): string | null {
+  const filePath = filePanel(tab)?.subtitle?.trim();
+  if (!filePath) return null;
+  if (isAbsoluteFilePath(filePath)) return filePath;
+  const folder = (props.agent.folder ?? '').trim().replace(/[\\/]+$/u, '');
+  if (!isAbsoluteFilePath(folder)) return null;
+  const separator = folder.includes('\\') && !folder.includes('/') ? '\\' : '/';
+  return `${folder}${separator}${filePath.replace(/\\/gu, '/').replace(/^(?:\.\/)+/u, '').replace(/\//gu, separator)}`;
+}
+
+function relativeFilePathForTab(tab: RightWorkspaceTab): string | null {
+  const filePath = filePanel(tab)?.subtitle?.trim();
+  if (!filePath) return null;
+  if (!isAbsoluteFilePath(filePath)) return filePath;
+  const folder = (props.agent.folder ?? '').trim().replace(/[\\/]+$/u, '').replace(/\\/gu, '/');
+  if (!isAbsoluteFilePath(folder)) return null;
+  const normalizedPath = filePath.replace(/\\/gu, '/');
+  return normalizedPath.startsWith(`${folder}/`) ? normalizedPath.slice(folder.length + 1) : null;
 }
 
 function imagePanel(tab: RightWorkspaceTab): RightWorkspaceImagePanel | undefined {

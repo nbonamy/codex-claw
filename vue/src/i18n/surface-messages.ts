@@ -646,6 +646,7 @@ export const surfaceMessages = {
     "scrollTabsRight": "Scroll tabs right",
     "tabActions": "Tab actions",
     "copyPath": "Copy path",
+    "copyRelativePath": "Copy relative path",
     "copyPathFailed": "Could not copy the path.",
     "closeTab": "Close tab",
     "closeOtherTabs": "Close other tabs",
@@ -656,11 +657,8 @@ export const surfaceMessages = {
     "review": "Review",
     "visualize": "Visualize",
     "changes": "Changes",
-    "g": "⌘G",
     "browser": "Browser",
-    "b": "⌘B",
     "files": "Files",
-    "p": "⌘P",
     "selectAFileFromTheExplorer": "Select a file from the explorer.",
     "resizeFileExplorer": "Resize file explorer",
     "gitHubReview": "GitHub Review",
@@ -944,8 +942,8 @@ export const surfaceMessages = {
     "backlog": "Backlog",
     "createTeam": "Create team",
     "automations": "Automations",
-    "muteSpokenAcknowledgments": "Mute spoken acknowledgments (⇧⌘M)",
-    "unmuteSpokenAcknowledgments": "Unmute spoken acknowledgments (⇧⌘M)"
+    "muteSpokenAcknowledgments": "Mute spoken acknowledgments",
+    "unmuteSpokenAcknowledgments": "Unmute spoken acknowledgments"
   },
   "updateAvailableBadge": {
     "checkingForUpdates": "Checking…",

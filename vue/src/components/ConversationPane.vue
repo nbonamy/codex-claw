@@ -296,7 +296,7 @@ defineExpose({ focusComposer });
   position: relative;
   display: flex;
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 360px;
   min-height: 0;
   overflow: hidden;
   background: var(--color-shell-main);

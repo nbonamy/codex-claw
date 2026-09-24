@@ -73,10 +73,8 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Review');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Changes');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Browser');
-    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘G');
-    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘B');
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Files');
-    expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('⌘P');
+    expect(wrapper.findAll('.right-workspace-panel__launcher kbd').map((shortcut) => shortcut.text())).toStrictEqual(['⌘G', '⌘B']);
     expect(wrapper.text()).not.toContain('Terminal');
 
     await wrapper.findAll('.right-workspace-panel__launcher button')[0]?.trigger('click');
@@ -113,9 +111,11 @@ describe('RightWorkspacePanel', () => {
     expect(tab.attributes('aria-label')).toBe('long-file-name.ts');
     expect(tab.attributes('title')).toBeUndefined();
     await tab.trigger('mouseenter');
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
     await vi.waitFor(() => {
       expect(document.body.querySelector('[role="tooltip"]')?.textContent).toContain('long-file-name.ts');
-    });
+    }, { timeout: 1_200 });
   });
 
   it('compresses tabs to icon width before requiring scroll navigation', async () => {
@@ -282,7 +282,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.emitted('closeTab')).toStrictEqual([[fileTab]]);
   });
 
-  it('copies the path of the file tab that was right-clicked without selecting it', async () => {
+  it('copies absolute and relative paths from the right-clicked file tab without selecting it', async () => {
     const fileTab = 'file:src%2Fmain.ts' as const;
     const copyText = vi.fn().mockResolvedValue(undefined);
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
@@ -298,15 +298,59 @@ describe('RightWorkspacePanel', () => {
 
       const menu = document.body.querySelector('[aria-label="Tab actions"]');
       expect([...menu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())).toStrictEqual([
-        'Copy path', 'Close tab', 'Close other tabs',
+        'Copy path', 'Copy relative path', 'Close tab', 'Close other tabs',
       ]);
       expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(1);
       expect(wrapper.emitted('selectTab')).toBeUndefined();
       (menu?.querySelector('[role="menuitem"]') as HTMLElement).click();
       await flushPromises();
 
-      expect(copyText).toHaveBeenCalledExactlyOnceWith('src/main.ts');
       expect(document.body.querySelector('[aria-label="Tab actions"]')).toBeNull();
+
+      await wrapper.findAll('.right-workspace-panel__tab')[1]?.trigger('contextmenu');
+      const relativeMenu = document.body.querySelector('[aria-label="Tab actions"]');
+      const copyRelative = [...relativeMenu!.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+        .find((item) => item.textContent?.trim() === 'Copy relative path');
+      copyRelative?.click();
+      await flushPromises();
+
+      await wrapper.setProps({
+        filePanels: {
+          [fileTab]: {
+            kind: 'source', title: 'main.ts', subtitle: '/repo/src/main.ts', content: '',
+            language: 'typescript', state: 'idle', error: null,
+          },
+        },
+      });
+      await wrapper.findAll('.right-workspace-panel__tab')[1]?.trigger('contextmenu');
+      const absoluteMenu = document.body.querySelector('[aria-label="Tab actions"]');
+      const relativeFromAbsolute = [...absoluteMenu!.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+        .find((item) => item.textContent?.trim() === 'Copy relative path');
+      relativeFromAbsolute?.click();
+      await flushPromises();
+
+      await wrapper.setProps({
+        filePanels: {
+          [fileTab]: {
+            kind: 'source', title: 'main.ts', subtitle: '/outside/main.ts', content: '',
+            language: 'typescript', state: 'idle', error: null,
+          },
+        },
+      });
+      await wrapper.findAll('.right-workspace-panel__tab')[1]?.trigger('contextmenu');
+      const outsideMenu = document.body.querySelector('[aria-label="Tab actions"]');
+      expect([...outsideMenu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())).toStrictEqual([
+        'Copy path', 'Close tab', 'Close other tabs',
+      ]);
+      (outsideMenu?.querySelector('[role="menuitem"]') as HTMLElement).click();
+      await flushPromises();
+      expect(copyText.mock.calls).toStrictEqual([
+        ['/repo/src/main.ts'],
+        ['src/main.ts'],
+        ['src/main.ts'],
+        ['/outside/main.ts'],
+      ]);
+      expect(wrapper.emitted('selectTab')).toBeUndefined();
 
       await wrapper.findAll('.right-workspace-panel__tab')[0]?.trigger('contextmenu');
       const browserMenu = document.body.querySelector('[aria-label="Tab actions"]');

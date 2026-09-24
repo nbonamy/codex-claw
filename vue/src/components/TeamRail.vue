@@ -76,8 +76,8 @@
           class="team-rail__speech-mute"
           :class="{ 'team-rail__speech-mute--active': spokenAnnouncementsMuted }"
           type="button"
-          :title="spokenAnnouncementsMuted ? $t('surface.teamRail.unmuteSpokenAcknowledgments') : $t('surface.teamRail.muteSpokenAcknowledgments')"
-          :aria-label="spokenAnnouncementsMuted ? $t('surface.teamRail.unmuteSpokenAcknowledgments') : $t('surface.teamRail.muteSpokenAcknowledgments')"
+          :title="spokenAnnouncementsToggleLabel"
+          :aria-label="spokenAnnouncementsToggleLabel"
           :aria-pressed="spokenAnnouncementsMuted"
           @click="emit('toggle-speech-mute')"
         >
@@ -186,6 +186,9 @@ const contextMenuTeam = computed(() => (
 const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value) && props.teams.length > 1);
 const unreadTeamIdSet = computed(() => new Set(props.unreadTeamIds ?? []));
 const workingTeamIdSet = computed(() => new Set(props.workingTeamIds ?? []));
+const spokenAnnouncementsToggleLabel = computed(() => (
+  `${translate(props.spokenAnnouncementsMuted ? 'surface.teamRail.unmuteSpokenAcknowledgments' : 'surface.teamRail.muteSpokenAcknowledgments')} (⇧⌘M)`
+));
 const clientTeamOrderUpdate = useListReorderDrag<string>({
   itemIds: () => props.teams.map((team) => team.id),
   onDrop: ({ draggedId, beforeId }) => {
