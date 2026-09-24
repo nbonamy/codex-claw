@@ -260,6 +260,32 @@ describe('stdio JSON-RPC transport', () => {
     peer.stop();
   });
 
+  it('delivers a large conversation snapshot after startup output backpressure', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough({ highWaterMark: 1 });
+    const peer = new StdioRpcPeer({ input, output, onMessage: () => undefined });
+    let largestReceivedFrameBytes = 0;
+    peer.start();
+
+    try {
+      peer.notify('backend/event/notify', { type: 'agent.statusChanged' });
+      peer.notify('backend/event/notify', {
+        type: 'codex.conversationSnapshotChanged',
+        snapshot: 'x'.repeat(64 * 1024 * 1024),
+      });
+
+      output.on('data', (chunk: Buffer) => {
+        largestReceivedFrameBytes = Math.max(largestReceivedFrameBytes, chunk.byteLength);
+      });
+      output.emit('drain');
+
+      await vi.waitFor(() => expect(largestReceivedFrameBytes).toBeGreaterThan(64 * 1024 * 1024));
+    } finally {
+      peer.stop();
+      output.destroy();
+    }
+  });
+
   it('identifies an oversized event without inspecting its payload', () => {
     const input = new PassThrough();
     const output = new PassThrough();

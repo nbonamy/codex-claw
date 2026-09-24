@@ -37,6 +37,8 @@ type QueuedFrame = {
   message: ClawRpcMessage;
 };
 
+const DEFAULT_MAX_BUFFERED_OUTPUT_BYTES = 128 * 1024 * 1024;
+
 export class StdioRpcPeer {
   private buffer = '';
   private nextRequestId = 1;
@@ -178,7 +180,7 @@ export class StdioRpcPeer {
   private write(message: ClawRpcMessage, responseMethod?: string): void {
     const frame = `${JSON.stringify(message)}\n`;
     const bytes = Buffer.byteLength(frame);
-    const maxBufferedBytes = this.options.maxBufferedOutputBytes ?? 64 * 1024 * 1024;
+    const maxBufferedBytes = this.options.maxBufferedOutputBytes ?? DEFAULT_MAX_BUFFERED_OUTPUT_BYTES;
     if (bytes > maxBufferedBytes) {
       this.reportOutputOverflow(message, bytes, responseMethod);
     }
@@ -233,7 +235,7 @@ export class StdioRpcPeer {
       }
     }
 
-    const maxBufferedBytes = this.options.maxBufferedOutputBytes ?? 64 * 1024 * 1024;
+    const maxBufferedBytes = this.options.maxBufferedOutputBytes ?? DEFAULT_MAX_BUFFERED_OUTPUT_BYTES;
     if (this.outputQueueBytes + bytes > maxBufferedBytes) {
       if (bytes <= maxBufferedBytes) {
         this.reportOutputOverflow(message, bytes, responseMethod);
