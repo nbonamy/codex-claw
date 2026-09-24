@@ -642,6 +642,13 @@ export const surfaceMessages = {
   "rightWorkspacePanel": {
     "rightWorkspace": "Right workspace",
     "rightWorkspaceTabs": "Right workspace tabs",
+    "scrollTabsLeft": "Scroll tabs left",
+    "scrollTabsRight": "Scroll tabs right",
+    "tabActions": "Tab actions",
+    "copyPath": "Copy path",
+    "copyPathFailed": "Could not copy the path.",
+    "closeTab": "Close tab",
+    "closeOtherTabs": "Close other tabs",
     "openRightWorkspaceTab": "Open right workspace tab",
     "newTab": "New tab",
     "openAWorkspaceTab": "Open a workspace tab",

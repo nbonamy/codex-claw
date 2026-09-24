@@ -67,6 +67,7 @@ const annotationMode = ref(false);
 const annotations = ref<BrowserAnnotation[]>([]);
 const state = ref<BrowserState>({ url: '', title: '', canGoBack: false, canGoForward: false });
 const menuOpen = ref(false);
+const nativeVisible = computed(() => props.visible && !menuOpen.value);
 const displayHost = computed(() => {
   try {
     return new URL(state.value.url || address.value).host;
@@ -101,7 +102,7 @@ onBeforeUnmount(() => {
   void codexClawApi?.browserClose(props.agentId, props.browserId);
 });
 
-watch(() => props.visible, async (visible) => {
+watch(nativeVisible, async (visible) => {
   if (!codexClawApi) return;
   await codexClawApi.browserSetVisible(props.agentId, props.browserId, visible);
   if (visible) {
@@ -182,7 +183,7 @@ async function toggleAnnotation(): Promise<void> {
 
 async function syncBounds(): Promise<void> {
   const element = viewport.value;
-  if (!element || loading.value || !props.visible) return;
+  if (!element || loading.value || !nativeVisible.value) return;
   const rect = element.getBoundingClientRect();
   const bounds: BrowserBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   await codexClawApi?.browserSetBounds(props.agentId, props.browserId, bounds);

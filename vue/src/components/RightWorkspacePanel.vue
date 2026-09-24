@@ -1,43 +1,78 @@
 <template>
   <aside class="right-workspace-panel" :aria-label="$t('surface.rightWorkspacePanel.rightWorkspace')">
     <header class="right-workspace-panel__tabs">
-      <div class="right-workspace-panel__tab-list" role="tablist" :aria-label="$t('surface.rightWorkspacePanel.rightWorkspaceTabs')">
-        <div
-          v-for="tab in tabs"
-          :key="tab"
-          class="right-workspace-panel__tab"
-          :class="{ 'right-workspace-panel__tab--active': activeTab === tab }"
+      <div ref="tabStripRoot" class="right-workspace-panel__tab-strip">
+        <button
+          v-if="tabsOverflow"
+          class="right-workspace-panel__tab-nav"
+          type="button"
+          :aria-label="$t('surface.rightWorkspacePanel.scrollTabsLeft')"
+          :disabled="!canScrollTabsLeft"
+          @click="scrollTabs(-1)"
         >
-          <button
-            class="right-workspace-panel__tab-select"
-            type="button"
-            role="tab"
-            :aria-selected="activeTab === tab"
-            @click="emit('selectTab', tab)"
-          >
-            <BacklogIcon v-if="tab === 'backlog'" aria-hidden="true" />
-            <IconChecklist v-if="tab === 'codeReview'" aria-hidden="true" />
-            <IconSitemap v-else-if="tab === 'visualize'" aria-hidden="true" />
-            <FileDiffIcon v-else-if="tab === 'review'" aria-hidden="true" />
-            <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
-            <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
-            <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
-            <IconLego v-else-if="isRightWorkspaceSubagentTab(tab)" aria-hidden="true" />
-            <FileDiffIcon v-else-if="diffPanel(tab)" aria-hidden="true" />
-            <PhotoIcon v-else-if="imagePanel(tab)" aria-hidden="true" />
-            <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
-            <CodeIcon v-else aria-hidden="true" />
-            <span>{{ tabLabel(tab) }}</span>
-          </button>
-          <button
-            class="right-workspace-panel__tab-close"
-            type="button"
-            :aria-label="$t('dynamic.files.closeTab', { tab: tabLabel(tab) })"
-            @click="emit('closeTab', tab)"
-          >
-            <X aria-hidden="true" />
-          </button>
+          <IconChevronLeft aria-hidden="true" />
+        </button>
+        <div
+          ref="tabListRoot"
+          class="right-workspace-panel__tab-list"
+          role="tablist"
+          :aria-label="$t('surface.rightWorkspacePanel.rightWorkspaceTabs')"
+          @scroll="updateTabScrollState"
+        >
+          <div ref="tabTrackRoot" class="right-workspace-panel__tab-track">
+            <div
+              v-for="tab in tabs"
+              :key="tab"
+              class="right-workspace-panel__tab"
+              :class="{ 'right-workspace-panel__tab--active': activeTab === tab }"
+              @contextmenu="openTabContextMenu(tab, $event)"
+            >
+              <el-tooltip :content="tabLabel(tab)" placement="top" :show-after="300">
+                <button
+                  class="right-workspace-panel__tab-select"
+                  type="button"
+                  role="tab"
+                  :aria-label="tabLabel(tab)"
+                  :aria-selected="activeTab === tab"
+                  @click="emit('selectTab', tab)"
+                  @keydown="openTabContextMenuFromKeyboard(tab, $event)"
+                >
+                  <BacklogIcon v-if="tab === 'backlog'" aria-hidden="true" />
+                  <IconChecklist v-if="tab === 'codeReview'" aria-hidden="true" />
+                  <IconSitemap v-else-if="tab === 'visualize'" aria-hidden="true" />
+                  <FileDiffIcon v-else-if="tab === 'review'" aria-hidden="true" />
+                  <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
+                  <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
+                  <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
+                  <IconLego v-else-if="isRightWorkspaceSubagentTab(tab)" aria-hidden="true" />
+                  <FileDiffIcon v-else-if="diffPanel(tab)" aria-hidden="true" />
+                  <PhotoIcon v-else-if="imagePanel(tab)" aria-hidden="true" />
+                  <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
+                  <CodeIcon v-else aria-hidden="true" />
+                  <span>{{ tabLabel(tab) }}</span>
+                </button>
+              </el-tooltip>
+              <button
+                class="right-workspace-panel__tab-close"
+                type="button"
+                :aria-label="$t('dynamic.files.closeTab', { tab: tabLabel(tab) })"
+                @click="emit('closeTab', tab)"
+              >
+                <X aria-hidden="true" />
+              </button>
+            </div>
+          </div>
         </div>
+        <button
+          v-if="tabsOverflow"
+          class="right-workspace-panel__tab-nav"
+          type="button"
+          :aria-label="$t('surface.rightWorkspacePanel.scrollTabsRight')"
+          :disabled="!canScrollTabsRight"
+          @click="scrollTabs(1)"
+        >
+          <IconChevronRight aria-hidden="true" />
+        </button>
       </div>
 
       <OpenInControl
@@ -79,6 +114,16 @@
         />
       </div>
     </header>
+
+    <AppContextMenu
+      v-if="tabContextMenu"
+      :ariaLabel="$t('surface.rightWorkspacePanel.tabActions')"
+      :items="tabContextMenuItems"
+      :x="tabContextMenu.x"
+      :y="tabContextMenu.y"
+      @close="tabContextMenu = null"
+      @select="selectTabContextMenuItem"
+    />
 
     <div ref="bodyRoot" class="right-workspace-panel__body">
       <div class="right-workspace-panel__content">
@@ -176,7 +221,7 @@
       :initial-url="browserInitialUrl"
       :open-request-id="browserOpenRequestId"
       :visualization="browserVisualization"
-      :visible="visible && activeTab === 'browser'"
+      :visible="visible && activeTab === 'browser' && !tabContextMenu && !addMenuOpen"
       @close="emit('closeTab', 'browser')"
       @send-prompt="emit('sendPrompt', $event)"
     />
@@ -291,11 +336,13 @@
 
 <script setup lang="ts">
 import { translate } from '../i18n';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { IconChecklist, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
+import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { BacklogIcon, CodeIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import AppContextMenu from '../shared/menu/AppContextMenu.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import OpenInControl from '../shared/OpenInControl.vue';
@@ -419,7 +466,15 @@ const emit = defineEmits<{
 
 const addMenuRoot = ref<HTMLElement | null>(null);
 const bodyRoot = ref<HTMLElement | null>(null);
+const tabStripRoot = ref<HTMLElement | null>(null);
+const tabListRoot = ref<HTMLElement | null>(null);
+const tabTrackRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
+const tabContextMenu = ref<{ tab: RightWorkspaceTab; x: number; y: number } | null>(null);
+const tabsOverflow = ref(false);
+const canScrollTabsLeft = ref(false);
+const canScrollTabsRight = ref(false);
+let tabResizeObserver: ResizeObserver | null = null;
 const visualFilesPaneWidth = ref(props.filesPaneWidth);
 const fileTabs = computed(() => props.tabs.filter(isRightWorkspaceFileTab));
 const diffTabs = computed(() => props.tabs.filter(isRightWorkspaceDiffTab));
@@ -449,16 +504,82 @@ const addMenuItems = computed<AppMenuItem[]>(() => [
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: translate('surface.rightWorkspacePanel.browser'), icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: translate('surface.rightWorkspacePanel.files'), icon: FoldersIcon },
 ]);
+const tabContextMenuItems = computed(() => tabContextMenu.value ? menuItemsForTab(tabContextMenu.value.tab) : []);
+
+watch(() => props.tabs, (tabs) => {
+  if (tabContextMenu.value && !tabs.includes(tabContextMenu.value.tab)) tabContextMenu.value = null;
+  void nextTick(() => {
+    updateTabScrollState();
+    revealActiveTab();
+  });
+});
+
+watch(() => [props.activeTab, props.visible], () => {
+  void nextTick(() => {
+    updateTabScrollState();
+    revealActiveTab();
+  });
+});
+
+watch(tabsOverflow, () => {
+  void nextTick(updateTabScrollState);
+});
 
 watch(() => props.filesPaneWidth, (width) => {
   visualFilesPaneWidth.value = width;
 });
 
-onMounted(() => document.addEventListener('click', closeAddMenuOnOutsideClick));
+onMounted(() => {
+  document.addEventListener('click', closeAddMenuOnOutsideClick);
+  window.addEventListener('resize', updateTabScrollState);
+  if (typeof ResizeObserver !== 'undefined' && tabStripRoot.value && tabTrackRoot.value) {
+    tabResizeObserver = new ResizeObserver(updateTabScrollState);
+    tabResizeObserver.observe(tabStripRoot.value);
+    tabResizeObserver.observe(tabTrackRoot.value);
+  }
+  void nextTick(() => {
+    updateTabScrollState();
+    revealActiveTab();
+  });
+});
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeAddMenuOnOutsideClick);
+  window.removeEventListener('resize', updateTabScrollState);
+  tabResizeObserver?.disconnect();
   stopFilesPaneResize();
 });
+
+function updateTabScrollState(): void {
+  const strip = tabStripRoot.value;
+  const list = tabListRoot.value;
+  const track = tabTrackRoot.value;
+  if (!strip || !list || !track) return;
+  tabsOverflow.value = track.scrollWidth > strip.clientWidth + 1;
+  canScrollTabsLeft.value = list.scrollLeft > 1;
+  canScrollTabsRight.value = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+}
+
+function scrollTabs(direction: -1 | 1): void {
+  const list = tabListRoot.value;
+  if (!list) return;
+  const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
+  const step = Math.max(40, list.clientWidth - 48);
+  list.scrollLeft = Math.max(0, Math.min(maxScroll, list.scrollLeft + direction * step));
+  updateTabScrollState();
+}
+
+function revealActiveTab(): void {
+  const list = tabListRoot.value;
+  const track = tabTrackRoot.value;
+  const index = props.tabs.findIndex((tab) => tab === props.activeTab);
+  const tab = index >= 0 ? track?.children[index] : null;
+  if (!list || !(tab instanceof HTMLElement)) return;
+  const viewport = list.getBoundingClientRect();
+  const bounds = tab.getBoundingClientRect();
+  if (bounds.left < viewport.left) list.scrollLeft -= viewport.left - bounds.left;
+  else if (bounds.right > viewport.right) list.scrollLeft += bounds.right - viewport.right;
+  updateTabScrollState();
+}
 
 function startFilesPaneResize(event: PointerEvent): void {
   event.preventDefault();
@@ -508,6 +629,64 @@ function diffPanel(tab: RightWorkspaceTab): RightWorkspaceDiffPanel | undefined 
 
 function filePanel(tab: RightWorkspaceTab): RightWorkspaceFilePanel | undefined {
   return isRightWorkspaceFileTab(tab) ? props.filePanels?.[tab] : undefined;
+}
+
+function menuItemsForTab(tab: RightWorkspaceTab): AppMenuItem[] {
+  const path = filePanel(tab)?.subtitle;
+  const specificItems: AppMenuItem[] = path?.trim()
+    ? [{ id: 'copy-path', type: 'action', label: translate('surface.rightWorkspacePanel.copyPath'), icon: CopyIcon }]
+    : [];
+  return [
+    ...specificItems,
+    ...(specificItems.length ? [{ id: 'tab-actions-divider', type: 'separator' } satisfies AppMenuItem] : []),
+    { id: 'close-tab', type: 'action', label: translate('surface.rightWorkspacePanel.closeTab'), icon: X },
+    {
+      id: 'close-other-tabs',
+      type: 'action',
+      label: translate('surface.rightWorkspacePanel.closeOtherTabs'),
+      icon: CircleXIcon,
+      disabled: props.tabs.length <= 1,
+    },
+  ];
+}
+
+function openTabContextMenu(tab: RightWorkspaceTab, event: MouseEvent): void {
+  event.preventDefault();
+  addMenuOpen.value = false;
+  tabContextMenu.value = { tab, x: event.clientX, y: event.clientY };
+}
+
+function openTabContextMenuFromKeyboard(tab: RightWorkspaceTab, event: KeyboardEvent): void {
+  if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return;
+  event.preventDefault();
+  const bounds = event.currentTarget instanceof HTMLElement ? event.currentTarget.getBoundingClientRect() : null;
+  addMenuOpen.value = false;
+  tabContextMenu.value = { tab, x: bounds?.left ?? 0, y: bounds?.bottom ?? 0 };
+}
+
+async function selectTabContextMenuItem(itemId: string): Promise<void> {
+  const tab = tabContextMenu.value?.tab;
+  tabContextMenu.value = null;
+  if (!tab) return;
+  if (itemId === 'close-tab') {
+    emit('closeTab', tab);
+    return;
+  }
+  if (itemId === 'close-other-tabs') {
+    emit('selectTab', tab);
+    for (const otherTab of props.tabs) {
+      if (otherTab !== tab) emit('closeTab', otherTab);
+    }
+    return;
+  }
+  if (itemId !== 'copy-path') return;
+  const path = filePanel(tab)?.subtitle;
+  if (!path?.trim()) return;
+  try {
+    await navigator.clipboard.writeText(path);
+  } catch {
+    ElMessage.error(translate('surface.rightWorkspacePanel.copyPathFailed'));
+  }
 }
 
 function imagePanel(tab: RightWorkspaceTab): RightWorkspaceImagePanel | undefined {
@@ -564,20 +743,70 @@ function isAbsoluteFilePath(filePath: string): boolean {
   background: var(--color-shell-main);
 }
 
-.right-workspace-panel__tab-list {
+.right-workspace-panel__tab-strip {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  overflow: hidden;
+}
+
+.right-workspace-panel__tab-list {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.right-workspace-panel__tab-list::-webkit-scrollbar {
+  display: none;
+}
+
+.right-workspace-panel__tab-track {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.right-workspace-panel__tab-nav {
+  flex: 0 0 var(--space-12);
+  display: grid;
+  place-items: center;
+  width: var(--space-12);
+  height: var(--space-12);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.right-workspace-panel__tab-nav svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.right-workspace-panel__tab-nav:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-high);
+}
+
+.right-workspace-panel__tab-nav:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .right-workspace-panel__tab {
-  min-width: 0;
+  flex: 0 1 176px;
+  min-width: 40px;
   max-width: 176px;
   display: flex;
   align-items: center;
+  container-type: inline-size;
   border-radius: var(--radius-lg);
   color: var(--color-text-muted);
   background: transparent;
@@ -599,6 +828,7 @@ function isAbsoluteFilePath(filePath: string): boolean {
 }
 
 .right-workspace-panel__tab-select {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -608,6 +838,7 @@ function isAbsoluteFilePath(filePath: string): boolean {
 }
 
 .right-workspace-panel__tab-select span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -623,6 +854,7 @@ function isAbsoluteFilePath(filePath: string): boolean {
 }
 
 .right-workspace-panel__tab-close {
+  flex: 0 0 var(--space-12);
   display: grid;
   place-items: center;
   width: var(--space-12);
@@ -630,6 +862,23 @@ function isAbsoluteFilePath(filePath: string): boolean {
   margin-right: var(--space-2);
   padding: 0;
   border-radius: var(--radius-full);
+}
+
+@container (max-width: 120px) {
+  .right-workspace-panel__tab-close {
+    display: none;
+  }
+}
+
+@container (max-width: 72px) {
+  .right-workspace-panel__tab-select {
+    justify-content: center;
+    gap: 0;
+  }
+
+  .right-workspace-panel__tab-select span {
+    display: none;
+  }
 }
 
 .right-workspace-panel__tab-close:hover,

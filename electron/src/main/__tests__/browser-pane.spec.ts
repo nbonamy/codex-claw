@@ -222,6 +222,22 @@ describe('browser pane helpers', () => {
     await expect(pane.execute('agent-one', 'secondary', 'console', {})).resolves.toStrictEqual({ messages: [] });
   });
 
+  it('does not uncover a hidden browser view during a later bounds update', async () => {
+    const browserWindow = {
+      contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+      isDestroyed: vi.fn(() => false),
+    };
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project');
+    pane.setBounds('agent-one', 'primary', { x: 100, y: 50, width: 600, height: 500 });
+    pane.setVisible('agent-one', 'primary', false);
+    pane.setBounds('agent-one', 'primary', { x: 120, y: 60, width: 580, height: 480 });
+
+    const guest = electronMocks.WebContentsViewMock.instances[0];
+    expect(guest?.setBounds).toHaveBeenLastCalledWith({ x: 120, y: 60, width: 580, height: 480 });
+    expect(guest?.setVisible).toHaveBeenLastCalledWith(false);
+  });
+
   it('uses collision-safe keys for future multiple browser tabs', () => {
     expect(browserPaneKey('agent:a', 'browser')).not.toBe(browserPaneKey('agent', 'a:browser'));
   });

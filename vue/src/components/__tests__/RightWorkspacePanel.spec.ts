@@ -1,8 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { ElTooltip } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentSubagentTree, OpenInApplicationCatalog, RendererMessage } from '@codex-claw/core/contracts';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
-import type { RightWorkspaceFilePanel, RightWorkspaceFileTab, RightWorkspaceImagePanel, RightWorkspaceImageTab, RightWorkspaceTab } from '../right-workspace';
+import { rightWorkspaceFileTab, type RightWorkspaceFilePanel, type RightWorkspaceFileTab, type RightWorkspaceImagePanel, type RightWorkspaceImageTab, type RightWorkspaceTab } from '../right-workspace';
 import type { SidePanelMarkdownState } from '../side-panel';
 import { i18n } from '../../i18n';
 
@@ -61,7 +62,7 @@ function mountPanel(
       finishCodeReview: vi.fn(),
       reviewCodeAgain: vi.fn(),
     },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n], components: { ElTooltip } },
   });
 }
 
@@ -97,6 +98,71 @@ describe('RightWorkspacePanel', () => {
 
     expect(wrapper.emitted('selectTab')).toStrictEqual([['browser']]);
     expect(wrapper.emitted('closeTab')).toStrictEqual([['review']]);
+  });
+
+  it('shows a tab title tooltip when the label may be compressed', async () => {
+    const fileTab = rightWorkspaceFileTab('src/long-file-name.ts');
+    const wrapper = mountPanel([fileTab], fileTab, {
+      [fileTab]: {
+        kind: 'source', title: 'long-file-name.ts', subtitle: 'src/long-file-name.ts', content: '',
+        language: 'typescript', state: 'idle', error: null,
+      },
+    });
+    const tab = wrapper.get('[role="tab"]');
+
+    expect(tab.attributes('aria-label')).toBe('long-file-name.ts');
+    expect(tab.attributes('title')).toBeUndefined();
+    await tab.trigger('mouseenter');
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('[role="tooltip"]')?.textContent).toContain('long-file-name.ts');
+    });
+  });
+
+  it('compresses tabs to icon width before requiring scroll navigation', async () => {
+    const tabs = Array.from({ length: 20 }, (_, index) => rightWorkspaceFileTab(`src/file-${index}.ts`));
+    const wrapper = mountPanel(tabs, tabs[0], {
+      [tabs[0]!]: {
+        kind: 'source', title: 'file-0.ts', subtitle: 'src/file-0.ts', content: '',
+        language: 'typescript', state: 'idle', error: null,
+      },
+    });
+    const strip = wrapper.get<HTMLElement>('.right-workspace-panel__tab-strip').element;
+    const list = wrapper.get<HTMLElement>('.right-workspace-panel__tab-list').element;
+    const track = wrapper.get<HTMLElement>('.right-workspace-panel__tab-track').element;
+    Object.defineProperties(strip, { clientWidth: { configurable: true, value: 400 } });
+    Object.defineProperties(list, {
+      clientWidth: { configurable: true, value: 352 },
+      scrollWidth: { configurable: true, value: 952 },
+    });
+    Object.defineProperties(track, { scrollWidth: { configurable: true, value: 952 } });
+    window.dispatchEvent(new Event('resize'));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(20);
+    expect(getComputedStyle(track).width).toBe('100%');
+    expect(getComputedStyle(wrapper.get('.right-workspace-panel__tab').element).minWidth).toBe('40px');
+    expect(getComputedStyle(wrapper.get('.right-workspace-panel__tab').element).flexShrink).toBe('1');
+    expect(wrapper.get('[role="tab"]').attributes('aria-label')).toBe('file-0.ts');
+    expect(getComputedStyle(list).overflowX).toBe('auto');
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Scroll tabs left"]').element.disabled).toBe(true);
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Scroll tabs right"]').element.disabled).toBe(false);
+
+    await wrapper.get('[aria-label="Scroll tabs right"]').trigger('click');
+    expect(list.scrollLeft).toBe(304);
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Scroll tabs left"]').element.disabled).toBe(false);
+
+    list.scrollLeft = 600;
+    list.dispatchEvent(new Event('scroll'));
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Scroll tabs right"]').element.disabled).toBe(true);
+
+    list.scrollLeft = 0;
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 352 } as DOMRect);
+    vi.spyOn(wrapper.findAll('.right-workspace-panel__tab')[19]!.element, 'getBoundingClientRect')
+      .mockReturnValue({ left: 912, right: 952 } as DOMRect);
+    await wrapper.setProps({ activeTab: tabs[19] });
+    await flushPromises();
+    expect(list.scrollLeft).toBe(600);
   });
 
   it('renders Files with a collapsible explorer beside supported workspace tabs', async () => {
@@ -214,6 +280,101 @@ describe('RightWorkspacePanel', () => {
 
     await wrapper.get('[aria-label="Close main.ts tab"]').trigger('click');
     expect(wrapper.emitted('closeTab')).toStrictEqual([[fileTab]]);
+  });
+
+  it('copies the path of the file tab that was right-clicked without selecting it', async () => {
+    const fileTab = 'file:src%2Fmain.ts' as const;
+    const copyText = vi.fn().mockResolvedValue(undefined);
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: copyText } });
+    try {
+      const wrapper = mountPanel(['browser', fileTab], 'browser', {
+        [fileTab]: {
+          kind: 'source', title: 'main.ts', subtitle: 'src/main.ts', content: '',
+          language: 'typescript', state: 'idle', error: null,
+        },
+      });
+      await wrapper.findAll('.right-workspace-panel__tab')[1]?.trigger('contextmenu', { clientX: 32, clientY: 48 });
+
+      const menu = document.body.querySelector('[aria-label="Tab actions"]');
+      expect([...menu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())).toStrictEqual([
+        'Copy path', 'Close tab', 'Close other tabs',
+      ]);
+      expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(1);
+      expect(wrapper.emitted('selectTab')).toBeUndefined();
+      (menu?.querySelector('[role="menuitem"]') as HTMLElement).click();
+      await flushPromises();
+
+      expect(copyText).toHaveBeenCalledExactlyOnceWith('src/main.ts');
+      expect(document.body.querySelector('[aria-label="Tab actions"]')).toBeNull();
+
+      await wrapper.findAll('.right-workspace-panel__tab')[0]?.trigger('contextmenu');
+      const browserMenu = document.body.querySelector('[aria-label="Tab actions"]');
+      expect([...browserMenu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())).toStrictEqual([
+        'Close tab', 'Close other tabs',
+      ]);
+      expect(browserMenu?.querySelector('[role="separator"]')).toBeNull();
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+    }
+  });
+
+  it('closes a tab through its context menu and disables Close other tabs when it is alone', async () => {
+    const wrapper = mountPanel(['files'], 'files');
+    await wrapper.get('.right-workspace-panel__tab').trigger('contextmenu');
+
+    const menu = document.body.querySelector('[aria-label="Tab actions"]');
+    const closeOthers = [...menu!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.trim() === 'Close other tabs');
+    expect(closeOthers?.disabled).toBe(true);
+    const closeTab = [...menu!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.trim() === 'Close tab');
+    closeTab?.click();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('closeTab')).toStrictEqual([['files']]);
+    expect(document.body.querySelector('[aria-label="Tab actions"]')).toBeNull();
+  });
+
+  it('keeps the right-clicked inactive tab and closes every other tab', async () => {
+    const wrapper = mountPanel(['review', 'browser', 'files'], 'review');
+    await wrapper.findAll('.right-workspace-panel__tab')[1]?.trigger('contextmenu');
+
+    const menu = document.body.querySelector('[aria-label="Tab actions"]');
+    const closeOthers = [...menu!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.trim() === 'Close other tabs');
+    closeOthers?.click();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('selectTab')).toStrictEqual([['browser']]);
+    expect(wrapper.emitted('closeTab')).toStrictEqual([['review'], ['files']]);
+    expect(document.body.querySelector('[aria-label="Tab actions"]')).toBeNull();
+  });
+
+  it('hides the native browser while a tab menu covers it, then restores it', async () => {
+    const wrapper = mountPanel(['browser'], 'browser');
+    await flushPromises();
+    const browserSetVisible = vi.mocked(window.codexClaw!.browserSetVisible);
+    browserSetVisible.mockClear();
+
+    await wrapper.get('.right-workspace-panel__tab').trigger('contextmenu');
+    await flushPromises();
+    expect(document.body.querySelector('[aria-label="Tab actions"]')).not.toBeNull();
+    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(document.body.querySelector('[aria-label="Tab actions"]')).toBeNull();
+    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+
+    await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
+    await flushPromises();
+    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+
+    document.body.click();
+    await flushPromises();
+    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
   });
 
   it('opens project files externally but omits Open In for outside-file previews', async () => {

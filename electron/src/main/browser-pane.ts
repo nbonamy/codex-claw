@@ -25,6 +25,7 @@ type HostedBrowserPane = {
   presentedTitle: string | null;
   presentedUrl: string | null;
   view: WebContentsView;
+  visible: boolean;
 };
 
 const maximumVisualizationBytes = 1_048_576;
@@ -99,6 +100,7 @@ export class BrowserPane {
       presentedTitle: null,
       presentedUrl: null,
       view,
+      visible: true,
     };
     this.panes.set(browserPaneKey(agentId, browserId), pane);
     browserWindow.contentView.addChildView(view);
@@ -161,12 +163,13 @@ export class BrowserPane {
       height: Math.max(1, Math.round(bounds.height)),
     };
     pane.view.setBounds(pane.bounds);
-    pane.view.setVisible(true);
+    pane.view.setVisible(pane.visible);
     this.syncAnnotationOverlayBounds(pane);
   }
 
   setVisible(agentId: string, browserId: string, visible: boolean): void {
     const pane = this.requirePane(agentId, browserId);
+    pane.visible = visible;
     pane.view.setVisible(visible);
     if (pane.annotationOverlay && !pane.annotationOverlay.isDestroyed()) {
       if (visible) pane.annotationOverlay.show();

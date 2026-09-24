@@ -191,6 +191,20 @@ describe('BrowserPanel', () => {
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 
+  it('hides the native view while its own menu is open', async () => {
+    const { api, wrapper } = mountPanel();
+    await flushPromises();
+    api.browserSetVisible.mockClear();
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await flushPromises();
+    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await flushPromises();
+    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+  });
+
   it('runs navigation controls, visibility updates, errors, resize, and cleanup', async () => {
     const { api, emitEvent, wrapper } = mountPanel();
     await flushPromises();

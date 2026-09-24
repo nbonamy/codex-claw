@@ -969,6 +969,9 @@ durable conversation state and agent execution in
 persisted application snapshot. Switching right-workspace tabs hides the
 native browser view without discarding its current page; closing the Browser
 tab destroys that view.
+The native child view paints above renderer DOM regardless of CSS z-index, so
+renderer overlays that may cover it must temporarily hide the view and restore
+it on dismissal. Bounds updates must preserve that requested visibility.
 
 The app-owned MCP `browser-open` tool can request this same surface for its
 calling agent. `clawd` delegates through `client/browser/open`; Electron asks

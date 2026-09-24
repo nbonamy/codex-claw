@@ -129,6 +129,7 @@ component is single-use.
 | Need | Canonical UI | Location |
 | --- | --- | --- |
 | Action, checkbox/radio, separator, or submenu rows | `AppMenu` | `vue/src/shared/menu/AppMenu.vue` |
+| Pointer-positioned context menu overlay | `AppContextMenu` | `vue/src/shared/menu/AppContextMenu.vue` |
 | Application launcher and icon catalog | `OpenInControl` | `vue/src/shared/OpenInControl.vue` |
 | Product glyphs, including GitHub | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
 | Dialog chrome and footer actions | `.claw-dialog`, `.claw-button` | `vue/src/styles/base.css` |
