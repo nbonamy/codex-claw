@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.20.4",
+  "currentVersion": "0.20.5",
   "releases": [
+    {
+      "version": "0.20.5",
+      "releasedAt": "2026-09-24",
+      "sourceSha256": "4f761d76d0557cad8e59c8a1cf7bf7a035b0247605b6cc331a1d3045753c7bd7",
+      "markdown": "### Improvements and fixes\n\n- File tabs can copy either an absolute or a repository-relative path. Their\n  tooltips wait longer, and the conversation keeps a readable width beside the\n  workspace.\n- The Git indicator says “No changes” when the selected diff is empty, and\n  weekly usage limits show a live time-to-reset countdown.\n- Visualize is available from an empty workspace, even before a diagram session\n  exists, and opens the same flow as `/visualize`.\n- Completed work can offer review at the handoff, while status updates and\n  turn-completion calls no longer clutter conversation or execution previews.\n- App and chat controls no longer select their labels when clicked. Completed\n  earlier turns no longer retain a stale streaming indicator."
+    },
     {
       "version": "0.20.4",
       "releasedAt": "2026-09-24",

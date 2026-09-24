@@ -4,6 +4,22 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.5] - 2026-09-24
+
+### Improvements and fixes
+
+- File tabs can copy either an absolute or a repository-relative path. Their
+  tooltips wait longer, and the conversation keeps a readable width beside the
+  workspace.
+- The Git indicator says “No changes” when the selected diff is empty, and
+  weekly usage limits show a live time-to-reset countdown.
+- Visualize is available from an empty workspace, even before a diagram session
+  exists, and opens the same flow as `/visualize`.
+- Completed work can offer review at the handoff, while status updates and
+  turn-completion calls no longer clutter conversation or execution previews.
+- App and chat controls no longer select their labels when clicked. Completed
+  earlier turns no longer retain a stale streaming indicator.
+
 ## [0.20.4] - 2026-09-24
 
 ### New features
