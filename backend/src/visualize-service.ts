@@ -1,3 +1,4 @@
+import { editCanvas, isCanvasDocument, selectedCanvasElements, type CanvasEdit, type SaveCanvasInput } from '@codex-claw/core/visualize-canvas';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +47,7 @@ export type VisualizeServiceOptions = {
 export class VisualizeService {
   private readonly createId: (prefix: string) => string;
   private readonly now: () => Date;
+  private readonly canvasWrites = new Map<string, Promise<unknown>>();
 
   constructor(private readonly options: VisualizeServiceOptions) {
     this.createId = options.createId ?? createEntityId;
@@ -69,6 +71,7 @@ export class VisualizeService {
       'Use them for Visualize requests to publish diagrams and suggestions, and keep chat secondary. Tool availability alone does not mean Visualize mode is active.',
       'Use list-visualizations to discover the current selection and get-visualization before replacing an existing visualization. Use add-visualization when the user asks for a new one.',
       SUPPORTED_MERMAID_GUIDANCE,
+      'Editable canvases are authoritative after import. Use read-visualization-canvas for the selection and revision, then edit-visualization-canvas for a single batch of targeted edits. Never replace a canvas or reimport its original source over user edits. Request all elements only when selection context is insufficient.',
       'Use the current conversation and existing visualizations as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research unless the user explicitly asks for outside evidence.',
       'If the Visualize pane is closed, handle the conversation normally and do not claim that Visualize mode is active.',
     ].join(' ');
@@ -173,7 +176,7 @@ export class VisualizeService {
 
   get(agentId: string, visualizationId: string): { success: true; visualization: Visualization } {
     const visualization = this.requireVisualization(agentId, visualizationId);
-    return { success: true, visualization: { ...visualization, content: { ...visualization.content } } };
+    return { success: true, visualization: { ...visualization, content: { ...visualization.content }, ...(visualization.canvas ? { canvas: structuredClone(visualization.canvas) } : {}) } };
   }
 
   list(agentId: string): {
@@ -222,6 +225,7 @@ export class VisualizeService {
     const index = visualize.visualizations.findIndex(candidate => candidate.id === input.visualizationId);
     const current = visualize.visualizations[index];
     if (!current) throw new Error(`Visualization not found: ${input.visualizationId}`);
+    if (current.canvas) throw new Error('This canvas is authoritative. Use edit-visualization-canvas with its current revision.');
     const suggestion = input.suggestionId
       ? visualize.suggestions.find(candidate => candidate.id === input.suggestionId)
       : undefined;
@@ -229,10 +233,12 @@ export class VisualizeService {
       throw new Error(`Visualize suggestion not found: ${input.suggestionId}`);
     }
     const timestamp = this.now().toISOString();
+    const content = await this.visualizationContent(input.content);
+    if (current.canvas || visualize.visualizations[index] !== current) throw new Error('Visualization changed. Read it again before replacing.');
     const replacement: Visualization = {
       ...current,
       title: boundedText(input.title, 'Visualization title', 200),
-      content: await this.visualizationContent(input.content),
+      content,
       updatedAt: timestamp,
     };
     visualize.visualizations[index] = replacement;
@@ -260,6 +266,67 @@ export class VisualizeService {
       await this.commit();
     }
     return cloneVisualizeSession(visualize);
+  }
+
+  saveCanvas(agentId: string, input: SaveCanvasInput) {
+    return this.canvasWrite(agentId, () => this.saveCanvasDocument(agentId, input));
+  }
+
+  private async saveCanvasDocument(agentId: string, input: SaveCanvasInput) {
+    // A renderer may finish its last save after the pane closes. Identity remains strict;
+    // MCP reads/edits still require the open context.
+    const session = this.sessionForAgent(agentId);
+    if (!session || session.id !== input.sessionId) throw new Error('Visualize mode is not active for this conversation.');
+    const visualization = session.visualizations.find(item => item.id === input.visualizationId);
+    if (!visualization) throw new Error('Visualization not found.');
+    if (!visualization.canvas && input.expectedSource !== JSON.stringify(visualization.content)) throw new Error('Visualization source changed. Open the current diagram again.');
+    if (input.expectedRevision !== (visualization.canvas?.revision ?? 0)) throw new Error('Stale canvas revision. Read the canvas and retry.');
+    const document = { ...input.document, revision: input.expectedRevision + 1 };
+    if (!isCanvasDocument(document)) throw new Error('Invalid canvas document.');
+    this.bindConversation(agentId, session);
+    const previous = visualization.canvas;
+    visualization.canvas = structuredClone(document);
+    try { await this.commit(); } catch (error) { visualization.canvas = previous; throw error; }
+    return structuredClone(document);
+  }
+
+  readCanvas(agentId: string, visualizationId: string, selectedOnly = true) {
+    const canvas = this.requireVisualization(agentId, visualizationId).canvas;
+    if (!canvas) throw new Error('Open this diagram in the canvas editor first.');
+    return {
+      revision: canvas.revision,
+      selectedElementIds: [...canvas.selectedElementIds],
+      elements: structuredClone(selectedOnly ? selectedCanvasElements(canvas) : canvas.elements.filter(element => !element.isDeleted)),
+    };
+  }
+
+  canvasPreview(agentId: string, visualizationId: string): string {
+    const canvas = this.requireVisualization(agentId, visualizationId).canvas;
+    if (!canvas?.preview) throw new Error('Canvas preview is not available yet.');
+    return canvas.preview;
+  }
+
+  editCanvas(agentId: string, visualizationId: string, expectedRevision: number, edits: CanvasEdit[]) {
+    return this.canvasWrite(agentId, () => this.editCanvasDocument(agentId, visualizationId, expectedRevision, edits));
+  }
+
+  private async editCanvasDocument(agentId: string, visualizationId: string, expectedRevision: number, edits: CanvasEdit[]) {
+    const visualization = this.requireVisualization(agentId, visualizationId);
+    const current = visualization.canvas;
+    if (!current || current.revision !== expectedRevision) throw new Error('Stale canvas revision. Read the canvas and retry.');
+    const next = editCanvas(current, edits);
+    this.bindConversation(agentId, this.requireContext(agentId).visualize);
+    visualization.canvas = next;
+    try { await this.commit(); } catch (error) { visualization.canvas = current; throw error; }
+    return { success: true, revision: next.revision };
+  }
+
+  private canvasWrite<T>(agentId: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.canvasWrites.get(agentId) ?? Promise.resolve();
+    const pending = previous.catch(() => undefined).then(action);
+    this.canvasWrites.set(agentId, pending);
+    void pending.finally(() => { if (this.canvasWrites.get(agentId) === pending) this.canvasWrites.delete(agentId); }).catch(() => undefined);
+    return pending;
   }
 
   async readAsset(agentId: string, visualizationId: string): Promise<VisualizationAsset> {
@@ -365,7 +432,7 @@ export function initialVisualizePrompt(): string {
     'Do not provide the suggestions only as prose. The Visualize pane is the source of truth.',
     'When asked to generate a suggestion or add a visualization, use Mermaid or SVG, or use image generation and then register its saved path with codex_claw.add-visualization.',
     SUPPORTED_MERMAID_GUIDANCE,
-    'When asked to edit a visualization, read it with codex_claw.get-visualization and publish the replacement with codex_claw.replace-visualization.',
+    'For static diagrams use get-visualization before replace-visualization. Once a canvas exists, read-visualization-canvas and edit-visualization-canvas are authoritative; preserve user edits and never replace or reimport its source.',
   ].join(' ');
   return injectedPrompt('Suggest useful visualizations for this conversation.', instructions);
 }

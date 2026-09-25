@@ -7,6 +7,10 @@ describe('Claw tool title presenter', () => {
   it.each([
     ['codex_claw.suggest-visualizations', { suggestions: [] }, 'completed', 'Suggested diagrams'],
     ['codex_claw.add-visualization', { title: 'System map' }, 'completed', 'Created diagram'],
+    ['codex_claw.read-visualization-canvas', {}, 'completed', 'Read canvas selection'],
+    ['codex_claw.edit-visualization-canvas', {}, 'running', 'Editing canvas'],
+    ['codex_claw.edit-visualization-canvas', {}, 'error', 'Could not edit canvas'],
+    ['codex_claw.view-visualization-canvas', {}, 'completed', 'Viewed canvas'],
     ['codex_claw.get-visualization', { visualizationId: 'diagram-1' }, 'completed', 'Read diagram'],
     ['codex_claw.list-visualizations', {}, 'completed', 'Listed diagrams'],
     ['codex_claw.delete-visualization', { visualizationId: 'diagram-1' }, 'completed', 'Deleted diagram'],

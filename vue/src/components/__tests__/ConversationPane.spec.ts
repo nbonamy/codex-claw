@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/core/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
+import type { VisualizationAnnotation } from '../use-visualization-annotations';
 import { i18n } from '../../i18n';
 
 const agent: Agent = {
@@ -138,6 +139,26 @@ describe('ConversationPane', () => {
     expect(wrapper.text()).not.toContain('Explain what you found.');
     await wrapper.get('[aria-label="Remove chat annotation"]').trigger('click');
     expect(wrapper.emitted('remove-text-annotation')).toStrictEqual([['annotation-1']]);
+  });
+
+  it('renders selected diagram shapes as removable composer context', async () => {
+    const annotation: VisualizationAnnotation = {
+      id: 'visualization-annotation-1',
+      visualizationId: 'visualization-7',
+      title: 'User-directed canvas edit',
+      revision: 4,
+      comment: 'blue',
+      elements: [{ id: 'api', type: 'rectangle', text: 'API' }, { id: 'db', type: 'rectangle', text: 'Database' }],
+    };
+    const wrapper = mountPane({ controller: controllerFor(messages), agent, visualizationAnnotations: [annotation] });
+
+    expect(wrapper.getComponent({ name: 'CodexConversationPane' }).props('hasComposerContext')).toBe(true);
+    expect(wrapper.get('.composer-context-cards__label').text()).toBe('Annotation');
+    expect(wrapper.find('.composer-context-cards__detail').exists()).toBe(false);
+    expect(wrapper.find('.composer-context-cards__label .tabler-icon-sitemap').exists()).toBe(true);
+    expect(wrapper.get('.composer-context-cards__card').attributes('title')).toBe('blue');
+    await wrapper.get('[aria-label="Remove diagram annotation: blue"]').trigger('click');
+    expect(wrapper.emitted('remove-visualization-annotation')).toStrictEqual([['visualization-annotation-1']]);
   });
 
   it('renders a review finding as removable composer context without exposing its body', async () => {
@@ -592,6 +613,7 @@ function mountPane(props: {
   agent: Agent | null;
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   textAnnotations?: readonly ChatTextAnnotation[];
+  visualizationAnnotations?: readonly VisualizationAnnotation[];
   reviewFinding?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
   plan?: ThreadPlan | null;
   planVisible?: boolean;

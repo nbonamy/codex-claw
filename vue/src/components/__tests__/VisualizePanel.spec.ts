@@ -1,8 +1,11 @@
+import { defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import type { VisualizationAsset, VisualizeSession } from '@codex-claw/core/visualize';
 import VisualizePanel from '../VisualizePanel.vue';
+
+vi.mock('../ExcalidrawCanvas.vue', () => ({ default: defineComponent({ props: ['visualization', 'imageSource'], template: '<div class="editor-canvas">{{ visualization.title }} canvas<img v-if="imageSource" :src="imageSource" /></div>' }) }));
 
 function visualizeSession(): VisualizeSession {
   return {
@@ -21,6 +24,20 @@ function visualizeSession(): VisualizeSession {
 }
 
 describe('VisualizePanel', () => {
+  it('opens the canvas immediately without a separate Mermaid view', async () => {
+    const visualize = visualizeSession();
+    visualize.visualizations = [{ id: 'map', title: 'Map', content: { kind: 'mermaid', source: 'flowchart LR; A --> B' }, createdAt: '', updatedAt: '' }];
+    visualize.selectedVisualizationId = 'map';
+    const wrapper = mount(VisualizePanel, {
+      props: { visualize, readAsset: vi.fn(), saveCanvas: vi.fn() },
+      global: { stubs: { ExcalidrawCanvas: defineComponent({
+        props: ['visualization', 'sessionId', 'save'],
+        template: `<div class="editor-canvas">{{ visualization.title }} canvas</div>`,
+      }) } },
+    });
+    expect(wrapper.get('.editor-canvas').text()).toBe('Map canvas');
+  });
+
   it('moves from suggestions to an inspectable visualization and switches with the thumbnail strip', async () => {
     const readAsset = vi.fn().mockResolvedValue({
       visualizationId: 'visualization-image',
@@ -28,7 +45,7 @@ describe('VisualizePanel', () => {
       dataUrl: 'data:image/png;base64,ZGlhZ3JhbQ==',
     });
     const visualize = visualizeSession();
-    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset } });
+    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset, saveCanvas: vi.fn() } });
 
     expect(wrapper.get('.visualize-panel__intro').text()).toContain('Choose a visualization to generate');
     expect(wrapper.findAll('.visualize-panel__suggestion')).toHaveLength(2);
@@ -69,7 +86,7 @@ describe('VisualizePanel', () => {
     const visualize = visualizeSession();
     const description = `Map ${'every relevant system boundary '.repeat(12)}`.trim();
     visualize.suggestions[0].description = description;
-    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset: vi.fn() } });
+    const wrapper = mount(VisualizePanel, { props: { saveCanvas: vi.fn(), visualize, readAsset: vi.fn() } });
     const rendered = wrapper.findAll('.visualize-panel__suggestion p')[0];
 
     expect(rendered.text()).toHaveLength(118);
@@ -94,7 +111,7 @@ describe('VisualizePanel', () => {
     const readAsset = vi.fn()
       .mockReturnValueOnce(oldAsset)
       .mockReturnValueOnce(newAsset);
-    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset } });
+    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset, saveCanvas: vi.fn() } });
 
     await wrapper.setProps({
       visualize: {
@@ -128,7 +145,7 @@ describe('VisualizePanel', () => {
     const readAsset = vi.fn()
       .mockResolvedValueOnce({ visualizationId: image.id, mimeType: 'image/png', dataUrl: 'data:image/png;base64,old' })
       .mockResolvedValueOnce({ visualizationId: image.id, mimeType: 'image/png', dataUrl: 'data:image/png;base64,new' });
-    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset } });
+    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset, saveCanvas: vi.fn() } });
     await flushPromises();
 
     await wrapper.setProps({ visualize: { ...visualize, visualizations: [], selectedVisualizationId: null } });
@@ -150,7 +167,7 @@ describe('VisualizePanel', () => {
     }];
     visualize.selectedVisualizationId = 'visualization-image';
     const wrapper = mount(VisualizePanel, {
-      props: { visualize, readAsset: vi.fn().mockRejectedValue(new Error('missing')) },
+      props: { saveCanvas: vi.fn(), visualize, readAsset: vi.fn().mockRejectedValue(new Error('missing')) },
     });
 
     await flushPromises();
@@ -181,69 +198,15 @@ describe('VisualizePanel', () => {
     }];
     visualize.selectedVisualizationId = 'visualization-svg';
     const wrapper = mount(VisualizePanel, {
-      props: { visualize, readAsset: vi.fn() },
+      props: { saveCanvas: vi.fn(), visualize, readAsset: vi.fn() },
     });
-    const source = decodeURIComponent(wrapper.get('.visualize-panel__diagram img').attributes('src') ?? '');
+    const source = decodeURIComponent(wrapper.get('.visualize-panel__thumbnail img').attributes('src') ?? '');
 
     expect(source).not.toContain('<script');
     expect(source).not.toContain('onload');
     expect(source).not.toContain('https://example.com');
     expect(source).toContain('fill:url(#gradient)');
     expect(source).toContain('marker-end="url(#arrowhead)"');
-  });
-
-  it('zooms, pans, and resets the selected visualization while leaving thumbnails static', async () => {
-    const visualize = visualizeSession();
-    visualize.visualizations = [{
-      id: 'visualization-svg',
-      title: 'Interactive visualization',
-      content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20"/></svg>' },
-      createdAt: visualize.createdAt,
-      updatedAt: visualize.updatedAt,
-    }];
-    visualize.selectedVisualizationId = 'visualization-svg';
-    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset: vi.fn() } });
-    const visualization = wrapper.get('.visualize-panel__diagram');
-    const viewport = visualization.get('.visualization-view__viewport');
-    const image = visualization.get('.visualization-view__image');
-
-    expect(wrapper.findAll('button[aria-label="Zoom in"]')).toHaveLength(1);
-    expect(wrapper.findAll('.visualize-panel__thumbnail .visualization-view__controls')).toHaveLength(0);
-
-    await wrapper.get('button[aria-label="Zoom in"]').trigger('click');
-    expect(image.attributes('style')).toContain('scale(1.25)');
-
-    viewport.element.dispatchEvent(new MouseEvent('pointerdown', {
-      bubbles: true, button: 0, clientX: 10, clientY: 10,
-    }));
-    viewport.element.dispatchEvent(new MouseEvent('pointermove', {
-      bubbles: true, clientX: 30, clientY: 40,
-    }));
-    await flushPromises();
-    expect(image.attributes('style')).toContain('translate(20px, 30px)');
-
-    await viewport.trigger('keydown', { key: 'ArrowRight' });
-    expect(image.attributes('style')).toContain('translate(0px, 30px)');
-
-    await wrapper.get('button[aria-label="Reset view"]').trigger('click');
-    expect(image.attributes('style')).toContain('translate(0px, 0px) scale(1)');
-
-    viewport.element.dispatchEvent(new WheelEvent('wheel', {
-      bubbles: true, cancelable: true, deltaY: -100,
-    }));
-    await flushPromises();
-    expect(wrapper.get('button[aria-label="Reset view"]').text()).toBe('106%');
-
-    await wrapper.setProps({
-      visualize: {
-        ...visualize,
-        visualizations: [{
-          ...visualize.visualizations[0],
-          content: { kind: 'svg', source: '<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>' },
-        }],
-      },
-    });
-    expect(wrapper.get('button[aria-label="Reset view"]').text()).toBe('100%');
   });
 
   it('confirms thumbnail deletion before emitting the visualization id', async () => {
@@ -257,7 +220,7 @@ describe('VisualizePanel', () => {
     }];
     visualize.selectedVisualizationId = 'visualization-system';
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
-    const wrapper = mount(VisualizePanel, { props: { visualize, readAsset: vi.fn() } });
+    const wrapper = mount(VisualizePanel, { props: { saveCanvas: vi.fn(), visualize, readAsset: vi.fn() } });
 
     await wrapper.get('button[aria-label="Delete System map"]').trigger('click');
     await flushPromises();
@@ -273,5 +236,29 @@ describe('VisualizePanel', () => {
     await wrapper.get('button[aria-label="Delete System map"]').trigger('click');
     await flushPromises();
     expect(wrapper.emitted('delete')).toStrictEqual([['visualization-system']]);
+    confirm.mockRestore();
+  });
+
+  it('allows thumbnail deletion while the agent is working', async () => {
+    const visualize = visualizeSession();
+    visualize.visualizations = [{
+      id: 'visualization-system',
+      title: 'System map',
+      content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
+      createdAt: visualize.createdAt,
+      updatedAt: visualize.updatedAt,
+    }];
+    visualize.selectedVisualizationId = 'visualization-system';
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const wrapper = mount(VisualizePanel, { props: { busy: true, saveCanvas: vi.fn(), visualize, readAsset: vi.fn() } });
+
+    const remove = wrapper.get('button[aria-label="Delete System map"]');
+    expect(remove.attributes('disabled')).toBeUndefined();
+    await remove.trigger('click');
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('delete')).toStrictEqual([['visualization-system']]);
+    confirm.mockRestore();
   });
 });

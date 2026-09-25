@@ -789,3 +789,16 @@ implementation report updates only its assigned ticket, appends verification
 evidence, and continues toward the explicit Review stage. Late reports from
 stopped or accepted attempts are rejected because they no longer have an active
 identity-bound context.
+
+### Visualize canvas tools
+
+The focused Visualize module exposes `read-visualization-canvas`,
+`edit-visualization-canvas`, and `view-visualization-canvas`. Reads default to the
+selection and its bound labels; full-scene reads are explicit. Edits are bounded
+batches against stable existing IDs and an expected revision. The service validates
+all edits before replacing the document and serializes canvas writes per agent.
+A stale revision must be reread, never retried blindly. Whole-visualization
+replacement is rejected after an editable canvas exists. The view tool returns
+the latest renderer-saved PNG and reports unavailable while a changed scene has
+no fresh preview. All three tools use the authenticated agent's open Visualize
+conversation and remain provider-neutral.

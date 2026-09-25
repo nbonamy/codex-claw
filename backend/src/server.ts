@@ -1197,6 +1197,12 @@ export class ClawBackendServer {
           return this.remoteTeams.clientSnapshot();
         });
       }
+      case backendMethods.agentVisualizationCanvasSave: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const input = requireRecordParam(message.params, 'input') as unknown as import('@codex-claw/core/visualize-canvas').SaveCanvasInput;
+        return this.routeAgentResultRequest(message.id, agentId, message.method, { agentId, input },
+          () => this.visualize.saveCanvas(agentId, input));
+      }
       case backendMethods.agentVisualizationAssetGet: {
         const agentId = requireStringParam(message.params, 'agentId');
         const visualizationId = requireStringParam(message.params, 'visualizationId');

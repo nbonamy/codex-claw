@@ -1,10 +1,11 @@
+import { excalidrawAssets } from '../vue/vite.excalidraw-assets';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
 
 export default defineConfig({
   root: path.resolve(__dirname, 'src/client'),
-  plugins: [vue()],
+  plugins: [vue(), excalidrawAssets()],
   resolve: {
     alias: {
       '@codex-claw/core': path.resolve(__dirname, '../core/src'),

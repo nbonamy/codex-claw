@@ -44,6 +44,7 @@
       :agents="snapshot.agents"
       :attachment-annotation-counts="activeAttachmentAnnotationCounts"
       :text-annotations="chatTextAnnotations"
+      :visualization-annotations="visualizationAnnotations"
       :review-finding="reviewFindingAttachment"
       :plan="currentTurnPlan"
       :plan-visible="executionPlanVisible"
@@ -57,6 +58,7 @@
       @retry-history="retryConversationHistory"
       @thread-flag="respondToThreadFlag($event)"
       @remove-text-annotation="removeChatTextAnnotation"
+      @remove-visualization-annotation="removeVisualizationAnnotation"
       @remove-review-finding="emit('removeReviewFindingAttachment')"
     />
     <RightWorkspacePanel
@@ -126,6 +128,7 @@
       @clarify-finding="emit('clarifyCodeReviewFinding', { agentId: agent.id, ...$event })"
       @select-tab="selectRightWorkspaceTab(agent.id, $event)"
       @send-prompt="forwardPrompt"
+      @annotate-visualization="attachVisualizationAnnotation"
     />
     <div
       v-if="rightWorkspaceVisible"
@@ -189,6 +192,7 @@ import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import type { AgentRightWorkspaceState } from './use-right-workspace-state';
 import type { PlanReviewComment, SidePanelGitDiffState } from './side-panel';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
+import type { VisualizationAnnotation, VisualizationAnnotationInput } from './use-visualization-annotations';
 import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { fileBasename } from './use-workspace-previews';
 import {
@@ -203,6 +207,7 @@ import {
 const props = defineProps<{
   activeAttachmentAnnotationCounts: Readonly<Record<string, number>>;
   addChatTextAnnotation: (selection: CodexMessageTextSelection, comment: string) => void;
+  addVisualizationAnnotation: (annotation: VisualizationAnnotationInput) => void;
   agentFiles: AgentFileSearchItem[];
   agentSidebarCollapsed: boolean;
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
@@ -213,6 +218,7 @@ const props = defineProps<{
   conversationPaneController: CodexConversationPaneController;
   conversationPlan: ThreadPlan | null;
   chatTextAnnotations: readonly ChatTextAnnotation[];
+  visualizationAnnotations: readonly VisualizationAnnotation[];
   reviewFindingAttachment?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
   currentAgent: Agent | null;
   currentAgentGitStatus: AgentGitStatus | null;
@@ -246,6 +252,7 @@ const props = defineProps<{
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;
   removeChatTextAnnotation: (annotationId: string) => void;
+  removeVisualizationAnnotation: (annotationId: string) => void;
   openFilePreview: (link: ConversationFileLink) => Promise<void>;
   openFilePreviewForAgent: (agentId: string, filePath: string) => Promise<void>;
   openInApplications: OpenInApplicationCatalog;
@@ -696,6 +703,11 @@ function prefillRepositoryWork(agentId: string, item: WorkItem): void {
 function isLocalAgent(agent: Agent): boolean {
   const team = props.snapshot.teams.find((candidate) => candidate.id === agent.teamId);
   return !team?.remoteConnectionId;
+}
+
+function attachVisualizationAnnotation(annotation: VisualizationAnnotationInput): void {
+  props.addVisualizationAnnotation(annotation);
+  focusComposer();
 }
 
 function focusComposer(): void {

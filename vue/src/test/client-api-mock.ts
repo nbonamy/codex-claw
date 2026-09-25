@@ -32,6 +32,7 @@ export function createClientApiMock(
     generateVisualizationSuggestion: unscripted('generateVisualizationSuggestion'),
     selectVisualization: unscripted('selectVisualization'),
     deleteVisualization: unscripted('deleteVisualization'),
+    saveVisualizationCanvas: unscripted('saveVisualizationCanvas'),
     readVisualizationAsset: unscripted('readVisualizationAsset'),
     startCodeReview: unscripted('startCodeReview'),
     decideCodeReviewFinding: unscripted('decideCodeReviewFinding'),

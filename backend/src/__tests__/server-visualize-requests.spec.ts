@@ -7,6 +7,20 @@ import { ClawBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
 
 describe('ClawBackendServer Visualize workflow', () => {
+  it('routes canvas saves through the owning agent and publishes persisted content', async () => {
+    const { agentId, server, snapshot } = setup();
+    try {
+      await request(server, { agentId });
+      const session = snapshot.agents.at(-1)!.visualize!;
+      session.visualizations.push({ id: 'canvas', title: 'Canvas', content: { kind: 'svg', source: '<svg />' }, createdAt: '', updatedAt: '' });
+      const result = await server.handleMessage({ jsonrpc: '2.0', id: 'canvas-save', method: backendMethods.agentVisualizationCanvasSave, params: {
+        agentId, input: { sessionId: session.id, expectedSource: JSON.stringify(session.visualizations[0].content), visualizationId: 'canvas', expectedRevision: 0, document: { elements: [], files: {}, selectedElementIds: [], preview: '' } },
+      } });
+      expect(result).toMatchObject({ result: { revision: 1, elements: [] } });
+      expect(snapshot.agents.at(-1)!.visualize!.visualizations[0].canvas?.revision).toBe(1);
+    } finally { await server.close(); }
+  });
+
   it('starts /visualize with one tool-first suggestion prompt and does not restart it on reentry', async () => {
     const { agentId, sendPrompt, server, snapshot } = setup();
 

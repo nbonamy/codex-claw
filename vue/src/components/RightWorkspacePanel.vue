@@ -185,7 +185,9 @@
       v-show="activeTab === 'visualize'"
       :busy="agent.status.type === 'working' || agent.status.type === 'awaitingInput'"
       :visualize="agent.visualize"
+      :save-canvas="input => saveCanvas(agent.id, input)"
       :read-asset="visualizationId => readVisualizationAsset(agent.id, visualizationId)"
+      @annotate="emit('annotateVisualization', $event)"
       @generate="generateVisualizationSuggestion(agent.id, { suggestionId: $event })"
       @select="selectVisualization(agent.id, { visualizationId: $event })"
       @delete="deleteVisualization(agent.id, { visualizationId: $event })"
@@ -334,6 +336,12 @@
 </template>
 
 <script setup lang="ts">
+import { codexClawApi } from '../platform-api';
+import type { SaveCanvasInput } from '@codex-claw/core/visualize-canvas';
+async function saveCanvas(agentId: string, input: SaveCanvasInput) {
+  if (!codexClawApi) throw new Error('Visualize is not available.');
+  return codexClawApi.saveVisualizationCanvas(agentId, input);
+}
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
@@ -444,6 +452,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
+  annotateVisualization: [annotation: import('./use-visualization-annotations').VisualizationAnnotationInput];
   closeTab: [tab: RightWorkspaceTab];
   cancelPlan: [];
   commentPlan: [comments: PlanReviewComment[]];
