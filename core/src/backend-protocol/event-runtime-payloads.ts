@@ -218,12 +218,14 @@ function expectAgentCreationProgress(value: unknown, path: string): void {
   expectLiteral(value.backend, ['codex', 'claude'], `${path}.backend`);
   expectString(value.repositoryName, `${path}.repositoryName`);
   expectBoolean(value.createWorktree, `${path}.createWorktree`);
+  expectOptional(value, 'createProject', path, expectBoolean);
   expectOptional(value, 'branchName', path, expectString);
   expectBoolean(value.hasPrompt, `${path}.hasPrompt`);
   expectOptional(value, 'phase', path, (candidate, candidatePath) => {
     expectLiteral(
       candidate,
       [
+        'creatingProject',
         'creatingWorktree',
         'initializingWorktree',
         'creatingAgent',

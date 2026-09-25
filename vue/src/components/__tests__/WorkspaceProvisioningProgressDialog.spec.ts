@@ -6,6 +6,32 @@ import WorkspaceProvisioningProgressDialog from '../WorkspaceProvisioningProgres
 describe('WorkspaceProvisioningProgressDialog', () => {
   afterEach(() => vi.useRealTimers());
 
+  it('shows project creation stages driven by backend progress and retains handoff failures', async () => {
+    const progress = {
+      id: 'project-1', state: 'running' as const, backend: 'codex' as const,
+      repositoryName: 'new-product', createWorktree: false, createProject: true,
+      hasPrompt: true, phase: 'creatingProject' as const,
+    };
+    const wrapper = mount(WorkspaceProvisioningProgressDialog, {
+      props: { operation: { mode: 'single', progress } },
+    });
+    expect(wrapper.text()).toContain('Creating new-product');
+    const steps = () => wrapper.findAll('.staged-operation-progress li');
+    expect(steps()).toHaveLength(3);
+    expect(steps()[0]!.text()).toContain('Creating project folder');
+    expect(steps()[0]!.classes()).toContain('is-active');
+    await wrapper.setProps({ operation: { mode: 'single', progress: { ...progress, phase: 'creatingAgent' } } });
+    expect(steps()[1]!.classes()).toContain('is-active');
+    await wrapper.setProps({ operation: { mode: 'single', progress: { ...progress, phase: 'startingPrompt' } } });
+    expect(steps()[2]!.classes()).toContain('is-active');
+    await wrapper.setProps({ operation: { mode: 'single', progress: {
+      ...progress, phase: 'startingPrompt', state: 'error', error: 'Project remains available; backend offline.',
+    } } });
+    expect(wrapper.get('[role="status"]').text()).toContain('Project remains available; backend offline.');
+    await wrapper.get('.claw-dialog__footer button').trigger('click');
+    expect(wrapper.emitted('close')).toStrictEqual([['project-1']]);
+  });
+
   it('shows the delegated worktree handoff and closes after the success animation', async () => {
     vi.useFakeTimers();
     const initialProgress = {

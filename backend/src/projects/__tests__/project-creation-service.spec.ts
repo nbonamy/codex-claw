@@ -19,25 +19,29 @@ describe('ProjectCreationService', () => {
       startAgent: vi.fn(async () => { steps.push('prompt'); }),
     });
 
-    await expect(service.create({ name: ' new-product ', teamId: 'team-one', prompt: ' Build it. ' })).resolves.toStrictEqual({
+    await expect(service.create({ name: ' new-product ', teamId: 'team-one', prompt: ' Build it. ' }, progress => {
+      steps.push(progress.state === 'running' ? progress.phase! : progress.state);
+    })).resolves.toStrictEqual({
       repository, agent, promptSubmitted: true,
     });
-    expect(steps).toStrictEqual(['repository', 'agent', 'prompt']);
+    expect(steps).toStrictEqual(['creatingProject', 'repository', 'creatingAgent', 'agent', 'startingPrompt', 'prompt', 'success']);
   });
 
   it('reports the recoverable project folder when agent creation fails', async () => {
     const createRepository = vi.fn().mockResolvedValue(repository);
     const startAgent = vi.fn();
+    const onProgress = vi.fn();
     const service = new ProjectCreationService({
       createRepository,
       createAgent: vi.fn().mockRejectedValue(new Error('Agent unavailable')),
       startAgent,
     });
 
-    await expect(service.create({ name: 'new-product', teamId: 'team-one' }))
+    await expect(service.create({ name: 'new-product', teamId: 'team-one' }, onProgress))
       .rejects.toThrow('Created the project folder at /src/new-product, but could not finish setting up its agent. The folder remains on disk; check the agent list before retrying. Agent unavailable');
     expect(createRepository).toHaveBeenCalledOnce();
     expect(startAgent).not.toHaveBeenCalled();
+    expect(onProgress).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'error', phase: 'creatingAgent', error: expect.stringContaining(repository.path) }));
   });
 
   it('keeps an already created project recoverable when its initial prompt fails', async () => {

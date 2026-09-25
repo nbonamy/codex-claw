@@ -42,6 +42,7 @@ import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRe
 import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/core/contracts';
 import { codexClawApi } from '../platform-api';
 import AnnotationSendButton from './AnnotationSendButton.vue';
+import { useRendererOverlays } from '../shared/use-renderer-overlays';
 
 const props = withDefaults(defineProps<{
   agentId: string;
@@ -67,7 +68,9 @@ const annotationMode = ref(false);
 const annotations = ref<BrowserAnnotation[]>([]);
 const state = ref<BrowserState>({ url: '', title: '', canGoBack: false, canGoForward: false });
 const menuOpen = ref(false);
-const nativeVisible = computed(() => props.visible && !menuOpen.value);
+const rendererOverlayVisible = useRendererOverlays();
+const nativeVisible = computed(() => props.visible && !menuOpen.value && !rendererOverlayVisible.value);
+let browserReady = false;
 const displayHost = computed(() => {
   try {
     return new URL(state.value.url || address.value).host;
@@ -85,6 +88,8 @@ onMounted(async () => {
   if (viewport.value) resizeObserver.observe(viewport.value);
   try {
     state.value = await openInitialContent();
+    browserReady = true;
+    if (!nativeVisible.value) await codexClawApi?.browserSetVisible(props.agentId, props.browserId, false);
     if (state.value.url) address.value = state.value.url;
   } catch (reason) {
     error.value = messageFor(reason);
@@ -103,7 +108,7 @@ onBeforeUnmount(() => {
 });
 
 watch(nativeVisible, async (visible) => {
-  if (!codexClawApi) return;
+  if (!codexClawApi || !browserReady) return;
   await codexClawApi.browserSetVisible(props.agentId, props.browserId, visible);
   if (visible) {
     await nextTick();
