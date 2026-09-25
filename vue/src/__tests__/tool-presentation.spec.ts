@@ -17,6 +17,7 @@ import { presentClawTool } from '../tool-presentation';
 
 describe('Claw tool presentation', () => {
   it.each([
+    ['edit-visualization-canvas', SitemapIcon, 'Edited canvas'],
     ['add-visualization', SitemapIcon, 'Created diagram'],
     ['delete-visualization', SitemapIcon, 'Deleted diagram'],
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],

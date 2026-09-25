@@ -746,6 +746,7 @@ export type CodexClawApi = {
   generateVisualizationSuggestion(agentId: string, input: import('./visualize').GenerateVisualizationSuggestionInput): Promise<AppSnapshot>;
   selectVisualization(agentId: string, input: import('./visualize').SelectVisualizationInput): Promise<AppSnapshot>;
   deleteVisualization(agentId: string, input: import('./visualize').DeleteVisualizationInput): Promise<AppSnapshot>;
+  saveVisualizationCanvas(agentId: string, input: import('./visualize-canvas').SaveCanvasInput): Promise<import('./visualize-canvas').CanvasDocument>;
   readVisualizationAsset(agentId: string, visualizationId: string): Promise<import('./visualize').VisualizationAsset>;
   startCodeReview(agentId: string, input: import('./code-review').CodeReviewStartInput): Promise<AppSnapshot>;
   decideCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDecisionInput): Promise<AppSnapshot>;

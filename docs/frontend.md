@@ -251,3 +251,26 @@ follow [Custom MCP Tools](custom-tools.md).
 Behavior is the ledger. Update the test at the owning seam when a rule changes;
 update this guide only when a reusable convention or canonical component
 changes.
+
+## Editable Visualize canvases
+
+Visualize imports Mermaid/SVG/image input directly into the canvas. The canvas
+is the default read-only view, with pan active; Edit unlocks editing without
+switching renderers. Once imported, `Visualization.canvas` is authoritative. `ExcalidrawCanvas.vue` owns
+save scheduling and selection persistence; `excalidraw-editor.ts` isolates the
+React SDK, browser-only Mermaid import, SVG sanitization/rasterization, exports,
+and editor cleanup. Claw's existing conversation handles requests for changes; the canvas has no
+separate composer. The agent reads the saved selection through its canvas tools.
+
+Canvas elements, binary assets, selection, revision, and a bounded PNG preview
+persist through clawd's app-owned save method. No hosted editor or browser-only
+database owns the document. Renderer saves include the Visualize session ID and
+expected revision; final saves can finish after closing the pane. MCP operations
+remain gated by the owning open conversation. Conflicting revisions are rejected
+without replacing local edits. Agent batches enter editor history as one immediate
+undo unit; history itself is editor-local and resets when the editor remounts.
+
+The pinned Mermaid converter imports supported diagrams as native shapes. SVG,
+generated images, and converter image fallbacks are rasterized sanitized content,
+not editable vector shapes. Never regenerate Mermaid over an edited canvas.
+Both hosts bundle Excalidraw fonts and license notices with the renderer.

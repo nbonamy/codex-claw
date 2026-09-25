@@ -90,6 +90,10 @@ export type ClawBackendRequestMap = {
     params: { agentId: string; input: import('../visualize').DeleteVisualizationInput };
     result: AppSnapshot;
   };
+  [backendMethods.agentVisualizationCanvasSave]: {
+    params: { agentId: string; input: import('../visualize-canvas').SaveCanvasInput };
+    result: import('../visualize-canvas').CanvasDocument;
+  };
   [backendMethods.agentVisualizationAssetGet]: {
     params: { agentId: string; visualizationId: string };
     result: import('../visualize').VisualizationAsset;

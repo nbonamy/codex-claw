@@ -1,3 +1,4 @@
+import { isCanvasDocument, type CanvasDocument } from './visualize-canvas';
 import type { BackendConversationRef } from './contracts';
 
 export const visualizationKinds = ['mermaid', 'svg', 'image'] as const;
@@ -37,6 +38,7 @@ export type Visualization = {
   id: string;
   title: string;
   content: VisualizationContent;
+  canvas?: CanvasDocument;
   createdAt: string;
   updatedAt: string;
 };
@@ -104,6 +106,7 @@ export function cloneVisualizeSession(session: VisualizeSession): VisualizeSessi
       id: visualization.id,
       title: visualization.title,
       content: { ...visualization.content },
+      ...(visualization.canvas ? { canvas: structuredClone(visualization.canvas) } : {}),
       createdAt: visualization.createdAt,
       updatedAt: visualization.updatedAt,
     })),
@@ -123,6 +126,7 @@ function isVisualization(value: unknown): value is Visualization {
     && typeof value.id === 'string'
     && typeof value.title === 'string'
     && isVisualizationContent(value.content)
+    && (value.canvas === undefined || isCanvasDocument(value.canvas))
     && typeof value.createdAt === 'string'
     && typeof value.updatedAt === 'string';
 }

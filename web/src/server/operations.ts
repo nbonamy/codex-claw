@@ -17,6 +17,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   generateVisualizationSuggestion: [backendMethods.agentVisualizationSuggestionGenerate, named('agentId', 'input')],
   selectVisualization: [backendMethods.agentVisualizationSelect, named('agentId', 'input')],
   deleteVisualization: [backendMethods.agentVisualizationDelete, named('agentId', 'input')],
+  saveVisualizationCanvas: [backendMethods.agentVisualizationCanvasSave, named('agentId', 'input')],
   readVisualizationAsset: [backendMethods.agentVisualizationAssetGet, named('agentId', 'visualizationId')],
   startCodeReview: [backendMethods.agentCodeReviewStart, named('agentId', 'input')],
   decideCodeReviewFinding: [backendMethods.agentCodeReviewFindingDecide, named('agentId', 'input')],

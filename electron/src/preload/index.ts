@@ -11,6 +11,7 @@ const api: CodexClawApi = {
   generateVisualizationSuggestion: (agentId, input) => ipc.invoke(ipcChannels.generateVisualizationSuggestion, agentId, input),
   selectVisualization: (agentId, input) => ipc.invoke(ipcChannels.selectVisualization, agentId, input),
   deleteVisualization: (agentId, input) => ipc.invoke(ipcChannels.deleteVisualization, agentId, input),
+  saveVisualizationCanvas: (agentId, input) => ipc.invoke(ipcChannels.saveVisualizationCanvas, agentId, input),
   readVisualizationAsset: (agentId, visualizationId) => ipc.invoke(ipcChannels.readVisualizationAsset, agentId, visualizationId),
   startCodeReview: (agentId, input) => ipc.invoke(ipcChannels.startCodeReview, agentId, input),
   decideCodeReviewFinding: (agentId, input) => ipc.invoke(ipcChannels.decideCodeReviewFinding, agentId, input),

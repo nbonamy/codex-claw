@@ -1,3 +1,4 @@
+import { excalidrawAssets } from '../vue/vite.excalidraw-assets';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
@@ -34,7 +35,7 @@ export default defineConfig({
       ],
     },
   },
-  plugins: [vue()],
+  plugins: [vue(), excalidrawAssets()],
   build: {
     outDir: path.resolve(__dirname, '.vite/renderer/main_window'),
     emptyOutDir: true,

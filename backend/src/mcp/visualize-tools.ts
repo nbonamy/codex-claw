@@ -27,6 +27,30 @@ export function createVisualizeToolModuleProvider(visualize: VisualizeService): 
 }
 
 function registerVisualizeTools(server: McpServer, visualize: VisualizeService, agentId: string): void {
+  server.registerTool('read-visualization-canvas', {
+    description: 'Read current selected canvas elements and revision. Set selectedOnly false only when the whole canvas is needed.',
+    inputSchema: { visualizationId: z.string().min(1), selectedOnly: z.boolean().default(true) },
+  }, ({ visualizationId, selectedOnly }) => loggedToolResult('read-visualization-canvas', { agentId, visualizationId },
+    () => visualize.readCanvas(agentId, visualizationId, selectedOnly)));
+  server.registerTool('edit-visualization-canvas', {
+    description: 'Apply one undoable batch to existing stable element IDs at the exact revision read. Preserves all other elements. Supports geometry, text, styling, locked and isDeleted; no code execution.',
+    inputSchema: {
+      visualizationId: z.string().min(1), expectedRevision: z.number().int().positive(),
+      edits: z.array(z.object({ id: z.string().min(1), changes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) })).min(1).max(100),
+    },
+  }, ({ visualizationId, expectedRevision, edits }) => loggedToolResult('edit-visualization-canvas', { agentId, visualizationId },
+    () => visualize.editCanvas(agentId, visualizationId, expectedRevision, edits)));
+  server.registerTool('view-visualization-canvas', {
+    description: 'Get the latest saved PNG visual context for a canvas when structured element context is insufficient.',
+    inputSchema: { visualizationId: z.string().min(1) },
+  }, async ({ visualizationId }) => {
+    try {
+      const data = visualize.canvasPreview(agentId, visualizationId).split(',')[1]!;
+      return { content: [{ type: 'image' as const, mimeType: 'image/png', data }] };
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text' as const, text: error instanceof Error ? error.message : String(error) }] };
+    }
+  });
   server.registerTool('suggest-visualizations', {
     description: 'Publish 1 to 4 compact visualization suggestions for the active Visualize conversation. Use short titles and one-sentence descriptions instead of listing suggestions only in chat.',
     inputSchema: {

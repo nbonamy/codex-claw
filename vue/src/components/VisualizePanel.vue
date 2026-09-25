@@ -7,12 +7,21 @@
           <span>{{ kindLabel(selectedVisualization) }}</span>
         </div>
       </div>
-      <VisualizationView
+      <KeepAlive :max="5">
+      <ExcalidrawCanvas
+        v-if="selectedVisualization.content.kind !== 'image' || selectedVisualization.canvas || imageSources[selectedVisualization.id]"
+        :key="visualizationRenderKey(selectedVisualization)"
         class="visualize-panel__diagram"
         :visualization="selectedVisualization"
         :image-source="imageSources[selectedVisualization.id]"
-        :load-error="imageErrors[selectedVisualization.id]"
+        :save="saveCanvas"
+        :session-id="visualize.id"
       />
+      </KeepAlive>
+      <div v-if="selectedVisualization.content.kind === 'image' && !selectedVisualization.canvas && !imageSources[selectedVisualization.id]" class="visualize-panel__diagram">
+        <span v-if="imageErrors[selectedVisualization.id]" role="alert">{{ imageErrors[selectedVisualization.id] }}</span>
+        <span v-else role="status">{{ translate('common.loading') }}</span>
+      </div>
     </div>
 
     <div v-else class="visualize-panel__suggestions">
@@ -79,11 +88,14 @@ import { ElMessageBox } from 'element-plus';
 import { IconX as XIcon } from '@tabler/icons-vue';
 import type { Visualization, VisualizationAsset, VisualizeSession } from '@codex-claw/core/visualize';
 import { translate } from '../i18n';
+import ExcalidrawCanvas from './ExcalidrawCanvas.vue';
+import type { SaveCanvasInput, CanvasDocument } from '@codex-claw/core/visualize-canvas';
 import VisualizationView from './VisualizationView.vue';
 import { visualizationRenderKey } from './visualization-render-key';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
+  saveCanvas: (input: SaveCanvasInput) => Promise<CanvasDocument>;
   visualize: VisualizeSession;
   readAsset: (visualizationId: string) => Promise<VisualizationAsset>;
 }>(), { busy: false });

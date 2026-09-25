@@ -546,6 +546,9 @@ export class AppController {
     ipc.handle(ipcChannels.deleteVisualization, async (_event, agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizationDelete, { agentId, input }))
     ));
+    ipc.handle(ipcChannels.saveVisualizationCanvas, (_event, agentId: string, input: import('@codex-claw/core/visualize-canvas').SaveCanvasInput) => (
+      this.requireBackendClient().request(backendMethods.agentVisualizationCanvasSave, { agentId, input })
+    ));
     ipc.handle(ipcChannels.readVisualizationAsset, (_event, agentId: string, visualizationId: string) => (
       this.requireBackendClient().request(backendMethods.agentVisualizationAssetGet, { agentId, visualizationId })
     ));

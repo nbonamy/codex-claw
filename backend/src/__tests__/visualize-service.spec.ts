@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { AppStatePersistence } from '../state-persistence';
 import { VisualizeService, generateVisualizationSuggestionPrompt } from '../visualize-service';
 
 let temporaryDirectory: string | null = null;
@@ -13,6 +14,59 @@ afterEach(async () => {
 });
 
 describe('VisualizeService', () => {
+  it('persists user-edited canvases and assets, rejects stale batches and preserves untouched edits across reload', async () => {
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'claw-canvas-'));
+    const persistence = new AppStatePersistence(path.join(temporaryDirectory, 'state.json'));
+    const snapshot = createInitialSnapshot();
+    const agentId = snapshot.agents[0].id;
+    const service = new VisualizeService({ snapshot, generatedImagesRoot: temporaryDirectory, persist: () => persistence.save(snapshot), publish: () => undefined });
+    await service.enter(agentId);
+    const { visualizationId } = await service.add(agentId, { title: 'Map', content: { kind: 'mermaid', source: 'flowchart LR; A --> B' } });
+    const document = {
+      elements: [{ id: 'a', type: 'text', x: 200, y: 90, width: 100, height: 24, text: 'User edit' }, { id: 'b', type: 'rectangle', x: 400, y: 90, width: 100, height: 80 }],
+      files: { image: { id: 'image', mimeType: 'image/png', dataURL: 'data:image/png;base64,YQ==', created: 1 } }, selectedElementIds: ['a'], preview: 'data:image/png;base64,YQ==',
+    };
+    await service.saveCanvas(agentId, { visualizationId, sessionId: snapshot.agents[0].visualize!.id, expectedSource: JSON.stringify(service.get(agentId, visualizationId).visualization.content), expectedRevision: 0, document });
+    expect(service.readCanvas(agentId, visualizationId)).toStrictEqual({ revision: 1, selectedElementIds: ['a'], elements: [document.elements[0]] });
+    await expect(service.editCanvas(agentId, visualizationId, 0, [{ id: 'a', changes: { text: 'Stale' } }])).rejects.toThrow('Stale');
+    await service.editCanvas(agentId, visualizationId, 1, [{ id: 'a', changes: { text: 'Agent edit' } }]);
+    await expect(service.replace(agentId, { visualizationId, title: 'Replace', content: { kind: 'mermaid', source: 'flowchart LR; A --> C' } })).rejects.toThrow('authoritative');
+    const reloaded = await persistence.load();
+    const canvas = reloaded.agents[0].visualize!.visualizations[0].canvas!;
+    expect(canvas.revision).toBe(2);
+    expect(canvas.elements[0]).toMatchObject({ text: 'Agent edit', x: 200, y: 90 });
+    expect(canvas.elements[1]).toStrictEqual(document.elements[1]);
+    expect(canvas.files).toStrictEqual(document.files);
+    const copy = service.get(agentId, visualizationId).visualization.canvas!;
+    copy.elements[0].text = 'Leak';
+    expect(service.readCanvas(agentId, visualizationId).elements[0].text).toBe('Agent edit');
+    await service.setOpen(agentId, false);
+    expect(() => service.readCanvas(agentId, visualizationId)).toThrow('not active');
+    await service.saveCanvas(agentId, { visualizationId, sessionId: snapshot.agents[0].visualize!.id, expectedSource: '', expectedRevision: 2, document });
+    await expect(service.saveCanvas(agentId, { visualizationId, sessionId: 'old-session', expectedSource: '', expectedRevision: 3, document })).rejects.toThrow('not active');
+    await service.setOpen(agentId, true);
+    snapshot.agents[0].visualize!.conversationRef = { backend: 'codex', threadId: 'other-conversation' };
+    await expect(service.saveCanvas(agentId, { visualizationId, sessionId: snapshot.agents[0].visualize!.id, expectedSource: '', expectedRevision: 2, document })).rejects.toThrow('not active');
+  });
+
+  it('rolls back failed saves and serializes competing canvas revisions', async () => {
+    const snapshot = createInitialSnapshot();
+    const persist = vi.fn().mockResolvedValue(undefined);
+    const service = new VisualizeService({ snapshot, generatedImagesRoot: os.tmpdir(), persist, publish: vi.fn() });
+    const agentId = snapshot.agents[0].id;
+    await service.enter(agentId);
+    const { visualizationId } = await service.add(agentId, { title: 'Map', content: { kind: 'svg', source: '<svg />' } });
+    const input = { visualizationId, sessionId: snapshot.agents[0].visualize!.id, expectedSource: JSON.stringify(service.get(agentId, visualizationId).visualization.content), expectedRevision: 0, document: { elements: [], files: {}, selectedElementIds: [], preview: '' } };
+    await expect(service.saveCanvas(agentId, { ...input, expectedSource: 'outdated import' })).rejects.toThrow('source changed');
+    expect(service.get(agentId, visualizationId).visualization.canvas).toBeUndefined();
+    persist.mockRejectedValueOnce(new Error('Disk full'));
+    await expect(service.saveCanvas(agentId, input)).rejects.toThrow('Disk full');
+    expect(service.get(agentId, visualizationId).visualization.canvas).toBeUndefined();
+    const results = await Promise.allSettled([service.saveCanvas(agentId, input), service.saveCanvas(agentId, input)]);
+    expect(results.map(result => result.status)).toStrictEqual(['fulfilled', 'rejected']);
+    expect(service.readCanvas(agentId, visualizationId).revision).toBe(1);
+  });
+
   it('runs the durable suggest, add, select, read, and replace workflow', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
