@@ -4,6 +4,20 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.21.1] - 2026-09-25
+
+### New features
+
+- The in-app browser now offers page zoom controls and a device toolbar with
+  responsive, phone, tablet, desktop, and custom viewport sizes.
+- Capture the visible browser page or a selected area directly to the clipboard.
+
+### Improvements and fixes
+
+- Code reviews end with a short, natural summary while keeping the detailed
+  findings in the Review pane. After an independent review, the original agent
+  receives a concise, programmatic list of remediated findings.
+
 ## [0.21.0] - 2026-09-25
 
 ### New features

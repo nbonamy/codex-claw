@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.21.0",
+  "currentVersion": "0.21.1",
   "releases": [
+    {
+      "version": "0.21.1",
+      "releasedAt": "2026-09-25",
+      "sourceSha256": "3bd0b270e24b194c27c24e9c9e2397407021734f947b1eff9b4e3f63e8d931d2",
+      "markdown": "### New features\n\n- The in-app browser now offers page zoom controls and a device toolbar with\n  responsive, phone, tablet, desktop, and custom viewport sizes.\n- Capture the visible browser page or a selected area directly to the clipboard.\n\n### Improvements and fixes\n\n- Code reviews end with a short, natural summary while keeping the detailed\n  findings in the Review pane. After an independent review, the original agent\n  receives a concise, programmatic list of remediated findings."
+    },
     {
       "version": "0.21.0",
       "releasedAt": "2026-09-25",
