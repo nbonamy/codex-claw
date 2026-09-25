@@ -487,6 +487,32 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
   });
 
+  it('renders a completed cua_repl.js call as Computer activity', () => {
+    const wrapper = mountPane({
+      controller: controllerFor([{
+        id: 'message-computer-tool',
+        agentId: agent.id,
+        role: 'assistant',
+        status: 'complete',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{
+          type: 'tool',
+          id: 'call-cua',
+          kind: 'mcp',
+          title: 'cua_repl.js',
+          status: 'completed',
+          input: { code: 'await cua.getState()' },
+          metadata: { server: 'cua_repl', tool: 'js' },
+        }],
+      }]),
+      agent,
+    });
+
+    expect(wrapper.get('.chat-tool-call').text()).toContain('Used Computer');
+    expect(wrapper.get('.chat-tool-call').text()).not.toContain('cua_repl.js');
+    expect(wrapper.find('.tabler-icon-device-desktop').exists()).toBe(true);
+  });
+
   it('preserves structured attachment parts supplied by the controller', () => {
     const wrapper = mountPane({
       controller: controllerFor([{

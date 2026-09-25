@@ -87,6 +87,15 @@ export function presentClawTool(
   translate: Translate,
   resolveAgentName?: AgentNameResolver,
 ): CodexToolPresentation | undefined {
+  if (context.kind === 'mcp' && context.metadata?.server === 'cua_repl' && context.metadata.tool === 'js') {
+    const phase = context.descriptor?.phase === 'failed' || context.toolCall.state === 'error'
+      ? 'failed'
+      : context.descriptor?.phase === 'completed' || context.toolCall.state === 'completed'
+        ? 'completed'
+        : 'running';
+    return { icon: icons.computerUse, title: translate(`chat.tool.mcp.cuaRepl.${phase}`) };
+  }
+
   const tool = clawMcpToolName(context.kind, context.metadata);
   const icon = tool ? clawToolIcon(tool) : undefined;
   if (!icon) return undefined;

@@ -758,6 +758,11 @@ export const messages = {
           },
         },
         mcp: {
+          cuaRepl: {
+            completed: 'Used Computer',
+            failed: 'Could not use Computer',
+            running: 'Using Computer',
+          },
           codexClaw: {
             broadcastMessage: {
               completed: 'Broadcast message',

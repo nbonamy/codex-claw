@@ -94,6 +94,22 @@ describe('Claw tool presentation', () => {
     });
   });
 
+  it.each([
+    ['running', 'Using Computer'],
+    ['completed', 'Used Computer'],
+    ['error', 'Could not use Computer'],
+  ] as const)('presents cua_repl.js activity while %s', (state, title) => {
+    const call = context('js', {}, 'cua_repl');
+    call.toolCall = {
+      ...call.toolCall,
+      function: 'cua_repl.js',
+      done: state !== 'running',
+      state,
+    };
+
+    expect(presentClawTool(call, translate)).toStrictEqual({ icon: DeviceDesktopIcon, title });
+  });
+
   it('leaves unknown, non-MCP, and third-party tools to the SDK fallback', () => {
     expect(presentClawTool(context('future-tool', {}), translate)).toBeUndefined();
     expect(presentClawTool(context('browser-open', {}, 'github'), translate)).toBeUndefined();
