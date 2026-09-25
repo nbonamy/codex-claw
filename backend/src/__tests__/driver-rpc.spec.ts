@@ -23,6 +23,18 @@ describe('BackendDriverRpc', () => {
       .toBeLessThan(extension!.developerInstructions!.indexOf('<context>'));
     expect(readEngineInstructions).toHaveBeenCalledWith('codex');
   });
+
+  it('configures the Claw MCP tools for a new Quick Chat without a folder', async () => {
+    const agent: Agent = { ...createAgent(), folder: null, sessionKind: 'quickChat' };
+    const options = codexClawSurfaceOptions({ clawMcpServerUrl: 'http://127.0.0.1:4321/mcp' });
+
+    const extension = await options.extensions?.[0]?.configureConversation?.({ extensionContext: agent } as never);
+
+    expect(extension?.config?.['mcp_servers.codex_claw.url'])
+      .toBe(`http://127.0.0.1:4321/mcp?agentId=${agent.id}`);
+    expect(extension?.developerInstructions).toContain('use create-project');
+  });
+
   it('puts Codex app-server state below the Claw home instead of ~/.codex', () => {
     vi.stubEnv('CODEX_CLAW_HOME', '/tmp/codex-claw-isolated-home');
     vi.stubEnv('CODEX_CLAW_BUNDLED_CODEX_PATH', '/app/resources/codex/codex');

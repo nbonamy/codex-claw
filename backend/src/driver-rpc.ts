@@ -91,7 +91,9 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
 function isAgent(value: unknown): value is Agent {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  return record.backend === 'codex' && typeof record.id === 'string' && typeof record.folder === 'string';
+  return record.backend === 'codex' && typeof record.id === 'string' && (
+    typeof record.folder === 'string' || (record.folder === null && record.sessionKind === 'quickChat')
+  );
 }
 
 function reviewExtensionAgent(value: unknown): Agent | null {
