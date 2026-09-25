@@ -1,0 +1,268 @@
+@import url("delegation-film.css");
+
+.project-group {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(12px);
+}
+.project-group.is-visible {
+  max-height: 100px;
+}
+.project-group .sidebar-group__heading > span {
+  color: #138a67;
+}
+.project-group .sidebar-session--active {
+  background: #e7f3ed;
+}
+.project-group .sidebar-session__working {
+  background: #0e9c70;
+}
+.project-intro {
+  display: grid;
+  gap: 8px;
+  margin: 5px 0 19px;
+  padding: 17px 18px;
+  border: 1px solid #e2e8f2;
+  border-radius: 9px;
+  background: #f8faff;
+}
+.project-intro span {
+  color: #6c88ba;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.project-intro strong {
+  color: #25364e;
+  font-size: 15px;
+}
+.project-intro p {
+  margin: 0;
+  color: #627086;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.project-decision {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 18px;
+  padding: 11px 13px;
+  border-left: 3px solid #3c75d1;
+  border-radius: 5px;
+  color: #3b4b62;
+  background: #f5f8ff;
+  font-size: 11px;
+}
+.project-decision b {
+  color: #1b4fb2;
+  font-size: 13px;
+}
+.project-tool {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid #dce6f4;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(20 47 89 / 8%);
+}
+.project-tool > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border-bottom: 1px solid #e6ebf4;
+  background: #f6f9ff;
+}
+.project-tool__glyph {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 6px;
+  color: #1b4fb2;
+  background: #e3edff;
+  font-size: 14px;
+}
+.project-tool > header strong {
+  color: #2a3851;
+  font-size: 11px;
+}
+.project-tool > header small {
+  margin-left: auto;
+  color: #7c8da6;
+  font-size: 9px;
+}
+.project-tool__body {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+.project-tool__body > div {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.project-tool__body span {
+  color: #8793a5;
+  font-size: 10px;
+}
+.project-tool__body strong {
+  color: #3a4b63;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.project-tool__body code {
+  width: fit-content;
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: #1555a9;
+  background: #eaf2ff;
+  font-size: 10px;
+}
+.project-progress {
+  margin-top: 18px;
+  border: 1px solid #dce6f4;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgb(22 51 95 / 9%);
+}
+.project-progress > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 17px;
+  border-bottom: 1px solid #e9edf4;
+}
+.project-progress > header > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  color: #1b4fb2;
+  background: #eaf1ff;
+  font-size: 17px;
+}
+.project-progress > header > div {
+  display: grid;
+  gap: 3px;
+}
+.project-progress > header strong {
+  color: #27374d;
+  font-size: 12px;
+}
+.project-progress > header small {
+  color: #8190a3;
+  font-size: 10px;
+}
+.project-progress__steps {
+  display: grid;
+  gap: 3px;
+  padding: 10px 17px 6px;
+}
+.project-progress__step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  color: #728095;
+  font-size: 11px;
+}
+.project-progress__step.is-active {
+  color: #174eaa;
+  background: #f1f6ff;
+  font-weight: 650;
+}
+.project-progress__step.is-complete {
+  color: #18825e;
+}
+.project-progress__step b {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  border: 1px solid #d7e2f2;
+  border-radius: 50%;
+  font-size: 10px;
+}
+.project-progress__step.is-active b {
+  border-color: #9dbdf5;
+  background: #e5eeff;
+}
+.project-progress__step.is-complete b {
+  border-color: #abdfca;
+  background: #e9f8f0;
+}
+.project-progress__track {
+  height: 5px;
+  overflow: hidden;
+  margin: 9px 17px 16px;
+  border-radius: 5px;
+  background: #e8eef8;
+}
+.project-progress__track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2761c1, #57a0ee);
+}
+.project-result {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 18px;
+  padding: 15px;
+  border: 1px solid #bee8d7;
+  border-radius: 9px;
+  background: #f0fbf5;
+}
+.project-result > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #0fa66e;
+  font-size: 17px;
+}
+.project-result > div {
+  display: grid;
+  gap: 3px;
+}
+.project-result strong {
+  color: #14694a;
+  font-size: 11px;
+}
+.project-result small {
+  color: #598c74;
+  font-size: 10px;
+}
+.project-file-list {
+  display: grid;
+  gap: 5px;
+  width: fit-content;
+  margin: 19px 0 0 0;
+  padding: 11px 14px;
+  border: 1px solid #e0e8f2;
+  border-radius: 7px;
+  background: #f9fbff;
+  color: #4c637d;
+  font-size: 10px;
+}
+.project-file-list strong {
+  margin-bottom: 3px;
+  color: #2c4564;
+}
+.project-file-list span::before {
+  margin-right: 8px;
+  color: #3472c5;
+  content: "▤";
+}

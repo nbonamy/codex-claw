@@ -11,21 +11,38 @@ const chromePath =
   process.env.CODEX_CLAW_FILM_CHROME ??
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const filmName = process.argv[2] ?? "mission-film";
-if (!["mission-film", "review-film", "delegation-film"].includes(filmName))
+if (
+  !["mission-film", "review-film", "delegation-film", "project-film"].includes(
+    filmName,
+  )
+)
   throw new Error(`Unknown film: ${filmName}`);
 const outputPath = join(root, `assets/${filmName}.mp4`);
 const posterPath = join(root, `assets/${filmName}-poster.png`);
 const fps = 24;
 const duration =
-  filmName === "delegation-film" ? 46 : filmName === "review-film" ? 50 : 48;
+  filmName === "project-film"
+    ? 43
+    : filmName === "delegation-film"
+      ? 46
+      : filmName === "review-film"
+        ? 50
+        : 48;
 const posterSecond =
-  filmName === "delegation-film" ? 29 : filmName === "review-film" ? 23 : 12;
+  filmName === "project-film"
+    ? 30
+    : filmName === "delegation-film"
+      ? 29
+      : filmName === "review-film"
+        ? 23
+        : 12;
 const allowedFiles = new Map([
   [`/${filmName}.html`, [`${filmName}.html`, "text/html; charset=utf-8"]],
   [`/${filmName}.css`, [`${filmName}.css`, "text/css; charset=utf-8"]],
   [`/${filmName}.mjs`, [`${filmName}.mjs`, "text/javascript; charset=utf-8"]],
   ["/mission-film.css", ["mission-film.css", "text/css; charset=utf-8"]],
   ["/review-film.css", ["review-film.css", "text/css; charset=utf-8"]],
+  ["/delegation-film.css", ["delegation-film.css", "text/css; charset=utf-8"]],
   [
     "/website/assets/claw-icon.png",
     ["../website/assets/claw-icon.png", "image/png"],
