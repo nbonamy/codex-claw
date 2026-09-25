@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.20.6",
+  "currentVersion": "0.20.7",
   "releases": [
+    {
+      "version": "0.20.7",
+      "releasedAt": "2026-09-24",
+      "sourceSha256": "2b8316e0ef93c90fb55280a8c24e1d21f55fe8deb31b1fc8771f0462a50b5e63",
+      "markdown": "### New features\n\n- Turn a Quick Chat into a project on request. Codex Claw creates the\n  folder and a project agent, hands over the conversation's decisions, and\n  keeps the original Quick Chat available.\n\n### Improvements and fixes\n\n- Projects can use ordinary folders without Git. New projects start with an\n  empty folder, and folder agents stay separate from Quick chats.\n- Quick Chats can access Claw tools, including project creation.\n- Codex Claw uses its own Computer Use tools instead of the bundled alternative;\n  older Computer Use calls also have readable activity labels.\n- Workspace tabs keep a stable height when labels appear or collapse, and\n  multi-target tool titles display their overflow count consistently."
+    },
     {
       "version": "0.20.6",
       "releasedAt": "2026-09-24",

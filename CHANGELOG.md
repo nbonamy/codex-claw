@@ -4,6 +4,24 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.7] - 2026-09-24
+
+### New features
+
+- Turn a Quick Chat into a project on request. Codex Claw creates the
+  folder and a project agent, hands over the conversation's decisions, and
+  keeps the original Quick Chat available.
+
+### Improvements and fixes
+
+- Projects can use ordinary folders without Git. New projects start with an
+  empty folder, and folder agents stay separate from Quick chats.
+- Quick Chats can access Claw tools, including project creation.
+- Codex Claw uses its own Computer Use tools instead of the bundled alternative;
+  older Computer Use calls also have readable activity labels.
+- Workspace tabs keep a stable height when labels appear or collapse, and
+  multi-target tool titles display their overflow count consistently.
+
 ## [0.20.6] - 2026-09-24
 
 ### Improvements and fixes
