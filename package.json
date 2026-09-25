@@ -1,6 +1,6 @@
 {
   "name": "codex-claw",
-  "version": "0.20.7",
+  "version": "0.21.0",
   "private": true,
   "overrides": {
     "@codex-app-sdk/backend": "file:../codex-app-sdk/packages/backend",

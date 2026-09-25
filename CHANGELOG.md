@@ -4,6 +4,30 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.21.0] - 2026-09-25
+
+### New features
+
+- Visualize diagrams now open on a persistent canvas. Edit supported Mermaid
+  shapes, annotate selected elements for the agent, and export the canvas as a
+  PNG. SVG and generated-image diagrams remain image elements on the canvas.
+
+### Improvements and fixes
+
+- Creating a project from a Quick Chat now shows progress through folder
+  creation, agent setup, and the first prompt.
+- In-app browser pages remain visible beneath Claw menus and dialogs instead
+  of disappearing when an overlay opens. The empty browser surface is white
+  and no longer shows a loading message.
+- Workspace tab labels collapse before their close buttons, keeping the close
+  action available until tabs reach icon-only width.
+- Selecting `/goal` opens a composer mode for the objective rather than sending
+  an empty goal immediately. Slash-menu keyboard selection now distinguishes
+  Tab completion from Enter activation.
+- The conversation shows “Working” when hidden Claw tool activity is the only
+  visible sign of an active turn, and skill reads show the skill name instead
+  of `SKILL.md`.
+
 ## [0.20.7] - 2026-09-24
 
 ### New features
