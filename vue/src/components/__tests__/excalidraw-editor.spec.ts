@@ -49,4 +49,43 @@ describe('canvas font loading', () => {
     fonts.dispatchEvent(new Event('loadingdone'));
     expect(frames).toHaveLength(0);
   });
+
+  it('fits once when a newly mounted canvas first receives usable dimensions', async () => {
+    const fonts = new EventTarget();
+    Object.assign(fonts, { ready: Promise.resolve(fonts) });
+    Object.defineProperty(document, 'fonts', { configurable: true, value: fonts });
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length; });
+    let resized!: () => void;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resized = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const host = document.createElement('div');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 0 },
+      clientHeight: { configurable: true, value: 0 },
+    });
+    const editor = mountCanvas(host, { elements: [], files: {}, selectedElementIds: [], preview: '' }, vi.fn(), vi.fn());
+    const api = { getSceneElements: () => [], updateScene: vi.fn(), scrollToContent: vi.fn(), refresh: vi.fn() };
+    root.render.mock.calls.at(-1)![0].props.children.props.excalidrawAPI(api);
+    await Promise.resolve();
+    frames.splice(0).forEach(callback => callback(0));
+    expect(api.scrollToContent).not.toHaveBeenCalled();
+
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 420 },
+      clientHeight: { configurable: true, value: 280 },
+    });
+    resized();
+    frames.splice(0).forEach(callback => callback(0));
+    expect(api.scrollToContent).toHaveBeenCalledOnce();
+    expect(api.scrollToContent).toHaveBeenCalledWith(undefined, { fitToContent: true });
+
+    resized();
+    frames.splice(0).forEach(callback => callback(0));
+    expect(api.scrollToContent).toHaveBeenCalledOnce();
+    editor.dispose();
+  });
 });

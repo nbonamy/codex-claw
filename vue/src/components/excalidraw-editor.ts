@@ -80,6 +80,21 @@ function restoreSceneElements(elements: readonly ExcalidrawElement[]) {
 }
 export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (scene: CanvasScene) => void, onError: (error: Error) => void) {
   const root = createRoot(host);
+  let api: ExcalidrawImperativeAPI | undefined;
+  let current = scene;
+  let disposed = false;
+  let initialFitPending = true;
+  let initialFitScheduled = false;
+  const fitInitialScene = () => {
+    if (!initialFitPending || initialFitScheduled || disposed || !api || !host.clientWidth || !host.clientHeight) return;
+    initialFitScheduled = true;
+    requestAnimationFrame(() => {
+      initialFitScheduled = false;
+      if (!initialFitPending || disposed || !api || !host.clientWidth || !host.clientHeight) return;
+      api.scrollToContent(undefined, { fitToContent: true });
+      initialFitPending = false;
+    });
+  };
   const theme = () => document.documentElement.classList.contains('dark') ? 'dark' as const : 'light' as const;
   const syncControlStyle = () => requestAnimationFrame(() => {
     if (disposed) return;
@@ -95,11 +110,11 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
     syncControlStyle();
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-  const resizeObserver = new ResizeObserver(() => api?.refresh());
+  const resizeObserver = new ResizeObserver(() => {
+    api?.refresh();
+    fitInitialScene();
+  });
   resizeObserver.observe(host);
-  let api: ExcalidrawImperativeAPI | undefined;
-  let current = scene;
-  let disposed = false;
   const refreshTextAfterFontsLoad = () => requestAnimationFrame(() => {
     if (disposed || !api) return;
     // Excalidraw invalidates glyph caches after loading fonts but retains the
@@ -126,7 +141,15 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
   };
   root.render(createElement(CanvasErrorBoundary, { onError, children: createElement(Excalidraw, {
     initialData: { elements: elements(scene), files: scene.files as BinaryFiles, appState: { selectedElementIds: selected(scene), theme: theme(), viewModeEnabled: true, activeTool: { type: 'hand', customType: null, locked: false, lastActiveTool: null } }, scrollToContent: true },
-    excalidrawAPI: (value: ExcalidrawImperativeAPI) => { api = value; void document.fonts.ready.then(refreshTextAfterFontsLoad); syncControlStyle(); requestAnimationFrame(() => { if (!disposed) value.scrollToContent(undefined, { fitToContent: true }); }); },
+    excalidrawAPI: (value: ExcalidrawImperativeAPI) => {
+      api = value;
+      void document.fonts.ready.then(() => {
+        refreshTextAfterFontsLoad();
+        fitInitialScene();
+      });
+      syncControlStyle();
+      fitInitialScene();
+    },
     onChange: (items: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
       if (disposed) return;
       current = { elements: items.map(element => ({ ...element, link: null })) as unknown as CanvasElement[], files, selectedElementIds: Object.keys(state.selectedElementIds).filter(id => state.selectedElementIds[id]), preview: '' };
