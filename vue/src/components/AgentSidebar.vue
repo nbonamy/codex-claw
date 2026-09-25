@@ -116,6 +116,12 @@
             data-icon="message"
             aria-hidden="true"
           />
+          <FolderIcon
+            v-else-if="group.kind === 'folder'"
+            class="agent-sidebar__workspace-icon"
+            data-icon="folder"
+            aria-hidden="true"
+          />
           <RepositoryIconPicker
             v-else
             :label="group.label"
@@ -145,7 +151,7 @@
               <PlusIcon aria-hidden="true" />
             </button>
           </span>
-          <span v-else class="agent-sidebar__workspace-actions">
+          <span v-else-if="group.kind === 'repository'" class="agent-sidebar__workspace-actions">
             <button
               type="button"
               :aria-label="t('sidebar.createFromRepository')"
@@ -210,12 +216,12 @@
             @dragend="clientAgentOrderUpdate.onDragEnd"
           >
             <GitForkIcon
-              v-if="group.kind !== 'quickChats' && session.kind === 'worktree'"
+              v-if="group.kind === 'repository' && session.kind === 'worktree'"
               class="agent-sidebar__session-icon"
               aria-hidden="true"
             />
             <GitBranchIcon
-              v-else-if="group.kind !== 'quickChats'"
+              v-else-if="group.kind === 'repository'"
               class="agent-sidebar__session-icon"
               aria-hidden="true"
             />
@@ -310,6 +316,7 @@ import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsI
 import { projectWorkspaceSidebar, type WorkspaceSidebarGroup, type WorkspaceSidebarSession } from '@codex-claw/core/workspace-sidebar';
 import {
   AlertTriangleIcon,
+  FolderIcon,
   GitBranchIcon,
   GitForkIcon,
   MessageIcon,
@@ -508,6 +515,9 @@ function isWorkspaceCollapsed(group: WorkspaceSidebarGroup): boolean {
 function workspaceToggleLabel(group: WorkspaceSidebarGroup): string {
   if (group.kind === 'quickChats') {
     return t(isWorkspaceCollapsed(group) ? 'sidebar.expandChats' : 'sidebar.collapseChats');
+  }
+  if (group.kind === 'folder') {
+    return t(isWorkspaceCollapsed(group) ? 'sidebar.expandFolder' : 'sidebar.collapseFolder', { folder: group.label });
   }
   return t(isWorkspaceCollapsed(group) ? 'sidebar.expandRepository' : 'sidebar.collapseRepository', { repository: group.label });
 }
@@ -1056,6 +1066,8 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__workspace-group[data-group-kind="quickChats"]
+  .agent-sidebar__agent,
+.agent-sidebar__workspace-group[data-group-kind="folder"]
   .agent-sidebar__agent,
 .agent-sidebar__workspace-group[data-group-kind="missions"]
   .agent-sidebar__agent {

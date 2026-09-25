@@ -20,7 +20,7 @@ export type WorkspaceSidebarSession = {
 
 export type WorkspaceSidebarGroup = {
   id: string;
-  kind: 'repository' | 'quickChats';
+  kind: 'repository' | 'folder' | 'quickChats';
   label: string;
   repositoryRoot?: string;
   repositoryKey?: string;
@@ -40,8 +40,10 @@ export function workspaceSidebarRepositoryRootForAgent(agent: Agent): string | n
 }
 
 export function workspaceSidebarGroupIdForAgent(agent: Agent): string {
+  if (agent.sessionKind === 'quickChat') return 'quick-chats';
   const repositoryRoot = workspaceSidebarRepositoryRootForAgent(agent);
-  return repositoryRoot ? `git:${repositoryRoot}` : 'quick-chats';
+  if (repositoryRoot) return `git:${repositoryRoot}`;
+  return agent.folder ? `folder:${agent.folder}` : `agent:${agent.id}`;
 }
 
 export function repositoryIconForAgent(
@@ -90,10 +92,17 @@ export function projectWorkspaceSidebar(input: {
               ?? workspace.primaryWorktreeRoot,
             sessions: [],
           }
-        : {
+        : isQuickChat ? {
             id,
             kind: 'quickChats',
             label: input.quickChatsLabel,
+            sessions: [],
+          } : {
+            id,
+            kind: 'folder',
+            label: workspace?.kind === 'folder'
+              ? workspace.label
+              : agent.folder?.replace(/\\/gu, '/').split('/').filter(Boolean).at(-1) ?? agentDisplayName(agent),
             sessions: [],
           };
       groups.set(id, group);

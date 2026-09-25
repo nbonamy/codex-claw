@@ -197,6 +197,10 @@ metadata, including predefined typed thread flags authored through its MCP
 server. `AppSnapshot` contains no provider transcript. Persisted Git remote
 identities are canonical and credential-free.
 
+`sessionKind` distinguishes quick chats from agents. An agent may use a Git
+repository or an ordinary folder; Git identity only enables repository-specific
+grouping and actions, never decides whether a session is a quick chat.
+
 Backend domain events, provider conversation frames, explicit client effects,
 and client transport events have separate contracts. A headless consumer can
 handle `plan.readyForReview` through `agent/planReview/respond` without a pane.

@@ -875,9 +875,6 @@ describe('ClawMcpService', () => {
     expect(sidebar.find((group) => group.id === 'git:/tmp/codex-sdk')?.sessions).toContainEqual(
       expect.objectContaining({ agentId: createdAgent!.id }),
     );
-    expect(sidebar.find((group) => group.kind === 'quickChats')?.sessions).not.toContainEqual(
-      expect.objectContaining({ agentId: createdAgent!.id }),
-    );
   });
 
   it('lets create-agent override inherited model settings and avoids cross-backend inheritance', async () => {

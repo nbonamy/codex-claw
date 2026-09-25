@@ -217,10 +217,12 @@ export const messages = {
     sidebar: {
       agents: 'Agents',
       collapseRepository: 'Collapse {repository} sessions',
+      collapseFolder: 'Collapse {folder} sessions',
       createFromRepository: 'Create agent from branch, pull request, or issue',
       createFrom: 'Create from…',
       defaultBranchUnavailable: 'Default branch unavailable',
       expandRepository: 'Expand {repository} sessions',
+      expandFolder: 'Expand {folder} sessions',
       hide: 'Hide agent sidebar',
       loadingDefaultBranch: 'Loading default branch…',
       newSession: 'New session',

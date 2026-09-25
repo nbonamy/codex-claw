@@ -66,7 +66,7 @@ describe('workspace sidebar projection', () => {
       ]);
   });
 
-  it('keeps group order stable and collects non-Git agents under Quick chats', () => {
+  it('groups folder agents by folder and reserves Quick chats for quick-chat sessions', () => {
     const folderAgent = baseAgent('agent-notes', 'Scratchpad', '/src/notes');
     folderAgent.workspace = {
       kind: 'folder',
@@ -74,20 +74,32 @@ describe('workspace sidebar projection', () => {
       label: 'notes',
       updatedAt: '2026-08-27T12:00:00.000Z',
     };
+    const secondFolderAgent = baseAgent('agent-notes-two', 'Research', '/src/notes');
     const unclassified = baseAgent('agent-loose', 'Uninitialized', '/tmp/loose');
     const repo = gitAgent('agent-sdk', 'SDK work', '/src/codex-app-sdk', 'main', false, '/src/codex-app-sdk');
+    const quickChat: Agent = { ...baseAgent('agent-chat', null, '/src/notes'), folder: null, sessionKind: 'quickChat' };
 
-    expect(projectSidebar({ agents: [folderAgent, repo, unclassified], activeAgentId: null }))
+    expect(projectSidebar({ agents: [folderAgent, repo, secondFolderAgent, unclassified, quickChat], activeAgentId: null }))
       .toMatchObject([{
-        id: 'quick-chats',
-        kind: 'quickChats',
-        label: 'Quick chats',
-        sessions: [{ agentId: 'agent-notes' }, { agentId: 'agent-loose' }],
+        id: 'folder:/src/notes',
+        kind: 'folder',
+        label: 'notes',
+        sessions: [{ agentId: 'agent-notes' }, { agentId: 'agent-notes-two' }],
       }, {
         id: 'git:/src/codex-app-sdk',
         kind: 'repository',
         label: 'codex-app-sdk',
         sessions: [{ agentId: 'agent-sdk' }],
+      }, {
+        id: 'folder:/tmp/loose',
+        kind: 'folder',
+        label: 'loose',
+        sessions: [{ agentId: 'agent-loose' }],
+      }, {
+        id: 'quick-chats',
+        kind: 'quickChats',
+        label: 'Quick chats',
+        sessions: [{ agentId: 'agent-chat' }],
       }]);
   });
 

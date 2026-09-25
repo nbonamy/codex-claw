@@ -267,12 +267,13 @@ describe('AgentSidebar actions', () => {
     expect(wrapper.get('.agent-sidebar__status').attributes('aria-label')).toBe('Idle');
   });
 
-  it('places agents without workspace identity under Chats with a create action', async () => {
+  it('shows folder agents separately from chats without repository actions', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents: [
           agents[0]!,
-          { ...agents[0], folder: '', workspace: undefined },
+          { ...agents[0]!, id: 'agent-notes', name: 'Notes agent', folder: '/src/notes', workspace: undefined },
+          { ...agents[0]!, id: 'agent-chat', name: null, folder: null, workspace: undefined, sessionKind: 'quickChat' },
         ],
         activeAgentId: 'agent-dina',
         teamName: 'Codex Claw',
@@ -283,13 +284,18 @@ describe('AgentSidebar actions', () => {
     });
 
     expect(wrapper.findAll('.agent-sidebar__workspace-header').map((header) => header.text()))
-      .toStrictEqual(['Chats', 'id8']);
+      .toStrictEqual(['Chats', 'id8', 'notes']);
     const chatsGroup = wrapper.findAll('.agent-sidebar__workspace-group')[0]!;
-    expect(chatsGroup.find('.agent-sidebar__branch').exists()).toBe(false);
     expect(chatsGroup.get('.agent-sidebar__workspace-header').find('[data-icon="message"]').exists()).toBe(true);
     expect(chatsGroup.get('.agent-sidebar__agent').find('.agent-sidebar__session-icon').exists()).toBe(false);
+    const folderGroup = wrapper.findAll('.agent-sidebar__workspace-group')[2]!;
+    expect(folderGroup.attributes('data-group-kind')).toBe('folder');
+    expect(folderGroup.get('.agent-sidebar__workspace-header').find('[data-icon="folder"]').exists()).toBe(true);
+    expect(folderGroup.get('.agent-sidebar__agent').find('.agent-sidebar__session-icon').exists()).toBe(false);
+    expect(folderGroup.find('[aria-label="Create agent from branch, pull request, or issue"]').exists()).toBe(false);
+    expect(folderGroup.find('[aria-label="New quick chat"]').exists()).toBe(false);
 
-    await wrapper.get('[aria-label="New quick chat"]').trigger('click');
+    await chatsGroup.get('[aria-label="New quick chat"]').trigger('click');
     expect(wrapper.emitted('create-quick-chat')).toStrictEqual([[]]);
   });
 

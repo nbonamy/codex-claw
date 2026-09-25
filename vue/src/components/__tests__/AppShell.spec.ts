@@ -1021,18 +1021,17 @@ describe('AppShell authentication and conversation', () => {
       id: 'agents',
       label: 'Agents',
       placement: 'before',
-      items: snapshot.teams[0]!.agentIds.map((agentId) => {
-        const teamAgent = snapshot.agents.find((candidate) => candidate.id === agentId)!;
-        const workspace = teamAgent.workspace;
-        const repository = workspace?.kind === 'git' ? workspace.repositoryName : 'Quick chats';
-        const branch = workspace?.kind === 'git' ? workspace.branch : null;
-        return {
-          id: teamAgent.id,
-          value: `agent:${teamAgent.id}`,
-          label: `${teamAgent.name} · ${branch ? `${repository}/${branch}` : repository}`,
-          payload: { agentId: teamAgent.id },
-        };
-      }),
+      items: [{
+        id: 'agent-dina',
+        value: 'agent:agent-dina',
+        label: 'Dina · codex-claw',
+        payload: { agentId: 'agent-dina' },
+      }, {
+        id: 'agent-jesse',
+        value: 'agent:agent-jesse',
+        label: 'Jesse · codex-claw',
+        payload: { agentId: 'agent-jesse' },
+      }],
     }]);
     expect(state.policy?.canForkTurn).toBe(true);
 
