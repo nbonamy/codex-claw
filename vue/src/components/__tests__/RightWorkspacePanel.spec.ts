@@ -171,6 +171,14 @@ describe('RightWorkspacePanel', () => {
     expect(list.scrollLeft).toBe(600);
   });
 
+  it('keeps the rendered tab control at the same height when its label is visible', () => {
+    const wrapper = mountPanel();
+    const tab = wrapper.get<HTMLElement>('[role="tab"]').element;
+
+    expect(tab.textContent).toContain('Changes');
+    expect(getComputedStyle(tab).height).toBe('var(--space-16)');
+  });
+
   it('renders Files with a collapsible explorer beside supported workspace tabs', async () => {
     const wrapper = mountPanel(['files'], 'files');
     await wrapper.setProps({

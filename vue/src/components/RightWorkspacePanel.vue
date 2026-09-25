@@ -861,7 +861,8 @@ function isAbsoluteFilePath(filePath: string): boolean {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
+  height: var(--space-16);
+  padding: 0 var(--space-4);
   font-size: var(--font-size-13);
 }
 
