@@ -310,6 +310,12 @@ export function conversationController(wrapper: VueWrapper): CodexConversationPa
   return wrapper.getComponent({ name: 'ConversationPane' }).props('controller') as CodexConversationPaneController;
 }
 
+/** Electron exposes the guest ID only after the renderer-hosted webview is ready. */
+export function readyBrowserGuest(element: Element, id: number): void {
+  Object.defineProperty(element, 'getWebContentsId', { configurable: true, value: () => id });
+  element.dispatchEvent(new Event('dom-ready'));
+}
+
 export function conversationControllerState(wrapper: VueWrapper): CodexConversationPaneState {
   return resolveConversationControllerValue(conversationController(wrapper).state);
 }

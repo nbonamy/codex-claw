@@ -410,7 +410,7 @@ describe('RightWorkspacePanel', () => {
     expect(document.body.querySelector('[aria-label="Tab actions"]')).toBeNull();
   });
 
-  it('hides the native browser while a tab menu covers it, then restores it', async () => {
+  it('keeps the native browser visible while tab menus open and close', async () => {
     const wrapper = mountPanel(['browser'], 'browser');
     await flushPromises();
     const browserSetVisible = vi.mocked(window.codexClaw!.browserSetVisible);
@@ -419,20 +419,20 @@ describe('RightWorkspacePanel', () => {
     await wrapper.get('.right-workspace-panel__tab').trigger('contextmenu');
     await flushPromises();
     expect(document.body.querySelector('[aria-label="Tab actions"]')).not.toBeNull();
-    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+    expect(browserSetVisible).not.toHaveBeenCalled();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await flushPromises();
     expect(document.body.querySelector('[aria-label="Tab actions"]')).toBeNull();
-    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+    expect(browserSetVisible).not.toHaveBeenCalled();
 
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');
     await flushPromises();
-    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+    expect(browserSetVisible).not.toHaveBeenCalled();
 
     document.body.click();
     await flushPromises();
-    expect(browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+    expect(browserSetVisible).not.toHaveBeenCalled();
   });
 
   it('opens project files externally but omits Open In for outside-file previews', async () => {

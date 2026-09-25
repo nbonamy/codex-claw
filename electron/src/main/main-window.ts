@@ -1,6 +1,7 @@
 import { app, BrowserWindow, globalShortcut, screen, shell, type BrowserWindowConstructorOptions, type Rectangle } from 'electron';
 import { closeSync, fstatSync, mkdirSync, openSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { isBrowserGuestPartition } from '@codex-claw/core/browser-guest';
 import {
   appCommandFromInput,
   cycleTeamsAccelerator,
@@ -57,6 +58,10 @@ export function createMainWindow(
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => handleExternalWindowOpen(url, (targetUrl) => shell.openExternal(targetUrl)));
+  window.webContents.on('will-attach-webview', secureBrowserGuestAttachment);
+  window.webContents.on('did-attach-webview', (_event, guest) => {
+    guest.setWindowOpenHandler(() => ({ action: 'deny' }));
+  });
   window.webContents.on('console-message', (_event, level, message, line, sourceId) => {
     logRendererConsole(level, message, { line, sourceId });
   });
@@ -82,6 +87,29 @@ export function createMainWindow(
   }
 
   return window;
+}
+
+/** Reject every guest except Claw's blank browser host, then lock its privileges. */
+export function secureBrowserGuestAttachment(
+  event: { preventDefault(): void },
+  webPreferences: Electron.WebPreferences,
+  params: Record<string, string>,
+): void {
+  if (params.src !== 'about:blank' || !isBrowserGuestPartition(params.partition ?? '')) {
+    event.preventDefault();
+    return;
+  }
+  delete params.preload;
+  delete params.allowpopups;
+  delete webPreferences.preload;
+  webPreferences.sandbox = true;
+  webPreferences.nodeIntegration = false;
+  webPreferences.nodeIntegrationInSubFrames = false;
+  webPreferences.contextIsolation = true;
+  webPreferences.webSecurity = true;
+  webPreferences.allowRunningInsecureContent = false;
+  webPreferences.webviewTag = false;
+  webPreferences.plugins = false;
 }
 
 export function createMainWindowOptions(
@@ -116,6 +144,7 @@ export function createMainWindowOptions(
       devTools: !releaseMode,
       nodeIntegration: false,
       sandbox: false,
+      webviewTag: true,
     },
   };
 }

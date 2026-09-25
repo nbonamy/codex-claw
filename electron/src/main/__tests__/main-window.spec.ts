@@ -1,15 +1,37 @@
 import { describe, expect, it } from 'vitest';
+import { vi } from 'vitest';
 import {
   createMainWindowOptions,
   handleExternalWindowOpen,
   isWindowBoundsVisible,
   parseWindowState,
+  secureBrowserGuestAttachment,
 } from '../main-window';
 
 describe('main window options', () => {
   it('disables BrowserWindow developer tools in release mode', () => {
     expect(createMainWindowOptions(true).webPreferences?.devTools).toBe(false);
     expect(createMainWindowOptions(false).webPreferences?.devTools).toBe(true);
+  });
+
+  it('admits only isolated Claw browser guests with no preload or Node access', () => {
+    const deny = { preventDefault: vi.fn() };
+    const preferences = {
+      preload: '/tmp/untrusted.js', nodeIntegration: true, sandbox: false, webviewTag: true,
+    };
+    secureBrowserGuestAttachment(deny, preferences, {
+      src: 'about:blank', partition: 'persist:codex-claw-browser-agent-one', preload: '/tmp/untrusted.js', allowpopups: '',
+    });
+    expect(deny.preventDefault).not.toHaveBeenCalled();
+    expect(preferences).toMatchObject({ nodeIntegration: false, sandbox: true, webviewTag: false });
+    expect(preferences).not.toHaveProperty('preload');
+
+    const reject = { preventDefault: vi.fn() };
+    secureBrowserGuestAttachment(reject, {}, { src: 'https://example.com', partition: 'persist:codex-claw-browser-agent-one' });
+    expect(reject.preventDefault).toHaveBeenCalledOnce();
+    reject.preventDefault.mockClear();
+    secureBrowserGuestAttachment(reject, {}, { src: 'about:blank', partition: 'persist:untrusted' });
+    expect(reject.preventDefault).toHaveBeenCalledOnce();
   });
 
   it('restores saved window bounds in the BrowserWindow options', () => {

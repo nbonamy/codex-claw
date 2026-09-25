@@ -612,8 +612,8 @@ export class AppController {
       return this.retryTurn(agentId, turnId);
     });
 
-    ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string) => this.browserOpen(agentId, browserId, url));
-    ipc.handle(ipcChannels.browserOpenVisualization, (_event, agentId: string, browserId: string, filePath: string, title: string) => this.browserOpenVisualization(agentId, browserId, filePath, title));
+    ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string, guestWebContentsId: number) => this.browserOpen(agentId, browserId, url, guestWebContentsId));
+    ipc.handle(ipcChannels.browserOpenVisualization, (_event, agentId: string, browserId: string, filePath: string, title: string, guestWebContentsId: number) => this.browserOpenVisualization(agentId, browserId, filePath, title, guestWebContentsId));
     ipc.handle(ipcChannels.browserNavigate, (_event, agentId: string, browserId: string, url: string) => this.browserNavigate(agentId, browserId, url));
     ipc.handle(ipcChannels.browserGoBack, (_event, agentId: string, browserId: string) => this.browserPane.goBack(agentId, browserId));
     ipc.handle(ipcChannels.browserGoForward, (_event, agentId: string, browserId: string) => this.browserPane.goForward(agentId, browserId));
@@ -1163,7 +1163,7 @@ export class AppController {
     }));
   }
 
-  private async browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState> {
+  private async browserOpen(agentId: string, browserId: string, url: string, guestWebContentsId: number): Promise<BrowserState> {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       throw new Error('Browser window is not available.');
     }
@@ -1172,7 +1172,7 @@ export class AppController {
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
       }
-      const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url, agent.folder ?? '');
+      const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url, agent.folder ?? '', guestWebContentsId);
       this.resolvePendingBrowserOpen(agentId, browserId, state);
       return state;
     } catch (error) {
@@ -1186,6 +1186,7 @@ export class AppController {
     browserId: string,
     filePath: string,
     title: string,
+    guestWebContentsId: number,
   ): Promise<BrowserState> {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       throw new Error('Browser window is not available.');
@@ -1194,7 +1195,7 @@ export class AppController {
     if (!agent) {
       throw new Error(`Agent not found: ${agentId}`);
     }
-    return this.browserPane.openVisualization(this.mainWindow, agentId, browserId, filePath, title);
+    return this.browserPane.openVisualization(this.mainWindow, agentId, browserId, filePath, title, guestWebContentsId);
   }
 
   private async browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {

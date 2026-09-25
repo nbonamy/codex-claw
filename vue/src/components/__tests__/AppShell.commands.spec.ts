@@ -16,6 +16,7 @@ import {
   conversationControllerActions,
   conversationControllerState,
   mountShell as mountRealShell,
+  readyBrowserGuest,
 } from './app-shell-test-harness';
 
 const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
@@ -954,10 +955,12 @@ describe('AppShell dialogs and commands', () => {
       url: 'https://example.com',
     });
     await nextTick();
+    readyBrowserGuest(wrapper.get('webview').element, 42);
     await flushPromises();
 
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Browser']);
-    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com');
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com', 42);
+    expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('https://example.com/');
   });
 
   it('ignores active-agent shortcuts when no agent is selected', () => {

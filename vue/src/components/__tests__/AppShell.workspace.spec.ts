@@ -17,6 +17,7 @@ import { useConfetti } from '../../shared/confetti/use-confetti';
 import {
   conversationControllerActions,
   mountShell as mountRealShell,
+  readyBrowserGuest,
   workItem,
 } from './app-shell-test-harness';
 
@@ -81,6 +82,7 @@ describe('AppShell workspace and plans', () => {
     expect(browserOpen).not.toHaveBeenCalled();
 
     await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.text().includes('Browser'))?.trigger('click');
+    readyBrowserGuest(wrapper.get('webview').element, 42);
     await flushPromises();
 
     expect(wrapper.get('[role="tab"]').text()).toBe('Browser');
@@ -201,8 +203,9 @@ describe('AppShell workspace and plans', () => {
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.text().includes('Browser'))?.trigger('click');
+    readyBrowserGuest(wrapper.get('webview').element, 42);
     await flushPromises();
-    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', '');
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', '', 42);
 
     await wrapper.setProps({ activeAgent: snapshot.agents.find((agent) => agent.id === 'agent-jesse') } as Record<string, unknown>);
     await flushPromises();
@@ -211,9 +214,10 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.findAllComponents({ name: 'BrowserPanel' })).toHaveLength(1);
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
     await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.isVisible() && button.text().includes('Browser'))?.trigger('click');
+    readyBrowserGuest(wrapper.findAll('webview')[1]!.element, 43);
     await flushPromises();
 
-    expect(browserOpen).toHaveBeenCalledWith('agent-jesse', 'primary', '');
+    expect(browserOpen).toHaveBeenCalledWith('agent-jesse', 'primary', '', 43);
     expect(wrapper.findAllComponents({ name: 'BrowserPanel' })).toHaveLength(2);
     await wrapper.setProps({ activeAgent: snapshot.agents.find((agent) => agent.id === 'agent-dina') } as Record<string, unknown>);
     await flushPromises();
@@ -246,9 +250,11 @@ describe('AppShell workspace and plans', () => {
     const wrapper = mountShell({ realConversationPane: true });
 
     listener({ type: 'open-browser', agentId: 'agent-jesse', browserId: 'primary', url: 'https://example.com' });
+    await nextTick();
+    readyBrowserGuest(wrapper.get('webview').element, 43);
     await flushPromises();
 
-    expect(browserOpen).toHaveBeenCalledWith('agent-jesse', 'primary', 'https://example.com');
+    expect(browserOpen).toHaveBeenCalledWith('agent-jesse', 'primary', 'https://example.com', 43);
     expect(wrapper.emitted('select-agent')).toBeUndefined();
     expect(wrapper.text()).toContain('Chat with Dina');
   });

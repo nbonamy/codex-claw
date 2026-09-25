@@ -22,6 +22,7 @@ import {
   conversationControllerActions,
   conversationControllerState,
   mountShell as mountRealShell,
+  readyBrowserGuest,
 } from './app-shell-test-harness';
 
 const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
@@ -1520,7 +1521,7 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.getComponent({ name: 'ConversationPane' }).props('attachmentAnnotationCounts')).toStrictEqual({});
   });
 
-  it('hides the native browser while the image annotation dialog is open', async () => {
+  it('suspends the browser annotation overlay while the image annotation dialog is open', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect() {}
@@ -1550,6 +1551,7 @@ describe('AppShell authentication and conversation', () => {
     await wrapper.findAll('.right-workspace-panel__launcher button')
       .find((button) => button.text().includes('Browser'))
       ?.trigger('click');
+    readyBrowserGuest(wrapper.get('webview').element, 42);
     await flushPromises();
 
     const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });

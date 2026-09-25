@@ -231,11 +231,10 @@ follow [Custom MCP Tools](custom-tools.md).
 - Drive staged operation steps from semantic backend phases when real progress
   is available. Timing may smooth completion, but it must not imply that a
   backend phase has completed before it actually has.
-- Native browser views are outside renderer CSS stacking. `BrowserPanel` uses
-  `useRendererOverlays` to suspend them while floating menus, dialogs, listboxes,
-  tooltips, or Element Plus poppers are visible, including teleported overlays.
-  Inline `app-menu--embedded` menus alone do not suspend the browser. Reuse these
-  semantic surfaces rather than wiring another menu-specific browser toggle.
+- The in-app browser uses a sandboxed `<webview>` inside the workspace DOM, so
+  Claw menus and dialogs remain above the visible page in the usual stacking
+  order. Do not hide the page to expose an overlay. The renderer owns only the
+  element and layout; Electron main validates its guest and owns navigation.
 - Commit an async result only while its request identity still matches the
   active selection.
 

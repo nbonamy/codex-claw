@@ -216,13 +216,14 @@
 
     <BrowserPanel
       v-if="browserAvailable && tabs.includes('browser')"
+      :key="browserVisualization ? 'visualization' : 'browser'"
       v-show="activeTab === 'browser'"
       :agent-id="agent.id"
       :browser-id="browserId"
       :initial-url="browserInitialUrl"
       :open-request-id="browserOpenRequestId"
       :visualization="browserVisualization"
-      :visible="visible && activeTab === 'browser' && !tabContextMenu && !addMenuOpen"
+      :visible="visible && activeTab === 'browser'"
       @close="emit('closeTab', 'browser')"
       @send-prompt="emit('sendPrompt', $event)"
     />

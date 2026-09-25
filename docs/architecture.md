@@ -960,9 +960,10 @@ because GitHub invalidates the old access and refresh tokens after rotation.
 
 The in-app browser is a desktop preview surface hosted in the renderer's
 tabbed right workspace alongside GitHub Review, and remains separate from
-`client/external/open`. Electron main hosts untrusted HTTP(S) pages in a
-sandboxed `WebContentsView` with a persistent, per-agent browser partition.
-The renderer may request navigation, sizing, and annotation capture,
+`client/external/open`. The renderer places a sandboxed `<webview>` in the
+workspace DOM with a persistent, per-agent browser partition. Electron main
+validates the attached guest and owns its navigation and annotation policy.
+The renderer may pass the guest's ID and request navigation, sizing, and annotation capture,
 but never receives the guest `WebContents`, Node access, cookies, or arbitrary
 page scripting capability. The page captures element clicks or dragged areas
 inside the guest view; Electron returns only structured annotation metadata to
@@ -971,20 +972,18 @@ batch, then turns the complete batch into one ordinary agent prompt, leaving
 durable conversation state and agent execution in
 `clawd`. Browser page state is deliberately ephemeral and is not added to the
 persisted application snapshot. Switching right-workspace tabs hides the
-native browser view without discarding its current page; closing the Browser
-tab destroys that view.
-The native child view paints above renderer DOM regardless of CSS z-index, so
-renderer overlays that may cover it must temporarily hide the view and restore
-it on dismissal. Bounds updates must preserve that requested visibility.
+webview element without discarding its current page; closing the Browser tab
+destroys the guest. Because the page is inside the workspace DOM, Claw's menus
+and dialogs can layer over it without hiding the page.
 
 The app-owned MCP `browser-open` tool can request this same surface for its
 calling agent. `clawd` delegates through `client/browser/open`; Electron asks
 the renderer to mount or navigate the addressed agent/browser tab, then
-resolves the callback only after the renderer-created native view has loaded
+resolves the callback only after the renderer-hosted guest has loaded
 the requested URL. Each agent owns independent right-workspace state, and
 inactive workspaces remain mounted and hidden so their browser tools keep
 working without changing the user's selection. Electron keys native browser
-views by both agent id and browser id; the current UI uses a stable `primary`
+guests by both agent id and browser id; the current UI uses a stable `primary`
 id but the host is ready for multiple browser tabs per agent.
 
 Agent selection reuses that agent's provider replica when available. First

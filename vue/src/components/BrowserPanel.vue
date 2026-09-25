@@ -27,9 +27,7 @@
     </header>
     <p v-if="error" class="browser-panel__error" role="alert">{{ error }}</p>
     <div class="browser-panel__surface">
-      <div ref="viewport" class="browser-panel__viewport">
-        <div v-if="loading" class="browser-panel__loading">{{ $t('surface.browserPanel.openingBrowser') }}</div>
-      </div>
+      <div ref="viewport" class="browser-panel__viewport" />
     </div>
 
   </section>
@@ -40,9 +38,9 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRefresh, IconX } from '@tabler/icons-vue';
 import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/core/contracts';
-import { codexClawApi } from '../platform-api';
+import { browserGuestPartition } from '@codex-claw/core/browser-guest';
+import { clawClientPlatform, codexClawApi } from '../platform-api';
 import AnnotationSendButton from './AnnotationSendButton.vue';
-import { useRendererOverlays } from '../shared/use-renderer-overlays';
 
 const props = withDefaults(defineProps<{
   agentId: string;
@@ -68,9 +66,11 @@ const annotationMode = ref(false);
 const annotations = ref<BrowserAnnotation[]>([]);
 const state = ref<BrowserState>({ url: '', title: '', canGoBack: false, canGoForward: false });
 const menuOpen = ref(false);
-const rendererOverlayVisible = useRendererOverlays();
-const nativeVisible = computed(() => props.visible && !menuOpen.value && !rendererOverlayVisible.value);
 let browserReady = false;
+let guestElement: (HTMLElement & { getWebContentsId?: () => number }) | null = null;
+let guestWebContentsId: number | null = null;
+let guestPartition: string | null = null;
+let disposed = false;
 const displayHost = computed(() => {
   try {
     return new URL(state.value.url || address.value).host;
@@ -89,7 +89,7 @@ onMounted(async () => {
   try {
     state.value = await openInitialContent();
     browserReady = true;
-    if (!nativeVisible.value) await codexClawApi?.browserSetVisible(props.agentId, props.browserId, false);
+    if (!props.visible) await codexClawApi?.browserSetVisible(props.agentId, props.browserId, false);
     if (state.value.url) address.value = state.value.url;
   } catch (reason) {
     error.value = messageFor(reason);
@@ -101,13 +101,16 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  disposed = true;
   unsubscribe?.();
   resizeObserver?.disconnect();
   window.removeEventListener('resize', syncBoundsAfterWindowResize);
+  guestElement?.remove();
+  guestElement = null;
   void codexClawApi?.browserClose(props.agentId, props.browserId);
 });
 
-watch(nativeVisible, async (visible) => {
+watch(() => props.visible, async (visible) => {
   if (!codexClawApi || !browserReady) return;
   await codexClawApi.browserSetVisible(props.agentId, props.browserId, visible);
   if (visible) {
@@ -127,18 +130,59 @@ watch(() => props.openRequestId, async (requestId, previousRequestId) => {
   await navigate();
 });
 
-function openInitialContent(): Promise<BrowserState> {
+async function openInitialContent(): Promise<BrowserState> {
   const api = requireBrowserApi();
+  const guestId = await ensureGuest();
   if (props.visualization) {
     return api.browserOpenVisualization(
       props.agentId,
       props.browserId,
       props.visualization.path,
       props.visualization.title,
+      guestId,
     );
   }
   address.value = props.initialUrl;
-  return api.browserOpen(props.agentId, props.browserId, address.value);
+  return api.browserOpen(props.agentId, props.browserId, address.value, guestId);
+}
+
+async function ensureGuest(): Promise<number> {
+  if (clawClientPlatform !== 'desktop') throw new Error(translate('surface.browserPanel.browserIsUnavailable'));
+  const partition = browserGuestPartition(props.agentId, Boolean(props.visualization));
+  if (guestElement && guestPartition === partition && guestWebContentsId != null) return guestWebContentsId;
+  guestElement?.remove();
+  const guest = document.createElement('webview') as HTMLElement & { getWebContentsId?: () => number };
+  guest.className = 'browser-panel__guest';
+  guest.setAttribute('partition', partition);
+  guest.setAttribute('src', 'about:blank');
+  guestElement = guest;
+  guestPartition = partition;
+  guestWebContentsId = null;
+  return new Promise<number>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      guest.removeEventListener('dom-ready', ready);
+      reject(new Error('Browser page did not attach.'));
+    }, 10_000);
+    const ready = (): void => {
+      if (disposed) return;
+      let id: number | undefined;
+      try {
+        id = guest.getWebContentsId?.();
+      } catch (reason) {
+        window.clearTimeout(timeout);
+        guest.removeEventListener('dom-ready', ready);
+        reject(reason);
+        return;
+      }
+      if (typeof id !== 'number' || id <= 0) return;
+      window.clearTimeout(timeout);
+      guest.removeEventListener('dom-ready', ready);
+      guestWebContentsId = id;
+      resolve(id);
+    };
+    guest.addEventListener('dom-ready', ready);
+    viewport.value?.append(guest);
+  });
 }
 
 async function navigate(): Promise<void> {
@@ -188,7 +232,7 @@ async function toggleAnnotation(): Promise<void> {
 
 async function syncBounds(): Promise<void> {
   const element = viewport.value;
-  if (!element || loading.value || !nativeVisible.value) return;
+  if (!element || !browserReady || disposed || !props.visible) return;
   const rect = element.getBoundingClientRect();
   const bounds: BrowserBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   await codexClawApi?.browserSetBounds(props.agentId, props.browserId, bounds);
@@ -408,14 +452,15 @@ function messageFor(reason: unknown): string {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  background: var(--color-surface-low);
+  background: var(--color-shell-main);
 }
 
-.browser-panel__loading {
-  display: grid;
-  place-items: center;
+.browser-panel__viewport :deep(.browser-panel__guest) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  width: 100%;
   height: 100%;
-  color: var(--color-text-muted);
 }
 
 .browser-panel__error {

@@ -5,6 +5,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const electronMocks = vi.hoisted(() => {
+  const guests = new Map<number, WebContentsMock>();
+  const sessions = new Map<string, object>();
   class BrowserWindowMock {
     static instances: BrowserWindowMock[] = [];
     readonly close = vi.fn(() => {
@@ -31,10 +33,14 @@ const electronMocks = vi.hoisted(() => {
   }
 
   class WebContentsMock {
+    readonly id: number;
+    hostWebContents: object | null = null;
+    session: object | null = null;
     close = vi.fn(() => { this.destroyed = true; });
     executeJavaScript = vi.fn().mockResolvedValue(undefined);
     focus = vi.fn();
     getTitle = vi.fn(() => this.url ? `Title for ${this.url}` : '');
+    getType = vi.fn(() => 'webview');
     getURL = vi.fn(() => this.url);
     isDestroyed = vi.fn(() => this.destroyed);
     loadURL = vi.fn(async (url: string) => { this.url = url; });
@@ -48,6 +54,8 @@ const electronMocks = vi.hoisted(() => {
     private readonly listeners = new Map<string, (...args: unknown[]) => void>();
     private url = '';
 
+    constructor(id: number) { this.id = id; }
+
     emitNavigation(event: 'will-navigate' | 'will-redirect', url: string) {
       const navigationEvent = { preventDefault: vi.fn() };
       this.listeners.get(event)?.(navigationEvent, url);
@@ -55,23 +63,27 @@ const electronMocks = vi.hoisted(() => {
     }
   }
 
-  class WebContentsViewMock {
-    static instances: WebContentsViewMock[] = [];
-    readonly webContents = new WebContentsMock();
-    readonly setBounds = vi.fn();
-    readonly setVisible = vi.fn();
-
-    constructor() {
-      WebContentsViewMock.instances.push(this);
-    }
+  function createGuest(owner: { webContents: object }, id: number, partition = 'persist:codex-claw-browser-agent-one') {
+    const guest = new WebContentsMock(id);
+    guest.hostWebContents = owner.webContents;
+    guest.session = fromPartition(partition);
+    guests.set(id, guest);
+    return guest;
   }
 
-  return { BrowserWindowMock, WebContentsViewMock };
+  function fromPartition(partition: string) {
+    let value = sessions.get(partition);
+    if (!value) { value = {}; sessions.set(partition, value); }
+    return value;
+  }
+
+  return { BrowserWindowMock, createGuest, fromPartition, guests, sessions };
 });
 
 vi.mock('electron', () => ({
   BrowserWindow: electronMocks.BrowserWindowMock,
-  WebContentsView: electronMocks.WebContentsViewMock,
+  session: { fromPartition: electronMocks.fromPartition },
+  webContents: { fromId: (id: number) => electronMocks.guests.get(id) },
 }));
 
 import { BrowserPane, browserPaneKey, normalizeBrowserUrl, readVisualizationDocument, safePartitionName } from '../browser-pane';
@@ -79,7 +91,8 @@ import { BrowserPane, browserPaneKey, normalizeBrowserUrl, readVisualizationDocu
 beforeEach(() => {
   vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', 'http://localhost:5174');
   electronMocks.BrowserWindowMock.instances.length = 0;
-  electronMocks.WebContentsViewMock.instances.length = 0;
+  electronMocks.guests.clear();
+  electronMocks.sessions.clear();
 });
 
 describe('browser pane helpers', () => {
@@ -106,22 +119,22 @@ describe('browser pane helpers', () => {
 
     try {
       const browserWindow = {
-        contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+        webContents: {},
         isDestroyed: vi.fn(() => false),
       };
+      const guest = electronMocks.createGuest(browserWindow, 11);
       const pane = new BrowserPane({ onAnnotation: vi.fn() });
       const localUrl = pathToFileURL(localFile).toString();
 
-      await expect(pane.open(browserWindow as never, 'agent-one', 'primary', localUrl, workspace)).resolves.toMatchObject({
+      await expect(pane.open(browserWindow as never, 'agent-one', 'primary', localUrl, workspace, 11)).resolves.toMatchObject({
         url: localUrl,
         title: `Title for ${localUrl}`,
       });
-      const guest = electronMocks.WebContentsViewMock.instances[0];
-      expect(guest?.webContents.loadURL).toHaveBeenCalledWith(localUrl);
+      expect(guest.loadURL).toHaveBeenCalledWith(localUrl);
       expect(() => normalizeBrowserUrl(pathToFileURL(outsideFile).toString(), workspace)).toThrow('stay inside the agent workspace');
       expect(() => normalizeBrowserUrl(pathToFileURL(linkedFile).toString(), workspace)).toThrow('stay inside the agent workspace');
 
-      const navigation = guest?.webContents.emitNavigation('will-navigate', pathToFileURL(outsideFile).toString());
+      const navigation = guest.emitNavigation('will-navigate', pathToFileURL(outsideFile).toString());
       expect(navigation?.preventDefault).toHaveBeenCalledOnce();
     } finally {
       await Promise.all([
@@ -140,9 +153,10 @@ describe('browser pane helpers', () => {
 
     try {
       const browserWindow = {
-        contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+        webContents: {},
         isDestroyed: vi.fn(() => false),
       };
+      const guest = electronMocks.createGuest(browserWindow, 12, 'codex-claw-visualization-agent-one');
       const pane = new BrowserPane({ onAnnotation: vi.fn() });
 
       await expect(pane.openVisualization(
@@ -151,6 +165,7 @@ describe('browser pane helpers', () => {
         'primary',
         visualizationPath,
         'Interactive chart',
+        12,
       )).resolves.toStrictEqual({
         url: '',
         title: 'Interactive chart',
@@ -158,14 +173,13 @@ describe('browser pane helpers', () => {
         canGoForward: false,
       });
 
-      const guest = electronMocks.WebContentsViewMock.instances[0];
-      const loadedUrl = guest?.webContents.loadURL.mock.calls[0]?.[0] as string;
+      const loadedUrl = guest.loadURL.mock.calls[0]?.[0] as string;
       expect(loadedUrl).toMatch(/^data:text\/html;base64,/u);
       const document = Buffer.from(loadedUrl.slice(loadedUrl.indexOf(',') + 1), 'base64').toString('utf8');
       expect(document).toContain('Content-Security-Policy');
       expect(document).toContain("connect-src 'none'");
       expect(document).toContain('<section id="chart">Chart</section>');
-      expect(guest?.webContents.emitNavigation('will-navigate', pathToFileURL(outsideFile).toString()).preventDefault).toHaveBeenCalledOnce();
+      expect(guest.emitNavigation('will-navigate', pathToFileURL(outsideFile).toString()).preventDefault).toHaveBeenCalledOnce();
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }
@@ -194,48 +208,40 @@ describe('browser pane helpers', () => {
     expect(safePartitionName('')).toBe('default');
   });
 
-  it('keeps independent browser views for each agent and browser id', async () => {
+  it('keeps independently attached browser guests for each browser id', async () => {
     const browserWindow = {
-      contentView: {
-        addChildView: vi.fn(),
-        removeChildView: vi.fn(),
-      },
+      webContents: {},
       isDestroyed: vi.fn(() => false),
     };
+    const primary = electronMocks.createGuest(browserWindow, 21);
+    const secondary = electronMocks.createGuest(browserWindow, 22);
     const pane = new BrowserPane({ onAnnotation: vi.fn() });
 
-    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project');
-    await pane.open(browserWindow as never, 'agent-one', 'secondary', 'https://two.example', '/tmp/project');
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project', 21);
+    await pane.open(browserWindow as never, 'agent-one', 'secondary', 'https://two.example', '/tmp/project', 22);
 
-    const [primary, secondary] = electronMocks.WebContentsViewMock.instances;
-    expect(browserWindow.contentView.addChildView).toHaveBeenCalledTimes(2);
-    expect(primary?.webContents.close).not.toHaveBeenCalled();
+    expect(primary.close).not.toHaveBeenCalled();
     pane.setVisible('agent-one', 'primary', true);
     pane.setVisible('agent-one', 'secondary', false);
-    expect(primary?.setVisible).toHaveBeenLastCalledWith(true);
-    expect(secondary?.setVisible).toHaveBeenLastCalledWith(false);
 
     await pane.close('agent-one', 'primary');
 
-    expect(primary?.webContents.close).toHaveBeenCalledOnce();
-    expect(secondary?.webContents.close).not.toHaveBeenCalled();
+    expect(primary.close).toHaveBeenCalledOnce();
+    expect(secondary.close).not.toHaveBeenCalled();
     await expect(pane.execute('agent-one', 'secondary', 'console', {})).resolves.toStrictEqual({ messages: [] });
   });
 
-  it('does not uncover a hidden browser view during a later bounds update', async () => {
+  it('rejects guests owned by another window or another agent session', async () => {
     const browserWindow = {
-      contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+      webContents: {},
       isDestroyed: vi.fn(() => false),
     };
     const pane = new BrowserPane({ onAnnotation: vi.fn() });
-    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project');
-    pane.setBounds('agent-one', 'primary', { x: 100, y: 50, width: 600, height: 500 });
-    pane.setVisible('agent-one', 'primary', false);
-    pane.setBounds('agent-one', 'primary', { x: 120, y: 60, width: 580, height: 480 });
+    electronMocks.createGuest({ webContents: {} }, 23);
+    electronMocks.createGuest(browserWindow, 24, 'persist:codex-claw-browser-agent-two');
 
-    const guest = electronMocks.WebContentsViewMock.instances[0];
-    expect(guest?.setBounds).toHaveBeenLastCalledWith({ x: 120, y: 60, width: 580, height: 480 });
-    expect(guest?.setVisible).toHaveBeenLastCalledWith(false);
+    await expect(pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project', 23)).rejects.toThrow('not attached');
+    await expect(pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project', 24)).rejects.toThrow('not attached');
   });
 
   it('uses collision-safe keys for future multiple browser tabs', () => {
@@ -245,15 +251,15 @@ describe('browser pane helpers', () => {
   it('hosts the extracted annotation popup over the full browser view', async () => {
     const onAnnotation = vi.fn();
     const browserWindow = {
-      contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+      webContents: {},
       getContentBounds: vi.fn(() => ({ x: 10, y: 20, width: 1200, height: 800 })),
       isDestroyed: vi.fn(() => false),
     };
+    const guest = electronMocks.createGuest(browserWindow, 31);
     const pane = new BrowserPane({ onAnnotation });
-    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project');
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project', 31);
     pane.setBounds('agent-one', 'primary', { x: 100, y: 50, width: 600, height: 500 });
-    const guest = electronMocks.WebContentsViewMock.instances[0];
-    guest?.webContents.executeJavaScript.mockResolvedValueOnce({
+    guest.executeJavaScript.mockResolvedValueOnce({
       id: 'annotation-one',
       kind: 'element',
       selector: '#save',
@@ -266,9 +272,6 @@ describe('browser pane helpers', () => {
     const overlay = electronMocks.BrowserWindowMock.instances[0];
     await vi.waitFor(() => expect((overlay?.loadFile.mock.calls.length ?? 0) + (overlay?.loadURL.mock.calls.length ?? 0)).toBe(1));
     expect(overlay?.options).toMatchObject({ x: 110, y: 70, width: 600, height: 500, transparent: true, frame: false });
-    expect(guest?.setBounds).toHaveBeenLastCalledWith({ x: 100, y: 50, width: 600, height: 500 });
-    const script = guest?.webContents.executeJavaScript.mock.calls[0]?.[0] as string;
-    expect(script).not.toContain("document.createElement('form')");
     const query = new URL(overlay?.loadURL.mock.calls[0]?.[0] ?? 'http://localhost').searchParams;
     expect(JSON.parse(query.get('anchor') ?? '')).toStrictEqual({ x: 30, y: 40, width: 100, height: 30 });
     const token = query.get('token');
@@ -286,15 +289,15 @@ describe('browser pane helpers', () => {
   it('restores browser capture after the annotation popup is cancelled', async () => {
     const onAnnotation = vi.fn();
     const browserWindow = {
-      contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
+      webContents: {},
       getContentBounds: vi.fn(() => ({ x: 0, y: 0, width: 800, height: 600 })),
       isDestroyed: vi.fn(() => false),
     };
+    const guest = electronMocks.createGuest(browserWindow, 32);
     const pane = new BrowserPane({ onAnnotation });
-    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project');
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project', 32);
     pane.setBounds('agent-one', 'primary', { x: 0, y: 0, width: 800, height: 600 });
-    const guest = electronMocks.WebContentsViewMock.instances[0];
-    guest?.webContents.executeJavaScript.mockResolvedValueOnce({
+    guest.executeJavaScript.mockResolvedValueOnce({
       id: 'annotation-one',
       kind: 'element',
       selector: '#save',
@@ -310,8 +313,8 @@ describe('browser pane helpers', () => {
 
     pane.resolveAnnotation(query.get('token')!, null);
 
-    await vi.waitFor(() => expect(guest?.webContents.executeJavaScript).toHaveBeenCalledTimes(2));
-    expect(guest?.webContents.focus).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(guest.executeJavaScript).toHaveBeenCalledTimes(2));
+    expect(guest.focus).toHaveBeenCalledTimes(2);
     expect(onAnnotation).not.toHaveBeenCalled();
   });
 });

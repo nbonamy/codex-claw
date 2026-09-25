@@ -167,6 +167,7 @@ describe('AppController', () => {
       'primary',
       state.url,
       '~/src/codex-claw',
+      42,
     );
   });
 
@@ -197,6 +198,7 @@ describe('AppController', () => {
       'primary',
       '/tmp/backlog-icon-candidates.html',
       'Backlog icon candidates',
+      42,
     );
   });
 
@@ -277,8 +279,8 @@ function requestBrowserOpen(controller: AppController, agentId: string, browserI
 
 function openBrowser(controller: AppController, agentId: string, browserId: string, url: string): Promise<BrowserState> {
   return (controller as unknown as {
-    browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
-  }).browserOpen(agentId, browserId, url);
+    browserOpen(agentId: string, browserId: string, url: string, guestWebContentsId: number): Promise<BrowserState>;
+  }).browserOpen(agentId, browserId, url, 42);
 }
 
 function openBrowserVisualization(
@@ -294,8 +296,9 @@ function openBrowserVisualization(
       browserId: string,
       filePath: string,
       title: string,
+      guestWebContentsId: number,
     ): Promise<BrowserState>;
-  }).browserOpenVisualization(agentId, browserId, filePath, title);
+  }).browserOpenVisualization(agentId, browserId, filePath, title, 42);
 }
 
 function resolvePendingBrowserOpen(controller: AppController, agentId: string, browserId: string, state: BrowserState): void {

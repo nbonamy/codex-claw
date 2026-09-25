@@ -1,10 +1,12 @@
-import { BrowserWindow, WebContentsView } from 'electron';
+import { BrowserWindow, session, webContents, type WebContents } from 'electron';
 import { constants as fsConstants, realpathSync } from 'node:fs';
 import { open } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { BrowserAnnotation, BrowserBounds, BrowserState } from '@codex-claw/core/contracts';
+import { browserGuestPartition } from '@codex-claw/core/browser-guest';
+export { safePartitionName } from '@codex-claw/core/browser-guest';
 
 type BrowserPaneOptions = {
   onAnnotation(annotation: BrowserAnnotation): void;
@@ -22,17 +24,18 @@ type HostedBrowserPane = {
   browserWindow: BrowserWindow;
   consoleMessages: Array<{ level: string; message: string; timestamp: string }>;
   fileRoot: string;
+  navigationEnabled: boolean;
   presentedTitle: string | null;
   presentedUrl: string | null;
-  view: WebContentsView;
+  webContents: WebContents;
   visible: boolean;
 };
 
 const maximumVisualizationBytes = 1_048_576;
 
 /**
- * Hosts untrusted web content in a native child view. The renderer only gets a
- * narrow navigation and annotation API; it never receives the guest WebContents.
+ * Owns navigation and annotation policy for a renderer-hosted webview. The
+ * renderer only passes its guest ID; it never receives the guest WebContents.
  */
 export class BrowserPane {
   private readonly panes = new Map<string, HostedBrowserPane>();
@@ -45,10 +48,11 @@ export class BrowserPane {
     browserId: string,
     url: string,
     fileRoot: string,
+    guestWebContentsId: number,
   ): Promise<BrowserState> {
-    const pane = await this.createPane(browserWindow, agentId, browserId, fileRoot, true);
+    const pane = await this.createPane(browserWindow, agentId, browserId, fileRoot, true, guestWebContentsId);
     if (url.trim()) return this.navigate(agentId, browserId, url);
-    await pane.view.webContents.loadURL('about:blank');
+    await pane.webContents.loadURL('about:blank');
     return { ...this.state(pane), url: '', title: '' };
   }
 
@@ -58,12 +62,13 @@ export class BrowserPane {
     browserId: string,
     filePath: string,
     title: string,
+    guestWebContentsId: number,
   ): Promise<BrowserState> {
     const document = await readVisualizationDocument(filePath, title);
-    const pane = await this.createPane(browserWindow, agentId, browserId, '', false);
+    const pane = await this.createPane(browserWindow, agentId, browserId, '', false, guestWebContentsId);
     pane.presentedTitle = title.trim() || 'Visualization';
     pane.presentedUrl = '';
-    await pane.view.webContents.loadURL(document);
+    await pane.webContents.loadURL(document);
     return this.state(pane);
   }
 
@@ -73,18 +78,28 @@ export class BrowserPane {
     browserId: string,
     fileRoot: string,
     navigationEnabled: boolean,
+    guestWebContentsId: number,
   ): Promise<HostedBrowserPane> {
+    const guest = webContents.fromId(guestWebContentsId);
+    const expectedPartition = browserGuestPartition(agentId, !navigationEnabled);
+    if (!Number.isSafeInteger(guestWebContentsId) || !guest
+      || guest.isDestroyed()
+      || guest.getType() !== 'webview'
+      || guest.hostWebContents !== browserWindow.webContents
+      || guest.session !== session.fromPartition(expectedPartition)) {
+      throw new Error('Browser guest is not attached to this window and agent.');
+    }
+    const key = browserPaneKey(agentId, browserId);
+    const previous = this.panes.get(key);
+    if (previous?.webContents === guest) {
+      await this.cancelAnnotationMode(previous);
+      previous.fileRoot = fileRoot;
+      previous.navigationEnabled = navigationEnabled;
+      previous.presentedTitle = null;
+      previous.presentedUrl = null;
+      return previous;
+    }
     await this.close(agentId, browserId);
-    const view = new WebContentsView({
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        partition: navigationEnabled
-          ? `persist:codex-claw-browser-${safePartitionName(agentId)}`
-          : `codex-claw-visualization-${safePartitionName(agentId)}`,
-      },
-    });
     const pane: HostedBrowserPane = {
       agentId,
       annotationEnabled: false,
@@ -97,17 +112,16 @@ export class BrowserPane {
       browserWindow,
       consoleMessages: [],
       fileRoot,
+      navigationEnabled,
       presentedTitle: null,
       presentedUrl: null,
-      view,
+      webContents: guest,
       visible: true,
     };
-    this.panes.set(browserPaneKey(agentId, browserId), pane);
-    browserWindow.contentView.addChildView(view);
-    view.setVisible(false);
-    view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    this.panes.set(key, pane);
+    guest.setWindowOpenHandler(() => ({ action: 'deny' }));
     const preventDisallowedNavigation = (event: { preventDefault(): void }, target: string): void => {
-      if (!navigationEnabled) {
+      if (!pane.navigationEnabled) {
         event.preventDefault();
         return;
       }
@@ -117,9 +131,9 @@ export class BrowserPane {
         event.preventDefault();
       }
     };
-    view.webContents.on('will-navigate', preventDisallowedNavigation);
-    view.webContents.on('will-redirect', preventDisallowedNavigation);
-    view.webContents.on('console-message', (_event, level, message) => {
+    guest.on('will-navigate', preventDisallowedNavigation);
+    guest.on('will-redirect', preventDisallowedNavigation);
+    guest.on('console-message', (_event, level, message) => {
       pane.consoleMessages.push({ level: String(level), message, timestamp: new Date().toISOString() });
       if (pane.consoleMessages.length > 100) pane.consoleMessages.shift();
     });
@@ -129,27 +143,27 @@ export class BrowserPane {
   async navigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {
     const pane = this.requirePane(agentId, browserId);
     const target = normalizeBrowserUrl(url, pane.fileRoot);
-    await pane.view.webContents.loadURL(target);
+    await pane.webContents.loadURL(target);
     return this.state(pane);
   }
 
   async goBack(agentId: string, browserId: string): Promise<BrowserState> {
     const pane = this.requirePane(agentId, browserId);
-    const webContents = pane.view.webContents;
+    const webContents = pane.webContents;
     if (webContents.canGoBack()) webContents.goBack();
     return this.waitForNavigation(pane);
   }
 
   async goForward(agentId: string, browserId: string): Promise<BrowserState> {
     const pane = this.requirePane(agentId, browserId);
-    const webContents = pane.view.webContents;
+    const webContents = pane.webContents;
     if (webContents.canGoForward()) webContents.goForward();
     return this.waitForNavigation(pane);
   }
 
   async reload(agentId: string, browserId: string): Promise<BrowserState> {
     const pane = this.requirePane(agentId, browserId);
-    const webContents = pane.view.webContents;
+    const webContents = pane.webContents;
     webContents.reload();
     return this.waitForNavigation(pane);
   }
@@ -162,15 +176,12 @@ export class BrowserPane {
       width: Math.max(1, Math.round(bounds.width)),
       height: Math.max(1, Math.round(bounds.height)),
     };
-    pane.view.setBounds(pane.bounds);
-    pane.view.setVisible(pane.visible);
     this.syncAnnotationOverlayBounds(pane);
   }
 
   setVisible(agentId: string, browserId: string, visible: boolean): void {
     const pane = this.requirePane(agentId, browserId);
     pane.visible = visible;
-    pane.view.setVisible(visible);
     if (pane.annotationOverlay && !pane.annotationOverlay.isDestroyed()) {
       if (visible) pane.annotationOverlay.show();
       else pane.annotationOverlay.hide();
@@ -191,7 +202,7 @@ export class BrowserPane {
   private startAnnotationCapture(pane: HostedBrowserPane): void {
     if (!pane.annotationEnabled || pane.annotationRequest || pane.annotationOverlay) return;
 
-    const webContents = pane.view.webContents;
+    const webContents = pane.webContents;
     if (webContents.isDestroyed()) return;
     webContents.focus();
     let resumeAfterPopup = false;
@@ -235,11 +246,8 @@ export class BrowserPane {
     const pane = this.panes.get(key);
     if (!pane) return;
     await this.cancelAnnotationMode(pane);
-    if (!pane.browserWindow.isDestroyed()) {
-      pane.browserWindow.contentView.removeChildView(pane.view);
-    }
-    if (!pane.view.webContents.isDestroyed()) {
-      pane.view.webContents.close();
+    if (!pane.webContents.isDestroyed()) {
+      pane.webContents.close();
     }
     this.panes.delete(key);
   }
@@ -250,7 +258,7 @@ export class BrowserPane {
 
   async execute(agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>): Promise<unknown> {
     const pane = this.requirePane(agentId, browserId);
-    const webContents = pane.view.webContents;
+    const webContents = pane.webContents;
     if (command === 'screenshot') {
       const image = await webContents.capturePage();
       return { mimeType: 'image/png', data: image.toPNG().toString('base64') };
@@ -273,8 +281,8 @@ export class BrowserPane {
   private async cancelAnnotationMode(pane: HostedBrowserPane): Promise<void> {
     pane.annotationEnabled = false;
     this.finishAnnotationOverlay(pane, null);
-    if (pane.view.webContents.isDestroyed()) return;
-    await pane.view.webContents.executeJavaScript('window.__codexClawCancelAnnotation?.()', true).catch(() => undefined);
+    if (pane.webContents.isDestroyed()) return;
+    await pane.webContents.executeJavaScript('window.__codexClawCancelAnnotation?.()', true).catch(() => undefined);
   }
 
   private async openAnnotationOverlay(
@@ -362,7 +370,7 @@ export class BrowserPane {
   }
 
   private async waitForNavigation(pane: HostedBrowserPane): Promise<BrowserState> {
-    const webContents = pane.view.webContents;
+    const webContents = pane.webContents;
     if (webContents.isLoading()) {
       await new Promise<void>((resolve) => webContents.once('did-finish-load', () => resolve()));
     }
@@ -370,7 +378,7 @@ export class BrowserPane {
   }
 
   private state(pane: HostedBrowserPane): BrowserState {
-    const webContents = pane.view.webContents;
+    const webContents = pane.webContents;
     return {
       url: pane.presentedUrl ?? webContents.getURL(),
       title: pane.presentedTitle ?? webContents.getTitle(),
@@ -381,7 +389,7 @@ export class BrowserPane {
 
   private requirePane(agentId: string, browserId: string): HostedBrowserPane {
     const pane = this.panes.get(browserPaneKey(agentId, browserId));
-    if (!pane || pane.view.webContents.isDestroyed()) throw new Error('Browser is not open.');
+    if (!pane || pane.webContents.isDestroyed()) throw new Error('Browser is not open.');
     return pane;
   }
 }
@@ -514,10 +522,6 @@ function assertFileUrlInsideRoot(url: URL, fileRoot?: string): void {
 function expandHome(value: string): string {
   if (value === '~') return os.homedir();
   return value.startsWith(`~${path.sep}`) ? path.join(os.homedir(), value.slice(2)) : value;
-}
-
-export function safePartitionName(agentId: string): string {
-  return agentId.replace(/[^a-zA-Z\d_-]/g, '-').slice(0, 80) || 'default';
 }
 
 function parseAnnotation(value: unknown, url: string): Omit<BrowserAnnotation, 'agentId' | 'browserId'> | null {

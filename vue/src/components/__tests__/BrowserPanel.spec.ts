@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BrowserPanel from '../BrowserPanel.vue';
 import { setElectronTestClient } from '../../test/client';
 import type { MainToRendererEvent } from '@codex-claw/core/contracts';
@@ -11,7 +11,18 @@ class ResizeObserverStub {
   disconnect = vi.fn();
 }
 
-function mountPanel(props: { initialUrl?: string; openRequestId?: number; visualization?: { path: string; title: string } } = {}) {
+beforeEach(() => {
+  Object.defineProperty(HTMLElement.prototype, 'getWebContentsId', { configurable: true, value: () => 42 });
+});
+
+afterEach(() => {
+  Reflect.deleteProperty(HTMLElement.prototype, 'getWebContentsId');
+});
+
+function mountPanel(
+  props: { initialUrl?: string; openRequestId?: number; visualization?: { path: string; title: string } } = {},
+  options: { deferDomReady?: boolean } = {},
+) {
   let listener: ((event: MainToRendererEvent) => void) | null = null;
   const browserOpen = vi.fn().mockResolvedValue({
     url: '',
@@ -48,12 +59,46 @@ function mountPanel(props: { initialUrl?: string; openRequestId?: number; visual
   };
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   setElectronTestClient(api);
-  return { api, browserOpen, emitEvent: (event: MainToRendererEvent) => listener?.(event), wrapper: mount(BrowserPanel, { props: { agentId: 'agent-1', visible: true, ...props } }) };
+  const wrapper = mount(BrowserPanel, { props: { agentId: 'agent-1', visible: true, ...props } });
+  const emitDomReady = () => wrapper.get('webview').element.dispatchEvent(new Event('dom-ready'));
+  if (!options.deferDomReady) queueMicrotask(emitDomReady);
+  return { api, browserOpen, emitDomReady, emitEvent: (event: MainToRendererEvent) => listener?.(event), wrapper };
 }
 
 describe('BrowserPanel', () => {
-  it('hides the native surface while the header Git menu is open and restores it on dismissal', async () => {
-    const { api } = mountPanel();
+  it('waits for the attached guest document before requesting its WebContents ID', async () => {
+    const getWebContentsId = vi.fn(() => 42);
+    Object.defineProperty(HTMLElement.prototype, 'getWebContentsId', { configurable: true, value: getWebContentsId });
+    const { browserOpen, emitDomReady } = mountPanel({}, { deferDomReady: true });
+
+    expect(getWebContentsId).not.toHaveBeenCalled();
+    expect(browserOpen).not.toHaveBeenCalled();
+    emitDomReady();
+    await flushPromises();
+
+    expect(getWebContentsId).toHaveBeenCalledOnce();
+    expect(browserOpen).toHaveBeenCalledWith('agent-1', 'primary', '', 42);
+  });
+
+  it('keeps a clean browser surface and does not set bounds when guest startup fails', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'getWebContentsId', {
+      configurable: true,
+      value: () => { throw new Error('Guest failed to initialize'); },
+    });
+    const { api, emitDomReady, wrapper } = mountPanel({}, { deferDomReady: true });
+
+    expect(wrapper.find('.browser-panel__viewport').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('Opening browser');
+    emitDomReady();
+    await flushPromises();
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('Guest failed to initialize');
+    expect(api.browserOpen).not.toHaveBeenCalled();
+    expect(api.browserSetBounds).not.toHaveBeenCalled();
+  });
+
+  it('keeps the browser page and a header menu in the same visible workspace', async () => {
+    const { api, wrapper } = mountPanel();
     await flushPromises();
     const header = mount(GitDiffControl, {
       attachTo: document.body,
@@ -68,41 +113,29 @@ describe('BrowserPanel', () => {
     api.browserSetVisible.mockClear();
     await header.get('.git-diff-control__menu-trigger').trigger('click');
     await flushPromises();
-    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
-    await header.get('.git-diff-control__menu-trigger').trigger('click');
-    await flushPromises();
-    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+    expect(header.find('[role="menu"]').exists()).toBe(true);
+    expect(wrapper.find('.browser-panel__viewport webview').exists()).toBe(true);
+    expect(api.browserSetVisible).not.toHaveBeenCalled();
   });
 
-  it('ignores embedded and hidden menus, and waits for the last floating overlay to close', async () => {
-    const surfaces = document.createElement('div');
-    surfaces.innerHTML = '<div role="menu" class="app-menu--embedded">Inline choices</div><div class="el-popper" style="display:none"><div role="menu">Popover</div></div><div role="dialog" hidden>Dialog</div>';
-    document.body.append(surfaces);
+  it('keeps the native browser visible when a tooltip is already present', async () => {
+    const tooltip = document.createElement('span');
+    tooltip.setAttribute('role', 'tooltip');
+    tooltip.style.opacity = '0';
+    document.body.append(tooltip);
     try {
       const { api } = mountPanel();
       await flushPromises();
       expect(api.browserSetVisible).not.toHaveBeenCalledWith('agent-1', 'primary', false);
-      const popover = surfaces.querySelector<HTMLElement>('.el-popper')!;
-      const dialog = surfaces.querySelector<HTMLElement>('[role="dialog"]')!;
-      popover.style.display = 'block';
-      await flushPromises();
-      expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
-      dialog.hidden = false;
-      popover.style.display = 'none';
-      await flushPromises();
-      expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
-      dialog.hidden = true;
-      await flushPromises();
-      expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
     } finally {
-      surfaces.remove();
+      tooltip.remove();
     }
   });
   it('opens an isolated browser for the active agent and exposes annotation mode', async () => {
     const { api, browserOpen, wrapper } = mountPanel();
     await flushPromises();
 
-    expect(browserOpen).toHaveBeenCalledWith('agent-1', 'primary', '');
+    expect(browserOpen).toHaveBeenCalledWith('agent-1', 'primary', '', 42);
     expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('');
     expect(api.browserSetBounds).toHaveBeenCalledTimes(1);
 
@@ -135,6 +168,7 @@ describe('BrowserPanel', () => {
       'primary',
       '/tmp/backlog-icon-candidates.html',
       'Backlog icon candidates',
+      42,
     );
     expect(wrapper.get('.browser-panel__visualization-title').text()).toBe('Backlog icon candidates');
     expect(wrapper.find('[aria-label="Browser address"]').exists()).toBe(false);
@@ -238,18 +272,15 @@ describe('BrowserPanel', () => {
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
 
-  it('hides the native view while its own menu is open', async () => {
+  it('keeps the native view visible while its own menu is open', async () => {
     const { api, wrapper } = mountPanel();
     await flushPromises();
     api.browserSetVisible.mockClear();
 
     await wrapper.get('[aria-label="Browser menu"]').trigger('click');
     await flushPromises();
-    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
-
-    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
-    await flushPromises();
-    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+    expect(wrapper.find('[role="menu"]').exists()).toBe(true);
+    expect(api.browserSetVisible).not.toHaveBeenCalled();
   });
 
   it('runs navigation controls, visibility updates, errors, resize, and cleanup', async () => {

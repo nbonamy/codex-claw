@@ -885,8 +885,8 @@ export type CodexClawApi = {
   deleteTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
   editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot>;
   retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
-  browserOpen(agentId: string, browserId: string, url: string): Promise<BrowserState>;
-  browserOpenVisualization(agentId: string, browserId: string, path: string, title: string): Promise<BrowserState>;
+  browserOpen(agentId: string, browserId: string, url: string, guestWebContentsId: number): Promise<BrowserState>;
+  browserOpenVisualization(agentId: string, browserId: string, path: string, title: string, guestWebContentsId: number): Promise<BrowserState>;
   browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState>;
   browserGoBack(agentId: string, browserId: string): Promise<BrowserState>;
   browserGoForward(agentId: string, browserId: string): Promise<BrowserState>;
