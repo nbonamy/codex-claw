@@ -523,10 +523,10 @@ the worker and deliver it back to that agent after the Git operation succeeds.
 Available only to Quick Chats. When the user explicitly asks to turn the
 discussion into a project, the tool takes a single-folder `name` and a
 self-contained `prompt`. It calls the same project-creation service as the
-New Project UI: create a Git repository in the team's configured source folder,
+New Project UI: create an empty folder in the team's configured source folder,
 create a normal agent there, and submit the handoff prompt. The Quick Chat
 remains available, and the tool returns the new agent and folder. If a later
-step fails, the created repository or agent remains available and the error
+step fails, the created folder or agent remains available and the error
 names what needs recovery.
 
 ### `display-markdown`

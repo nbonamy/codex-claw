@@ -37,7 +37,7 @@ export class ProjectCreationService {
         ...(input.backendDefaults ? { backendDefaults: input.backendDefaults } : {}),
       });
     } catch (error) {
-      throw new Error(`Created the repository at ${repository.path}, but could not finish setting up its agent. The repository remains on disk; check the agent list before retrying. ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+      throw new Error(`Created the project folder at ${repository.path}, but could not finish setting up its agent. The folder remains on disk; check the agent list before retrying. ${error instanceof Error ? error.message : String(error)}`, { cause: error });
     }
     if (prompt) {
       try {

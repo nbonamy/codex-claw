@@ -15,7 +15,7 @@ export function createQuickChatProjectToolModuleProvider(options: {
         id: 'quick-chat-project',
         register: server => {
           server.registerTool('create-project', {
-            description: 'Turn this Quick Chat into a new Git project and start a project agent with a self-contained handoff. Use only when the user explicitly asks to create a project. The project is created in the configured source folder and this Quick Chat remains available.',
+            description: 'Turn this Quick Chat into a new project folder and start a project agent with a self-contained handoff. Use only when the user explicitly asks to create a project. The project is created in the configured source folder without initializing Git, and this Quick Chat remains available.',
             inputSchema: {
               name: z.string().trim().min(1).describe('A single folder name for the new project.'),
               prompt: z.string().trim().min(1).describe('Self-contained first prompt for the new project agent, summarizing the agreed outcome and relevant decisions.'),

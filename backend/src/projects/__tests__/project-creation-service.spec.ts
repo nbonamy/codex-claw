@@ -6,11 +6,11 @@ import { ProjectCreationService } from '../project-creation-service';
 const repository: SourceRepository = {
   name: 'new-product',
   path: '/src/new-product',
-  worktrees: [{ name: 'main', path: '/src/new-product' }],
+  worktrees: [],
 };
 
 describe('ProjectCreationService', () => {
-  it('creates the repository and agent before submitting the handoff prompt', async () => {
+  it('creates the project folder and agent before submitting the handoff prompt', async () => {
     const steps: string[] = [];
     const agent = createAgentFromInput({ name: null, folder: repository.path, backend: 'codex', teamId: 'team-one' });
     const service = new ProjectCreationService({
@@ -25,7 +25,7 @@ describe('ProjectCreationService', () => {
     expect(steps).toStrictEqual(['repository', 'agent', 'prompt']);
   });
 
-  it('reports the recoverable repository when agent creation fails', async () => {
+  it('reports the recoverable project folder when agent creation fails', async () => {
     const createRepository = vi.fn().mockResolvedValue(repository);
     const startAgent = vi.fn();
     const service = new ProjectCreationService({
@@ -35,7 +35,7 @@ describe('ProjectCreationService', () => {
     });
 
     await expect(service.create({ name: 'new-product', teamId: 'team-one' }))
-      .rejects.toThrow('Created the repository at /src/new-product, but could not finish setting up its agent. The repository remains on disk; check the agent list before retrying. Agent unavailable');
+      .rejects.toThrow('Created the project folder at /src/new-product, but could not finish setting up its agent. The folder remains on disk; check the agent list before retrying. Agent unavailable');
     expect(createRepository).toHaveBeenCalledOnce();
     expect(startAgent).not.toHaveBeenCalled();
   });

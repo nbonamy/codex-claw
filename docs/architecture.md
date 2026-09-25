@@ -240,8 +240,8 @@ Discovery does not run `git` and must tolerate missing, unreadable, detached,
 or malformed git metadata.
 
 Creating a project, and listing and creating worktrees, are backend operations.
-Project creation makes one direct child of the configured source folder and
-runs `git init` there. Discovery can show
+Project creation makes one empty direct child of the configured source folder
+without initializing Git. Discovery can show
 shallow worktree hints from source-folder metadata, but an explicit worktree
 list runs `git worktree list --porcelain` inside `clawd`. Creating a worktree
 runs through the shared backend worktree manager, which creates the checkout,
@@ -266,7 +266,7 @@ detection. Existing worktrees are not initialized again. Local and remote
 worktrees follow the same contract on the `clawd` that owns their filesystem.
 
 The renderer uses source repositories only as creation affordances: Settings
-chooses or clears the source folder; **Add project** can create a Git repository,
+chooses or clears the source folder; **Add project** can create a project folder,
 open a discovered local repository, clone a connected GitHub repository, or
 clone an explicit repository URL; and repository-level session creation can use the default
 branch or create a named worktree. The Claw MCP server exposes the same
