@@ -199,6 +199,10 @@ export type BackendCommandSummary = {
   description?: string;
   slashName?: string;
   submitOnSelect?: boolean;
+  composerMode?: {
+    label?: string;
+    placeholder?: string;
+  };
   providerMetadata?: Record<string, unknown>;
 };
 

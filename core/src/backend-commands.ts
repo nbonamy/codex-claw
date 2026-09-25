@@ -44,7 +44,10 @@ export const codexBackendCommands: BackendCommandSummary[] = [
     displayName: 'Goal',
     description: 'Set or view the Codex thread goal.',
     slashName: 'goal',
-    submitOnSelect: true,
+    composerMode: {
+      label: 'Goal',
+      placeholder: 'Describe the goal',
+    },
   },
 ];
 

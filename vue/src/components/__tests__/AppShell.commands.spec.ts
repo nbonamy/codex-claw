@@ -7,6 +7,7 @@ import type {
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import type { AppCommand, CodexClawApi, Team } from '@codex-claw/core/contracts';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 
@@ -43,6 +44,29 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it.each(['Enter', 'Tab'])('keeps /goal pending after %s and submits the objective through the host', async (key) => {
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountRealShell({ realConversationPane: true, sendPromptAction });
+    await wrapper.setProps({ backendCommands: defaultBackendCommands('codex') });
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = '/goal';
+    await editor.trigger('input');
+    await editor.trigger('keyup');
+    await nextTick();
+    expect(wrapper.find('[aria-label="Commands and skills"]').exists()).toBe(true);
+    await editor.trigger('keydown', { key });
+    await flushPromises();
+    expect(sendPromptAction).not.toHaveBeenCalled();
+    expect(wrapper.find('[aria-label="Remove Goal command"]').exists()).toBe(true);
+    editor.element.textContent = 'Finish the release';
+    await editor.trigger('input');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(sendPromptAction).toHaveBeenCalledExactlyOnceWith('/goal Finish the release', undefined);
+    expect(wrapper.find('[aria-label="Remove Goal command"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('starts Visualize from an empty workspace before any Visualize session exists', async () => {
     const snapshot = createInitialSnapshot();
     const startVisualize = vi.fn().mockResolvedValue(snapshot);
