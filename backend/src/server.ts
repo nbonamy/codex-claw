@@ -16,7 +16,7 @@ import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNo
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
 import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitDiffTarget, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, BackendConversationRef, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, BackendPublishedEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentGitDiffTarget, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, BackendConversationRef, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, BackendPublishedEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
 import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
 import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
@@ -63,6 +63,7 @@ import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewStartInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
+import { ProjectCreationService, type CreatedProject } from './projects/project-creation-service';
 import { VisualizeService, directVisualizationPrompt, generateVisualizationSuggestionPrompt, initialVisualizePrompt } from './visualize-service';
 import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@codex-claw/core/visualize';
 
@@ -155,6 +156,7 @@ export class ClawBackendServer {
   private readonly agentGitWorkflows: AgentGitWorkflowService;
   private readonly codeReviews?: CodeReviewService;
   private readonly agentCreation: AgentCreationService;
+  private readonly projectCreation: ProjectCreationService;
   private readonly visualize: VisualizeService;
   private readonly deleteMissionHome: (missionId: string) => Promise<void>;
   private unsubscribeDriverEvents?: () => void;
@@ -167,6 +169,26 @@ export class ClawBackendServer {
     this.snapshot = options.snapshot ?? createEmptySnapshot();
     this.missions = new MissionService(this.snapshot, async snapshot => { await options.saveSnapshot?.(snapshot); });
     this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
+    this.projectCreation = new ProjectCreationService({
+      createRepository: name => this.createLocalSourceRepository(name),
+      createAgent: async ({ repository, teamId, backendDefaults }) => {
+        const input: CreateAgentInput = {
+          name: null,
+          folder: repository.path,
+          backend: 'codex',
+          sourceRepositoryName: repository.name,
+          teamId,
+          ...(backendDefaults ? { backendDefaults } : {}),
+        };
+        await this.validateAgentInput(input, null);
+        const agent = this.agentCreation.create(input, { select: false });
+        await this.agentWorkspaces.refreshIdentity(agent.id);
+        await this.persistAndEmitSnapshot();
+        await this.agentWorkspaces.refreshGitStatus(agent.id);
+        return agent;
+      },
+      startAgent: (agent, prompt) => this.agentPrompts.sendAndWaitForAcceptance(agent, prompt),
+    });
     this.driverRpc = options.driverRpc;
     this.onEvent = options.onEvent;
     this.onBackendEventApplied = options.onBackendEventApplied;
@@ -368,6 +390,20 @@ export class ClawBackendServer {
     return this.missionExecution.submit(agentId, input);
   }
 
+  async createProjectFromQuickChat(agentId: string, name: string, prompt: string): Promise<CreatedProject> {
+    const caller = this.snapshot.agents.find(agent => agent.id === agentId);
+    if (caller?.sessionKind !== 'quickChat' || !caller.teamId) {
+      throw new Error('create-project is available only in a Quick Chat with a team.');
+    }
+    if (!prompt.trim()) throw new Error('A self-contained project handoff prompt is required.');
+    return this.projectCreation.create({
+      name,
+      teamId: caller.teamId,
+      backendDefaults: caller.backendDefaults,
+      prompt,
+    });
+  }
+
   async upsertMissionTicket(agentId: string, input: import('@codex-claw/core/mission-execution').MissionTicketDraftInput) {
     return this.missionExecution.upsertTicket(agentId, input);
   }
@@ -480,13 +516,13 @@ export class ClawBackendServer {
     const completesReview = message.method === backendMethods.agentCodeReviewFinish
       || message.method === backendMethods.agentCodeReviewDiscard;
     const createsAgent = startsIndependentReview
-      || [backendMethods.agentCreate, backendMethods.agentQuickChatCreate, backendMethods.agentDuplicate, backendMethods.agentFork].some((method) => method === message.method);
+      || [backendMethods.agentCreate, backendMethods.projectCreate, backendMethods.agentQuickChatCreate, backendMethods.agentDuplicate, backendMethods.agentFork].some((method) => method === message.method);
     const createsTeam = message.method === backendMethods.teamCreate || message.method === backendMethods.teamConnect;
     const before = createsAgent || createsTeam || completesReview ? await this.remoteTeams.clientSnapshot() : undefined;
     const reviewTargetAgentId = completesReview && before && typeof params?.agentId === 'string'
       ? projectClientSnapshot(before, clientId).agents.find((agent) => agent.id === params.agentId)?.codeReview?.targetAgentId
       : undefined;
-    if (before && (message.method === backendMethods.agentCreate || message.method === backendMethods.agentQuickChatCreate)) {
+    if (before && (message.method === backendMethods.agentCreate || message.method === backendMethods.projectCreate || message.method === backendMethods.agentQuickChatCreate)) {
       const input = isRecord(params?.input) ? params.input : {};
       const teamId = input.teamId ?? projectClientSnapshot(before, clientId).activeTeamId;
       if (typeof teamId !== 'string' || !before.teams.some((team) => team.id === teamId)) {
@@ -848,6 +884,23 @@ export class ClawBackendServer {
         const snapshot = await this.persistAndEmitSnapshot();
         await this.agentWorkspaces.refreshGitStatus(createdAgent.id);
         return createClawRpcResult(message.id, snapshot);
+      }
+      case backendMethods.projectCreate: {
+        const input = requireProjectCreateInput(message.params);
+        const remoteTeamPointer = this.remoteTeams.pointerForAgentInput(input);
+        if (remoteTeamPointer) {
+          const remoteSnapshot = await this.remoteTeams.request<AppSnapshot>(remoteTeamPointer.connectionId, backendMethods.projectCreate, {
+            input: { name: input.name, teamId: remoteTeamPointer.remoteTeamId },
+          });
+          this.remoteTeams.adoptCreatedAgentSnapshot(remoteTeamPointer, remoteSnapshot);
+          if (remoteSnapshot.activeAgentId) onCreated(remoteSnapshot.activeAgentId);
+          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        }
+        const team = this.snapshot.teams.find(candidate => candidate.id === input.teamId);
+        if (!team) throw new Error(`Team not found: ${input.teamId}`);
+        const created = await this.projectCreation.create({ name: input.name, teamId: team.id });
+        onCreated(created.agent.id);
+        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.missionExecute: {
         const input = requireRecord(message.params).input as MissionExecutionInput;
@@ -1905,20 +1958,8 @@ export class ClawBackendServer {
             location,
             backendMethods.sourceRepositoryCreate,
             { input: { name: input.name } },
-            async () => {
-              await this.initializeSourceFolderIfNeeded();
-              const sourceFolderPath = this.snapshot.sourceFolder.path.trim();
-              if (!sourceFolderPath) throw new Error('Choose a source folder before creating a project.');
-              return this.requireDriverRpc().handle(backendMethods.sourceRepositoryCreate, {
-                sourceFolderPath,
-                name: input.name,
-              }) as Promise<SourceRepository> | SourceRepository;
-            },
+            () => this.createLocalSourceRepository(input.name),
           );
-          if (location.kind === 'local') {
-            this.addRecentSourceRepository(repository.name);
-            await this.persistAndEmitSnapshot();
-          }
           return createClawRpcResult(message.id, repository);
         } catch (error) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
@@ -2499,6 +2540,19 @@ export class ClawBackendServer {
     return reconciliation;
   }
 
+  private async createLocalSourceRepository(name: string): Promise<SourceRepository> {
+    await this.initializeSourceFolderIfNeeded();
+    const sourceFolderPath = this.snapshot.sourceFolder.path.trim();
+    if (!sourceFolderPath) throw new Error('Choose a source folder before creating a project.');
+    const repository = await this.requireDriverRpc().handle(backendMethods.sourceRepositoryCreate, {
+      sourceFolderPath,
+      name,
+    }) as SourceRepository;
+    this.addRecentSourceRepository(repository.name);
+    await this.persistAndEmitSnapshot();
+    return repository;
+  }
+
   private async initializeSourceFolderIfNeeded(): Promise<void> {
     if ((this.snapshot.sourceFolder.initialized && this.snapshot.sourceFolder.path.trim()) || !this.driverRpc) {
       return;
@@ -2760,6 +2814,14 @@ function requireAgentCreateInput(params: unknown): CreateAgentInput {
     ...input,
     name: input.name === null ? null : requireString(input.name, 'agent name'),
   } as CreateAgentInput;
+}
+
+function requireProjectCreateInput(params: unknown): CreateProjectInput & { teamId: string } {
+  const input = requireRecord(requireRecord(params).input);
+  return {
+    name: requireString(input.name, 'project name'),
+    teamId: requireString(input.teamId, 'team id'),
+  };
 }
 
 function requireQuickChatCreateInput(params: unknown): CreateQuickChatInput {

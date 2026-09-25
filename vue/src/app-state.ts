@@ -798,6 +798,12 @@ export function useAppState() {
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
+  async function createProject(input: import('@codex-claw/core/contracts').CreateProjectInput): Promise<void> {
+    if (!codexClawApi?.createProject) throw new Error(translate('surface.app-state.repositoryCreationIsNotAvailable'));
+    adoptNavigationSnapshot(await codexClawApi.createProject(input));
+    await Promise.all([loadActiveAgentCatalogs(), sourceRepositoryState.load()]);
+  }
+
   async function executeMission(input: import('@codex-claw/core/mission-execution').MissionExecutionInput) {
     if (!codexClawApi) throw new Error('Backend unavailable.');
     adoptNavigationSnapshot(await codexClawApi.executeMission(input));
@@ -1491,6 +1497,7 @@ export function useAppState() {
     listSourceRepositories,
     cloneSourceRepository,
     createSourceRepository,
+    createProject,
     listSourceBranches,
     listSourceWorktrees,
     suggestSourceWorktreePath,

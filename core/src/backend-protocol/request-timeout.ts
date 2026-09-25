@@ -180,6 +180,8 @@ const requestTimeoutByMethod = {
   [backendMethods.sourceRepositoriesList]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.sourceRepositoryClone]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.sourceRepositoryCreate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  // Creates a Git repository and an agent; both may need filesystem and Git I/O.
+  [backendMethods.projectCreate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.sourceBranchesList]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.sourceWorktreeCreate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.sourceWorktreePathSuggest]: IO_REQUEST_TIMEOUT_MS,

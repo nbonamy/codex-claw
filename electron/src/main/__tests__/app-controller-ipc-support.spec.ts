@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AppSnapshot, ClientRequestResponse, CloneSourceRepositoryInput, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MoveAgentToTeamInput, PairedDevice, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, AppSnapshot, ClientRequestResponse, CloneSourceRepositoryInput, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MoveAgentToTeamInput, PairedDevice, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { currentSnapshot, createBackendClient, updateSettings } from './app-controller-test-harness';
 
@@ -82,6 +82,22 @@ describe('AppController', () => {
 
     await expect(createSourceRepository(controller, input)).resolves.toStrictEqual(repository);
     expect(request).toHaveBeenCalledWith(backendMethods.sourceRepositoryCreate, { input });
+  });
+
+  it('routes project creation and adopts the created agent snapshot', async () => {
+    const initial = createInitialSnapshot();
+    const created = structuredClone(initial);
+    created.agents.push({ ...initial.agents[0]!, id: 'agent-project', folder: '/src/new-product' });
+    created.activeAgentId = 'agent-project';
+    const request = vi.fn().mockResolvedValue(created);
+    const controller = new AppController(initial, createBackendClient({ request }));
+    const input: CreateProjectInput = { name: 'new-product', teamId: 'team-codex-claw' };
+    await controller.initialize();
+
+    await expect((controller as unknown as { createProject(input: CreateProjectInput): Promise<AppSnapshot> }).createProject(input))
+      .resolves.toBe(created);
+    expect(request).toHaveBeenCalledWith(backendMethods.projectCreate, { input });
+    expect(currentSnapshot(controller).activeAgentId).toBe('agent-project');
   });
 
   it('routes source worktree listing through clawd', async () => {

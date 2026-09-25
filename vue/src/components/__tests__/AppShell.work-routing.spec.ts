@@ -267,14 +267,8 @@ describe('AppShell work routing', () => {
 
   it('creates a new Git project and opens an agent in it', async () => {
     const snapshot = createInitialSnapshot();
-    const repository: SourceRepository = {
-      name: 'fresh-project',
-      path: '/Users/nbonamy/src/fresh-project',
-      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/fresh-project' }],
-    };
-    const createSourceRepository = vi.fn().mockResolvedValue(repository);
-    const createAgent = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountRealShell({ snapshot, createSourceRepository, createAgent });
+    const createProject = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountRealShell({ snapshot, createProject });
 
     wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'new');
     await flushPromises();
@@ -284,44 +278,21 @@ describe('AppShell work routing', () => {
     dialog.vm.$emit('create', 'fresh-project');
     await flushPromises();
 
-    expect(createSourceRepository).toHaveBeenCalledWith({ name: 'fresh-project' });
-    expect(createAgent).toHaveBeenCalledWith({
-      name: null,
-      folder: '/Users/nbonamy/src/fresh-project',
-      backend: 'codex',
-      sourceRepositoryName: 'fresh-project',
-      teamId: 'team-codex-claw',
-    });
+    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-codex-claw' });
     expect(dialog.props('visible')).toBe(false);
   });
 
   it('creates new Git projects on the active remote team devbox', async () => {
     const snapshot = remoteEmptyTeamSnapshot();
-    const repository: SourceRepository = {
-      name: 'fresh-project',
-      path: '/home/nicolas/src/fresh-project',
-      worktrees: [{ name: 'main', path: '/home/nicolas/src/fresh-project' }],
-    };
-    const createSourceRepository = vi.fn().mockResolvedValue(repository);
-    const createAgent = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountRealShell({ snapshot, createSourceRepository, createAgent });
+    const createProject = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountRealShell({ snapshot, createProject });
 
     wrapper.getComponent({ name: 'AgentEmptyState' }).vm.$emit('start-work', 'new');
     await flushPromises();
     wrapper.getComponent({ name: 'NewProjectDialog' }).vm.$emit('create', 'fresh-project');
     await flushPromises();
 
-    expect(createSourceRepository).toHaveBeenCalledWith({
-      name: 'fresh-project',
-      remoteConnectionId: 'connection-devbox',
-    });
-    expect(createAgent).toHaveBeenCalledWith({
-      name: null,
-      folder: '/home/nicolas/src/fresh-project',
-      backend: 'codex',
-      sourceRepositoryName: 'fresh-project',
-      teamId: 'team-remote',
-    });
+    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-remote' });
   });
 
   it('browses and opens existing folders on the active remote team devbox', async () => {

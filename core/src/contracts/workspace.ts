@@ -59,6 +59,11 @@ export type CreateSourceRepositoryInput = {
   remoteConnectionId?: string;
 };
 
+export type CreateProjectInput = {
+  name: string;
+  teamId?: string;
+};
+
 export type SourceFolderEntry = {
   name: string;
   path: string;

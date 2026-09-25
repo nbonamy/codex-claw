@@ -88,6 +88,7 @@ export function createClientApiMock(
     listSourceRepositories: unscripted('listSourceRepositories'),
     cloneSourceRepository: unscripted('cloneSourceRepository'),
     createSourceRepository: unscripted('createSourceRepository'),
+    createProject: unscripted('createProject'),
     listSourceBranches: unscripted('listSourceBranches'),
     listSourceWorktrees: unscripted('listSourceWorktrees'),
     suggestSourceWorktreePath: unscripted('suggestSourceWorktreePath'),

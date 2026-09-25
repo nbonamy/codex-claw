@@ -134,6 +134,29 @@ describe('useAppState', () => {
     expect(listSourceRepositories).toHaveBeenCalledTimes(4);
   });
 
+  it('adopts the new project agent and refreshes repository discovery', async () => {
+    const initial = createInitialSnapshot();
+    initial.sourceFolder = { path: '/src', initialized: true, recentRepoNames: [] };
+    const created = structuredClone(initial);
+    created.agents.push({ ...created.agents[0]!, id: 'agent-project', folder: '/src/new-product', name: null });
+    created.teams[0]!.agentIds.push('agent-project');
+    created.activeAgentId = 'agent-project';
+    const repository: SourceRepository = {
+      name: 'new-product', path: '/src/new-product', worktrees: [{ name: 'main', path: '/src/new-product' }],
+    };
+    const createProject = vi.fn().mockResolvedValue(created);
+    const listSourceRepositories = vi.fn().mockResolvedValue([repository]);
+    stubElectronTestWindow({ codexClaw: { createProject, listSourceRepositories } satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+    state.snapshot.value = initial;
+
+    await state.createProject({ name: 'new-product', teamId: 'team-codex-claw' });
+
+    expect(createProject).toHaveBeenCalledWith({ name: 'new-product', teamId: 'team-codex-claw' });
+    expect(state.activeAgent.value?.id).toBe('agent-project');
+    expect(state.sourceRepositories.value).toStrictEqual([repository]);
+  });
+
   it('uses source repository fallbacks when preload helpers are unavailable', async () => {
     stubLegacyElectronTestWindow({ codexClaw: {} });
     const state = useAppState();

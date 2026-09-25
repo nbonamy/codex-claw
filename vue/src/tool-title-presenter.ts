@@ -38,6 +38,7 @@ const TOOL_KEYS: Record<string, string> = {
   'computer-use-stop': 'computerUseStop',
   'computer-use-type-text': 'computerUseTypeText',
   'create-agent': 'createAgent',
+  'create-project': 'createProject',
   'create-worktree': 'createWorktree',
   'display-markdown': 'displayMarkdown',
   'suggest-visualizations': 'suggestVisualizations',
@@ -142,7 +143,9 @@ function toolTarget(
         ? [args.title, args.path]
         : tool === 'create-agent'
             ? [phase === 'completed' ? resultString(result, 'agentName') : undefined, args.name, args.branchName, args.repoPath]
-            : tool === 'create-worktree'
+            : tool === 'create-project'
+              ? [args.name]
+              : tool === 'create-worktree'
               ? [args.branchName, args.destinationPath]
               : tool === 'list-worktrees'
                 ? [args.repoPath]

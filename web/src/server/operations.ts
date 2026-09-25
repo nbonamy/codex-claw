@@ -81,6 +81,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   resumeAgentConversation: [backendMethods.agentConversationResume, named('agentId', 'ref')],
   readConversationMessages: [backendMethods.agentConversationMessagesGet, namedOptional('ref', 'agentId', 'location')],
   createAgent: [backendMethods.agentCreate, named('input')],
+  createProject: [backendMethods.projectCreate, named('input')],
   executeMission: [backendMethods.missionExecute, named('input')],
   createMission: [backendMethods.missionCreate, named('input')],
   deleteMission: [backendMethods.missionDelete, named('input')],

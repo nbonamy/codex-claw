@@ -29,6 +29,7 @@ import type {
   AgentWorkspaceIdentity,
   CloneSourceRepositoryInput,
   CreateSourceRepositoryInput,
+  CreateProjectInput,
   CreateSourceWorktreeInput,
   SourceBranch,
   SourceFolderListInput,
@@ -125,6 +126,7 @@ export type {
   AgentWorkspaceIdentity,
   CloneSourceRepositoryInput,
   CreateSourceRepositoryInput,
+  CreateProjectInput,
   CreateSourceWorktreeInput,
   SourceBranch,
   SourceFolderEntry,
@@ -800,6 +802,7 @@ export type CodexClawApi = {
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
   cloneSourceRepository(input: CloneSourceRepositoryInput): Promise<SourceRepository>;
   createSourceRepository(input: CreateSourceRepositoryInput): Promise<SourceRepository>;
+  createProject(input: CreateProjectInput): Promise<AppSnapshot>;
   listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<SourceBranch[]>;
   listSourceWorktrees(repoPath: string, remoteConnectionId?: string): Promise<SourceWorktree[]>;
   suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string>;

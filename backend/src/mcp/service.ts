@@ -44,6 +44,8 @@ import path from 'node:path';
 import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
 import { AgentCreationService } from '../agents/agent-creation-service';
 import type { ClawMcpToolModuleProvider } from './tool-modules';
+import { createQuickChatProjectToolModuleProvider } from './quick-chat-project-tools';
+import type { CreatedProject } from '../projects/project-creation-service';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
@@ -60,6 +62,7 @@ export type ClawMcpServiceOptions = {
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
   agentCreation?: AgentCreationService;
+  createProject?: (agentId: string, name: string, prompt: string) => Promise<CreatedProject>;
   toolModuleProviders?: readonly ClawMcpToolModuleProvider[];
 };
 
@@ -122,7 +125,10 @@ export class ClawMcpService {
       browser: options.browser,
       hostedMcpGateway: options.hostedMcpGateway,
       reviewTools: this.reviewTools,
-      toolModuleProviders: options.toolModuleProviders,
+      toolModuleProviders: [
+        ...(options.createProject ? [createQuickChatProjectToolModuleProvider({ snapshot: this.snapshot, createProject: options.createProject })] : []),
+        ...(options.toolModuleProviders ?? []),
+      ],
     });
   }
 

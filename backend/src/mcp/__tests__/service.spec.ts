@@ -3,6 +3,7 @@ import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { Agent, AppSnapshot, Automation, BackendPublishedEvent } from '@codex-claw/core/contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createQuickChatInSnapshot } from '@codex-claw/core/agent-manager';
 import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { VisualizeService } from '../../visualize-service';
@@ -18,6 +19,42 @@ describe('ClawMcpService', () => {
   afterEach(async () => {
     await service?.stop();
     service = null;
+  });
+
+  it('offers create-project only to Quick Chats and routes the handoff through the shared project operation', async () => {
+    const snapshot = createInitialSnapshot();
+    createQuickChatInSnapshot(snapshot, { teamId: 'team-codex-claw' }, undefined, 'agent-quick-chat', { select: false });
+    const createProject = vi.fn().mockResolvedValue({
+      repository: { name: 'new-product', path: '/src/new-product', worktrees: [] },
+      agent: { ...snapshot.agents[0], id: 'agent-project', name: null, folder: '/src/new-product' },
+      promptSubmitted: true,
+    });
+    service = new ClawMcpService({ snapshot, createProject });
+    const url = await service.start();
+
+    const ordinaryTools = await postJson(agentUrl(url, 'agent-dina'), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: {},
+    });
+    const quickChatTools = await postJson(agentUrl(url, 'agent-quick-chat'), {
+      jsonrpc: '2.0', id: 2, method: 'tools/list', params: {},
+    });
+    expect(ordinaryTools.result.tools.map((tool: { name: string }) => tool.name)).not.toContain('create-project');
+    expect(quickChatTools.result.tools.map((tool: { name: string }) => tool.name)).toContain('create-project');
+
+    const result = await callTool(url, 'agent-quick-chat', 'create-project', {
+      name: 'new-product', prompt: 'Build the agreed product and start with the requirements.',
+    });
+    expect(createProject).toHaveBeenCalledWith(
+      'agent-quick-chat', 'new-product', 'Build the agreed product and start with the requirements.',
+    );
+    expect(result.result.structuredContent).toStrictEqual({
+      success: true,
+      agentId: 'agent-project',
+      agentName: 'new-product',
+      folder: '/src/new-product',
+      promptSubmitted: true,
+      message: 'Created new-product and started its project agent.',
+    });
   });
 
   it('serializes an explicit null when set-status clears the current text', async () => {

@@ -924,6 +924,11 @@ export const messages = {
               failed: 'Failed creating agent {target}',
               running: 'Creating agent {target}',
             },
+            createProject: {
+              completed: 'Created project {target}',
+              failed: 'Failed creating project {target}',
+              running: 'Creating project {target}',
+            },
             createWorktree: {
               completed: 'Created worktree {target}',
               failed: 'Failed creating worktree {target}',

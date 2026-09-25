@@ -129,6 +129,7 @@ export function mountShell(overrides: Partial<{
   chooseAgentFolder: () => Promise<string | null>;
   cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
   createSourceRepository: (input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => Promise<SourceRepository>;
+  createProject: (input: import('@codex-claw/core/contracts').CreateProjectInput) => Promise<void>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission: (input: CreateMissionInput) => Promise<Mission>;
   selectMission: (missionId: string | null) => Promise<void>;
@@ -235,6 +236,7 @@ export function mountShell(overrides: Partial<{
       chooseAgentFolder: overrides.chooseAgentFolder ?? vi.fn().mockResolvedValue(null),
       cloneSourceRepository: overrides.cloneSourceRepository ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createSourceRepository: overrides.createSourceRepository ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
+      createProject: overrides.createProject ?? vi.fn().mockRejectedValue(new Error('Unavailable')),
       createSourceWorktree: overrides.createSourceWorktree ?? vi.fn().mockResolvedValue({ name: '', path: '' }),
       listSourceFolders: overrides.listSourceFolders ?? vi.fn().mockResolvedValue({ path: '', parentPath: null, entries: [] }),
       listSourceRepositories: overrides.listSourceRepositories ?? vi.fn().mockResolvedValue([]),

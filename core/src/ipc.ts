@@ -64,6 +64,7 @@ export const ipcChannels = {
   listSourceRepositories: 'source-folder:repositories:list',
   cloneSourceRepository: 'source-folder:repository:clone',
   createSourceRepository: 'source-folder:repository:create',
+  createProject: 'project:create',
   listSourceBranches: 'source-folder:branches:list',
   listSourceWorktrees: 'source-folder:worktrees:list',
   suggestSourceWorktreePath: 'source-folder:worktree-path:suggest',

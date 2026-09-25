@@ -167,6 +167,7 @@ the explicit Review stage remains the user gate.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `agent/create` | `{ input: CreateAgentInput }` | `AppSnapshot` | Creates the agent in the owning team's backend location. For remote-team pointers, local `clawd` forwards creation to the remote `clawd` with the remote team id and does not persist a local proxy agent. |
+| `project/create` | `{ input: CreateProjectInput }` | `AppSnapshot` | Creates a Git repository in the target team's backend source folder and a normal agent in it as one app-owned operation. The UI and Quick Chat MCP tool use the same backend project-creation service; remote teams execute the operation on their owning `clawd`. |
 | `agent/quickChat/create` | `{ input: CreateQuickChatInput }` | `AppSnapshot` | Creates a team-scoped quick chat in a private backend-managed scratch workspace and persists its non-project identity across restarts. |
 | `agent/update` | `{ input: UpdateAgentInput }` | `AppSnapshot` | Validates folder and refreshes git status. |
 | `client/navigation/selectAgent` | `{ agentId }` | `AppSnapshot` | Persists this client's selection only. Conversation loading and Git refresh are explicit runtime operations. |

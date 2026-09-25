@@ -37,6 +37,7 @@ describe('Claw tool presentation', () => {
     ['list-agents', UsersIcon, 'Listed agents'],
     ['toggle_thread_flag', UsersIcon, 'Updated thread flag'],
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
+    ['create-project', GitBranchIcon, 'Created project new-product'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
     ['set-mission-title', TargetArrowIcon, 'Named mission'],
     ['attach-mission-repository', GitBranchIcon, 'Attached mission repository'],
@@ -51,6 +52,8 @@ describe('Claw tool presentation', () => {
       ? { to: 'codex-app-sdk' }
       : tool === 'create-worktree'
         ? { branchName: 'feature/tool-icons' }
+        : tool === 'create-project'
+          ? { name: 'new-product' }
         : tool === 'display-markdown'
           ? { title: 'Review notes' }
           : tool === 'computer-use-get-app-state'

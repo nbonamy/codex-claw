@@ -75,7 +75,7 @@
     :list-source-folders="listSourceFolders"
     :list-source-repositories="listSourceRepositories"
     :clone-source-repository="cloneSourceRepository"
-    :create-source-repository="createSourceRepository"
+    :create-project="createProject"
     :list-source-branches="listSourceBranches"
     :list-source-worktrees="listSourceWorktrees"
     :suggest-source-worktree-path="suggestSourceWorktreePath"
@@ -307,7 +307,7 @@ const {
   listSourceFolders,
   listSourceRepositories,
   cloneSourceRepository,
-  createSourceRepository,
+  createProject,
   listSourceBranches,
   listSourceWorktrees,
   suggestSourceWorktreePath,

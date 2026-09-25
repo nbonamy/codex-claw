@@ -3,6 +3,8 @@ import type { SourceWorktree } from '@codex-claw/core/contracts';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
+import { AgentGitService } from '../git/agent-git-service';
+import { createQuickChatInSnapshot } from '@codex-claw/core/agent-manager';
 import {
   createTestSnapshot,
   readyRemoteConnection,
@@ -129,6 +131,118 @@ describe('ClawBackendServer', () => {
     });
     expect(snapshot.sourceFolder.recentRepoNames).toContain('fresh-project');
     expect(saveSnapshot).toHaveBeenCalled();
+  });
+
+  it('creates a project repository and agent as one UI request', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = { path: '/src', initialized: true, recentRepoNames: [] };
+    const repository = {
+      name: 'new-product',
+      path: '/src/new-product',
+      worktrees: [{ name: 'main', path: '/src/new-product' }],
+    };
+    const driverRpc = {
+      handle: vi.fn().mockResolvedValue(repository),
+      onEvent: vi.fn(() => () => undefined),
+    } as unknown as BackendDriverRpc;
+    const agentGitService = {
+      identity: vi.fn(async (folder: string) => ({
+        kind: 'git' as const,
+        folder,
+        repositoryName: 'new-product',
+        repositoryRoot: folder,
+        branch: 'main',
+        isLinkedWorktree: false,
+        primaryWorktreeRoot: folder,
+        updatedAt: '2026-09-25T00:00:00.000Z',
+      })),
+      status: vi.fn().mockResolvedValue(null),
+    } as unknown as AgentGitService;
+    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc, agentGitService });
+
+    const response = await server.handleMessage({
+      jsonrpc: '2.0', id: 'project-create', method: backendMethods.projectCreate,
+      params: { input: { name: 'new-product' } },
+    });
+
+    expect(response).toMatchObject({ result: {
+      activeAgentId: expect.any(String),
+      agents: [{ folder: '/src/new-product', teamId: 'team-test', name: null, backend: 'codex' }],
+      sourceFolder: { recentRepoNames: ['new-product'] },
+    } });
+    expect(driverRpc.handle).toHaveBeenCalledWith(backendMethods.sourceRepositoryCreate, {
+      sourceFolderPath: '/src', name: 'new-product',
+    });
+  });
+
+  it('creates a project in the selected remote team', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams[0].remoteConnectionId = 'connection-devbox';
+    snapshot.teams[0].remoteTeamId = 'team-remote';
+    const remoteSnapshot = createRemoteTeamSnapshot([{
+      ...createRemoteAgent(),
+      folder: '/home/nicolas/src/new-product',
+    }]);
+    const remoteClients = { request: vi.fn().mockResolvedValue(remoteSnapshot), close: vi.fn() };
+    const server = new ClawBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never });
+
+    await expect(server.handleMessage({
+      jsonrpc: '2.0', id: 'remote-project', method: backendMethods.projectCreate,
+      params: { input: { name: 'new-product' } },
+    })).resolves.toMatchObject({ result: { agents: [{ folder: '/home/nicolas/src/new-product', teamId: 'team-test' }] } });
+    expect(remoteClients.request).toHaveBeenCalledWith(
+      snapshot.remoteConnections.connections[0],
+      backendMethods.projectCreate,
+      { input: { name: 'new-product', teamId: 'team-remote' }, _clientId: 'remote-controller' },
+      expect.any(Function),
+    );
+  });
+
+  it('starts a normal project agent from a Quick Chat with its handoff prompt', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = { path: '/src', initialized: true, recentRepoNames: [] };
+    createQuickChatInSnapshot(snapshot, { teamId: 'team-test' }, undefined, 'agent-quick-chat', { select: false });
+    const repository = {
+      name: 'new-product', path: '/src/new-product', worktrees: [{ name: 'main', path: '/src/new-product' }],
+    };
+    const handle = vi.fn(async (method: string) => method === backendMethods.sourceRepositoryCreate
+      ? repository
+      : method === backendMethods.driverPromptSend
+        ? { backendSession: { kind: 'codex', threadId: 'thread-project' }, turnId: 'turn-1' }
+        : undefined);
+    const driverRpc = {
+      handle,
+      tryHandlePromptCommand: vi.fn().mockReturnValue(null),
+      onEvent: vi.fn(() => () => undefined),
+    } as unknown as BackendDriverRpc;
+    const agentGitService = {
+      identity: vi.fn(async (folder: string) => ({
+        kind: 'git' as const, folder, repositoryName: 'new-product', repositoryRoot: folder,
+        branch: 'main', isLinkedWorktree: false, primaryWorktreeRoot: folder,
+        updatedAt: '2026-09-25T00:00:00.000Z',
+      })),
+      status: vi.fn().mockResolvedValue(null),
+    } as unknown as AgentGitService;
+    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc, agentGitService });
+
+    const result = await server.createProjectFromQuickChat(
+      'agent-quick-chat', 'new-product', 'Build the agreed product.',
+    );
+
+    expect(result).toMatchObject({ repository, promptSubmitted: true, agent: {
+      folder: repository.path, teamId: 'team-test', name: null, backend: 'codex',
+      backendSession: { kind: 'codex', threadId: 'thread-project' },
+    } });
+    expect(result.agent.delegatedByAgentId).toBeUndefined();
+    expect(snapshot.activeAgentId).not.toBe(result.agent.id);
+    expect(handle).toHaveBeenCalledWith(backendMethods.driverPromptSend, {
+      agent: result.agent,
+      prompt: 'Build the agreed product.',
+      options: undefined,
+    });
+    await expect(server.createProjectFromQuickChat(result.agent.id, 'another-project', 'Start it.'))
+      .rejects.toThrow('create-project is available only in a Quick Chat');
   });
 
   it('routes source repository discovery to selected SSH connections', async () => {

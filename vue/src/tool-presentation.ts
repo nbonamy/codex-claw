@@ -76,7 +76,7 @@ const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-mess
 const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding', 'report-mission-review-finding', 'update-mission-review-finding']);
 const VISUALIZE_TOOLS = new Set(['suggest-visualizations', 'add-visualization', 'get-visualization', 'list-visualizations', 'delete-visualization', 'replace-visualization']);
 const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent']);
-const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-worktree', 'list-repos', 'list-worktrees']);
+const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-project', 'create-worktree', 'list-repos', 'list-worktrees']);
 const HIDDEN_HOUSEKEEPING_TOOLS = new Set(['set-status', 'finish-turn']);
 
 export const isClawToolVisible: CodexToolVisibility = (toolCall) =>

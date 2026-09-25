@@ -51,6 +51,9 @@ describe('Claw tool title presenter', () => {
     ['mcp__codex_claw__computer_use_screenshot', { displayId: 42, scope: 'screen' }, 'completed', 'Captured display 42 screenshot'],
     ['mcp__codex_claw__computer_use_request_screen_recording', {}, 'completed', 'Requested macOS Screen Recording access for Computer Use'],
     ['codex_claw.create-worktree', { branchName: 'feature/tool-labels' }, 'error', 'Failed creating worktree feature/tool-labels'],
+    ['codex_claw.create-project', { name: 'new-product' }, 'running', 'Creating project new-product'],
+    ['codex_claw.create-project', { name: 'new-product' }, 'completed', 'Created project new-product'],
+    ['codex_claw.create-project', { name: 'new-product' }, 'error', 'Failed creating project new-product'],
   ])('presents %s as user-facing activity text', (functionName, args, state, expected) => {
     expect(presentClawToolTitle(context(
       functionName,

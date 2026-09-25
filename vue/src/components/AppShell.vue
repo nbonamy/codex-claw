@@ -485,7 +485,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -617,7 +617,7 @@ const props = withDefaults(defineProps<{
   sourceRepositories?: SourceRepository[];
   listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
   cloneSourceRepository?: (input: CloneSourceRepositoryInput) => Promise<SourceRepository>;
-  createSourceRepository?: (input: CreateSourceRepositoryInput) => Promise<SourceRepository>;
+  createProject?: (input: CreateProjectInput) => Promise<void>;
   listSourceBranches?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
   listSourceWorktrees?: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   suggestSourceWorktreePath?: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
@@ -762,7 +762,7 @@ const props = withDefaults(defineProps<{
   sourceRepositories: () => [],
   listSourceRepositories: async () => [],
   cloneSourceRepository: async () => { throw new Error(translate('surface.appShell.repositoryCloningIsNotAvailable')); },
-  createSourceRepository: async () => { throw new Error(translate('surface.appShell.repositoryCreationIsNotAvailable')); },
+  createProject: async () => { throw new Error(translate('surface.appShell.repositoryCreationIsNotAvailable')); },
   listSourceBranches: async () => [],
   suggestSourceWorktreePath: async () => '',
   chooseSourceWorktreeDestination: async () => null,
@@ -2296,19 +2296,12 @@ function closeNewProjectDialog(): void {
 }
 
 async function createNewProject(name: string): Promise<void> {
-  const { remoteConnectionId, teamId } = repositorySessionContext(null);
+  const { teamId } = repositorySessionContext(null);
   newProjectBusy.value = true;
   newProjectError.value = null;
   try {
-    const repository = await props.createSourceRepository({
+    await props.createProject({
       name,
-      ...(remoteConnectionId ? { remoteConnectionId } : {}),
-    });
-    await props.createAgent({
-      name: null,
-      folder: repository.path,
-      backend: 'codex',
-      sourceRepositoryName: repository.name,
       ...(teamId ? { teamId } : {}),
     });
     newProjectDialogVisible.value = false;

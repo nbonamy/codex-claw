@@ -71,6 +71,11 @@ describe('Claw web operations', () => {
       input: { name: 'Dina' },
     });
 
+    await invokeClawWebOperation({ request }, 'createProject', [{ name: 'new-product', teamId: 'team-one' }]);
+    expect(request).toHaveBeenLastCalledWith(backendMethods.projectCreate, {
+      input: { name: 'new-product', teamId: 'team-one' },
+    });
+
     await expect(invokeClawWebOperation({ request }, 'createQuickChat', [{ teamId: 'team-one' }]))
       .resolves.toEqual({ ok: true });
     expect(request).toHaveBeenLastCalledWith(backendMethods.agentQuickChatCreate, {
