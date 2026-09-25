@@ -156,6 +156,36 @@ describe('BrowserPanel', () => {
     expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('https://example.com/');
   });
 
+  it('opens the loaded page in the system browser and follows navigation inside the page', async () => {
+    const { api, emitDomReady, wrapper } = mountPanel({}, { deferDomReady: true });
+    api.browserOpen.mockResolvedValueOnce({
+      url: 'https://example.com/start', title: 'Start', canGoBack: false, canGoForward: false,
+    });
+    const openExternal = vi.spyOn(window, 'open').mockReturnValue(null);
+    emitDomReady();
+    await flushPromises();
+
+    const button = wrapper.get('[aria-label="Open in external browser"]');
+    await button.trigger('click');
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/start', '_blank', 'noopener,noreferrer');
+
+    wrapper.get('webview').element.dispatchEvent(Object.assign(new Event('did-navigate'), {
+      url: 'https://example.com/next',
+    }));
+    await flushPromises();
+
+    expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('https://example.com/next');
+    expect(wrapper.emitted('url-change')?.at(-1)).toStrictEqual(['https://example.com/next']);
+    await button.trigger('click');
+    expect(openExternal).toHaveBeenLastCalledWith('https://example.com/next', '_blank', 'noopener,noreferrer');
+
+    wrapper.get('webview').element.dispatchEvent(Object.assign(new Event('did-navigate-in-page'), {
+      url: 'https://example.com/next#details', isMainFrame: true,
+    }));
+    await flushPromises();
+    expect(wrapper.emitted('url-change')?.at(-1)).toStrictEqual(['https://example.com/next#details']);
+  });
+
   it('keeps the latest requested address when blank browser startup finishes after navigation', async () => {
     const { api, emitDomReady, wrapper } = mountPanel({}, { deferDomReady: true });
     const requestedUrl = 'http://127.0.0.1:4174/videos/visualize-film.html?t=25';

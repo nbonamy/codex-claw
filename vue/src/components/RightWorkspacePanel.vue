@@ -226,6 +226,7 @@
       :visible="visible && activeTab === 'browser'"
       @close="emit('closeTab', 'browser')"
       @send-prompt="emit('sendPrompt', $event)"
+      @url-change="browserUrl = $event"
     />
 
         <div
@@ -349,13 +350,14 @@ import { ElMessage } from 'element-plus';
 import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppContextMenu from '../shared/menu/AppContextMenu.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import OpenInControl from '../shared/OpenInControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 import BrowserPanel from './BrowserPanel.vue';
+import { externalBrowserUrl, openInExternalBrowser } from './browser-external';
 import CodeReviewPanel from './CodeReviewPanel.vue';
 import VisualizePanel from './VisualizePanel.vue';
 import FileExplorerPanel from './FileExplorerPanel.vue';
@@ -482,6 +484,7 @@ const tabListRoot = ref<HTMLElement | null>(null);
 const tabTrackRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
 const tabContextMenu = ref<{ tab: RightWorkspaceTab; x: number; y: number } | null>(null);
+const browserUrl = ref('');
 const tabsOverflow = ref(false);
 const canScrollTabsLeft = ref(false);
 const canScrollTabsRight = ref(false);
@@ -519,6 +522,7 @@ const tabContextMenuItems = computed(() => tabContextMenu.value ? menuItemsForTa
 
 watch(() => props.tabs, (tabs) => {
   if (tabContextMenu.value && !tabs.includes(tabContextMenu.value.tab)) tabContextMenu.value = null;
+  if (!tabs.includes('browser')) browserUrl.value = '';
   void nextTick(() => {
     updateTabScrollState();
     revealActiveTab();
@@ -644,6 +648,11 @@ function filePanel(tab: RightWorkspaceTab): RightWorkspaceFilePanel | undefined 
 
 function menuItemsForTab(tab: RightWorkspaceTab): AppMenuItem[] {
   const specificItems: AppMenuItem[] = [
+    ...(tab === 'browser' && !props.browserVisualization
+      ? [
+        { id: 'copy-url', type: 'action', label: translate('surface.rightWorkspacePanel.copyUrl'), icon: CopyIcon, disabled: !browserUrl.value } satisfies AppMenuItem,
+        { id: 'open-external', type: 'action', label: translate('surface.browserPanel.openInExternalBrowser'), icon: ArrowUpRightIcon, disabled: !externalBrowserUrl(browserUrl.value) } satisfies AppMenuItem,
+      ] : []),
     ...(absoluteFilePathForTab(tab)
       ? [{ id: 'copy-path', type: 'action', label: translate('surface.rightWorkspacePanel.copyPath'), icon: CopyIcon } satisfies AppMenuItem]
       : []),
@@ -691,6 +700,23 @@ async function selectTabContextMenuItem(itemId: string): Promise<void> {
     emit('selectTab', tab);
     for (const otherTab of props.tabs) {
       if (otherTab !== tab) emit('closeTab', otherTab);
+    }
+    return;
+  }
+  if (tab === 'browser' && itemId === 'open-external') {
+    try {
+      await openInExternalBrowser(browserUrl.value);
+    } catch {
+      ElMessage.error(translate('surface.browserPanel.openExternalFailed'));
+    }
+    return;
+  }
+  if (tab === 'browser' && itemId === 'copy-url') {
+    if (!browserUrl.value) return;
+    try {
+      await navigator.clipboard.writeText(browserUrl.value);
+    } catch {
+      ElMessage.error(translate('surface.rightWorkspacePanel.copyUrlFailed'));
     }
     return;
   }

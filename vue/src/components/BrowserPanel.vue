@@ -7,7 +7,15 @@
         <button type="button" :aria-label="$t('surface.browserPanel.reloadPage')" :title="$t('surface.browserPanel.reload')" :disabled="loading" @click="reload"><IconRefresh /></button>
       </div>
       <form v-if="!annotationMode && !visualization" class="browser-panel__address" @submit.prevent="navigate">
-        <input v-model="address" :aria-label="$t('surface.browserPanel.browserAddress')" spellcheck="false" :title="state.title || address" />
+        <input ref="addressInput" v-model="address" :aria-label="$t('surface.browserPanel.browserAddress')" spellcheck="false" :title="state.title || address" />
+        <button
+          v-if="externalUrl"
+          class="browser-panel__external-open"
+          type="button"
+          :aria-label="$t('surface.browserPanel.openInExternalBrowser')"
+          :title="$t('surface.browserPanel.openInExternalBrowser')"
+          @click="openExternal"
+        ><ArrowUpRightIcon aria-hidden="true" /></button>
       </form>
       <div v-else-if="visualization" class="browser-panel__visualization-title">{{ visualization.title }}</div>
       <div v-else class="browser-panel__annotation-title"><strong>{{ $t('surface.browserPanel.annotating') }}</strong><span>•</span><span>{{ displayHost }}</span></div>
@@ -40,7 +48,9 @@ import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRe
 import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/core/contracts';
 import { browserGuestPartition } from '@codex-claw/core/browser-guest';
 import { clawClientPlatform, codexClawApi } from '../platform-api';
+import { ArrowUpRightIcon } from '../shared/icons/app-icons';
 import AnnotationSendButton from './AnnotationSendButton.vue';
+import { externalBrowserUrl, openInExternalBrowser } from './browser-external';
 
 const props = withDefaults(defineProps<{
   agentId: string;
@@ -56,9 +66,10 @@ const props = withDefaults(defineProps<{
   visible: true,
   visualization: null,
 });
-const emit = defineEmits<{ close: []; 'send-prompt': [prompt: string] }>();
+const emit = defineEmits<{ close: []; 'send-prompt': [prompt: string]; 'url-change': [url: string] }>();
 
 const viewport = ref<HTMLElement | null>(null);
+const addressInput = ref<HTMLInputElement | null>(null);
 const address = ref(props.initialUrl ?? '');
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -78,8 +89,11 @@ const displayHost = computed(() => {
     return address.value;
   }
 });
+const externalUrl = computed(() => props.visualization ? null : externalBrowserUrl(state.value.url));
 let resizeObserver: ResizeObserver | null = null;
 let unsubscribe: (() => void) | null = null;
+
+watch(() => state.value.url, (url) => emit('url-change', url), { immediate: true });
 
 onMounted(async () => {
   const initialRequestId = props.openRequestId;
@@ -166,6 +180,8 @@ async function ensureGuest(): Promise<number> {
   guest.className = 'browser-panel__guest';
   guest.setAttribute('partition', partition);
   guest.setAttribute('src', 'about:blank');
+  guest.addEventListener('did-navigate', handleGuestNavigation);
+  guest.addEventListener('did-navigate-in-page', handleGuestNavigation);
   guestElement = guest;
   guestPartition = partition;
   guestWebContentsId = null;
@@ -194,6 +210,23 @@ async function ensureGuest(): Promise<number> {
     guest.addEventListener('dom-ready', ready);
     viewport.value?.append(guest);
   });
+}
+
+function handleGuestNavigation(event: Event): void {
+  const navigation = event as Event & { url?: string; isMainFrame?: boolean };
+  if (!browserReady || props.visualization || !navigation.url || navigation.url === 'about:blank'
+    || navigation.isMainFrame === false) return;
+  state.value = { ...state.value, url: navigation.url };
+  if (document.activeElement !== addressInput.value) address.value = navigation.url;
+}
+
+async function openExternal(): Promise<void> {
+  if (!externalUrl.value) return;
+  try {
+    await openInExternalBrowser(externalUrl.value);
+  } catch (reason) {
+    error.value = messageFor(reason);
+  }
 }
 
 async function navigate(): Promise<void> {
@@ -381,14 +414,23 @@ function messageFor(reason: unknown): string {
 }
 
 .browser-panel__address {
-  padding: 0 var(--space-8);
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  width: auto;
+  height: 28px;
+  margin: 0 var(--space-8);
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
 }
 
 .browser-panel__address input {
   box-sizing: border-box;
-  width: 100%;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  border: 0;
   background: transparent;
   color: var(--color-text);
   font: inherit;
@@ -397,12 +439,30 @@ function messageFor(reason: unknown): string {
   line-height: var(--line-height-16);
   text-align: center;
   outline: none;
-  padding: calc(var(--space-1) + 1px) var(--space-3);
+  padding: 0 var(--space-3);
 }
 
-.browser-panel__address input:focus {
+.browser-panel__address:hover,
+.browser-panel__address:focus-within {
   border-color: var(--color-border);
   background: var(--color-surface-lowest);
+}
+
+.browser-panel .browser-panel__external-open {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 100%;
+  border-radius: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.browser-panel__address:hover .browser-panel__external-open,
+.browser-panel__address:focus-within .browser-panel__external-open {
+  background: var(--color-surface-low);
+  color: var(--color-text);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .browser-panel__annotation-title {

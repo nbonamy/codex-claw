@@ -3,6 +3,7 @@ import { ElTooltip } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentSubagentTree, OpenInApplicationCatalog, RendererMessage } from '@codex-claw/core/contracts';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
+import BrowserPanel from '../BrowserPanel.vue';
 import { rightWorkspaceFileTab, type RightWorkspaceFilePanel, type RightWorkspaceFileTab, type RightWorkspaceImagePanel, type RightWorkspaceImageTab, type RightWorkspaceTab } from '../right-workspace';
 import type { SidePanelMarkdownState } from '../side-panel';
 import { i18n } from '../../i18n';
@@ -369,9 +370,48 @@ describe('RightWorkspacePanel', () => {
       await wrapper.findAll('.right-workspace-panel__tab')[0]?.trigger('contextmenu');
       const browserMenu = document.body.querySelector('[aria-label="Tab actions"]');
       expect([...browserMenu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())).toStrictEqual([
-        'Close tab', 'Close other tabs',
+        'Copy URL', 'Open in external browser', 'Close tab', 'Close other tabs',
       ]);
-      expect(browserMenu?.querySelector('[role="separator"]')).toBeNull();
+      expect(browserMenu?.querySelectorAll('[role="separator"]')).toHaveLength(1);
+      expect([...browserMenu!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].slice(0, 2).map((item) => item.disabled)).toStrictEqual([true, true]);
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+    }
+  });
+
+  it('copies the current browser URL and opens it in the system browser from the tab menu', async () => {
+    const copyText = vi.fn().mockResolvedValue(undefined);
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: copyText } });
+    const openExternal = vi.spyOn(window, 'open').mockReturnValue(null);
+    try {
+      const wrapper = mountPanel(['browser'], 'browser');
+      wrapper.getComponent(BrowserPanel).vm.$emit('url-change', 'https://example.com/current');
+      await wrapper.vm.$nextTick();
+      await wrapper.get('.right-workspace-panel__tab').trigger('contextmenu');
+
+      const menu = document.body.querySelector('[aria-label="Tab actions"]');
+      expect([...menu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())).toStrictEqual([
+        'Copy URL', 'Open in external browser', 'Close tab', 'Close other tabs',
+      ]);
+      expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(1);
+      (menu?.querySelector('[role="menuitem"]') as HTMLElement).click();
+      await flushPromises();
+      expect(copyText).toHaveBeenCalledWith('https://example.com/current');
+
+      await wrapper.get('.right-workspace-panel__tab').trigger('contextmenu');
+      const external = [...document.body.querySelectorAll<HTMLElement>('[aria-label="Tab actions"] [role="menuitem"]')]
+        .find((item) => item.textContent?.trim() === 'Open in external browser');
+      external?.click();
+      await flushPromises();
+      expect(openExternal).toHaveBeenCalledWith('https://example.com/current', '_blank', 'noopener,noreferrer');
+
+      wrapper.getComponent(BrowserPanel).vm.$emit('url-change', 'file:///repo/README.md');
+      await wrapper.vm.$nextTick();
+      await wrapper.get('.right-workspace-panel__tab').trigger('contextmenu');
+      const fileUrlMenu = document.body.querySelector('[aria-label="Tab actions"]');
+      expect([...fileUrlMenu!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].slice(0, 2).map((item) => item.disabled)).toStrictEqual([false, true]);
     } finally {
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
       else Reflect.deleteProperty(navigator, 'clipboard');
