@@ -12,30 +12,40 @@ const chromePath =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const filmName = process.argv[2] ?? "mission-film";
 if (
-  !["mission-film", "review-film", "delegation-film", "project-film"].includes(
-    filmName,
-  )
+  ![
+    "mission-film",
+    "review-film",
+    "delegation-film",
+    "project-film",
+    "project-shorts",
+  ].includes(filmName)
 )
   throw new Error(`Unknown film: ${filmName}`);
 const outputPath = join(root, `assets/${filmName}.mp4`);
 const posterPath = join(root, `assets/${filmName}-poster.png`);
 const fps = 24;
+const width = filmName === "project-shorts" ? 1080 : 1600;
+const height = filmName === "project-shorts" ? 1920 : 900;
 const duration =
-  filmName === "project-film"
-    ? 43
-    : filmName === "delegation-film"
-      ? 46
-      : filmName === "review-film"
-        ? 50
-        : 48;
+  filmName === "project-shorts"
+    ? 40
+    : filmName === "project-film"
+      ? 43
+      : filmName === "delegation-film"
+        ? 46
+        : filmName === "review-film"
+          ? 50
+          : 48;
 const posterSecond =
-  filmName === "project-film"
-    ? 30
-    : filmName === "delegation-film"
-      ? 29
-      : filmName === "review-film"
-        ? 23
-        : 12;
+  filmName === "project-shorts"
+    ? 29
+    : filmName === "project-film"
+      ? 30
+      : filmName === "delegation-film"
+        ? 29
+        : filmName === "review-film"
+          ? 23
+          : 12;
 const allowedFiles = new Map([
   [`/${filmName}.html`, [`${filmName}.html`, "text/html; charset=utf-8"]],
   [`/${filmName}.css`, [`${filmName}.css`, "text/css; charset=utf-8"]],
@@ -158,7 +168,7 @@ async function render() {
         "--remote-debugging-port=0",
         "--remote-allow-origins=*",
         `--user-data-dir=${profilePath}`,
-        "--window-size=1600,900",
+        `--window-size=${width},${height}`,
         `http://127.0.0.1:${port}/${filmName}.html?export=1`,
       ],
       { stdio: "ignore" },
@@ -168,8 +178,8 @@ async function render() {
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
     await cdp.send("Emulation.setDeviceMetricsOverride", {
-      width: 1600,
-      height: 900,
+      width,
+      height,
       deviceScaleFactor: 1,
       mobile: false,
     });

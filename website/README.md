@@ -70,6 +70,12 @@ node videos/render-mission-film.mjs project-film
 
 The source thumbnail is `videos/assets/project-film-thumbnail.png`.
 
+`videos/project-shorts.html` reframes the same story as an editable 40-second 9:16 vertical cut for TikTok and YouTube Shorts. It uses larger mobile-readable captions and a focused app close-up; the explicit create request and retained Quick Chat remain visible. Preview it at <http://127.0.0.1:4174/videos/project-shorts.html> and export the ignored 1080×1920 MP4 and poster with:
+
+```bash
+node videos/render-mission-film.mjs project-shorts
+```
+
 ## Deploy
 
 The deploy helper streams the static site over SSH, provisions the Let’s Encrypt certificate if this is the first deploy, and installs the matching nginx site on `joshua`:

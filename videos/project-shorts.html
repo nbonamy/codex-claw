@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex Claw — Quick Chat to project · Shorts</title>
+    <link rel="icon" href="../website/assets/claw-icon.png" />
+    <link rel="stylesheet" href="project-shorts.css" />
+  </head>
+  <body>
+    <main class="preview">
+      <header class="preview-header">
+        <div>
+          <p>Codex Claw / vertical product film</p>
+          <h1>Quick Chat to project · Shorts</h1>
+        </div>
+        <span>9:16 · 40 seconds · illustrative workflow</span>
+      </header>
+
+      <div class="film-viewport">
+        <div
+          id="film"
+          class="film shorts-film"
+          aria-label="Animated vertical Quick Chat to project walkthrough"
+        >
+          <div class="shorts-glow shorts-glow--top"></div>
+          <div class="shorts-glow shorts-glow--bottom"></div>
+          <div class="shorts-orbit shorts-orbit--one"></div>
+          <div class="shorts-orbit shorts-orbit--two"></div>
+
+          <section class="shorts-opening" aria-label="Opening title">
+            <div class="shorts-opening__brand">
+              <img src="../website/assets/claw-icon.png" alt="" /><span
+                >CODEX CLAW</span
+              >
+            </div>
+            <span class="shorts-opening__eyebrow">FROM IDEA TO PROJECT</span>
+            <h2>Just start<br /><em>talking.</em></h2>
+            <p>
+              Quick Chat is a place to shape the idea before the project exists.
+            </p>
+            <div class="shorts-opening__flow">
+              <span>DISCUSS</span><i>→</i><span>CREATE</span><i>→</i
+              ><span>BUILD</span>
+            </div>
+          </section>
+
+          <section
+            class="shorts-story"
+            aria-label="Vertical project creation animation"
+          >
+            <div class="shorts-story__brand">
+              <img src="../website/assets/claw-icon.png" alt="" /><span
+                >CODEX CLAW</span
+              ><b>QUICK CHAT → PROJECT</b>
+            </div>
+            <div class="shorts-story__chapter">
+              <span id="chapter-number">01 / 06</span><i></i
+              ><span id="chapter-label">DISCUSS</span>
+            </div>
+            <h2 id="story-title">It starts with a Quick Chat.</h2>
+            <p id="story-subtitle">No folder to choose. Just the idea.</p>
+
+            <div
+              id="app-panel"
+              class="shorts-app"
+              aria-label="Illustrative Codex Claw app close-up"
+            >
+              <div class="shorts-app__bar">
+                <div class="shorts-traffic"><i></i><i></i><i></i></div>
+                <span
+                  ><img src="../website/assets/claw-icon.png" alt="" /> Codex
+                  Claw</span
+                ><b>···</b>
+              </div>
+              <div class="shorts-app__header">
+                <div id="app-avatar" class="shorts-app__avatar">✦</div>
+                <div>
+                  <small id="app-path">Quick Chat · no project folder</small
+                  ><strong id="app-title">New app idea</strong>
+                </div>
+                <span id="app-state">Discussing</span>
+              </div>
+              <div class="shorts-app__body">
+                <div id="scene-body" class="shorts-scene-body"></div>
+              </div>
+              <div id="app-composer" class="shorts-app__composer">
+                <span id="composer-text">Ask a follow-up</span><b>↑</b>
+              </div>
+            </div>
+
+            <div id="film-pointer" class="shorts-pointer" aria-hidden="true">
+              <svg viewBox="0 0 27 31">
+                <path d="M3 2v23l6.1-6.2 4.1 9.1 4.1-1.9-4.2-9.2H23z" />
+              </svg>
+            </div>
+            <div
+              id="pointer-ring"
+              class="shorts-pointer-ring"
+              aria-hidden="true"
+            ></div>
+            <p id="story-note" class="shorts-story__note">
+              A thought can stay a conversation until it is ready.
+            </p>
+            <div class="shorts-progress">
+              <span id="progress-label">DISCUSS</span>
+              <div><i id="film-progress"></i></div>
+              <span>CODEX CLAW</span>
+            </div>
+          </section>
+
+          <section class="shorts-ending" aria-label="Closing title">
+            <div class="shorts-ending__brand">
+              <img src="../website/assets/claw-icon.png" alt="" /><span
+                >CODEX CLAW</span
+              >
+            </div>
+            <div class="shorts-ending__symbol">
+              <span>◌</span><i>→</i><span>◫</span>
+            </div>
+            <h2>Talk it through.<br /><em>Build it for real.</em></h2>
+            <p>
+              From Quick Chat to a project agent, with the context already
+              there.
+            </p>
+            <span class="shorts-ending__url">codex-claw.nabocorp.com</span>
+          </section>
+        </div>
+      </div>
+
+      <div class="controls" aria-label="Film controls">
+        <button id="play-toggle" type="button" aria-label="Play film">
+          Play
+        </button>
+        <button id="restart" type="button" aria-label="Restart film">↺</button>
+        <input
+          id="scrubber"
+          type="range"
+          min="0"
+          max="40"
+          step="0.01"
+          value="0"
+          aria-label="Film position"
+        />
+        <output id="timecode" for="scrubber">00:00 / 00:40</output>
+        <a class="download-film" href="assets/project-shorts.mp4" download
+          >Download MP4 ↓</a
+        >
+      </div>
+      <p class="preview-note">
+        Scripted product illustration, not a captured live run. Scrub the
+        timeline to inspect each beat.
+      </p>
+    </main>
+    <script type="module" src="project-shorts.mjs"></script>
+  </body>
+</html>
