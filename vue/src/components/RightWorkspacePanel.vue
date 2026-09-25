@@ -187,6 +187,7 @@
       :visualize="agent.visualize"
       :save-canvas="input => saveCanvas(agent.id, input)"
       :read-asset="visualizationId => readVisualizationAsset(agent.id, visualizationId)"
+      @annotate="emit('annotateVisualization', $event)"
       @generate="generateVisualizationSuggestion(agent.id, { suggestionId: $event })"
       @select="selectVisualization(agent.id, { visualizationId: $event })"
       @delete="deleteVisualization(agent.id, { visualizationId: $event })"
@@ -451,6 +452,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
+  annotateVisualization: [annotation: import('./use-visualization-annotations').VisualizationAnnotationInput];
   closeTab: [tab: RightWorkspaceTab];
   cancelPlan: [];
   commentPlan: [comments: PlanReviewComment[]];

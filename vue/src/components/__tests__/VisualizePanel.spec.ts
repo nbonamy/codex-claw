@@ -236,5 +236,29 @@ describe('VisualizePanel', () => {
     await wrapper.get('button[aria-label="Delete System map"]').trigger('click');
     await flushPromises();
     expect(wrapper.emitted('delete')).toStrictEqual([['visualization-system']]);
+    confirm.mockRestore();
+  });
+
+  it('allows thumbnail deletion while the agent is working', async () => {
+    const visualize = visualizeSession();
+    visualize.visualizations = [{
+      id: 'visualization-system',
+      title: 'System map',
+      content: { kind: 'mermaid', source: 'flowchart LR\n A --> B' },
+      createdAt: visualize.createdAt,
+      updatedAt: visualize.updatedAt,
+    }];
+    visualize.selectedVisualizationId = 'visualization-system';
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const wrapper = mount(VisualizePanel, { props: { busy: true, saveCanvas: vi.fn(), visualize, readAsset: vi.fn() } });
+
+    const remove = wrapper.get('button[aria-label="Delete System map"]');
+    expect(remove.attributes('disabled')).toBeUndefined();
+    await remove.trigger('click');
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('delete')).toStrictEqual([['visualization-system']]);
+    confirm.mockRestore();
   });
 });

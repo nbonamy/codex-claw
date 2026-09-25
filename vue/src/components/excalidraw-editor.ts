@@ -1,6 +1,6 @@
 import { Component, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Excalidraw, MainMenu, CaptureUpdateAction, bumpVersion, convertToExcalidrawElements, exportToCanvas, restoreElements } from '@excalidraw/excalidraw';
+import { Excalidraw, MainMenu, CaptureUpdateAction, bumpVersion, convertToExcalidrawElements, exportToCanvas, restoreElements, sceneCoordsToViewportCoords } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI, BinaryFiles, AppState, ExcalidrawProps } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement, FileId } from '@excalidraw/excalidraw/element/types';
 import type { CanvasDocument, CanvasElement } from '@codex-claw/core/visualize-canvas';
@@ -11,6 +11,8 @@ import '@excalidraw/excalidraw/index.css';
 Object.assign(window, { EXCALIDRAW_ASSET_PATH: new URL('./excalidraw/', document.baseURI).href });
 
 export type CanvasScene = Omit<CanvasDocument, 'revision'>;
+export type CanvasAnnotationTarget = { id: string; x: number; y: number; width: number; height: number };
+export type CanvasControlsState = { zoom: number };
 export async function importVisualization(visualization: Visualization, imageSource: string): Promise<CanvasScene> {
   if (visualization.canvas) return structuredClone(visualization.canvas);
   if (visualization.content.kind === 'mermaid') {
@@ -78,10 +80,11 @@ function restoreSceneElements(elements: readonly ExcalidrawElement[]) {
     };
   });
 }
-export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (scene: CanvasScene) => void, onError: (error: Error) => void) {
+export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (scene: CanvasScene) => void, onError: (error: Error) => void, onViewportChange: () => void = () => {}) {
   const root = createRoot(host);
   let api: ExcalidrawImperativeAPI | undefined;
   let current = scene;
+  let unsubscribeScroll: (() => void) | undefined;
   let disposed = false;
   let initialFitPending = true;
   let initialFitScheduled = false;
@@ -104,6 +107,7 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
     for (const [target, source] of Object.entries({ background: '--color-surface-low', foreground: '--text-primary-color', size: '--lg-button-size', radius: '--border-radius-lg' })) {
       host.parentElement?.style.setProperty(`--visualize-control-${target}`, style.getPropertyValue(source));
     }
+    onViewportChange();
   });
   const themeObserver = new MutationObserver(() => {
     api?.updateScene({ appState: { theme: theme() }, captureUpdate: CaptureUpdateAction.NEVER });
@@ -113,6 +117,8 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
   const resizeObserver = new ResizeObserver(() => {
     api?.refresh();
     fitInitialScene();
+    syncControlStyle();
+    onViewportChange();
   });
   resizeObserver.observe(host);
   const refreshTextAfterFontsLoad = () => requestAnimationFrame(() => {
@@ -133,16 +139,17 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
   });
   document.fonts.addEventListener('loadingdone', refreshTextAfterFontsLoad);
   const elements = (value: CanvasScene) => restoreSceneElements(value.elements as unknown as ExcalidrawElement[]);
-  const selected = (value: CanvasScene) => Object.fromEntries(value.selectedElementIds.map(id => [id, true as const]));
   const update = (value: CanvasScene, undoable: boolean) => {
     current = value;
     api?.addFiles(Object.values(value.files) as unknown as Parameters<ExcalidrawImperativeAPI['addFiles']>[0]);
-    api?.updateScene({ elements: elements(value), appState: { selectedElementIds: selected(value) }, captureUpdate: undoable ? CaptureUpdateAction.IMMEDIATELY : CaptureUpdateAction.NEVER });
+    api?.updateScene({ elements: elements(value), appState: { selectedElementIds: {} }, captureUpdate: undoable ? CaptureUpdateAction.IMMEDIATELY : CaptureUpdateAction.NEVER });
+    requestAnimationFrame(onViewportChange);
   };
   root.render(createElement(CanvasErrorBoundary, { onError, children: createElement(Excalidraw, {
-    initialData: { elements: elements(scene), files: scene.files as BinaryFiles, appState: { selectedElementIds: selected(scene), theme: theme(), viewModeEnabled: true, activeTool: { type: 'hand', customType: null, locked: false, lastActiveTool: null } }, scrollToContent: true },
+    initialData: { elements: elements(scene), files: scene.files as BinaryFiles, appState: { selectedElementIds: {}, theme: theme(), viewModeEnabled: true, activeTool: { type: 'hand', customType: null, locked: false, lastActiveTool: null } }, scrollToContent: true },
     excalidrawAPI: (value: ExcalidrawImperativeAPI) => {
       api = value;
+      unsubscribeScroll = value.onScrollChange(onViewportChange);
       void document.fonts.ready.then(() => {
         refreshTextAfterFontsLoad();
         fitInitialScene();
@@ -150,9 +157,9 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
       syncControlStyle();
       fitInitialScene();
     },
-    onChange: (items: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
+    onChange: (items: readonly ExcalidrawElement[], _state: AppState, files: BinaryFiles) => {
       if (disposed) return;
-      current = { elements: items.map(element => ({ ...element, link: null })) as unknown as CanvasElement[], files, selectedElementIds: Object.keys(state.selectedElementIds).filter(id => state.selectedElementIds[id]), preview: '' };
+      current = { elements: items.map(element => ({ ...element, link: null })) as unknown as CanvasElement[], files, selectedElementIds: current.selectedElementIds, preview: '' };
       onChange(current);
     },
     onLinkOpen: ((_element, event) => event.preventDefault()) as ExcalidrawProps['onLinkOpen'],
@@ -162,15 +169,48 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
   }, createElement(MainMenu)) }));
   return {
     update,
-    setEditing(editing: boolean) {
-      api?.updateScene({ appState: { viewModeEnabled: !editing }, captureUpdate: CaptureUpdateAction.NEVER });
-      api?.setActiveTool({ type: 'hand' });
+    setSelection(elementIds: readonly string[]) {
+      current = { ...current, selectedElementIds: [...elementIds], preview: '' };
+    },
+    getAnnotationTargets(): CanvasAnnotationTarget[] {
+      if (!api) return [];
+      const appState = api.getAppState();
+      return api.getSceneElements()
+        .filter(element => !element.isDeleted && ['rectangle', 'ellipse', 'diamond'].includes(element.type))
+        .map(element => {
+          const start = sceneCoordsToViewportCoords({ sceneX: element.x, sceneY: element.y }, appState);
+          const end = sceneCoordsToViewportCoords({ sceneX: element.x + element.width, sceneY: element.y + element.height }, appState);
+          return { id: element.id, x: start.x - appState.offsetLeft, y: start.y - appState.offsetTop, width: end.x - start.x, height: end.y - start.y };
+        });
+    },
+    getControlsState(): CanvasControlsState {
+      return { zoom: api?.getAppState().zoom.value ?? 1 };
+    },
+    zoomBy(delta: number): number {
+      if (!api) return 1;
+      const state = api.getAppState();
+      const nextZoom = Math.min(30, Math.max(0.1, Math.round((state.zoom.value + delta) * 10) / 10));
+      if (nextZoom === state.zoom.value) return nextZoom;
+      const viewportX = state.width / 2;
+      const viewportY = state.height / 2;
+      const baseScrollX = state.scrollX + viewportX - viewportX / state.zoom.value;
+      const baseScrollY = state.scrollY + viewportY - viewportY / state.zoom.value;
+      api.updateScene({
+        appState: {
+          scrollX: baseScrollX - (viewportX - viewportX / nextZoom),
+          scrollY: baseScrollY - (viewportY - viewportY / nextZoom),
+          zoom: { value: nextZoom } as AppState['zoom'],
+        },
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+      requestAnimationFrame(onViewportChange);
+      return nextZoom;
     },
     fit() { api?.scrollToContent(undefined, { fitToContent: true }); },
     async preview(value = current): Promise<string> {
       const canvas = await exportToCanvas({ elements: elements(value), files: value.files as BinaryFiles, appState: { exportBackground: false }, maxWidthOrHeight: 1000 });
       return canvas.toDataURL('image/png');
     },
-    dispose() { document.fonts.removeEventListener('loadingdone', refreshTextAfterFontsLoad); themeObserver.disconnect(); resizeObserver.disconnect(); disposed = true; root.unmount(); api = undefined; },
+    dispose() { document.fonts.removeEventListener('loadingdone', refreshTextAfterFontsLoad); unsubscribeScroll?.(); themeObserver.disconnect(); resizeObserver.disconnect(); disposed = true; root.unmount(); api = undefined; },
   };
 }

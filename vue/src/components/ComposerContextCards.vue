@@ -4,8 +4,12 @@
       v-for="item in items"
       :key="item.id"
       class="composer-context-cards__card"
+      :title="item.title"
     >
-      <span class="composer-context-cards__label">{{ item.label }}</span>
+      <span class="composer-context-cards__label">
+        <component :is="item.icon" v-if="item.icon" class="composer-context-cards__icon" :stroke-width="1.5" aria-hidden="true" />
+        {{ item.label }}
+      </span>
       <strong v-if="item.detail" class="composer-context-cards__detail">{{ item.detail }}</strong>
       <button
         type="button"
@@ -21,11 +25,14 @@
 </template>
 
 <script setup lang="ts">
+import type { Component } from 'vue';
 import { X } from '../shared/icons/app-icons';
 
 export type ComposerContextCard = {
   id: string;
   label: string;
+  icon?: Component;
+  title?: string;
   detail?: string;
   removeLabel: string;
 };
@@ -61,10 +68,18 @@ const emit = defineEmits<{
 }
 
 .composer-context-cards__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   flex: 0 0 auto;
   color: var(--color-text-muted);
   font-weight: 600;
   font-size: var(--font-size-11);
+}
+
+.composer-context-cards__icon {
+  width: 15px;
+  height: 15px;
 }
 
 .composer-context-cards__detail {

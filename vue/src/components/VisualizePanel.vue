@@ -16,6 +16,7 @@
         :image-source="imageSources[selectedVisualization.id]"
         :save="saveCanvas"
         :session-id="visualize.id"
+        @annotate="emit('annotate', $event)"
       />
       </KeepAlive>
       <div v-if="selectedVisualization.content.kind === 'image' && !selectedVisualization.canvas && !imageSources[selectedVisualization.id]" class="visualize-panel__diagram">
@@ -72,7 +73,6 @@
           type="button"
           class="visualize-panel__delete"
           :aria-label="translate('visualize.deleteDiagram', { title: visualization.title })"
-          :disabled="busy"
           @click="confirmDelete(visualization)"
         >
           <XIcon aria-hidden="true" />
@@ -92,6 +92,7 @@ import ExcalidrawCanvas from './ExcalidrawCanvas.vue';
 import type { SaveCanvasInput, CanvasDocument } from '@codex-claw/core/visualize-canvas';
 import VisualizationView from './VisualizationView.vue';
 import { visualizationRenderKey } from './visualization-render-key';
+import type { VisualizationAnnotationInput } from './use-visualization-annotations';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
@@ -101,6 +102,7 @@ const props = withDefaults(defineProps<{
 }>(), { busy: false });
 
 const emit = defineEmits<{
+  annotate: [annotation: VisualizationAnnotationInput];
   generate: [suggestionId: string];
   select: [visualizationId: string];
   delete: [visualizationId: string];
@@ -377,11 +379,6 @@ async function confirmDelete(visualization: Visualization): Promise<void> {
 .visualize-panel__thumbnail-item:hover .visualize-panel__delete,
 .visualize-panel__delete:focus-visible {
   opacity: 1;
-}
-
-.visualize-panel__delete:disabled {
-  cursor: default;
-  opacity: 0.45;
 }
 
 .visualize-panel__delete svg {

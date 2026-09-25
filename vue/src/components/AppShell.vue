@@ -226,6 +226,7 @@
         ref="agentWorkspace"
         :active-attachment-annotation-counts="activeAttachmentAnnotationCounts"
         :add-chat-text-annotation="addChatTextAnnotation"
+        :add-visualization-annotation="addVisualizationAnnotation"
         :agent-files="agentFiles"
         :agent-sidebar-collapsed="agentSidebarCollapsed"
         :close-right-workspace-tab="closeRightWorkspaceTab"
@@ -237,6 +238,7 @@
         :conversation-pane-controller="conversationPaneController"
         :conversation-plan="conversationPlan"
         :chat-text-annotations="activeChatTextAnnotations"
+        :visualization-annotations="activeVisualizationAnnotations"
         :review-finding-attachment="activeReviewFindingAttachment"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
         :current-agent="currentAgent"
@@ -263,6 +265,7 @@
         :open-agent-in="openAgentIn"
         :open-attachment-image-annotation="openAttachmentImageAnnotation"
         :remove-chat-text-annotation="removeChatTextAnnotation"
+        :remove-visualization-annotation="removeVisualizationAnnotation"
         :open-file-preview="openFilePreview"
         :open-file-preview-for-agent="openFilePreviewForAgent"
         :open-in-applications="openInApplications"
@@ -560,6 +563,7 @@ import { useRightWorkspaceState } from './use-right-workspace-state';
 import type { RightWorkspaceTab } from './right-workspace';
 import { useImageAnnotation } from './use-image-annotation';
 import { useChatTextAnnotations } from './use-chat-text-annotations';
+import { useVisualizationAnnotations } from './use-visualization-annotations';
 import { useCockpitBacklog } from './use-cockpit-backlog';
 import { useWorkspacePreviews } from './use-workspace-previews';
 import { useWorkItemRouting } from './use-work-item-routing';
@@ -1574,6 +1578,15 @@ const {
   forward: forwardCodexPromptWithChatTextAnnotations,
   remove: removeChatTextAnnotation,
 } = chatTextAnnotation;
+const visualizationAnnotation = useVisualizationAnnotations({
+  currentAgentId: () => currentAgent.value?.id,
+});
+const {
+  activeAnnotations: activeVisualizationAnnotations,
+  add: addVisualizationAnnotation,
+  forward: forwardCodexPromptWithVisualizationAnnotations,
+  remove: removeVisualizationAnnotation,
+} = visualizationAnnotation;
 const cockpitBacklogState = useCockpitBacklog({
   configure: (input) => props.configureWorkBacklog(input),
   confirmLoadAll: async () => {
@@ -2628,25 +2641,33 @@ function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions)
 }
 
 async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
-  await forwardCodexPromptWithChatTextAnnotations(
+  await forwardCodexPromptWithVisualizationAnnotations(
     prompt,
     options,
-    (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
-      nextPrompt,
-      nextOptions,
-      forwardPrompt,
+    (visualizationPrompt, visualizationOptions) => forwardCodexPromptWithChatTextAnnotations(
+      visualizationPrompt,
+      visualizationOptions,
+      (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
+        nextPrompt,
+        nextOptions,
+        forwardPrompt,
+      ),
     ),
   );
 }
 
 async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
-  await forwardCodexPromptWithChatTextAnnotations(
+  await forwardCodexPromptWithVisualizationAnnotations(
     prompt,
     options,
-    (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
-      nextPrompt,
-      nextOptions,
-      forwardSteerPrompt,
+    (visualizationPrompt, visualizationOptions) => forwardCodexPromptWithChatTextAnnotations(
+      visualizationPrompt,
+      visualizationOptions,
+      (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
+        nextPrompt,
+        nextOptions,
+        forwardSteerPrompt,
+      ),
     ),
   );
 }

@@ -10,7 +10,7 @@
       ref="surface"
       class="conversation-pane__surface"
       :controller="controller"
-      :has-composer-context="textAnnotations.length > 0"
+      :has-composer-context="textAnnotations.length > 0 || visualizationAnnotations.length > 0"
       :message-text-selection="true"
       :transform-message="transformConversationMessage"
       :tool-visibility="isClawToolVisible"
@@ -115,6 +115,7 @@ import {
   type SurfaceMessage,
 } from '@codex-app-sdk/vue';
 import { PlusCircleIcon } from '../shared/icons/app-icons';
+import { IconSitemap } from '@tabler/icons-vue';
 import type {
   Agent,
   RendererMessage,
@@ -129,6 +130,7 @@ import ComposerContextCards, { type ComposerContextCard } from './ComposerContex
 import ChatTextSelectionAnnotation from './ChatTextSelectionAnnotation.vue';
 import ThreadFlagAffordance from './ThreadFlagAffordance.vue';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
+import type { VisualizationAnnotation } from './use-visualization-annotations';
 import type { CodeReviewFinding } from '@codex-claw/core/code-review';
 import {
   presentCollaborationMessage,
@@ -150,6 +152,7 @@ const props = withDefaults(defineProps<{
   agents?: readonly Agent[];
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   textAnnotations?: readonly ChatTextAnnotation[];
+  visualizationAnnotations?: readonly VisualizationAnnotation[];
   reviewFinding?: CodeReviewFinding | null;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
@@ -163,6 +166,7 @@ const props = withDefaults(defineProps<{
   agents: () => [],
   attachmentAnnotationCounts: () => ({}),
   textAnnotations: () => [],
+  visualizationAnnotations: () => [],
   reviewFinding: null,
   planVisible: true,
   historyLoadFailed: false,
@@ -183,6 +187,7 @@ const emit = defineEmits<{
   'annotate-attachment': [attachment: CodexNativeAttachment];
   'close-plan': [];
   'remove-text-annotation': [annotationId: string];
+  'remove-visualization-annotation': [annotationId: string];
   'remove-review-finding': [];
   'retry-history': [];
   'thread-flag': [response: ThreadFlagResponse];
@@ -194,6 +199,13 @@ const composerContextCards = computed<ComposerContextCard[]>(() => [
     id: `annotation:${annotation.id}`,
     label: t('chat.textAnnotations.annotation'),
     removeLabel: t('chat.textAnnotations.remove'),
+  })),
+  ...props.visualizationAnnotations.map((annotation) => ({
+    id: `visualization-annotation:${annotation.id}`,
+    label: t('chat.composerContext.visualizationAnnotation'),
+    icon: IconSitemap,
+    title: annotation.comment,
+    removeLabel: `${t('chat.composerContext.removeVisualizationAnnotation')}: ${annotation.comment}`,
   })),
   ...(props.reviewFinding ? [{
     id: 'review-finding',
@@ -253,6 +265,10 @@ function removeComposerContextCard(itemId: string): void {
   }
   if (itemId.startsWith('annotation:')) {
     emit('remove-text-annotation', itemId.slice('annotation:'.length));
+    return;
+  }
+  if (itemId.startsWith('visualization-annotation:')) {
+    emit('remove-visualization-annotation', itemId.slice('visualization-annotation:'.length));
   }
 }
 

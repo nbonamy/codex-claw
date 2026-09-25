@@ -4,7 +4,17 @@ import type { CanvasDocument, SaveCanvasInput } from '@codex-claw/core/visualize
 import type { Visualization } from '@codex-claw/core/visualize';
 import type { CanvasScene } from '../excalidraw-editor';
 import ExcalidrawCanvas from '../ExcalidrawCanvas.vue';
-const editor = vi.hoisted(() => ({ setEditing: vi.fn(), update: vi.fn(), fit: vi.fn(), dispose: vi.fn(), preview: vi.fn().mockResolvedValue('data:image/png;base64,YQ=='), change: (_scene: CanvasScene) => {} }));
+const editor = vi.hoisted(() => ({
+  setSelection: vi.fn(),
+  getAnnotationTargets: vi.fn(() => [{ id: 'b', x: 190, y: 20, width: 120, height: 110 }]),
+  update: vi.fn(),
+  fit: vi.fn(),
+  zoomBy: vi.fn(),
+  getControlsState: vi.fn(() => ({ zoom: 1 })),
+  dispose: vi.fn(),
+  preview: vi.fn().mockResolvedValue('data:image/png;base64,YQ=='),
+  change: (_scene: CanvasScene) => {},
+}));
 vi.mock('../excalidraw-editor', () => ({
   importVisualization: async (visualization: Visualization) => structuredClone(visualization.canvas),
   mountCanvas: (_host: HTMLElement, _scene: CanvasScene, change: typeof editor.change) => { editor.change = change; return editor; },
@@ -14,37 +24,129 @@ const canvas: CanvasDocument = {
   selectedElementIds: ['a'], files: {}, preview: '',
 };
 const visualization: Visualization = { id: 'v', title: 'Map', content: { kind: 'mermaid', source: 'flowchart LR; A --> B' }, canvas, createdAt: '', updatedAt: '' };
-beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  editor.getControlsState.mockReturnValue({ zoom: 1 });
+  editor.getAnnotationTargets.mockReturnValue([{ id: 'b', x: 190, y: 20, width: 120, height: 110 }]);
+  vi.useFakeTimers();
+});
 afterEach(() => { vi.useRealTimers(); });
 describe('ExcalidrawCanvas', () => {
-  it('autosaves edits and selection for the original agent without a second composer', async () => {
+  it('autosaves the selected shapes for the original agent without a second composer', async () => {
     const save = vi.fn(async (input: SaveCanvasInput) => ({ ...input.document, revision: input.expectedRevision + 1 }));
     const wrapper = mount(ExcalidrawCanvas, { props: { visualization, save, sessionId: 'session' } });
     await flushPromises();
-    const edited = structuredClone(canvas);
-    edited.elements[0].x = 70;
-    editor.change(edited);
+    const selected = structuredClone(canvas);
+    selected.selectedElementIds = ['b'];
+    editor.change(selected);
     await vi.advanceTimersByTimeAsync(200);
     expect(wrapper.find('form').exists()).toBe(false);
     expect(wrapper.find('input').exists()).toBe(false);
-    expect(save).toHaveBeenCalledWith({ sessionId: 'session', expectedSource: JSON.stringify(visualization.content), visualizationId: 'v', expectedRevision: 1, document: { ...edited, preview: 'data:image/png;base64,YQ==' } });
+    expect(save).toHaveBeenCalledWith({ sessionId: 'session', expectedSource: JSON.stringify(visualization.content), visualizationId: 'v', expectedRevision: 1, document: { ...selected, preview: 'data:image/png;base64,YQ==' } });
 
   });
-  it('starts read-only with quiet save status and toggles editing without remounting', async () => {
+  it('starts in pan mode and toggles annotation selection without exposing edit mode', async () => {
     const wrapper = mount(ExcalidrawCanvas, { props: { visualization, save: vi.fn(), sessionId: 'session' } });
     await flushPromises();
     expect(wrapper.find('[role="status"]').exists()).toBe(false);
-    const toggle = wrapper.get('button[aria-label="Edit"]');
-    expect(toggle.text()).toBe('');
+    expect(wrapper.find('button[aria-label="Edit"]').exists()).toBe(false);
+    const toggle = wrapper.get('button[aria-label="Annotate diagram"]');
     await wrapper.get('button[aria-label="Fit canvas"]').trigger('click');
     expect(editor.fit).toHaveBeenCalledOnce();
     expect(toggle.attributes('aria-pressed')).toBe('false');
     await toggle.trigger('click');
-    expect(editor.setEditing).toHaveBeenLastCalledWith(true);
-    expect(toggle.attributes('aria-label')).toBe('Done');
+    expect(toggle.attributes('aria-label')).toBe('Stop annotating');
+    const target = wrapper.get('button[aria-label="Select shape b"]');
+    expect(target.attributes('aria-pressed')).toBe('false');
+    await target.trigger('click');
+    expect(editor.setSelection).toHaveBeenLastCalledWith(['b']);
+    expect(target.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.findComponent({ name: 'AnnotationPopup' }).exists()).toBe(true);
+    expect(wrapper.emitted('annotate')).toBeUndefined();
     await toggle.trigger('click');
-    expect(editor.setEditing).toHaveBeenLastCalledWith(false);
     expect(editor.dispose).not.toHaveBeenCalled();
+  });
+  it('keeps the canvas height stable while an annotation selection autosaves', async () => {
+    const scene = { ...canvas, selectedElementIds: [] };
+    const wrapper = mount(ExcalidrawCanvas, { props: { visualization: { ...visualization, canvas: scene }, save: vi.fn(), sessionId: 'session' } });
+    await flushPromises();
+    await wrapper.get('button[aria-label="Annotate diagram"]').trigger('click');
+    await wrapper.get('button[aria-label="Select shape b"]').trigger('click');
+
+    expect(wrapper.get('button[aria-label="Select shape b"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('.visualize-editor__status').exists()).toBe(false);
+  });
+  it('replaces the annotated shape when another box is clicked', async () => {
+    editor.getAnnotationTargets.mockReturnValue([
+      { id: 'b', x: 190, y: 20, width: 120, height: 110 },
+      { id: 'c', x: 350, y: 20, width: 120, height: 110 },
+    ]);
+    const scene = { ...canvas, selectedElementIds: [], elements: [...canvas.elements, { id: 'c', type: 'rectangle', x: 350, y: 30, width: 100, height: 90 }] };
+    const save = vi.fn(async (input: SaveCanvasInput) => ({ ...input.document, revision: input.expectedRevision + 1 }));
+    const wrapper = mount(ExcalidrawCanvas, { props: { visualization: { ...visualization, canvas: scene }, save, sessionId: 'session' } });
+    await flushPromises();
+    await wrapper.get('button[aria-label="Annotate diagram"]').trigger('click');
+    await wrapper.get('button[aria-label="Select shape b"]').trigger('click');
+    await wrapper.get('button[aria-label="Select shape c"]').trigger('click');
+
+    expect(wrapper.get('button[aria-label="Select shape b"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get('button[aria-label="Select shape c"]').attributes('aria-pressed')).toBe('true');
+    wrapper.getComponent({ name: 'AnnotationPopup' }).vm.$emit('submit', 'Change C');
+    await vi.advanceTimersByTimeAsync(200);
+    await flushPromises();
+    expect(wrapper.emitted('annotate')?.[0]?.[0]).toMatchObject({ elements: [{ id: 'c', type: 'rectangle' }] });
+    expect(save.mock.calls.at(-1)?.[0].document.selectedElementIds).toEqual([]);
+    await wrapper.get('button[aria-label="Select shape c"]').trigger('click');
+    await wrapper.get('button[aria-label="Select shape c"]').trigger('click');
+    expect(wrapper.get('button[aria-label="Select shape c"]').attributes('aria-pressed')).toBe('false');
+    expect(wrapper.findComponent({ name: 'AnnotationPopup' }).exists()).toBe(false);
+  });
+  it('keeps zoom usable without Excalidraw toolbar controls', async () => {
+    editor.getControlsState.mockReturnValue({ zoom: 0.4 });
+    const wrapper = mount(ExcalidrawCanvas, { props: { visualization, save: vi.fn(), sessionId: 'session' } });
+    await flushPromises();
+    expect(wrapper.get('.visualize-editor__compact-zoom').text()).toContain('40%');
+    await wrapper.get('button[aria-label="Zoom out"]').trigger('click');
+    await wrapper.get('button[aria-label="Zoom in"]').trigger('click');
+    expect(editor.zoomBy).toHaveBeenNthCalledWith(1, -0.1);
+    expect(editor.zoomBy).toHaveBeenNthCalledWith(2, 0.1);
+  });
+  it('accepts repeated annotations while clearing each validated selection', async () => {
+    const save = vi.fn(async (input: SaveCanvasInput) => ({ ...input.document, revision: input.expectedRevision + 1 }));
+    const wrapper = mount(ExcalidrawCanvas, { props: { visualization, save, sessionId: 'session' } });
+    await flushPromises();
+    await wrapper.get('button[aria-label="Annotate diagram"]').trigger('click');
+    await wrapper.get('button[aria-label="Select shape b"]').trigger('click');
+    wrapper.getComponent({ name: 'AnnotationPopup' }).vm.$emit('submit', 'Rename this to worker');
+    await vi.advanceTimersByTimeAsync(200);
+    await flushPromises();
+    expect(wrapper.emitted('annotate')).toEqual([[{
+      visualizationId: 'v',
+      title: 'Map',
+      revision: 3,
+      comment: 'Rename this to worker',
+      elements: [{ id: 'b', type: 'rectangle' }],
+    }]]);
+    expect(editor.setSelection).toHaveBeenLastCalledWith([]);
+    expect(wrapper.find('.visualize-editor__annotation-layer').exists()).toBe(true);
+    expect(wrapper.get('button[aria-label="Select shape b"]').attributes('aria-pressed')).toBe('false');
+    await wrapper.get('button[aria-label="Select shape b"]').trigger('click');
+    wrapper.getComponent({ name: 'AnnotationPopup' }).vm.$emit('submit', 'Make it blue');
+    await flushPromises();
+    expect(wrapper.emitted('annotate')).toHaveLength(2);
+    expect(wrapper.emitted('annotate')?.[1]?.[0]).toMatchObject({ comment: 'Make it blue', elements: [{ id: 'b' }] });
+  });
+  it('downloads the current canvas as a named PNG', async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const wrapper = mount(ExcalidrawCanvas, { props: { visualization, save: vi.fn(), sessionId: 'session' } });
+    await flushPromises();
+    await wrapper.get('button[aria-label="Save as PNG"]').trigger('click');
+    await flushPromises();
+    expect(editor.preview).toHaveBeenCalledWith(expect.objectContaining({ elements: canvas.elements }));
+    expect(click).toHaveBeenCalledOnce();
+    const anchor = click.mock.instances[0] as HTMLAnchorElement;
+    expect(anchor.download).toBe('Map.png');
+    expect(anchor.href).toBe('data:image/png;base64,YQ==');
   });
   it('refreshes the persisted thumbnail after an agent batch even without further user edits', async () => {
     vi.useFakeTimers();

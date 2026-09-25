@@ -88,8 +88,15 @@ export const messages = {
       revoke: 'Revoke',
     },
     visualize: {
-      editCanvas: 'Edit',
-      doneEditing: 'Done',
+      annotateCanvas: 'Annotate diagram',
+      stopAnnotating: 'Stop annotating',
+      annotationComment: 'Diagram annotation comment',
+      annotationPlaceholder: 'What should change?',
+      addAnnotation: 'Add annotation',
+      selectedShapeCount: 'Selected shapes: {count}',
+      savePng: 'Save as PNG',
+      selectShapes: 'Selectable diagram shapes',
+      selectShape: 'Select shape {id}',
       fitCanvas: 'Fit canvas',
       saving: 'Saving…',
       retrySave: 'Retry save',
@@ -640,6 +647,8 @@ export const messages = {
       composerContext: {
         label: 'Composer context',
         removeReviewFinding: 'Remove review finding',
+        visualizationAnnotation: 'Annotation',
+        removeVisualizationAnnotation: 'Remove diagram annotation',
       },
       collaboration: {
         messageFrom: 'Message from {name}',
