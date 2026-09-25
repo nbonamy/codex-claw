@@ -101,6 +101,38 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.find('.app-shell__right-workspace').isVisible()).toBe(false);
   });
 
+  it('keeps resizing the browser workspace when the pointer crosses into its page', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    });
+    setElectronTestClient({
+      browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
+      browserSetBounds: vi.fn().mockResolvedValue(undefined),
+      browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined),
+      onEvent: vi.fn(() => vi.fn()),
+    });
+    const wrapper = mountShell();
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button').find((button) => button.text().includes('Browser'))?.trigger('click');
+    readyBrowserGuest(wrapper.get('webview').element, 42);
+    await flushPromises();
+
+    const body = wrapper.get('.app-shell__body').element as HTMLElement;
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue({ right: 1200, width: 1200 } as DOMRect);
+    await wrapper.get('.app-shell__right-workspace-resizer').trigger('pointerdown');
+    expect(wrapper.find('.app-shell__right-workspace-resize-shield').exists()).toBe(true);
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 900 }));
+    await nextTick();
+
+    const workspace = wrapper.findAll('.app-shell__right-workspace').find((panel) => panel.isVisible());
+    expect((workspace?.element as HTMLElement).style.flexBasis).toBe('300px');
+    window.dispatchEvent(new Event('pointerup'));
+    await nextTick();
+    expect(wrapper.find('.app-shell__right-workspace-resize-shield').exists()).toBe(false);
+  });
+
   it('opens Files as a right-side explorer pane and keeps it open beside previews', async () => {
     const previewAgentFile = vi.fn().mockImplementation(async (_agentId: string, path: string) => ({
       path, size: 8, kind: 'text' as const, content: path === 'README.md' ? '# Claw\n' : 'export {};\n',

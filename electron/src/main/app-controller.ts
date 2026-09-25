@@ -45,6 +45,7 @@ type ClientEventInput<Event extends MainToRendererEvent = MainToRendererEvent> =
 type PendingBrowserOpen = {
   agentId: string;
   browserId: string;
+  url: string;
   resolve(state: BrowserState): void;
   reject(error: Error): void;
   timeout: ReturnType<typeof setTimeout>;
@@ -1173,7 +1174,7 @@ export class AppController {
         throw new Error(`Agent not found: ${agentId}`);
       }
       const state = await this.browserPane.open(this.mainWindow, agentId, browserId, url, agent.folder ?? '', guestWebContentsId);
-      this.resolvePendingBrowserOpen(agentId, browserId, state);
+      this.resolvePendingBrowserOpen(agentId, browserId, url, state);
       return state;
     } catch (error) {
       this.rejectPendingBrowserOpen(agentId, browserId, error);
@@ -1201,7 +1202,7 @@ export class AppController {
   private async browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {
     try {
       const state = await this.browserPane.navigate(agentId, browserId, url);
-      this.resolvePendingBrowserOpen(agentId, browserId, state);
+      this.resolvePendingBrowserOpen(agentId, browserId, url, state);
       return state;
     } catch (error) {
       this.rejectPendingBrowserOpen(agentId, browserId, error);
@@ -1219,15 +1220,15 @@ export class AppController {
       const timeout = setTimeout(() => {
         this.rejectPendingBrowserOpen(agentId, browserId, new Error('Timed out opening the in-app browser.'));
       }, 30_000);
-      this.pendingBrowserOpens.set(browserPaneKey(agentId, browserId), { agentId, browserId, resolve, reject, timeout });
+      this.pendingBrowserOpens.set(browserPaneKey(agentId, browserId), { agentId, browserId, url, resolve, reject, timeout });
       sendAppCommand(this.mainWindow!.webContents, { type: 'open-browser', agentId, browserId, url });
     });
   }
 
-  private resolvePendingBrowserOpen(agentId: string, browserId: string, state: BrowserState): void {
+  private resolvePendingBrowserOpen(agentId: string, browserId: string, url: string, state: BrowserState): void {
     const key = browserPaneKey(agentId, browserId);
     const pending = this.pendingBrowserOpens.get(key);
-    if (!pending) return;
+    if (!pending || pending.url !== url) return;
     clearTimeout(pending.timeout);
     this.pendingBrowserOpens.delete(key);
     pending.resolve(state);

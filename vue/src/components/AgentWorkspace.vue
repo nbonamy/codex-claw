@@ -136,6 +136,7 @@
       :aria-label="$t('surface.appShell.resizeRightWorkspace')"
       @pointerdown="startRightWorkspaceResize"
     />
+    <div v-if="rightWorkspaceResizing" class="app-shell__right-workspace-resize-shield" aria-hidden="true" />
   </div>
 </template>
 
@@ -262,6 +263,7 @@ const props = defineProps<{
   rightWorkspaceFor: (agentId: string) => AgentRightWorkspaceState;
   rightWorkspaces: Record<string, AgentRightWorkspaceState>;
   rightWorkspaceVisible: boolean;
+  rightWorkspaceResizing?: boolean;
   readConversationMessages: (
     ref: BackendConversationRef,
     agentId: string,
@@ -768,5 +770,13 @@ defineExpose({
 
 .app-shell__right-workspace-resizer:hover::after {
   background: var(--color-border-strong);
+}
+
+.app-shell__right-workspace-resize-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: col-resize;
+  user-select: none;
 }
 </style>

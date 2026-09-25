@@ -1,6 +1,6 @@
 import { PRIMARY_BROWSER_ID, type WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { computed, reactive } from 'vue';
+import { computed, onScopeDispose, reactive, ref } from 'vue';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
   isRightWorkspaceDiffTab,
@@ -41,6 +41,8 @@ export function useRightWorkspaceState(options: {
   workspaceBody: () => HTMLElement | null;
 }) {
   const workspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
+  const resizing = ref(false);
+  let stopActiveResize: (() => void) | null = null;
   const visible = computed(() => {
     const agentId = options.currentAgentId();
     return Boolean(agentId && workspaceFor(agentId).open);
@@ -140,6 +142,8 @@ export function useRightWorkspaceState(options: {
     const body = options.workspaceBody();
     const agentId = options.currentAgentId();
     if (!body || !agentId) return;
+    stopActiveResize?.();
+    resizing.value = true;
     const updateWidth = (moveEvent: PointerEvent) => {
       const bounds = body.getBoundingClientRect();
       const availableWidth = Math.max(240, bounds.width - 240);
@@ -148,15 +152,25 @@ export function useRightWorkspaceState(options: {
     const stop = () => {
       window.removeEventListener('pointermove', updateWidth);
       window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('blur', stop);
+      resizing.value = false;
+      stopActiveResize = null;
     };
+    stopActiveResize = stop;
     window.addEventListener('pointermove', updateWidth);
     window.addEventListener('pointerup', stop, { once: true });
+    window.addEventListener('pointercancel', stop, { once: true });
+    window.addEventListener('blur', stop, { once: true });
   }
+
+  onScopeDispose(() => stopActiveResize?.());
 
   return {
     closeTab,
     isVisible,
     openTab,
+    resizing,
     rightWorkspaceVisible: visible,
     selectTab,
     startResize,

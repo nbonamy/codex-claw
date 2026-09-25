@@ -156,6 +156,23 @@ describe('BrowserPanel', () => {
     expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe('https://example.com/');
   });
 
+  it('keeps the latest requested address when blank browser startup finishes after navigation', async () => {
+    const { api, emitDomReady, wrapper } = mountPanel({}, { deferDomReady: true });
+    const requestedUrl = 'http://127.0.0.1:4174/videos/visualize-film.html?t=25';
+    let finishBlankOpen: ((state: { url: string; title: string; canGoBack: boolean; canGoForward: boolean }) => void) | undefined;
+    api.browserOpen.mockImplementationOnce(() => new Promise((resolve) => { finishBlankOpen = resolve; }));
+    api.browserNavigate.mockResolvedValueOnce({ url: requestedUrl, title: 'Visualize and refine', canGoBack: true, canGoForward: false });
+    emitDomReady();
+    await flushPromises();
+
+    await wrapper.setProps({ initialUrl: requestedUrl, openRequestId: 1 });
+    finishBlankOpen?.({ url: 'about:blank', title: '', canGoBack: false, canGoForward: false });
+    await flushPromises();
+
+    expect(api.browserNavigate).toHaveBeenCalledWith('agent-1', 'primary', requestedUrl);
+    expect((wrapper.get('[aria-label="Browser address"]').element as HTMLInputElement).value).toBe(requestedUrl);
+  });
+
   it('opens visualization content through the dedicated host API without exposing it as a browser address', async () => {
     const { api, browserOpen, wrapper } = mountPanel({
       visualization: { path: '/tmp/backlog-icon-candidates.html', title: 'Backlog icon candidates' },

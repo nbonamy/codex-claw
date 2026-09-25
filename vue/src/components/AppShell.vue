@@ -282,6 +282,7 @@
         :snapshot="snapshot"
         :start-repository-work="startRepositoryWork"
         :start-right-workspace-resize="startRightWorkspaceResize"
+        :right-workspace-resizing="rightWorkspaceResizing"
         :toggle-file-explorer="toggleFileExplorer"
         :toggle-right-workspace="toggleRightWorkspace"
         :update-status="updateStatus"
@@ -1470,6 +1471,7 @@ const {
   isVisible: isRightWorkspaceVisible,
   openTab: openRightWorkspaceTabLocal,
   rightWorkspaceVisible,
+  resizing: rightWorkspaceResizing,
   selectTab: selectRightWorkspaceTab,
   startResize: startRightWorkspaceResize,
   toggle: toggleRightWorkspace,

@@ -142,8 +142,29 @@ describe('AppController', () => {
       browserId: 'primary',
       url: 'https://example.com',
     });
-    resolvePendingBrowserOpen(controller, 'agent-dina', 'primary', state);
+    resolvePendingBrowserOpen(controller, 'agent-dina', 'primary', 'https://example.com', state);
     await expect(opened).resolves.toStrictEqual(state);
+  });
+
+  it('does not complete a model-requested URL from the browser pane blank startup', async () => {
+    const controller = new AppController(createInitialSnapshot(), null);
+    setMainWindowSend(controller, vi.fn());
+    const requestedUrl = 'http://127.0.0.1:4174/videos/visualize-film.html?t=25';
+    const opened = requestBrowserOpen(controller, 'agent-dina', 'primary', requestedUrl);
+    const blank: BrowserState = { url: 'about:blank', title: '', canGoBack: false, canGoForward: false };
+    const loaded: BrowserState = { url: requestedUrl, title: 'Visualize and refine', canGoBack: false, canGoForward: false };
+    const pane = (controller as unknown as { browserPane: { open: ReturnType<typeof vi.fn>; navigate: ReturnType<typeof vi.fn> } }).browserPane;
+    vi.spyOn(pane, 'open').mockResolvedValue(blank);
+    vi.spyOn(pane, 'navigate').mockResolvedValue(loaded);
+    const settled = vi.fn();
+    void opened.then(settled);
+
+    await openBrowser(controller, 'agent-dina', 'primary', '');
+    await Promise.resolve();
+    expect(settled).not.toHaveBeenCalled();
+
+    await (controller as unknown as { browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState> }).browserNavigate('agent-dina', 'primary', requestedUrl);
+    await expect(opened).resolves.toStrictEqual(loaded);
   });
 
   it('scopes in-app browser files to the owning agent folder', async () => {
@@ -239,8 +260,8 @@ describe('AppController', () => {
 
     const first = requestBrowserOpen(controller, 'agent-dina', 'primary', 'https://one.example');
     const second = requestBrowserOpen(controller, 'agent-jesse', 'primary', 'https://two.example');
-    resolvePendingBrowserOpen(controller, 'agent-jesse', 'primary', secondState);
-    resolvePendingBrowserOpen(controller, 'agent-dina', 'primary', firstState);
+    resolvePendingBrowserOpen(controller, 'agent-jesse', 'primary', 'https://two.example', secondState);
+    resolvePendingBrowserOpen(controller, 'agent-dina', 'primary', 'https://one.example', firstState);
 
     await expect(first).resolves.toStrictEqual(firstState);
     await expect(second).resolves.toStrictEqual(secondState);
@@ -301,8 +322,8 @@ function openBrowserVisualization(
   }).browserOpenVisualization(agentId, browserId, filePath, title, 42);
 }
 
-function resolvePendingBrowserOpen(controller: AppController, agentId: string, browserId: string, state: BrowserState): void {
+function resolvePendingBrowserOpen(controller: AppController, agentId: string, browserId: string, url: string, state: BrowserState): void {
   (controller as unknown as {
-    resolvePendingBrowserOpen(agentId: string, browserId: string, state: BrowserState): void;
-  }).resolvePendingBrowserOpen(agentId, browserId, state);
+    resolvePendingBrowserOpen(agentId: string, browserId: string, url: string, state: BrowserState): void;
+  }).resolvePendingBrowserOpen(agentId, browserId, url, state);
 }

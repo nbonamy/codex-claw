@@ -82,15 +82,25 @@ let resizeObserver: ResizeObserver | null = null;
 let unsubscribe: (() => void) | null = null;
 
 onMounted(async () => {
+  const initialRequestId = props.openRequestId;
   unsubscribe = codexClawApi?.onEvent(handleEvent) ?? null;
   resizeObserver = new ResizeObserver(() => void syncBounds());
   window.addEventListener('resize', syncBoundsAfterWindowResize);
   if (viewport.value) resizeObserver.observe(viewport.value);
   try {
-    state.value = await openInitialContent();
+    const initialState = await openInitialContent();
     browserReady = true;
     if (!props.visible) await codexClawApi?.browserSetVisible(props.agentId, props.browserId, false);
-    if (state.value.url) address.value = state.value.url;
+    if (props.openRequestId !== initialRequestId) {
+      if (props.visualization || !props.initialUrl) await runNavigation(openInitialContent);
+      else {
+        address.value = props.initialUrl;
+        await navigate();
+      }
+    } else {
+      state.value = initialState;
+      if (initialState.url) address.value = initialState.url;
+    }
   } catch (reason) {
     error.value = messageFor(reason);
   } finally {
@@ -121,6 +131,7 @@ watch(() => props.visible, async (visible) => {
 
 watch(() => props.openRequestId, async (requestId, previousRequestId) => {
   if (!requestId || requestId === previousRequestId) return;
+  if (!browserReady) return;
   if (props.visualization) {
     await runNavigation(openInitialContent);
     return;
@@ -306,9 +317,9 @@ function messageFor(reason: unknown): string {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  height: 32px;
-  min-height: 32px;
-  max-height: 32px;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
   box-sizing: border-box;
   padding: 0 var(--space-3);
   border-bottom: 1px solid var(--color-outline-subtle);
@@ -322,8 +333,8 @@ function messageFor(reason: unknown): string {
 .browser-panel button {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-full);
@@ -342,8 +353,8 @@ function messageFor(reason: unknown): string {
 }
 
 .browser-panel button :deep(svg) {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   stroke-width: 1.8;
 }
 
@@ -386,7 +397,7 @@ function messageFor(reason: unknown): string {
   line-height: var(--line-height-16);
   text-align: center;
   outline: none;
-  padding: 0 var(--space-3);
+  padding: calc(var(--space-1) + 1px) var(--space-3);
 }
 
 .browser-panel__address input:focus {
