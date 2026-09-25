@@ -18,6 +18,7 @@ if (
     "delegation-film",
     "project-film",
     "project-shorts",
+    "visualize-film",
   ].includes(filmName)
 )
   throw new Error(`Unknown film: ${filmName}`);
@@ -27,25 +28,29 @@ const fps = 24;
 const width = filmName === "project-shorts" ? 1080 : 1600;
 const height = filmName === "project-shorts" ? 1920 : 900;
 const duration =
-  filmName === "project-shorts"
-    ? 40
-    : filmName === "project-film"
-      ? 43
-      : filmName === "delegation-film"
-        ? 46
-        : filmName === "review-film"
-          ? 50
-          : 48;
+  filmName === "visualize-film"
+    ? 44
+    : filmName === "project-shorts"
+      ? 40
+      : filmName === "project-film"
+        ? 43
+        : filmName === "delegation-film"
+          ? 46
+          : filmName === "review-film"
+            ? 50
+            : 48;
 const posterSecond =
-  filmName === "project-shorts"
-    ? 29
-    : filmName === "project-film"
-      ? 30
-      : filmName === "delegation-film"
-        ? 29
-        : filmName === "review-film"
-          ? 23
-          : 12;
+  filmName === "visualize-film"
+    ? 36
+    : filmName === "project-shorts"
+      ? 29
+      : filmName === "project-film"
+        ? 30
+        : filmName === "delegation-film"
+          ? 29
+          : filmName === "review-film"
+            ? 23
+            : 12;
 const allowedFiles = new Map([
   [`/${filmName}.html`, [`${filmName}.html`, "text/html; charset=utf-8"]],
   [`/${filmName}.css`, [`${filmName}.css`, "text/css; charset=utf-8"]],

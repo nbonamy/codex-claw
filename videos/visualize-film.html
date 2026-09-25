@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex Claw — Visualize and refine</title>
+    <link rel="icon" href="../website/assets/claw-icon.png" />
+    <link rel="stylesheet" href="visualize-film.css" />
+  </head>
+  <body>
+    <main class="preview">
+      <header class="preview-header">
+        <div>
+          <p>Codex Claw / product film</p>
+          <h1>Visualize and refine</h1>
+        </div>
+        <span>Illustrative Visualize workflow · 44 seconds · 16:9</span>
+      </header>
+
+      <div class="film-viewport">
+        <div
+          id="film"
+          class="film"
+          aria-label="Animated Visualize canvas and annotation workflow"
+        >
+          <div class="film-glow film-glow--one"></div>
+          <div class="film-glow film-glow--two"></div>
+
+          <section class="opening" aria-label="Opening title">
+            <div class="opening-mark">
+              <img src="../website/assets/claw-icon.png" alt="" /> Codex
+              <b>Claw</b>
+            </div>
+            <p class="opening-eyebrow">See the system. Shape the decision.</p>
+            <h2>
+              Make the diagram<br /><span class="opening-period"
+                >a conversation.</span
+              >
+            </h2>
+            <div class="opening-rule"><span></span></div>
+            <p class="opening-subtitle">
+              Visualize the work, point to a detail, and refine it together.
+            </p>
+          </section>
+
+          <section
+            class="walkthrough"
+            aria-label="Visualize workflow animation"
+          >
+            <div class="film-chapter">
+              <span id="chapter-index">01 / 06</span>
+              <div>
+                <h2 id="chapter-title"></h2>
+                <p id="chapter-detail"></p>
+              </div>
+              <span class="film-chapter__brand"
+                ><img src="../website/assets/claw-icon.png" alt="" /> Codex
+                Claw</span
+              >
+            </div>
+
+            <div
+              class="app-window"
+              aria-label="Illustrative Codex Claw desktop interface"
+            >
+              <div class="app-titlebar">
+                <div class="traffic-lights" aria-hidden="true">
+                  <i></i><i></i><i></i>
+                </div>
+                <span
+                  ><img src="../website/assets/claw-icon.png" alt="" /> Codex
+                  Claw</span
+                >
+                <small>ILLUSTRATIVE VISUALIZE / ANNOTATIONS</small>
+              </div>
+              <div class="app-main">
+                <nav class="team-rail" aria-label="Teams">
+                  <span class="team-rail__cockpit">⌘</span
+                  ><span class="team-rail__active">N</span
+                  ><span class="team-rail__other">C</span
+                  ><span class="team-rail__plus">+</span>
+                </nav>
+                <aside class="sidebar" aria-label="Sessions">
+                  <header><strong>Sessions</strong><span>‹</span></header>
+                  <div class="sidebar-actions">
+                    <span><b>＋</b> Start work</span
+                    ><span><b>◌</b> Quick Chat</span>
+                  </div>
+                  <div class="sidebar-group">
+                    <div class="sidebar-group__heading">
+                      <span>◫</span><strong>codex-claw</strong><b>＋</b>
+                    </div>
+                    <div class="sidebar-session sidebar-session--active">
+                      <span>Release workflow</span><i></i>
+                    </div>
+                    <div class="sidebar-session"><span>Issue triage</span></div>
+                  </div>
+                </aside>
+
+                <main class="viz-chat" aria-label="Agent conversation">
+                  <header class="viz-chat__header">
+                    <span class="review-avatar">✦</span>
+                    <div>
+                      <strong>Release workflow</strong
+                      ><small>Codex · codex-claw</small>
+                    </div>
+                    <span>···</span>
+                  </header>
+                  <div id="chat-body" class="viz-chat__body"></div>
+                  <div class="viz-chat__bottom">
+                    <div id="annotation-card" class="viz-attachment">
+                      <span>◈</span>
+                      <div>
+                        <strong>1 diagram annotation</strong
+                        ><small>Review &amp; approval · selected shape</small>
+                      </div>
+                      <b>×</b>
+                    </div>
+                    <div id="chat-composer" class="viz-composer">
+                      <span id="composer-text">Ask a follow-up</span><b>↑</b>
+                    </div>
+                  </div>
+                </main>
+
+                <aside class="viz-panel" aria-label="Visualize canvas">
+                  <header class="viz-panel__tabs">
+                    <span class="viz-panel__tab"
+                      >♧ <strong>Visualize</strong></span
+                    ><span class="viz-panel__more">＋</span>
+                  </header>
+                  <div id="viz-suggestions" class="viz-suggestions">
+                    <small>VISUALIZE</small>
+                    <h3>Choose a visualization to generate</h3>
+                    <p>Suggested from the conversation.</p>
+                    <div id="release-suggestion" class="viz-suggestion">
+                      <strong>Release flow</strong
+                      ><span>Brief → implementation → review → ship</span
+                      ><small>Generate visualization</small>
+                    </div>
+                    <div class="viz-suggestion viz-suggestion--quiet">
+                      <strong>Ownership map</strong
+                      ><span>People and handoffs across the release</span
+                      ><small>Generate visualization</small>
+                    </div>
+                  </div>
+                  <div id="viz-content" class="viz-content">
+                    <div class="viz-content__heading">
+                      <div>
+                        <strong>Release flow</strong
+                        ><small>Mermaid · Excalidraw canvas</small>
+                      </div>
+                      <span>⋯</span>
+                    </div>
+                    <div class="viz-canvas">
+                      <div class="viz-canvas__grid"></div>
+                      <div id="viz-flow" class="viz-flow">
+                        <svg
+                          class="viz-lines"
+                          viewBox="0 0 560 470"
+                          aria-hidden="true"
+                        >
+                          <g class="viz-lines__base">
+                            <path
+                              d="M280 88 V122 M280 185 V218 M280 284 V354"
+                            />
+                          </g>
+                          <g id="refined-lines" class="viz-lines__refined">
+                            <path
+                              d="M280 185 V207 Q280 221 172 221 V230 M280 185 V207 Q280 221 388 221 V230 M172 298 V319 Q172 334 280 334 V354 M388 298 V319 Q388 334 280 334 V354"
+                            />
+                          </g>
+                        </svg>
+                        <div class="viz-node viz-node--brief">
+                          <span>Brief</span>
+                        </div>
+                        <div class="viz-node viz-node--implement">
+                          <span>Implement</span>
+                        </div>
+                        <div id="review-node" class="viz-node viz-node--review">
+                          <span>Review &amp; approval</span>
+                        </div>
+                        <div
+                          id="code-review-node"
+                          class="viz-node viz-node--code-review"
+                        >
+                          <span>Code review</span>
+                        </div>
+                        <div
+                          id="approval-node"
+                          class="viz-node viz-node--approval"
+                        >
+                          <span>Human approval</span>
+                        </div>
+                        <div class="viz-node viz-node--ship">
+                          <span>Ship</span>
+                        </div>
+                      </div>
+                      <div
+                        id="annotation-highlight"
+                        class="viz-annotation-highlight"
+                      ></div>
+                      <div id="annotation-popup" class="viz-annotation-popup">
+                        <small>DIAGRAM ANNOTATION</small
+                        ><strong>Review &amp; approval</strong>
+                        <div id="comment-text">What should change?</div>
+                        <span id="add-annotation">Add annotation</span>
+                      </div>
+                      <div class="viz-canvas__zoom">
+                        <span>−</span><b id="zoom-level">100%</b><span>＋</span>
+                      </div>
+                      <div class="viz-canvas__fit">⤢</div>
+                      <div class="viz-canvas__actions">
+                        <span id="annotate-button">⊕</span><span>⇩</span>
+                      </div>
+                    </div>
+                    <div class="viz-strip">
+                      <div class="viz-strip__thumb">
+                        <span>◇</span><small>Release flow</small>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+
+            <div class="motion-layer" aria-hidden="true">
+              <div id="film-pointer" class="film-pointer">
+                <svg viewBox="0 0 27 31">
+                  <path d="M3 2v23l6.1-6.2 4.1 9.1 4.1-1.9-4.2-9.2H23z" />
+                </svg>
+              </div>
+              <div id="pointer-ring" class="pointer-ring"></div>
+            </div>
+            <div class="film-footer">
+              <span id="film-footer-stage">VISUALIZE / ASK</span>
+              <div class="film-footer__rule"><i id="film-progress"></i></div>
+              <span>CODEX CLAW</span>
+            </div>
+          </section>
+
+          <section class="ending" aria-label="Closing title">
+            <div class="ending-mark">
+              <img src="../website/assets/claw-icon.png" alt="" /><span
+                >Codex <b>Claw</b></span
+              >
+            </div>
+            <h2>Point to the change.<br /><em>Keep the rest.</em></h2>
+            <p>Visualize, annotate, and refine software work together.</p>
+            <span>codex-claw.nabocorp.com</span>
+          </section>
+        </div>
+      </div>
+
+      <div class="controls" aria-label="Film controls">
+        <button id="play-toggle" type="button" aria-label="Play film">
+          Play
+        </button>
+        <button id="restart" type="button" aria-label="Restart film">↺</button>
+        <input
+          id="scrubber"
+          type="range"
+          min="0"
+          max="44"
+          step="0.01"
+          value="0"
+          aria-label="Film position"
+        />
+        <output id="timecode" for="scrubber">00:00 / 00:44</output>
+        <a class="download-film" href="assets/visualize-film.mp4" download
+          >Download MP4 ↓</a
+        >
+      </div>
+      <p class="preview-note">
+        Scripted product illustration, not a captured live run. The canvas
+        interaction mirrors the shipped Visualize and annotation flow.
+      </p>
+    </main>
+    <script type="module" src="visualize-film.mjs"></script>
+  </body>
+</html>

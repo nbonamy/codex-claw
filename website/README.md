@@ -76,6 +76,16 @@ The source thumbnail is `videos/assets/project-film-thumbnail.png`.
 node videos/render-mission-film.mjs project-shorts
 ```
 
+## Visualize and annotations product film
+
+`videos/visualize-film.html` is an editable 44-second, 16:9 illustration of the shipped Visualize flow: ask for a release diagram, open the Excalidraw canvas, select and annotate a shape, send the annotation with a follow-up, and refine just that part of the diagram. It is a scripted promotion, not a recording of a live run. Preview it at <http://127.0.0.1:4174/videos/visualize-film.html> and export the ignored 1600×900 MP4 and poster with:
+
+```bash
+node videos/render-mission-film.mjs visualize-film
+```
+
+The source thumbnail is `videos/assets/visualize-film-thumbnail.png`.
+
 ## Deploy
 
 The deploy helper streams the static site over SSH, provisions the Let’s Encrypt certificate if this is the first deploy, and installs the matching nginx site on `joshua`:
