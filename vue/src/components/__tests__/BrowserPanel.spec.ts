@@ -1,5 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { serialize } from 'node:v8';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ElMessage } from 'element-plus';
 import BrowserPanel from '../BrowserPanel.vue';
 import { setElectronTestClient } from '../../test/client';
 import type { MainToRendererEvent } from '@codex-claw/core/contracts';
@@ -7,11 +9,17 @@ import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import GitDiffControl from '../GitDiffControl.vue';
 
 class ResizeObserverStub {
+  static latest: ResizeObserverStub | null = null;
+  constructor(private readonly callback: ResizeObserverCallback) {
+    ResizeObserverStub.latest = this;
+  }
   observe = vi.fn();
   disconnect = vi.fn();
+  notify(): void { this.callback([], this as unknown as ResizeObserver); }
 }
 
 beforeEach(() => {
+  ResizeObserverStub.latest = null;
   Object.defineProperty(HTMLElement.prototype, 'getWebContentsId', { configurable: true, value: () => 42 });
 });
 
@@ -21,7 +29,7 @@ afterEach(() => {
 
 function mountPanel(
   props: { initialUrl?: string; openRequestId?: number; visualization?: { path: string; title: string } } = {},
-  options: { deferDomReady?: boolean } = {},
+  options: { deferDomReady?: boolean; attachTo?: Element } = {},
 ) {
   let listener: ((event: MainToRendererEvent) => void) | null = null;
   const browserOpen = vi.fn().mockResolvedValue({
@@ -47,6 +55,9 @@ function mountPanel(
     browserGoBack: vi.fn().mockResolvedValue({ url: 'https://back.example/', title: 'Back', canGoBack: false, canGoForward: true }),
     browserGoForward: vi.fn().mockResolvedValue({ url: 'https://forward.example/', title: 'Forward', canGoBack: true, canGoForward: false }),
     browserReload: vi.fn().mockResolvedValue({ url: 'https://reload.example/', title: 'Reload', canGoBack: true, canGoForward: true }),
+    browserGetZoom: vi.fn().mockResolvedValue(100),
+    browserSetZoom: vi.fn(async (_agentId: string, _browserId: string, percent: number) => percent),
+    browserCopyScreenshot: vi.fn().mockResolvedValue(undefined),
     browserSetBounds: vi.fn().mockResolvedValue(undefined),
     browserSetVisible: vi.fn().mockResolvedValue(undefined),
     browserSetAnnotationMode: vi.fn().mockResolvedValue(undefined),
@@ -59,7 +70,7 @@ function mountPanel(
   };
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   setElectronTestClient(api);
-  const wrapper = mount(BrowserPanel, { props: { agentId: 'agent-1', visible: true, ...props } });
+  const wrapper = mount(BrowserPanel, { attachTo: options.attachTo, props: { agentId: 'agent-1', visible: true, ...props } });
   const emitDomReady = () => wrapper.get('webview').element.dispatchEvent(new Event('dom-ready'));
   if (!options.deferDomReady) queueMicrotask(emitDomReady);
   return { api, browserOpen, emitDomReady, emitEvent: (event: MainToRendererEvent) => listener?.(event), wrapper };
@@ -307,16 +318,208 @@ describe('BrowserPanel', () => {
     expect(wrapper.find('[aria-label^="Send "]').exists()).toBe(false);
   });
 
-  it('closes the native browser view before leaving the panel', async () => {
+  it('keeps closing the browser in tab chrome, not its overflow menu', async () => {
     const { api, wrapper } = mountPanel();
     await flushPromises();
 
     await wrapper.get('[aria-label="Browser menu"]').trigger('click');
-    await wrapper.get('[role="menuitem"]').trigger('click');
-    await flushPromises();
+    expect(wrapper.findAll('[role="menuitem"]').some(item => item.text().includes('Close browser'))).toBe(false);
+    const screenshotItem = wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Screenshot')!;
+    expect(screenshotItem.element.previousElementSibling?.getAttribute('role')).toBe('separator');
+    wrapper.unmount();
 
     expect(api.browserClose).toHaveBeenCalledWith('agent-1', 'primary');
-    expect(wrapper.emitted('close')).toStrictEqual([[]]);
+  });
+
+  it('dismisses the browser menu when interacting outside it, including the guest page', async () => {
+    const { wrapper } = mountPanel({}, { attachTo: document.body });
+    await flushPromises();
+    const trigger = wrapper.get('[aria-label="Browser menu"]');
+
+    await trigger.trigger('click');
+    await wrapper.get('[aria-label="Zoom in"]').trigger('pointerdown');
+    expect(wrapper.find('.browser-panel__menu').exists()).toBe(true);
+
+    await wrapper.get('[aria-label="Browser address"]').trigger('pointerdown');
+    expect(wrapper.find('.browser-panel__menu').exists()).toBe(false);
+
+    await trigger.trigger('click');
+    await wrapper.get('.browser-panel__viewport').trigger('pointerdown');
+    expect(wrapper.find('.browser-panel__menu').exists()).toBe(false);
+
+    await trigger.trigger('click');
+    wrapper.get('webview').element.dispatchEvent(new Event('focus'));
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.browser-panel__menu').exists()).toBe(false);
+
+    await trigger.trigger('click');
+    await trigger.trigger('pointerdown');
+    expect(wrapper.find('.browser-panel__menu').exists()).toBe(true);
+    await trigger.trigger('click');
+    expect(wrapper.find('.browser-panel__menu').exists()).toBe(false);
+  });
+
+  it('changes page zoom through the browser guest and resets it from the menu', async () => {
+    const { api, wrapper } = mountPanel();
+    await flushPromises();
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    expect(wrapper.get('[role="group"][aria-label="Zoom"]').element.firstElementChild?.tagName.toLowerCase()).toBe('svg');
+    expect(wrapper.get('[aria-label="Reset zoom"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('[aria-label="Zoom in"]').trigger('click');
+    await flushPromises();
+    expect(api.browserSetZoom).toHaveBeenCalledWith('agent-1', 'primary', 110);
+    expect(wrapper.get('.browser-panel__zoom-actions').text()).toContain('110%');
+    await wrapper.get('[aria-label="Reset zoom"]').trigger('click');
+    await flushPromises();
+    expect(api.browserSetZoom).toHaveBeenLastCalledWith('agent-1', 'primary', 100);
+    expect(wrapper.get('.browser-panel__zoom-actions').text()).toContain('100%');
+  });
+
+  it('shows the guest zoom after opening, navigation, and an external origin zoom change', async () => {
+    const { api, emitDomReady, wrapper } = mountPanel({}, { deferDomReady: true });
+    api.browserGetZoom.mockResolvedValue(125);
+    emitDomReady();
+    await flushPromises();
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('.browser-panel__zoom-actions').text()).toContain('125%');
+    expect(wrapper.get('[aria-label="Reset zoom"]').attributes('disabled')).toBeUndefined();
+
+    api.browserGetZoom.mockResolvedValue(100);
+    wrapper.get('webview').element.dispatchEvent(Object.assign(new Event('did-navigate'), {
+      url: 'https://another.example/', isMainFrame: true,
+    }));
+    await flushPromises();
+    expect(wrapper.get('.browser-panel__zoom-actions').text()).toContain('100%');
+    expect(wrapper.get('[aria-label="Reset zoom"]').attributes('disabled')).toBeDefined();
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    api.browserGetZoom.mockResolvedValue(120);
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('.browser-panel__zoom-actions').text()).toContain('120%');
+    await wrapper.get('[aria-label="Zoom in"]').trigger('click');
+    expect(api.browserSetZoom).toHaveBeenLastCalledWith('agent-1', 'primary', 125);
+  });
+
+  it('resizes the actual webview for device presets and custom dimensions', async () => {
+    const { wrapper } = mountPanel();
+    await flushPromises();
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    const toggle = wrapper.get('[role="menuitem"]');
+    expect(toggle.text()).toBe('Show device toolbar');
+    await toggle.trigger('click');
+    await flushPromises();
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    expect(wrapper.get('[role="menuitem"]').text()).toBe('Hide device toolbar');
+    expect(wrapper.find('[role="menuitemcheckbox"]').exists()).toBe(false);
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    const mode = wrapper.get<HTMLSelectElement>('[aria-label="Device mode"]');
+    await mode.setValue('phone');
+    expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 390px');
+    expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('height: 844px');
+    expect(wrapper.find('.browser-panel__guest-frame webview').exists()).toBe(true);
+
+    await wrapper.get<HTMLInputElement>('[aria-label="Viewport width"]').setValue('520');
+    expect(mode.element.value).toBe('custom');
+    expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 520px');
+    await wrapper.get('[aria-label="Rotate viewport"]').trigger('click');
+    expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 844px');
+    await wrapper.get('[aria-label="Hide device toolbar"]').trigger('click');
+    expect(wrapper.find('.browser-panel__device-toolbar').exists()).toBe(false);
+    expect(wrapper.find('.browser-panel__guest-frame webview').exists()).toBe(true);
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    expect(wrapper.get('[role="menuitem"]').text()).toBe('Show device toolbar');
+  });
+
+  it('restores a fluid viewport when Responsive is selected and tracks pane resizing', async () => {
+    const { wrapper } = mountPanel();
+    await flushPromises();
+    const viewport = wrapper.get<HTMLElement>('.browser-panel__viewport').element;
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 720 },
+      clientHeight: { configurable: true, value: 540 },
+    });
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await wrapper.get('[role="menuitem"]').trigger('click');
+    const mode = wrapper.get<HTMLSelectElement>('[aria-label="Device mode"]');
+    await mode.setValue('phone');
+    expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 390px');
+
+    await mode.setValue('responsive');
+    await flushPromises();
+    expect(wrapper.get('.browser-panel__guest-frame').attributes('style') ?? '').not.toContain('390px');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Viewport width"]').element.value).toBe('720');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Viewport height"]').element.value).toBe('540');
+
+    Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 600 });
+    ResizeObserverStub.latest!.notify();
+    await flushPromises();
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Viewport width"]').element.value).toBe('600');
+  });
+
+  it('keeps annotation bounds clipped to the visible device viewport while scrolling', async () => {
+    const { api, wrapper } = mountPanel();
+    await flushPromises();
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await wrapper.get('[role="menuitem"]').trigger('click');
+    await wrapper.get<HTMLSelectElement>('[aria-label="Device mode"]').setValue('phone');
+
+    const viewport = wrapper.get<HTMLElement>('.browser-panel__viewport').element;
+    const guest = wrapper.get<HTMLElement>('webview').element;
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({ left: 50, top: 100, right: 650, bottom: 600, width: 600, height: 500 } as DOMRect);
+    vi.spyOn(guest, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 20, right: 490, bottom: 864, width: 390, height: 844 } as DOMRect);
+    api.browserSetBounds.mockClear();
+
+    viewport.dispatchEvent(new Event('scroll'));
+    await flushPromises();
+    expect(api.browserSetBounds).toHaveBeenLastCalledWith('agent-1', 'primary', {
+      x: 100, y: 100, width: 390, height: 500, contentOffset: { x: 0, y: 80 },
+    });
+  });
+
+  it('copies the visible page and a dragged screenshot area, while Escape cancels selection', async () => {
+    const { api, wrapper } = mountPanel();
+    await flushPromises();
+    const notifySuccess = vi.spyOn(ElMessage, 'success').mockImplementation(() => undefined as never);
+    api.browserCopyScreenshot.mockImplementation(async (_agentId, _browserId, rect) => {
+      try {
+        serialize(rect);
+      } catch (reason) {
+        throw new Error(String(reason));
+      }
+    });
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Screenshot')!.trigger('click');
+    await flushPromises();
+    expect(api.browserCopyScreenshot).toHaveBeenCalledWith('agent-1', 'primary', undefined);
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Screenshot area')!.trigger('click');
+    const overlay = wrapper.get<HTMLElement>('[aria-label="Select screenshot area"]');
+    vi.spyOn(overlay.element, 'getBoundingClientRect').mockReturnValue({ left: 10, top: 20, width: 400, height: 300 } as DOMRect);
+    overlay.element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 50, clientY: 60 }));
+    overlay.element.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 150, clientY: 120 }));
+    overlay.element.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 150, clientY: 120 }));
+    await flushPromises();
+    expect(api.browserCopyScreenshot).toHaveBeenLastCalledWith('agent-1', 'primary', { x: 40, y: 40, width: 100, height: 60 });
+    expect(notifySuccess).toHaveBeenCalledTimes(2);
+    expect(notifySuccess).toHaveBeenLastCalledWith('Screenshot copied to clipboard');
+    expect(wrapper.find('[role="alert"]').exists() ? wrapper.get('[role="alert"]').text() : '').toBe('');
+    expect(wrapper.find('[aria-label="Select screenshot area"]').exists()).toBe(false);
+
+    await wrapper.get('[aria-label="Browser menu"]').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Screenshot area')!.trigger('click');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(wrapper.find('[aria-label="Select screenshot area"]').exists()).toBe(false);
+    expect(api.browserCopyScreenshot).toHaveBeenCalledTimes(2);
+    notifySuccess.mockRestore();
   });
 
   it('keeps the native view visible while its own menu is open', async () => {

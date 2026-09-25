@@ -1,10 +1,10 @@
-import { BrowserWindow, session, webContents, type WebContents } from 'electron';
+import { BrowserWindow, clipboard, session, webContents, type WebContents } from 'electron';
 import { constants as fsConstants, realpathSync } from 'node:fs';
 import { open } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BrowserAnnotation, BrowserBounds, BrowserState } from '@codex-claw/core/contracts';
+import type { BrowserAnnotation, BrowserBounds, BrowserState, BrowserViewportBounds } from '@codex-claw/core/contracts';
 import { browserGuestPartition } from '@codex-claw/core/browser-guest';
 export { safePartitionName } from '@codex-claw/core/browser-guest';
 
@@ -23,6 +23,7 @@ type HostedBrowserPane = {
   browserId: string;
   browserWindow: BrowserWindow;
   consoleMessages: Array<{ level: string; message: string; timestamp: string }>;
+  contentOffset: { x: number; y: number };
   fileRoot: string;
   navigationEnabled: boolean;
   presentedTitle: string | null;
@@ -111,6 +112,7 @@ export class BrowserPane {
       browserId,
       browserWindow,
       consoleMessages: [],
+      contentOffset: { x: 0, y: 0 },
       fileRoot,
       navigationEnabled,
       presentedTitle: null,
@@ -168,13 +170,41 @@ export class BrowserPane {
     return this.waitForNavigation(pane);
   }
 
-  setBounds(agentId: string, browserId: string, bounds: BrowserBounds): void {
+  getZoom(agentId: string, browserId: string): number {
+    return Math.round(this.requirePane(agentId, browserId).webContents.getZoomFactor() * 100);
+  }
+
+  setZoom(agentId: string, browserId: string, percent: number): number {
+    if (!Number.isInteger(percent) || percent < 50 || percent > 300) {
+      throw new Error('Browser zoom must be between 50% and 300%.');
+    }
+    this.requirePane(agentId, browserId).webContents.setZoomFactor(percent / 100);
+    return percent;
+  }
+
+  async copyScreenshot(agentId: string, browserId: string, rect?: BrowserBounds): Promise<void> {
+    if (rect !== undefined && (
+      typeof rect !== 'object' || rect === null ||
+      ![rect.x, rect.y, rect.width, rect.height].every(Number.isSafeInteger) ||
+      rect.x < 0 || rect.y < 0 || rect.width < 1 || rect.height < 1 ||
+      rect.x + rect.width > 10_000 || rect.y + rect.height > 10_000
+    )) throw new Error('Invalid browser screenshot area.');
+    const image = await this.requirePane(agentId, browserId).webContents.capturePage(rect);
+    if (image.isEmpty()) throw new Error('The browser screenshot is empty.');
+    clipboard.writeImage(image);
+  }
+
+  setBounds(agentId: string, browserId: string, bounds: BrowserViewportBounds): void {
     const pane = this.requirePane(agentId, browserId);
     pane.bounds = {
       x: Math.max(0, Math.round(bounds.x)),
       y: Math.max(0, Math.round(bounds.y)),
       width: Math.max(1, Math.round(bounds.width)),
       height: Math.max(1, Math.round(bounds.height)),
+    };
+    pane.contentOffset = {
+      x: Math.max(0, Math.round(bounds.contentOffset?.x ?? 0)),
+      y: Math.max(0, Math.round(bounds.contentOffset?.y ?? 0)),
     };
     this.syncAnnotationOverlayBounds(pane);
   }
@@ -330,7 +360,11 @@ export class BrowserPane {
     const query = {
       surface: 'annotation-overlay',
       token,
-      anchor: JSON.stringify(annotation.rect),
+      anchor: JSON.stringify({
+        ...annotation.rect,
+        x: annotation.rect.x - pane.contentOffset.x,
+        y: annotation.rect.y - pane.contentOffset.y,
+      }),
       description: annotation.label ?? annotation.selector ?? 'Selected page area',
     };
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

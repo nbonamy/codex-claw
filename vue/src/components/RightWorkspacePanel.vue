@@ -224,7 +224,6 @@
       :open-request-id="browserOpenRequestId"
       :visualization="browserVisualization"
       :visible="visible && activeTab === 'browser'"
-      @close="emit('closeTab', 'browser')"
       @send-prompt="emit('sendPrompt', $event)"
       @url-change="browserUrl = $event"
     />

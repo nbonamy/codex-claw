@@ -27,15 +27,60 @@
           :label="$t('dynamic.annotation.send', { count: annotations.length })"
           @click="sendAnnotations"
         />
-        <button type="button" :aria-label="$t('surface.browserPanel.browserMenu')" :title="$t('surface.browserPanel.browserMenu')" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><IconDotsVertical /></button>
-        <div v-if="menuOpen" class="browser-panel__menu" role="menu">
-          <button type="button" role="menuitem" @click="close">{{ $t('surface.browserPanel.closeBrowser') }}</button>
+        <button ref="menuTrigger" type="button" :aria-label="$t('surface.browserPanel.browserMenu')" :title="$t('surface.browserPanel.browserMenu')" :aria-expanded="menuOpen" @click="toggleMenu"><IconDotsVertical /></button>
+        <div v-if="menuOpen" ref="menuRoot" class="browser-panel__menu">
+          <div class="browser-panel__zoom" role="group" :aria-label="$t('surface.browserPanel.zoom')">
+            <IconZoom class="browser-panel__zoom-icon" aria-hidden="true" />
+            <span>{{ $t('surface.browserPanel.zoom') }}</span>
+            <div class="browser-panel__zoom-actions">
+              <button type="button" :aria-label="$t('surface.browserPanel.zoomOut')" :disabled="zoomPercent <= 50 || !browserReadyForControls || zoomPending" @click="changeZoom(-1)"><IconMinus /></button>
+              <span>{{ zoomPercent }}%</span>
+              <button type="button" :aria-label="$t('surface.browserPanel.zoomIn')" :disabled="zoomPercent >= 300 || !browserReadyForControls || zoomPending" @click="changeZoom(1)"><IconPlus /></button>
+            </div>
+            <button type="button" :aria-label="$t('surface.browserPanel.resetZoom')" :disabled="zoomPercent === 100 || !browserReadyForControls || zoomPending" @click="setZoom(100)"><IconRefresh /></button>
+          </div>
+          <AppMenu class="app-menu--embedded" :ariaLabel="$t('surface.browserPanel.browserMenu')" :items="menuItems" @select="selectMenuAction" />
         </div>
       </div>
     </header>
+    <div v-if="deviceToolbarVisible && !visualization" class="browser-panel__device-toolbar">
+      <label>
+        {{ $t('surface.browserPanel.dimensions') }}
+        <select v-model="devicePreset" :aria-label="$t('surface.browserPanel.deviceMode')" @change="selectDevicePreset">
+          <option value="responsive">{{ $t('surface.browserPanel.responsive') }}</option>
+          <option value="custom">{{ $t('surface.browserPanel.custom') }}</option>
+          <option value="phone">{{ $t('surface.browserPanel.phone') }}</option>
+          <option value="tablet">{{ $t('surface.browserPanel.tablet') }}</option>
+          <option value="desktop">{{ $t('surface.browserPanel.desktop') }}</option>
+        </select>
+      </label>
+      <div class="browser-panel__dimensions">
+        <input type="number" min="240" max="2000" :value="deviceWidth" :aria-label="$t('surface.browserPanel.viewportWidth')" @change="setDeviceDimension('width', $event)" />
+        <span aria-hidden="true">×</span>
+        <input type="number" min="320" max="2000" :value="deviceHeight" :aria-label="$t('surface.browserPanel.viewportHeight')" @change="setDeviceDimension('height', $event)" />
+      </div>
+      <button type="button" :aria-label="$t('surface.browserPanel.rotateViewport')" :title="$t('surface.browserPanel.rotateViewport')" @click="rotateDevice"><IconRotateClockwise /></button>
+      <span class="browser-panel__device-zoom">{{ zoomPercent }}%</span>
+      <button type="button" :aria-label="$t('surface.browserPanel.hideDeviceToolbar')" :title="$t('surface.browserPanel.hideDeviceToolbar')" @click="deviceToolbarVisible = false"><IconX /></button>
+    </div>
     <p v-if="error" class="browser-panel__error" role="alert">{{ error }}</p>
     <div class="browser-panel__surface">
-      <div ref="viewport" class="browser-panel__viewport" />
+      <div ref="viewport" class="browser-panel__viewport" :class="{ 'browser-panel__viewport--device': deviceToolbarVisible, 'browser-panel__viewport--responsive': deviceToolbarVisible && devicePreset === 'responsive' }" @scroll="syncBounds">
+        <div ref="guestFrame" class="browser-panel__guest-frame" :style="guestFrameStyle">
+          <div
+            v-if="capturingArea"
+            class="browser-panel__capture-overlay"
+            :aria-label="$t('surface.browserPanel.selectScreenshotArea')"
+            @pointerdown="startAreaSelection"
+            @pointermove="moveAreaSelection"
+            @pointerup="finishAreaSelection"
+            @pointercancel="cancelAreaSelection"
+          >
+            <span v-if="!selectionRect" class="browser-panel__capture-hint">{{ $t('surface.browserPanel.dragToCapture') }}</span>
+            <div v-if="selectionRect" class="browser-panel__capture-selection" :style="selectionStyle" />
+          </div>
+        </div>
+      </div>
     </div>
 
   </section>
@@ -44,12 +89,15 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { IconArrowLeft, IconArrowRight, IconCirclePlus, IconDotsVertical, IconRefresh, IconX } from '@tabler/icons-vue';
-import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type MainToRendererEvent } from '@codex-claw/core/contracts';
+import { ElMessage } from 'element-plus';
+import { IconArrowLeft, IconArrowRight, IconCamera, IconCirclePlus, IconCrop, IconDeviceMobile, IconDotsVertical, IconMinus, IconPlus, IconRefresh, IconRotateClockwise, IconX, IconZoom } from '@tabler/icons-vue';
+import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type MainToRendererEvent } from '@codex-claw/core/contracts';
 import { browserGuestPartition } from '@codex-claw/core/browser-guest';
 import { clawClientPlatform, codexClawApi } from '../platform-api';
 import { ArrowUpRightIcon } from '../shared/icons/app-icons';
 import AnnotationSendButton from './AnnotationSendButton.vue';
+import AppMenu from '../shared/menu/AppMenu.vue';
+import type { AppMenuItem } from '../shared/menu/app-menu';
 import { externalBrowserUrl, openInExternalBrowser } from './browser-external';
 
 const props = withDefaults(defineProps<{
@@ -66,9 +114,12 @@ const props = withDefaults(defineProps<{
   visible: true,
   visualization: null,
 });
-const emit = defineEmits<{ close: []; 'send-prompt': [prompt: string]; 'url-change': [url: string] }>();
+const emit = defineEmits<{ 'send-prompt': [prompt: string]; 'url-change': [url: string] }>();
 
+const menuTrigger = ref<HTMLElement | null>(null);
+const menuRoot = ref<HTMLElement | null>(null);
 const viewport = ref<HTMLElement | null>(null);
+const guestFrame = ref<HTMLElement | null>(null);
 const addressInput = ref<HTMLInputElement | null>(null);
 const address = ref(props.initialUrl ?? '');
 const loading = ref(true);
@@ -77,11 +128,23 @@ const annotationMode = ref(false);
 const annotations = ref<BrowserAnnotation[]>([]);
 const state = ref<BrowserState>({ url: '', title: '', canGoBack: false, canGoForward: false });
 const menuOpen = ref(false);
+const zoomPercent = ref(100);
+const zoomPending = ref(false);
+const zoomSteps = [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300];
+const deviceToolbarVisible = ref(false);
+const devicePreset = ref('responsive');
+const deviceWidth = ref(390);
+const deviceHeight = ref(844);
+const capturingArea = ref(false);
+const screenshotPending = ref(false);
+const selectionStart = ref<{ x: number; y: number } | null>(null);
+const selectionRect = ref<BrowserBounds | null>(null);
 let browserReady = false;
 let guestElement: (HTMLElement & { getWebContentsId?: () => number }) | null = null;
 let guestWebContentsId: number | null = null;
 let guestPartition: string | null = null;
 let disposed = false;
+let zoomRequestId = 0;
 const displayHost = computed(() => {
   try {
     return new URL(state.value.url || address.value).host;
@@ -90,6 +153,20 @@ const displayHost = computed(() => {
   }
 });
 const externalUrl = computed(() => props.visualization ? null : externalBrowserUrl(state.value.url));
+const browserReadyForControls = computed(() => browserReady && !loading.value);
+const menuItems = computed<AppMenuItem[]>(() => [
+  ...(!props.visualization ? [{ id: 'device-toolbar', type: 'action', label: translate(deviceToolbarVisible.value ? 'surface.browserPanel.hideDeviceToolbar' : 'surface.browserPanel.showDeviceToolbar'), icon: IconDeviceMobile } satisfies AppMenuItem] : []),
+  ...(!props.visualization ? [{ id: 'screenshot-divider', type: 'separator' } satisfies AppMenuItem] : []),
+  { id: 'screenshot', type: 'action', label: translate('surface.browserPanel.screenshot'), icon: IconCamera, disabled: !browserReadyForControls.value || screenshotPending.value },
+  { id: 'screenshot-area', type: 'action', label: translate('surface.browserPanel.screenshotArea'), icon: IconCrop, disabled: !browserReadyForControls.value || screenshotPending.value },
+]);
+const guestFrameStyle = computed(() => deviceToolbarVisible.value && devicePreset.value !== 'responsive' && !props.visualization
+  ? { width: `${deviceWidth.value}px`, height: `${deviceHeight.value}px` }
+  : undefined);
+const selectionStyle = computed(() => selectionRect.value ? {
+  left: `${selectionRect.value.x}px`, top: `${selectionRect.value.y}px`,
+  width: `${selectionRect.value.width}px`, height: `${selectionRect.value.height}px`,
+} : undefined);
 let resizeObserver: ResizeObserver | null = null;
 let unsubscribe: (() => void) | null = null;
 
@@ -98,9 +175,15 @@ watch(() => state.value.url, (url) => emit('url-change', url), { immediate: true
 onMounted(async () => {
   const initialRequestId = props.openRequestId;
   unsubscribe = codexClawApi?.onEvent(handleEvent) ?? null;
-  resizeObserver = new ResizeObserver(() => void syncBounds());
+  resizeObserver = new ResizeObserver(() => {
+    updateResponsiveDimensions();
+    void syncBounds();
+  });
   window.addEventListener('resize', syncBoundsAfterWindowResize);
+  document.addEventListener('pointerdown', closeMenuOnOutsideClick);
+  window.addEventListener('keydown', handleEscape);
   if (viewport.value) resizeObserver.observe(viewport.value);
+  if (guestFrame.value) resizeObserver.observe(guestFrame.value);
   try {
     const initialState = await openInitialContent();
     browserReady = true;
@@ -118,6 +201,7 @@ onMounted(async () => {
   } catch (reason) {
     error.value = messageFor(reason);
   } finally {
+    if (browserReady) await syncZoom();
     loading.value = false;
     await nextTick();
     await syncBounds();
@@ -129,6 +213,8 @@ onBeforeUnmount(() => {
   unsubscribe?.();
   resizeObserver?.disconnect();
   window.removeEventListener('resize', syncBoundsAfterWindowResize);
+  document.removeEventListener('pointerdown', closeMenuOnOutsideClick);
+  window.removeEventListener('keydown', handleEscape);
   guestElement?.remove();
   guestElement = null;
   void codexClawApi?.browserClose(props.agentId, props.browserId);
@@ -182,6 +268,7 @@ async function ensureGuest(): Promise<number> {
   guest.setAttribute('src', 'about:blank');
   guest.addEventListener('did-navigate', handleGuestNavigation);
   guest.addEventListener('did-navigate-in-page', handleGuestNavigation);
+  guest.addEventListener('focus', () => { menuOpen.value = false; });
   guestElement = guest;
   guestPartition = partition;
   guestWebContentsId = null;
@@ -208,7 +295,7 @@ async function ensureGuest(): Promise<number> {
       resolve(id);
     };
     guest.addEventListener('dom-ready', ready);
-    viewport.value?.append(guest);
+    guestFrame.value?.append(guest);
   });
 }
 
@@ -218,6 +305,7 @@ function handleGuestNavigation(event: Event): void {
     || navigation.isMainFrame === false) return;
   state.value = { ...state.value, url: navigation.url };
   if (document.activeElement !== addressInput.value) address.value = navigation.url;
+  void syncZoom();
 }
 
 async function openExternal(): Promise<void> {
@@ -245,6 +333,167 @@ async function reload(): Promise<void> {
   await runNavigation(() => requireBrowserApi().browserReload(props.agentId, props.browserId));
 }
 
+async function setZoom(percent: number): Promise<void> {
+  if (zoomPending.value) return;
+  const requestId = ++zoomRequestId;
+  zoomPending.value = true;
+  try {
+    const actualPercent = await requireBrowserApi().browserSetZoom(props.agentId, props.browserId, percent);
+    if (requestId === zoomRequestId) zoomPercent.value = actualPercent;
+    error.value = null;
+  } catch (reason) {
+    error.value = messageFor(reason);
+  } finally {
+    zoomPending.value = false;
+  }
+}
+
+async function changeZoom(direction: -1 | 1): Promise<void> {
+  const next = direction === 1
+    ? zoomSteps.find((step) => step > zoomPercent.value)
+    : [...zoomSteps].reverse().find((step) => step < zoomPercent.value);
+  if (next !== undefined) await setZoom(next);
+}
+
+function toggleMenu(): void {
+  menuOpen.value = !menuOpen.value;
+  if (menuOpen.value && browserReady) void syncZoom();
+}
+
+async function syncZoom(): Promise<void> {
+  const requestId = ++zoomRequestId;
+  try {
+    const actualPercent = await requireBrowserApi().browserGetZoom(props.agentId, props.browserId);
+    if (!disposed && requestId === zoomRequestId) zoomPercent.value = actualPercent;
+  } catch (reason) {
+    if (!disposed && requestId === zoomRequestId) error.value = messageFor(reason);
+  }
+}
+
+async function selectMenuAction(itemId: string): Promise<void> {
+  menuOpen.value = false;
+  if (itemId === 'device-toolbar') {
+    deviceToolbarVisible.value = !deviceToolbarVisible.value;
+    await nextTick();
+    updateResponsiveDimensions();
+    await syncBounds();
+  } else if (itemId === 'screenshot') {
+    await copyScreenshot();
+  } else if (itemId === 'screenshot-area') {
+    capturingArea.value = true;
+    selectionRect.value = null;
+  }
+}
+
+function updateResponsiveDimensions(): void {
+  if (!deviceToolbarVisible.value || devicePreset.value !== 'responsive' || !viewport.value) return;
+  deviceWidth.value = viewport.value.clientWidth;
+  deviceHeight.value = viewport.value.clientHeight;
+}
+
+async function selectDevicePreset(): Promise<void> {
+  if (devicePreset.value === 'responsive') {
+    await nextTick();
+    updateResponsiveDimensions();
+    return;
+  }
+  const presets: Record<string, { width: number; height: number }> = {
+    phone: { width: 390, height: 844 },
+    tablet: { width: 768, height: 1024 },
+    desktop: { width: 1280, height: 800 },
+  };
+  const preset = presets[devicePreset.value];
+  if (!preset) return;
+  deviceWidth.value = preset.width;
+  deviceHeight.value = preset.height;
+}
+
+function setDeviceDimension(dimension: 'width' | 'height', event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const value = Number(input.value);
+  const min = dimension === 'width' ? 240 : 320;
+  const max = 2000;
+  if (!Number.isFinite(value)) return;
+  const clamped = Math.max(min, Math.min(max, Math.round(value)));
+  if (dimension === 'width') deviceWidth.value = clamped;
+  else deviceHeight.value = clamped;
+  input.value = String(clamped);
+  devicePreset.value = 'custom';
+}
+
+function rotateDevice(): void {
+  [deviceWidth.value, deviceHeight.value] = [deviceHeight.value, deviceWidth.value];
+  devicePreset.value = 'custom';
+}
+
+async function copyScreenshot(rect?: BrowserBounds): Promise<void> {
+  if (screenshotPending.value) return;
+  screenshotPending.value = true;
+  try {
+    await requireBrowserApi().browserCopyScreenshot(props.agentId, props.browserId, rect);
+    ElMessage.success(translate('surface.browserPanel.screenshotCopied'));
+    error.value = null;
+  } catch (reason) {
+    error.value = messageFor(reason);
+  } finally {
+    screenshotPending.value = false;
+  }
+}
+
+function pointInCapture(event: PointerEvent): { x: number; y: number } {
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(Math.round(event.clientX - bounds.left), Math.round(bounds.width))),
+    y: Math.max(0, Math.min(Math.round(event.clientY - bounds.top), Math.round(bounds.height))),
+  };
+}
+
+function startAreaSelection(event: PointerEvent): void {
+  if (event.button !== 0) return;
+  selectionStart.value = pointInCapture(event);
+  selectionRect.value = null;
+  (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+}
+
+function moveAreaSelection(event: PointerEvent): void {
+  if (!selectionStart.value) return;
+  const point = pointInCapture(event);
+  selectionRect.value = {
+    x: Math.min(selectionStart.value.x, point.x),
+    y: Math.min(selectionStart.value.y, point.y),
+    width: Math.abs(selectionStart.value.x - point.x),
+    height: Math.abs(selectionStart.value.y - point.y),
+  };
+}
+
+function finishAreaSelection(event: PointerEvent): void {
+  if (!selectionStart.value) return;
+  moveAreaSelection(event);
+  const rect = selectionRect.value;
+  cancelAreaSelection();
+  if (rect && rect.width >= 5 && rect.height >= 5) {
+    void copyScreenshot({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+  }
+}
+
+function cancelAreaSelection(): void {
+  capturingArea.value = false;
+  selectionStart.value = null;
+  selectionRect.value = null;
+}
+
+function handleEscape(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') return;
+  if (capturingArea.value) cancelAreaSelection();
+  else menuOpen.value = false;
+}
+
+function closeMenuOnOutsideClick(event: PointerEvent): void {
+  if (!menuOpen.value || !(event.target instanceof Node)) return;
+  if (menuRoot.value?.contains(event.target) || menuTrigger.value?.contains(event.target)) return;
+  menuOpen.value = false;
+}
+
 async function runNavigation(action: () => Promise<BrowserState>): Promise<void> {
   loading.value = true;
   error.value = null;
@@ -254,6 +503,7 @@ async function runNavigation(action: () => Promise<BrowserState>): Promise<void>
   } catch (reason) {
     error.value = messageFor(reason);
   } finally {
+    if (browserReady) await syncZoom();
     loading.value = false;
   }
 }
@@ -275,10 +525,17 @@ async function toggleAnnotation(): Promise<void> {
 }
 
 async function syncBounds(): Promise<void> {
-  const element = viewport.value;
-  if (!element || !browserReady || disposed || !props.visible) return;
-  const rect = element.getBoundingClientRect();
-  const bounds: BrowserBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  if (!guestElement || !viewport.value || !browserReady || disposed || !props.visible) return;
+  const rect = guestElement.getBoundingClientRect();
+  const viewportRect = viewport.value.getBoundingClientRect();
+  const x = Math.max(rect.left, viewportRect.left);
+  const y = Math.max(rect.top, viewportRect.top);
+  const bounds: BrowserViewportBounds = {
+    x, y,
+    width: Math.max(0, Math.min(rect.right, viewportRect.right) - x),
+    height: Math.max(0, Math.min(rect.bottom, viewportRect.bottom) - y),
+  };
+  if (deviceToolbarVisible.value) bounds.contentOffset = { x: x - rect.left, y: y - rect.top };
   await codexClawApi?.browserSetBounds(props.agentId, props.browserId, bounds);
 }
 
@@ -307,12 +564,6 @@ async function sendAnnotations(): Promise<void> {
   annotationMode.value = false;
   await requireBrowserApi().browserSetAnnotationMode(props.agentId, props.browserId, false);
   await requireBrowserApi().browserClearAnnotations(props.agentId, props.browserId);
-}
-
-async function close(): Promise<void> {
-  menuOpen.value = false;
-  await codexClawApi?.browserClose(props.agentId, props.browserId);
-  emit('close');
 }
 
 function requireBrowserApi() {
@@ -494,21 +745,102 @@ function messageFor(reason: unknown): string {
   z-index: 3;
   top: calc(100% + var(--space-3));
   right: 0;
+  min-width: 232px;
   padding: var(--space-2);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-shell-main);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-lowest);
   box-shadow: var(--shadow-menu);
 }
 
-.browser-panel__menu button {
-  display: block;
-  width: auto;
-  height: auto;
-  border-radius: var(--radius-sm);
-  padding: var(--space-4) var(--space-6);
+.browser-panel__zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--color-outline-subtle);
   color: var(--color-text);
+  font-size: var(--font-size-14);
+}
+
+.browser-panel__zoom-icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+  stroke-width: 2.5px;
+}
+
+.browser-panel__zoom > span {
+  flex: 0 0 auto;
+  font-weight: var(--font-weight-medium);
+}
+
+.browser-panel__zoom-actions {
+  display: flex;
+  align-items: center;
+  margin-left: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.browser-panel__zoom-actions span {
+  min-width: 48px;
+  border-right: 1px solid var(--color-outline-subtle);
+  border-left: 1px solid var(--color-outline-subtle);
+  text-align: center;
+}
+
+.browser-panel__zoom button {
+  border-radius: var(--radius-sm);
+}
+
+.browser-panel__device-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-outline-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
   white-space: nowrap;
+  overflow-x: auto;
+}
+
+.browser-panel__device-toolbar label,
+.browser-panel__dimensions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.browser-panel__device-toolbar select,
+.browser-panel__device-toolbar input {
+  box-sizing: border-box;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-lowest);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.browser-panel__device-toolbar select {
+  padding: 0 var(--space-2);
+}
+
+.browser-panel__device-toolbar input {
+  width: 64px;
+  padding: 0 var(--space-2);
+  text-align: center;
+}
+
+.browser-panel__device-toolbar button:last-child {
+  margin-left: auto;
+}
+
+.browser-panel__device-zoom {
+  color: var(--color-text-muted);
 }
 
 .browser-panel__surface {
@@ -524,14 +856,66 @@ function messageFor(reason: unknown): string {
   min-width: 0;
   min-height: 0;
   background: var(--color-shell-main);
+  overflow: hidden;
 }
 
-.browser-panel__viewport :deep(.browser-panel__guest) {
+.browser-panel__viewport--device {
+  display: flex;
+  align-items: flex-start;
+  overflow: auto;
+  background: var(--color-surface-low);
+}
+
+.browser-panel__guest-frame {
+  position: relative;
+  flex: none;
+  width: 100%;
+  height: 100%;
+}
+
+.browser-panel__viewport--device:not(.browser-panel__viewport--responsive) .browser-panel__guest-frame {
+  margin: var(--space-4) auto;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-menu);
+}
+
+.browser-panel__guest-frame :deep(.browser-panel__guest) {
   position: absolute;
   inset: 0;
   display: flex;
   width: 100%;
   height: 100%;
+}
+
+.browser-panel__capture-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  cursor: crosshair;
+  background: color-mix(in srgb, var(--color-shell-main) 35%, transparent);
+  touch-action: none;
+}
+
+.browser-panel__capture-hint {
+  position: absolute;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-text);
+  color: var(--color-shell-main);
+  font-size: var(--font-size-13);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.browser-panel__capture-selection {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  pointer-events: none;
 }
 
 .browser-panel__error {

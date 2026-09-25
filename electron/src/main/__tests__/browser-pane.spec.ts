@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 const electronMocks = vi.hoisted(() => {
   const guests = new Map<number, WebContentsMock>();
   const sessions = new Map<string, object>();
+  const writeImage = vi.fn();
   class BrowserWindowMock {
     static instances: BrowserWindowMock[] = [];
     readonly close = vi.fn(() => {
@@ -50,6 +51,9 @@ const electronMocks = vi.hoisted(() => {
     setWindowOpenHandler = vi.fn();
     canGoBack = vi.fn(() => false);
     canGoForward = vi.fn(() => false);
+    getZoomFactor = vi.fn(() => 1);
+    setZoomFactor = vi.fn();
+    capturePage = vi.fn(async (_rect?: { x: number; y: number; width: number; height: number }) => ({ isEmpty: (): boolean => false }));
     private destroyed = false;
     private readonly listeners = new Map<string, (...args: unknown[]) => void>();
     private url = '';
@@ -77,11 +81,12 @@ const electronMocks = vi.hoisted(() => {
     return value;
   }
 
-  return { BrowserWindowMock, createGuest, fromPartition, guests, sessions };
+  return { BrowserWindowMock, createGuest, fromPartition, guests, sessions, writeImage };
 });
 
 vi.mock('electron', () => ({
   BrowserWindow: electronMocks.BrowserWindowMock,
+  clipboard: { writeImage: electronMocks.writeImage },
   session: { fromPartition: electronMocks.fromPartition },
   webContents: { fromId: (id: number) => electronMocks.guests.get(id) },
 }));
@@ -93,6 +98,7 @@ beforeEach(() => {
   electronMocks.BrowserWindowMock.instances.length = 0;
   electronMocks.guests.clear();
   electronMocks.sessions.clear();
+  electronMocks.writeImage.mockReset();
 });
 
 describe('browser pane helpers', () => {
@@ -231,6 +237,37 @@ describe('browser pane helpers', () => {
     await expect(pane.execute('agent-one', 'secondary', 'console', {})).resolves.toStrictEqual({ messages: [] });
   });
 
+  it('zooms the owning guest and copies its selected viewport area to the clipboard', async () => {
+    const browserWindow = { webContents: {}, isDestroyed: vi.fn(() => false) };
+    const guest = electronMocks.createGuest(browserWindow, 25);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project', 25);
+    guest.getZoomFactor.mockReturnValue(1.25);
+    expect(pane.getZoom('agent-one', 'primary')).toBe(125);
+    expect(() => pane.getZoom('agent-two', 'primary')).toThrow('Browser is not open');
+    expect(pane.setZoom('agent-one', 'primary', 125)).toBe(125);
+    expect(guest.setZoomFactor).toHaveBeenCalledWith(1.25);
+    expect(() => pane.setZoom('agent-one', 'primary', 0)).toThrow('between 50% and 300%');
+    expect(() => pane.setZoom('agent-two', 'primary', 125)).toThrow('Browser is not open');
+
+    const image = { isEmpty: vi.fn(() => false) };
+    guest.capturePage.mockResolvedValue(image);
+    const rect = { x: 12, y: 24, width: 180, height: 90 };
+    await pane.copyScreenshot('agent-one', 'primary', rect);
+    expect(guest.capturePage).toHaveBeenCalledWith(rect);
+    expect(electronMocks.writeImage).toHaveBeenCalledWith(image);
+
+    await pane.copyScreenshot('agent-one', 'primary');
+    expect(guest.capturePage).toHaveBeenLastCalledWith(undefined);
+    expect(electronMocks.writeImage).toHaveBeenCalledTimes(2);
+
+    await expect(pane.copyScreenshot('agent-two', 'primary')).rejects.toThrow('Browser is not open');
+    await expect(pane.copyScreenshot('agent-one', 'primary', { x: -1, y: 0, width: 1, height: 1 })).rejects.toThrow('Invalid browser screenshot area');
+    image.isEmpty.mockReturnValue(true);
+    await expect(pane.copyScreenshot('agent-one', 'primary')).rejects.toThrow('The browser screenshot is empty');
+    expect(electronMocks.writeImage).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects guests owned by another window or another agent session', async () => {
     const browserWindow = {
       webContents: {},
@@ -248,7 +285,7 @@ describe('browser pane helpers', () => {
     expect(browserPaneKey('agent:a', 'browser')).not.toBe(browserPaneKey('agent', 'a:browser'));
   });
 
-  it('hosts the extracted annotation popup over the full browser view', async () => {
+  it('hosts the annotation popup over the visible viewport with a translated anchor', async () => {
     const onAnnotation = vi.fn();
     const browserWindow = {
       webContents: {},
@@ -258,13 +295,13 @@ describe('browser pane helpers', () => {
     const guest = electronMocks.createGuest(browserWindow, 31);
     const pane = new BrowserPane({ onAnnotation });
     await pane.open(browserWindow as never, 'agent-one', 'primary', 'https://one.example', '/tmp/project', 31);
-    pane.setBounds('agent-one', 'primary', { x: 100, y: 50, width: 600, height: 500 });
+    pane.setBounds('agent-one', 'primary', { x: 100, y: 50, width: 600, height: 500, contentOffset: { x: 0, y: 80 } });
     guest.executeJavaScript.mockResolvedValueOnce({
       id: 'annotation-one',
       kind: 'element',
       selector: '#save',
       label: 'Save',
-      rect: { x: 30, y: 40, width: 100, height: 30 },
+      rect: { x: 30, y: 120, width: 100, height: 30 },
     });
 
     await pane.setAnnotationMode('agent-one', 'primary', true);

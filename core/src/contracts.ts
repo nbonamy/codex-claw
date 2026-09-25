@@ -511,6 +511,11 @@ export type BrowserBounds = {
   height: number;
 };
 
+export type BrowserViewportBounds = BrowserBounds & {
+  /** Guest viewport pixels hidden above or to the left of the visible bounds. */
+  contentOffset?: { x: number; y: number };
+};
+
 export const PRIMARY_BROWSER_ID = 'primary';
 
 export type BrowserAnnotation = {
@@ -892,7 +897,10 @@ export type CodexClawApi = {
   browserGoBack(agentId: string, browserId: string): Promise<BrowserState>;
   browserGoForward(agentId: string, browserId: string): Promise<BrowserState>;
   browserReload(agentId: string, browserId: string): Promise<BrowserState>;
-  browserSetBounds(agentId: string, browserId: string, bounds: BrowserBounds): Promise<void>;
+  browserGetZoom(agentId: string, browserId: string): Promise<number>;
+  browserSetZoom(agentId: string, browserId: string, percent: number): Promise<number>;
+  browserCopyScreenshot(agentId: string, browserId: string, rect?: BrowserBounds): Promise<void>;
+  browserSetBounds(agentId: string, browserId: string, bounds: BrowserViewportBounds): Promise<void>;
   browserSetVisible(agentId: string, browserId: string, visible: boolean): Promise<void>;
   browserSetAnnotationMode(agentId: string, browserId: string, enabled: boolean): Promise<void>;
   browserResolveAnnotation(token: string, comment: string | null): Promise<void>;
