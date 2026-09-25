@@ -111,6 +111,10 @@ blocked while chats are active because it restarts `clawd` and its app-server
 processes. The isolated home may require its own sign in on first launch; do
 not copy normal Codex thread or auth files into it.
 
+Claw disables the bundled unified Computer Use plugin in its app-server
+startup overrides, even when plugins are shared. macOS GUI automation in Claw
+uses the app-owned Computer Use MCP tools instead.
+
 Codex Claw reads and mutates that isolated authentication state through the
 SDK account surface. When `account/read` reports that OpenAI authentication is
 required and no account is loaded, the renderer gates the workspace behind a

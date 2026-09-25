@@ -10,6 +10,7 @@ export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettin
     configOverride('features.apply_patch_streaming_events', true),
     configOverride('features.memories', true),
     configOverride('plugins."github@openai-curated-remote".enabled', false),
+    configOverride('plugins."unified-computer-use@openai-bundled".enabled', false),
     ...(pluginSettings.chromeEnabled
       ? [configOverride('mcp_servers.node_repl.enabled', true)]
       : []),
