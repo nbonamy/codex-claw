@@ -903,19 +903,24 @@ function isAbsoluteFilePath(filePath: string): boolean {
   border-radius: var(--radius-full);
 }
 
-@container (max-width: 120px) {
-  .right-workspace-panel__tab-close {
-    display: none;
-  }
-}
-
 @container (max-width: 72px) {
   .right-workspace-panel__tab-select {
     justify-content: center;
     gap: 0;
+    padding: 0;
   }
 
   .right-workspace-panel__tab-select span {
+    display: none;
+  }
+
+  .right-workspace-panel__tab-close {
+    margin-right: 0;
+  }
+}
+
+@container (max-width: 48px) {
+  .right-workspace-panel__tab-close {
     display: none;
   }
 }
