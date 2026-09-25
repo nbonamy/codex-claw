@@ -1,61 +1,52 @@
-const DURATION = 44;
+const DURATION = 31;
 const SCENES = [
-  { name: "opening", start: 0, end: 3 },
+  { name: "opening", start: 0, end: 2.5 },
   {
     name: "ask",
-    start: 3,
-    end: 9,
-    chapter: "01 / 06",
+    start: 2.5,
+    end: 7,
+    chapter: "01 / 05",
     title: "Ask to see the system.",
-    detail: "A diagram starts from the conversation.",
+    detail: "Type /visualize to open diagram suggestions.",
     footer: "VISUALIZE / ASK",
   },
   {
     name: "generate",
-    start: 9,
-    end: 15,
-    chapter: "02 / 06",
+    start: 7,
+    end: 9.5,
+    chapter: "02 / 05",
     title: "A shared view appears.",
-    detail: "The release flow becomes an Excalidraw canvas.",
+    detail: "Choose a suggestion and watch the canvas take shape.",
     footer: "VISUALIZE / GENERATE",
   },
   {
-    name: "explore",
-    start: 15,
-    end: 20,
-    chapter: "03 / 06",
-    title: "Explore the shape.",
-    detail: "Zoom into the part that needs attention.",
-    footer: "VISUALIZE / EXPLORE",
-  },
-  {
     name: "annotate",
-    start: 20,
-    end: 28,
-    chapter: "04 / 06",
+    start: 9.5,
+    end: 15.5,
+    chapter: "03 / 05",
     title: "Point to what should change.",
     detail: "An annotation is anchored to the selected shape.",
     footer: "VISUALIZE / ANNOTATE",
   },
   {
     name: "send",
-    start: 28,
-    end: 33,
-    chapter: "05 / 06",
-    title: "Keep the conversation going.",
-    detail: "The selected shape travels with the next message.",
-    footer: "VISUALIZE / DISCUSS",
+    start: 15.5,
+    end: 18,
+    chapter: "04 / 05",
+    title: "Send the annotation.",
+    detail: "The selected shape and comment are enough context.",
+    footer: "VISUALIZE / SEND",
   },
   {
     name: "refine",
-    start: 33,
-    end: 40,
-    chapter: "06 / 06",
+    start: 18,
+    end: 26.5,
+    chapter: "05 / 05",
     title: "Refine just that part.",
     detail: "The agent updates the canvas; untouched shapes remain.",
     footer: "VISUALIZE / REFINE",
   },
-  { name: "ending", start: 40, end: DURATION },
+  { name: "ending", start: 26.5, end: DURATION },
 ];
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -68,21 +59,14 @@ const agent = (content) =>
   `<div class="viz-message viz-message--agent"><span class="viz-message__author">✦ Codex</span><p>${content}</p></div>`;
 const tool = (label, detail = "Done") =>
   `<div class="viz-tool"><b>◈</b><span>${label}</span><small>${detail}</small></div>`;
-const initialPrompt = "/visualize Map our release flow from brief to ship.";
+const initialPrompt = "/visualize";
 const comment = "Split review from approval.";
-const followup = "Update that part of the flow.";
+const submittedAnnotation = `<span class="viz-annotation-in-chat">◈ Review &amp; approval · ${comment}</span>`;
 
 function conversation(scene, local) {
   if (scene === "ask") {
-    if (local < 2.3) return "";
-    return (
-      user(initialPrompt) +
-      (local > 3.6
-        ? agent(
-            "I’ll map the stages and handoffs so we can inspect them together.",
-          )
-        : "")
-    );
+    if (local < 1.45) return "";
+    return user(initialPrompt);
   }
   if (scene === "generate") {
     return (
@@ -93,7 +77,7 @@ function conversation(scene, local) {
       )
     );
   }
-  if (scene === "explore" || scene === "annotate") {
+  if (scene === "annotate") {
     return (
       user(initialPrompt) +
       tool("add-visualization · Release flow") +
@@ -108,23 +92,22 @@ function conversation(scene, local) {
       agent(
         "Here’s the release flow. Select any part you want to discuss or refine.",
       );
-    if (local < 3.4) return base;
-    return (
-      base +
-      user(
-        `<div class="viz-annotation-in-chat">◈ Review &amp; approval · ${comment}</div>${followup}`,
-      )
-    );
+    if (local < 1.6) return base;
+    return base + user(submittedAnnotation);
   }
   if (scene === "refine") {
-    let result = user(
-      `<div class="viz-annotation-in-chat">◈ Review &amp; approval · ${comment}</div>${followup}`,
-    );
-    if (local > 0.5)
-      result += tool("read-visualization-canvas · selected shape");
-    if (local > 1.9)
-      result += tool("edit-visualization-canvas · targeted update");
-    if (local > 4.1)
+    let result = user(submittedAnnotation);
+    if (local > 0.3)
+      result += tool(
+        "read-visualization-canvas · selected shape",
+        local < 1.1 ? "Reading…" : "Done",
+      );
+    if (local > 1.1)
+      result += tool(
+        "edit-visualization-canvas · targeted update",
+        local < 4.1 ? "Updating…" : "Done",
+      );
+    if (local > 4.3)
       result += agent(
         "Done. Review is now distinct from human approval; the rest of the flow is unchanged.",
       );
@@ -143,10 +126,27 @@ export function createFilm(document, browserWindow) {
   const walkthrough = $(".walkthrough");
   const ending = $(".ending");
   const flow = $("#viz-flow");
+  const fixedPath = $(".viz-lines__fixed path");
+  const initialPaths = [
+    ...document.querySelectorAll(".viz-lines__initial path"),
+  ];
+  const refinedPaths = [...document.querySelectorAll("#refined-lines path")];
+  const pathLengths = new Map(
+    [fixedPath, ...initialPaths, ...refinedPaths].map((path) => [
+      path,
+      path.getTotalLength(),
+    ]),
+  );
   let time = 0;
   let playing = false;
   let lastFrame = 0;
   let lastConversation = "";
+
+  function drawPath(path, progress) {
+    const length = pathLengths.get(path);
+    path.style.strokeDasharray = `${length}`;
+    path.style.strokeDashoffset = `${length * (1 - progress)}`;
+  }
 
   function targetCenter(selector) {
     const element = $(selector);
@@ -162,14 +162,13 @@ export function createFilm(document, browserWindow) {
 
   function pointer(scene, local) {
     const schedules = {
-      ask: [[4.2, 5.25, "#release-suggestion"]],
-      explore: [[0.65, 2.25, ".viz-canvas__zoom span:last-child"]],
+      ask: [[2.6, 3.75, "#release-suggestion"]],
       annotate: [
-        [0.2, 1.2, "#annotate-button"],
-        [1.45, 2.5, "#review-node"],
-        [6.2, 7.35, "#add-annotation"],
+        [0.1, 0.7, "#annotate-button"],
+        [0.9, 1.65, "#review-node"],
+        [4.75, 5.55, "#add-annotation"],
       ],
-      send: [[2.1, 3.35, "#chat-composer b"]],
+      send: [[0.4, 1.55, "#chat-composer b"]],
     };
     const active = schedules[scene]?.find(
       ([start, click]) => local >= start && local <= click + 0.25,
@@ -202,8 +201,8 @@ export function createFilm(document, browserWindow) {
     const local = time - scene.start;
     const isOpening = scene.name === "opening";
     const isEnding = scene.name === "ending";
-    const transitionIn = ease((time - 2.15) / 1.2);
-    const transitionOut = ease((time - 39.25) / 1.1);
+    const transitionIn = ease((time - 1.7) / 1.0);
+    const transitionOut = ease((time - 26) / 1.0);
     opening.style.opacity = String(1 - transitionIn);
     opening.style.transform = `translateX(${-115 * transitionIn}px) scale(${1 - 0.045 * transitionIn})`;
     walkthrough.style.opacity = String(transitionIn * (1 - transitionOut));
@@ -216,25 +215,19 @@ export function createFilm(document, browserWindow) {
       $("#chapter-title").textContent = scene.title;
       $("#chapter-detail").textContent = scene.detail;
       $("#film-footer-stage").textContent = scene.footer;
-      $("#film-progress").style.width = `${((time - 3) / 37) * 100}%`;
+      $("#film-progress").style.width = `${((time - 2.5) / 24) * 100}%`;
     }
 
-    const promptTyping = scene.name === "ask" && local < 2.3;
-    const followupTyping = scene.name === "send" && local < 3.4;
+    const promptTyping = scene.name === "ask" && local < 1.45;
     $("#composer-text").textContent = promptTyping
       ? initialPrompt.slice(
           0,
-          Math.floor(clamp((local - 0.3) / 1.9, 0, 1) * initialPrompt.length),
+          Math.floor(clamp((local - 0.2) / 1.0, 0, 1) * initialPrompt.length),
         ) || "Ask a follow-up"
-      : followupTyping
-        ? followup.slice(
-            0,
-            Math.floor(clamp((local - 0.5) / 2.25, 0, 1) * followup.length),
-          ) || "Ask a follow-up"
-        : "Ask a follow-up";
+      : "Ask a follow-up";
     $("#annotation-card").classList.toggle(
       "is-visible",
-      scene.name === "send" && local < 3.4,
+      scene.name === "send" && local < 1.6,
     );
 
     const content = conversation(scene.name, local);
@@ -243,17 +236,27 @@ export function createFilm(document, browserWindow) {
       lastConversation = content;
     }
 
-    const canvasVisible = time >= 10.7;
+    const suggestionEntrance = ease((time - 4.05) / 0.55);
+    const suggestionExit = 1 - ease((time - 6.95) / 0.2);
+    const canvasVisible = time >= 7.15;
     $("#viz-suggestions").style.display = canvasVisible ? "none" : "flex";
+    $("#viz-suggestions").style.opacity = String(
+      suggestionEntrance * suggestionExit,
+    );
+    $("#viz-suggestions").style.transform =
+      `translateY(${14 * (1 - suggestionEntrance)}px)`;
+    document.querySelectorAll(".viz-suggestion").forEach((item, index) => {
+      const appear = ease((time - 4.1 - index * 0.25) / 0.55);
+      item.style.opacity = String(appear);
+      const selectedSuggestion =
+        index === 0 && scene.name === "ask" && local > 3.75;
+      item.style.transform = `translateY(${12 * (1 - appear)}px) scale(${selectedSuggestion ? 0.975 : 1})`;
+    });
     $("#viz-content").classList.toggle("is-visible", canvasVisible);
-    $("#release-suggestion").style.transform =
-      scene.name === "generate" && local < 1.7
-        ? `scale(${1 - 0.025 * ease(local / 1.7)})`
-        : "";
     $("#release-suggestion").style.borderColor =
-      scene.name === "generate" ? "#3777d6" : "";
+      scene.name === "ask" && local > 3.75 ? "#3777d6" : "";
 
-    const entering = clamp((time - 10.7) / 3.1, 0, 1);
+    const entering = clamp((time - 7.15) / 1.8, 0, 1);
     const nodes = [
       ".viz-node--brief",
       ".viz-node--implement",
@@ -261,54 +264,57 @@ export function createFilm(document, browserWindow) {
       ".viz-node--ship",
     ];
     nodes.forEach((selector, index) => {
-      const step = ease((entering * 3.1 - index * 0.52) / 0.82);
+      const step = ease((entering - index * 0.18) / 0.27);
       const node = $(selector);
       node.style.opacity = String(step);
-      node.style.transform = `translateY(${14 * (1 - step)}px)`;
+      node.style.transform = `translateY(${18 * (1 - step)}px) scale(${0.88 + 0.12 * step})`;
     });
-    $(".viz-lines__base").style.opacity = String(
-      ease((entering - 0.34) / 0.44),
-    );
+    drawPath(fixedPath, ease((entering - 0.18) / 0.25));
+    drawPath(initialPaths[0], ease((entering - 0.4) / 0.25));
+    drawPath(initialPaths[1], ease((entering - 0.62) / 0.25));
 
     const zoom =
-      scene.name === "explore"
-        ? ease((local - 0.5) / 2.1)
-        : time >= 20 && time < 33
-          ? 1
+      time >= 8.5 && time < 18
+        ? clamp((time - 8.5) / 3, 0, 1)
+        : scene.name === "refine"
+          ? 1 - ease(local / 1.2)
           : 0;
     flow.style.transform = `scale(${1 + 0.12 * zoom})`;
     $("#zoom-level").textContent = `${Math.round(100 + 12 * zoom)}%`;
+    $("#canvas-status").textContent =
+      scene.name === "refine" && local > 1.1 && local < 4.1
+        ? "Updating selected shapes…"
+        : "Mermaid · Excalidraw canvas";
 
     const annotating = scene.name === "annotate";
-    const selected = annotating && local > 2.3;
+    const selected = annotating && local > 1.65;
     $("#annotate-button").classList.toggle(
       "is-active",
-      annotating && local > 1.2,
+      annotating && local > 0.7,
     );
-    $("#annotation-highlight").style.opacity = String(
-      selected ? ease((local - 2.3) / 0.4) : 0,
-    );
+    $("#review-node").classList.toggle("is-annotated", selected);
     $("#annotation-popup").style.opacity = String(
-      selected && local > 3.1 ? ease((local - 3.1) / 0.45) : 0,
+      selected && local > 1.85 ? ease((local - 1.85) / 0.35) : 0,
     );
     $("#annotation-popup").style.transform =
       `translateY(${selected ? 0 : 12}px)`;
     $("#comment-text").textContent =
-      local > 3.5 && annotating
+      local > 2.05 && annotating
         ? comment.slice(
             0,
-            Math.floor(clamp((local - 3.5) / 2.1, 0, 1) * comment.length),
+            Math.floor(clamp((local - 2.05) / 1.55, 0, 1) * comment.length),
           )
         : "What should change?";
 
     const refining = scene.name === "refine";
-    const split = refining ? ease((local - 2.2) / 1.7) : 0;
-    $("#review-node").style.opacity = String(
-      (1 - split) * (canvasVisible ? 1 : entering),
-    );
-    $("#review-node").style.transform = `scale(${1 - 0.15 * split})`;
-    $(".viz-lines__base").style.opacity = String(1 - split);
+    const split = refining ? ease((local - 2.3) / 1.6) : isEnding ? 1 : 0;
+    if (refining || isEnding) {
+      $("#review-node").style.opacity = String(1 - split);
+      $("#review-node").style.transform = `scale(${1 - 0.15 * split})`;
+    }
+    $(".viz-lines__initial").style.opacity = String(1 - split);
     $("#refined-lines").style.opacity = String(split);
+    refinedPaths.forEach((path) => drawPath(path, split));
     for (const [selector, direction] of [
       ["#code-review-node", 1],
       ["#approval-node", -1],
@@ -328,7 +334,7 @@ export function createFilm(document, browserWindow) {
 
     scrubber.value = String(time);
     $("#timecode").textContent =
-      `00:${String(Math.floor(time)).padStart(2, "0")} / 00:44`;
+      `00:${String(Math.floor(time)).padStart(2, "0")} / 00:31`;
     return { scene: scene.name, time };
   }
 

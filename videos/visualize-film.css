@@ -172,6 +172,7 @@
   color: #5d9c86;
 }
 .viz-annotation-in-chat {
+  display: block;
   margin-top: 8px;
   padding: 9px 10px;
   border-left: 3px solid #e68566;
@@ -392,20 +393,12 @@
   border-color: #60aa9b;
   background: #effbf7;
 }
-.viz-annotation-highlight {
-  position: absolute;
-  z-index: 2;
-  top: 217px;
-  left: 50%;
-  width: 230px;
-  height: 75px;
-  margin-left: -115px;
-  border: 3px solid #e6795f;
-  border-radius: 14px;
-  background: #f2856a1a;
-  box-shadow: 0 0 0 8px #ef987b2b;
-  opacity: 0;
-  pointer-events: none;
+.viz-node--review.is-annotated {
+  border-color: #e6795f;
+  background: #fff5f2;
+  box-shadow:
+    0 0 0 6px #ef987b2b,
+    0 5px 13px #1e426017;
 }
 .viz-annotation-popup {
   position: absolute;

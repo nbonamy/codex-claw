@@ -29,7 +29,7 @@ const width = filmName === "project-shorts" ? 1080 : 1600;
 const height = filmName === "project-shorts" ? 1920 : 900;
 const duration =
   filmName === "visualize-film"
-    ? 44
+    ? 31
     : filmName === "project-shorts"
       ? 40
       : filmName === "project-film"
@@ -41,7 +41,7 @@ const duration =
             : 48;
 const posterSecond =
   filmName === "visualize-film"
-    ? 36
+    ? 24
     : filmName === "project-shorts"
       ? 29
       : filmName === "project-film"
