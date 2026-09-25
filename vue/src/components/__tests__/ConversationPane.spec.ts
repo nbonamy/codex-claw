@@ -482,6 +482,35 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.chat-message--assistant').exists()).toBe(false);
   });
 
+  it('keeps working feedback visible while a Claw status tool is hidden', () => {
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: 'agent:agent-dina',
+          activeTurnId: 'turn-status',
+          busy: true,
+          messages: [{
+            id: 'prompt-status', role: 'user', status: 'complete',
+            turnId: 'turn-status', createdAt: '2026-06-05T00:00:00.000Z',
+            parts: [{ type: 'text', text: 'Check the change.' }],
+          }, {
+            id: 'status-tool', role: 'assistant', status: 'streaming',
+            turnId: 'turn-status', createdAt: '2026-06-05T00:00:01.000Z',
+            parts: [{ type: 'tool', id: 'call-status', kind: 'mcp', title: 'codex_claw.set-status',
+              status: 'running', metadata: { server: 'codex_claw', tool: 'set-status' } }],
+          }],
+        },
+        composer: { placeholder: 'Ask for follow-up changes' },
+      },
+      actions: {},
+    });
+    const wrapper = mountPane({ controller, agent });
+
+    expect(wrapper.get('.chat-message__thinking').text()).toBe('Working');
+    expect(wrapper.text()).not.toContain('codex_claw.set-status');
+    expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+  });
+
   it('renders review tool activity as finding actions instead of raw MCP names', () => {
     const wrapper = mountPane({
       controller: controllerFor([{
