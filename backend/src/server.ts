@@ -12,6 +12,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { mkdir, rm } from 'node:fs/promises';
 import { createEntityId } from '@codex-claw/core/ids';
+import { resolveAgentBackend } from '@codex-claw/core/agent-backends';
 import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
@@ -171,11 +172,11 @@ export class ClawBackendServer {
     this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.projectCreation = new ProjectCreationService({
       createRepository: name => this.createLocalSourceRepository(name),
-      createAgent: async ({ repository, teamId, backendDefaults }) => {
+      createAgent: async ({ repository, teamId, backend, backendDefaults }) => {
         const input: CreateAgentInput = {
           name: null,
           folder: repository.path,
-          backend: 'codex',
+          backend,
           sourceRepositoryName: repository.name,
           teamId,
           ...(backendDefaults ? { backendDefaults } : {}),
@@ -393,7 +394,7 @@ export class ClawBackendServer {
     return this.missionExecution.submit(agentId, input);
   }
 
-  async createProjectFromQuickChat(agentId: string, name: string, prompt: string): Promise<CreatedProject> {
+  async createProjectFromQuickChat(agentId: string, name: string, prompt: string, backend?: Agent['backend']): Promise<CreatedProject> {
     const caller = this.snapshot.agents.find(agent => agent.id === agentId);
     if (caller?.sessionKind !== 'quickChat' || !caller.teamId) {
       throw new Error('create-project is available only in a Quick Chat with a team.');
@@ -402,7 +403,8 @@ export class ClawBackendServer {
     return this.projectCreation.create({
       name,
       teamId: caller.teamId,
-      backendDefaults: caller.backendDefaults,
+      backend: resolveAgentBackend(this.snapshot.general, backend ?? caller.backend),
+      backendDefaults: !backend || backend === caller.backend ? caller.backendDefaults : undefined,
       prompt,
     }, payload => this.applyAndEmitBackendEvent({ agentId: caller.id, type: 'agentCreation.progress', payload }));
   }
@@ -893,7 +895,7 @@ export class ClawBackendServer {
         const remoteTeamPointer = this.remoteTeams.pointerForAgentInput(input);
         if (remoteTeamPointer) {
           const remoteSnapshot = await this.remoteTeams.request<AppSnapshot>(remoteTeamPointer.connectionId, backendMethods.projectCreate, {
-            input: { name: input.name, teamId: remoteTeamPointer.remoteTeamId },
+            input: { ...input, teamId: remoteTeamPointer.remoteTeamId },
           });
           this.remoteTeams.adoptCreatedAgentSnapshot(remoteTeamPointer, remoteSnapshot);
           if (remoteSnapshot.activeAgentId) onCreated(remoteSnapshot.activeAgentId);
@@ -901,7 +903,7 @@ export class ClawBackendServer {
         }
         const team = this.snapshot.teams.find(candidate => candidate.id === input.teamId);
         if (!team) throw new Error(`Team not found: ${input.teamId}`);
-        const created = await this.projectCreation.create({ name: input.name, teamId: team.id });
+        const created = await this.projectCreation.create({ ...input, teamId: team.id, backend: resolveAgentBackend(this.snapshot.general, input.backend) });
         onCreated(created.agent.id);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
@@ -953,7 +955,7 @@ export class ClawBackendServer {
         const remoteTeamPointer = this.remoteTeams.pointerForAgentInput(input);
         if (remoteTeamPointer) {
           const remoteSnapshot = await this.remoteTeams.request<AppSnapshot>(remoteTeamPointer.connectionId, backendMethods.agentQuickChatCreate, {
-            input: { teamId: remoteTeamPointer.remoteTeamId },
+            input: { ...input, teamId: remoteTeamPointer.remoteTeamId },
           });
           this.remoteTeams.adoptCreatedAgentSnapshot(remoteTeamPointer, remoteSnapshot);
           if (remoteSnapshot.activeAgentId) onCreated(remoteSnapshot.activeAgentId);
@@ -2830,13 +2832,22 @@ function requireProjectCreateInput(params: unknown): CreateProjectInput & { team
   return {
     name: requireString(input.name, 'project name'),
     teamId: requireString(input.teamId, 'team id'),
+    ...(input.backend === undefined ? {} : { backend: requireAgentBackend(input.backend) }),
   };
 }
 
 function requireQuickChatCreateInput(params: unknown): CreateQuickChatInput {
   const record = requireRecord(params);
   const input = requireRecord(record.input);
-  return input.teamId === undefined ? {} : { teamId: requireString(input.teamId, 'team id') };
+  return {
+    ...(input.teamId === undefined ? {} : { teamId: requireString(input.teamId, 'team id') }),
+    ...(input.backend === undefined ? {} : { backend: requireAgentBackend(input.backend) }),
+  };
+}
+
+function requireAgentBackend(value: unknown): Agent['backend'] {
+  if (value !== 'codex' && value !== 'claude') throw new Error('Invalid agent backend.');
+  return value;
 }
 
 function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
@@ -2845,6 +2856,7 @@ function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
   const result: UpdateAgentInput = {
     id: requireString(input.id, 'agent id'),
   };
+  if (input.backend !== undefined) result.backend = requireAgentBackend(input.backend);
   if ('name' in input) {
     result.name = input.name === null ? null : requireString(input.name, 'agent name');
   }
@@ -2853,8 +2865,8 @@ function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
       ? null
       : requireAgentGitDiffTarget(input.gitDiffTarget);
   }
-  if (result.name === undefined && result.gitDiffTarget === undefined) {
-    throw new Error('Agent update must include a name or Git diff target.');
+  if (result.name === undefined && result.gitDiffTarget === undefined && result.backend === undefined) {
+    throw new Error('Agent update must include a name, backend, or Git diff target.');
   }
   return result;
 }
@@ -3342,8 +3354,7 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
   }
 
   return candidate.backend === 'claude' &&
-    typeof candidate.folder === 'string' &&
-    candidate.folder.trim().length > 0 &&
+    (candidate.folder === null || (typeof candidate.folder === 'string' && candidate.folder.trim().length > 0)) &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;
 }

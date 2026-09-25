@@ -12,6 +12,7 @@ import {
   restartAgentConversation,
   resumeAgentConversationInSnapshot,
   updateWorkItemAssignmentInSnapshot,
+  updateAgentFromInput,
 } from '../agent-manager';
 import { createInitialSnapshot } from '../snapshot';
 import { createTeamInSnapshot } from '../team-manager';
@@ -19,6 +20,30 @@ import type { Agent, WorkItem } from '../contracts';
 import { workItemAssignmentKey } from '../work-assignments';
 
 describe('agent-manager', () => {
+  it('switches a fresh agent without carrying model or permission settings across providers', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
+    const agent = snapshot.agents[0]!;
+    delete agent.backendSession;
+    agent.status = { type: 'idle' };
+    agent.backendDefaults = { kind: 'codex', model: 'codex-model', approvalPreset: 'full-access' };
+    updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' });
+    expect(agent.backend).toBe('claude');
+    expect(agent.backendDefaults).toStrictEqual({ kind: 'claude' });
+    agent.status = { type: 'working' };
+    expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'codex' })).toThrow('before the first prompt');
+    agent.status = { type: 'idle' };
+    agent.backendSession = { kind: 'claude', sessionId: 'history', transport: 'stdio' };
+    expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'codex' })).toThrow('before the first prompt');
+    delete agent.backendSession;
+    updateAgentFromInput(snapshot, { id: agent.id, backend: 'codex' });
+    agent.hasSubmittedPrompt = true;
+    expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' })).toThrow('before the first prompt');
+    delete agent.hasSubmittedPrompt;
+    snapshot.general.claudeCodeEnabled = false;
+    expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' })).toThrow('not enabled');
+    expect(agent.backend).toBe('codex');
+  });
   it('duplicates an agent in the same team and selects the copy', () => {
     const snapshot = createInitialSnapshot();
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-duplicate-dina');

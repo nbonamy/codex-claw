@@ -308,6 +308,7 @@
       />
     </section>
     <RepositorySessionSourceDialog
+      v-model:backend="repositorySession.backend.value"
       :visible="repositorySessionSourceVisible"
       :repository-name="repositorySessionSource?.repositoryName ?? ''"
       :branches="repositorySessionSourceBranches"
@@ -337,6 +338,7 @@
       @select-work-item="chooseMissionIssue"
     />
     <NewSourceWorktreeDialog
+      v-model:backend="repositorySession.backend.value"
       :allow-destination-override="false"
       :branches="repositorySessionWorktreeBranches"
       :branches-loading="repositorySessionWorktreeBranchesLoading"
@@ -349,6 +351,7 @@
       @created="createRepositorySessionFromWorktree"
     />
     <RepositoryAcquireDialog
+      v-model:backend="repositorySession.backend.value"
       :visible="repositoryAcquireVisible"
       :mode="repositoryAcquireMode"
       :connection="githubConnection"
@@ -397,7 +400,6 @@
       :visible="agentDialogVisible"
       :mode="agentDialogMode"
       :agent="editingAgent"
-      :claude-code-enabled="snapshot.general.claudeCodeEnabled"
       :choose-agent-folder="chooseAgentFolder"
       :choose-source-worktree-destination="chooseSourceWorktreeDestination"
       :create-agent="createAgentFromDialog"
@@ -503,6 +505,7 @@ import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import NewProjectDialog from './NewProjectDialog.vue';
+import { provideBackendChoices, provideBackendSwitch } from './backend-selection';
 import CockpitView from './CockpitView.vue';
 import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
@@ -900,6 +903,8 @@ type PendingMissionReviewDiscussion = {
 };
 
 type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
+provideBackendChoices(() => props.snapshot.general);
+const backendSwitch = provideBackendSwitch((id, backend) => props.updateAgent({ id, backend }));
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
 const missionConversationPane = ref<{ focusComposer(): void } | null>(null);
@@ -1832,7 +1837,7 @@ const conversationPaneState: CodexConversationPaneState = {
     get messages() { return conversationMessages.value; },
     get busy() { return providerConversation.value?.busy ?? props.isSending; },
     get disabled() {
-      return !currentAgent.value || (props.isConversationLoadFailed && conversationMessages.value.length === 0);
+      return backendSwitch.busy.value || !currentAgent.value || (props.isConversationLoadFailed && conversationMessages.value.length === 0);
     },
   },
   history: {
@@ -2310,13 +2315,14 @@ function closeNewProjectDialog(): void {
   newProjectError.value = null;
 }
 
-async function createNewProject(name: string): Promise<void> {
+async function createNewProject(name: string, backend: Agent['backend'] = 'codex'): Promise<void> {
   const { teamId } = repositorySessionContext(null);
   newProjectBusy.value = true;
   newProjectError.value = null;
   try {
     await props.createProject({
       name,
+      backend,
       ...(teamId ? { teamId } : {}),
     });
     newProjectDialogVisible.value = false;
@@ -2643,6 +2649,7 @@ function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions)
 }
 
 async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  await backendSwitch.settled();
   await forwardCodexPromptWithVisualizationAnnotations(
     prompt,
     options,

@@ -22,7 +22,7 @@ import {
 } from '@codex-claw/core/claude-conversation-replica';
 import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
 import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { claudeWorkingDirectory } from './working-directory';
 import { agentScopedMcpUrl } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
@@ -219,7 +219,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   async disposeCodeReview(agent: Agent, reviewerSession: BackendSession): Promise<void> {
     if (reviewerSession.kind !== 'claude') throw new Error('Claude cannot dispose a non-Claude review conversation.');
     if (this.transport.deleteSession) {
-      await this.transport.deleteSession(reviewerSession.sessionId, requireAgentFolder(agent));
+      await this.transport.deleteSession(reviewerSession.sessionId, claudeWorkingDirectory(agent));
     } else {
       await this.transport.closeSession?.(reviewerSession.sessionId);
     }
@@ -246,7 +246,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
     }
-    const folder = requireAgentFolder(agent);
+    const folder = claudeWorkingDirectory(agent);
     const turnId = this.nextTurnId();
     const existingSessionId = claudeSessionId(agent);
     const liveSessionId = this.liveSessionIdsByAgentId.get(agent.id);
@@ -1359,7 +1359,7 @@ function claudeTurnParams(
   const mcpServerUrl = clawMcpServerUrl ? agentScopedMcpUrl(clawMcpServerUrl, agent.id) : null;
   return {
     ownerId: agent.id,
-    cwd: requireAgentFolder(agent),
+    cwd: claudeWorkingDirectory(agent),
     prompt,
     sessionId: existingSessionId ?? undefined,
     model: options.model ?? defaults?.model ?? null,

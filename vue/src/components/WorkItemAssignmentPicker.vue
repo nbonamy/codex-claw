@@ -3,6 +3,7 @@
     <template v-if="reuseAction && existingWorktreePath">
       <WorktreeReusePrompt :branch="branchName" :path="existingWorktreePath" />
       <footer>
+        <BackendSelector v-if="destination === 'new'" v-model="backend" size="small" />
         <button class="claw-button claw-button--tertiary" type="button" @click="reuseAction = null">
           {{ t('common.cancel') }}
         </button>
@@ -78,6 +79,7 @@
       <p v-if="error" class="work-item-assignment-picker__error" role="alert">{{ error }}</p>
 
       <footer>
+        <BackendSelector v-if="destination === 'new'" v-model="backend" size="small" :disabled="busy" />
         <button class="claw-button claw-button--tertiary" type="button" :disabled="!canSubmit" @click="requestCustom">
           {{ t('repositoryBacklog.custom') }}
         </button>
@@ -99,6 +101,8 @@ import { IconAlertTriangle, IconCopy, IconGitBranch, IconGitPullRequest, IconRob
 import type { WorkItem } from '@codex-claw/core/contracts';
 import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
+import BackendSelector from './BackendSelector.vue';
+const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
 
 export type WorkItemAssignmentDestination = 'existing' | 'new';
 
@@ -108,6 +112,7 @@ export type WorkItemAssignmentSession = {
 };
 
 export type WorkItemAssignmentSelection = {
+  backend?: import('@codex-claw/core/contracts').AgentBackend;
   action: WorkItemAssignmentAction;
   agentId?: string;
   destination: WorkItemAssignmentDestination;
@@ -180,6 +185,7 @@ function confirmReuse(): void {
 function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'action'> {
   return {
     destination: destination.value,
+    ...(destination.value === 'new' ? { backend: backend.value } : {}),
     ...(destination.value === 'existing' ? { agentId: selectedAgentId.value } : {}),
     item: props.item,
     ...(reuseExisting ? { reuseExisting: true } : {}),
@@ -318,5 +324,9 @@ function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'ac
   margin: 0 calc(-1 * var(--space-8));
   padding: var(--space-6) var(--space-8) 0;
   border-top: 1px solid var(--color-border);
+}
+
+.work-item-assignment-picker footer .backend-selector {
+  margin-right: auto;
 }
 </style>

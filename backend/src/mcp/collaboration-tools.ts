@@ -163,7 +163,7 @@ function registerCollaborationTools(
     description: 'Create a new Codex Claw co-agent in your team, optionally in an isolated worktree. Model and reasoning effort inherit from the caller when the backend matches unless explicitly overridden. Provide an initial prompt to start the co-agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.',
     inputSchema: {
       name: z.string().optional().describe('Optional custom name. When omitted, the agent displays its branch or folder name.'),
-      backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to codex.'),
+      backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to the caller’s backend.'),
       model: z.string().optional().describe('Optional model override. Inherits the caller model when the backend matches.'),
       reasoningEffort: z.string().optional().describe('Optional reasoning effort override. Inherits the caller effort when the backend matches.'),
       repoPath: z.string().describe('Repository or worktree folder path.'),

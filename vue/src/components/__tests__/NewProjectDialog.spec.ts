@@ -17,7 +17,7 @@ describe('NewProjectDialog', () => {
     await wrapper.get('#new-project-name').setValue('  fresh-project  ');
     await wrapper.get('.claw-button--primary').trigger('click');
 
-    expect(wrapper.emitted('create')).toStrictEqual([['fresh-project']]);
+    expect(wrapper.emitted('create')).toStrictEqual([['fresh-project', 'codex']]);
   });
 
   it('keeps invalid nested names in the dialog', async () => {

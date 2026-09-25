@@ -15,6 +15,7 @@ import type {
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 import { agentDisplayName } from './agent-display';
+import { canSelectAgentBackend, resolveAgentBackend } from './agent-backends';
 import { seedTeamId } from './seed-ids';
 import { workspaceSidebarGroupIdForAgent, workspaceSidebarRepositoryRootForAgent } from './workspace-sidebar';
 
@@ -64,7 +65,7 @@ export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQu
   const agent = createAgentFromInput({
     name: null,
     folder: '',
-    backend: 'codex',
+    backend: resolveAgentBackend(snapshot.general, input.backend),
     ...(input.teamId ? { teamId: input.teamId } : {}),
   }, createdAt, targetTeamId(snapshot, input.teamId), id);
   agent.folder = null;
@@ -76,6 +77,13 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   const agent = findAgent(snapshot, input.id);
   if (!agent) {
     return null;
+  }
+  if (input.backend !== undefined && input.backend !== agent.backend) {
+    const backend = resolveAgentBackend(snapshot.general, input.backend);
+    if (!canSelectAgentBackend(agent)) throw new Error('Backend can only be changed before the first prompt.');
+    agent.backend = backend;
+    agent.backendDefaults = defaultBackendDefaults(backend);
+    agent.updatedAt = updatedAt;
   }
   if (input.name !== undefined) {
     agent.name = normalizedOptionalString(input.name) ?? null;
@@ -175,6 +183,7 @@ function targetTeamId(snapshot: AppSnapshot, teamId: string | undefined): string
 }
 
 function clearAgentRuntimeState(agent: Agent): void {
+  delete agent.hasSubmittedPrompt;
   delete agent.backendSession;
   delete agent.contextUsage;
   delete agent.plan;
@@ -579,6 +588,7 @@ function ensureAgentCanChange(agent: Agent, message: string): void {
 }
 
 function clearRuntimeState(agent: Agent): void {
+  delete agent.hasSubmittedPrompt;
   delete agent.backendSession;
   delete agent.conversationTitle;
   delete agent.contextUsage;

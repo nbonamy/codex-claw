@@ -444,6 +444,7 @@ describe('AppStatePersistence', () => {
       statusText: 'Registered',
       status: { type: 'working', detail: 'busy' },
       lastActivityAt: '2026-06-04T23:59:00.000Z',
+      hasSubmittedPrompt: true,
     };
     snapshot.workBacklog.assignments = {
       'github:nbonamy/codex-claw#12': {
@@ -518,6 +519,7 @@ describe('AppStatePersistence', () => {
     expect(writtenAgent).not.toHaveProperty('mcpSessionId');
     expect(writtenAgent.statusText).toBe('Registered');
     expect(writtenAgent.lastActivityAt).toBe('2026-06-04T23:59:00.000Z');
+    expect(writtenAgent.hasSubmittedPrompt).toBe(true);
     expect(writtenAgent).not.toHaveProperty('status');
   });
 

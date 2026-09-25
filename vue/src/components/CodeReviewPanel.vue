@@ -86,6 +86,7 @@
                   </span>
                 </span>
               </button>
+              <BackendSelector v-model="reviewBackend" class="code-review-panel__backend" size="small" :disabled="busy || threadMode === 'current'" />
             </div>
           </fieldset>
         </div>
@@ -276,6 +277,7 @@ import {
 } from "@codex-claw/core/code-review";
 import type { Agent, AgentGitStatus, AppSnapshot } from "@codex-claw/core/contracts";
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
+import BackendSelector from './BackendSelector.vue';
 
 const props = defineProps<{
   agent: Agent;
@@ -306,6 +308,8 @@ const busy = ref(false);
 const error = ref<string | null>(null);
 const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
 const threadMode = ref<CodeReviewThreadMode>("independent");
+const reviewBackend = ref(props.agent.backend);
+watch(() => props.agent.id, () => { reviewBackend.value = props.agent.backend; });
 const selectedRoundId = ref("");
 const session = computed(() => props.agent.codeReview ?? null);
 const branchScope = computed(() => props.gitStatus?.diffCatalog?.branch);
@@ -491,7 +495,10 @@ function startSelectedReview(): void {
   const reviewScope: CodeReviewStartInput["scope"] = scope.value === "branch" && branchScope.value
     ? { type: "branch", baseRef: branchScope.value.baseRef }
     : { type: "uncommitted" };
-  void run(() => props.startReview(props.agent.id, { scope: reviewScope, threadMode: threadMode.value }));
+  void run(() => props.startReview(props.agent.id, {
+    scope: reviewScope, threadMode: threadMode.value,
+    ...(threadMode.value === 'independent' ? { backend: reviewBackend.value } : {}),
+  }));
 }
 
 function retryReview(): void {
@@ -559,6 +566,12 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   display: grid;
   gap: var(--space-10);
   text-align: left;
+}
+
+.code-review-panel__choices .code-review-panel__backend {
+  width: 100%;
+  grid-column: 1;
+  justify-self: start;
 }
 
 .code-review-panel__start {

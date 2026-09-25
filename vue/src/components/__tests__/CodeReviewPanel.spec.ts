@@ -1,4 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { computed } from 'vue';
+import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, AgentGitStatus, AppSnapshot } from '@codex-claw/core/contracts';
 import type { CodeReviewFinding, CodeReviewSession } from '@codex-claw/core/code-review';
@@ -63,7 +65,7 @@ function mountPanel(
     actions,
     wrapper: mount(CodeReviewPanel, {
       props: { agent: owner, gitStatus, ...actions },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n], provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } },
     }),
   };
 }
@@ -79,9 +81,14 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.findAll('.code-review-panel__choice-icon')).toHaveLength(4);
     const independent = wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Independent reviewer'))!;
     expect(independent.attributes('aria-checked')).toBe('true');
+    expect(getComputedStyle(wrapper.get('.code-review-panel__backend').element).justifySelf).toBe('start');
+    const selector = wrapper.get('.code-review-panel__choices > .code-review-panel__backend');
+    expect(getComputedStyle(selector.element).width).toBe('100%');
+    expect(getComputedStyle(selector.element).gridColumn).toBe('1');
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
     expect(actions.startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'uncommitted' },
+      backend: 'codex',
       threadMode: 'independent',
     });
   });
@@ -108,6 +115,10 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.text()).toContain('Against origin/main');
     expect(wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Uncommitted changes'))!.attributes('aria-checked')).toBe('true');
     await wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current branch'))!.trigger('click');
+    await wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current thread'))!.trigger('click');
+    expect(wrapper.get('.backend-selector select').attributes('disabled')).toBeDefined();
+    await wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Independent reviewer'))!.trigger('click');
+    expect(wrapper.get('.backend-selector select').attributes('disabled')).toBeUndefined();
     await wrapper.findAll('[role="radio"]').find((radio) => radio.text().includes('Current thread'))!.trigger('click');
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
 
@@ -146,6 +157,7 @@ describe('CodeReviewPanel', () => {
     expect(actions.startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'branch', baseRef: 'origin/main' },
       threadMode: 'independent',
+      backend: 'codex',
     });
   });
 

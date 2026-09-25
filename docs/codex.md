@@ -222,8 +222,10 @@ Code review defaults to a separate visible reviewer agent in the same workspace,
 but the user may choose the owning agent's current conversation. Either path
 uses the review-session finding tools; finding clarification and batched
 remediation continue through the normal Codex conversation replica. An
-independent reviewer starts without the source conversation history but inherits
-its selected model and reasoning effort. `Review again` archives the independent
+independent reviewer starts without the source conversation history. It defaults
+to the source backend and inherits its selected model and reasoning effort only
+when using that same backend; users can choose another enabled backend.
+`Review again` archives the independent
 reviewer's conversation and binds a fresh one to the same sidebar agent, while
 current-thread reviews keep the user-owned conversation for the whole workflow.
 Finishing removes an independent reviewer agent and its conversation but leaves

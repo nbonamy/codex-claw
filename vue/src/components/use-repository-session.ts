@@ -1,6 +1,7 @@
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type {
   Agent,
+  AgentBackend,
   AppSnapshot,
   AutomationLocation,
   CreateAgentInput,
@@ -24,7 +25,7 @@ export function useRepositorySession(options: {
   createIsolatedWorkItemAgent: (
     item: WorkItem,
     teamId: string,
-    options?: { reuseExisting?: boolean },
+    options?: { reuseExisting?: boolean; backend?: AgentBackend },
   ) => Promise<{ agent: Agent; item: WorkItem }>;
   createSourceWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   getSnapshot: () => AppSnapshot;
@@ -42,6 +43,7 @@ export function useRepositorySession(options: {
   suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
 }) {
   const source = ref<RepositorySessionSource | null>(null);
+  const backend = ref<AgentBackend>('codex');
   const visible = ref(false);
   const branches = ref<SourceBranch[]>([]);
   const workItems = ref<WorkItem[]>([]);
@@ -126,6 +128,7 @@ export function useRepositorySession(options: {
   }
 
   function createOnBranch(payload: RepositorySessionSource & { branch: SourceBranch }): void {
+    backend.value = 'codex';
     const { branch, ...nextSource } = payload;
     void createSession(nextSource, branch, context(nextSource).teamId);
   }
@@ -177,7 +180,7 @@ export function useRepositorySession(options: {
       await options.createAgent({
         name: null,
         folder: worktree.path,
-        backend: 'codex',
+        backend: backend.value,
         sourceRepositoryName: nextSource.repositoryName,
         ...(teamId ? { teamId } : {}),
       });
@@ -206,7 +209,7 @@ export function useRepositorySession(options: {
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          selection.reuseExisting ? { reuseExisting: true } : {},
+          { backend: backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}) },
         );
         await options.assignWorkItem({
           agentId: agent.id,
@@ -236,7 +239,7 @@ export function useRepositorySession(options: {
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          selection.reuseExisting ? { reuseExisting: true } : {},
+          { backend: backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}) },
         );
         options.prefillWorkItemForAgent(agent.id, item);
       }
@@ -261,7 +264,7 @@ export function useRepositorySession(options: {
       await options.createAgent({
         name: null,
         folder: worktree.path,
-        backend: 'codex',
+        backend: backend.value,
         sourceRepositoryName: nextSource.repositoryName,
         ...(teamId ? { teamId } : {}),
       });
@@ -275,6 +278,7 @@ export function useRepositorySession(options: {
   }
 
   return {
+    backend,
     assignmentError,
     assignmentSessions,
     assignmentState,

@@ -82,6 +82,9 @@
       </template>
     </form>
 
+    <template #footer-left>
+      <BackendSelector v-model="backend" :disabled="creating" />
+    </template>
     <template #footer>
       <button class="claw-button claw-button--tertiary" type="button" @click="backOrClose">
         {{ existingWorktree ? $t('common.back') : $t('surface.newSourceWorktreeDialog.cancel') }}
@@ -109,6 +112,8 @@ import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
+import BackendSelector from './BackendSelector.vue';
+const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
 
 const props = withDefaults(defineProps<{
   allowDestinationOverride?: boolean;
@@ -158,7 +163,7 @@ const creationProgress = computed<AgentCreationProgress | null>(() => {
   return {
     id: 'manual-worktree-creation',
     state: creationState.value,
-    backend: 'codex',
+    backend: backend.value,
     repositoryName: props.repo.name,
     createWorktree: true,
     branchName: pendingBranchName.value,

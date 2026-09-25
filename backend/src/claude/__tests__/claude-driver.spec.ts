@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { homedir } from 'node:os';
 import { ClaudeBackendDriver } from '../claude-driver';
 import type { ClaudeSdkMessage } from '../protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../transport';
@@ -23,6 +24,26 @@ function unwrapClaudeConversationEvent(event: BackendEvent) {
 }
 
 describe('ClaudeBackendDriver', () => {
+  it('loads models and starts a folderless Quick Chat', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const quickChat: Agent = { ...agent, folder: null, sessionKind: 'quickChat' };
+    const models = await driver.listModels(quickChat);
+    expect(models.length).toBeGreaterThan(0);
+    expect(transport.discoverModels).toHaveBeenCalledWith({ cwd: homedir() });
+    const started = driver.sendPrompt(quickChat, 'hello claude');
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: homedir(), prompt: 'hello claude',
+    }), expect.any(Function), expect.any(Function), expect.any(Function));
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'quick-chat-session' });
+    await expect(started).resolves.toEqual(expect.objectContaining({
+      backendSession: expect.objectContaining({ kind: 'claude', sessionId: 'quick-chat-session' }),
+    }));
+    expect(quickChat.folder).toBeNull();
+    transport.resolveDone();
+    await driver.close();
+  });
+
   it('exposes and persists Claude permission modes without creating a session', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

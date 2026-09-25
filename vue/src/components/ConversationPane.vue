@@ -65,6 +65,13 @@
         </el-tooltip>
       </template>
       <template #composer-shelf-actions="{ disabled }">
+        <BackendSelector
+          v-if="showBackendSelector && agent && backendSwitch"
+          :model-value="agent.backend"
+          size="small"
+          :disabled="disabled || backendSwitch.busy.value"
+          @update:model-value="selectBackend"
+        />
         <div v-if="activeThreadFlags.length > 0" class="conversation-pane__thread-flags">
           <ThreadFlagAffordance
             v-for="flag in activeThreadFlags"
@@ -129,6 +136,10 @@ import AgentMention from './AgentMention.vue';
 import ComposerContextCards, { type ComposerContextCard } from './ComposerContextCards.vue';
 import ChatTextSelectionAnnotation from './ChatTextSelectionAnnotation.vue';
 import ThreadFlagAffordance from './ThreadFlagAffordance.vue';
+import BackendSelector from './BackendSelector.vue';
+import { useBackendChoices, useBackendSwitch } from './backend-selection';
+import { canSelectAgentBackend } from '@codex-claw/core/agent-backends';
+import { ElMessage } from 'element-plus';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
 import type { VisualizationAnnotation } from './use-visualization-annotations';
 import type { CodeReviewFinding } from '@codex-claw/core/code-review';
@@ -138,6 +149,13 @@ import {
   type CollaborationMessagePresentation,
 } from '../shared/collaboration-message';
 import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
+const backendSwitch = useBackendSwitch();
+const backendChoices = useBackendChoices();
+async function selectBackend(backend: Agent['backend']): Promise<void> {
+  if (!props.agent || !backendSwitch) return;
+  try { await backendSwitch.select(props.agent.id, backend); }
+  catch (error) { ElMessage.error(error instanceof Error ? error.message : String(error)); }
+}
 
 const { t, te } = useI18n();
 const agentMentionGroupId = 'agents';
@@ -214,6 +232,10 @@ const composerContextCards = computed<ComposerContextCard[]>(() => [
     removeLabel: t('chat.composerContext.removeReviewFinding'),
   }] : []),
 ]);
+const showBackendSelector = computed(() => Boolean(
+  backendChoices.value.length > 1 && props.agent && backendSwitch
+  && canSelectAgentBackend(props.agent) && !props.historyLoading && !props.hasVisibleMessages,
+));
 const activeThreadFlags = computed<ThreadFlagId[]>(() => (
   (['ready_for_review', 'delegate_to_worktree'] as const)
     .filter((id) => props.agent?.threadFlags?.[id] === true)

@@ -42,10 +42,11 @@ describe('ClawMcpService', () => {
     expect(quickChatTools.result.tools.map((tool: { name: string }) => tool.name)).toContain('create-project');
 
     const result = await callTool(url, 'agent-quick-chat', 'create-project', {
-      name: 'new-product', prompt: 'Build the agreed product and start with the requirements.',
+      name: 'new-product', prompt: 'Build the agreed product and start with the requirements.', backend: 'claude',
     });
     expect(createProject).toHaveBeenCalledWith(
       'agent-quick-chat', 'new-product', 'Build the agreed product and start with the requirements.',
+      'claude',
     );
     expect(result.result.structuredContent).toStrictEqual({
       success: true,
@@ -697,6 +698,7 @@ describe('ClawMcpService', () => {
 
   it('displays generated Markdown, requests celebrations, and creates agents through the service boundary', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
     const events: any[] = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
@@ -879,6 +881,7 @@ describe('ClawMcpService', () => {
 
   it('lets create-agent override inherited model settings and avoids cross-backend inheritance', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
     snapshot.agents[0]!.backendDefaults = {
       kind: 'codex',
       model: 'gpt-5.6-sol',

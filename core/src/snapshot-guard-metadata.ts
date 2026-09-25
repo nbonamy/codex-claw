@@ -126,6 +126,7 @@ function isAgent(value: unknown): boolean {
     isAgentStatus(value.status) &&
     typeof value.createdAt === 'string' &&
     optional(value, 'lastActivityAt', isString) &&
+    optional(value, 'hasSubmittedPrompt', isBoolean) &&
     typeof value.updatedAt === 'string';
 }
 
@@ -316,7 +317,7 @@ function isAutomationCreatedAgent(value: unknown): boolean {
 function isBackendConversationRef(value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (value.backend === 'codex') return typeof value.threadId === 'string';
-  return value.backend === 'claude' && typeof value.folder === 'string' && typeof value.sessionId === 'string';
+  return value.backend === 'claude' && isNullableString(value.folder) && typeof value.sessionId === 'string';
 }
 
 function isBackendRuntimeStatus(value: unknown): boolean {

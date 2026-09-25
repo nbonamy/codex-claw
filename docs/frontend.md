@@ -142,6 +142,7 @@ component is single-use.
 | Need | Canonical UI | Location |
 | --- | --- | --- |
 | Emoji, grapheme, or cropped-image identity | `IdentityPicker` | `vue/src/shared/identity/IdentityPicker.vue` |
+| Enabled coding backend, small/default/large | `BackendSelector` | `vue/src/components/BackendSelector.vue` |
 | Searchable compact picker | Header filter plus list body | GitHub mode in `RepositoryAcquireDialog`; `RepositorySessionSourceDialog` |
 | Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow`, `SettingsTextareaField` | `vue/src/components/Settings*.vue` |
 | Dense structured data | `AppDataList` | `vue/src/components/AppDataList.vue` |
@@ -152,6 +153,10 @@ component is single-use.
 depends on avatar-specific product leaves. Keep new product dependencies out of
 `shared/`; extract domain-neutral preview and crop leaves before treating the
 picker as a shared interaction primitive.
+
+`BackendSelector` consumes the enabled choices provided once by `AppShell`
+through `backend-selection`. It hides itself for a single enabled backend;
+creation dialogs must reuse it rather than read backend settings independently.
 
 Use `CodexConversationPane` from `@codex-app-sdk/vue` as the complete
 conversation and composer surface. Extend it through its controller, slots, and

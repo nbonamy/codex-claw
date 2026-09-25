@@ -60,6 +60,7 @@
         />
         <WorkItemAssignmentPicker
           v-else
+          v-model:backend="backend"
           :item="selectedWorkItem"
           :branch-name="assignmentBranchName"
           :existing-worktree-path="assignmentExistingWorktreePath"
@@ -107,6 +108,9 @@
         <p v-if="filteredWorkItems.length === 0" class="repository-session-source-dialog__state">{{ tab === 'pullRequests' ? t('repositories.sessionSource.noPullRequests') : t('repositories.sessionSource.noIssues') }}</p>
       </template>
     </section>
+    <template v-if="purpose === 'session' && !selectedWorkItem" #footer>
+      <BackendSelector v-model="backend" size="small" :disabled="preparationVisible" />
+    </template>
   </el-dialog>
 </template>
 
@@ -122,6 +126,8 @@ import {
 import type { SourceBranch, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
+import BackendSelector from './BackendSelector.vue';
+const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
 import StagedOperationProgress from './StagedOperationProgress.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 
@@ -265,6 +271,13 @@ function resetPreparation(clearSelection = true): void {
 </script>
 
 <style scoped>
+.repository-session-source-dialog :deep(.el-dialog__footer) {
+  text-align: left;
+}
+
+.repository-session-source-dialog :deep(.el-dialog__footer:not(:has(.backend-selector))) {
+  display: none;
+}
 :global(.repository-session-source-dialog.el-dialog) {
   overflow: hidden;
   transition: width 240ms ease;

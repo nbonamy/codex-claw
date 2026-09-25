@@ -199,17 +199,21 @@ describe('ClawBackendServer', () => {
     );
   });
 
-  it('starts a normal project agent from a Quick Chat with its handoff prompt', async () => {
+  it.each(['codex', 'claude'] as const)('starts a project using the %s Quick Chat backend', async (backend) => {
     const snapshot = createTestSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
     snapshot.sourceFolder = { path: '/src', initialized: true, recentRepoNames: [] };
-    createQuickChatInSnapshot(snapshot, { teamId: 'team-test' }, undefined, 'agent-quick-chat', { select: false });
+    createQuickChatInSnapshot(snapshot, { teamId: 'team-test', backend }, undefined, 'agent-quick-chat', { select: false });
+    const backendSession = backend === 'codex'
+      ? { kind: 'codex', threadId: 'thread-project' }
+      : { kind: 'claude', sessionId: 'session-project', transport: 'stdio' };
     const repository = {
       name: 'new-product', path: '/src/new-product', worktrees: [{ name: 'main', path: '/src/new-product' }],
     };
     const handle = vi.fn(async (method: string) => method === backendMethods.sourceRepositoryCreate
       ? repository
       : method === backendMethods.driverPromptSend
-        ? { backendSession: { kind: 'codex', threadId: 'thread-project' }, turnId: 'turn-1' }
+        ? { backendSession, turnId: 'turn-1' }
         : undefined);
     const driverRpc = {
       handle,
@@ -231,8 +235,8 @@ describe('ClawBackendServer', () => {
     );
 
     expect(result).toMatchObject({ repository, promptSubmitted: true, agent: {
-      folder: repository.path, teamId: 'team-test', name: null, backend: 'codex',
-      backendSession: { kind: 'codex', threadId: 'thread-project' },
+      folder: repository.path, teamId: 'team-test', name: null, backend,
+      backendSession,
     } });
     expect(result.agent.delegatedByAgentId).toBeUndefined();
     const progress = events.filter(event => event.type === 'agentCreation.progress');

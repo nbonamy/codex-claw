@@ -3,7 +3,7 @@ import { access, readFile, readdir, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/core/contracts';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { claudeWorkingDirectory } from './working-directory';
 import { claudeToolPart, completedClaudeToolPart } from './claude-tool-part-adapter';
 import { claudeToolResultText } from './claude-tool-result';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
@@ -46,7 +46,7 @@ export async function loadClaudeTranscriptHistory(
   }
 
   const projectsRoot = options.projectsRoot ?? path.join(os.homedir(), '.claude', 'projects');
-  const transcriptPath = await findClaudeTranscriptPath(projectsRoot, requireAgentFolder(agent), sessionId);
+  const transcriptPath = await findClaudeTranscriptPath(projectsRoot, claudeWorkingDirectory(agent), sessionId);
   if (!transcriptPath) {
     return {
       backendSession: agent.backendSession,
@@ -108,8 +108,8 @@ export async function listClaudeTranscriptSummaries(
   options: ClaudeTranscriptHistoryOptions = {},
 ): Promise<ConversationSummary[]> {
   const projectsRoot = options.projectsRoot ?? path.join(os.homedir(), '.claude', 'projects');
-  const folder = requireAgentFolder(agent);
-  const projectDir = path.join(projectsRoot, claudeProjectDirectoryName(expandHome(folder)));
+  const folder = agent.folder;
+  const projectDir = path.join(projectsRoot, claudeProjectDirectoryName(expandHome(claudeWorkingDirectory(agent))));
   const files: Array<{ filePath: string; sessionId: string; updatedAt: string; updatedAtMs: number }> = [];
 
   let entries: Dirent[];

@@ -61,6 +61,7 @@ export type CreateSourceRepositoryInput = {
 
 export type CreateProjectInput = {
   name: string;
+  backend?: import('./shared').AgentBackend;
   teamId?: string;
 };
 

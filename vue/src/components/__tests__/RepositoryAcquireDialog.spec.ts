@@ -1,4 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { computed } from 'vue';
+import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it } from 'vitest';
 import type { WorkRepository } from '@codex-claw/core/contracts';
 import RepositoryAcquireDialog from '../RepositoryAcquireDialog.vue';
@@ -125,11 +127,15 @@ describe('RepositoryAcquireDialog', () => {
 
   it('validates and submits an explicit repository URL', async () => {
     const wrapper = mount(RepositoryAcquireDialog, {
-      props: { visible: true, mode: 'url' },
+      props: { visible: true, mode: 'url', connection: { provider: 'github', status: 'connected' } },
+      global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } },
     });
     await flushPromises();
 
     expect(wrapper.find('.repository-acquire-dialog__search').exists()).toBe(false);
+    expect(wrapper.find('.repository-acquire-dialog__body--state').exists()).toBe(false);
+    expect(wrapper.find('.claw-form-dialog__field [aria-label="Repository URL"]').exists()).toBe(true);
+    expect(wrapper.find('.claw-form-dialog__footer-left .backend-selector').exists()).toBe(true);
     expect(wrapper.get('.claw-dialog__title').text()).toBe('Clone repository');
     expect(wrapper.get('.el-dialog').classes()).not.toContain('claw-dialog--compact');
     expect(wrapper.get('[aria-label="Repository URL"]').attributes('placeholder')).toBe('https://github.com/owner/repository.git');
@@ -137,6 +143,7 @@ describe('RepositoryAcquireDialog', () => {
     expect(submit.attributes('disabled')).toBeDefined();
 
     await wrapper.get('[aria-label="Repository URL"]').setValue('git@github.com:nbonamy/codex-claw.git');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Repository URL"]').element.checkValidity()).toBe(true);
     await submit.trigger('click');
 
     expect(wrapper.emitted('clone-url')).toStrictEqual([['git@github.com:nbonamy/codex-claw.git']]);

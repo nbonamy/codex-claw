@@ -6,6 +6,7 @@ import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { resolveAgentBackend } from '@codex-claw/core/agent-backends';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type {
@@ -62,7 +63,7 @@ export type ClawMcpServiceOptions = {
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
   agentCreation?: AgentCreationService;
-  createProject?: (agentId: string, name: string, prompt: string) => Promise<CreatedProject>;
+  createProject?: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude') => Promise<CreatedProject>;
   toolModuleProviders?: readonly ClawMcpToolModuleProvider[];
 };
 
@@ -451,7 +452,7 @@ export class ClawMcpService {
     const progressId = `agent-creation-${randomUUID()}`;
     const progress = {
       id: progressId,
-      backend: input.backend ?? 'codex',
+      backend: resolveAgentBackend(this.snapshot.general, input.backend ?? caller.backend),
       repositoryName: fileBasename(repoPath),
       createWorktree: input.createWorktree === true,
       ...(branchName ? { branchName } : {}),
@@ -492,7 +493,7 @@ export class ClawMcpService {
       const createInput: CreateAgentInput = {
         name: input.name?.trim() || null,
         folder,
-        backend: input.backend ?? 'codex',
+        backend: progress.backend,
         backendDefaults: delegatedBackendDefaults(caller, input),
         delegatedByAgentId: caller.id,
         teamId: input.teamId ?? caller.teamId,
@@ -602,7 +603,7 @@ export class ClawMcpService {
 }
 
 function delegatedBackendDefaults(caller: Agent, input: McpCreateAgentInput): BackendDefaults {
-  const backend = input.backend ?? 'codex';
+  const backend = input.backend ?? caller.backend;
   const callerDefaults = caller.backend === backend && caller.backendDefaults?.kind === backend
     ? caller.backendDefaults
     : undefined;

@@ -612,7 +612,7 @@ async function startWork(selection: WorkItemAssignmentSelection): Promise<void> 
   operationError.value = null;
   try {
     const input: RepositoryWorkStartInput = selection.destination === 'new'
-      ? { action: selection.action, item, target: 'duplicate', workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
+      ? { action: selection.action, item, target: 'duplicate', backend: selection.backend, workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
       : { action: selection.action, item, target: 'current', workspace: { kind: 'current' } };
     await props.startWorkAction(input);
     operationState.value = 'success';

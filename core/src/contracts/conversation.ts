@@ -54,7 +54,7 @@ export type BackendConversationRef =
   }
   | {
     backend: 'claude';
-    folder: string;
+    folder: string | null;
     sessionId: string;
   };
 

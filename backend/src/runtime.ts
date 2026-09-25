@@ -115,7 +115,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     resolveWorkspaceIdentity: (folder) => agentGitService.identity(folder),
     worktreeManager,
     agentCreation,
-    createProject: (agentId, name, prompt) => server.createProjectFromQuickChat(agentId, name, prompt),
+    createProject: (agentId, name, prompt, backend) => server.createProjectFromQuickChat(agentId, name, prompt, backend),
     toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService)],
   });
   const mcpServerUrl = await mcpService.start();

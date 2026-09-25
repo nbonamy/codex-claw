@@ -87,7 +87,12 @@ export function useWorkItemRouting(options: {
     }
 
     const targetAgent = input.target === 'duplicate'
-      ? await options.actions.duplicateAgent(sourceAgent.id, {
+      ? input.backend && input.backend !== sourceAgent.backend
+        ? await options.actions.createAgent({
+            name: `${sourceAgentName} gh-${item.number}`, folder: sourceAgent.folder ?? '',
+            backend: input.backend, teamId: sourceAgent.teamId,
+          })
+        : await options.actions.duplicateAgent(sourceAgent.id, {
           select: false,
           name: `${sourceAgentName} gh-${item.number}`,
         })
@@ -148,9 +153,10 @@ export function useWorkItemRouting(options: {
     action: WorkItemAssignmentAction;
     items: WorkItem[];
     teamId: string;
+    backend?: Agent['backend'];
   }): Promise<void> {
     await Promise.all(input.items.map(async (listedItem) => {
-      const { agent, item } = await createIsolatedAgent(listedItem, input.teamId);
+      const { agent, item } = await createIsolatedAgent(listedItem, input.teamId, { backend: input.backend });
       await assignWithPrompt(agent.id, item, input.action);
     }));
   }
@@ -158,7 +164,7 @@ export function useWorkItemRouting(options: {
   async function createIsolatedAgent(
     listedItem: WorkItem,
     teamId: string,
-    creationOptions: { reuseExisting?: boolean } = {},
+    creationOptions: { reuseExisting?: boolean; backend?: Agent['backend'] } = {},
   ): Promise<{ agent: Agent; item: WorkItem }> {
     const team = options.model.snapshot().teams.find((candidate) => candidate.id === teamId);
     if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
@@ -177,7 +183,7 @@ export function useWorkItemRouting(options: {
     const agent = await options.actions.createAgent({
       name: null,
       folder: worktree.path,
-      backend: 'codex',
+      backend: creationOptions.backend ?? 'codex',
       sourceRepositoryName: repository.name,
       teamId: team.id,
     });

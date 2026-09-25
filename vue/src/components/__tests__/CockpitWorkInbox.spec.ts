@@ -1,4 +1,6 @@
 import { mount } from '@vue/test-utils';
+import { computed } from 'vue';
+import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
@@ -167,12 +169,13 @@ describe('CockpitWorkInbox', () => {
     expect(startButton.props('disabled')).toBe(false);
     await startButton.trigger('click');
     expect(wrapper.get('.cockpit-inbox__start-body').text()).toContain('Launch 1 agent?');
-    const clientNavigationSelectTeam = wrapper.findAllComponents({ name: 'ElSelect' }).at(-1)!;
+    const clientNavigationSelectTeam = wrapper.findAllComponents({ name: 'ElSelect' }).find(select => select.attributes('aria-label') === 'Team for new agents')!;
     expect(clientNavigationSelectTeam.props('modelValue')).toBe('team-one');
     await clientNavigationSelectTeam.vm.$emit('update:modelValue', 'team-two');
+    await wrapper.get('.claw-dialog__footer .backend-selector select').setValue('claude');
 
     await wrapper.findAll('.claw-dialog__footer button').find((button) => button.text() === 'Investigate')?.trigger('click');
-    expect(startWorkAction).toHaveBeenCalledWith({ action: 'investigate', items: [second], teamId: 'team-two' });
+    expect(startWorkAction).toHaveBeenCalledWith({ action: 'investigate', items: [second], teamId: 'team-two', backend: 'claude' });
   });
 
   it('guides unfiltered global views before loading cross-repository work', async () => {
@@ -217,6 +220,7 @@ function mountInbox(
   startWorkAction = vi.fn().mockResolvedValue(undefined),
 ) {
   return mount(CockpitWorkInbox, {
+    global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } },
     props: {
       agents: [agent('agent-one', 'Dina'), agent('agent-two', 'Jesse')], assignments,
       connection: { provider: 'github', status: 'connected', accountLabel: 'nicolas' },

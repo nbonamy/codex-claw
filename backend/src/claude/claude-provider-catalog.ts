@@ -1,4 +1,4 @@
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { claudeWorkingDirectory } from './working-directory';
 import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { BackendEvent, BackendPermissionModeResult } from '@codex-claw/core/backend-driver';
 import type {
@@ -71,7 +71,7 @@ export class ClaudeProviderCatalog {
       await this.modelCatalogDiscovery;
       return;
     }
-    const discovery = this.options.transport.discoverModels({ cwd: requireAgentFolder(agent) })
+    const discovery = this.options.transport.discoverModels({ cwd: claudeWorkingDirectory(agent) })
       .then((availableModels) => {
         if (availableModels?.length) this.applyModels(availableModels);
       })

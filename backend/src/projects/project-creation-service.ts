@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentCreationProgress, BackendDefaults, SourceRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AgentCreationProgress, BackendDefaults, SourceRepository } from '@codex-claw/core/contracts';
 import { requireRepositoryName } from '../create-source-repository';
 
 export type ProjectCreationInput = {
   name: string;
   teamId: string;
+  backend?: AgentBackend;
   backendDefaults?: BackendDefaults;
   prompt?: string;
 };
@@ -21,6 +22,7 @@ export class ProjectCreationService {
     createAgent(input: {
       repository: SourceRepository;
       teamId: string;
+      backend?: AgentBackend;
       backendDefaults?: BackendDefaults;
     }): Promise<Agent>;
     startAgent(agent: Agent, prompt: string): Promise<void>;
@@ -31,7 +33,7 @@ export class ProjectCreationService {
     const progress: AgentCreationProgress = {
       id: `project-creation-${randomUUID()}`,
       state: 'running',
-      backend: 'codex',
+      backend: input.backend ?? 'codex',
       repositoryName: name,
       createWorktree: false,
       createProject: true,
@@ -62,6 +64,7 @@ export class ProjectCreationService {
       agent = await this.ports.createAgent({
         repository,
         teamId: input.teamId,
+        ...(input.backend ? { backend: input.backend } : {}),
         ...(input.backendDefaults ? { backendDefaults: input.backendDefaults } : {}),
       });
     } catch (error) {

@@ -494,7 +494,7 @@ export class ClawMcpAgentCoordinator {
     return this.onCreateAgent(agent, {
       name: input.name?.trim(),
       prompt: input.prompt?.trim() || undefined,
-      backend: input.backend ?? 'codex',
+      backend: input.backend ?? agent.backend,
       model: input.model?.trim() || undefined,
       reasoningEffort: input.reasoningEffort?.trim() || undefined,
       repoPath: input.repoPath.trim(),

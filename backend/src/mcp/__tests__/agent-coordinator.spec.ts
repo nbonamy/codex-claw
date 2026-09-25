@@ -340,7 +340,7 @@ describe('ClawMcpAgentCoordinator', () => {
       agentId: 'agent-new',
       message: 'Created',
     });
-    const { coordinator } = fixture({ onCreateSourceWorktree, onCreateAgent });
+    const { coordinator, agents } = fixture({ onCreateSourceWorktree, onCreateAgent });
 
     await coordinator.createSourceWorktree('agent-dina', {
       repoPath: ' /src/claw ',
@@ -375,6 +375,11 @@ describe('ClawMcpAgentCoordinator', () => {
       prompt: 'Fix the flaky test.',
       teamId: 'team-codex-claw',
     });
+    agents[0]!.backend = 'claude';
+    await coordinator.createAgent('agent-dina', { repoPath: '/src/claw' });
+    expect(onCreateAgent).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ backend: 'claude' }));
+    await coordinator.createAgent('agent-dina', { repoPath: '/src/claw', backend: 'codex' });
+    expect(onCreateAgent).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ backend: 'codex' }));
   });
 
   it('reports unavailable agent creation', async () => {

@@ -14,6 +14,7 @@ describe('agent chat service', () => {
     const backendDriver = createFakeBackendDriver(completion.promise, 'claude');
     const events: MainToRendererEvent[] = [];
 
+    expect(snapshot.agents[0].hasSubmittedPrompt).toBeUndefined();
     const result = sendAgentPrompt(snapshot, backendDriver, 'agent-dina', ' hello ', undefined, (event) => {
       const fullEvent = {
         ...event,
@@ -23,6 +24,7 @@ describe('agent chat service', () => {
       events.push(fullEvent);
       applyMainEventToSnapshot(snapshot, fullEvent);
     });
+    expect(snapshot.agents[0].hasSubmittedPrompt).toBe(true);
 
     expect(result).toBe(snapshot);
     expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({

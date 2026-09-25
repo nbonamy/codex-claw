@@ -179,6 +179,10 @@ Skill listing is filesystem-derived: Claw reads user skills from `~/.claude/skil
 and project skills from `<agent-folder>/.claude/skills`, parses each
 `SKILL.md` frontmatter, and lets project skills override global skills with the
 same name.
+Folderless Quick Chats use the user's home directory as Claude's runtime cwd,
+without assigning a project folder to the agent. Model discovery, turns, and
+transcript recovery use that same directory; skill discovery includes only
+user skills. Claude conversation references retain a null folder for these chats.
 Claude advertises `planMode: "prompted"`: Claw owns the composer Plan-mode
 flag, and when the renderer sends `planMode: true`, the driver keeps the prompt
 text unchanged and starts the Agent SDK turn with its native `permissionMode:

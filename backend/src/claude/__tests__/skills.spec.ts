@@ -90,6 +90,9 @@ describe('listClaudeSkills', () => {
 
     const skills = await listClaudeSkills(agentForFolder(repoDir), { homeDir });
 
+    await expect(listClaudeSkills({ ...agentForFolder(repoDir), folder: null, sessionKind: 'quickChat' }, { homeDir }))
+      .resolves.toEqual([expect.objectContaining({ name: 'reviewer', description: 'Global reviewer.', scope: 'user' })]);
+
     expect(skills).toStrictEqual([
       expect.objectContaining({
         description: 'Repo reviewer.',

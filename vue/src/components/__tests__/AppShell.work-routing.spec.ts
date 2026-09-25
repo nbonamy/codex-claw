@@ -275,10 +275,10 @@ describe('AppShell work routing', () => {
     const dialog = wrapper.getComponent({ name: 'NewProjectDialog' });
     expect(dialog.props('visible')).toBe(true);
 
-    dialog.vm.$emit('create', 'fresh-project');
+    dialog.vm.$emit('create', 'fresh-project', 'claude');
     await flushPromises();
 
-    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-codex-claw' });
+    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-codex-claw', backend: 'claude' });
     expect(dialog.props('visible')).toBe(false);
   });
 
@@ -292,7 +292,7 @@ describe('AppShell work routing', () => {
     wrapper.getComponent({ name: 'NewProjectDialog' }).vm.$emit('create', 'fresh-project');
     await flushPromises();
 
-    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-remote' });
+    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-remote', backend: 'codex' });
   });
 
   it('browses and opens existing folders on the active remote team devbox', async () => {
@@ -756,9 +756,9 @@ describe('AppShell work routing', () => {
 
     await wrapper.get('[aria-label="Backlog"]').trigger('click');
     const startWorkItemsAction = wrapper.findComponent({ name: 'BacklogView' }).props('startWorkItemsAction') as (input: {
-      action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string;
+      action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend'];
     }) => Promise<void>;
-    await startWorkItemsAction({ action: 'fix', items: [first, second], teamId: 'team-codex-claw' });
+    await startWorkItemsAction({ action: 'fix', items: [first, second], teamId: 'team-codex-claw', backend: 'claude' });
 
     expect(createSourceWorktree).toHaveBeenNthCalledWith(1, {
       repoPath: '/Users/nbonamy/src/codex-claw',
@@ -769,12 +769,14 @@ describe('AppShell work routing', () => {
       branchName: 'fix/gh-13',
     });
     expect(createAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      backend: 'claude',
       name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
       sourceRepositoryName: 'codex-claw',
       teamId: 'team-codex-claw',
     }));
     expect(createAgent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      backend: 'claude',
       name: null,
       folder: '/Users/nbonamy/src/codex-claw-fix-gh-13',
       sourceRepositoryName: 'codex-claw',

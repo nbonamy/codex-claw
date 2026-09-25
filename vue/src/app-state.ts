@@ -1072,6 +1072,7 @@ export function useAppState() {
     }
 
     adoptBackgroundSnapshot(await codexClawApi.updateAgent(input));
+    if (input.backend) synchronizeComposerSelectionForAgent(input.id);
     await loadActiveAgentCatalogs();
   }
 

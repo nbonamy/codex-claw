@@ -9,6 +9,7 @@ export type CodeReviewScope =
 export type CodeReviewThreadMode = 'current' | 'independent';
 
 export type CodeReviewStartInput = {
+  backend?: 'codex' | 'claude';
   scope: CodeReviewScope;
   threadMode: CodeReviewThreadMode;
 };
@@ -200,7 +201,8 @@ export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSe
 }
 
 export function isCodeReviewStartInput(value: unknown): value is CodeReviewStartInput {
-  return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode);
+  return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode)
+    && (value.backend === undefined || value.backend === 'codex' || value.backend === 'claude');
 }
 
 export function isCodeReviewDecisionInput(value: unknown): value is CodeReviewDecisionInput {

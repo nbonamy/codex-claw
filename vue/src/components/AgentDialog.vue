@@ -112,23 +112,6 @@
         </div>
       </FormDialogField>
 
-      <FormDialogField
-        v-if="!isEditing && claudeCodeEnabled"
-        :label="$t('surface.agentDialog.codingAgent')"
-        label-for="agent-dialog-backend"
-      >
-        <div class="claw-form-dialog__control">
-          <el-select
-            id="agent-dialog-backend"
-            v-model="backend"
-            :aria-label="$t('surface.agentDialog.codingAgent')"
-          >
-            <el-option :label="$t('surface.agentDialog.codex')" value="codex" />
-            <el-option :label="$t('surface.agentDialog.claudeCode')" value="claude" />
-          </el-select>
-        </div>
-      </FormDialogField>
-
       <el-alert
         v-if="errorMessage"
         :title="errorMessage"
@@ -139,6 +122,7 @@
     </form>
 
     <NewSourceWorktreeDialog
+      v-model:backend="backend"
       :choose-destination="chooseSourceWorktreeDestination"
       :create-worktree="createSourceWorktree"
       :repo="selectedSourceRepository"
@@ -157,6 +141,9 @@
       @select="selectRemoteFolder"
     />
 
+    <template #footer-left>
+      <BackendSelector v-if="!isEditing" id="agent-dialog-backend" v-model="backend" :disabled="submitting" />
+    </template>
     <template #footer>
       <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
       <button
@@ -187,6 +174,7 @@ import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import BackendSelector from './BackendSelector.vue';
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 
@@ -197,7 +185,6 @@ export type AgentDialogCreateInput = CreateAgentInput & {
 
 const props = withDefaults(defineProps<{
   agent: Agent | null;
-  claudeCodeEnabled?: boolean;
   chooseAgentFolder: () => Promise<string | null>;
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
@@ -221,7 +208,6 @@ const props = withDefaults(defineProps<{
   updateAgent: (input: UpdateAgentInput) => Promise<void>;
   visible: boolean;
 }>(), {
-  claudeCodeEnabled: false,
   initialAgentName: '',
   initialNewTeamName: '',
   initialNewWorktreeBranchName: '',

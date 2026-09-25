@@ -1,4 +1,6 @@
 import { mount } from '@vue/test-utils';
+import { computed } from 'vue';
+import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it } from 'vitest';
 import type { WorkItem } from '@codex-claw/core/contracts';
 import WorkItemAssignmentPicker from '../WorkItemAssignmentPicker.vue';
@@ -27,6 +29,7 @@ describe('WorkItemAssignmentPicker', () => {
         branchName: 'fix/gh-24',
         sessions: [{ agentId: 'agent-main', label: 'main · main' }],
       },
+      global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } },
     });
 
     const destinationButtons = wrapper.findAll('.work-item-assignment-picker__target-options button');
@@ -40,11 +43,14 @@ describe('WorkItemAssignmentPicker', () => {
     expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-24');
     expect(wrapper.find('.work-item-assignment-picker__workspace').text()).not.toContain('Workspace');
     expect(wrapper.find('.work-item-assignment-picker__workspace').text()).not.toContain('New worktree');
+    await wrapper.get('.backend-selector select').setValue('claude');
     await wrapper.get('.claw-button--primary').trigger('click');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
-      { action: 'fix', destination: 'new', item: issue },
+      { action: 'fix', destination: 'new', item: issue, backend: 'claude' },
     ]]);
+    await destinationButtons[1]!.trigger('click');
+    expect(wrapper.find('.backend-selector').exists()).toBe(false);
   });
 
   it('assigns an existing repository session without offering a worktree', async () => {
@@ -99,7 +105,7 @@ describe('WorkItemAssignmentPicker', () => {
     await wrapper.get('.claw-button--primary').trigger('click');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
-      { action: 'fix', destination: 'new', item: issue, reuseExisting: true },
+      { action: 'fix', destination: 'new', item: issue, reuseExisting: true, backend: 'codex' },
     ]]);
   });
 });

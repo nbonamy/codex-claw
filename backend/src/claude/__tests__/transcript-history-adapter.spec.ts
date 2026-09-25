@@ -1,6 +1,6 @@
 import { mkdir, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
 import type { Agent } from '@codex-claw/core/contracts';
@@ -224,9 +224,9 @@ describe('claudeTranscriptSettings', () => {
 });
 
 describe('loadClaudeTranscriptHistory', () => {
-  it('loads the transcript for a persisted Claude session from the project directory', async () => {
-    const projectsRoot = path.join(tmpdir(), `codex-claw-claude-history-${Date.now()}`);
-    const projectDirectory = path.join(projectsRoot, '-Users-nbonamy-src-id8');
+  it.each(['/Users/nbonamy/src/id8', null])('loads a persisted Claude session with folder %s', async (folder) => {
+    const projectsRoot = path.join(tmpdir(), `codex-claw-claude-history-${Date.now()}-${folder ? 'project' : 'chat'}`);
+    const projectDirectory = path.join(projectsRoot, (folder ?? homedir()).replaceAll(path.sep, '-'));
     await mkdir(projectDirectory, { recursive: true });
     await writeFile(path.join(projectDirectory, 'session-1.jsonl'), [
       JSON.stringify({
@@ -246,7 +246,7 @@ describe('loadClaudeTranscriptHistory', () => {
     const agent: Agent = {
       id: 'agent-claude',
       name: 'Claude',
-      folder: '/Users/nbonamy/src/id8',
+      folder,
       backend: 'claude',
       backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' },
       status: { type: 'idle' },
@@ -274,6 +274,9 @@ describe('loadClaudeTranscriptHistory', () => {
         }),
       ],
     });
+    await expect(listClaudeTranscriptSummaries(agent, { projectsRoot })).resolves.toEqual([
+      expect.objectContaining({ ref: { backend: 'claude', folder, sessionId: 'session-1' } }),
+    ]);
   });
 });
 

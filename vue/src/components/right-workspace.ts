@@ -12,6 +12,7 @@ export type RightWorkspaceDiffPanel = SidePanelGitDiffState;
 export type RightWorkspaceImagePanel = SidePanelImageState;
 
 export type RepositoryWorkStartInput = {
+  backend?: import('@codex-claw/core/contracts').AgentBackend;
   action: WorkItemAssignmentAction;
   item: WorkItem;
   target: 'current' | 'duplicate';

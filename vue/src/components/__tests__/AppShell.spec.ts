@@ -837,6 +837,7 @@ describe('AppShell authentication and conversation', () => {
     await flushPromises();
 
     expect(startCodeReview).toHaveBeenCalledExactlyOnceWith(source.id, {
+      backend: 'codex',
       scope: { type: 'uncommitted' },
       threadMode: 'independent',
     });

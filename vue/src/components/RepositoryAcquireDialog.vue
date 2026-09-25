@@ -1,10 +1,46 @@
 <template>
+  <FormDialog
+    v-if="mode === 'url'"
+    class="repository-acquire-dialog"
+    :model-value="visible"
+    :title="t('repositories.acquire.cloneRepository')"
+    @update:model-value="onVisibilityChanged"
+  >
+    <form class="claw-form-dialog" @submit.prevent="submitUrl">
+      <FormDialogField :label="t('repositories.acquire.url')" label-for="repository-acquire-url">
+        <div class="claw-form-dialog__control claw-form-dialog__input-control">
+          <input
+            id="repository-acquire-url"
+            ref="urlInput"
+            v-model="url"
+            class="claw-form-dialog__text-input"
+            type="text"
+            :aria-label="t('repositories.acquire.url')"
+            autocomplete="url"
+            :placeholder="t('repositories.acquire.urlPlaceholder')"
+            spellcheck="false"
+          >
+        </div>
+      </FormDialogField>
+      <p v-if="error" class="repository-acquire-dialog__url-error">{{ error }}</p>
+    </form>
+    <template #footer-left>
+      <BackendSelector v-model="backend" :disabled="busy" />
+    </template>
+    <template #footer>
+      <button class="claw-button claw-button--tertiary" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
+      <button class="claw-button claw-button--primary" type="button" :disabled="!canSubmitUrl || busy" @click="submitUrl">
+        {{ busy ? t('repositories.acquire.cloning') : t('repositories.acquire.cloneRepository') }}
+      </button>
+    </template>
+  </FormDialog>
   <el-dialog
+    v-else
     class="claw-dialog repository-acquire-dialog"
     :class="{ 'claw-dialog--compact': mode === 'github' }"
     :model-value="visible"
     :teleported="false"
-    :width="mode === 'url' ? '520px' : githubConnected ? '680px' : '560px'"
+    :width="githubConnected ? '680px' : '560px'"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
@@ -21,11 +57,6 @@
         >
       </div>
     </template>
-    <template v-else-if="mode === 'url'" #header>
-      <div class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">{{ t('repositories.acquire.cloneRepository') }}</h2>
-      </div>
-    </template>
     <template v-else #header>
       <span class="repository-acquire-dialog__accessible-title">{{ t('repositories.githubOnboarding.title') }}</span>
     </template>
@@ -37,26 +68,7 @@
         'repository-acquire-dialog__scroll-region': mode === 'github' && githubConnected,
       }"
     >
-      <template v-if="mode === 'url'">
-        <form class="claw-form-dialog repository-acquire-dialog__url-form" @submit.prevent="submitUrl">
-          <label class="claw-form-dialog__label" for="repository-acquire-url">{{ t('repositories.acquire.url') }}</label>
-          <div class="claw-form-dialog__control claw-form-dialog__input-control">
-            <input
-              id="repository-acquire-url"
-              ref="urlInput"
-              v-model="url"
-              class="claw-form-dialog__text-input"
-              type="url"
-              :aria-label="t('repositories.acquire.url')"
-              autocomplete="url"
-              :placeholder="t('repositories.acquire.urlPlaceholder')"
-              spellcheck="false"
-            >
-          </div>
-          <p v-if="error" class="repository-acquire-dialog__url-error">{{ error }}</p>
-        </form>
-      </template>
-      <template v-else-if="githubConnected">
+      <template v-if="githubConnected">
         <p v-if="loading" class="repository-acquire-dialog__state">{{ t('repositories.acquire.loading') }}</p>
         <p v-else-if="error" class="repository-acquire-dialog__state repository-acquire-dialog__state--error">{{ error }}</p>
         <template v-else>
@@ -111,12 +123,6 @@
       </section>
     </section>
 
-    <template v-if="mode === 'url'" #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
-      <button class="claw-button claw-button--primary" type="button" :disabled="!canSubmitUrl || busy" @click="submitUrl">
-        {{ busy ? t('repositories.acquire.cloning') : t('repositories.acquire.cloneRepository') }}
-      </button>
-    </template>
   </el-dialog>
 </template>
 
@@ -128,6 +134,10 @@ import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkReposito
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { GitHubIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
+import BackendSelector from './BackendSelector.vue';
+import FormDialog from '../shared/dialog/FormDialog.vue';
+import FormDialogField from '../shared/dialog/FormDialogField.vue';
+const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
@@ -384,11 +394,6 @@ function repositoryKindLabel(repository: WorkRepository): string {
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
   font-style: normal;
-}
-
-.repository-acquire-dialog__url-form {
-  gap: var(--space-8);
-  padding: var(--space-6) 0;
 }
 
 .repository-acquire-dialog__url-error {

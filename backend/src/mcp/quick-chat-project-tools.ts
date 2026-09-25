@@ -5,7 +5,7 @@ import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules
 
 export function createQuickChatProjectToolModuleProvider(options: {
   snapshot: AppSnapshot;
-  createProject: (agentId: string, name: string, prompt: string) => Promise<CreatedProject>;
+  createProject: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude') => Promise<CreatedProject>;
 }): ClawMcpToolModuleProvider {
   return {
     id: 'quick-chat-project',
@@ -17,15 +17,16 @@ export function createQuickChatProjectToolModuleProvider(options: {
           server.registerTool('create-project', {
             description: 'Turn this Quick Chat into a new project folder and start a project agent with a self-contained handoff. Use only when the user explicitly asks to create a project. The project is created in the configured source folder without initializing Git, and this Quick Chat remains available.',
             inputSchema: {
+              backend: z.enum(['codex', 'claude']).optional().describe('Coding backend; defaults to this Quick Chat’s backend.'),
               name: z.string().trim().min(1).describe('A single folder name for the new project.'),
               prompt: z.string().trim().min(1).describe('Self-contained first prompt for the new project agent, summarizing the agreed outcome and relevant decisions.'),
             },
-          }, ({ name, prompt }) => loggedToolResult('create-project', {
+          }, ({ name, prompt, backend }) => loggedToolResult('create-project', {
             agentId,
             name,
             promptLength: prompt.length,
           }, async () => {
-            const created = await options.createProject(agentId, name, prompt);
+            const created = await options.createProject(agentId, name, prompt, backend);
             return {
               success: true,
               agentId: created.agent.id,

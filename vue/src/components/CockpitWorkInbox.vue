@@ -225,6 +225,7 @@
 
       <template #footer>
         <div class="claw-dialog__footer">
+          <BackendSelector v-model="selectedBackend" :disabled="startingWork" class="cockpit-inbox__backend" />
           <button class="claw-button claw-button--tertiary" type="button" :disabled="startingWork" @click="closeStartWorkDialog(false)">{{ $t('surface.cockpitWorkInbox.cancel') }}</button>
           <button class="claw-button claw-button--secondary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('investigate')">{{ $t('surface.cockpitWorkInbox.investigate') }}</button>
           <button class="claw-button claw-button--primary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('fix')">{{ $t('surface.cockpitWorkInbox.fix') }}</button>
@@ -244,6 +245,7 @@ import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
+import BackendSelector from './BackendSelector.vue';
 
 type InboxView = 'all' | 'backlog' | 'wip' | 'focus';
 type SummaryFilter = 'inProgress' | 'blocked' | 'readyForReview';
@@ -272,7 +274,7 @@ const props = withDefaults(defineProps<{
   teams: Team[];
   totalItems?: number;
   defaultTeamId?: string | null;
-  startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
+  startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend'] }) => Promise<void>;
 }>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, repositoryIcons: () => ({}), searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null, totalItems: 0 });
 
 const emit = defineEmits<{
@@ -294,6 +296,7 @@ const startWorkDialogOpen = ref(false);
 const startingWork = ref(false);
 const startWorkError = ref<string | null>(null);
 const selectedTeamId = ref('');
+const selectedBackend = ref<Agent['backend']>('codex');
 const localActiveView = ref<InboxView>(props.activeView);
 const activeView = computed(() => localActiveView.value);
 const effectiveSearchQuery = ref(props.searchQuery);
@@ -494,7 +497,7 @@ async function startSelectedWork(action: 'investigate' | 'fix'): Promise<void> {
   startingWork.value = true;
   startWorkError.value = null;
   try {
-    await props.startWorkAction({ action, items, teamId: selectedTeamId.value });
+    await props.startWorkAction({ action, items, teamId: selectedTeamId.value, backend: selectedBackend.value });
     selectedItemIds.value = new Set();
     startWorkDialogOpen.value = false;
   } catch (error) {
@@ -526,6 +529,10 @@ function selectAssignee(value: unknown): void { emit('select-assignee', normaliz
 </script>
 
 <style scoped>
+.cockpit-inbox__backend {
+  margin-right: auto;
+}
+
 .cockpit-inbox {
   position: relative;
   min-height: 0;

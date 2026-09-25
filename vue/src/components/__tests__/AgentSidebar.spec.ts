@@ -1,5 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElPopover } from 'element-plus';
+import { computed } from 'vue';
+import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
 import type { Agent } from '@codex-claw/core/contracts';
@@ -64,7 +66,7 @@ describe('AgentSidebar sessions', () => {
     expect(firstSession.attributes('style') ?? '').not.toContain('display: none');
   });
 
-  it('emits repository-scoped session creation actions', async () => {
+  it('creates directly on main even with multiple backends enabled', async () => {
     const listRepositoryBranches = vi.fn().mockResolvedValue([{ name: 'main', isDefault: true, worktreePath: '~/src/id8' }]);
     const wrapper = mount(AgentSidebar, {
       props: {
@@ -73,7 +75,10 @@ describe('AgentSidebar sessions', () => {
         listRepositoryBranches,
         teamName: 'Codex Claw',
       },
-      global: { components: { ElPopover } },
+      global: {
+        components: { ElPopover },
+        provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) },
+      },
     });
 
     const sessionMenu = wrapper.findAllComponents({ name: 'ElPopover' }).find((popover) => (
@@ -81,7 +86,10 @@ describe('AgentSidebar sessions', () => {
     ));
     await sessionMenu?.vm.$emit('update:visible', true);
     await flushPromises();
-    wrapper.findAllComponents({ name: 'AppMenu' }).find((menu) => menu.props('ariaLabel') === 'New session in id8')?.vm.$emit('select', 'default-branch');
+    const menu = wrapper.findAllComponents({ name: 'AppMenu' }).find((item) => item.props('ariaLabel') === 'New session in id8')!;
+    const main = menu.findAll('[role="menuitem"]').find((item) => item.text() === 'main')!;
+    expect(main.attributes('aria-haspopup')).toBeUndefined();
+    await main.trigger('click');
     await wrapper.get('[aria-label="Create agent from branch, pull request, or issue"]').trigger('click');
 
     expect(listRepositoryBranches).toHaveBeenCalledWith({

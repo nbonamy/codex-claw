@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { nextTick } from 'vue';
+import { computed, nextTick } from 'vue';
+import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
 import AgentDialog from '../AgentDialog.vue';
 import type { Agent, CreateAgentInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
@@ -50,7 +51,8 @@ describe('AgentDialog', () => {
   it('offers Claude Code when the experimental setting is enabled', () => {
     const wrapper = mountDialog({ claudeCodeEnabled: true });
 
-    expect(wrapper.text()).toContain('Coding agent');
+    expect(wrapper.find('.claw-form-dialog__footer-left [aria-label="Coding agent"]').exists()).toBe(true);
+    expect(wrapper.find('form [aria-label="Coding agent"]').exists()).toBe(false);
     expect(wrapper.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label'))).toEqual(expect.arrayContaining([
       'Codex',
       'Claude Code',
@@ -644,6 +646,7 @@ function mountDialog(overrides: Partial<{
       ...overrides,
     },
     global: {
+      provide: { [backendChoicesKey as symbol]: computed(() => overrides.claudeCodeEnabled ? ['codex', 'claude'] : ['codex']) },
       stubs: {
         ElDialog: {
           name: 'ElDialog',
@@ -679,7 +682,7 @@ async function emitSelect(wrapper: ReturnType<typeof mountDialog>, id: string, v
       : id === 'agent-dialog-backend'
         ? selects.at(-1)
         : id === 'agent-dialog-team'
-          ? (wrapper.props('claudeCodeEnabled') ? selects.at(-2) : selects.at(-1))
+          ? (wrapper.find('#agent-dialog-backend').exists() ? selects.at(-2) : selects.at(-1))
           : undefined;
   if (!select) {
     throw new Error(`Select not found: ${id}`);

@@ -331,6 +331,7 @@ describe('RepositoryBacklogPanel', () => {
 
     expect(startWorkAction).toHaveBeenCalledWith({
       action: 'fix',
+      backend: 'codex',
       item: expect.objectContaining({ id: 'nbonamy/codex-claw#12' }),
       target: 'duplicate',
       workspace: { branchName: 'fix/gh-12', kind: 'worktree' },

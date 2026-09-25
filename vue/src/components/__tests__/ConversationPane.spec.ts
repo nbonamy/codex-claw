@@ -1,17 +1,18 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import {
   createCodexConversationPaneController,
   type CodexConversationPaneController,
   type CodexMessageTextSelection,
   type CodexNativeAttachment,
 } from '@codex-app-sdk/vue';
-import { nextTick } from 'vue';
-import { describe, expect, it } from 'vitest';
+import { computed, defineComponent, h, nextTick, provide, ref } from 'vue';
+import { describe, expect, it, vi } from 'vitest';
 import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/core/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import type { VisualizationAnnotation } from '../use-visualization-annotations';
 import { i18n } from '../../i18n';
+import { backendChoicesKey, provideBackendSwitch } from '../backend-selection';
 
 const agent: Agent = {
   id: 'agent-dina',
@@ -58,6 +59,38 @@ const executionPlan: ThreadPlan = {
 };
 
 describe('ConversationPane', () => {
+  it('switches a fresh chat without losing its draft and locks the choice after submission', async () => {
+    const selectedAgent = ref<Agent>({ ...agent });
+    const choices = ref<Agent['backend'][]>(['codex']);
+    const update = vi.fn(async (_id: string, backend: Agent['backend']) => {
+      selectedAgent.value = { ...selectedAgent.value, backend, backendDefaults: { kind: backend } };
+    });
+    const controller = controllerFor([]);
+    const wrapper = mount(defineComponent({
+      setup() {
+        provide(backendChoicesKey, computed(() => choices.value));
+        provideBackendSwitch(update);
+        return () => h(ConversationPane, { agent: selectedAgent.value, controller });
+      },
+    }));
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+    choices.value = ['codex', 'claude'];
+    await nextTick();
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(true);
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = 'Keep this idea';
+    await editor.trigger('input');
+    await wrapper.get('.backend-selector select').setValue('claude');
+    await flushPromises();
+    expect(update).toHaveBeenCalledWith(agent.id, 'claude');
+    expect(editor.element.textContent).toBe('Keep this idea');
+    expect(wrapper.get<HTMLSelectElement>('.backend-selector select').element.value).toBe('claude');
+    selectedAgent.value = { ...selectedAgent.value, hasSubmittedPrompt: true };
+    await nextTick();
+    expect(wrapper.find('.backend-selector').exists()).toBe(false);
+    expect(wrapper.find('.chat-composer-shelf').exists()).toBe(false);
+  });
+
   it('stays a thin presentation wrapper around an AppShell-owned controller', () => {
     const controller = controllerFor(messages);
     const wrapper = mountPane({ controller, agent });

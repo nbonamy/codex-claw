@@ -163,7 +163,7 @@ const props = defineProps<{
   repositoryIcons?: Record<string, string>;
   teams: Team[];
   defaultTeamId?: string | null;
-  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string }) => Promise<void>;
+  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend'] }) => Promise<void>;
   workBacklog?: CockpitWorkBacklog | null;
 }>();
 

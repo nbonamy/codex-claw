@@ -43,6 +43,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   avatar?: string;
   backend: AgentBackend;
   backendSession?: BackendSession;
+  hasSubmittedPrompt?: boolean;
   backendDefaults?: BackendDefaults;
   openInApplication?: OpenInApplication;
   gitDiffTarget?: Agent['gitDiffTarget'];
@@ -182,6 +183,7 @@ function persistedAgentFromSnapshot(agent: Agent, libraries?: RepositoryVisualiz
     ...(agent.workspace ? { workspace: { ...agent.workspace } } : {}),
     backend: agent.backend,
     ...(agent.backendSession ? { backendSession: cloneBackendSession(agent.backendSession) } : {}),
+    ...(agent.hasSubmittedPrompt ? { hasSubmittedPrompt: true } : {}),
     ...(agent.backendDefaults ? { backendDefaults: cloneBackendDefaults(agent.backendDefaults) } : {}),
     ...(agent.openInApplication ? { openInApplication: agent.openInApplication } : {}),
     ...(agent.gitDiffTarget ? { gitDiffTarget: { ...agent.gitDiffTarget } } : {}),
@@ -427,6 +429,7 @@ function sanitizeAgent(value: unknown, libraries: RepositoryVisualizations): Age
     ...(workspace ? { workspace } : {}),
     backend,
     ...(backendSession ? { backendSession } : {}),
+    ...(value.hasSubmittedPrompt === true ? { hasSubmittedPrompt: true } : {}),
     ...(backendDefaults ? { backendDefaults } : {}),
     ...(openInApplication ? { openInApplication } : {}),
     ...(gitDiffTarget ? { gitDiffTarget } : {}),
@@ -1184,8 +1187,7 @@ function sanitizeBackendConversationRef(value: unknown): Partial<Pick<Automation
 
   if (
     value.backend === 'claude' &&
-    typeof value.folder === 'string' &&
-    value.folder.trim() &&
+    (value.folder === null || (typeof value.folder === 'string' && value.folder.trim())) &&
     typeof value.sessionId === 'string' &&
     value.sessionId.trim()
   ) {

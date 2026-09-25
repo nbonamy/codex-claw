@@ -77,7 +77,7 @@ export class CodeReviewService {
 
     const reviewer = input.threadMode === 'current'
       ? agent
-      : this.createIndependentReviewer(agent);
+      : this.createIndependentReviewer(agent, input.backend ?? agent.backend);
     if (current?.status === 'failed') this.closeReviewToolContext(current);
     const session = this.newSession(agent, reviewer, input);
     const firstRound = activeCodeReviewRound(session);
@@ -520,18 +520,18 @@ export class CodeReviewService {
     };
   }
 
-  private createIndependentReviewer(target: Agent): Agent {
-    const sourceDefaults = target.backendDefaults?.kind === target.backend
+  private createIndependentReviewer(target: Agent, backend: Agent['backend']): Agent {
+    const sourceDefaults = target.backendDefaults?.kind === backend
       ? target.backendDefaults
       : undefined;
     const reviewer = this.options.createAgent({
       name: 'Review',
       folder: target.folder ?? '',
       avatar: target.avatar,
-      backend: target.backend,
+      backend,
       backendDefaults: {
         ...sourceDefaults,
-        kind: target.backend,
+        kind: backend,
       },
       teamId: target.teamId,
     }, { select: false, afterAgentId: target.id });

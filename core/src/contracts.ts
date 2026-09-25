@@ -349,6 +349,8 @@ export type Agent = {
   workspace?: AgentWorkspaceIdentity;
   backend: AgentBackend;
   backendSession?: BackendSession;
+  /** Locks provider choice as soon as the first prompt is admitted. */
+  hasSubmittedPrompt?: boolean;
   backendDefaults?: BackendDefaults;
   openInApplication?: OpenInApplication;
   gitDiffTarget?: AgentGitDiffTarget;
@@ -682,6 +684,7 @@ export type CreateAgentInput = {
 };
 
 export type CreateQuickChatInput = {
+  backend?: AgentBackend;
   teamId?: string;
 };
 
@@ -707,6 +710,7 @@ export type ReorderTeamsInput = {
 
 export type UpdateAgentInput = {
   id: string;
+  backend?: AgentBackend;
   name?: string | null;
   gitDiffTarget?: AgentGitDiffTarget | null;
 };

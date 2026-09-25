@@ -29,6 +29,7 @@ export function sendAgentPrompt(
     return snapshot;
   }
 
+  agent.hasSubmittedPrompt = true;
   const promptResult = backendDriver.tryHandlePromptCommand?.(agent, trimmedPrompt) ?? null;
   const hadBackendSession = Boolean(agent.backendSession);
 

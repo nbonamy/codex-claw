@@ -19,6 +19,7 @@ import { AsyncCatalogCache, type AsyncCatalogEntry, type AsyncCatalogStatus } fr
 import { codexClawApi } from './platform-api';
 
 type AgentComposerConfiguration = {
+  backend: Agent['backend'] | undefined;
   selectionSource: string;
   models: BackendModelOption[];
   modelStatus: AsyncCatalogStatus;
@@ -82,6 +83,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     }
     const selection = selectionFromAgent(agent);
     const created: AgentComposerConfiguration = {
+      backend: agent?.backend,
       selectionSource: selection.source,
       models: [],
       modelStatus: 'notLoaded',
@@ -202,7 +204,8 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
 
   async function loadActive(agentId = snapshot().activeAgentId): Promise<void> {
     if (!agentId) return;
-    const existing = loadsByAgentId.get(agentId);
+    const key = `${agentId}:${snapshot().agents.find(agent => agent.id === agentId)?.backend}`;
+    const existing = loadsByAgentId.get(key);
     if (existing) return existing;
     const load = Promise.all([
       loadModels(agentId),
@@ -210,9 +213,9 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
       loadSkills(agentId),
       loadFiles(agentId),
     ]).then(() => undefined).finally(() => {
-      if (loadsByAgentId.get(agentId) === load) loadsByAgentId.delete(agentId);
+      if (loadsByAgentId.get(key) === load) loadsByAgentId.delete(key);
     });
-    loadsByAgentId.set(agentId, load);
+    loadsByAgentId.set(key, load);
     await load;
   }
 
@@ -398,11 +401,12 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     load: () => Promise<Value[]>;
     sync: (agentId: string, entry: AsyncCatalogEntry<Value>) => void;
   }): Promise<void> {
+    const backend = snapshot().agents.find(agent => agent.id === catalog.agentId)?.backend;
     const entry = catalog.cache.load(catalog.key, catalog.source, catalog.load);
     catalog.sync(catalog.agentId, entry);
     if (catalog.agentId === snapshot().activeAgentId) restore(catalog.agentId);
     await entry.promise;
-    if (catalog.session !== codexClawApi) return;
+    if (catalog.session !== codexClawApi || snapshot().agents.find(agent => agent.id === catalog.agentId)?.backend !== backend) return;
     catalog.sync(catalog.agentId, entry);
     if (catalog.agentId === snapshot().activeAgentId) restore(catalog.agentId);
   }
@@ -584,6 +588,17 @@ function selectionFromAgent(agent: Agent | undefined): {
 function synchronizeSelectionWithAgent(configuration: AgentComposerConfiguration, agent: Agent): void {
   const selection = selectionFromAgent(agent);
   if (configuration.selectionSource === selection.source) return;
+  if (configuration.backend !== agent.backend) {
+    configuration.models = [];
+    configuration.modelStatus = 'notLoaded';
+    configuration.modelError = null;
+    configuration.skills = [];
+    configuration.plugins = [];
+    configuration.skillStatus = 'notLoaded';
+    configuration.skillError = null;
+    configuration.planMode = false;
+  }
+  configuration.backend = agent.backend;
   configuration.selectionSource = selection.source;
   configuration.selectedModelId = selection.model;
   configuration.selectedReasoningEffort = selection.reasoningEffort;

@@ -1,4 +1,3 @@
-import { requireAgentFolder } from './agent-folder';
 import type { Agent, BackendConversationRef } from './contracts';
 
 export function conversationRefFromAgent(agent: Agent): BackendConversationRef | null {
@@ -8,7 +7,7 @@ export function conversationRefFromAgent(agent: Agent): BackendConversationRef |
   if (agent.backendSession?.kind === 'claude') {
     return {
       backend: 'claude',
-      folder: requireAgentFolder(agent),
+      folder: agent.folder,
       sessionId: agent.backendSession.transcriptSessionId ?? agent.backendSession.sessionId,
     };
   }

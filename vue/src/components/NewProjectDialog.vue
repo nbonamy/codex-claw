@@ -29,6 +29,9 @@
       />
     </form>
 
+    <template #footer-left>
+      <BackendSelector v-model="backend" :disabled="busy" />
+    </template>
     <template #footer>
       <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="close">
         {{ t('newProjectDialog.cancel') }}
@@ -51,6 +54,8 @@ import { nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import BackendSelector from './BackendSelector.vue';
+import type { AgentBackend } from '@codex-claw/core/contracts';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
@@ -63,11 +68,12 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  create: [name: string];
+  create: [name: string, backend: AgentBackend];
 }>();
 
 const { t } = useI18n();
 const name = ref('');
+const backend = ref<AgentBackend>('codex');
 const nameInput = ref<HTMLInputElement | null>(null);
 const validationError = ref<string | null>(null);
 
@@ -95,7 +101,7 @@ function submit(): void {
     return;
   }
   validationError.value = null;
-  emit('create', projectName);
+  emit('create', projectName, backend.value);
 }
 </script>
 

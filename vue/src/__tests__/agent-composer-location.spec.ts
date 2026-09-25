@@ -4,6 +4,28 @@ import { createAgentComposerState } from '../agent-composer-state';
 import { stubElectronTestWindow } from '../test/client';
 
 describe('composer catalog locations', () => {
+  it('keeps a fresh backend switch isolated from an outstanding old-provider catalog', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    snapshot.activeAgentId = agent.id;
+    const model = (id: string) => ({ id, model: id, displayName: id, isDefault: true });
+    let finishCodex!: (models: ReturnType<typeof model>[]) => void;
+    const oldModels = new Promise<ReturnType<typeof model>[]>(resolve => { finishCodex = resolve; });
+    stubElectronTestWindow({ codexClaw: {
+      listBackendModels: vi.fn(() => agent.backend === 'codex' ? oldModels : Promise.resolve([model('sonnet')])),
+    } });
+    const composer = createAgentComposerState({ getSnapshot: () => snapshot });
+    const oldLoad = composer.loadModels(agent.id);
+    agent.backend = 'claude';
+    agent.backendDefaults = { kind: 'claude' };
+    composer.synchronizeAgentSelection(agent.id);
+    await composer.loadModels(agent.id);
+    expect(composer.selectedModelId.value).toBe('sonnet');
+    finishCodex([model('codex-model')]);
+    await oldLoad;
+    expect(composer.backendModels.value.map(item => item.id)).toStrictEqual(['sonnet']);
+    expect(composer.resolvePromptOptions(agent.id, 'hello')?.model).toBe('sonnet');
+  });
   it('keeps local and SSH models separate, including pushed catalog updates', async () => {
     const snapshot = createInitialSnapshot();
     const local = snapshot.agents[0]!;

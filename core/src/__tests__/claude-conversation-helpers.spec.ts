@@ -70,9 +70,9 @@ describe('provider conversation boundaries', () => {
       backend: 'claude', folder: '/repo', sessionId: 'session-live',
     });
     expect(conversationRefFromAgent(agent())).toBeNull();
-    expect(() => conversationRefFromAgent({
+    expect(conversationRefFromAgent({
       ...agent({ kind: 'claude', sessionId: 'session-live', transport: 'stdio' }), folder: null,
-    })).toThrow('does not have a project workspace');
+    })).toStrictEqual({ backend: 'claude', folder: null, sessionId: 'session-live' });
   });
 
   it('unwraps provider frames and preserves ordinary app-owned events', () => {

@@ -135,7 +135,7 @@ describe('RepositorySessionSourceDialog', () => {
 
     await wrapper.get('.claw-button--primary').trigger('click');
     expect(wrapper.emitted('start-work-item')).toStrictEqual([[
-      { action: 'fix', destination: 'new', item: issue },
+      { action: 'fix', destination: 'new', item: issue, backend: 'codex' },
     ]]);
   });
 

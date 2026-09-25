@@ -68,6 +68,16 @@ function reviewer(test: ReturnType<typeof harness>, session: { reviewerAgentId: 
 }
 
 describe('CodeReviewService', () => {
+  it('uses a selected reviewer backend without copying the source provider settings', () => {
+    const test = harness([]);
+    test.snapshot.general.claudeCodeEnabled = true;
+    test.owner.backendDefaults = { kind: 'codex', model: 'codex-model', reasoningEffort: 'high' };
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent', backend: 'claude',
+    });
+    expect(reviewer(test, session)).toMatchObject({ backend: 'claude', backendDefaults: { kind: 'claude' } });
+    expect(reviewer(test, session).backendDefaults).toStrictEqual({ kind: 'claude' });
+  });
   it('creates an independent reviewer as a normal adjacent agent for the same workspace', async () => {
     const test = harness([async () => ({ text: '' })]);
     const neighbor = agent('neighbor');
