@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it } from 'vitest';
 import type { WorkRepository } from '@codex-claw/core/contracts';
@@ -126,10 +126,15 @@ describe('RepositoryAcquireDialog', () => {
   });
 
   it('validates and submits an explicit repository URL', async () => {
+    const choices = ref<('codex' | 'claude')[]>(['codex']);
     const wrapper = mount(RepositoryAcquireDialog, {
       props: { visible: true, mode: 'url', connection: { provider: 'github', status: 'connected' } },
-      global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } },
+      global: { provide: { [backendChoicesKey as symbol]: computed(() => choices.value) } },
     });
+    await flushPromises();
+
+    expect(wrapper.find('.claw-form-dialog__footer-left').exists()).toBe(false);
+    choices.value = ['codex', 'claude'];
     await flushPromises();
 
     expect(wrapper.find('.repository-acquire-dialog__search').exists()).toBe(false);

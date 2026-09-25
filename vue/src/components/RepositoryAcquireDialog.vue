@@ -24,7 +24,7 @@
       </FormDialogField>
       <p v-if="error" class="repository-acquire-dialog__url-error">{{ error }}</p>
     </form>
-    <template #footer-left>
+    <template v-if="backendChoices.length > 1" #footer-left>
       <BackendSelector v-model="backend" :disabled="busy" />
     </template>
     <template #footer>
@@ -135,6 +135,8 @@ import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { GitHubIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
 import BackendSelector from './BackendSelector.vue';
+import { useBackendChoices } from './backend-selection';
+const backendChoices = useBackendChoices();
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });

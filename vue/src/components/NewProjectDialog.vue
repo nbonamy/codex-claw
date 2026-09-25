@@ -29,7 +29,7 @@
       />
     </form>
 
-    <template #footer-left>
+    <template v-if="backendChoices.length > 1" #footer-left>
       <BackendSelector v-model="backend" :disabled="busy" />
     </template>
     <template #footer>
@@ -55,6 +55,8 @@ import { useI18n } from 'vue-i18n';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import BackendSelector from './BackendSelector.vue';
+import { useBackendChoices } from './backend-selection';
+const backendChoices = useBackendChoices();
 import type { AgentBackend } from '@codex-claw/core/contracts';
 
 const props = withDefaults(defineProps<{

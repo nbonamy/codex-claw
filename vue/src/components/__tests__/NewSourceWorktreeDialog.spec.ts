@@ -51,6 +51,7 @@ describe('NewSourceWorktreeDialog', () => {
       path: '/Users/nbonamy/src/codex-claw-fix-source-folder',
     });
     const wrapper = mountDialog({ chooseDestination, createWorktree });
+    expect(wrapper.find('.claw-form-dialog__footer-left').exists()).toBe(false);
 
     expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
       ['claw-button', 'claw-button--tertiary'],

@@ -39,6 +39,7 @@ describe('AgentDialog', () => {
     expect(wrapper.text()).not.toContain('Resolved path');
     expect(wrapper.text()).not.toContain('Coding agent');
     expect(wrapper.find('#agent-dialog-backend').exists()).toBe(false);
+    expect(wrapper.find('.claw-form-dialog__footer-left').exists()).toBe(false);
     expect(wrapper.get('#agent-dialog-name').attributes('placeholder')).toBe('Optional');
     expect(wrapper.findAllComponents({ name: 'ElOption' })[0]?.props('label')).toBe('Choose folder...');
     expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([

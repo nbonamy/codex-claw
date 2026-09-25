@@ -82,7 +82,7 @@
       </template>
     </form>
 
-    <template #footer-left>
+    <template v-if="backendChoices.length > 1" #footer-left>
       <BackendSelector v-model="backend" :disabled="creating" />
     </template>
     <template #footer>
@@ -113,6 +113,8 @@ import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 import BackendSelector from './BackendSelector.vue';
+import { useBackendChoices } from './backend-selection';
+const backendChoices = useBackendChoices();
 const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
 
 const props = withDefaults(defineProps<{

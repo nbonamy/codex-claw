@@ -141,7 +141,7 @@
       @select="selectRemoteFolder"
     />
 
-    <template #footer-left>
+    <template v-if="!isEditing && backendChoices.length > 1" #footer-left>
       <BackendSelector v-if="!isEditing" id="agent-dialog-backend" v-model="backend" :disabled="submitting" />
     </template>
     <template #footer>
@@ -175,6 +175,8 @@ import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, 
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import BackendSelector from './BackendSelector.vue';
+import { useBackendChoices } from './backend-selection';
+const backendChoices = useBackendChoices();
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 

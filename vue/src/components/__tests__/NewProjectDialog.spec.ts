@@ -14,6 +14,7 @@ describe('NewProjectDialog', () => {
       global: { stubs: { ElDialog: dialogStub } },
     });
 
+    expect(wrapper.find('.claw-form-dialog__footer-left').exists()).toBe(false);
     await wrapper.get('#new-project-name').setValue('  fresh-project  ');
     await wrapper.get('.claw-button--primary').trigger('click');
 
