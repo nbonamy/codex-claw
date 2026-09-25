@@ -374,8 +374,11 @@ export class ClawBackendServer {
           restartAgentConversation(this.snapshot, agent.id);
           this.agentRequests.clearAgent(agent.id);
         },
-        deleteReviewer: async (agent) => {
+        deleteReviewer: async (agent, handoff) => {
           await this.disposeAndReleaseReviewConversation(agent);
+          if (handoff && this.sendAgentMessage) {
+            this.sendAgentMessage(agent.id, handoff.targetAgentId, handoff.content);
+          }
           closeAgentInSnapshot(this.snapshot, agent.id);
           delete this.snapshot.agentGitStatuses[agent.id];
           this.agentRequests.clearAgent(agent.id);

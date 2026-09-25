@@ -24,6 +24,7 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
   const turns: Array<{ prompt: string; reviewerSession?: BackendSession }> = [];
   const reset: string[] = [];
   const deleted: string[] = [];
+  const handoffs: Array<{ from: string; to: string; content: string }> = [];
   const changed = vi.fn();
   const agentCreation = new AgentCreationService(snapshot);
   const tools: CodeReviewToolPort = {
@@ -49,14 +50,15 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
       reset.push(reviewer.id);
       delete reviewer.backendSession;
     },
-    deleteReviewer: async (reviewer) => {
+    deleteReviewer: async (reviewer, handoff) => {
       deleted.push(reviewer.id);
       await deleteReviewer(reviewer);
+      if (handoff) handoffs.push({ from: reviewer.id, to: handoff.targetAgentId, content: handoff.content });
       snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== reviewer.id);
     },
     changed,
   });
-  return { owner, snapshot, service, turns, reset, deleted, changed };
+  return { owner, snapshot, service, turns, reset, deleted, handoffs, changed };
 }
 
 function reviewer(test: ReturnType<typeof harness>, session: { reviewerAgentId: string }): Agent {
@@ -121,6 +123,7 @@ describe('CodeReviewService', () => {
 
     expect(test.snapshot.agents).toStrictEqual([test.owner]);
     expect(test.deleted).toStrictEqual([visibleReviewer.id]);
+    expect(test.handoffs).toStrictEqual([]);
   });
 
   it('retains an independent review ledger when its visible reviewer cannot be deleted', async () => {
@@ -138,6 +141,25 @@ describe('CodeReviewService', () => {
 
     expect(visibleReviewer.codeReview).toBe(session);
     expect(session.status).toBe('readyToFinish');
+    expect(test.handoffs).toStrictEqual([]);
+  });
+
+  it('notifies the original thread when an independent review finishes without fixes', async () => {
+    const test = harness([async () => ({ text: '' })]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
+
+    test.service.submit(visibleReviewer, session.id);
+    await test.service.finish(visibleReviewer, session.id);
+
+    expect(test.handoffs).toStrictEqual([{
+      from: visibleReviewer.id,
+      to: test.owner.id,
+      content: 'Independent review completed. No findings were remediated. Please give the user a concise update.\nNo reply to the reviewer is needed.',
+    }]);
   });
 
   it('retries a failed independent review against the original target in the same visible reviewer', async () => {
@@ -182,7 +204,7 @@ describe('CodeReviewService', () => {
     const initialPrompt = test.turns[0]!.prompt;
     const contextEnd = initialPrompt.indexOf('</context>');
     expect(initialPrompt.slice(0, contextEnd)).toContain('the current branch against origin/main');
-    expect(initialPrompt.slice(0, contextEnd)).toContain('respond with exactly "Review complete." and end the turn');
+    expect(initialPrompt.slice(0, contextEnd)).toContain('end the turn with a natural summary of one or two short sentences');
     expect(initialPrompt.slice(contextEnd + '</context>'.length).trim()).toBe(
       'Review the current branch against origin/main.',
     );
@@ -197,6 +219,7 @@ describe('CodeReviewService', () => {
     await test.service.finish(test.owner, session.id);
     expect(test.reset).toStrictEqual([]);
     expect(test.deleted).toStrictEqual([]);
+    expect(test.handoffs).toStrictEqual([]);
   });
 
   it('carries skipped findings from every prior round inside the reviewer context', async () => {
@@ -340,6 +363,11 @@ describe('CodeReviewService', () => {
     await test.service.finish(visibleReviewer, session.id);
     expect(test.deleted).toStrictEqual([visibleReviewer.id]);
     expect(test.snapshot.agents).toStrictEqual([test.owner]);
+    expect(test.handoffs).toStrictEqual([{
+      from: visibleReviewer.id,
+      to: test.owner.id,
+      content: 'Independent review completed. Please give the user a concise update with these remediated findings:\n- P0 — Authorize before writing\nNo reply to the reviewer is needed.',
+    }]);
   });
 
   it('keeps one review tool URL alive when the provider caches it for the reviewer thread', async () => {
@@ -443,6 +471,13 @@ describe('CodeReviewService', () => {
     await vi.waitFor(() => expect(round.findings.map((finding) => finding.remediation.state)).toEqual(['fixed', 'fixed']));
     expect(session.status).toBe('readyToFinish');
     expect(test.turns).toHaveLength(2);
+    await test.service.finish(visibleReviewer, session.id);
+    expect(test.turns).toHaveLength(2);
+    expect(test.handoffs).toStrictEqual([{
+      from: visibleReviewer.id,
+      to: test.owner.id,
+      content: 'Independent review completed. Please give the user a concise update with these remediated findings:\n- P2 — First\n- P2 — Second\nNo reply to the reviewer is needed.',
+    }]);
   });
 
   it('rejects new findings after the review turn has entered remediation', async () => {

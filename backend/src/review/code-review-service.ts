@@ -32,7 +32,7 @@ export type CodeReviewServiceOptions = {
     reviewerSession?: BackendSession,
   ): Promise<BackendCodeReviewResult>;
   resetReviewer(agent: Agent): Promise<void>;
-  deleteReviewer(agent: Agent): Promise<void>;
+  deleteReviewer(agent: Agent, handoff?: { targetAgentId: string; content: string }): Promise<void>;
   changed(): Promise<void> | void;
   now?: () => Date;
 };
@@ -190,7 +190,10 @@ export class CodeReviewService {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('The review is not ready to finish.');
     if (session.threadMode === 'independent') {
-      await this.options.deleteReviewer(agent);
+      const target = this.options.snapshot.agents.find((candidate) => candidate.id === session.targetAgentId);
+      await this.options.deleteReviewer(agent, target
+        ? { targetAgentId: target.id, content: independentReviewHandoff(session) }
+        : undefined);
       this.closeReviewToolContext(session);
       return;
     }
@@ -577,6 +580,19 @@ export class CodeReviewService {
   }
 }
 
+function independentReviewHandoff(session: CodeReviewSession): string {
+  const latestFindings = new Map<string, CodeReviewFinding>();
+  for (const round of session.rounds) {
+    for (const finding of round.findings) latestFindings.set(finding.id, finding);
+  }
+  const remediated = [...latestFindings.values()].filter((finding) => finding.remediation.state === 'fixed');
+  const summary = remediated.length
+    ? ['Independent review completed. Please give the user a concise update with these remediated findings:',
+        ...remediated.map((finding) => `- ${finding.priority.toUpperCase()} — ${finding.title.replace(/\s+/g, ' ').trim()}`)]
+    : ['Independent review completed. No findings were remediated. Please give the user a concise update.'];
+  return [...summary, 'No reply to the reviewer is needed.'].join('\n');
+}
+
 function reviewPrompt(session: CodeReviewSession): string {
   const ledger = codeReviewLedger(session);
   const detailedScope = session.scope.type === 'branch'
@@ -592,7 +608,7 @@ ${JSON.stringify(ledger, null, 2)}
 
 Review ${detailedScope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
 
-Findings are the only review artifact. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, respond with exactly "Review complete." and end the turn. There is no tool for completing the review workflow.
+Structured findings are the source of truth for this review. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, end the turn with a natural summary of one or two short sentences. If there are no actionable findings, say so plainly; otherwise state how many findings you reported and invite the user to review them or ask questions. Do not list or repeat the findings in chat, imply that the review is an approval to ship, or use a generic "Review complete" response. There is no tool for completing the review workflow.
 </context>
 
 Review ${visibleScope}.`;

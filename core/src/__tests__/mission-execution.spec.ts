@@ -37,6 +37,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     }
     if (stage === 'review') {
       expect(prompt).toContain('may inspect every listed isolated Mission worktree');
+      expect(prompt).toContain('After submission succeeds, end with one or two short, natural sentences');
       expect(prompt).not.toContain('Do not edit source checkouts or other Mission worktrees');
     }
     expect(prompt).toContain('Claw-owned Mission skill');

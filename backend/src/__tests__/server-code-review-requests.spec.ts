@@ -121,6 +121,7 @@ describe('ClawBackendServer code review workflow', () => {
     });
     const disposeCodeReview = vi.fn().mockResolvedValue(undefined);
     const releaseConversation = vi.fn();
+    const sendAgentMessage = vi.fn();
     const driver: AgentBackendDriver = {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
@@ -138,6 +139,7 @@ describe('ClawBackendServer code review workflow', () => {
     const server = new ClawBackendServer({
       version: 'test',
       snapshot,
+      sendAgentMessage,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
       codeReviewTools: {
@@ -197,6 +199,11 @@ describe('ClawBackendServer code review workflow', () => {
     expect(snapshot.agentGitStatuses[reviewer.id]).toBeUndefined();
     expect(disposeCodeReview).toHaveBeenCalledTimes(2);
     expect(finished.activeAgentId).toBe(owner.id);
+    expect(sendAgentMessage).toHaveBeenCalledExactlyOnceWith(
+      reviewer.id,
+      owner.id,
+      expect.stringContaining('- P1 — Authorize before writing'),
+    );
 
     await server.close();
   });
