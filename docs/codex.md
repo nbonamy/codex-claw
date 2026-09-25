@@ -404,8 +404,8 @@ from `/` command search resolves the same way. `clawd` then appends Codex
 Composer shortcuts are split by surface: `@` searches files, `$` searches
 skills, and `/` searches backend commands first, then matching skills. The
 initial Codex command catalog includes `compact`, `review`, `plan`, and `goal` without
-a visible slash prefix in the menu. Selecting one submits the corresponding
-slash form through the normal composer path.
+a visible slash prefix in the menu. Immediate commands submit their slash form;
+selecting `goal` enters the SDK's pending command mode until an objective is submitted.
 
 `compact` is an app command. Bare `/compact`, the agent-menu action, and
 Command-K all open the Compress Session flow described above. The renderer
@@ -627,7 +627,11 @@ also an app-server operation: native Codex prompts send `planMode: false`, and
 selected model/reasoning settings. Omitting `collaborationMode` would leave the
 thread in its previous mode.
 
-Codex goals are thread metadata, not composer modes. The renderer handles
+Codex goals are durable thread metadata. The transient Goal composer pill only
+collects an objective; it is not the active goal itself. Selecting `/goal` with
+Enter or Tab shows this pill, and submitting the objective sends
+`/goal <objective>` through the existing host action and clears the pill.
+The renderer handles
 `/goal` commands before prompt submission:
 
 - `/goal <objective>` calls `thread/goal/set` through `clawd`, strips the slash
