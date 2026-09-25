@@ -11,6 +11,11 @@ All notable Codex Claw changes are recorded here.
 - Visualize diagrams now open on a persistent canvas. Edit supported Mermaid
   shapes, annotate selected elements for the agent, and export the canvas as a
   PNG. SVG and generated-image diagrams remain image elements on the canvas.
+- Visualize diagrams now belong to their Git repository instead of the agent
+  that created them. Agents in linked worktrees share diagrams and editable
+  canvases, which remain available after a worktree agent is removed.
+- Browser tabs can copy their current URL or open it in the system browser.
+  The address bar also offers an open-external action on hover or focus.
 
 ### Improvements and fixes
 
@@ -19,6 +24,9 @@ All notable Codex Claw changes are recorded here.
 - In-app browser pages remain visible beneath Claw menus and dialogs instead
   of disappearing when an overlay opens. The empty browser surface is white
   and no longer shows a loading message.
+- Tool-opened browser pages now keep the requested URL in the address bar,
+  and resizing the workspace no longer stalls when the pointer crosses the
+  embedded browser.
 - Workspace tab labels collapse before their close buttons, keeping the close
   action available until tabs reach icon-only width.
 - Selecting `/goal` opens a composer mode for the objective rather than sending
