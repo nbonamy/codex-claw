@@ -20,11 +20,11 @@
         <span>{{ $t('surface.instructionSettings.personalization') }}</span>
       </el-menu-item>
       <el-menu-item index="codex">
-        <BrandOpenaiIcon aria-hidden="true" />
+        <BackendIcon backend="codex" monochrome />
         <span>{{ $t('surface.settingsSidebar.codex') }}</span>
       </el-menu-item>
       <el-menu-item index="claude-code">
-        <RobotFaceIcon aria-hidden="true" />
+        <BackendIcon backend="claude" monochrome />
         <span>{{ $t('surface.settingsSidebar.claudeCode') }}</span>
       </el-menu-item>
       <el-menu-item index="plugins">
@@ -53,7 +53,8 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, BrandOpenaiIcon, GitBranchIcon, PaletteIcon, PhotoIcon, PuzzleIcon, RobotFaceIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, GitBranchIcon, PaletteIcon, PhotoIcon, PuzzleIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
+import BackendIcon from './BackendIcon.vue';
 import { clawHostCapabilities } from '../platform-api';
 
 defineProps<{
@@ -97,7 +98,8 @@ function selectTab(tab: string): void {
   font-size: var(--font-size-15);
 }
 
-.settings-sidebar :deep(.el-menu-item svg) {
+.settings-sidebar :deep(.el-menu-item svg),
+.settings-sidebar :deep(.el-menu-item .backend-icon) {
   flex: 0 0 auto;
   width: var(--icon-md);
   height: var(--icon-md);
@@ -106,6 +108,10 @@ function selectTab(tab: string): void {
 
 .settings-sidebar :deep(.el-menu-item:hover) {
   background: var(--color-surface-high);
+}
+
+.settings-sidebar :deep(.el-menu-item .backend-icon) {
+  transform: scale(1.15);
 }
 
 .settings-sidebar :deep(.el-menu-item.is-active) {

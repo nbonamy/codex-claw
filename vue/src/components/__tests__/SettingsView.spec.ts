@@ -16,6 +16,7 @@ describe('SettingsView', () => {
   it('opens on General by default, preserves the settings order, and emits tab selections', async () => {
     setElectronTestClient({});
     const wrapper = mount(SettingsView, {
+      attachTo: document.body,
       props: {
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
@@ -41,8 +42,16 @@ describe('SettingsView', () => {
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Theme');
     const menuItems = wrapper.findAll('.el-menu-item');
-    expect(menuItems.find((item) => item.text() === 'Codex')?.get('svg').attributes('fill')).toBe('none');
-    expect(menuItems.find((item) => item.text() === 'Claude Code')?.get('svg').attributes('fill')).toBe('none');
+    for (const label of ['Codex', 'Claude Code']) {
+      const item = menuItems.find((item) => item.text() === label)!;
+      const icon = item.get('.backend-icon');
+      expect(getComputedStyle(icon.element).transform).toBe('scale(1.15)');
+      for (const color of ['rgb(120, 120, 120)', 'rgb(220, 220, 220)']) {
+        (item.element as HTMLElement).style.color = color;
+        expect(getComputedStyle(icon.element).backgroundColor).toBe(color);
+      }
+      expect(getComputedStyle(icon.element).maskImage).toContain('url(');
+    }
     expect(menuItems.find((item) => item.text() === 'Plugins')?.get('svg').html())
       .not.toBe(menuItems.find((item) => item.text() === 'Integrations')?.get('svg').html());
 
