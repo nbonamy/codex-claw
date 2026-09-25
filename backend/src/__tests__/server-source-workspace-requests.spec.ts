@@ -224,8 +224,8 @@ describe('ClawBackendServer', () => {
       })),
       status: vi.fn().mockResolvedValue(null),
     } as unknown as AgentGitService;
-    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc, agentGitService });
-
+    const events: import('@codex-claw/core/contracts').MainToRendererEvent[] = [];
+    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc, agentGitService, onEvent: event => events.push(event) });
     const result = await server.createProjectFromQuickChat(
       'agent-quick-chat', 'new-product', 'Build the agreed product.',
     );
@@ -235,6 +235,14 @@ describe('ClawBackendServer', () => {
       backendSession: { kind: 'codex', threadId: 'thread-project' },
     } });
     expect(result.agent.delegatedByAgentId).toBeUndefined();
+    const progress = events.filter(event => event.type === 'agentCreation.progress');
+    expect(progress.map(event => [event.agentId, event.payload.state, event.payload.phase])).toStrictEqual([
+      ['agent-quick-chat', 'running', 'creatingProject'],
+      ['agent-quick-chat', 'running', 'creatingAgent'],
+      ['agent-quick-chat', 'running', 'startingPrompt'],
+      ['agent-quick-chat', 'success', 'startingPrompt'],
+    ]);
+    expect(progress.at(-1)?.payload).toMatchObject({ createProject: true, agentId: result.agent.id });
     expect(snapshot.activeAgentId).not.toBe(result.agent.id);
     expect(handle).toHaveBeenCalledWith(backendMethods.driverPromptSend, {
       agent: result.agent,

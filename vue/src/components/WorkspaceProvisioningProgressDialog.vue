@@ -69,6 +69,7 @@ const eyebrow = computed(() => props.operation?.mode === 'multiple'
   : t('agentCreationProgress.eyebrow'));
 const title = computed(() => {
   if (props.operation?.mode === 'multiple') return t('missions.implementationStartTitle');
+  if (progress.value?.createProject) return t('agentCreationProgress.creatingProject', { repository: progress.value.repositoryName });
   return progress.value?.createWorktree
     ? t('agentCreationProgress.buildingIsolatedHome', { repository: progress.value.repositoryName })
     : t('agentCreationProgress.creatingAgent', { repository: progress.value?.repositoryName ?? '' });
@@ -91,7 +92,10 @@ const activeStep = computed(() => {
     return 0;
   }
   if (!progress.value?.phase) return undefined;
-  if (!progress.value.createWorktree) return progress.value.phase === 'startingPrompt' ? 2 : 1;
+  if (!progress.value.createWorktree) {
+    if (progress.value.phase === 'creatingProject') return 0;
+    return progress.value.phase === 'startingPrompt' ? 2 : 1;
+  }
   if (progress.value.phase === 'initializingWorktree') return 1;
   if (progress.value.phase === 'creatingAgent') return 2;
   if (progress.value.phase === 'startingPrompt') return 3;
@@ -117,7 +121,9 @@ const steps = computed<StagedOperationStep[]>(() => {
   const creationSteps: StagedOperationStep[] = [{
     title: current.createWorktree
       ? t('repositoryBacklog.createIsolatedWorktree')
-      : t('agentCreationProgress.useRepository'),
+      : current.createProject
+        ? t('agentCreationProgress.createProjectFolder')
+        : t('agentCreationProgress.useRepository'),
     detail: current.branchName ?? current.repositoryName,
   }];
   if (current.createWorktree) {

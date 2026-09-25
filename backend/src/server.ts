@@ -401,7 +401,7 @@ export class ClawBackendServer {
       teamId: caller.teamId,
       backendDefaults: caller.backendDefaults,
       prompt,
-    });
+    }, payload => this.applyAndEmitBackendEvent({ agentId: caller.id, type: 'agentCreation.progress', payload }));
   }
 
   async upsertMissionTicket(agentId: string, input: import('@codex-claw/core/mission-execution').MissionTicketDraftInput) {

@@ -452,6 +452,8 @@ export const messages = {
       eyebrow: 'Delegating work',
       buildingIsolatedHome: 'Building an isolated home in {repository}…',
       creatingAgent: 'Creating an agent in {repository}…',
+      creatingProject: 'Creating {repository}…',
+      createProjectFolder: 'Creating project folder',
       ready: '{agent} is ready',
       failed: 'Couldn’t create the agent',
       useRepository: 'Using repository',

@@ -618,9 +618,10 @@ export type AgentCreationProgress = {
   backend: AgentBackend;
   repositoryName: string;
   createWorktree: boolean;
+  createProject?: boolean;
   branchName?: string;
   hasPrompt: boolean;
-  phase?: 'creatingWorktree' | 'initializingWorktree' | 'creatingAgent' | 'startingPrompt';
+  phase?: 'creatingProject' | 'creatingWorktree' | 'initializingWorktree' | 'creatingAgent' | 'startingPrompt';
   initializationDetail?: string;
   agentId?: string;
   agentName?: string;
