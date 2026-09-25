@@ -733,9 +733,10 @@ bounded title/description pairs. `add-visualization` publishes and selects a
 complete Mermaid, SVG, or generated-image result, optionally satisfying one
 suggestion. `list-visualizations` exposes compact IDs, kinds, and selection,
 while `get-visualization` returns the complete current source needed for an
-edit. `replace-visualization` uses last-write-wins semantics for the single
-agent writer. `delete-visualization` removes an item and repairs selection and
-suggestion links.
+edit. `replace-visualization` uses last-write-wins semantics for a source
+diagram; editable canvases instead require an expected revision.
+`delete-visualization` removes an item and repairs selections and suggestion
+links for every agent viewing that repository library.
 
 Mermaid content is limited to the diagram families rendered by
 `beautiful-mermaid`: flowchart, state, sequence, class, ER, and XY. Agents use
@@ -796,7 +797,8 @@ The focused Visualize module exposes `read-visualization-canvas`,
 `edit-visualization-canvas`, and `view-visualization-canvas`. Reads default to the
 selection and its bound labels; full-scene reads are explicit. Edits are bounded
 batches against stable existing IDs and an expected revision. The service validates
-all edits before replacing the document and serializes canvas writes per agent.
+all edits before replacing the document and serializes canvas writes per
+visualization, including edits from different agents in the same repository.
 A stale revision must be reread, never retried blindly. Whole-visualization
 replacement is rejected after an editable canvas exists. The view tool returns
 the latest renderer-saved PNG and reports unavailable while a changed scene has

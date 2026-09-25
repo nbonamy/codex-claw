@@ -581,6 +581,7 @@ export type CodexResourceSharingStatus = {
 
 export type AppSnapshot = {
   missions?: import('./missions').Mission[];
+  repositoryVisualizations?: import('./visualize').RepositoryVisualizations;
   clientPreferences?: Record<string, import('./client-preferences').ClientPreferences>;
   teams: Team[];
   agents: Agent[];

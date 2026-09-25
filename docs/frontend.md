@@ -274,6 +274,11 @@ remain gated by the owning open conversation. Conflicting revisions are rejected
 without replacing local edits. Agent batches enter editor history as one immediate
 undo unit; history itself is editor-local and resets when the editor remounts.
 
+Git-workspace diagrams are stored under the primary worktree's repository identity
+in Claw's state, not under the agent that created them. Linked worktree agents
+share the library; pane visibility, suggestions, selection, and tool authorization
+remain conversation-scoped.
+
 The pinned Mermaid converter imports supported diagrams as native shapes. SVG,
 generated images, and converter image fallbacks are rasterized sanitized content,
 not editable vector shapes. Never regenerate Mermaid over an edited canvas.

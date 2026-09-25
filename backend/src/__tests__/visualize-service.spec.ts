@@ -14,6 +14,39 @@ afterEach(async () => {
 });
 
 describe('VisualizeService', () => {
+  it('shares repository diagrams across a worktree and main agent while keeping pane state separate', async () => {
+    const snapshot = createInitialSnapshot();
+    const [worker, main] = snapshot.agents;
+    worker.folder = '/projects/claw-feature';
+    worker.workspace = { kind: 'git', folder: worker.folder, repositoryName: 'claw', repositoryRoot: worker.folder,
+      branch: 'feature', isLinkedWorktree: true, primaryWorktreeRoot: '/projects/claw', updatedAt: worker.updatedAt };
+    main.folder = '/projects/claw';
+    main.workspace = { kind: 'git', folder: main.folder, repositoryName: 'claw', repositoryRoot: main.folder,
+      branch: 'main', isLinkedWorktree: false, primaryWorktreeRoot: '/projects/claw', updatedAt: main.updatedAt };
+    const service = new VisualizeService({ snapshot, generatedImagesRoot: os.tmpdir(), persist: async () => undefined, publish: () => undefined });
+
+    await service.enter(worker.id);
+    const { visualizationId } = await service.add(worker.id, { title: 'Shared map', content: { kind: 'mermaid', source: 'flowchart LR; A --> B' } });
+    expect((await service.enter(main.id)).created).toBe(false);
+
+    expect(service.list(main.id).visualizations).toStrictEqual([{ id: visualizationId, title: 'Shared map', kind: 'mermaid', selected: true }]);
+    expect(snapshot.repositoryVisualizations?.['/projects/claw']).toStrictEqual(worker.visualize?.visualizations);
+    expect(main.visualize?.id).not.toBe(worker.visualize?.id);
+    const source = JSON.stringify(service.get(main.id, visualizationId).visualization.content);
+    const document = { elements: [], files: {}, selectedElementIds: [], preview: '' };
+    const saves = await Promise.allSettled([
+      service.saveCanvas(worker.id, { visualizationId, sessionId: worker.visualize!.id, expectedSource: source, expectedRevision: 0, document }),
+      service.saveCanvas(main.id, { visualizationId, sessionId: main.visualize!.id, expectedSource: source, expectedRevision: 0, document }),
+    ]);
+    expect(saves.map(result => result.status)).toStrictEqual(['fulfilled', 'rejected']);
+    expect(service.readCanvas(main.id, visualizationId).revision).toBe(1);
+    await service.setOpen(worker.id, false);
+    expect(service.list(main.id).visualizations).toHaveLength(1);
+    await service.delete(main.id, visualizationId);
+    expect(worker.visualize?.visualizations).toStrictEqual([]);
+    expect(worker.visualize?.selectedVisualizationId).toBeNull();
+  });
+
   it('persists user-edited canvases and assets, rejects stale batches and preserves untouched edits across reload', async () => {
     temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'claw-canvas-'));
     const persistence = new AppStatePersistence(path.join(temporaryDirectory, 'state.json'));

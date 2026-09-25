@@ -1,5 +1,5 @@
 import { isCanvasDocument, type CanvasDocument } from './visualize-canvas';
-import type { BackendConversationRef } from './contracts';
+import type { Agent, BackendConversationRef } from './contracts';
 
 export const visualizationKinds = ['mermaid', 'svg', 'image'] as const;
 
@@ -42,6 +42,15 @@ export type Visualization = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type RepositoryVisualizations = Record<string, Visualization[]>;
+
+export function visualizationRepositoryRoot(agent: Agent): string | null {
+  const workspace = agent.workspace;
+  return workspace?.kind === 'git' && workspace.folder === agent.folder
+    ? workspace.primaryWorktreeRoot
+    : null;
+}
 
 export type VisualizeSession = {
   id: string;
@@ -121,7 +130,7 @@ function isVisualizationSuggestion(value: unknown): value is VisualizationSugges
     && (value.visualizationId === undefined || typeof value.visualizationId === 'string');
 }
 
-function isVisualization(value: unknown): value is Visualization {
+export function isVisualization(value: unknown): value is Visualization {
   return record(value)
     && typeof value.id === 'string'
     && typeof value.title === 'string'

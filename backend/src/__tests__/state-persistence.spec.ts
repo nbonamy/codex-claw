@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
+import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/core/settings';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
 
@@ -122,6 +123,37 @@ describe('AppStatePersistence', () => {
 
     expect(restored.agents[0].visualize).toStrictEqual(snapshot.agents[0].visualize);
     expect(restored.agents[0].visualize).not.toBe(snapshot.agents[0].visualize);
+  });
+
+  it('keeps repository diagrams after their worktree agent is deleted', async () => {
+    const filePath = await tempStatePath();
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0];
+    agent.folder = '/projects/claw-feature';
+    agent.workspace = {
+      kind: 'git', folder: agent.folder, repositoryName: 'claw', repositoryRoot: agent.folder,
+      branch: 'feature', isLinkedWorktree: true, primaryWorktreeRoot: '/projects/claw', updatedAt: agent.updatedAt,
+    };
+    agent.visualize = {
+      id: 'visualize-feature', conversationRef: null, isOpen: true, suggestions: [],
+      visualizations: [{ id: 'diagram-feature', title: 'Map', content: { kind: 'mermaid', source: 'flowchart LR; A --> B' },
+        canvas: { revision: 1, elements: [], files: {}, selectedElementIds: [], preview: '' },
+        createdAt: agent.createdAt, updatedAt: agent.updatedAt }],
+      selectedVisualizationId: 'diagram-feature', createdAt: agent.createdAt, updatedAt: agent.updatedAt,
+    };
+    snapshot.repositoryVisualizations = { '/projects/claw': agent.visualize.visualizations };
+    await writeFile(filePath, JSON.stringify(persistedStateFromSnapshot(snapshot)), 'utf8');
+
+    const loaded = await new AppStatePersistence(filePath).load();
+    expect(loaded.repositoryVisualizations?.['/projects/claw']).toStrictEqual(agent.visualize.visualizations);
+    expect(isAppSnapshot(loaded)).toBe(true);
+    expect(loaded.agents[0].visualize?.visualizations).toBe(loaded.repositoryVisualizations?.['/projects/claw']);
+    closeAgentInSnapshot(loaded, agent.id);
+    await new AppStatePersistence(filePath).save(loaded);
+    const reloaded = await new AppStatePersistence(filePath).load();
+    expect(reloaded.repositoryVisualizations?.['/projects/claw'])
+      .toStrictEqual(agent.visualize.visualizations);
+    expect(reloaded.agents.some(candidate => candidate.id === agent.id)).toBe(false);
   });
 
   it('migrates a persisted Design session to Visualize state', () => {

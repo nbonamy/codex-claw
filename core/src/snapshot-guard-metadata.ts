@@ -4,7 +4,7 @@ import { isAppTextDescriptor } from './app-text';
 import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
 import { spokenAnnouncementVoices } from './contracts';
 import { isPlanReview } from './plan-review';
-import { isVisualizeSession } from './visualize';
+import { isVisualization, isVisualizeSession } from './visualize';
 import { isCodeReviewSession } from './code-review';
 import {
   isSubagentActivityKind,
@@ -40,6 +40,7 @@ export function isSnapshotMetadata(value: unknown): value is Record<string, unkn
     isArrayOf(value.agents, isAgent) &&
     isArrayOf(value.automations, isAutomation) &&
     optional(value, 'missions', (candidate) => isArrayOf(candidate, isMission)) &&
+    optional(value, 'repositoryVisualizations', (candidate) => isRecordMapOf(candidate, (visualizations) => isArrayOf(visualizations, isVisualization))) &&
     isNullableString(value.activeTeamId) &&
     isNullableString(value.activeAgentId) &&
     optional(value, 'queuedPrompts', (candidate) => isArrayOf(candidate, isQueuedPrompt)) &&

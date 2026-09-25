@@ -10,7 +10,7 @@ import type {
   VisualizationContent,
   VisualizeSession,
 } from '@codex-claw/core/visualize';
-import { cloneVisualizeSession, visualizationSuggestionLimits } from '@codex-claw/core/visualize';
+import { cloneVisualizeSession, visualizationRepositoryRoot, visualizationSuggestionLimits } from '@codex-claw/core/visualize';
 import { createEntityId } from '@codex-claw/core/ids';
 
 const MAX_VISUALIZATION_SOURCE_BYTES = 250_000;
@@ -81,30 +81,33 @@ export class VisualizeService {
     const agent = this.requireAgent(agentId);
     const existing = this.sessionForAgent(agentId);
     if (existing) {
+      let changed = this.attachRepositoryVisualizations(agent, existing);
       const shouldSuggest = !existing.isOpen && existing.visualizations.length === 0;
       if (!existing.isOpen) {
         existing.isOpen = true;
         if (shouldSuggest) existing.suggestions = [];
         existing.updatedAt = this.now().toISOString();
-        await this.commit();
+        changed = true;
       }
+      if (changed) await this.commit();
       return { created: shouldSuggest, visualize: cloneVisualizeSession(existing) };
     }
 
     const timestamp = this.now().toISOString();
+    const visualizations = this.repositoryVisualizationsFor(agent) ?? [];
     const visualize: VisualizeSession = {
       id: this.createId('visualize'),
       conversationRef: cloneConversationRef(conversationRefFromAgent(agent)),
       isOpen: true,
       suggestions: [],
-      visualizations: [],
-      selectedVisualizationId: null,
+      visualizations,
+      selectedVisualizationId: visualizations.at(-1)?.id ?? null,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
     agent.visualize = visualize;
     await this.commit();
-    return { created: true, visualize: cloneVisualizeSession(visualize) };
+    return { created: visualizations.length === 0, visualize: cloneVisualizeSession(visualize) };
   }
 
   async setOpen(agentId: string, open: boolean): Promise<VisualizeSession> {
@@ -204,13 +207,17 @@ export class VisualizeService {
     const index = visualize.visualizations.findIndex(visualization => visualization.id === visualizationId);
     if (index === -1) throw new Error(`Visualization not found: ${visualizationId}`);
     visualize.visualizations.splice(index, 1);
-    for (const suggestion of visualize.suggestions) {
-      if (suggestion.visualizationId === visualizationId) delete suggestion.visualizationId;
+    for (const agent of this.options.snapshot.agents) {
+      const session = agent.visualize;
+      if (!session || session.visualizations !== visualize.visualizations) continue;
+      for (const suggestion of session.suggestions) {
+        if (suggestion.visualizationId === visualizationId) delete suggestion.visualizationId;
+      }
+      if (session.selectedVisualizationId === visualizationId) {
+        session.selectedVisualizationId = session.visualizations[Math.min(index, session.visualizations.length - 1)]?.id ?? null;
+      }
+      session.updatedAt = this.now().toISOString();
     }
-    if (visualize.selectedVisualizationId === visualizationId) {
-      visualize.selectedVisualizationId = visualize.visualizations[Math.min(index, visualize.visualizations.length - 1)]?.id ?? null;
-    }
-    visualize.updatedAt = this.now().toISOString();
     await this.commit();
     return { success: true, visualizationId, selectedVisualizationId: visualize.selectedVisualizationId };
   }
@@ -269,7 +276,7 @@ export class VisualizeService {
   }
 
   saveCanvas(agentId: string, input: SaveCanvasInput) {
-    return this.canvasWrite(agentId, () => this.saveCanvasDocument(agentId, input));
+    return this.canvasWrite(input.visualizationId, () => this.saveCanvasDocument(agentId, input));
   }
 
   private async saveCanvasDocument(agentId: string, input: SaveCanvasInput) {
@@ -307,7 +314,7 @@ export class VisualizeService {
   }
 
   editCanvas(agentId: string, visualizationId: string, expectedRevision: number, edits: CanvasEdit[]) {
-    return this.canvasWrite(agentId, () => this.editCanvasDocument(agentId, visualizationId, expectedRevision, edits));
+    return this.canvasWrite(visualizationId, () => this.editCanvasDocument(agentId, visualizationId, expectedRevision, edits));
   }
 
   private async editCanvasDocument(agentId: string, visualizationId: string, expectedRevision: number, edits: CanvasEdit[]) {
@@ -321,11 +328,11 @@ export class VisualizeService {
     return { success: true, revision: next.revision };
   }
 
-  private canvasWrite<T>(agentId: string, action: () => Promise<T>): Promise<T> {
-    const previous = this.canvasWrites.get(agentId) ?? Promise.resolve();
+  private canvasWrite<T>(visualizationId: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.canvasWrites.get(visualizationId) ?? Promise.resolve();
     const pending = previous.catch(() => undefined).then(action);
-    this.canvasWrites.set(agentId, pending);
-    void pending.finally(() => { if (this.canvasWrites.get(agentId) === pending) this.canvasWrites.delete(agentId); }).catch(() => undefined);
+    this.canvasWrites.set(visualizationId, pending);
+    void pending.finally(() => { if (this.canvasWrites.get(visualizationId) === pending) this.canvasWrites.delete(visualizationId); }).catch(() => undefined);
     return pending;
   }
 
@@ -363,6 +370,23 @@ export class VisualizeService {
     const agent = this.agent(agentId);
     if (!agent) throw new Error(`Agent not found: ${agentId}`);
     return agent;
+  }
+
+  private repositoryVisualizationsFor(agent: Agent): Visualization[] | null {
+    const root = visualizationRepositoryRoot(agent);
+    if (!root) return null;
+    const libraries = this.options.snapshot.repositoryVisualizations ??= {};
+    return libraries[root] ??= [];
+  }
+
+  private attachRepositoryVisualizations(agent: Agent, session: VisualizeSession): boolean {
+    const visualizations = this.repositoryVisualizationsFor(agent);
+    if (!visualizations || visualizations === session.visualizations) return false;
+    session.visualizations = visualizations;
+    if (session.selectedVisualizationId && !visualizations.some(item => item.id === session.selectedVisualizationId)) {
+      session.selectedVisualizationId = visualizations.at(-1)?.id ?? null;
+    }
+    return true;
   }
 
   private ownsCurrentConversation(agent: Agent, visualize: VisualizeSession): boolean {

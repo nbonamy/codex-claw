@@ -15,10 +15,11 @@ import { appText } from '@codex-claw/core/app-text';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
 import { cloneCodeReviewSession, isCodeReviewSession } from '@codex-claw/core/code-review';
 import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
-import { cloneVisualizeSession, isVisualizeSession } from '@codex-claw/core/visualize';
+import { cloneVisualizeSession, isVisualization, isVisualizeSession, visualizationRepositoryRoot, type RepositoryVisualizations, type Visualization, type VisualizeSession } from '@codex-claw/core/visualize';
 
 type PersistedState = {
   missions?: AppSnapshot['missions'];
+  repositoryVisualizations?: RepositoryVisualizations;
   clientPreferences?: AppSnapshot['clientPreferences'];
   teams: Team[];
   agents: PersistedAgent[];
@@ -52,7 +53,7 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   codeReview?: import('@codex-claw/core/code-review').CodeReviewSession;
   threadFlags?: import('@codex-claw/core/thread-flags').ThreadFlags;
   goal?: ThreadGoal;
-  visualize?: import('@codex-claw/core/visualize').VisualizeSession;
+  visualize?: Omit<VisualizeSession, 'visualizations'> & { visualizations?: Visualization[] };
   statusText?: string;
   lastActivityAt?: string;
   teamId?: string;
@@ -138,8 +139,9 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
   return {
     ...(snapshot.clientPreferences ? { clientPreferences: structuredClone(snapshot.clientPreferences) } : {}),
     ...(snapshot.missions ? { missions: structuredClone(snapshot.missions) } : {}),
+    ...(snapshot.repositoryVisualizations ? { repositoryVisualizations: structuredClone(snapshot.repositoryVisualizations) } : {}),
     teams: snapshot.teams.map((team) => ({ ...team, agentIds: [...team.agentIds] })),
-    agents: snapshot.agents.map(persistedAgentFromSnapshot),
+    agents: snapshot.agents.map(agent => persistedAgentFromSnapshot(agent, snapshot.repositoryVisualizations)),
     automations: snapshot.automations.map(cloneAutomation),
     activeTeamId: snapshot.activeTeamId,
     activeAgentId: snapshot.activeAgentId,
@@ -159,7 +161,14 @@ export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedStat
   };
 }
 
-function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
+function persistedAgentFromSnapshot(agent: Agent, libraries?: RepositoryVisualizations): PersistedAgent {
+  const root = visualizationRepositoryRoot(agent);
+  const visualize = agent.visualize ? cloneVisualizeSession(agent.visualize) : undefined;
+  let persistedVisualize: PersistedAgent['visualize'] = visualize;
+  if (visualize && root && libraries?.[root]) {
+    const { visualizations: _repositoryVisualizations, ...session } = visualize;
+    persistedVisualize = session;
+  }
   return {
     id: agent.id,
     teamId: agent.teamId,
@@ -182,7 +191,7 @@ function persistedAgentFromSnapshot(agent: Agent): PersistedAgent {
     ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
     ...(agent.codeReview ? { codeReview: cloneCodeReviewSession(agent.codeReview) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
-    ...(agent.visualize ? { visualize: cloneVisualizeSession(agent.visualize) } : {}),
+    ...(persistedVisualize ? { visualize: persistedVisualize } : {}),
     statusText: agent.statusText,
     createdAt: agent.createdAt,
     ...(agent.lastActivityAt ? { lastActivityAt: agent.lastActivityAt } : {}),
@@ -200,8 +209,9 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   const workBacklog = sanitizeWorkBacklogState(value.workBacklog, seed.workBacklog);
   const remoteConnections = sanitizeRemoteConnectionsState(value.remoteConnections, seed.remoteConnections);
   const remoteConnectionIds = new Set(remoteConnections.connections.map((connection) => connection.id));
+  const durableLibraries = sanitizeRepositoryVisualizations(value.repositoryVisualizations);
   const allAgents = Array.isArray(value.agents)
-    ? value.agents.map((agent) => sanitizeAgent(agent)).filter((agent): agent is Agent => Boolean(agent))
+    ? value.agents.map((agent) => sanitizeAgent(agent, durableLibraries)).filter((agent): agent is Agent => Boolean(agent))
     : [];
   const teams = Array.isArray(value.teams)
     ? value.teams.map((team) => sanitizeTeam(team, allAgents, remoteConnectionIds)).filter((team): team is Team => Boolean(team))
@@ -220,6 +230,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     ...(Array.isArray(value.missions) ? { missions: value.missions.filter(isMission).map(m => structuredClone(m)) } : {}),
     teams: teams.length > 0 ? teams : seed.teams,
     agents,
+    ...(Object.keys(durableLibraries).length ? { repositoryVisualizations: durableLibraries } : {}),
     automations: persistedAutomations
       .map(sanitizeAutomation)
       .filter((automation): automation is Automation => Boolean(automation)),
@@ -243,6 +254,18 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
   snapshot.activeTeamId = repairedActiveTeamId(snapshot);
 
   return snapshot;
+}
+
+function sanitizeRepositoryVisualizations(value: unknown): RepositoryVisualizations {
+  const libraries: RepositoryVisualizations = {};
+  if (isRecord(value)) {
+    for (const [root, candidates] of Object.entries(value)) {
+      if (root && Array.isArray(candidates) && candidates.every(isVisualization)) {
+        libraries[root] = structuredClone(candidates);
+      }
+    }
+  }
+  return libraries;
 }
 
 function cloneSubagentTrees(trees: Record<string, AgentSubagentTree>): Record<string, AgentSubagentTree> {
@@ -361,7 +384,7 @@ function sanitizeSubagentActivity(value: unknown): SubagentActivity | null {
   };
 }
 
-function sanitizeAgent(value: unknown): Agent | null {
+function sanitizeAgent(value: unknown, libraries: RepositoryVisualizations): Agent | null {
   if (!isRecord(value) || typeof value.id !== 'string' || (value.name !== null && typeof value.name !== 'string')) {
     return null;
   }
@@ -385,7 +408,8 @@ function sanitizeAgent(value: unknown): Agent | null {
   const gitDiffTarget = isAgentGitDiffTarget(value.gitDiffTarget) ? { ...value.gitDiffTarget } : undefined;
   const workspace = sanitizeAgentWorkspace(value.workspace);
   const pullRequest = sanitizeAgentPullRequest(value.pullRequest);
-  const visualize = sanitizeVisualizeSession(value.visualize ?? value.design);
+  const repositoryRoot = workspace?.kind === 'git' && workspace.folder === folder ? workspace.primaryWorktreeRoot : null;
+  const visualize = sanitizeVisualizeSession(value.visualize ?? value.design, repositoryRoot ? libraries[repositoryRoot] : undefined);
   return {
     id: value.id,
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
@@ -423,7 +447,11 @@ function sanitizeAgent(value: unknown): Agent | null {
   };
 }
 
-function sanitizeVisualizeSession(value: unknown): import('@codex-claw/core/visualize').VisualizeSession | undefined {
+function sanitizeVisualizeSession(value: unknown, repositoryVisualizations?: Visualization[]): VisualizeSession | undefined {
+  if (repositoryVisualizations && isRecord(value)) {
+    const session = { ...value, visualizations: repositoryVisualizations };
+    return isVisualizeSession(session) ? { ...cloneVisualizeSession(session), visualizations: repositoryVisualizations } : undefined;
+  }
   if (isVisualizeSession(value)) return cloneVisualizeSession(value);
   if (!isRecord(value)) return undefined;
 

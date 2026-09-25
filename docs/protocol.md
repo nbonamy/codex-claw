@@ -217,15 +217,18 @@ the explicit Review stage remains the user gate.
 
 ## Client To `clawd`: Visualize
 
-Visualize state belongs to the agent's current provider conversation. The
-snapshot stores compact suggestions and complete Mermaid, SVG, or generated
-image visualization records; generated image bytes remain backend-owned and
-are read through the asset method.
+For Git workspaces, complete Mermaid, SVG, generated-image, and editable-canvas
+records belong to the primary repository worktree in Claw's app state. Linked
+worktree agents see the same diagrams, which survive conversation resets and
+agent deletion. Each agent still owns its pane state, suggestions, selection,
+and current-provider-conversation tool access. Agents without a Git workspace
+retain conversation-scoped visualizations. Generated image bytes remain
+backend-owned and are read through the asset method.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `agent/visualize/start` | `{ agentId, input?: { prompt? } }` | `AppSnapshot` | Opens or creates the conversation's Visualize session. Without a prompt, a new empty session asks the agent for suggestions; with a prompt, it asks for one direct visualization. |
-| `agent/visualize/open/set` | `{ agentId, input: { open } }` | `AppSnapshot` | Opens or closes the existing conversation-scoped Visualize pane. Closing removes the contextual MCP tool surface without deleting its visualizations. |
+| `agent/visualize/start` | `{ agentId, input?: { prompt? } }` | `AppSnapshot` | Opens or creates the agent's Visualize pane over the repository library when available. Without a prompt, an empty library asks the agent for suggestions; with a prompt, it asks for one direct visualization. |
+| `agent/visualize/open/set` | `{ agentId, input: { open } }` | `AppSnapshot` | Opens or closes the agent's Visualize pane. Closing removes contextual MCP tool access without deleting repository diagrams. |
 | `agent/visualize/suggestion/generate` | `{ agentId, input: { suggestionId } }` | `AppSnapshot` | Validates the current suggestion and submits the corresponding generation prompt to the owning conversation. |
 | `agent/visualize/visualization/select` | `{ agentId, input: { visualizationId } }` | `AppSnapshot` | Selects an existing visualization for the pane and subsequent edit requests. |
 | `agent/visualize/visualization/delete` | `{ agentId, input: { visualizationId } }` | `AppSnapshot` | Deletes an existing visualization, clears matching suggestion links, and selects the nearest remaining item. |
