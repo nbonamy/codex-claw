@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.20.5",
+  "currentVersion": "0.20.6",
   "releases": [
+    {
+      "version": "0.20.6",
+      "releasedAt": "2026-09-24",
+      "sourceSha256": "d47842e505e508012a110fca4cfd1f973eee68acbcdd0423154315bd35e80f98",
+      "markdown": "### Improvements and fixes\n\n- Single free-text questions now use a compact input-and-send layout. In\n  multi-question cards, the primary action follows Back in the footer."
+    },
     {
       "version": "0.20.5",
       "releasedAt": "2026-09-24",

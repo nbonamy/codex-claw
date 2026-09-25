@@ -4,6 +4,13 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.20.6] - 2026-09-24
+
+### Improvements and fixes
+
+- Single free-text questions now use a compact input-and-send layout. In
+  multi-question cards, the primary action follows Back in the footer.
+
 ## [0.20.5] - 2026-09-24
 
 ### Improvements and fixes
