@@ -4,6 +4,7 @@ import BrowserPanel from '../BrowserPanel.vue';
 import { setElectronTestClient } from '../../test/client';
 import type { MainToRendererEvent } from '@codex-claw/core/contracts';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import GitDiffControl from '../GitDiffControl.vue';
 
 class ResizeObserverStub {
   observe = vi.fn();
@@ -51,6 +52,52 @@ function mountPanel(props: { initialUrl?: string; openRequestId?: number; visual
 }
 
 describe('BrowserPanel', () => {
+  it('hides the native surface while the header Git menu is open and restores it on dismissal', async () => {
+    const { api } = mountPanel();
+    await flushPromises();
+    const header = mount(GitDiffControl, {
+      attachTo: document.body,
+      props: {
+        agentId: 'agent-1',
+        gitStatus: {
+          folder: '/src/project', branch: 'main', addedLines: 4, removedLines: 2, changedFiles: 1,
+          ahead: 0, behind: 0, hasUntracked: false, state: 'dirty', updatedAt: '2026-09-25T00:00:00Z',
+        },
+      },
+    });
+    api.browserSetVisible.mockClear();
+    await header.get('.git-diff-control__menu-trigger').trigger('click');
+    await flushPromises();
+    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+    await header.get('.git-diff-control__menu-trigger').trigger('click');
+    await flushPromises();
+    expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+  });
+
+  it('ignores embedded and hidden menus, and waits for the last floating overlay to close', async () => {
+    const surfaces = document.createElement('div');
+    surfaces.innerHTML = '<div role="menu" class="app-menu--embedded">Inline choices</div><div class="el-popper" style="display:none"><div role="menu">Popover</div></div><div role="dialog" hidden>Dialog</div>';
+    document.body.append(surfaces);
+    try {
+      const { api } = mountPanel();
+      await flushPromises();
+      expect(api.browserSetVisible).not.toHaveBeenCalledWith('agent-1', 'primary', false);
+      const popover = surfaces.querySelector<HTMLElement>('.el-popper')!;
+      const dialog = surfaces.querySelector<HTMLElement>('[role="dialog"]')!;
+      popover.style.display = 'block';
+      await flushPromises();
+      expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+      dialog.hidden = false;
+      popover.style.display = 'none';
+      await flushPromises();
+      expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', false);
+      dialog.hidden = true;
+      await flushPromises();
+      expect(api.browserSetVisible).toHaveBeenLastCalledWith('agent-1', 'primary', true);
+    } finally {
+      surfaces.remove();
+    }
+  });
   it('opens an isolated browser for the active agent and exposes annotation mode', async () => {
     const { api, browserOpen, wrapper } = mountPanel();
     await flushPromises();
