@@ -1,6 +1,6 @@
 import { Component, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Excalidraw, MainMenu, CaptureUpdateAction, convertToExcalidrawElements, exportToCanvas, restoreElements } from '@excalidraw/excalidraw';
+import { Excalidraw, MainMenu, CaptureUpdateAction, bumpVersion, convertToExcalidrawElements, exportToCanvas, restoreElements } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI, BinaryFiles, AppState, ExcalidrawProps } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement, FileId } from '@excalidraw/excalidraw/element/types';
 import type { CanvasDocument, CanvasElement } from '@codex-claw/core/visualize-canvas';
@@ -63,6 +63,21 @@ class CanvasErrorBoundary extends Component<{ onError: (error: Error) => void; c
   componentDidCatch(error: Error) { this.props.onError(error); }
   render() { return this.state.failed ? null : this.props.children; }
 }
+function restoreSceneElements(elements: readonly ExcalidrawElement[]) {
+  const restored = restoreElements(elements.map(element => element.type === 'text'
+    ? { ...element, text: element.originalText ?? element.text } : element), null,
+  { repairBindings: true, refreshDimensions: true });
+  const byId = new Map(restored.map(element => [element.id, element]));
+  return restored.map(element => {
+    if (element.type !== 'text' || !element.containerId) return element;
+    const container = byId.get(element.containerId);
+    if (!container || !['rectangle', 'ellipse', 'diamond'].includes(container.type)) return element;
+    return { ...element,
+      x: element.textAlign === 'center' ? container.x + (container.width - element.width) / 2 : element.x,
+      y: element.verticalAlign === 'middle' ? container.y + (container.height - element.height) / 2 : element.y,
+    };
+  });
+}
 export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (scene: CanvasScene) => void, onError: (error: Error) => void) {
   const root = createRoot(host);
   const theme = () => document.documentElement.classList.contains('dark') ? 'dark' as const : 'light' as const;
@@ -85,7 +100,24 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
   let api: ExcalidrawImperativeAPI | undefined;
   let current = scene;
   let disposed = false;
-  const elements = (value: CanvasScene) => restoreElements(value.elements as unknown as ExcalidrawElement[], null, { refreshDimensions: true });
+  const refreshTextAfterFontsLoad = () => requestAnimationFrame(() => {
+    if (disposed || !api) return;
+    // Excalidraw invalidates glyph caches after loading fonts but retains the
+    // fallback-font bounds. Remeasure the current scene, never the import snapshot.
+    const currentElements = api.getSceneElements();
+    const restored = restoreSceneElements(currentElements);
+    const changed = restored.map((element, index) => {
+      const previous = currentElements[index];
+      return element.type === 'text' && (element.width !== previous.width || element.height !== previous.height || element.x !== previous.x || element.y !== previous.y || element.text !== (previous as typeof element).text)
+        ? bumpVersion(element) : element;
+    });
+    api.updateScene({
+      elements: changed,
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+  });
+  document.fonts.addEventListener('loadingdone', refreshTextAfterFontsLoad);
+  const elements = (value: CanvasScene) => restoreSceneElements(value.elements as unknown as ExcalidrawElement[]);
   const selected = (value: CanvasScene) => Object.fromEntries(value.selectedElementIds.map(id => [id, true as const]));
   const update = (value: CanvasScene, undoable: boolean) => {
     current = value;
@@ -94,7 +126,7 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
   };
   root.render(createElement(CanvasErrorBoundary, { onError, children: createElement(Excalidraw, {
     initialData: { elements: elements(scene), files: scene.files as BinaryFiles, appState: { selectedElementIds: selected(scene), theme: theme(), viewModeEnabled: true, activeTool: { type: 'hand', customType: null, locked: false, lastActiveTool: null } }, scrollToContent: true },
-    excalidrawAPI: (value: ExcalidrawImperativeAPI) => { api = value; syncControlStyle(); requestAnimationFrame(() => { if (!disposed) value.scrollToContent(undefined, { fitToContent: true }); }); },
+    excalidrawAPI: (value: ExcalidrawImperativeAPI) => { api = value; void document.fonts.ready.then(refreshTextAfterFontsLoad); syncControlStyle(); requestAnimationFrame(() => { if (!disposed) value.scrollToContent(undefined, { fitToContent: true }); }); },
     onChange: (items: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
       if (disposed) return;
       current = { elements: items.map(element => ({ ...element, link: null })) as unknown as CanvasElement[], files, selectedElementIds: Object.keys(state.selectedElementIds).filter(id => state.selectedElementIds[id]), preview: '' };
@@ -116,6 +148,6 @@ export function mountCanvas(host: HTMLElement, scene: CanvasScene, onChange: (sc
       const canvas = await exportToCanvas({ elements: elements(value), files: value.files as BinaryFiles, appState: { exportBackground: false }, maxWidthOrHeight: 1000 });
       return canvas.toDataURL('image/png');
     },
-    dispose() { themeObserver.disconnect(); resizeObserver.disconnect(); disposed = true; root.unmount(); api = undefined; },
+    dispose() { document.fonts.removeEventListener('loadingdone', refreshTextAfterFontsLoad); themeObserver.disconnect(); resizeObserver.disconnect(); disposed = true; root.unmount(); api = undefined; },
   };
 }
