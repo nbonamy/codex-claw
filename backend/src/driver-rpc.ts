@@ -169,7 +169,7 @@ export class BackendDriverRpc {
       case backendMethods.workspaceFilePreview: {
         const record = requireRecord(params);
         return previewAgentFolderFile(
-          requireString(record.folder, 'folder'),
+          record.folder === undefined ? undefined : requireString(record.folder, 'folder'),
           requireString(record.filePath, 'filePath'),
         );
       }

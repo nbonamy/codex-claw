@@ -177,7 +177,7 @@ the explicit Review stage remains the user gate.
 | `client/agentOrder/update` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
 | `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Archives the attached provider conversation when supported, then removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
-| `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-host file. Relative inputs resolve from the agent folder; absolute paths and relative traversal may address files elsewhere on that host. The backend caps preview bytes and classifies text, image, binary, and oversized results. Clients must not read backend-host files directly. |
+| `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-host file. Relative inputs require and resolve from the agent folder; absolute paths also work for folderless sessions. Absolute paths and relative traversal may address files elsewhere on that host. The backend caps preview bytes and classifies text, image, binary, and oversized results. Clients must not read backend-host files directly. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
 | `agent/skills/list` | `{ agentId }` | `BackendSkillSummary[]` | Provider-specific skills adapted to app-owned shape. |
 | `agent/git/diff/get` | `{ agentId, target? }` | `AgentGitDiff` | Returns backend-owned diff data; failures propagate as request errors. Targets are branch, uncommitted, unstaged, staged, an exact commit, or a provider-supplied turn diff. Clients choose presentation; no panel event is emitted. |
@@ -378,7 +378,7 @@ implementation messages, not the preferred app protocol for clients.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `workspace/files/list` | `{ folder }` | `AgentFileSearchItem[]` |
-| `workspace/file/preview` | `{ folder, filePath }` | `AgentFilePreviewResult` |
+| `workspace/file/preview` | `{ folder?, filePath }` | `AgentFilePreviewResult` |
 | `workspace/folder/validate` | `{ folder }` | `null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/codeReview/run` | `{ agent, prompt, cwd, reviewMcpServerUrl, reviewerSession? }` | `BackendCodeReviewResult` | Creates a fresh provider conversation when `reviewerSession` is absent; otherwise continues that opaque provider session. |

@@ -86,7 +86,7 @@ export async function listAgentFolderFiles(
 }
 
 export async function previewAgentFolderFile(
-  folder: string,
+  folder: string | undefined,
   filePath: string,
   options: { maxBytes?: number } = {},
 ): Promise<AgentFilePreviewResult> {
@@ -122,10 +122,15 @@ export async function previewAgentFolderFile(
   };
 }
 
-async function resolveAgentFilePath(folder: string, filePath: string): Promise<{ absolutePath: string; previewPath: string }> {
-  const root = path.resolve(folder);
+async function resolveAgentFilePath(folder: string | undefined, filePath: string): Promise<{ absolutePath: string; previewPath: string }> {
   const absoluteInput = path.isAbsolute(filePath);
-  const target = absoluteInput ? path.resolve(filePath) : path.resolve(root, filePath);
+  let target: string;
+  if (absoluteInput) {
+    target = path.resolve(filePath);
+  } else {
+    if (!folder) throw new Error('This session does not have a project workspace.');
+    target = path.resolve(folder, filePath);
+  }
   const realTarget = await realpath(target);
 
   return {

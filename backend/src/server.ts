@@ -33,7 +33,7 @@ import { teamColors } from '@codex-claw/core/team-colors';
 import { sanitizeWorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
 import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/core/approval-presets';
 import { formatConversationTitle } from '@codex-claw/core/conversation-title';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { agentFolder, requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { BackendDriverRpc } from './driver-rpc';
 import { ClientPreferencesService } from './client-preferences-service';
 import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
@@ -1137,7 +1137,7 @@ export class ClawBackendServer {
           agentId,
           filePath: requireString(params.filePath, 'filePath'),
         }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.workspaceFilePreview, {
-          folder: requireAgentFolder(agent),
+          folder: agentFolder(agent),
           filePath: requireString(params.filePath, 'filePath'),
         }));
       }

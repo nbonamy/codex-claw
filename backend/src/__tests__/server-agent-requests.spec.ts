@@ -476,6 +476,50 @@ describe('ClawBackendServer', () => {
     }
   });
 
+  it('previews absolute files from a quick chat without a project workspace', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-quick-chat-file-'));
+    const filePath = path.join(tempDir, 'MEMORY.md');
+    const snapshot = createTestSnapshot();
+    snapshot.teams[0]!.agentIds = ['agent-quick-chat'];
+    snapshot.agents = [{
+      id: 'agent-quick-chat',
+      teamId: 'team-test',
+      sessionKind: 'quickChat',
+      name: null,
+      folder: null,
+      backend: 'codex',
+      status: { type: 'idle' },
+      createdAt: '2026-06-13T00:00:00.000Z',
+      updatedAt: '2026-06-13T00:00:00.000Z',
+    }];
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      driverRpc: new BackendDriverRpc(new Map()),
+    });
+
+    try {
+      await writeFile(filePath, '# Memory\n');
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'preview-quick-chat-absolute-file',
+        method: 'agent/file/preview',
+        params: { agentId: 'agent-quick-chat', filePath },
+      })).resolves.toMatchObject({
+        result: { path: filePath, kind: 'text', content: '# Memory\n' },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'preview-quick-chat-relative-file',
+        method: 'agent/file/preview',
+        params: { agentId: 'agent-quick-chat', filePath: 'MEMORY.md' },
+      })).rejects.toThrow('This session does not have a project workspace.');
+    } finally {
+      await server.close();
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('owns provider metadata and conversation-history reads by resolving agents internally', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
