@@ -410,7 +410,15 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   async loadConversation(agent: Agent): Promise<BackendSession | null> {
-    const history = await this.loadHistory(agent);
+    const sessionId = claudeSessionId(agent);
+    const hasLiveSession = () => sessionId !== null && this.liveSessionIdsByAgentId.get(agent.id) === sessionId;
+    const history = hasLiveSession() ? null : await this.loadHistory(agent);
+    const current = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
+    // A turn can start while history is being read. Keep its live message identities.
+    if (hasLiveSession() && current?.sessionId === sessionId) {
+      this.publishConversationSnapshot(current);
+      return agent.backendSession ?? null;
+    }
     if (!history) {
       return null;
     }

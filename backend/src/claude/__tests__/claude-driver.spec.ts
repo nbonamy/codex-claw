@@ -5,6 +5,8 @@ import type { ClaudeSdkMessage } from '../protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../transport';
 import type { Agent } from '@codex-claw/core/contracts';
 import type { BackendEvent } from '@codex-claw/core/backend-driver';
+import { createClaudeConversationReplica, type ClaudeConversationReplica } from '@codex-claw/core/claude-conversation-replica';
+import { claudeTranscriptToRendererMessages } from '../transcript-history-adapter';
 
 const agent: Agent = {
   id: 'agent-claude',
@@ -754,6 +756,55 @@ describe('ClaudeBackendDriver', () => {
     const answers = { 'Which approach?': { answers: ['Simple'] } };
     await driver.respondToAgentRequest({ id: 'request-question-1', outcome: { kind: 'answered', answers } });
     expect(transport.respondToPermissionRequest).toHaveBeenCalledWith('request-question-1', { answers }, agent.id);
+  });
+
+  it.each(['before', 'during'] as const)('keeps live tool calls and answer together when history loading starts %s the turn', async (loadTiming) => {
+    const transport = createFakeTransport();
+    const session = { kind: 'claude' as const, sessionId: 'claude-session-existing', transport: 'stdio' as const };
+    const persistedAgent = { ...agent, backendSession: session };
+    const tool = { type: 'tool_use' as const, id: 'git-log', name: 'Bash', input: { command: 'git log -10' } };
+    const messages = claudeTranscriptToRendererMessages([
+      { type: 'user', uuid: 'prompt-history', message: { content: 'Summarize commits' } },
+      { type: 'assistant', message: { content: [tool] } },
+      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: tool.id, content: '10 commits' }] } },
+    ].map((message) => JSON.stringify(message)).join('\n'), agent.id, session.sessionId);
+    let resolveHistory!: (history: { backendSession: typeof session; messages: typeof messages }) => void;
+    const history = new Promise<{ backendSession: typeof session; messages: typeof messages }>((resolve) => { resolveHistory = resolve; });
+    const driver = new ClaudeBackendDriver(transport, () => history);
+    let replica: ClaudeConversationReplica | undefined;
+    driver.onEvent((event) => {
+      if (event.type === 'claude.conversationSnapshotChanged') replica = createClaudeConversationReplica(event.payload.snapshot);
+      if (event.type === 'claude.conversationEventReceived') replica!.apply(event.payload.event);
+    });
+
+    try {
+      let loading = loadTiming === 'before' ? driver.loadConversation(persistedAgent) : undefined;
+      const started = await driver.sendPrompt(persistedAgent, 'Summarize commits');
+      transport.emit({ type: 'assistant', session_id: session.sessionId, message: { content: [tool] } });
+      transport.emit({ type: 'user', session_id: session.sessionId, message: { content: [{ type: 'tool_result', tool_use_id: tool.id, content: '10 commits' }] } });
+      loading ??= driver.loadConversation(persistedAgent);
+      resolveHistory({ backendSession: session, messages });
+      await loading;
+
+      transport.emit({ type: 'stream_event', session_id: session.sessionId, event: {
+        type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'All 10 commits landed today.' },
+      } });
+      expect(replica!.getSnapshot().messages.filter((message) => message.role === 'assistant')).toMatchObject([{
+        turnId: started.turnId,
+        status: 'streaming',
+        parts: [{ type: 'tool', id: tool.id, status: 'completed' }, { type: 'text', text: 'All 10 commits landed today.' }],
+      }]);
+      expect(replica!.getSnapshot()).toMatchObject({ busy: true, activeTurnId: started.turnId });
+      transport.emit({ type: 'result', subtype: 'success', session_id: session.sessionId, is_error: false });
+      expect(replica!.getSnapshot().messages.filter((message) => message.role === 'assistant')).toMatchObject([{
+        turnId: started.turnId, status: 'complete', parts: [{ type: 'tool', id: tool.id }, { type: 'text', text: 'All 10 commits landed today.' }],
+      }]);
+      const completed = replica!.getSnapshot();
+      await driver.loadConversation(persistedAgent);
+      expect(replica!.getSnapshot()).toStrictEqual(completed);
+    } finally {
+      await driver.close();
+    }
   });
 
   it('hydrates persisted Claude transcript history through the driver', async () => {

@@ -157,6 +157,10 @@ The host maintains one `ClaudeConversationSnapshot` per agent and publishes a
 bounded reset followed by revisioned provider deltas. The renderer applies
 those deltas with the shared Claude replica; `AppSnapshot` and the generic Claw
 coordination reducer never contain or mutate Claude messages.
+Conversation refreshes republish the snapshot of an open live session, preserving
+its message identities and turn state. Transcript history is used when no live
+session exists; an in-flight history read cannot replace a session started during
+that read.
 
 This gives Claude agents local prompt send, persistent multi-turn sessions,
 streaming display, session resume, and interrupt through the
