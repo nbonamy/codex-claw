@@ -7,7 +7,7 @@ type AppMenuItemBase = {
   disabled?: boolean;
   icon?: Component;
   iconUrl?: string;
-  value?: string;
+  value?: string | { addedLines: number; removedLines: number };
 };
 
 export type AppMenuActionItem = AppMenuItemBase & {

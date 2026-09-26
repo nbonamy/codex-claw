@@ -227,6 +227,8 @@ describe('AgentHeader', () => {
       expect.objectContaining({ id: 'turn', label: 'Last turn' }),
       expect.objectContaining({ id: 'commits', type: 'submenu' }),
     ]));
+    expect(menu.find('[role="menuitemradio"][aria-checked="true"]').text()).toContain('Uncommitted');
+    expect(menu.find('.app-menu__check').exists()).toBe(false);
     menu.vm.$emit('select', 'staged');
     await wrapper.vm.$nextTick();
 

@@ -26,7 +26,6 @@
           :aria-expanded="!item.disabled && item.items.length > 0"
           :disabled="item.disabled || item.items.length === 0"
         >
-          <span v-if="checkPosition === 'start'" class="app-menu__check-slot" aria-hidden="true" />
           <component
             :is="item.icon"
             v-if="item.icon"
@@ -42,7 +41,12 @@
           <span
             v-if="item.value"
             class="app-menu__value"
-          >{{ item.value }}</span>
+          >
+            <template v-if="typeof item.value === 'string'">{{ item.value }}</template>
+            <template v-else>
+              <span class="app-menu__value-added">+{{ item.value.addedLines }}</span>{{ ' ' }}<span class="app-menu__value-removed">-{{ item.value.removedLines }}</span>
+            </template>
+          </span>
           <ChevronRightIcon class="app-menu__chevron" />
         </button>
 
@@ -52,7 +56,7 @@
           :class="{ 'app-menu__submenu-menu--wide': item.submenuWidth === 'wide' }"
           :ariaLabel="item.label"
           :items="item.items"
-          :check-position="checkPosition"
+          :show-selection-check="showSelectionCheck"
           @select="$emit('select', $event)"
         />
       </div>
@@ -70,9 +74,6 @@
         :disabled="item.disabled"
         @click="selectItem(item)"
       >
-        <span v-if="checkPosition === 'start'" class="app-menu__check-slot" aria-hidden="true">
-          <CheckIcon v-if="isSelected(item) && !(item.type === 'checkbox' && item.accessory === 'switch')" class="app-menu__check" />
-        </span>
         <span
           v-if="item.type === 'action' && item.leadingColor"
           class="app-menu__color-dot"
@@ -105,7 +106,12 @@
         <span
           v-if="item.value"
           class="app-menu__value"
-        >{{ item.value }}</span>
+        >
+          <template v-if="typeof item.value === 'string'">{{ item.value }}</template>
+          <template v-else>
+            <span class="app-menu__value-added">+{{ item.value.addedLines }}</span>{{ ' ' }}<span class="app-menu__value-removed">-{{ item.value.removedLines }}</span>
+          </template>
+        </span>
         <el-switch
           v-if="item.type === 'checkbox' && item.accessory === 'switch'"
           :model-value="item.checked"
@@ -114,7 +120,7 @@
           @change="$emit('select', item.id)"
         />
         <CheckIcon
-          v-else-if="checkPosition === 'end' && isSelected(item)"
+          v-else-if="showSelectionCheck && isSelected(item)"
           class="app-menu__check"
         />
       </button>
@@ -133,8 +139,8 @@ defineOptions({
 withDefaults(defineProps<{
   ariaLabel: string;
   items: AppMenuItem[];
-  checkPosition?: 'start' | 'end';
-}>(), { checkPosition: 'end' });
+  showSelectionCheck?: boolean;
+}>(), { showSelectionCheck: true });
 
 const emit = defineEmits<{
   select: [itemId: string];
@@ -227,18 +233,12 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
 }
 
 .app-menu__icon,
-.app-menu__check-slot,
 .app-menu__check,
 .app-menu__chevron {
   width: var(--icon-md);
   height: var(--icon-md);
   flex: 0 0 auto;
   stroke-width: 2.5px;
-}
-
-.app-menu__check-slot {
-  display: flex;
-  align-items: center;
 }
 
 .app-menu__icon--empty {
@@ -284,6 +284,23 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-menu__value-added,
+.app-menu__value-removed {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-12);
+  line-height: var(--line-height-16);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-menu__value-added {
+  color: var(--color-success);
+}
+
+.app-menu__value-removed {
+  color: var(--color-error);
 }
 
 .app-menu__separator {

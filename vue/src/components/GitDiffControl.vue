@@ -37,7 +37,7 @@
     <AppMenu
       v-if="menuOpen"
       class="git-diff-control__menu"
-      check-position="start"
+      :show-selection-check="false"
       :ariaLabel="$t('surface.agentHeader.chooseRepositoryDiff')"
       :items="menuItems"
       @select="selectTarget"
@@ -49,7 +49,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import type { AgentGitDiffSummary, AgentGitDiffTarget, AgentGitStatus, TurnGitDiff } from '@codex-claw/core/contracts';
 import { CodexAnimatedDiffStat } from '@codex-app-sdk/vue';
-import { ChevronDown, FileDiffIcon, GitBranchIcon, GitCommitIcon } from '../shared/icons/app-icons';
+import { CheckIcon, ChevronDown, FileDiffIcon, GitBranchIcon, GitCommitIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { translate } from '../i18n';
@@ -87,15 +87,18 @@ const menuItems = computed<AppMenuItem[]>(() => {
     { type: 'staged' },
     ...(props.lastTurnGitDiff?.diff ? [{ type: 'turn' as const, turnId: props.lastTurnGitDiff.turnId }] : []),
   ];
-  const items: AppMenuItem[] = targets.map((target) => ({
-    id: targetId(target),
-    type: 'radio',
-    label: labelFor(target),
-    ...(target.type === 'branch' && target.baseRef ? { description: target.baseRef } : {}),
-    icon: target.type === 'branch' ? GitBranchIcon : target.type === 'turn' ? GitCommitIcon : FileDiffIcon,
-    checked: targetId(selectedTarget.value) === targetId(target),
-    value: formatSummary(summaryFor(target)),
-  }));
+  const items: AppMenuItem[] = targets.map((target) => {
+    const checked = targetId(selectedTarget.value) === targetId(target);
+    return {
+      id: targetId(target),
+      type: 'radio',
+      label: labelFor(target),
+      ...(target.type === 'branch' && target.baseRef ? { description: target.baseRef } : {}),
+      icon: checked ? CheckIcon : target.type === 'branch' ? GitBranchIcon : target.type === 'turn' ? GitCommitIcon : FileDiffIcon,
+      checked,
+      value: summaryFor(target),
+    };
+  });
   const commits = catalog?.commits ?? [];
   if (commits.length > 0) {
     items.push({ id: 'separator-commits', type: 'separator' });
@@ -105,14 +108,18 @@ const menuItems = computed<AppMenuItem[]>(() => {
       label: translate('surface.agentHeader.commits'),
       icon: GitCommitIcon,
       submenuWidth: 'wide',
-      items: commits.map((commit) => ({
-        id: `commit:${commit.sha}`,
-        type: 'radio',
-        label: commit.subject,
-        description: commit.shortSha,
-        checked: selectedTarget.value.type === 'commit' && selectedTarget.value.sha === commit.sha,
-        value: formatSummary(commit),
-      })),
+      items: commits.map((commit) => {
+        const checked = selectedTarget.value.type === 'commit' && selectedTarget.value.sha === commit.sha;
+        return {
+          id: `commit:${commit.sha}`,
+          type: 'radio',
+          label: commit.subject,
+          description: commit.shortSha,
+          icon: checked ? CheckIcon : GitCommitIcon,
+          checked,
+          value: commit,
+        };
+      }),
     });
   }
   return items;
@@ -203,10 +210,6 @@ function summaryFor(target: AgentGitDiffTarget): AgentGitDiffSummary {
   return catalog?.commits.find((commit) => commit.sha === target.sha) ?? fallbackSummary.value;
 }
 
-function formatSummary(summary: AgentGitDiffSummary): string {
-  return `+${summary.addedLines} -${summary.removedLines}`;
-}
-
 function closeMenuOnOutsideClick(event: MouseEvent): void {
   if (!root.value?.contains(event.target as Node)) menuOpen.value = false;
 }
@@ -275,5 +278,10 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
 .git-diff-control__menu :deep(.app-menu__submenu-menu) {
   right: 100%;
   left: auto;
+}
+
+.git-diff-control__menu :deep([role="menuitemradio"][aria-checked="false"] .app-menu__icon) {
+  opacity: 0.4;
+  stroke-width: 2px;
 }
 </style>
