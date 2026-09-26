@@ -63,6 +63,9 @@ describe('appCommandFromInput', () => {
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'd' })).toStrictEqual({ type: 'duplicate-active-agent' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: ',' })).toStrictEqual({ type: 'open-settings' });
     expect(appCommandFromInput({ type: 'keyDown', meta: true, key: 'k' })).toStrictEqual({ type: 'open-agent-palette' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'K' })).toStrictEqual({ type: 'compact-active-session' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'X' })).toStrictEqual({ type: 'save-active-prompt-draft' });
+    expect(appCommandFromInput({ type: 'keyDown', meta: true, shift: true, key: 'V' })).toStrictEqual({ type: 'open-saved-prompt-drafts' });
   });
 
   it('maps control tab to cycle agents', () => {

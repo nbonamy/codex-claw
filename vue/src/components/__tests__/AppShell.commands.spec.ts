@@ -382,6 +382,58 @@ describe('AppShell dialogs and commands', () => {
     });
   });
 
+  it('compacts the active session from the native shortcut and a targeted agent from its menu', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    snapshot.agents[1]!.backendSession = { kind: 'codex', threadId: 'thread-jesse' };
+    const wrapper = mountShell({ snapshot });
+
+    listener({ type: 'compact-active-session' });
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('compact-session', 'agent-jesse');
+    await nextTick();
+
+    expect(wrapper.emitted('send-agent-prompt')).toStrictEqual([
+      [{ agentId: 'agent-dina', prompt: '/compact' }],
+      [{ agentId: 'agent-jesse', prompt: '/compact' }],
+    ]);
+  });
+
+  it('saves and opens drafts from native Edit menu commands', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountRealShell({
+      stubAgentWorkspace: false,
+      realConversationPane: true,
+      composerState: { text: 'Park this prompt', selectionStart: 0, selectionEnd: 0 },
+      updateSettings,
+    });
+
+    listener({ type: 'save-active-prompt-draft' });
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith({
+      general: { savedPromptDrafts: [expect.objectContaining({ agentId: 'agent-dina', text: 'Park this prompt' })] },
+    });
+    listener({ type: 'open-saved-prompt-drafts' });
+    await flushPromises();
+
+    expect(wrapper.find('.saved-prompt-draft-picker [role="searchbox"]').exists()).toBe(true);
+  });
+
   it('reveals delayed Command-number hints and switches to the numbered agent', async () => {
     vi.useFakeTimers();
     let listener: (command: AppCommand) => void = () => undefined;

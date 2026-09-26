@@ -656,6 +656,7 @@ export type AppCommand =
   | { type: 'close-active-agent' }
   | { type: 'close-active-team' }
   | { type: 'compress-active-session' }
+  | { type: 'compact-active-session' }
   | { type: 'cycle-agents'; direction: -1 | 1 }
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
@@ -674,10 +675,12 @@ export type AppCommand =
   | { type: 'open-agent-palette' }
   | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }
   | { type: 'open-review' }
+  | { type: 'open-saved-prompt-drafts' }
   | { type: 'open-settings' }
   | { type: 'open-whats-new' }
   | { type: 'quit' }
   | { type: 'restart-active-agent' }
+  | { type: 'save-active-prompt-draft' }
   | { type: 'toggle-spoken-announcements-muted' };
 
 export type CreateAgentInput = {

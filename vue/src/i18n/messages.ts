@@ -199,6 +199,7 @@ export const messages = {
       actions: 'Agent actions',
       close: 'Close Agent',
       replaceConversationWithSummary: 'Compress Session',
+      compactSession: 'Compact Session',
       duplicate: 'Duplicate Agent',
       edit: 'Edit Agent',
       fork: 'Fork Agent',

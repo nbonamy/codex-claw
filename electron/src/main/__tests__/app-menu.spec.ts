@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MenuItemConstructorOptions } from 'electron';
 import { buildAppMenuTemplate, installAppMenu, type AppMenuCallbacks } from '../app-menu';
+import { sendAppCommand } from '../ipc-events';
+
+vi.mock('../ipc-events', () => ({ sendAppCommand: vi.fn() }));
 
 const electronMenuMocks = vi.hoisted(() => ({
   buildFromTemplate: vi.fn((template: MenuItemConstructorOptions[]) => ({
@@ -8,7 +11,9 @@ const electronMenuMocks = vi.hoisted(() => ({
       if (options.role !== 'editMenu') return { ...options };
       const items: MenuItemConstructorOptions[] = [];
       return {
-        ...options,
+        label: 'Edit',
+        id: options.id,
+        role: 'editmenu',
         submenu: {
           items,
           append(item: MenuItemConstructorOptions): void {
@@ -17,6 +22,9 @@ const electronMenuMocks = vi.hoisted(() => ({
         },
       };
     }),
+    getMenuItemById(id: string) {
+      return this.items.find((item) => item.id === id);
+    },
   })),
   MenuItem: class {
     constructor(options: MenuItemConstructorOptions) {
@@ -46,6 +54,7 @@ vi.mock('electron', () => ({
 }));
 
 beforeEach(() => {
+  vi.mocked(sendAppCommand).mockClear();
   electronMenuMocks.buildFromTemplate.mockClear();
   electronMenuMocks.setApplicationMenu.mockClear();
   electronClipboardMocks.availableFormats.mockReturnValue([]);
@@ -80,12 +89,12 @@ describe('app menu', () => {
     ]);
     expect(menu.find((item) => item.role === 'editMenu')).toBeDefined();
     expect(menuLabels(submenu(menu, 'View'))).toStrictEqual([
-      'Go to Agent...',
-      'Review',
+      'Changes',
       'Browser',
-      'Next Team',
+      'Go to Agent...',
       'Next Agent',
       'Previous Agent',
+      'Next Team',
     ]);
     expect(menuLabels(submenu(menu, 'Help'))).toStrictEqual(['What’s New']);
     expect(JSON.stringify(menu)).not.toMatch(/viewMenu|reload|forceReload|toggleDevTools/i);
@@ -102,13 +111,28 @@ describe('app menu', () => {
     const editItems = installedEditItems();
     expect(editItems.map((item) => item.type ?? item.label)).toStrictEqual([
       'separator',
+      'Save Draft for Later',
+      'Saved Drafts...',
+      'separator',
       'Edit Agent',
       'Duplicate Agent',
       'Restart Agent',
+      'separator',
+      'Compact Session',
     ]);
-    expect(editItems[1]?.accelerator).toBe('CommandOrControl+E');
-    expect(editItems[2]?.accelerator).toBe('CommandOrControl+D');
-    expect(editItems[3]?.accelerator).toBeUndefined();
+    expect(editItems[1]?.accelerator).toBe('CommandOrControl+Shift+X');
+    expect(editItems[2]?.accelerator).toBe('CommandOrControl+Shift+V');
+    expect(editItems[4]?.accelerator).toBe('CommandOrControl+E');
+    expect(editItems[5]?.accelerator).toBe('CommandOrControl+D');
+    expect(editItems[8]?.accelerator).toBe('CommandOrControl+Shift+K');
+    editItems[1]?.click?.(undefined as never, undefined as never, undefined as never);
+    editItems[2]?.click?.(undefined as never, undefined as never, undefined as never);
+    editItems[8]?.click?.(undefined as never, undefined as never, undefined as never);
+    expect(vi.mocked(sendAppCommand).mock.calls.map(([, command]) => command)).toStrictEqual([
+      { type: 'save-active-prompt-draft' },
+      { type: 'open-saved-prompt-drafts' },
+      { type: 'compact-active-session' },
+    ]);
   });
 
   it('sends app commands from menu items', () => {
@@ -121,7 +145,7 @@ describe('app menu', () => {
       ['File', 'Close Team'],
       ['File', 'Quit'],
       ['View', 'Go to Agent...'],
-      ['View', 'Review'],
+      ['View', 'Changes'],
       ['View', 'Browser'],
       ['View', 'Next Team'],
       ['View', 'Next Agent'],
@@ -150,7 +174,7 @@ describe('app menu', () => {
     expect(menuItem(menu, 'File', 'Close Team')?.accelerator).toBe('CommandOrControl+Shift+W');
     expect(menuItem(menu, 'File', 'Quit')?.accelerator).toBe('CommandOrControl+Q');
     expect(menuItem(menu, 'View', 'Go to Agent...')?.accelerator).toBe('CommandOrControl+K');
-    expect(menuItem(menu, 'View', 'Review')?.accelerator).toBe('CommandOrControl+G');
+    expect(menuItem(menu, 'View', 'Changes')?.accelerator).toBe('CommandOrControl+G');
     expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
   });
 
@@ -262,12 +286,12 @@ describe('app menu', () => {
     const releaseMenu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
     expect(menuLabels(submenu(debugMenu, 'View'))).toStrictEqual([
-      'Go to Agent...',
-      'Review',
+      'Changes',
       'Browser',
-      'Next Team',
+      'Go to Agent...',
       'Next Agent',
       'Previous Agent',
+      'Next Team',
       'Reload',
       'Toggle Developer Tools',
     ]);
@@ -601,9 +625,9 @@ function clickThreadFlagItem(template: MenuItemConstructorOptions[], label: stri
 
 function installedEditItems(): MenuItemConstructorOptions[] {
   const installedMenu = electronMenuMocks.setApplicationMenu.mock.calls.at(-1)?.[0] as {
-    items?: Array<{ role?: string; submenu?: { items?: MenuItemConstructorOptions[] } }>;
+    items?: Array<{ label?: string; submenu?: { items?: MenuItemConstructorOptions[] } }>;
   } | undefined;
-  const items = installedMenu?.items?.find((item) => item.role === 'editMenu')?.submenu?.items;
+  const items = installedMenu?.items?.find((item) => item.label === 'Edit')?.submenu?.items;
   if (!items) throw new Error('Installed native Edit menu not found');
   return items;
 }

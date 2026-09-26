@@ -269,6 +269,7 @@
       :fork-disabled="!canForkContextMenuAgent"
       :compress-visible="canReplaceContextMenuConversation"
       :compress-disabled="!canCompressContextMenuAgent"
+      :compact-disabled="!canCompactContextMenuAgent"
       :open-in-catalog="resolvedOpenInCatalog"
       :open-in-disabled="!contextMenuAgentIsLocal"
       :move-targets="contextMenuMoveTargets"
@@ -365,6 +366,7 @@ const emit = defineEmits<{
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
   'compress-session': [agentId: string];
+  'compact-session': [agentId: string];
   'cleanup-pull-request': [agentId: string];
   'update-collapsed-repositories': [repositoryKeys: string[]];
   'create-agent-from-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
@@ -421,6 +423,10 @@ const canForkContextMenuAgent = computed(() => (
 ));
 const canCompressContextMenuAgent = computed(() => (
   canReplaceContextMenuConversation.value &&
+  contextMenuAgent.value?.status.type === 'idle' &&
+  Boolean(contextMenuAgent.value.backendSession)
+));
+const canCompactContextMenuAgent = computed(() => (
   contextMenuAgent.value?.status.type === 'idle' &&
   Boolean(contextMenuAgent.value.backendSession)
 ));
@@ -651,6 +657,9 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'compress-session':
       emit('compress-session', agentId);
+      break;
+    case 'compact-session':
+      emit('compact-session', agentId);
       break;
     case 'fork-agent':
       emit('fork-agent', agentId);

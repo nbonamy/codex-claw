@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentContextMenu from '../AgentContextMenu.vue';
+import { ViewportShortIcon } from '../../shared/icons/app-icons';
 import type { Team } from '@codex-claw/core/contracts';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
@@ -24,11 +25,12 @@ describe('AgentContextMenu', () => {
       'Duplicate Agent',
       'Fork Agent',
       'Move to Other Team',
+      'Compact Session⇧⌘K',
       'Resume Session',
       'Restart Agent',
       'Close Agent',
     ]);
-    expect(wrapper.findAll('[role="separator"]')).toHaveLength(2);
+    expect(wrapper.findAll('[role="separator"]')).toHaveLength(3);
   });
 
   it('portals above shell clipping and shifts upward when opened near the viewport bottom', async () => {
@@ -88,6 +90,18 @@ describe('AgentContextMenu', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Compress Session')?.trigger('click');
 
     expect(wrapper.emitted('action')).toStrictEqual([['compress-session']]);
+  });
+
+  it('groups compact with compression and emits compact', async () => {
+    const wrapper = mountMenu({ compressVisible: true });
+    const items = wrapper.findAll('[role="menuitem"]');
+    expect(items.map((item) => item.text()).slice(4, 6)).toStrictEqual([
+      'Compact Session⇧⌘K',
+      'Compress Session',
+    ]);
+    expect(items[4]?.findComponent(ViewportShortIcon).exists()).toBe(true);
+    await items.find((item) => item.text().startsWith('Compact Session'))?.trigger('click');
+    expect(wrapper.emitted('action')).toStrictEqual([['compact-session']]);
   });
 
   it('disables move targets when no other teams are available', () => {
@@ -167,7 +181,7 @@ describe('AgentContextMenu', () => {
 });
 
 function mountMenu(
-  props: { compressDisabled?: boolean; compressVisible?: boolean; forkDisabled?: boolean; moveTargets?: Team[]; x?: number; y?: number } = {},
+  props: { compactDisabled?: boolean; compressDisabled?: boolean; compressVisible?: boolean; forkDisabled?: boolean; moveTargets?: Team[]; x?: number; y?: number } = {},
   stubTeleport = true,
 ) {
   const wrapper = mount(AgentContextMenu, {

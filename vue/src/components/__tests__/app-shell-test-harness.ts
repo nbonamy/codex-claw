@@ -50,6 +50,7 @@ const AgentSidebarStub = defineComponent({
   emits: [
     'collapse-sidebar',
     'close-agent',
+    'compact-session',
     'cleanup-pull-request',
     'create-agent-from-repository',
     'create-agent-on-branch',

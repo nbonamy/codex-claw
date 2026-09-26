@@ -38,6 +38,18 @@ export function appCommandFromInput(input: AppShortcutInput): AppCommand | null 
       return { type: 'toggle-spoken-announcements-muted' };
     }
 
+    if (input.shift === true && key === 'k') {
+      return { type: 'compact-active-session' };
+    }
+
+    if (input.shift === true && key === 'x') {
+      return { type: 'save-active-prompt-draft' };
+    }
+
+    if (input.shift === true && key === 'v') {
+      return { type: 'open-saved-prompt-drafts' };
+    }
+
     if (input.shift !== true) {
       if (key === 'n') {
         return { type: 'new-team' };

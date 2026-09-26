@@ -37,6 +37,7 @@ type AppShellCommandOptions = {
   };
   actions: {
     closeAgent: (agentId: string) => void;
+    compactSession: (agentId: string) => void;
     replaceConversationWithSummary: (agentId: string) => void;
     closeTeam: (teamId: string) => void;
     debugMarkUnread: () => void;
@@ -46,6 +47,7 @@ type AppShellCommandOptions = {
     newTeam: () => void;
     openAgentSurface: () => void;
     openAgentPalette: () => void;
+    openSavedPromptDrafts: () => void;
     openBrowser: (command: Extract<AppCommand, { type: 'open-browser' }>) => void;
     openDebugImageAnnotation: (imageDataUrl?: string, pixelRatio?: 1 | 2) => void | Promise<void>;
     openDebugOperationProgress: (
@@ -59,6 +61,7 @@ type AppShellCommandOptions = {
     openWhatsNew: () => void;
     quit: () => void | Promise<void>;
     restartAgent: (agentId: string) => void;
+    savePromptDraft: () => void;
     selectAgent: (agentId: string) => void;
     selectTeam: (teamId: string) => void;
     sendAgentPrompt: (agentId: string, prompt: string) => void;
@@ -269,6 +272,16 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       return;
     }
 
+    if (command.type === 'save-active-prompt-draft') {
+      options.actions.savePromptDraft();
+      return;
+    }
+
+    if (command.type === 'open-saved-prompt-drafts') {
+      options.actions.openSavedPromptDrafts();
+      return;
+    }
+
     if (command.type === 'toggle-spoken-announcements-muted') {
       options.actions.toggleSpokenAnnouncementsMuted();
       return;
@@ -442,6 +455,14 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       if (!isAgentWorkspaceVisible.value || !currentAgent.value) return;
       if (options.state.canReplaceConversation?.() ?? defaultBackendCapabilities(currentAgent.value.backend).conversationReplaceWithSummary) {
         options.actions.replaceConversationWithSummary(currentAgent.value.id);
+      }
+      return;
+    }
+
+    if (command.type === 'compact-active-session') {
+      if (!isAgentWorkspaceVisible.value || !currentAgent.value) return;
+      if (currentAgent.value.status.type === 'idle' && currentAgent.value.backendSession) {
+        options.actions.compactSession(currentAgent.value.id);
       }
       return;
     }

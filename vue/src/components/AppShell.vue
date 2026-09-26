@@ -55,6 +55,7 @@
       @close-team="$emit('close-team', $event)"
       @close-agent="$emit('close-agent', $event)"
       @compress-session="$emit('compress-session', $event)"
+      @compact-session="compactAgentSession($event)"
       @cleanup-pull-request="$emit('cleanup-pull-request', $event)"
       @collapse-sidebar="agentSidebarCollapsed = true"
       @create-agent-from-repository="openRepositorySessionSource"
@@ -1942,15 +1943,11 @@ const conversationPaneActions: CodexConversationPaneActions = {
   menuSelect: (item) => {
     if (item.payload && typeof item.payload === 'object' && 'kind' in item.payload) {
       if (item.payload.kind === 'save-prompt-draft') {
-        if (activeSurface.value === 'mission') void missionConversationPane.value?.saveCurrentDraft();
-        else agentWorkspace.value?.saveCurrentDraft();
+        saveActivePromptDraft();
         return;
       }
       if (item.payload.kind === 'open-saved-prompt-drafts') {
-        void nextTick(() => {
-          if (activeSurface.value === 'mission') missionConversationPane.value?.openSavedDraftPicker();
-          else agentWorkspace.value?.openSavedDraftPicker();
-        });
+        openActiveSavedPromptDrafts();
         return;
       }
     }
@@ -2059,6 +2056,22 @@ const conversationPaneController = createCodexConversationPaneController({
   actions: conversationPaneActions,
 });
 
+function saveActivePromptDraft(): void {
+  if (activeSurface.value === 'mission') void missionConversationPane.value?.saveCurrentDraft();
+  else agentWorkspace.value?.saveCurrentDraft();
+}
+
+function openActiveSavedPromptDrafts(): void {
+  void nextTick(() => {
+    if (activeSurface.value === 'mission') missionConversationPane.value?.openSavedDraftPicker();
+    else agentWorkspace.value?.openSavedDraftPicker();
+  });
+}
+
+function compactAgentSession(agentId: string): void {
+  emit('send-agent-prompt', { agentId, prompt: '/compact' });
+}
+
 const showAgentDialogTeamSelector = computed(() => agentDialogMode.value === 'create' && pendingNewAgentWorkItem.value !== null);
 const pendingNewAgentName = '';
 const pendingNewAgentWorktreeBranchName = computed(() => (
@@ -2099,6 +2112,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
   },
   actions: {
     closeAgent: (agentId) => emit('close-agent', agentId),
+    compactSession: compactAgentSession,
     replaceConversationWithSummary: (agentId) => emit('compress-session', agentId),
     closeTeam: (teamId) => emit('close-team', teamId),
     debugMarkUnread: () => emit('debug-mark-unread'),
@@ -2107,6 +2121,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     focusComposer: () => agentWorkspace.value?.focusComposer(),
     newTeam: openNewTeam,
     openAgentPalette: () => { agentQuickOpenVisible.value = true; },
+    openSavedPromptDrafts: openActiveSavedPromptDrafts,
     openAgentSurface: () => { activeSurface.value = 'agent'; },
     openBrowser: (command) => agentWorkspace.value?.handleBrowserOpenCommand(command),
     openDebugImageAnnotation,
@@ -2119,6 +2134,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openWhatsNew,
     quit,
     restartAgent: (agentId) => emit('restart-agent', agentId),
+    savePromptDraft: saveActivePromptDraft,
     selectAgent: selectAgentFromShell,
     selectTeam: selectTeamFromRail,
     sendAgentPrompt: (agentId, prompt) => emit('send-agent-prompt', { agentId, prompt }),

@@ -70,6 +70,7 @@ export {
   IconTextWrapDisabled as TextWrapDisabledIcon,
   IconTrash as Trash2Icon,
   IconUserCircle as UserCircleIcon,
+  IconViewportShort as ViewportShortIcon,
   IconVolume as VolumeIcon,
   IconVolumeOff as VolumeOffIcon,
   IconX as X,

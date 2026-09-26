@@ -34,6 +34,7 @@ export type AppMenuCallbacks = {
 };
 
 type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
+const editMenuId = 'claw-edit-menu';
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -387,14 +388,25 @@ function buildFileMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions 
 }
 
 function buildEditMenu(): MenuItemConstructorOptions {
-  return { role: 'editMenu' };
+  return { id: editMenuId, role: 'editMenu' };
 }
 
 function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): void {
-  const editMenu = menu.items.find((item) => item.role === 'editMenu')?.submenu;
+  const editMenu = menu.getMenuItemById(editMenuId)?.submenu;
   if (!editMenu) return;
 
   [
+    { type: 'separator' as const },
+    {
+      label: mainT('menu.saveDraft'),
+      accelerator: 'CommandOrControl+Shift+X',
+      click: () => callbacks.sendAppCommand({ type: 'save-active-prompt-draft' }),
+    },
+    {
+      label: mainT('menu.savedDrafts'),
+      accelerator: 'CommandOrControl+Shift+V',
+      click: () => callbacks.sendAppCommand({ type: 'open-saved-prompt-drafts' }),
+    },
     { type: 'separator' as const },
     {
       label: mainT('menu.editAgent'),
@@ -410,6 +422,12 @@ function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): 
       label: mainT('menu.restartAgent'),
       click: () => callbacks.sendAppCommand({ type: 'restart-active-agent' }),
     },
+    { type: 'separator' as const },
+    {
+      label: mainT('menu.compactSession'),
+      accelerator: 'CommandOrControl+Shift+K',
+      click: () => callbacks.sendAppCommand({ type: 'compact-active-session' }),
+    },
   ].forEach((item) => editMenu.append(new MenuItem(item)));
 }
 
@@ -418,12 +436,7 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
     label: mainT('menu.view'),
     submenu: [
       {
-        label: mainT('menu.goToAgent'),
-        accelerator: 'CommandOrControl+K',
-        click: () => callbacks.sendAppCommand({ type: 'open-agent-palette' }),
-      },
-      {
-        label: mainT('menu.review'),
+        label: mainT('menu.changes'),
         accelerator: 'CommandOrControl+G',
         click: () => callbacks.sendAppCommand({ type: 'open-review' }),
       },
@@ -434,9 +447,9 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
       },
       { type: 'separator' },
       {
-        label: mainT('menu.nextTeam'),
-        accelerator: cycleTeamsAccelerator,
-        click: () => callbacks.sendAppCommand({ type: 'cycle-teams' }),
+        label: mainT('menu.goToAgent'),
+        accelerator: 'CommandOrControl+K',
+        click: () => callbacks.sendAppCommand({ type: 'open-agent-palette' }),
       },
       {
         label: mainT('menu.nextAgent'),
@@ -447,6 +460,12 @@ function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Me
         label: mainT('menu.previousAgent'),
         accelerator: 'Control+Shift+Tab',
         click: () => callbacks.sendAppCommand({ type: 'cycle-agents', direction: -1 }),
+      },
+      { type: 'separator' },
+      {
+        label: mainT('menu.nextTeam'),
+        accelerator: cycleTeamsAccelerator,
+        click: () => callbacks.sendAppCommand({ type: 'cycle-teams' }),
       },
       ...(options.debugMode ? [
         { type: 'separator' as const },

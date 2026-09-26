@@ -30,6 +30,7 @@ import {
   PencilIcon,
   RefreshIcon,
   SwitchHorizontalIcon,
+  ViewportShortIcon,
   X,
 } from '../shared/icons/app-icons';
 import { openInApplicationFromMenuItem, openInMenuItems } from '../shared/open-in';
@@ -37,6 +38,7 @@ import { openInApplicationFromMenuItem, openInMenuItems } from '../shared/open-i
 export type AgentContextMenuAction =
   | 'close-agent'
   | 'compress-session'
+  | 'compact-session'
   | 'duplicate-agent'
   | 'edit-agent'
   | 'fork-agent'
@@ -46,6 +48,7 @@ export type AgentContextMenuAction =
 const props = defineProps<{
   compressDisabled?: boolean;
   compressVisible?: boolean;
+  compactDisabled?: boolean;
   moveTargets?: Team[];
   forkDisabled?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
@@ -113,7 +116,15 @@ const menuItems = computed<AppMenuItem[]>(() => [
       leadingColor: team.color ?? defaultTeamColor,
     })),
   },
-  { id: 'group-danger', type: 'separator' },
+  { id: 'group-session', type: 'separator' },
+  {
+    id: 'compact-session',
+    type: 'action',
+    label: t('agents.compactSession'),
+    icon: ViewportShortIcon,
+    value: '⇧⌘K',
+    disabled: props.compactDisabled === true,
+  },
   ...(props.compressVisible === true ? [{
     id: 'compress-session',
     type: 'action',
@@ -121,6 +132,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
     icon: ArrowsMinimizeIcon,
     disabled: props.compressDisabled === true,
   } satisfies AppMenuItem] : []),
+  { id: 'group-lifecycle', type: 'separator' },
   {
     id: 'resume-session',
     type: 'action',
@@ -218,6 +230,7 @@ function teamIdFromMoveItemId(itemId: string): string | null {
 function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAction {
   return itemId === 'close-agent' ||
     itemId === 'compress-session' ||
+    itemId === 'compact-session' ||
     itemId === 'duplicate-agent' ||
     itemId === 'edit-agent' ||
     itemId === 'fork-agent' ||
