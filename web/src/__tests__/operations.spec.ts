@@ -83,6 +83,9 @@ describe('Claw web operations', () => {
     expect(request).toHaveBeenLastCalledWith(backendMethods.agentQuickChatCreate, {
       input: { teamId: 'team-one' },
     });
+
+    await invokeClawWebOperation({ request }, 'continueInterruptedTurn', ['agent-dina']);
+    expect(request).toHaveBeenLastCalledWith(backendMethods.agentTurnContinueInterrupted, { agentId: 'agent-dina' });
   });
 
   it('exposes mission operations through the browser operation allowlist', async () => {

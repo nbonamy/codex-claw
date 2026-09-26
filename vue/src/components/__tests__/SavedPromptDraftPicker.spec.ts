@@ -10,6 +10,21 @@ const drafts = [
 ];
 
 describe('SavedPromptDraftPicker', () => {
+  it('explains how to save the first draft without showing that hint for an unmatched search', async () => {
+    const wrapper = mount(SavedPromptDraftPicker, { attachTo: document.body, props: { drafts: [] }, global: { plugins: [i18n] } });
+    await nextTick();
+    expect(wrapper.find('[role="searchbox"]').exists()).toBe(false);
+    expect(document.activeElement).toBe(wrapper.element);
+    expect(wrapper.get('.saved-prompt-draft-picker__empty').text()).toBe('No saved drafts. Use ⇧⌘X to save one.');
+    await wrapper.trigger('keydown', { key: 'Escape' });
+    expect(wrapper.emitted('close')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ drafts });
+    expect(wrapper.find('[role="searchbox"]').exists()).toBe(true);
+    await wrapper.get<HTMLInputElement>('input[role="searchbox"]').setValue('nothing matches');
+    expect(wrapper.get('.saved-prompt-draft-picker__empty').text()).toBe('No matching drafts.');
+  });
+
   it('searches drafts and offers restore, insert-copy, and deletion from the keyboard or rows', async () => {
     const wrapper = mount(SavedPromptDraftPicker, { attachTo: document.body, props: { drafts }, global: { plugins: [i18n] } });
     const search = wrapper.get<HTMLInputElement>('input[role="searchbox"]');

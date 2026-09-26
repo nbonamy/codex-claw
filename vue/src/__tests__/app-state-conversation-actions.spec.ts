@@ -408,6 +408,29 @@ describe('useAppState', () => {
     expect(retryTurn).toHaveBeenCalledWith('agent-dina', 'turn-1');
   });
 
+  it('continues a Codex interrupted turn through preload without sending a prompt', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const continuedSnapshot = structuredClone(remoteSnapshot);
+    continuedSnapshot.agents[0]!.status = { type: 'working' };
+    const continueInterruptedTurn = vi.fn().mockResolvedValue(continuedSnapshot);
+    const sendPrompt = vi.fn();
+    stubElectronTestWindow({ codexClaw: {
+      getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
+      continueInterruptedTurn,
+      sendPrompt,
+      onEvent: vi.fn(),
+    } satisfies Partial<CodexClawApi> });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.continueInterruptedTurn();
+
+    expect(continueInterruptedTurn).toHaveBeenCalledExactlyOnceWith('agent-dina');
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(state.snapshot.value.agents[0]?.status).toStrictEqual({ type: 'working' });
+  });
+
   it('blocks message actions when the active backend does not support them', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].backend = 'claude';

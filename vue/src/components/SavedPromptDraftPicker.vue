@@ -1,6 +1,6 @@
 <template>
-  <div class="saved-prompt-draft-picker" role="region" :aria-label="t('chat.savedDrafts.title')">
-    <div class="saved-prompt-draft-picker__header">
+  <div ref="pickerRoot" class="saved-prompt-draft-picker" role="region" :aria-label="t('chat.savedDrafts.title')" :tabindex="drafts.length === 0 ? -1 : undefined" @keydown.esc="closeOnEscape">
+    <div v-if="drafts.length > 0" class="saved-prompt-draft-picker__header">
       <input
         ref="searchInput"
         v-model="query"
@@ -33,7 +33,9 @@
           <XIcon aria-hidden="true" />
         </button>
       </div>
-      <p v-if="matches.length === 0" class="saved-prompt-draft-picker__empty">{{ t('chat.savedDrafts.empty') }}</p>
+      <p v-if="matches.length === 0" class="saved-prompt-draft-picker__empty">
+        {{ t(drafts.length === 0 ? 'chat.savedDrafts.empty' : 'chat.savedDrafts.noMatch') }}
+      </p>
     </div>
   </div>
 </template>
@@ -51,6 +53,7 @@ const emit = defineEmits<{
   select: [selection: { id: string; keep: boolean }];
 }>();
 const { t } = useI18n();
+const pickerRoot = ref<HTMLElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const activeIndex = ref(0);
@@ -62,12 +65,14 @@ const matches = computed(() => {
 const activeDraft = computed(() => matches.value[activeIndex.value]);
 watch(query, () => { activeIndex.value = 0; });
 watch(matches, (items) => { activeIndex.value = Math.min(activeIndex.value, Math.max(0, items.length - 1)); });
-onMounted(() => void nextTick(() => searchInput.value?.focus()));
+function focusPicker(): void { (searchInput.value ?? pickerRoot.value)?.focus(); }
+onMounted(() => void nextTick(focusPicker));
+watch(() => props.drafts.length === 0, () => void nextTick(focusPicker));
 
 function optionId(id: string): string { return `${listId}-${id}`; }
 function preview(text: string): string { return text.replace(/\s+/gu, ' ').trim(); }
+function closeOnEscape(event: KeyboardEvent): void { event.preventDefault(); emit('close'); }
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') { event.preventDefault(); emit('close'); return; }
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
     if (matches.value.length) activeIndex.value = (activeIndex.value + (event.key === 'ArrowDown' ? 1 : -1) + matches.value.length) % matches.value.length;
@@ -91,6 +96,7 @@ function handleKeydown(event: KeyboardEvent): void {
   background: var(--color-surface-lowest);
   box-shadow: var(--shadow-lg);
 }
+.saved-prompt-draft-picker:focus { outline: none; }
 
 .saved-prompt-draft-picker__header { display: flex; align-items: center; border-bottom: 1px solid var(--color-border); }
 .saved-prompt-draft-picker__search {
@@ -138,6 +144,6 @@ function handleKeydown(event: KeyboardEvent): void {
 }
 .saved-prompt-draft-picker__action:hover { color: var(--color-text); background: var(--color-surface-high); }
 .saved-prompt-draft-picker__action svg { width: var(--icon-sm); height: var(--icon-sm); }
-.saved-prompt-draft-picker__empty { margin: 0; padding: var(--space-3) var(--space-4); color: var(--color-text-muted); font-size: var(--font-size-12); }
+.saved-prompt-draft-picker__empty { margin: 0; padding: var(--space-2) var(--space-4); color: var(--color-text-muted); font: inherit; }
 .saved-prompt-draft-picker__hint { flex: 0 0 auto; padding-right: var(--space-4); color: var(--color-text-muted); font-size: var(--font-size-12); white-space: nowrap; }
 </style>

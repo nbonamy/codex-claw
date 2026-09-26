@@ -597,7 +597,8 @@ export const messages = {
       savedDrafts: {
         title: 'Saved drafts',
         search: 'Search saved drafts',
-        empty: 'No saved drafts',
+        empty: 'No saved drafts. Use ⇧⌘X to save one.',
+        noMatch: 'No matching drafts.',
         hint: '⇧⏎ to insert a copy',
         save: 'Save draft for later',
         saved: 'Draft saved. Use ⇧⌘V to recall it.',

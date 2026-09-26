@@ -126,6 +126,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   deleteTurn: [backendMethods.agentTurnDelete, named('agentId', 'turnId')],
   editTurn: [backendMethods.agentTurnEdit, named('agentId', 'turnId', 'content')],
   retryTurn: [backendMethods.agentTurnRetry, named('agentId', 'turnId')],
+  continueInterruptedTurn: [backendMethods.agentTurnContinueInterrupted, named('agentId')],
   respondToClientRequest: [backendMethods.agentRequestRespond, (args) => ({ response: agentResponseFromClientResponse(args[0] as ClientRequestResponse) })],
 };
 

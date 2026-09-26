@@ -10,6 +10,7 @@ import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/sna
 import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import type { AppCommand, CodexClawApi, Team } from '@codex-claw/core/contracts';
 import { useConfetti } from '../../shared/confetti/use-confetti';
+import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 
 import {
   clickPortaledMenuItem,
@@ -45,6 +46,33 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it('continues a restored interrupted Codex turn without submitting a prompt', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const continueInterruptedTurnAction = vi.fn().mockResolvedValue(undefined);
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({
+      snapshot,
+      realConversationPane: true,
+      stubAgentWorkspace: false,
+      continueInterruptedTurnAction,
+      sendPromptAction,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('partial-answer', 'assistant', 'Partial work', 'turn-interrupted'),
+      ], {
+        activeConversationId: 'thread-dina',
+        turnIds: ['turn-interrupted'],
+        turns: [{ id: 'turn-interrupted', status: 'interrupted', error: null, willRetry: false,
+          startedAt: null, completedAt: null, durationMs: null }],
+      }),
+    });
+
+    await wrapper.get('button[aria-label="Continue"]').trigger('click');
+
+    expect(continueInterruptedTurnAction).toHaveBeenCalledOnce();
+    expect(sendPromptAction).not.toHaveBeenCalled();
+  });
+
   it.each(['Enter', 'Tab'])('keeps /goal pending after %s and submits the objective through the host', async (key) => {
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountRealShell({ realConversationPane: true, sendPromptAction });
@@ -406,6 +434,27 @@ describe('AppShell dialogs and commands', () => {
     ]);
   });
 
+  it('forks and opens conversation history for the active agent from native Agent commands', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
+    const wrapper = mountShell({ snapshot });
+
+    listener({ type: 'fork-active-agent' });
+    listener({ type: 'resume-active-session' });
+    await nextTick();
+
+    expect(wrapper.emitted('fork-agent')).toStrictEqual([['agent-dina']]);
+    expect(wrapper.findComponent({ name: 'ConversationHistoryDialog' }).exists()).toBe(true);
+  });
+
   it('saves and opens drafts from native Edit menu commands', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
     window.codexClaw = {
@@ -431,7 +480,7 @@ describe('AppShell dialogs and commands', () => {
     listener({ type: 'open-saved-prompt-drafts' });
     await flushPromises();
 
-    expect(wrapper.find('.saved-prompt-draft-picker [role="searchbox"]').exists()).toBe(true);
+    expect(wrapper.find('.saved-prompt-draft-picker').exists()).toBe(true);
   });
 
   it('reveals delayed Command-number hints and switches to the numbered agent', async () => {
@@ -1047,13 +1096,17 @@ describe('AppShell dialogs and commands', () => {
 
     listener({ type: 'close-active-agent' });
     listener({ type: 'duplicate-active-agent' });
+    listener({ type: 'fork-active-agent' });
     listener({ type: 'restart-active-agent' });
+    listener({ type: 'resume-active-session' });
     listener({ type: 'edit-active-agent' });
     listener({ type: 'close-active-team' });
 
     expect(wrapper.emitted('close-agent')).toBeUndefined();
     expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
+    expect(wrapper.emitted('fork-agent')).toBeUndefined();
     expect(wrapper.emitted('restart-agent')).toBeUndefined();
+    expect(wrapper.findComponent({ name: 'ConversationHistoryDialog' }).exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Edit Agent');
     expect(wrapper.emitted('close-team')).toBeUndefined();
   });

@@ -56,7 +56,7 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     setDebugThreadFlag: options.setDebugThreadFlag,
   };
   const menu = Menu.buildFromTemplate(buildAppMenuTemplate(callbacks, menuOptions));
-  appendAgentActionsToEditMenu(menu, callbacks);
+  appendDraftActionsToEditMenu(menu, callbacks);
   Menu.setApplicationMenu(menu);
 }
 
@@ -70,6 +70,7 @@ export function buildAppMenuTemplate(
     buildFileMenu(callbacks),
     buildEditMenu(),
     buildViewMenu(callbacks, options),
+    buildAgentMenu(callbacks),
     ...(options.debugMode ? [buildDebugMenu(callbacks)] : []),
     buildWindowMenu(callbacks, platform),
     buildHelpMenu(callbacks),
@@ -391,7 +392,7 @@ function buildEditMenu(): MenuItemConstructorOptions {
   return { id: editMenuId, role: 'editMenu' };
 }
 
-function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): void {
+function appendDraftActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): void {
   const editMenu = menu.getMenuItemById(editMenuId)?.submenu;
   if (!editMenu) return;
 
@@ -407,28 +408,48 @@ function appendAgentActionsToEditMenu(menu: Menu, callbacks: AppMenuCallbacks): 
       accelerator: 'CommandOrControl+Shift+V',
       click: () => callbacks.sendAppCommand({ type: 'open-saved-prompt-drafts' }),
     },
-    { type: 'separator' as const },
-    {
-      label: mainT('menu.editAgent'),
-      accelerator: 'CommandOrControl+E',
-      click: () => callbacks.sendAppCommand({ type: 'edit-active-agent' }),
-    },
-    {
-      label: mainT('menu.duplicateAgent'),
-      accelerator: 'CommandOrControl+D',
-      click: () => callbacks.sendAppCommand({ type: 'duplicate-active-agent' }),
-    },
-    {
-      label: mainT('menu.restartAgent'),
-      click: () => callbacks.sendAppCommand({ type: 'restart-active-agent' }),
-    },
-    { type: 'separator' as const },
-    {
-      label: mainT('menu.compactSession'),
-      accelerator: 'CommandOrControl+Shift+K',
-      click: () => callbacks.sendAppCommand({ type: 'compact-active-session' }),
-    },
   ].forEach((item) => editMenu.append(new MenuItem(item)));
+}
+
+function buildAgentMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
+  return {
+    label: mainT('menu.agent'),
+    submenu: [
+      {
+        label: mainT('menu.editAgent'),
+        accelerator: 'CommandOrControl+E',
+        click: () => callbacks.sendAppCommand({ type: 'edit-active-agent' }),
+      },
+      {
+        label: mainT('menu.duplicateAgent'),
+        accelerator: 'CommandOrControl+D',
+        click: () => callbacks.sendAppCommand({ type: 'duplicate-active-agent' }),
+      },
+      {
+        label: mainT('menu.forkAgent'),
+        click: () => callbacks.sendAppCommand({ type: 'fork-active-agent' }),
+      },
+      { type: 'separator' },
+      {
+        label: mainT('menu.compactSession'),
+        accelerator: 'CommandOrControl+Shift+K',
+        click: () => callbacks.sendAppCommand({ type: 'compact-active-session' }),
+      },
+      {
+        label: mainT('menu.compressSession'),
+        click: () => callbacks.sendAppCommand({ type: 'compress-active-session' }),
+      },
+      { type: 'separator' },
+      {
+        label: mainT('menu.resumeSession'),
+        click: () => callbacks.sendAppCommand({ type: 'resume-active-session' }),
+      },
+      {
+        label: mainT('menu.restartAgent'),
+        click: () => callbacks.sendAppCommand({ type: 'restart-active-agent' }),
+      },
+    ],
+  };
 }
 
 function buildViewMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {

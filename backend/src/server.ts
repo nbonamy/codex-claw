@@ -1709,6 +1709,15 @@ export class ClawBackendServer {
           return snapshot;
         });
       }
+      case backendMethods.agentTurnContinueInterrupted: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentTurnContinueInterrupted, { agentId }, async () => {
+          const snapshot = await this.agentConversations.continueInterruptedTurn(agentId);
+          if (!snapshot) throw new Error(`Agent not found: ${agentId}`);
+          return snapshot;
+        });
+      }
       case backendMethods.teamConnect:
       case backendMethods.teamCreate: {
         const input = requireTeamCreateInput(message.params);

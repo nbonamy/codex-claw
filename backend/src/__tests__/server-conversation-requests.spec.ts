@@ -524,6 +524,10 @@ describe('ClawBackendServer', () => {
       backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
       activeTurnId: 'turn-new',
     });
+    const continueInterruptedTurn = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
+      activeTurnId: 'turn-continued',
+    });
     const editTurn = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex' as const, threadId: 'thread-dina' },
       activeTurnId: 'turn-edited',
@@ -537,6 +541,7 @@ describe('ClawBackendServer', () => {
       respondToAgentRequest: async () => undefined,
       editTurn,
       retryTurn,
+      continueInterruptedTurn,
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
@@ -555,6 +560,16 @@ describe('ClawBackendServer', () => {
     });
 
     expect(retryTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'turn-1');
+
+    snapshot.agents[0]!.status = { type: 'idle' };
+    const continued = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'continue-interrupted',
+      method: 'agent/turn/continueInterrupted',
+      params: { agentId: 'agent-dina' },
+    });
+    expect(continueInterruptedTurn).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
+    expect(continued).toMatchObject({ result: { agents: [{ status: { type: 'working' } }] } });
 
     snapshot.agents[0]!.status = { type: 'idle' };
     await server.handleMessage({

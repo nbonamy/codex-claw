@@ -171,6 +171,7 @@ export function createClientApiMock(
     deleteTurn: unscripted('deleteTurn'),
     editTurn: unscripted('editTurn'),
     retryTurn: unscripted('retryTurn'),
+    continueInterruptedTurn: unscripted('continueInterruptedTurn'),
     browserOpen: unscripted('browserOpen'),
     browserOpenVisualization: unscripted('browserOpenVisualization'),
     browserNavigate: unscripted('browserNavigate'),

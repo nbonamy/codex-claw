@@ -168,6 +168,24 @@ describe('ConversationPane', () => {
     expect(wrapper.getComponent({ name: 'CodexConversationPane' }).props('controller')).toStrictEqual(controller);
   });
 
+  it('sends continue from the empty composer through the AppShell controller', async () => {
+    const submit = vi.fn();
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: { conversationKey: 'agent:agent-dina', messages },
+        composer: { placeholder: 'Ask for follow-up changes' },
+      },
+      actions: { submit },
+    });
+    const wrapper = mountPane({ controller, agent });
+    const send = wrapper.get('button[aria-label="Send continue prompt"]');
+
+    await send.trigger('mouseenter');
+    await send.trigger('click');
+
+    expect(submit).toHaveBeenCalledWith('continue', undefined);
+  });
+
   it('floats active plan progress independently of controller state', () => {
     const controller = controllerFor(messages);
     const wrapper = mountPane({ controller, agent, plan: executionPlan });

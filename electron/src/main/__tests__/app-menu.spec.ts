@@ -78,8 +78,10 @@ const callbacks = (): AppMenuCallbacks => ({
 });
 
 describe('app menu', () => {
-  it('builds app-owned file and view menus with the native Edit menu', () => {
+  it('builds app-owned file, view, and agent menus with the native Edit menu', () => {
     const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
+
+    expect(menu.map((item) => item.label)).toStrictEqual(['Codex Claw', 'File', undefined, 'View', 'Agent', 'Window', 'Help']);
 
     expect(menuLabels(submenu(menu, 'File'))).toStrictEqual([
       'New Team',
@@ -96,11 +98,22 @@ describe('app menu', () => {
       'Previous Agent',
       'Next Team',
     ]);
+    expect(submenu(menu, 'Agent').map((item) => item.type ?? item.label)).toStrictEqual([
+      'Edit Agent',
+      'Duplicate Agent',
+      'Fork Agent',
+      'separator',
+      'Compact Session',
+      'Compress Session',
+      'separator',
+      'Resume Session',
+      'Restart Agent',
+    ]);
     expect(menuLabels(submenu(menu, 'Help'))).toStrictEqual(['What’s New']);
     expect(JSON.stringify(menu)).not.toMatch(/viewMenu|reload|forceReload|toggleDevTools/i);
   });
 
-  it('appends app-owned agent actions to the realized native Edit menu', () => {
+  it('keeps only draft actions in the realized native Edit menu', () => {
     installAppMenu({
       webContents: {
         reload: vi.fn(),
@@ -113,26 +126,45 @@ describe('app menu', () => {
       'separator',
       'Save Draft for Later',
       'Saved Drafts...',
-      'separator',
-      'Edit Agent',
-      'Duplicate Agent',
-      'Restart Agent',
-      'separator',
-      'Compact Session',
     ]);
     expect(editItems[1]?.accelerator).toBe('CommandOrControl+Shift+X');
     expect(editItems[2]?.accelerator).toBe('CommandOrControl+Shift+V');
-    expect(editItems[4]?.accelerator).toBe('CommandOrControl+E');
-    expect(editItems[5]?.accelerator).toBe('CommandOrControl+D');
-    expect(editItems[8]?.accelerator).toBe('CommandOrControl+Shift+K');
     editItems[1]?.click?.(undefined as never, undefined as never, undefined as never);
     editItems[2]?.click?.(undefined as never, undefined as never, undefined as never);
-    editItems[8]?.click?.(undefined as never, undefined as never, undefined as never);
     expect(vi.mocked(sendAppCommand).mock.calls.map(([, command]) => command)).toStrictEqual([
       { type: 'save-active-prompt-draft' },
       { type: 'open-saved-prompt-drafts' },
-      { type: 'compact-active-session' },
     ]);
+  });
+
+  it('routes Agent menu actions to the active session in context-menu order', () => {
+    const nextCallbacks = callbacks();
+    const menu = buildAppMenuTemplate(nextCallbacks, { debugMode: false }, 'darwin');
+    const actions = [
+      'Edit Agent',
+      'Duplicate Agent',
+      'Fork Agent',
+      'Compact Session',
+      'Compress Session',
+      'Resume Session',
+      'Restart Agent',
+    ];
+
+    actions.forEach((label) => clickItem(menu, 'Agent', label));
+
+    expect(nextCallbacks.sendAppCommand).toHaveBeenCalledTimes(actions.length);
+    expect(vi.mocked(nextCallbacks.sendAppCommand).mock.calls.map(([command]) => command)).toStrictEqual([
+      { type: 'edit-active-agent' },
+      { type: 'duplicate-active-agent' },
+      { type: 'fork-active-agent' },
+      { type: 'compact-active-session' },
+      { type: 'compress-active-session' },
+      { type: 'resume-active-session' },
+      { type: 'restart-active-agent' },
+    ]);
+    expect(menuItem(menu, 'Agent', 'Edit Agent')?.accelerator).toBe('CommandOrControl+E');
+    expect(menuItem(menu, 'Agent', 'Duplicate Agent')?.accelerator).toBe('CommandOrControl+D');
+    expect(menuItem(menu, 'Agent', 'Compact Session')?.accelerator).toBe('CommandOrControl+Shift+K');
   });
 
   it('sends app commands from menu items', () => {

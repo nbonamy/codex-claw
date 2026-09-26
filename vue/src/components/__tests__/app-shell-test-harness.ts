@@ -185,6 +185,7 @@ export function mountShell(overrides: Partial<{
   deleteTurnAction: (turnId: string) => Promise<void>;
   editTurnAction: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction: (turnId: string) => Promise<void>;
+  continueInterruptedTurnAction: () => Promise<void>;
   startCodeReview: (
     agentId: string,
     input: import('@codex-claw/core/code-review').CodeReviewStartInput,
@@ -222,6 +223,7 @@ export function mountShell(overrides: Partial<{
       deleteTurnAction: overrides.deleteTurnAction,
       editTurnAction: overrides.editTurnAction,
       retryTurnAction: overrides.retryTurnAction,
+      continueInterruptedTurnAction: overrides.continueInterruptedTurnAction,
       startCodeReview: overrides.startCodeReview,
       startVisualize: overrides.startVisualize,
       setVisualizeOpen: overrides.setVisualizeOpen,

@@ -130,6 +130,7 @@ export type AgentBackendDriver = {
   deleteTurn?(agent: Agent, turnId: string): Promise<BackendTurnActionResult>;
   editTurn?(agent: Agent, turnId: string, content: string): Promise<BackendTurnActionResult>;
   retryTurn?(agent: Agent, turnId: string): Promise<BackendTurnActionResult>;
+  continueInterruptedTurn?(agent: Agent): Promise<BackendTurnActionResult>;
   listModels?(agent: Agent): Promise<BackendModelOption[]>;
   listPlugins?(agent: Agent): Promise<BackendPluginSummary[]>;
   listSkills?(agent: Agent): Promise<BackendSkillSummary[]>;

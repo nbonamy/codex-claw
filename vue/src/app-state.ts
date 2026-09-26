@@ -604,6 +604,20 @@ export function useAppState() {
     }
   }
 
+  async function continueInterruptedTurn(): Promise<void> {
+    const agent = activeAgent.value;
+    if (agent?.backend !== 'codex' || !agent.backendSession || !codexClawApi?.continueInterruptedTurn || isAgentSending(agent.id)) {
+      return;
+    }
+
+    markAgentSending(agent.id, true);
+    try {
+      adoptBackgroundSnapshot(await codexClawApi.continueInterruptedTurn(agent.id));
+    } finally {
+      markAgentSending(agent.id, false);
+    }
+  }
+
   async function updateQueuedPrompt(promptId: string, prompt: string): Promise<void> {
     const agentId = activeAgent.value?.id;
     if (!agentId || !codexClawApi?.updateQueuedPrompt) {
@@ -1611,6 +1625,7 @@ export function useAppState() {
     deleteTurn,
     editTurn,
     retryTurn,
+    continueInterruptedTurn,
     steerQueuedPrompt,
     updateQueuedPrompt,
     removeQueuedPrompt,

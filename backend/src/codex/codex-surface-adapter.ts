@@ -470,6 +470,17 @@ export class CodexSurfaceAgentAdapter {
     };
   }
 
+  async continueInterruptedTurn(agent: Agent) {
+    const session = await this.ensureSession(agent);
+    const snapshot = await invokeCodexConversationBridgeOperation(
+      this.surface, session.handle.id, 'continueInterruptedTurn', [],
+    );
+    return {
+      threadId: session.handle.id,
+      activeTurnId: snapshot.activeTurnId,
+    };
+  }
+
   async readConversationMessages(threadId: string, agentId: string): Promise<RendererMessage[]> {
     await this.start();
     const owner = this.subagentOwners.get(threadId);

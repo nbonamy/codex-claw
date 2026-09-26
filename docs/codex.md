@@ -278,6 +278,12 @@ generic queue presentation and interaction. This is distinct from any
 provider-native queue represented by the SDK conversation snapshot; Claw must
 not substitute the provider snapshot's queue for its own admitted prompts.
 
+The SDK pane's Continue control for a restored interrupted turn invokes a
+dedicated Claw controller action. Claw routes it through IPC and `clawd` to the
+Codex conversation handle's `continueInterruptedTurn()` operation, which starts
+the next turn with empty input only after confirming the latest turn is
+interrupted. It must not submit the text `continue` as a new user prompt.
+
 The Resume Session dialog opened from an agent's sidebar menu searches both
 active and archived SDK conversation catalogs with the agent folder as an
 exact `cwd` filter. `ConversationSummary.storageState` tells the UI which rows

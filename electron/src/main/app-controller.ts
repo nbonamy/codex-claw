@@ -614,6 +614,10 @@ export class AppController {
       return this.retryTurn(agentId, turnId);
     });
 
+    ipc.handle(ipcChannels.continueInterruptedTurn, (_event, agentId: string) => {
+      return this.continueInterruptedTurn(agentId);
+    });
+
     ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string, guestWebContentsId: number) => this.browserOpen(agentId, browserId, url, guestWebContentsId));
     ipc.handle(ipcChannels.browserOpenVisualization, (_event, agentId: string, browserId: string, filePath: string, title: string, guestWebContentsId: number) => this.browserOpenVisualization(agentId, browserId, filePath, title, guestWebContentsId));
     ipc.handle(ipcChannels.browserNavigate, (_event, agentId: string, browserId: string, url: string) => this.browserNavigate(agentId, browserId, url));
@@ -1395,6 +1399,10 @@ export class AppController {
 
   private async retryTurn(agentId: string, turnId: string): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnRetry, { agentId, turnId }));
+  }
+
+  private async continueInterruptedTurn(agentId: string): Promise<AppSnapshot> {
+    return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentTurnContinueInterrupted, { agentId }));
   }
 
   private async chooseAgentFolder(): Promise<string | null> {

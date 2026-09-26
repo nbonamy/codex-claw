@@ -382,7 +382,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/turn/delete', { agentId: 'agent-dina', turnId: 'turn-2' });
   });
 
-  it('retries a Codex turn', async () => {
+  it('routes retry and interrupted-turn continuation to distinct backend operations', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -392,8 +392,10 @@ describe('AppController', () => {
 
     await controller.initialize();
     await retryTurn(controller, 'agent-dina', 'turn-1');
+    await continueInterruptedTurn(controller, 'agent-dina');
 
     expect(request).toHaveBeenCalledWith('agent/turn/retry', { agentId: 'agent-dina', turnId: 'turn-1' });
+    expect(request).toHaveBeenCalledWith('agent/turn/continueInterrupted', { agentId: 'agent-dina' });
   });
 
   it('edits a Codex turn', async () => {
@@ -513,6 +515,12 @@ async function retryTurn(controller: AppController, agentId: string, turnId: str
   return (controller as unknown as {
     retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
   }).retryTurn(agentId, turnId);
+}
+
+async function continueInterruptedTurn(controller: AppController, agentId: string): Promise<AppSnapshot> {
+  return (controller as unknown as {
+    continueInterruptedTurn(agentId: string): Promise<AppSnapshot>;
+  }).continueInterruptedTurn(agentId);
 }
 
 async function editTurn(controller: AppController, agentId: string, turnId: string, content: string): Promise<AppSnapshot> {

@@ -31,6 +31,7 @@
     :delete-turn-action="deleteTurn"
     :edit-turn-action="editTurn"
     :retry-turn-action="retryTurn"
+    :continue-interrupted-turn-action="continueInterruptedTurn"
     :history-has-older="activeHistoryHasOlder"
     :history-loading-older="isLoadingOlderHistory"
     :load-older-agent-history="loadOlderAgentHistory"
@@ -422,6 +423,7 @@ const {
   deleteTurn,
   editTurn,
   retryTurn,
+  continueInterruptedTurn,
   steerQueuedPrompt,
   updateQueuedPrompt,
   removeQueuedPrompt,

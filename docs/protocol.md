@@ -211,6 +211,7 @@ the explicit Review stage remains the user gate.
 | `agent/turn/delete` | `{ agentId, turnId }` | `AppSnapshot` | Delegates provider-defined turn deletion to the owning conversation host. |
 | `agent/turn/edit` | `{ agentId, turnId, content }` | `AppSnapshot` | Replaces the selected turn's prompt and restarts execution through the owning backend. |
 | `agent/turn/retry` | `{ agentId, turnId }` | `AppSnapshot` | Retries the selected turn through the owning backend. |
+| `agent/turn/continueInterrupted` | `{ agentId }` | `AppSnapshot` | Continues the latest interrupted Codex turn without submitting a new user prompt. |
 | `agent/goal/update` | `{ agentId, objective }` | `AppSnapshot` | Sets provider goal metadata and updates agent goal state. |
 | `agent/goal/clear` | `{ agentId }` | `AppSnapshot` | Clears provider goal metadata and agent goal state. |
 | `agent/approvalPreset/update` | `{ agentId, preset: ApprovalPreset }` | `AppSnapshot` | Applies app-owned approval preset through the backend driver. |
@@ -400,6 +401,7 @@ implementation messages, not the preferred app protocol for clients.
 | `driver/turn/delete` | `{ agent, turnId }` | `BackendTurnActionResult` |
 | `driver/turn/edit` | `{ agent, turnId, content }` | `BackendTurnActionResult` |
 | `driver/turn/retry` | `{ agent, turnId }` | `BackendTurnActionResult` |
+| `driver/turn/continueInterrupted` | `{ agent }` | `BackendTurnActionResult` |
 | `driver/models/list` | `{ agent }` | `BackendModelOption[]` |
 | `driver/skills/list` | `{ agent }` | `BackendSkillSummary[]` |
 | `source/folder/detect` | none | `string | null` |

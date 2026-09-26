@@ -239,6 +239,14 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
+  async continueInterruptedTurn(agent: Agent): Promise<BackendTurnActionResult> {
+    const result = await this.sessionManager.continueInterruptedTurn(agent);
+    return {
+      backendSession: codexBackendSession(result.threadId),
+      activeTurnId: result.activeTurnId,
+    };
+  }
+
   async loadConversation(agent: Agent): Promise<BackendSession | null> {
     const threadId = await this.sessionManager.loadConversation(agent);
     return threadId ? codexBackendSession(threadId) : null;

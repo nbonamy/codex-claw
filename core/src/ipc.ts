@@ -145,6 +145,7 @@ export const ipcChannels = {
   deleteTurn: 'turn:delete',
   editTurn: 'turn:edit',
   retryTurn: 'turn:retry',
+  continueInterruptedTurn: 'turn:continue-interrupted',
   browserOpen: 'browser:open',
   browserOpenVisualization: 'browser:visualization:open',
   browserNavigate: 'browser:navigate',

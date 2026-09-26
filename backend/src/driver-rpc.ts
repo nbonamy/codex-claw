@@ -419,6 +419,14 @@ export class BackendDriverRpc {
         }
         return driver.retryTurn(agent, requireString(record.turnId, 'turnId'));
       }
+      case backendMethods.driverTurnContinueInterrupted: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.continueInterruptedTurn) {
+          throw unsupportedBackendFeature(agent, 'interrupted turn continuation');
+        }
+        return driver.continueInterruptedTurn(agent);
+      }
       case backendMethods.driverModelsList: {
         const { agent } = requireAgentParams(params);
         const driver = this.requireDriver(agent.backend);

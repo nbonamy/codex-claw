@@ -99,6 +99,9 @@ describe('Codex SDK → Claw backend controls', () => {
     expect(handle.editTurn).toHaveBeenCalledWith('turn', 'corrected');
     await driver.retryTurn(sdkAgent(), 'turn');
     expect(handle.retryTurn).toHaveBeenCalledWith('turn');
+    await driver.continueInterruptedTurn(sdkAgent());
+    expect(handle.continueInterruptedTurn).toHaveBeenCalledOnce();
+    expect(handle.sendMessage).toHaveBeenCalledOnce();
     await driver.deleteTurn(sdkAgent(), 'turn');
     expect(handle.deleteTurn).toHaveBeenCalledWith('turn');
     handle.forkTurn.mockResolvedValue({ conversationId: 'fork', conversation: surface.conversation('fork'), snapshot: sdkSnapshot('fork') });

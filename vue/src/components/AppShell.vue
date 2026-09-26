@@ -704,6 +704,7 @@ const props = withDefaults(defineProps<{
   deleteTurnAction?: (turnId: string) => Promise<void>;
   editTurnAction?: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction?: (turnId: string) => Promise<void>;
+  continueInterruptedTurnAction?: () => Promise<void>;
   quit?: () => Promise<void>;
   startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
   decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
@@ -1926,6 +1927,7 @@ const conversationPaneState: CodexConversationPaneState = {
 };
 const conversationPaneActions: CodexConversationPaneActions = {
   cancel: () => emit('interrupt-agent'),
+  continueInterruptedTurn: () => props.continueInterruptedTurnAction?.(),
   clearGoal: () => emit('clear-goal'),
   clientResponse: (response) => {
     if (debugUserQuestions.value?.requestId === response.id) {
@@ -2118,6 +2120,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     debugMarkUnread: () => emit('debug-mark-unread'),
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
     editAgent: openEditAgent,
+    forkAgent: (agentId) => { if (forkableAgentIds.value.includes(agentId)) emit('fork-agent', agentId); },
     focusComposer: () => agentWorkspace.value?.focusComposer(),
     newTeam: openNewTeam,
     openAgentPalette: () => { agentQuickOpenVisible.value = true; },
@@ -2134,6 +2137,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openWhatsNew,
     quit,
     restartAgent: (agentId) => emit('restart-agent', agentId),
+    resumeSession: openResumeSession,
     savePromptDraft: saveActivePromptDraft,
     selectAgent: selectAgentFromShell,
     selectTeam: selectTeamFromRail,

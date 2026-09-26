@@ -43,6 +43,7 @@ type AppShellCommandOptions = {
     debugMarkUnread: () => void;
     duplicateAgent: (agentId: string) => void;
     editAgent: (agentId: string) => void;
+    forkAgent: (agentId: string) => void;
     focusComposer: () => void;
     newTeam: () => void;
     openAgentSurface: () => void;
@@ -61,6 +62,7 @@ type AppShellCommandOptions = {
     openWhatsNew: () => void;
     quit: () => void | Promise<void>;
     restartAgent: (agentId: string) => void;
+    resumeSession: (agentId: string) => void;
     savePromptDraft: () => void;
     selectAgent: (agentId: string) => void;
     selectTeam: (teamId: string) => void;
@@ -496,6 +498,21 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
         return;
       }
       duplicateActiveAgent();
+      return;
+    }
+
+    if (command.type === 'fork-active-agent') {
+      const agent = currentAgent.value;
+      if (isAgentWorkspaceVisible.value && agent?.status.type === 'idle' && agent.backendSession) {
+        options.actions.forkAgent(agent.id);
+      }
+      return;
+    }
+
+    if (command.type === 'resume-active-session') {
+      if (isAgentWorkspaceVisible.value && currentAgent.value) {
+        options.actions.resumeSession(currentAgent.value.id);
+      }
       return;
     }
 

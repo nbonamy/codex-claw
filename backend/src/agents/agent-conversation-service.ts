@@ -57,6 +57,17 @@ export class AgentConversationService {
     return this.applyTurnAction(agentId, result);
   }
 
+  async continueInterruptedTurn(agentId: string): Promise<AppSnapshot | null> {
+    const agent = this.agent(agentId);
+    if (!agent) return null;
+    const result = await this.options.driverRequest(
+      agent,
+      backendMethods.driverTurnContinueInterrupted,
+      { agent },
+    ) as BackendTurnActionResult;
+    return this.applyTurnAction(agentId, result);
+  }
+
   isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
     const snapshot = this.options.getSnapshot();
     const storedAutomationConversation = snapshot.automations.some((automation) => automation.executionLog.some((entry) => (
