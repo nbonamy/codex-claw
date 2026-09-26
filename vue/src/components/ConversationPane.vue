@@ -68,6 +68,7 @@
       <template #composer-shelf-actions="{ disabled }">
         <BackendSelector
           v-if="showBackendSelector && agent && backendSwitch"
+          class="conversation-pane__backend-selector"
           :model-value="agent.backend"
           size="small"
           :disabled="disabled || backendSwitch.busy.value"
@@ -484,6 +485,23 @@ defineExpose({ focusComposer, openSavedDraftPicker, saveCurrentDraft });
   width: 100%;
   display: grid;
   gap: var(--space-4);
+}
+
+.conversation-pane__backend-selector {
+  width: calc(100% + var(--space-12)) !important;
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-6));
+}
+
+.conversation-pane__backend-selector :deep(.el-select__wrapper) {
+  min-height: var(--space-16);
+  padding-inline: var(--space-6);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.conversation-pane__backend-selector :deep(.el-select__wrapper:hover) {
+  background: var(--color-surface-low);
 }
 
 .conversation-pane__empty {

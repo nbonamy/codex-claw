@@ -4,6 +4,20 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+### New features
+
+- Goal mode can now be toggled from the composer menu. Goal and Plan modes are
+  mutually exclusive, whichever entry point activates them.
+- Changed-file headers in Git diffs can open the full file directly in a
+  workspace tab.
+
+### Improvements and fixes
+
+- App, composer, model, and suggestion menus now use consistent spacing,
+  typography, icon emphasis, and selected-state treatment.
+- Added and removed line backgrounds now extend across the full horizontally
+  scrolled Git diff.
+
 ## [0.22.1] - 2026-09-26
 
 ### Improvements and fixes
