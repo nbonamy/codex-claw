@@ -143,7 +143,7 @@ describe('ClawBackendServer code review workflow', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
       codeReviewTools: {
-        createReviewToolContext: (agentId, handlers) => {
+        createReviewToolContext: (agentId, _sessionId, handlers) => {
           activeHandlers = handlers;
           return { id: `context-${++context}`, url: `http://review.test/mcp?agentId=${agentId}&reviewContextId=${context}` };
         },
@@ -259,7 +259,7 @@ describe('ClawBackendServer code review workflow', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
       codeReviewTools: {
-        createReviewToolContext: (_agentId, handlers) => {
+        createReviewToolContext: (_agentId, _sessionId, handlers) => {
           activeHandlers = handlers;
           return { id: 'review-context', url: 'http://review.test/mcp?reviewContextId=review-context' };
         },

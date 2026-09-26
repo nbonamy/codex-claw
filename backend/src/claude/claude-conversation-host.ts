@@ -23,7 +23,7 @@ import {
 import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
 import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { claudeWorkingDirectory } from './working-directory';
-import { agentScopedMcpUrl } from '../mcp/codex-config';
+import { agentScopedMcpUrl, clawMcpUrlForAgent } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
 import {
@@ -187,6 +187,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       allowedTools: [
         'mcp__codex_claw__report_finding',
         'mcp__codex_claw__update_finding',
+        'mcp__codex_claw__delete_finding',
       ],
       });
       targetTurnId = started.turnId ?? null;
@@ -1356,7 +1357,7 @@ function claudeTurnParams(
 ): ClaudeTurnParams {
   const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
-  const mcpServerUrl = clawMcpServerUrl ? agentScopedMcpUrl(clawMcpServerUrl, agent.id) : null;
+  const mcpServerUrl = clawMcpServerUrl ? clawMcpUrlForAgent(clawMcpServerUrl, agent) : null;
   return {
     ownerId: agent.id,
     cwd: claudeWorkingDirectory(agent),

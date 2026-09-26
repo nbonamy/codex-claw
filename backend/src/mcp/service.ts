@@ -164,8 +164,8 @@ export class ClawMcpService {
     return this.server.hostedMcpServerUrls();
   }
 
-  createReviewToolContext(agentId: string, handlers: ReviewToolHandlers): { id: string; url: string } {
-    const context = this.reviewTools.create(agentId, handlers);
+  createReviewToolContext(agentId: string, sessionId: string, handlers: ReviewToolHandlers): { id: string; url: string } {
+    const context = this.reviewTools.create(agentId, sessionId, handlers);
     return { id: context.id, url: this.server.reviewMcpServerUrl(agentId, context.id) };
   }
 

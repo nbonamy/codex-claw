@@ -17,7 +17,7 @@ import type { AgentCreationOptions } from '../agents/agent-creation-service';
 import type { ReviewToolHandlers } from './review-tool-registry';
 
 export type CodeReviewToolPort = {
-  createReviewToolContext(agentId: string, handlers: ReviewToolHandlers): { id: string; url: string };
+  createReviewToolContext(agentId: string, sessionId: string, handlers: ReviewToolHandlers): { id: string; url: string };
   closeReviewToolContext(contextId: string): void;
 };
 
@@ -44,6 +44,10 @@ export class CodeReviewService {
 
   constructor(private readonly options: CodeReviewServiceOptions) {
     this.now = options.now ?? (() => new Date());
+    for (const agent of options.snapshot.agents) {
+      const session = agent.codeReview;
+      if (session && session.status !== 'finished') this.reviewToolContext(agent, session);
+    }
   }
 
   start(agent: Agent, input: CodeReviewStartInput): CodeReviewSession {
@@ -386,17 +390,20 @@ export class CodeReviewService {
         if (agent.codeReview !== session || session.status !== 'fixing') return;
         agent.backendSession = result.reviewerSession;
         round.reviewerSession = result.reviewerSession;
-        const incomplete = findings.filter((finding) => (
-          this.findFindingInSession(session, finding.id)?.remediation.state !== 'fixed'
-        ));
+        const incomplete = findings.filter((finding) => {
+          const current = this.findFindingInSession(session, finding.id);
+          return current && current.remediation.state !== 'fixed';
+        });
         if (incomplete.length > 0) {
           throw new Error(`Reviewer did not update ${incomplete.length} finding(s) to fixed: ${incomplete.map((finding) => finding.title).join(', ')}.`);
         }
       }
       const completedAt = this.timestamp();
-      round.status = 'completed';
-      round.completedAt = completedAt;
-      session.status = 'readyToFinish';
+      const newFindings = round.findings.some((finding) => finding.remediation.state === 'notStarted');
+      round.status = newFindings ? 'ready' : 'completed';
+      if (newFindings) delete round.completedAt;
+      else round.completedAt = completedAt;
+      session.status = newFindings ? 'ready' : 'readyToFinish';
       session.updatedAt = completedAt;
     } catch (error) {
       if (session.status !== 'fixing') return;
@@ -413,7 +420,7 @@ export class CodeReviewService {
   private reviewToolContext(agent: Agent, session: CodeReviewSession): { id: string; url: string } {
     const existing = this.reviewContexts.get(session);
     if (existing) return existing;
-    const context = this.options.tools.createReviewToolContext(agent.id, this.reviewToolHandlers(session));
+    const context = this.options.tools.createReviewToolContext(agent.id, session.id, this.reviewToolHandlers(session));
     this.reviewContexts.set(session, context);
     return context;
   }
@@ -429,6 +436,7 @@ export class CodeReviewService {
     return {
       reportFinding: (input) => this.reportFinding(session, activeCodeReviewRound(session), input),
       updateFinding: (input) => this.updateFinding(session, input),
+      deleteFinding: (input) => this.deleteFinding(session, input.findingId),
     };
   }
 
@@ -437,13 +445,7 @@ export class CodeReviewService {
     round: CodeReviewRound,
     input: CodeReviewFindingInput,
   ): Promise<CodeReviewFinding> {
-    if (
-      session.status !== 'reviewing'
-      || round.status !== 'reviewing'
-      || !this.activeRoundTurns.has(round.id)
-    ) {
-      throw new Error('Findings can only be reported during an active review turn.');
-    }
+    this.requireOpenReviewSession(session);
     const now = this.timestamp();
     const prior = input.priorFindingId
       ? this.findFindingInSession(session, input.priorFindingId)
@@ -464,12 +466,16 @@ export class CodeReviewService {
     const existingIndex = round.findings.findIndex((candidate) => candidate.id === finding.id);
     if (existingIndex >= 0) round.findings.splice(existingIndex, 1, finding);
     else round.findings.push(finding);
+    if (session.status === 'readyToFinish' || session.status === 'failed') {
+      this.reopenRound(session, round);
+    }
     session.updatedAt = now;
     await this.options.changed();
     return structuredClone(finding);
   }
 
   private async updateFinding(session: CodeReviewSession, input: CodeReviewFindingUpdateInput): Promise<CodeReviewFinding> {
+    this.requireOpenReviewSession(session);
     const finding = this.findFindingInSession(session, input.findingId);
     if (!finding) throw new Error('Code review finding was not found.');
     if (input.status === 'fixed' && finding.remediation.state !== 'fixing') {
@@ -491,6 +497,38 @@ export class CodeReviewService {
     session.updatedAt = finding.updatedAt;
     await this.options.changed();
     return structuredClone(finding);
+  }
+
+  private async deleteFinding(session: CodeReviewSession, findingId: string): Promise<{ findingId: string; deleted: true }> {
+    this.requireOpenReviewSession(session);
+    if (!this.findFindingInSession(session, findingId)) throw new Error('Code review finding was not found.');
+    for (const round of session.rounds) {
+      round.findings = round.findings.filter((finding) => finding.id !== findingId);
+    }
+    session.updatedAt = this.timestamp();
+    await this.options.changed();
+    return { findingId, deleted: true };
+  }
+
+  private requireOpenReviewSession(session: CodeReviewSession): void {
+    const reviewer = this.options.snapshot.agents.find((agent) => agent.id === session.reviewerAgentId);
+    if (reviewer?.codeReview !== session || session.status === 'finished') {
+      throw new Error('Review session is no longer open.');
+    }
+  }
+
+  private reopenRound(session: CodeReviewSession, round: CodeReviewRound): void {
+    if (session.status === 'failed') {
+      for (const finding of round.findings) {
+        if (finding.remediation.state === 'pending' || finding.remediation.state === 'fixing') {
+          finding.remediation = { state: 'notStarted' };
+        }
+      }
+    }
+    round.status = 'ready';
+    delete round.completedAt;
+    delete round.error;
+    session.status = 'ready';
   }
 
   private findFindingInSession(session: CodeReviewSession, findingId: string): CodeReviewFinding | undefined {
@@ -607,7 +645,7 @@ ${JSON.stringify(ledger, null, 2)}
 
 Review ${detailedScope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
 
-Structured findings are the source of truth for this review. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, end the turn with a natural summary of one or two short sentences. If there are no actionable findings, say so plainly; otherwise state how many findings you reported and invite the user to review them or ask questions. Do not list or repeat the findings in chat, imply that the review is an approval to ship, or use a generic "Review complete" response. There is no tool for completing the review workflow.
+Structured findings are the source of truth for this review. You can add, edit, or delete findings while this reviewer thread remains open, including after an inspection turn ends. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding, and delete_finding to retract one that is no longer actionable. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, end the turn with a natural summary of one or two short sentences. If there are no actionable findings, say so plainly; otherwise state how many findings you reported and invite the user to review them or ask questions. Do not list or repeat the findings in chat, imply that the review is an approval to ship, or use a generic "Review complete" response. There is no tool for completing the review workflow.
 </context>
 
 Review ${visibleScope}.`;

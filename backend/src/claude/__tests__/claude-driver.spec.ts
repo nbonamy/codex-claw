@@ -564,6 +564,30 @@ describe('ClaudeBackendDriver', () => {
     });
   });
 
+  it('uses the review tool context for a reviewer chat follow-up', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport, async () => null, {
+      clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+    });
+    const reviewer: Agent = {
+      ...agent,
+      backendSession: { kind: 'claude', sessionId: 'review-thread', transport: 'stdio' },
+      codeReview: {
+        id: 'review-1', targetAgentId: 'target', reviewerAgentId: agent.id,
+        scope: { type: 'uncommitted' }, threadMode: 'independent', status: 'ready',
+        activeRoundId: 'round-1', rounds: [{ id: 'round-1', number: 1, status: 'ready', findings: [], startedAt: '' }],
+        createdAt: '', updatedAt: '',
+      },
+    };
+    const result = driver.sendPrompt(reviewer, 'I found another issue');
+    expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({
+      mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
+      allowedTools: ['mcp__codex_claw__*'],
+    });
+    transport.resolveDone();
+    await result;
+  });
+
   it('runs review in a fresh context with only review-domain MCP tools added', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
@@ -586,6 +610,7 @@ describe('ClaudeBackendDriver', () => {
       allowedTools: [
         'mcp__codex_claw__report_finding',
         'mcp__codex_claw__update_finding',
+        'mcp__codex_claw__delete_finding',
       ],
       model: 'opus',
       effort: 'xhigh',

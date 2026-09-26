@@ -50,6 +50,13 @@ export function registerReviewTools(server: McpServer, context: ReviewToolContex
     ...(input.status ? { status: input.status } : {}),
     ...(input.evidence ? { evidence: input.evidence } : {}),
   })));
+
+  server.registerTool('delete_finding', {
+    description: 'Delete a finding from the open review ledger when it is no longer actionable.',
+    inputSchema: {
+      findingId: z.string().trim().min(1).describe('Stable ID of the finding to remove from this review.'),
+    },
+  }, (input) => reviewToolResult(() => context.deleteFinding({ findingId: input.findingId })));
 }
 
 async function reviewToolResult(run: () => unknown) {

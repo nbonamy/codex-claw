@@ -1002,6 +1002,11 @@ export const messages = {
               failed: 'Failed reporting finding',
               running: 'Reporting finding',
             },
+            deleteFinding: {
+              completed: 'Deleted finding',
+              failed: 'Could not delete finding',
+              running: 'Deleting finding',
+            },
             updateWorkItem: {
               completed: 'Updated work item',
               failed: 'Failed updating work item',

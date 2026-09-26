@@ -112,4 +112,21 @@ describe('codex-config', () => {
   it('preserves existing query params when scoping an MCP URL to an agent', () => {
     expect(agentScopedMcpUrl('http://127.0.0.1:8767/mcp?debug=1', 'agent-dina')).toBe('http://127.0.0.1:8767/mcp?debug=1&agentId=agent-dina');
   });
+
+  it('keeps review finding tools on ordinary follow-up turns until the review closes', () => {
+    const reviewer: Agent = {
+      ...agent,
+      codeReview: {
+        id: 'review-1', targetAgentId: agent.id, reviewerAgentId: agent.id,
+        scope: { type: 'uncommitted' }, threadMode: 'current', status: 'ready',
+        activeRoundId: 'round-1', rounds: [{ id: 'round-1', number: 1, status: 'ready', findings: [], startedAt: '' }],
+        createdAt: '', updatedAt: '',
+      },
+    };
+    expect(buildCodexClawThreadConfig(reviewer, 'http://127.0.0.1:8767/mcp').config?.['mcp_servers.codex_claw.url'])
+      .toBe('http://127.0.0.1:8767/mcp?agentId=agent-dina&reviewContextId=review-1');
+    reviewer.codeReview!.status = 'finished';
+    expect(buildCodexClawThreadConfig(reviewer, 'http://127.0.0.1:8767/mcp').config?.['mcp_servers.codex_claw.url'])
+      .toBe('http://127.0.0.1:8767/mcp?agentId=agent-dina');
+  });
 });

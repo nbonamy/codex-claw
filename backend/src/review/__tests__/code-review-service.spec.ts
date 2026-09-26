@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, AppSnapshot, BackendSession } from '@codex-claw/core/contracts';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { activeCodeReviewRound } from '@codex-claw/core/code-review';
+import { activeCodeReviewRound, codeReviewLedger } from '@codex-claw/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from '../code-review-service';
 import type { ReviewToolHandlers } from '../review-tool-registry';
 import { AgentCreationService } from '../../agents/agent-creation-service';
@@ -28,7 +28,7 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
   const changed = vi.fn();
   const agentCreation = new AgentCreationService(snapshot);
   const tools: CodeReviewToolPort = {
-    createReviewToolContext: (agentId, handlers) => {
+    createReviewToolContext: (agentId, _sessionId, handlers) => {
       activeHandlers = handlers;
       return { id: `context-${++context}`, url: `http://review.test/mcp?agentId=${agentId}&reviewContextId=${context}` };
     },
@@ -232,6 +232,44 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([]);
   });
 
+  it('removes a reobserved finding from every round and the cumulative ledger', async () => {
+    let tools!: ReviewToolHandlers;
+    let findingId = '';
+    const test = harness([
+      async (context) => {
+        tools = context;
+        findingId = (await context.reportFinding({
+          priority: 'p2', title: 'Check the retry path', body: 'The retry may fail.',
+        })).id;
+        return { text: '' };
+      },
+      async (context) => {
+        await context.reportFinding({
+          priority: 'p2', title: 'Check the retry path again', body: 'The latest code still fails.',
+          priorFindingId: findingId,
+        });
+        return { text: '' };
+      },
+    ]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
+    test.service.decide(visibleReviewer, {
+      sessionId: session.id, roundId: activeCodeReviewRound(session).id, findingId,
+      decision: 'reject', reason: 'The retry already handles this.',
+    });
+    test.service.submit(visibleReviewer, session.id);
+    await test.service.reviewAgain(visibleReviewer, session.id);
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+
+    await tools.deleteFinding({ findingId });
+
+    expect(session.rounds.map((round) => round.findings)).toStrictEqual([[], []]);
+    expect(codeReviewLedger(session)).toStrictEqual({ exclusions: [], regressionChecks: [], behaviorDecisions: [] });
+  });
+
   it('carries skipped findings from every prior round inside the reviewer context', async () => {
     let firstSkippedId = '';
     let secondSkippedId = '';
@@ -397,7 +435,7 @@ describe('CodeReviewService', () => {
       snapshot,
       createAgent: (input, options) => new AgentCreationService(snapshot).create(input, options),
       tools: {
-        createReviewToolContext: (agentId, handlers) => {
+        createReviewToolContext: (agentId, _sessionId, handlers) => {
           const id = `context-${++contextSequence}`;
           contexts.set(id, handlers);
           return { id, url: `http://review.test/mcp?agentId=${agentId}&reviewContextId=${id}` };
@@ -435,6 +473,36 @@ describe('CodeReviewService', () => {
     expect(closeReviewToolContext).not.toHaveBeenCalled();
     await service.finish(owner, session.id);
     expect(closeReviewToolContext).toHaveBeenCalledOnce();
+  });
+
+  it('restores the review tool URL for an open reviewer after backend restart', async () => {
+    const test = harness([async () => ({ text: '' })]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const snapshot = structuredClone(test.snapshot);
+    let restoredTools!: ReviewToolHandlers;
+    const createReviewToolContext = vi.fn((agentId: string, sessionId: string, handlers: ReviewToolHandlers) => {
+      restoredTools = handlers;
+      return { id: sessionId, url: `http://review.test/mcp?agentId=${agentId}&reviewContextId=${sessionId}` };
+    });
+    new CodeReviewService({
+      snapshot,
+      createAgent: (input, options) => new AgentCreationService(snapshot).create(input, options),
+      tools: { createReviewToolContext, closeReviewToolContext: vi.fn() },
+      runReview: vi.fn(),
+      resetReviewer: vi.fn(),
+      deleteReviewer: vi.fn(),
+      changed: vi.fn(),
+    });
+
+    expect(createReviewToolContext).toHaveBeenCalledWith(session.reviewerAgentId, session.id, expect.any(Object));
+    const finding = await restoredTools.reportFinding({
+      priority: 'p1', title: 'Keep the restored review alive', body: 'The follow-up found a defect.',
+    });
+    const restoredReviewer = snapshot.agents.find((agent) => agent.id === session.reviewerAgentId)!;
+    expect(activeCodeReviewRound(restoredReviewer.codeReview!).findings[0]?.id).toBe(finding.id);
   });
 
   it('sends every selected finding in one fix turn and records each fixed update', async () => {
@@ -490,9 +558,39 @@ describe('CodeReviewService', () => {
     }]);
   });
 
-  it('rejects new findings after the review turn has entered remediation', async () => {
+  it('keeps finding tools available after the review turn and reopens a completed round', async () => {
+    let tools!: ReviewToolHandlers;
+    const test = harness([async (context) => { tools = context; return { text: '' }; }]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const round = activeCodeReviewRound(session);
+    const finding = await tools.reportFinding({
+      priority: 'p1', title: 'Fix the late finding', body: 'The failure is actionable.',
+    });
+    await tools.updateFinding({ findingId: finding.id, priority: 'p2' });
+    expect(round.findings[0]).toMatchObject({ id: finding.id, priority: 'p2' });
+    test.service.decide(reviewer(test, session), {
+      sessionId: session.id, roundId: round.id, findingId: finding.id, decision: 'reject',
+    });
+    test.service.submit(reviewer(test, session), session.id);
+    expect(session.status).toBe('readyToFinish');
+
+    const late = await tools.reportFinding({
+      priority: 'p1', title: 'Handle the missed path', body: 'A missed path still fails.',
+    });
+    expect(session.status).toBe('ready');
+    expect(round.status).toBe('ready');
+    expect(round.findings.map((item) => item.id)).toContain(late.id);
+    await expect(tools.deleteFinding({ findingId: finding.id })).resolves.toStrictEqual({ findingId: finding.id, deleted: true });
+    expect(round.findings.map((item) => item.id)).toStrictEqual([late.id]);
+    expect(test.changed).toHaveBeenCalled();
+  });
+
+  it('accepts new findings during remediation and returns them for arbitration', async () => {
     let findingId = '';
-    let acceptedDuringFix = false;
+    let lateFindingId = '';
     const test = harness([
       async (tools) => {
         findingId = (await tools.reportFinding({
@@ -502,15 +600,10 @@ describe('CodeReviewService', () => {
         return { text: '' };
       },
       async (tools) => {
-        try {
-          await tools.reportFinding({
-            priority: 'p2', title: 'Late finding',
-            body: 'This must not be added while fixes are running.',
-          });
-          acceptedDuringFix = true;
-        } catch {
-          // Expected: reporting findings is limited to the review turn.
-        }
+        lateFindingId = (await tools.reportFinding({
+          priority: 'p2', title: 'Late finding',
+          body: 'The follow-up exposed another issue.',
+        })).id;
         await tools.updateFinding({ findingId, status: 'fixed' });
         return { text: '' };
       },
@@ -523,10 +616,34 @@ describe('CodeReviewService', () => {
     const visibleReviewer = reviewer(test, session);
 
     test.service.submit(visibleReviewer, session.id);
-    await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
 
-    expect(acceptedDuringFix).toBe(false);
-    expect(activeCodeReviewRound(session).findings).toHaveLength(1);
+    expect(activeCodeReviewRound(session).findings).toHaveLength(2);
+    expect(activeCodeReviewRound(session).findings.find((finding) => finding.id === lateFindingId)?.remediation.state).toBe('notStarted');
+    expect(activeCodeReviewRound(session).findings.find((finding) => finding.id === findingId)?.remediation.state).toBe('fixed');
+  });
+
+  it('lets the reviewer retract a finding during remediation', async () => {
+    let findingId = '';
+    const test = harness([
+      async (tools) => {
+        findingId = (await tools.reportFinding({
+          priority: 'p2', title: 'Check this suspected failure', body: 'This might fail.',
+        })).id;
+        return { text: '' };
+      },
+      async (tools) => {
+        await tools.deleteFinding({ findingId });
+        return { text: '' };
+      },
+    ]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    test.service.submit(reviewer(test, session), session.id);
+    await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
+    expect(activeCodeReviewRound(session).findings).toStrictEqual([]);
   });
 
   it('preserves completed fixes when remediation is interrupted and only retries unfinished findings', async () => {

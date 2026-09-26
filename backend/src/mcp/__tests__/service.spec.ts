@@ -162,9 +162,11 @@ describe('ClawMcpService', () => {
     const ordinaryUrl = await service.start();
     const reportFinding = vi.fn().mockResolvedValue({ id: 'finding-1' });
     const updateFinding = vi.fn().mockResolvedValue({ id: 'finding-1', status: 'fixed' });
-    const review = service.createReviewToolContext('agent-dina', {
+    const deleteFinding = vi.fn().mockResolvedValue({ findingId: 'finding-1', deleted: true });
+    const review = service.createReviewToolContext('agent-dina', 'review-session-1', {
       reportFinding,
       updateFinding,
+      deleteFinding,
     });
 
     const ordinary = await postJson(agentUrl(ordinaryUrl, 'agent-dina'), {
@@ -177,10 +179,10 @@ describe('ClawMcpService', () => {
     const scopedNames = scoped.result.tools.map((tool: { name: string }) => tool.name);
 
     expect(ordinaryNames).not.toEqual(expect.arrayContaining([
-      'report_finding', 'update_finding',
+      'report_finding', 'update_finding', 'delete_finding',
     ]));
     expect(scopedNames).toEqual(expect.arrayContaining([
-      'report_finding', 'update_finding',
+      'report_finding', 'update_finding', 'delete_finding',
     ]));
     expect(scopedNames).not.toContain('mark_finding_complete');
     expect(scopedNames).not.toEqual(expect.arrayContaining([
@@ -229,6 +231,14 @@ describe('ClawMcpService', () => {
     expect(updateFinding).toHaveBeenCalledWith({
       findingId: 'finding-1', status: 'fixed', evidence: 'Focused test passes.',
     });
+
+    const deleted = await postJson(review.url, {
+      jsonrpc: '2.0', id: 6, method: 'tools/call', params: {
+        name: 'delete_finding', arguments: { findingId: 'finding-1' },
+      },
+    });
+    expect(deleted.result.isError).toBe(false);
+    expect(deleteFinding).toHaveBeenCalledWith({ findingId: 'finding-1' });
 
     service.closeReviewToolContext(review.id);
   });

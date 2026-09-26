@@ -653,13 +653,17 @@ state, not Codex transcript duplication.
 
 ### Review-scoped finding tools
 
-Each review session receives a dedicated MCP URL whose tool surface adds only
-two model actions: `report_finding` and `update_finding`. The URL remains stable
-across inspection, clarification, remediation, and later rounds because the
-provider conversation may retain its initial MCP configuration. Claw closes
-the context when the user finishes or discards the review.
-`update_finding` may also move an actively remediated finding to `fixed`. The
-ordinary provider harness continues to supply repository reading, search, Git,
+Each review session receives a dedicated MCP URL whose tool surface adds
+`report_finding`, `update_finding`, and `delete_finding`. The URL is derived
+from the durable review session ID and remains stable across app restarts,
+inspection, clarification, remediation, and later rounds because the provider
+conversation may retain its initial MCP configuration. The reviewer can change
+findings while the review is open, even after an inspection turn ends. Claw
+closes the context when the user finishes or discards the review.
+`update_finding` may also move an actively remediated finding to `fixed`.
+`delete_finding` removes a finding from every round of the review. These are
+model-only tools; users cannot invoke them from the review pane. The ordinary
+provider harness continues to supply repository reading, search, Git,
 and test tools. The review tools mutate the active app-owned ledger and persist
 it before returning; the registry itself does not own finding storage.
 

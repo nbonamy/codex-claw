@@ -41,6 +41,7 @@ const TOOL_KEYS: Record<string, string> = {
   'create-project': 'createProject',
   'create-worktree': 'createWorktree',
   'display-markdown': 'displayMarkdown',
+  'delete-finding': 'deleteFinding',
   'suggest-visualizations': 'suggestVisualizations',
   'add-visualization': 'addVisualization',
   'read-visualization-canvas': 'readVisualizationCanvas',

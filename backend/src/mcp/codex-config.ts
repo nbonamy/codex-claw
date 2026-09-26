@@ -30,7 +30,7 @@ export function buildCodexClawThreadConfig(
 
   return {
     config: {
-      'mcp_servers.codex_claw.url': agentScopedMcpUrl(mcpServerUrl, agent.id),
+      'mcp_servers.codex_claw.url': clawMcpUrlForAgent(mcpServerUrl, agent),
       'mcp_servers.codex_claw.default_tools_approval_mode': 'approve',
       ...Object.fromEntries(
         Object.entries(hostedMcpServerUrls).map(([serverId, serverUrl]) => [
@@ -52,6 +52,14 @@ export function buildCodexClawThreadConfig(
 export function agentScopedMcpUrl(serverUrl: string, agentId: string): string {
   const url = new URL(serverUrl);
   url.searchParams.set('agentId', agentId);
+  return url.toString();
+}
+
+export function clawMcpUrlForAgent(serverUrl: string, agent: Agent): string {
+  const url = new URL(agentScopedMcpUrl(serverUrl, agent.id));
+  if (agent.codeReview?.reviewerAgentId === agent.id && agent.codeReview.status !== 'finished') {
+    url.searchParams.set('reviewContextId', agent.codeReview.id);
+  }
   return url.toString();
 }
 

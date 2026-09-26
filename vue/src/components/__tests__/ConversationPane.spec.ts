@@ -570,6 +570,35 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
   });
 
+  it.each([
+    ['running', 'Deleting finding'],
+    ['completed', 'Deleted finding'],
+  ] as const)('renders a %s model deletion as %s', (status, title) => {
+    const wrapper = mountPane({
+      controller: controllerFor([{
+        id: `message-delete-${status}`,
+        agentId: agent.id,
+        role: 'assistant',
+        status: status === 'running' ? 'streaming' : 'complete',
+        createdAt: '2026-06-05T00:00:01.000Z',
+        parts: [{
+          type: 'tool',
+          id: `call-delete-${status}`,
+          kind: 'mcp',
+          title: 'codex_claw.delete_finding',
+          status,
+          input: { findingId: 'finding-1' },
+          metadata: { server: 'codex_claw', tool: 'delete_finding' },
+        }],
+      }]),
+      agent,
+    });
+
+    expect(wrapper.get('.chat-tool-call').text()).toContain(title);
+    expect(wrapper.text()).not.toContain('codex_claw.delete_finding');
+    expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
+  });
+
   it('renders a completed cua_repl.js call as Computer activity', () => {
     const wrapper = mountPane({
       controller: controllerFor([{

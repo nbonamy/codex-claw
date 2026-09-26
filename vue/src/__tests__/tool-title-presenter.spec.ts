@@ -36,6 +36,8 @@ describe('Claw tool title presenter', () => {
     ['codex_claw.update-mission-review-finding', { findingId: 'finding-1' }, 'completed', 'Updated Mission finding'],
     ['codex_claw.report_finding', { title: 'Keep tool copy product-facing' }, 'completed', 'Reported finding'],
     ['codex_claw.update_finding', { findingId: 'finding-1' }, 'completed', 'Updated finding'],
+    ['codex_claw.delete_finding', { findingId: 'finding-1' }, 'running', 'Deleting finding'],
+    ['codex_claw.delete_finding', { findingId: 'finding-1' }, 'completed', 'Deleted finding'],
     ['codex_claw.mark_finding_complete', { findingId: 'finding-1' }, 'completed', 'Verified finding fix'],
     ['codex_claw.browser-screenshot', {}, 'running', 'Capturing page screenshot'],
     ['codex_claw.browser-open', { url: 'https://example.com' }, 'completed', 'Opened https://example.com'],

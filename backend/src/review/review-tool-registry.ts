@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type {
   CodeReviewFinding,
   CodeReviewFindingInput,
@@ -8,6 +7,7 @@ import type {
 export type ReviewToolHandlers = {
   reportFinding(input: CodeReviewFindingInput): Promise<CodeReviewFinding> | CodeReviewFinding;
   updateFinding(input: CodeReviewFindingUpdateInput): Promise<CodeReviewFinding> | CodeReviewFinding;
+  deleteFinding(input: { findingId: string }): Promise<{ findingId: string; deleted: true }> | { findingId: string; deleted: true };
 };
 
 export type ReviewToolContext = ReviewToolHandlers & {
@@ -18,12 +18,14 @@ export type ReviewToolContext = ReviewToolHandlers & {
 export class ReviewToolRegistry {
   private readonly contexts = new Map<string, ReviewToolContext>();
 
-  create(agentId: string, handlers: ReviewToolHandlers): ReviewToolContext {
+  create(agentId: string, contextId: string, handlers: ReviewToolHandlers): ReviewToolContext {
+    if (this.contexts.has(contextId)) throw new Error('Review context already exists.');
     const context: ReviewToolContext = {
-      id: randomUUID(),
+      id: contextId,
       agentId,
       reportFinding: (input) => this.run(context, () => handlers.reportFinding(input)),
       updateFinding: (input) => this.run(context, () => handlers.updateFinding(input)),
+      deleteFinding: (input) => this.run(context, () => handlers.deleteFinding(input)),
     };
     this.contexts.set(context.id, context);
     return context;
