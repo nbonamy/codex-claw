@@ -199,6 +199,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
   gap: var(--space-3);
   width: 100%;
   min-height: 28px;
+  margin-block: 0.125px;
   padding: var(--space-2) var(--space-4);
   border: 0;
   border-radius: var(--radius-xl);
