@@ -198,6 +198,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
   align-items: center;
   gap: var(--space-3);
   width: 100%;
+  min-height: 28px;
   padding: var(--space-2) var(--space-4);
   border: 0;
   border-radius: var(--radius-xl);
@@ -241,6 +242,16 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
   stroke-width: 2.5px;
 }
 
+.app-menu__icon {
+  opacity: 0.5;
+  stroke-width: 2px;
+}
+
+.app-menu__item--selected .app-menu__icon {
+  opacity: 1;
+  stroke-width: 2.5px;
+}
+
 .app-menu__icon--empty {
   visibility: hidden;
 }
@@ -248,6 +259,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
 .app-menu__icon--image {
   border-radius: var(--radius-sm);
   object-fit: contain;
+  opacity: 1;
 }
 
 .app-menu__check,

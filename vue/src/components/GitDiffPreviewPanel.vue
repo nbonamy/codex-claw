@@ -29,34 +29,46 @@
         :key="file.key"
         class="git-diff-preview-panel__file"
       >
-        <button
-          class="git-diff-preview-panel__file-header"
-          type="button"
-          :aria-expanded="isFileExpanded(file.key)"
-          @click="toggleFile(file.key)"
-        >
-          <span
-            class="git-diff-preview-panel__file-icon"
-            :class="`git-diff-preview-panel__file-icon--${file.iconKind}`"
-            aria-hidden="true"
-          >
-            <component :is="fileIcon(file.iconKind)" />
-          </span>
-          <span
-            class="git-diff-preview-panel__file-title"
-            :title="file.fullPath"
+        <div class="git-diff-preview-panel__file-header-row">
+          <button
+            class="git-diff-preview-panel__file-header"
+            type="button"
+            :aria-expanded="isFileExpanded(file.key)"
+            @click="toggleFile(file.key)"
           >
             <span
-              v-if="file.directory"
-              class="git-diff-preview-panel__file-directory"
-            >{{ file.directory }}</span>
-            <strong>{{ file.name }}</strong>
-          </span>
-          <span class="git-diff-preview-panel__file-meta">
-            <span class="git-diff-preview-panel__file-added">+{{ file.addedLines }}</span>
-            <span class="git-diff-preview-panel__file-removed">-{{ file.removedLines }}</span>
-          </span>
-        </button>
+              class="git-diff-preview-panel__file-icon"
+              :class="`git-diff-preview-panel__file-icon--${file.iconKind}`"
+              aria-hidden="true"
+            >
+              <component :is="fileIcon(file.iconKind)" />
+            </span>
+            <span
+              class="git-diff-preview-panel__file-title"
+              :title="file.fullPath"
+            >
+              <span
+                v-if="file.directory"
+                class="git-diff-preview-panel__file-directory"
+              >{{ file.directory }}</span>
+              <strong>{{ file.name }}</strong>
+            </span>
+            <span class="git-diff-preview-panel__file-meta">
+              <span class="git-diff-preview-panel__file-added">+{{ file.addedLines }}</span>
+              <span class="git-diff-preview-panel__file-removed">-{{ file.removedLines }}</span>
+            </span>
+          </button>
+          <button
+            v-if="openFileEnabled && file.openable"
+            class="git-diff-preview-panel__open-file"
+            type="button"
+            :aria-label="$t('surface.gitDiffPreviewPanel.openFileInTab', { file: file.fullPath })"
+            :title="$t('surface.gitDiffPreviewPanel.openFileInTab', { file: file.fullPath })"
+            @click="emit('openFile', file.fullPath)"
+          >
+            <FileArrowRightIcon aria-hidden="true" />
+          </button>
+        </div>
 
         <div
           v-if="isFileExpanded(file.key) && file.chunks.length"
@@ -104,24 +116,28 @@ import { computed, ref, watch } from 'vue';
 import { IconBrandJavascript, IconBrandTypescript, IconBrandVue, IconFileCode } from '@tabler/icons-vue';
 import parseGitDiff, { type AnyChunk, type AnyFileChange, type Chunk } from 'parse-git-diff';
 import { translate } from '../i18n';
+import { FileArrowRightIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   diff: string;
   collapseAllSignal?: number;
   error?: string | null;
   expandAllSignal?: number;
+  openFileEnabled?: boolean;
   state?: 'idle' | 'loading' | 'error';
   wordWrap?: boolean;
 }>(), {
   collapseAllSignal: 0,
   error: null,
   expandAllSignal: 0,
+  openFileEnabled: false,
   state: 'idle',
   wordWrap: false,
 });
 
 const emit = defineEmits<{
   allExpandedChange: [isAllExpanded: boolean];
+  openFile: [filePath: string];
 }>();
 
 type DiffLineKind = 'added' | 'deleted' | 'context' | 'message';
@@ -150,6 +166,7 @@ type DiffFileView = {
   fullPath: string;
   name: string;
   iconKind: DiffFileIconKind;
+  openable: boolean;
   addedLines: number;
   removedLines: number;
   chunks: DiffChunkView[];
@@ -229,6 +246,7 @@ function mapFile(file: AnyFileChange, fileIndex: number): DiffFileView {
     fullPath: visiblePath,
     name,
     iconKind: fileIconKind(name),
+    openable: file.type !== 'DeletedFile',
     addedLines: countLines(chunks, 'added'),
     removedLines: countLines(chunks, 'deleted'),
     chunks,
@@ -368,32 +386,74 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
   border-bottom: 1px solid var(--color-border);
 }
 
-.git-diff-preview-panel__file-header {
+.git-diff-preview-panel__file-header-row {
   position: sticky;
   top: 0;
   z-index: 1;
   width: 100%;
   display: flex;
   align-items: center;
-  gap: var(--space-6);
   min-height: 36px;
-  padding: var(--space-2) var(--space-8);
-  border: 0;
   border-bottom: 1px solid var(--color-border);
   color: inherit;
   background: var(--color-surface-lowest);
+}
+
+.git-diff-preview-panel__file-header {
+  min-width: 0;
+  min-height: 36px;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-8);
+  border: 0;
+  color: inherit;
+  background: transparent;
   font-family: var(--font-family-base);
   text-align: left;
   cursor: pointer;
 }
 
-.git-diff-preview-panel__file-header:hover {
+.git-diff-preview-panel__file-header-row:hover {
   background: var(--color-surface-low);
 }
 
 .git-diff-preview-panel__file-header:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
+}
+
+.git-diff-preview-panel__open-file {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  margin-right: var(--space-4);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.git-diff-preview-panel__open-file:hover,
+.git-diff-preview-panel__open-file:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.git-diff-preview-panel__open-file:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.git-diff-preview-panel__open-file svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  stroke-width: 1.8;
 }
 
 .git-diff-preview-panel__file-icon {
@@ -469,11 +529,18 @@ function mapLine(line: Chunk['changes'][number]): DiffLineView {
   line-height: var(--line-height-20);
 }
 
+.git-diff-preview-panel__chunks,
+.git-diff-preview-panel__chunk {
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+}
+
 .git-diff-preview-panel__line {
   display: grid;
   grid-template-columns: 5ch 5ch 2ch max-content;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   min-height: var(--line-height-20);
   color: var(--color-text);
   white-space: pre;

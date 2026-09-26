@@ -282,7 +282,6 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
 
 .git-diff-control__menu :deep([role="menuitemradio"][aria-checked="false"] .app-menu__icon) {
   opacity: 0.4;
-  stroke-width: 2px;
 }
 
 .git-diff-control__menu :deep(.app-menu__check) {

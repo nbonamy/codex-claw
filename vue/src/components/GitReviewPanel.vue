@@ -46,9 +46,11 @@
       :diff="visibleDiff"
       :error="panel.error"
       :expand-all-signal="expandAllSignal"
+      open-file-enabled
       :state="panel.state"
       :word-wrap="wordWrap"
       @all-expanded-change="allExpanded = $event"
+      @open-file="emit('openFile', $event)"
     />
   </section>
 </template>
@@ -70,6 +72,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  openFile: [filePath: string];
   refresh: [];
 }>();
 

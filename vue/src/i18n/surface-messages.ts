@@ -423,6 +423,7 @@ export const surfaceMessages = {
   },
   "gitDiffPreviewPanel": {
     "loadingDiff": "Loading diff...",
+    "openFileInTab": "Open {file} in a tab",
     "unmodified": "unmodified",
     "noTextualHunks": "No textual hunks.",
     "noDiffContent": "No diff content.",

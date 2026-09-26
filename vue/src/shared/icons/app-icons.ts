@@ -25,6 +25,7 @@ export {
   IconDownload as DownloadIcon,
   IconEye as EyeIcon,
   IconExternalLink as ExternalLinkIcon,
+  IconFileArrowRight as FileArrowRightIcon,
   IconFileDiff as FileDiffIcon,
   IconFileText as FileTextIcon,
   IconFolder as FolderIcon,

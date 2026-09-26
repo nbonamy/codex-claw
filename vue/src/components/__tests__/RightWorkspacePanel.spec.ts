@@ -105,6 +105,30 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.emitted('closeTab')).toStrictEqual([['review']]);
   });
 
+  it('opens a changed file from its diff header in a full file tab', async () => {
+    const wrapper = mountPanel(['review'], 'review');
+    await wrapper.setProps({
+      gitPanel: {
+        kind: 'gitDiff',
+        title: 'Review',
+        diff: [
+          'diff --git a/src/main.ts b/src/main.ts',
+          '--- a/src/main.ts',
+          '+++ b/src/main.ts',
+          '@@ -1 +1 @@',
+          '-export const oldValue = 1;',
+          '+export const newValue = 2;',
+        ].join('\n'),
+        state: 'idle',
+      },
+    });
+
+    await wrapper.get('[aria-label="Open src/main.ts in a tab"]').trigger('click');
+
+    expect(wrapper.emitted('previewFile')).toStrictEqual([['src/main.ts']]);
+    expect(wrapper.get('.git-diff-preview-panel__file-header').attributes('aria-expanded')).toBe('true');
+  });
+
   it('shows a tab title tooltip when the label may be compressed', async () => {
     const fileTab = rightWorkspaceFileTab('src/long-file-name.ts');
     const wrapper = mountPanel([fileTab], fileTab, {

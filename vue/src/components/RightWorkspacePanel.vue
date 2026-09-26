@@ -163,6 +163,7 @@
       :agent="agent"
       :git-status="gitStatus"
       :panel="gitPanel"
+      @open-file="emit('previewFile', $event)"
       @refresh="emit('refreshGitDiff', gitPanel.target)"
     />
 
