@@ -284,4 +284,8 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
   opacity: 0.4;
   stroke-width: 2px;
 }
+
+.git-diff-control__menu :deep(.app-menu__check) {
+  display: none;
+}
 </style>
