@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.22.0",
+  "currentVersion": "0.22.1",
   "releases": [
+    {
+      "version": "0.22.1",
+      "releasedAt": "2026-09-26",
+      "sourceSha256": "893090fb7b6f95e677e0c16ba1ba294830bba801bcb8e94aa4ce12c56706550f",
+      "markdown": "### Improvements and fixes\n\n- Quick Chats can preview absolute file links such as shared memory and\n  instruction files even though they do not have a project workspace.\n- Claude Code keeps live tool calls and the following answer in one message\n  when conversation history refreshes during generation.\n- Saved-draft actions remain available through their keyboard shortcuts and\n  the Edit menu without duplicating them in the composer menu."
+    },
     {
       "version": "0.22.0",
       "releasedAt": "2026-09-26",

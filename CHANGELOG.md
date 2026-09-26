@@ -4,6 +4,17 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.22.1] - 2026-09-26
+
+### Improvements and fixes
+
+- Quick Chats can preview absolute file links such as shared memory and
+  instruction files even though they do not have a project workspace.
+- Claude Code keeps live tool calls and the following answer in one message
+  when conversation history refreshes during generation.
+- Saved-draft actions remain available through their keyboard shortcuts and
+  the Edit menu without duplicating them in the composer menu.
+
 ## [0.22.0] - 2026-09-26
 
 ### New features
