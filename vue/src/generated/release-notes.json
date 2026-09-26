@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.23.0",
+  "currentVersion": "0.23.1",
   "releases": [
+    {
+      "version": "0.23.1",
+      "releasedAt": "2026-09-26",
+      "sourceSha256": "9d9aad887b5eaa00746930865f16438dac2898a5af436b897f1b643c9f96777f",
+      "markdown": "### Improvements and fixes\n\n- Empty-composer Send stays disabled instead of sending an implicit “continue.”\n- Remote team actions distinguish connecting to an existing team, disconnecting\n  it locally without confirmation, and deleting it on the host. Deleting the\n  host’s last team now offers to disconnect instead."
+    },
     {
       "version": "0.23.0",
       "releasedAt": "2026-09-26",

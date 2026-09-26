@@ -4,6 +4,15 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.23.1] - 2026-09-26
+
+### Improvements and fixes
+
+- Empty-composer Send stays disabled instead of sending an implicit “continue.”
+- Remote team actions distinguish connecting to an existing team, disconnecting
+  it locally without confirmation, and deleting it on the host. Deleting the
+  host’s last team now offers to disconnect instead.
+
 ## [0.23.0] - 2026-09-26
 
 ### New features
