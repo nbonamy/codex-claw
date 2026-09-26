@@ -14,10 +14,10 @@
         :class="{ 'agent-quick-open__unread--visible': unreadAgentIdSet.has(item.id) }"
         aria-hidden="true"
       />
-      <AgentAvatar
-        :avatar="agentById.get(item.id)?.avatar"
+      <AgentQuickOpenIcon
+        :agent="agentById.get(item.id)"
         :name="item.label"
-        size="xs"
+        :repository-icons="repositoryIcons ?? {}"
       />
       <span class="agent-quick-open__copy">
         <span class="agent-quick-open__identity">
@@ -41,12 +41,13 @@ import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import QuickOpenDialog, { type QuickOpenItem } from '../shared/QuickOpenDialog.vue';
-import AgentAvatar from './AgentAvatar.vue';
+import AgentQuickOpenIcon from './AgentQuickOpenIcon.vue';
 
 const props = defineProps<{
   agents: Agent[];
   teams: Team[];
   unreadAgentIds: string[];
+  repositoryIcons?: Record<string, string>;
 }>();
 const emit = defineEmits<{
   close: [];

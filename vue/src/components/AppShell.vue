@@ -478,6 +478,7 @@
     <AgentQuickOpen
       v-if="agentQuickOpenVisible"
       :agents="snapshot.agents"
+      :repository-icons="snapshot.general.repositoryIcons"
       :teams="snapshot.teams"
       :unread-agent-ids="unreadAgentIds ?? []"
       @close="agentQuickOpenVisible = false"
