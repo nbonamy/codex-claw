@@ -33,6 +33,7 @@ describe('settings contracts', () => {
       spokenAnnouncementVoice: 'bf_emma',
       collapsedRepositoryKeys: [],
       modelFavorites: [],
+      savedPromptDrafts: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: true,
@@ -57,6 +58,12 @@ describe('settings contracts', () => {
     expect(normalizeGeneralSettings({ sessionCompressionWarningEnabled: false }).sessionCompressionWarningEnabled)
       .toBe(false);
     expect(normalizeGeneralSettings({ cockpitAgentViewMode: 'invalid' }).cockpitAgentViewMode).toBe('teams');
+    expect(normalizeGeneralSettings({ savedPromptDrafts: [
+      { id: 'draft-1', agentId: 'agent-1', text: 'Come back later', createdAt: 1000, unexpected: 'discard' },
+      { id: 'draft-2', agentId: 'agent-1', text: '', createdAt: 1001 },
+    ] }).savedPromptDrafts).toStrictEqual([
+      { id: 'draft-1', agentId: 'agent-1', text: 'Come back later', createdAt: 1000 },
+    ]);
     expect(normalizeGeneralSettings(null)).toStrictEqual(defaultGeneralSettings);
     expect(normalizeAppshotSettings(null)).toStrictEqual(defaultAppshotSettings);
     expect(normalizePluginSettings([])).toStrictEqual(defaultPluginSettings);
@@ -127,6 +134,7 @@ describe('settings contracts', () => {
       spokenAnnouncementVoice: 'af_heart',
       collapsedRepositoryKeys: [],
       modelFavorites: [],
+      savedPromptDrafts: [],
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       agentListCompact: false,

@@ -1,13 +1,14 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import {
   createCodexConversationPaneController,
+  type CodexComposerState,
   type CodexConversationPaneController,
   type CodexMessageTextSelection,
   type CodexNativeAttachment,
 } from '@codex-app-sdk/vue';
 import { computed, defineComponent, h, nextTick, provide, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, RendererMessage, ThreadPlan } from '@codex-claw/core/contracts';
+import type { Agent, RendererMessage, SavedPromptDraft, ThreadPlan } from '@codex-claw/core/contracts';
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import type { VisualizationAnnotation } from '../use-visualization-annotations';
@@ -59,6 +60,75 @@ const executionPlan: ThreadPlan = {
 };
 
 describe('ConversationPane', () => {
+  it('parks only the selected composer text and restores a saved draft at the caret', async () => {
+    const composerState = ref<CodexComposerState>({ text: 'first then second', selectionStart: 6, selectionEnd: 10 });
+    const conversationId = ref(agent.id);
+    const savePromptDraft = vi.fn().mockResolvedValue(undefined);
+    const removePromptDraft = vi.fn().mockResolvedValue(undefined);
+    const controller = createCodexConversationPaneController({
+      state: () => ({ identity: { conversationKey: conversationId.value, messages: [] }, composer: { state: composerState.value } }),
+      actions: { updateComposerState: (state) => { composerState.value = state; } },
+    });
+    const wrapper = mount(ConversationPane, {
+      attachTo: document.body,
+      props: { controller, agent, savePromptDraft, removePromptDraft },
+      global: { plugins: [i18n] },
+    });
+    const editor = wrapper.get<HTMLElement>('.chat-rich-text-editor');
+
+    await editor.trigger('keydown', { key: 'X', metaKey: true, shiftKey: true });
+    await flushPromises();
+    expect(savePromptDraft).toHaveBeenCalledWith(agent.id, 'then');
+    expect(composerState.value.text).toBe('first  second');
+    expect(document.body.textContent).toContain('Draft saved. Use ⇧⌘V to recall it.');
+
+    const draft: SavedPromptDraft = { id: 'draft-1', agentId: agent.id, text: 'then', createdAt: 1000 };
+    await wrapper.setProps({ savedPromptDrafts: [draft] });
+    await editor.trigger('keydown', { key: 'V', metaKey: true, shiftKey: true });
+    await nextTick();
+    const search = wrapper.get('.saved-prompt-draft-picker input');
+    await nextTick();
+    expect(document.activeElement).toBe(search.element);
+    expect(search.attributes('aria-label')).toBe('Search saved drafts');
+    await search.trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(composerState.value.text).toBe('first then second');
+    expect(removePromptDraft).toHaveBeenCalledWith(draft.id);
+    expect(document.activeElement).toBe(editor.element);
+
+    await editor.trigger('keydown', { key: 'V', metaKey: true, shiftKey: true });
+    await nextTick();
+    await wrapper.get('.saved-prompt-draft-picker input').trigger('keydown', { key: 'Enter', shiftKey: true });
+    await flushPromises();
+    expect(removePromptDraft).toHaveBeenCalledTimes(1);
+
+    await editor.trigger('keydown', { key: 'V', metaKey: true, shiftKey: true });
+    await nextTick();
+    expect(wrapper.find('.saved-prompt-draft-picker').exists()).toBe(true);
+    editor.element.focus();
+    await nextTick();
+    expect(wrapper.find('.saved-prompt-draft-picker').exists()).toBe(false);
+
+    composerState.value = { text: 'Park the whole prompt', selectionStart: 21, selectionEnd: 21 };
+    await nextTick();
+    await editor.trigger('keydown', { key: 'X', metaKey: true, shiftKey: true });
+    await flushPromises();
+    expect(savePromptDraft).toHaveBeenLastCalledWith(agent.id, 'Park the whole prompt');
+    expect(composerState.value.text).toBe('');
+
+    composerState.value = { text: 'Do not lose this', selectionStart: 0, selectionEnd: 0 };
+    savePromptDraft.mockRejectedValueOnce(new Error('Storage unavailable'));
+    await nextTick();
+    await editor.trigger('keydown', { key: 'X', metaKey: true, shiftKey: true });
+    await flushPromises();
+    expect(composerState.value.text).toBe('Do not lose this');
+
+    await editor.trigger('keydown', { key: 'V', metaKey: true, shiftKey: true });
+    expect(wrapper.find('.saved-prompt-draft-picker').exists()).toBe(true);
+    conversationId.value = 'new-conversation';
+    await nextTick();
+    expect(wrapper.find('.saved-prompt-draft-picker').exists()).toBe(false);
+  });
   it('switches a fresh chat without losing its draft and locks the choice after submission', async () => {
     const selectedAgent = ref<Agent>({ ...agent });
     const choices = ref<Agent['backend'][]>(['codex']);
@@ -714,6 +784,9 @@ function mountPane(props: {
   emptyHeadline?: string;
   emptySubhead?: string;
   threadFlagBusy?: boolean;
+  savedPromptDrafts?: readonly SavedPromptDraft[];
+  savePromptDraft?: (agentId: string, text: string) => Promise<void>;
+  removePromptDraft?: (id: string) => Promise<void>;
 }) {
   return mount(ConversationPane, {
     props,

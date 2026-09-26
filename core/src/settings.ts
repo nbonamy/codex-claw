@@ -1,4 +1,4 @@
-import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type ModelFavorite, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
+import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type ModelFavorite, type SavedPromptDraft, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
 import { repositoryIconKeyForRemote } from './git-remote';
 
 export const defaultPluginSettings: AppPluginSettings = {
@@ -30,6 +30,7 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   cockpitAgentViewMode: 'teams',
   collapsedRepositoryKeys: [],
   modelFavorites: [],
+  savedPromptDrafts: [],
   shareCodexSkillsAndPlugins: true,
   worktreeInitializationMode: 'automatic',
   sessionCompressionWarningEnabled: true,
@@ -122,6 +123,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     cockpitAgentViewMode: value.cockpitAgentViewMode === 'recent' ? 'recent' : 'teams',
     collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
     modelFavorites: normalizeModelFavorites(value.modelFavorites),
+    savedPromptDrafts: normalizeSavedPromptDrafts(value.savedPromptDrafts),
     shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
     worktreeInitializationMode: normalizeWorktreeInitializationMode(value.worktreeInitializationMode),
     sessionCompressionWarningEnabled: value.sessionCompressionWarningEnabled !== false,
@@ -190,6 +192,23 @@ function normalizeModelFavorites(value: unknown): ModelFavorite[] {
     if (favorites.length >= 20) break;
   }
   return favorites;
+}
+
+function normalizeSavedPromptDrafts(value: unknown): SavedPromptDraft[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const drafts: SavedPromptDraft[] = [];
+  for (const candidate of value) {
+    if (!isRecord(candidate)) continue;
+    const { id, agentId, text, createdAt } = candidate;
+    if (typeof id !== 'string' || !id || id.length > 128 || seen.has(id)
+      || typeof agentId !== 'string' || !agentId || agentId.length > 128
+      || typeof text !== 'string' || !text.trim() || text.length > 131_072
+      || typeof createdAt !== 'number' || !Number.isFinite(createdAt) || createdAt < 0) continue;
+    seen.add(id);
+    drafts.push({ id, agentId, text, createdAt });
+  }
+  return drafts.slice(-100);
 }
 
 function normalizeFavoriteValue(value: unknown): string | undefined {

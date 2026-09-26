@@ -42,6 +42,9 @@
       :controller="conversationPaneController"
       :agent="currentAgent"
       :agents="snapshot.agents"
+      :saved-prompt-drafts="snapshot.general.savedPromptDrafts"
+      :save-prompt-draft="savePromptDraft"
+      :remove-prompt-draft="removePromptDraft"
       :attachment-annotation-counts="activeAttachmentAnnotationCounts"
       :text-annotations="chatTextAnnotations"
       :visualization-annotations="visualizationAnnotations"
@@ -217,6 +220,8 @@ const props = defineProps<{
   respondToThreadFlag: (response: ThreadFlagResponse) => Promise<void>;
   threadFlagBusy: boolean;
   conversationPaneController: CodexConversationPaneController;
+  savePromptDraft: (agentId: string, text: string) => Promise<void>;
+  removePromptDraft: (id: string) => Promise<void>;
   conversationPlan: ThreadPlan | null;
   chatTextAnnotations: readonly ChatTextAnnotation[];
   visualizationAnnotations: readonly VisualizationAnnotation[];
@@ -365,7 +370,7 @@ const {
 } = toRefs(props);
 
 const workspaceBody = ref<HTMLElement | null>(null);
-const conversationPane = ref<{ focusComposer(): void } | null>(null);
+const conversationPane = ref<{ focusComposer(): void; openSavedDraftPicker(): void; saveCurrentDraft(): Promise<void> } | null>(null);
 const rightWorkspaces = props.rightWorkspaces;
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
 
@@ -716,6 +721,9 @@ function focusComposer(): void {
   conversationPane.value?.focusComposer();
 }
 
+function openSavedDraftPicker(): void { conversationPane.value?.openSavedDraftPicker(); }
+function saveCurrentDraft(): void { void conversationPane.value?.saveCurrentDraft(); }
+
 function workspaceBodyElement(): HTMLElement | null {
   return workspaceBody.value;
 }
@@ -726,6 +734,8 @@ function showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void
 
 defineExpose({
   focusComposer,
+  openSavedDraftPicker,
+  saveCurrentDraft,
   handleBrowserOpenCommand,
   openConversationLink,
   openConversationImage,

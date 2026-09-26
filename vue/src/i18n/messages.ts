@@ -593,6 +593,20 @@ export const messages = {
     },
     chat: {
       quickChatHeadline: 'What can I help with?',
+      savedDrafts: {
+        title: 'Saved drafts',
+        search: 'Search saved drafts',
+        empty: 'No saved drafts',
+        hint: '⇧⏎ to insert a copy',
+        save: 'Save draft for later',
+        saved: 'Draft saved. Use ⇧⌘V to recall it.',
+        open: 'Saved drafts',
+        insertCopy: 'Insert a copy and keep draft',
+        delete: 'Delete saved draft',
+        saveFailed: 'Could not save draft',
+        restoreFailed: 'Could not restore draft',
+        invalid: 'A draft must contain text and be at most 128 KiB.',
+      },
       threadFlags: {
         delegateToWorktree: {
           prompt: 'Start implementation in a worktree?',

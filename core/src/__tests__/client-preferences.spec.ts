@@ -7,6 +7,10 @@ describe('client preference projection', () => {
     expect(splitSettingsInput({})).toStrictEqual({ policy: {}, preferences: {} });
     const input = { general: { agentListCompact: true, preventSleepWhenAgentsRun: false }, theme: { mode: 'dark' as const }, sourceFolder: { path: '/src' }, workProviders: { github: { oauthClientId: 'client-id' } } };
     expect(splitSettingsInput(input)).toStrictEqual({ policy: { general: { preventSleepWhenAgentsRun: false }, sourceFolder: input.sourceFolder, workProviders: input.workProviders }, preferences: { general: { agentListCompact: true }, theme: input.theme } });
+    const draft = { id: 'draft', agentId: 'agent', text: 'Later', createdAt: 1000 };
+    expect(splitSettingsInput({ general: { savedPromptDrafts: [draft] } })).toStrictEqual({
+      policy: {}, preferences: { general: { savedPromptDrafts: [draft] } },
+    });
   });
 
   it('projects ordering, per-team selection and appearance without mutating the shared snapshot', () => {

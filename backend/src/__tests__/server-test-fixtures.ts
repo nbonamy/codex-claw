@@ -45,6 +45,7 @@ export function createTestSnapshot(): AppSnapshot {
       cockpitAgentViewMode: 'teams',
       collapsedRepositoryKeys: [],
       modelFavorites: [],
+      savedPromptDrafts: [],
       shareCodexSkillsAndPlugins: true,
       sessionCompressionWarningEnabled: true,
       worktreeInitializationMode: 'automatic',

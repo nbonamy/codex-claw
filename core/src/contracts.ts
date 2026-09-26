@@ -442,6 +442,13 @@ export type ModelFavorite = {
   serviceTier: string | null;
 };
 
+export type SavedPromptDraft = {
+  id: string;
+  agentId: string;
+  text: string;
+  createdAt: number;
+};
+
 export type CockpitAgentViewMode = 'teams' | 'recent';
 
 export type AppGeneralSettings = {
@@ -462,6 +469,7 @@ export type AppGeneralSettings = {
   cockpitAgentViewMode: CockpitAgentViewMode;
   collapsedRepositoryKeys: string[];
   modelFavorites: ModelFavorite[];
+  savedPromptDrafts: SavedPromptDraft[];
   shareCodexSkillsAndPlugins: boolean;
   worktreeInitializationMode: WorktreeInitializationMode;
   sessionCompressionWarningEnabled: boolean;

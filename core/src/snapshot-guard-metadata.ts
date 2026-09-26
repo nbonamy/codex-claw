@@ -538,6 +538,8 @@ function isGeneralSettings(value: unknown): boolean {
     typeof value.agentListCompact === 'boolean' &&
     includes(['teams', 'recent'], value.cockpitAgentViewMode) &&
     isArrayOf(value.collapsedRepositoryKeys, isString) &&
+    isArrayOf(value.savedPromptDrafts, (draft) => isRecord(draft)
+      && isString(draft.id) && isString(draft.agentId) && isString(draft.text) && isNumber(draft.createdAt)) &&
     typeof value.shareCodexSkillsAndPlugins === 'boolean' &&
     typeof value.sessionCompressionWarningEnabled === 'boolean' &&
     includes(['automatic', 'repository', 'off'], value.worktreeInitializationMode) &&

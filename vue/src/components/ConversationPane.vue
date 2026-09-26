@@ -1,5 +1,5 @@
 <template>
-  <div class="conversation-pane">
+  <div class="conversation-pane" @keydown.capture="handleDraftShortcut" @focusin.capture="handleDraftFocusIn">
     <ConversationLoadError
       v-if="historyLoadFailed && !hasVisibleMessages"
       :loading="historyLoading"
@@ -83,6 +83,16 @@
           />
         </div>
       </template>
+      <template #before-composer>
+        <div v-if="draftPickerOpen" class="conversation-pane__draft-anchor">
+          <SavedPromptDraftPicker
+            :drafts="agentDrafts"
+            @close="closeDraftPicker"
+            @delete="deleteSavedDraft"
+            @select="restoreSavedDraft"
+          />
+        </div>
+      </template>
       <template #composer-context="{ disabled }">
         <ComposerContextCards
           v-if="composerContextCards.length > 0"
@@ -109,12 +119,14 @@
 
 <script setup lang="ts">
 import { translate } from '../i18n';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   CodexConversationPane,
   defaultCodexChatTranslate,
   provideCodexChatTranslate,
+  resolveCodexConversationPaneValue,
+  type CodexComposerState,
   type CodexChatMessage,
   type CodexConversationPaneController,
   type CodexMessageTextSelection,
@@ -126,6 +138,7 @@ import { IconSitemap } from '@tabler/icons-vue';
 import type {
   Agent,
   RendererMessage,
+  SavedPromptDraft,
   ThreadPlan,
 } from '@codex-claw/core/contracts';
 import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
@@ -137,6 +150,7 @@ import ComposerContextCards, { type ComposerContextCard } from './ComposerContex
 import ChatTextSelectionAnnotation from './ChatTextSelectionAnnotation.vue';
 import ThreadFlagAffordance from './ThreadFlagAffordance.vue';
 import BackendSelector from './BackendSelector.vue';
+import SavedPromptDraftPicker from './SavedPromptDraftPicker.vue';
 import { useBackendChoices, useBackendSwitch } from './backend-selection';
 import { canSelectAgentBackend } from '@codex-claw/core/agent-backends';
 import { ElMessage } from 'element-plus';
@@ -159,7 +173,7 @@ async function selectBackend(backend: Agent['backend']): Promise<void> {
 
 const { t, te } = useI18n();
 const agentMentionGroupId = 'agents';
-const surface = ref<{ focusComposer(): void } | null>(null);
+const surface = ref<{ focusComposer(): void; $el: HTMLElement } | null>(null);
 provideCodexChatTranslate((key, params) => te(key)
   ? t(key, params ?? {})
   : defaultCodexChatTranslate(key, params));
@@ -180,6 +194,9 @@ const props = withDefaults(defineProps<{
   emptyHeadline?: string;
   emptySubhead?: string;
   threadFlagBusy?: boolean;
+  savedPromptDrafts?: readonly SavedPromptDraft[];
+  savePromptDraft?: (agentId: string, text: string) => Promise<void>;
+  removePromptDraft?: (id: string) => Promise<void>;
 }>(), {
   agents: () => [],
   attachmentAnnotationCounts: () => ({}),
@@ -191,6 +208,7 @@ const props = withDefaults(defineProps<{
   historyLoading: false,
   hasVisibleMessages: false,
   threadFlagBusy: false,
+  savedPromptDrafts: () => [],
 });
 provideClawToolPresentation(
   (key, params) => t(key, params ?? {}),
@@ -212,6 +230,107 @@ const emit = defineEmits<{
 }>();
 
 const conversationKey = computed(() => props.agent?.id ?? 'no-agent');
+const paneConversationKey = computed(() => resolveCodexConversationPaneValue(props.controller.state).identity.conversationKey ?? conversationKey.value);
+const agentDrafts = computed(() => props.savedPromptDrafts.filter((draft) => draft.agentId === props.agent?.id));
+const draftPickerOpen = ref(false);
+const draftSavePending = ref(false);
+const insertionRange = ref<{ start: number; end: number } | null>(null);
+watch(paneConversationKey, () => { draftPickerOpen.value = false; insertionRange.value = null; });
+
+function composerState(): CodexComposerState | null {
+  return resolveCodexConversationPaneValue(props.controller.state).composer?.state ?? null;
+}
+
+function updateComposerState(state: CodexComposerState): void {
+  void resolveCodexConversationPaneValue(props.controller.actions).updateComposerState?.(state);
+}
+
+function editorElement(): HTMLElement | null {
+  return surface.value?.$el?.querySelector?.('.chat-composer [contenteditable="true"]') ?? null;
+}
+
+function handleDraftShortcut(event: KeyboardEvent): void {
+  if (!event.metaKey || !event.shiftKey || event.ctrlKey || event.altKey || !props.agent) return;
+  const key = event.key.toLowerCase();
+  if (key === 'x' && event.target === editorElement()) {
+    event.preventDefault();
+    event.stopPropagation();
+    void saveCurrentDraft();
+  } else if (key === 'v' && event.target === editorElement() && !draftPickerOpen.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    openSavedDraftPicker();
+  }
+}
+
+function handleDraftFocusIn(event: FocusEvent): void {
+  if (draftPickerOpen.value && event.target === editorElement()) {
+    draftPickerOpen.value = false;
+    insertionRange.value = null;
+  }
+}
+
+async function saveCurrentDraft(): Promise<void> {
+  const agentId = props.agent?.id;
+  const state = composerState();
+  if (!agentId || !state?.text?.trim() || !props.savePromptDraft || draftSavePending.value) return;
+  const start = Math.min(state.selectionStart, state.selectionEnd);
+  const end = Math.max(state.selectionStart, state.selectionEnd);
+  const hasSelection = end > start;
+  const text = hasSelection ? state.text.slice(start, end) : state.text;
+  if (!text.trim()) return;
+  draftSavePending.value = true;
+  try {
+    await props.savePromptDraft(agentId, text);
+    ElMessage.success(t('chat.savedDrafts.saved'));
+    if (props.agent?.id !== agentId || composerState()?.text !== state.text) return;
+    const nextText = hasSelection ? state.text.slice(0, start) + state.text.slice(end) : '';
+    updateComposerState({
+      ...state,
+      text: nextText,
+      selectionStart: hasSelection ? start : 0,
+      selectionEnd: hasSelection ? start : 0,
+      ...(hasSelection ? {} : { activeCommandId: null }),
+    });
+  } catch (error) {
+    ElMessage.error(`${t('chat.savedDrafts.saveFailed')}: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    draftSavePending.value = false;
+  }
+}
+
+function openSavedDraftPicker(): void {
+  if (!props.agent) return;
+  const state = composerState();
+  insertionRange.value = state ? { start: state.selectionStart, end: state.selectionEnd } : null;
+  draftPickerOpen.value = true;
+}
+
+function closeDraftPicker(): void {
+  draftPickerOpen.value = false;
+  void nextTick(() => editorElement()?.focus());
+}
+
+async function deleteSavedDraft(id: string): Promise<void> {
+  try { await props.removePromptDraft?.(id); }
+  catch (error) { ElMessage.error(error instanceof Error ? error.message : String(error)); }
+}
+
+async function restoreSavedDraft(selection: { id: string; keep: boolean }): Promise<void> {
+  const draft = agentDrafts.value.find((candidate) => candidate.id === selection.id);
+  const state = composerState();
+  if (!draft || !state) return;
+  const start = Math.min(insertionRange.value?.start ?? state.text.length, state.text.length);
+  const end = Math.min(insertionRange.value?.end ?? start, state.text.length);
+  const text = `${state.text.slice(0, start)}${draft.text}${state.text.slice(end)}`;
+  const caret = start + draft.text.length;
+  updateComposerState({ ...state, text, selectionStart: caret, selectionEnd: caret });
+  closeDraftPicker();
+  if (!selection.keep) {
+    try { await props.removePromptDraft?.(draft.id); }
+    catch (error) { ElMessage.error(`${t('chat.savedDrafts.restoreFailed')}: ${error instanceof Error ? error.message : String(error)}`); }
+  }
+}
 const composerContextCards = computed<ComposerContextCard[]>(() => [
   ...props.textAnnotations.map((annotation) => ({
     id: `annotation:${annotation.id}`,
@@ -327,7 +446,7 @@ function focusComposer(): void {
   surface.value?.focusComposer?.();
 }
 
-defineExpose({ focusComposer });
+defineExpose({ focusComposer, openSavedDraftPicker, saveCurrentDraft });
 </script>
 
 <style scoped>
@@ -345,6 +464,19 @@ defineExpose({ focusComposer });
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+
+.conversation-pane__draft-anchor {
+  position: relative;
+  z-index: 10;
+  height: 0;
+}
+
+.conversation-pane__draft-anchor > * {
+  position: absolute;
+  bottom: var(--space-2);
+  right: 0;
+  left: 0;
 }
 
 .conversation-pane__thread-flags {

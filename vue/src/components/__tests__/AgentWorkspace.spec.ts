@@ -59,6 +59,8 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       confirmPlan: vi.fn(),
       threadFlagBusy: false,
       conversationPaneController: {} as CodexConversationPaneController,
+      savePromptDraft: vi.fn(),
+      removePromptDraft: vi.fn(),
       conversationPlan: currentAgent.plan ?? null,
       respondToThreadFlag: vi.fn(),
       createAgentGitPullRequest: vi.fn(),

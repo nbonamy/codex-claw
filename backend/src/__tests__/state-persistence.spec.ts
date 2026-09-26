@@ -7,6 +7,7 @@ import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/sna
 import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
 import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/core/settings';
+import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
 
 let tempDir: string | null = null;
@@ -19,6 +20,18 @@ afterEach(async () => {
 });
 
 describe('AppStatePersistence', () => {
+  it('restores saved prompt drafts for the same client after a restart', async () => {
+    const persistence = new AppStatePersistence(await tempStatePath());
+    const snapshot = createInitialSnapshot();
+    const draft = { id: 'draft-1', agentId: snapshot.agents[0]!.id, text: 'Finish this after the review', createdAt: 1000 };
+    snapshot.clientPreferences = { desktop: { general: { savedPromptDrafts: [draft] } } };
+
+    await persistence.save(snapshot);
+    const restored = await persistence.load();
+
+    expect(projectClientSnapshot(restored, 'desktop').general.savedPromptDrafts).toStrictEqual([draft]);
+    expect(projectClientSnapshot(restored, 'other').general.savedPromptDrafts).toStrictEqual([]);
+  });
   it('loads the default team with no agents when no state file exists', async () => {
     const persistence = new AppStatePersistence(await tempStatePath());
 
@@ -1157,6 +1170,7 @@ describe('AppStatePersistence', () => {
         reasoningEffort: 'high',
         serviceTier: 'priority',
       }],
+      savedPromptDrafts: [],
       shareCodexSkillsAndPlugins: false,
       sessionCompressionWarningEnabled: false,
       worktreeInitializationMode: 'repository',

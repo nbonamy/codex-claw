@@ -214,7 +214,7 @@
           />
         </template>
         <template #conversation="{ agentId }">
-          <ConversationPane v-if="currentAgent?.id === agentId" ref="missionConversationPane" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory">
+          <ConversationPane v-if="currentAgent?.id === agentId" ref="missionConversationPane" :controller="conversationPaneController" :agent="currentAgent" :agents="snapshot.agents" :saved-prompt-drafts="snapshot.general.savedPromptDrafts" :save-prompt-draft="savePromptDraft" :remove-prompt-draft="removePromptDraft" :history-load-failed="props.isConversationLoadFailed" :history-loading="isConversationLoading" :has-visible-messages="conversationMessages.length > 0" :empty-headline="selectedMission.stage === 'requirements' ? t('missions.whatDoYouWantToBuild') : undefined" :empty-subhead="selectedMission.stage === 'requirements' ? '' : undefined" @retry-history="props.retryAgentHistory">
             <template v-if="selectedMission.stage === 'requirements' && conversationMessages.length === 0" #empty-actions>
               <AppMenu class="app-menu--embedded" :ariaLabel="t('missions.chooseIssue')" :items="missionSourceMenuItems" @select="openMissionIssuePicker" />
             </template>
@@ -236,6 +236,8 @@
         :respond-to-thread-flag="respondToThreadFlag"
         :thread-flag-busy="threadFlagBusy"
         :conversation-pane-controller="conversationPaneController"
+        :save-prompt-draft="savePromptDraft"
+        :remove-prompt-draft="removePromptDraft"
         :conversation-plan="conversationPlan"
         :chat-text-annotations="activeChatTextAnnotations"
         :visualization-annotations="activeVisualizationAnnotations"
@@ -907,7 +909,7 @@ provideBackendChoices(() => props.snapshot.general);
 const backendSwitch = provideBackendSwitch((id, backend) => props.updateAgent({ id, backend }));
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
-const missionConversationPane = ref<{ focusComposer(): void } | null>(null);
+const missionConversationPane = ref<{ focusComposer(): void; openSavedDraftPicker(): void; saveCurrentDraft(): Promise<void> } | null>(null);
 const activeReviewFindingAttachment = computed(() => {
   const clarification = pendingReviewClarification.value;
   return clarification && clarification.agentId === currentAgent.value?.id
@@ -1152,6 +1154,8 @@ const debugAgentCreationProgress = ref<AgentCreationProgress | null>(null);
 const debugAgentCreationTimers: Array<ReturnType<typeof setTimeout>> = [];
 const agentWorkspace = ref<{
   focusComposer(): void;
+  openSavedDraftPicker(): void;
+  saveCurrentDraft(): void;
   handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-browser' }>): void;
   openConversationLink(link: CodexConversationLink): void | Promise<void>;
   openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext): boolean;
@@ -1748,6 +1752,14 @@ const permissionModeMenuItems = computed<CodexComposerMenuItem[]>(() => {
     items: modes.map((mode) => permissionModeMenuItem(mode, props.permissionMode)),
   }];
 });
+const composerLeadingMenuItems = computed<CodexComposerMenuItem[]>(() => {
+  const savedCount = props.snapshot.general.savedPromptDrafts.filter((draft) => draft.agentId === currentAgent.value?.id).length;
+  return [
+    { id: 'save-prompt-draft', type: 'action', label: t('chat.savedDrafts.save'), value: '⇧⌘X', disabled: !props.composerState.text.trim(), payload: { kind: 'save-prompt-draft' } },
+    { id: 'open-saved-prompt-drafts', type: 'action', label: `${t('chat.savedDrafts.open')} (${savedCount})`, value: '⇧⌘V', payload: { kind: 'open-saved-prompt-drafts' } },
+    ...(permissionModeMenuItems.value.length ? [{ id: 'saved-prompt-drafts-separator', type: 'separator' as const }, ...permissionModeMenuItems.value] : []),
+  ];
+});
 const currentModelFavorite = computed<ModelFavorite | null>(() => {
   const agent = currentAgent.value;
   const model = props.backendModels.find((candidate) => candidate.id === props.selectedModelId)
@@ -1882,7 +1894,7 @@ const conversationPaneState: CodexConversationPaneState = {
       return translate('surface.appShell.askForFollowUpChanges');
     },
     get approvalPreset() { return props.approvalPreset; },
-    get leadingMenuItems() { return permissionModeMenuItems.value; },
+    get leadingMenuItems() { return composerLeadingMenuItems.value; },
     get modelMenuItems() { return modelFavoriteMenuItems.value; },
     get planMode() { return props.planMode; },
     get selectedModelId() { return props.selectedModelId; },
@@ -1928,6 +1940,20 @@ const conversationPaneActions: CodexConversationPaneActions = {
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   menuSelect: (item) => {
+    if (item.payload && typeof item.payload === 'object' && 'kind' in item.payload) {
+      if (item.payload.kind === 'save-prompt-draft') {
+        if (activeSurface.value === 'mission') void missionConversationPane.value?.saveCurrentDraft();
+        else agentWorkspace.value?.saveCurrentDraft();
+        return;
+      }
+      if (item.payload.kind === 'open-saved-prompt-drafts') {
+        void nextTick(() => {
+          if (activeSurface.value === 'mission') missionConversationPane.value?.openSavedDraftPicker();
+          else agentWorkspace.value?.openSavedDraftPicker();
+        });
+        return;
+      }
+    }
     const favoriteCommand = modelFavoriteCommand(item.payload);
     if (favoriteCommand) {
       void handleModelFavoriteCommand(favoriteCommand);
@@ -2707,6 +2733,18 @@ async function openAgentIn(
 
  async function updateSettings(input: UpdateSettingsInput): Promise<void> {
   await props.updateSettings(input);
+}
+
+async function savePromptDraft(agentId: string, text: string): Promise<void> {
+  if (!text.trim() || text.length > 131_072) throw new Error(t('chat.savedDrafts.invalid'));
+  const savedPromptDrafts = [...props.snapshot.general.savedPromptDrafts.map((draft) => ({ ...draft })), {
+    id: crypto.randomUUID(), agentId, text, createdAt: Date.now(),
+  }].slice(-100);
+  await updateSettings({ general: { savedPromptDrafts } });
+}
+
+async function removePromptDraft(id: string): Promise<void> {
+  await updateSettings({ general: { savedPromptDrafts: props.snapshot.general.savedPromptDrafts.filter((draft) => draft.id !== id).map((draft) => ({ ...draft })) } });
 }
 
 async function updateRepositoryIcon(payload: {
