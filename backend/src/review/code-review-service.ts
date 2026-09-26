@@ -586,10 +586,9 @@ function independentReviewHandoff(session: CodeReviewSession): string {
     for (const finding of round.findings) latestFindings.set(finding.id, finding);
   }
   const remediated = [...latestFindings.values()].filter((finding) => finding.remediation.state === 'fixed');
-  const summary = remediated.length
-    ? ['Independent review completed. Please give the user a concise update with these remediated findings:',
-        ...remediated.map((finding) => `- ${finding.priority.toUpperCase()} — ${finding.title.replace(/\s+/g, ' ').trim()}`)]
-    : ['Independent review completed. No findings were remediated. Please give the user a concise update.'];
+  if (remediated.length === 0) return 'Independent review completed. No code changes were made.';
+  const summary = ['Independent review completed. Please give the user a concise update with these remediated findings:',
+    ...remediated.map((finding) => `- ${finding.priority.toUpperCase()} — ${finding.title.replace(/\s+/g, ' ').trim()}`)];
   return [...summary, 'No reply to the reviewer is needed.'].join('\n');
 }
 

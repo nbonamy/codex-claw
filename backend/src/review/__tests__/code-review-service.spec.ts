@@ -168,7 +168,7 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([{
       from: visibleReviewer.id,
       to: test.owner.id,
-      content: 'Independent review completed. No findings were remediated. Please give the user a concise update.\nNo reply to the reviewer is needed.',
+      content: 'Independent review completed. No code changes were made.',
     }]);
   });
 
