@@ -178,7 +178,7 @@ describe('ConversationPane', () => {
       actions: { submit },
     });
     const wrapper = mountPane({ controller, agent });
-    const send = wrapper.get('button[aria-label="Send continue prompt"]');
+    const send = wrapper.get('button[aria-label="Send default prompt"]');
 
     await send.trigger('mouseenter');
     await send.trigger('click');

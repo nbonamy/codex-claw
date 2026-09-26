@@ -10,7 +10,7 @@
       ref="surface"
       class="conversation-pane__surface"
       :controller="controller"
-      :empty-send-continues="true"
+      empty-send-prompt="continue"
       :has-composer-context="textAnnotations.length > 0 || visualizationAnnotations.length > 0"
       :message-text-selection="true"
       :transform-message="transformConversationMessage"
