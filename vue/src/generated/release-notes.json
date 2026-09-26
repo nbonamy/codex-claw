@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.21.1",
+  "currentVersion": "0.22.0",
   "releases": [
+    {
+      "version": "0.22.0",
+      "releasedAt": "2026-09-26",
+      "sourceSha256": "1d7c0bcf4de04936ec88a03990108ddf12d1d9a125200aa2f325ce757b5a2236",
+      "markdown": "### New features\n\n- Choose Codex or Claude Code across agent creation flows, including worktrees,\n  work items, projects, and repository URLs. Fresh chats can switch before the\n  first prompt, and independent reviews can use a different backend. The\n  selector stays hidden when only one backend is enabled.\n- Save a prompt or selected text for later with ⇧⌘X, then search and restore\n  persistent drafts with ⇧⌘V.\n- SSH connections can install Claude Code and show its sign-in status with\n  guided authentication steps in Settings.\n- Reviewers can add, correct, or retract structured findings across turns\n  while a review remains open.\n- The new Agent menu groups edit, duplicate, fork, compact, compress, resume,\n  and restart actions in the same order as the agent context menu.\n\n### Improvements and fixes\n\n- An empty, idle composer can send “continue”; a restored interrupted turn\n  resumes through its dedicated action without adding a user prompt.\n- Git diff menu statistics align with the main indicator, and the selected\n  scope is easier to distinguish.\n- Repository URL acquisition accepts SSH addresses and keeps the selected\n  backend through agent creation.\n- Remote Codex sign-in distinguishes unavailable status from a required\n  sign-in, and Claude settings stay in sync with remote hosts.\n- Independent reviews with no remediated findings now say that no code changes\n  were made."
+    },
     {
       "version": "0.21.1",
       "releasedAt": "2026-09-25",

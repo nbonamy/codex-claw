@@ -4,6 +4,36 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.22.0] - 2026-09-26
+
+### New features
+
+- Choose Codex or Claude Code across agent creation flows, including worktrees,
+  work items, projects, and repository URLs. Fresh chats can switch before the
+  first prompt, and independent reviews can use a different backend. The
+  selector stays hidden when only one backend is enabled.
+- Save a prompt or selected text for later with ⇧⌘X, then search and restore
+  persistent drafts with ⇧⌘V.
+- SSH connections can install Claude Code and show its sign-in status with
+  guided authentication steps in Settings.
+- Reviewers can add, correct, or retract structured findings across turns
+  while a review remains open.
+- The new Agent menu groups edit, duplicate, fork, compact, compress, resume,
+  and restart actions in the same order as the agent context menu.
+
+### Improvements and fixes
+
+- An empty, idle composer can send “continue”; a restored interrupted turn
+  resumes through its dedicated action without adding a user prompt.
+- Git diff menu statistics align with the main indicator, and the selected
+  scope is easier to distinguish.
+- Repository URL acquisition accepts SSH addresses and keeps the selected
+  backend through agent creation.
+- Remote Codex sign-in distinguishes unavailable status from a required
+  sign-in, and Claude settings stay in sync with remote hosts.
+- Independent reviews with no remediated findings now say that no code changes
+  were made.
+
 ## [0.21.1] - 2026-09-25
 
 ### New features
