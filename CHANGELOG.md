@@ -15,6 +15,7 @@ All notable Codex Claw changes are recorded here.
 
 - App, composer, model, and suggestion menus now use consistent spacing,
   typography, icon emphasis, and selected-state treatment.
+- The backend selector above an empty composer now uses the full shelf row.
 - Added and removed line backgrounds now extend across the full horizontally
   scrolled Git diff.
 
