@@ -6,6 +6,23 @@ import type { AppMenuItem } from '../app-menu';
 import '../../../styles/base.css';
 
 describe('AppMenu', () => {
+  it('reserves a leading check column without shifting labels or trailing values', async () => {
+    const items: AppMenuItem[] = [
+      { id: 'branch', type: 'radio', label: 'Branch', value: '+12 -4', checked: false, icon: PencilIcon },
+      { id: 'working', type: 'radio', label: 'Uncommitted', value: '+2 -1', checked: true, icon: PencilIcon },
+    ];
+    const wrapper = mount(AppMenu, { props: { ariaLabel: 'Diff scope', items, checkPosition: 'start' } });
+    const rows = wrapper.findAll('[role="menuitemradio"]');
+    for (const row of rows) {
+      expect(row.element.firstElementChild?.classList.contains('app-menu__check-slot')).toBe(true);
+      expect(row.element.lastElementChild?.classList.contains('app-menu__value')).toBe(true);
+    }
+    expect(rows[0]!.find('.app-menu__check-slot .app-menu__check').exists()).toBe(false);
+    expect(rows[1]!.find('.app-menu__check-slot .app-menu__check').exists()).toBe(true);
+    await rows[0]!.trigger('click');
+    expect(wrapper.emitted('select')).toStrictEqual([['branch']]);
+  });
+
   it('renders actions, separators, selected radio state, and submenu chevrons consistently', () => {
     const wrapper = mountMenu([
       {

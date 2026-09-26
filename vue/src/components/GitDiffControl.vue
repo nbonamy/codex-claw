@@ -37,6 +37,7 @@
     <AppMenu
       v-if="menuOpen"
       class="git-diff-control__menu"
+      check-position="start"
       :ariaLabel="$t('surface.agentHeader.chooseRepositoryDiff')"
       :items="menuItems"
       @select="selectTarget"

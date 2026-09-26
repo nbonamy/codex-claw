@@ -26,6 +26,7 @@
           :aria-expanded="!item.disabled && item.items.length > 0"
           :disabled="item.disabled || item.items.length === 0"
         >
+          <span v-if="checkPosition === 'start'" class="app-menu__check-slot" aria-hidden="true" />
           <component
             :is="item.icon"
             v-if="item.icon"
@@ -51,6 +52,7 @@
           :class="{ 'app-menu__submenu-menu--wide': item.submenuWidth === 'wide' }"
           :ariaLabel="item.label"
           :items="item.items"
+          :check-position="checkPosition"
           @select="$emit('select', $event)"
         />
       </div>
@@ -68,6 +70,9 @@
         :disabled="item.disabled"
         @click="selectItem(item)"
       >
+        <span v-if="checkPosition === 'start'" class="app-menu__check-slot" aria-hidden="true">
+          <CheckIcon v-if="isSelected(item) && !(item.type === 'checkbox' && item.accessory === 'switch')" class="app-menu__check" />
+        </span>
         <span
           v-if="item.type === 'action' && item.leadingColor"
           class="app-menu__color-dot"
@@ -109,7 +114,7 @@
           @change="$emit('select', item.id)"
         />
         <CheckIcon
-          v-else-if="isSelected(item)"
+          v-else-if="checkPosition === 'end' && isSelected(item)"
           class="app-menu__check"
         />
       </button>
@@ -125,10 +130,11 @@ defineOptions({
   name: 'AppMenu',
 });
 
-defineProps<{
+withDefaults(defineProps<{
   ariaLabel: string;
   items: AppMenuItem[];
-}>();
+  checkPosition?: 'start' | 'end';
+}>(), { checkPosition: 'end' });
 
 const emit = defineEmits<{
   select: [itemId: string];
@@ -221,12 +227,18 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
 }
 
 .app-menu__icon,
+.app-menu__check-slot,
 .app-menu__check,
 .app-menu__chevron {
   width: var(--icon-md);
   height: var(--icon-md);
   flex: 0 0 auto;
   stroke-width: 2.5px;
+}
+
+.app-menu__check-slot {
+  display: flex;
+  align-items: center;
 }
 
 .app-menu__icon--empty {
