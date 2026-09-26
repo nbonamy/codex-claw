@@ -82,7 +82,7 @@ describe('TeamDialog', () => {
     await flushPromises();
     await wrapper.findAllComponents({ name: 'ElSelect' })[1]?.vm.$emit('update:modelValue', 'team-remote');
     await flushPromises();
-    await saveButton(wrapper).trigger('click');
+    await saveButton(wrapper, 'Connect').trigger('click');
 
     expect(loadRemoteTeams).toHaveBeenCalledWith('connection-devbox');
     expect(createTeam).toHaveBeenCalledWith({

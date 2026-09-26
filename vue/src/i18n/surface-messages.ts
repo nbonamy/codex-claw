@@ -981,6 +981,7 @@ export const surfaceMessages = {
     "cancel": "Cancel",
     "editTeam": "Edit Team",
     "createTeam": "Create Team",
+    "connect": "Connect",
     "save": "Save"
   },
   "teamRail": {
@@ -1054,6 +1055,11 @@ export const surfaceMessages = {
   },
   "team-close-confirmation": {
     "deleteTeam": "Delete Team",
-    "closeTeam": "Close Team"
+    "closeTeam": "Close Team",
+    "cannotDeleteTeam": "Cannot delete team",
+    "onlyRemoteTeam": "{team} is the only team on {host}, so it can’t be deleted. Do you want to disconnect instead?",
+    "remoteTeamsUnavailable": "Could not check teams on the remote host.",
+    "remoteTeamNotFound": "This team could not be found on the remote host.",
+    "yes": "Yes"
   }
 } as const;

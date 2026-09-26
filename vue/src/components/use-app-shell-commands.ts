@@ -2,6 +2,7 @@ import type {
   Agent,
   AppCommand,
   BackendApprovalRequest,
+  RemoteConnection,
   SidePanelMarkdownRequest,
   Team,
 } from '@codex-claw/core/contracts';
@@ -34,12 +35,15 @@ type AppShellCommandOptions = {
     isModalDialogVisible: () => boolean;
     showOnboardingGate: () => boolean;
     teams: () => Team[];
+    remoteConnections: () => RemoteConnection[];
+    loadRemoteTeams: (connectionId: string) => Promise<Team[]>;
   };
   actions: {
     closeAgent: (agentId: string) => void;
     compactSession: (agentId: string) => void;
     replaceConversationWithSummary: (agentId: string) => void;
     closeTeam: (teamId: string) => void;
+    disconnectTeam: (teamId: string) => void;
     debugMarkUnread: () => void;
     duplicateAgent: (agentId: string) => void;
     editAgent: (agentId: string) => void;
@@ -580,12 +584,20 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
   async function closeActiveTeam(): Promise<void> {
     const team = activeTeam.value;
-    if (!team || options.state.teams().length <= 1) {
+    if (!team || (!team.remoteConnectionId && options.state.teams().length <= 1)) {
       return;
     }
 
-    if (await confirmCloseTeam(team)) {
+    const action = await confirmCloseTeam(team, team.remoteConnectionId
+      ? {
+          loadTeams: options.state.loadRemoteTeams,
+          hostName: options.state.remoteConnections().find(connection => connection.id === team.remoteConnectionId)?.name ?? team.remoteConnectionId,
+        }
+      : undefined);
+    if (action === 'close') {
       options.actions.closeTeam(team.id);
+    } else if (action === 'disconnect') {
+      options.actions.disconnectTeam(team.id);
     }
   }
 

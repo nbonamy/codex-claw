@@ -1,9 +1,41 @@
 
 import { translate } from '../i18n';
-import { ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import type { Team } from '@codex-claw/core/contracts';
 
-export async function confirmCloseTeam(team: Team): Promise<boolean> {
+export async function confirmCloseTeam(
+  team: Team,
+  remote?: { loadTeams: (connectionId: string) => Promise<Team[]>; hostName: string },
+): Promise<'close' | 'disconnect' | null> {
+  if (team.remoteConnectionId) {
+    try {
+      if (!remote) throw new Error(translate('surface.team-close-confirmation.remoteTeamsUnavailable'));
+      const remoteTeams = await remote.loadTeams(team.remoteConnectionId);
+      if (!remoteTeams.some(remoteTeam => remoteTeam.id === team.remoteTeamId)) {
+        throw new Error(translate('surface.team-close-confirmation.remoteTeamNotFound'));
+      }
+      if (remoteTeams.length === 1) {
+        try {
+          await ElMessageBox.confirm(
+            translate('surface.team-close-confirmation.onlyRemoteTeam', { team: team.name, host: remote.hostName }),
+            translate('surface.team-close-confirmation.cannotDeleteTeam'),
+            {
+              cancelButtonText: translate('common.cancel'),
+              confirmButtonText: translate('surface.team-close-confirmation.yes'),
+              type: 'info',
+            },
+          );
+          return 'disconnect';
+        } catch {
+          return null;
+        }
+      }
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : String(error));
+      return null;
+    }
+  }
+
   try {
     const isRemoteTeam = Boolean(team.remoteConnectionId);
     await ElMessageBox.confirm(
@@ -17,26 +49,9 @@ export async function confirmCloseTeam(team: Team): Promise<boolean> {
         type: 'warning',
       },
     );
-    return true;
+    return 'close';
   } catch {
     // Element Plus rejects when the user cancels or closes the confirmation.
-    return false;
-  }
-}
-
-export async function confirmDisconnectTeam(team: Team): Promise<boolean> {
-  try {
-    await ElMessageBox.confirm(
-      `${team.name} will be removed from this app. Its agents keep running on the remote backend.`,
-      `Disconnect from ${team.name}?`,
-      {
-        cancelButtonText: translate('common.cancel'),
-        confirmButtonText: translate('common.disconnect'),
-        type: 'info',
-      },
-    );
-    return true;
-  } catch {
-    return false;
+    return null;
   }
 }

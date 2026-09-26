@@ -890,7 +890,8 @@ export function useAppState() {
   }
 
   async function closeTeam(teamId: string): Promise<void> {
-    if (!codexClawApi?.closeTeam || snapshot.value.teams.length <= 1 || !snapshot.value.teams.some((team) => team.id === teamId)) {
+    const team = snapshot.value.teams.find(candidate => candidate.id === teamId);
+    if (!codexClawApi?.closeTeam || !team || (snapshot.value.teams.length <= 1 && !team.remoteConnectionId)) {
       return;
     }
 
@@ -899,7 +900,8 @@ export function useAppState() {
   }
 
   async function disconnectTeam(teamId: string): Promise<void> {
-    if (!codexClawApi?.disconnectTeam || snapshot.value.teams.length <= 1 || !snapshot.value.teams.some((team) => team.id === teamId)) {
+    const team = snapshot.value.teams.find(candidate => candidate.id === teamId);
+    if (!codexClawApi?.disconnectTeam || !team?.remoteConnectionId) {
       return;
     }
 

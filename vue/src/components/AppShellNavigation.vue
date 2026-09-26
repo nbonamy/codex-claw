@@ -1,6 +1,8 @@
 <template>
   <TeamRail
     :teams="snapshot.teams"
+    :remote-connections="snapshot.remoteConnections.connections"
+    :load-remote-teams="loadRemoteTeams"
     :unread-team-ids="unreadTeamIds"
     :working-team-ids="workingTeamIds"
     :active-team-id="backlogVisible || cockpitVisible || automationsVisible || settingsVisible ? null : (activeTeam?.id ?? null)"
@@ -124,6 +126,7 @@ const props = defineProps<{
   forkableAgentIds: string[];
   summaryReplacementAgentIds?: string[];
   listRepositorySessionBranches: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
+  loadRemoteTeams: (connectionId: string) => Promise<Team[]>;
   openInApplications: OpenInApplicationCatalog;
   quickAgentShortcutsVisible: boolean;
   settingsVisible: boolean;
@@ -207,6 +210,7 @@ const {
   forkableAgentIds,
   summaryReplacementAgentIds,
   listRepositorySessionBranches,
+  loadRemoteTeams,
   openInApplications,
   quickAgentShortcutsVisible,
   settingsVisible,

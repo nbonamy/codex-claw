@@ -44,6 +44,7 @@
       :forkable-agent-ids="forkableAgentIds"
       :summary-replacement-agent-ids="summaryReplacementAgentIds"
       :list-repository-session-branches="listRepositorySessionBranches"
+      :load-remote-teams="loadRemoteTeams"
       :open-in-applications="openInApplications"
       :quick-agent-shortcuts-visible="quickAgentShortcutsVisible"
       :settings-visible="settingsVisible"
@@ -2094,12 +2095,15 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     isModalDialogVisible: () => isModalDialogVisible.value,
     showOnboardingGate: () => showOnboardingGate.value,
     teams: () => props.snapshot.teams,
+    remoteConnections: () => props.snapshot.remoteConnections.connections,
+    loadRemoteTeams,
   },
   actions: {
     closeAgent: (agentId) => emit('close-agent', agentId),
     compactSession: compactAgentSession,
     replaceConversationWithSummary: (agentId) => emit('compress-session', agentId),
     closeTeam: (teamId) => emit('close-team', teamId),
+    disconnectTeam: (teamId) => emit('disconnect-team', teamId),
     debugMarkUnread: () => emit('debug-mark-unread'),
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
     editAgent: openEditAgent,
@@ -2387,8 +2391,11 @@ function openEditTeam(teamId: string): void {
 }
 
 async function loadRemoteTeams(connectionId: string): Promise<Team[]> {
-  const remoteSnapshot = await props.getAutomationSnapshot?.({ kind: 'remote', remoteConnectionId: connectionId });
-  return remoteSnapshot?.teams ?? [];
+  if (!props.getAutomationSnapshot) {
+    throw new Error(t('surface.team-close-confirmation.remoteTeamsUnavailable'));
+  }
+  const remoteSnapshot = await props.getAutomationSnapshot({ kind: 'remote', remoteConnectionId: connectionId });
+  return remoteSnapshot.teams;
 }
 
 function openEditAgent(agentId: string): void {

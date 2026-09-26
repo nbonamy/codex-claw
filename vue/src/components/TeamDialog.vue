@@ -173,7 +173,9 @@ const selectedRemoteConnectionId = computed(() => (
 ));
 const connectionLocked = computed(() => props.mode === 'edit' && (props.team?.agentIds.length ?? 0) > 0);
 const dialogTitle = computed(() => props.mode === 'edit' ? translate('surface.teamDialog.editTeam') : translate('surface.teamDialog.createTeam'));
-const submitLabel = computed(() => props.mode === 'edit' ? translate('surface.teamDialog.save') : translate('surface.teamDialog.createTeam'));
+const submitLabel = computed(() => props.mode === 'edit'
+  ? translate('surface.teamDialog.save')
+  : translate(selectedExistingRemoteTeam.value ? 'surface.teamDialog.connect' : 'surface.teamDialog.createTeam'));
 
 watch(() => props.visible, (visible) => {
   if (visible) {

@@ -134,7 +134,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { AccountRateLimits, CodexAccount, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { teamInitials } from '@codex-claw/core/team-manager';
 import { AutomationIcon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
@@ -142,10 +142,12 @@ import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
-import { confirmCloseTeam, confirmDisconnectTeam } from './team-close-confirmation';
+import { confirmCloseTeam } from './team-close-confirmation';
 
 const props = defineProps<{
   teams: Team[];
+  remoteConnections?: RemoteConnection[];
+  loadRemoteTeams?: (connectionId: string) => Promise<Team[]>;
   activeTeamId: string | null;
   backlogActive?: boolean;
   cockpitActive?: boolean;
@@ -183,7 +185,7 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuTeam = computed(() => (
   contextMenuTeamId.value ? props.teams.find((team) => team.id === contextMenuTeamId.value) ?? null : null
 ));
-const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value) && props.teams.length > 1);
+const canCloseContextTeam = computed(() => Boolean(contextMenuTeam.value && (contextMenuTeam.value.remoteConnectionId || props.teams.length > 1)));
 const unreadTeamIdSet = computed(() => new Set(props.unreadTeamIds ?? []));
 const workingTeamIdSet = computed(() => new Set(props.workingTeamIds ?? []));
 const spokenAnnouncementsToggleLabel = computed(() => (
@@ -239,39 +241,35 @@ function teamAriaLabel(team: Team): string {
 }
 
 async function requestCloseTeam(teamId: string): Promise<void> {
-  if (props.teams.length <= 1) {
-    return;
-  }
-
   const team = props.teams.find((candidate) => candidate.id === teamId);
-  if (!team) {
+  if (!team || (!team.remoteConnectionId && props.teams.length <= 1)) {
     return;
   }
 
   contextMenuTeamId.value = null;
   await nextTick();
 
-  if (await confirmCloseTeam(team)) {
+  const action = await confirmCloseTeam(team, team.remoteConnectionId && props.loadRemoteTeams
+    ? {
+        loadTeams: props.loadRemoteTeams,
+        hostName: props.remoteConnections?.find(connection => connection.id === team.remoteConnectionId)?.name ?? team.remoteConnectionId,
+      }
+    : undefined);
+  if (action === 'close') {
     emit('close-team', team.id);
+  } else if (action === 'disconnect') {
+    emit('disconnect-team', team.id);
   }
 }
 
-async function requestDisconnectTeam(teamId: string): Promise<void> {
-  if (props.teams.length <= 1) {
-    return;
-  }
-
+function requestDisconnectTeam(teamId: string): void {
   const team = props.teams.find((candidate) => candidate.id === teamId);
   if (!team?.remoteConnectionId) {
     return;
   }
 
   contextMenuTeamId.value = null;
-  await nextTick();
-
-  if (await confirmDisconnectTeam(team)) {
-    emit('disconnect-team', team.id);
-  }
+  emit('disconnect-team', team.id);
 }
 
 function openTeamMenu(teamId: string, event: MouseEvent): void {

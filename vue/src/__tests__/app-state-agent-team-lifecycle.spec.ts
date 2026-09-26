@@ -677,6 +677,34 @@ describe('useAppState', () => {
   });
 
 
+  it('allows removing a sole local remote pointer and adopts the backend fallback team', async () => {
+    const remotePointerSnapshot = createInitialSnapshot();
+    remotePointerSnapshot.teams[0] = {
+      ...remotePointerSnapshot.teams[0]!,
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+    };
+    const fallbackSnapshot = structuredClone(remotePointerSnapshot);
+    fallbackSnapshot.teams = [{ id: 'team-local', name: 'Local', agentIds: [] }];
+    fallbackSnapshot.activeTeamId = 'team-local';
+    fallbackSnapshot.agents = [];
+    fallbackSnapshot.activeAgentId = null;
+    const closeTeam = vi.fn().mockResolvedValue(fallbackSnapshot);
+    const disconnectTeam = vi.fn().mockResolvedValue(fallbackSnapshot);
+    stubElectronTestWindow({ codexClaw: { closeTeam, disconnectTeam } satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+
+    state.snapshot.value = remotePointerSnapshot;
+    await state.closeTeam('team-codex-claw');
+    expect(closeTeam).toHaveBeenCalledExactlyOnceWith('team-codex-claw');
+    expect(state.snapshot.value.activeTeamId).toBe('team-local');
+
+    state.snapshot.value = remotePointerSnapshot;
+    await state.disconnectTeam('team-codex-claw');
+    expect(disconnectTeam).toHaveBeenCalledExactlyOnceWith('team-codex-claw');
+    expect(state.snapshot.value.activeTeamId).toBe('team-local');
+  });
+
   it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
     const remoteSnapshot = createInitialSnapshot();
     stubLegacyElectronTestWindow({

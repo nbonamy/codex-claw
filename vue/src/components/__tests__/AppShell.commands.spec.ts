@@ -263,6 +263,53 @@ describe('AppShell dialogs and commands', () => {
     });
   });
 
+  it('disconnects the only remote team when Delete Team is invoked from the app menu', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.codexClaw = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
+        listener = nextListener;
+        return () => undefined;
+      }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.teams[0] = {
+      ...snapshot.teams[0]!,
+      name: 'BUG',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+    };
+    snapshot.remoteConnections.connections = [{
+      id: 'connection-devbox',
+      kind: 'ssh',
+      name: 'wall-e',
+      host: 'wall-e',
+      status: 'ready',
+      createdAt: '2026-06-14T10:00:00.000Z',
+      updatedAt: '2026-06-14T10:00:00.000Z',
+    }];
+    const remoteSnapshot = createEmptySnapshot();
+    remoteSnapshot.teams = [{ id: 'team-remote', name: 'BUG', agentIds: [] }];
+    const getAutomationSnapshot = vi.fn().mockResolvedValue(remoteSnapshot);
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
+    const wrapper = mountShell({ snapshot, getAutomationSnapshot });
+
+    listener({ type: 'close-active-team' });
+    await flushPromises();
+
+    expect(getAutomationSnapshot).toHaveBeenCalledExactlyOnceWith({
+      kind: 'remote',
+      remoteConnectionId: 'connection-devbox',
+    });
+    expect(confirm).toHaveBeenCalledExactlyOnceWith(
+      'BUG is the only team on wall-e, so it can’t be deleted. Do you want to disconnect instead?',
+      'Cannot delete team',
+      { cancelButtonText: 'Cancel', confirmButtonText: 'Yes', type: 'info' },
+    );
+    expect(wrapper.emitted('disconnect-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('close-team')).toBeUndefined();
+    wrapper.unmount();
+  });
+
   it('forwards agent move targets from the context menu', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
