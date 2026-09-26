@@ -310,6 +310,10 @@ cleanup, or migrations because remote team ids can collide with local team ids.
 Generic location-scoped requests first resolve an internal `BackendLocation`.
 Agent-scoped requests resolve an internal `AgentLocation` so projected remote
 agents can still route to the owning remote `clawd` over SSH stdio.
+When loading a remote snapshot or selecting Claude for a remote agent, local
+`clawd` mirrors the Mac app's `claudeCodeEnabled` setting to the remote `clawd`
+before the remote backend validates agent creation. This also reconciles a
+remote daemon that started with the default setting disabled.
 Remote backend events use the same boundary: local `clawd` forwards agent events
 only when the remote agent belongs to a connected remote-team pointer.
 Slash-command interception remains local-only for now; ordinary prompts route

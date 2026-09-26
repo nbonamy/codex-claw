@@ -86,6 +86,51 @@ describe('RemoteTeamService', () => {
     expect(service.knownSnapshot('connection-devbox')).toBeUndefined();
   });
 
+  it('applies the Mac Claude setting before remote agent creation', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const remoteSnapshot = createRemoteTeamSnapshot([]);
+    remoteSnapshot.general.claudeCodeEnabled = false;
+    const requests: string[] = [];
+    const clients = {
+      request: vi.fn(async (_connection, method: string, params?: { input?: { general?: { claudeCodeEnabled?: boolean } } }) => {
+        requests.push(method);
+        if (method === 'snapshot/get') return {
+          snapshot: structuredClone(remoteSnapshot),
+          lastEventSeq: 0,
+          clientState: { sourceFolderPath: '', shouldPreventDisplaySleep: false },
+        };
+        if (method === 'settings/update') {
+          remoteSnapshot.general.claudeCodeEnabled = params?.input?.general?.claudeCodeEnabled === true;
+          return structuredClone(remoteSnapshot);
+        }
+        if (method === 'agent/quickChat/create') {
+          if (!remoteSnapshot.general.claudeCodeEnabled) throw new Error('Backend is not enabled: claude');
+          return structuredClone(remoteSnapshot);
+        }
+        throw new Error(`Unexpected remote method: ${method}`);
+      }),
+    };
+    const service = new RemoteTeamService({
+      clients: clients as never,
+      getSnapshot: () => snapshot,
+      onForwardedEvent: vi.fn(),
+      onProjectedSnapshotChanged: vi.fn(),
+    });
+
+    await expect(service.request('connection-devbox', 'agent/quickChat/create', {
+      input: { backend: 'claude', teamId: 'team-remote' },
+    })).resolves.toMatchObject({ general: { claudeCodeEnabled: true } });
+    expect(requests).toStrictEqual(['snapshot/get', 'settings/update', 'agent/quickChat/create']);
+
+    snapshot.general.claudeCodeEnabled = false;
+    await expect(service.snapshot('connection-devbox')).resolves.toMatchObject({
+      general: { claudeCodeEnabled: false },
+    });
+    expect(requests.slice(-2)).toStrictEqual(['snapshot/get', 'settings/update']);
+  });
+
   it('adopts and forwards provider frames without restoring a global transcript', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];

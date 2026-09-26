@@ -70,16 +70,31 @@ export class RemoteTeamService {
   }
 
   async request<Result = unknown>(connectionId: string, method: string, params?: unknown): Promise<Result> {
+    if (requestsClaudeBackend(method, params)) await this.snapshot(connectionId);
+    return this.remoteRequest(connectionId, method, params);
+  }
+
+  private async remoteRequest<Result = unknown>(connectionId: string, method: string, params?: unknown): Promise<Result> {
     return this.options.clients.request<Result>(this.connection(connectionId), method, { ...(params && typeof params === 'object' ? params : {}), _clientId: 'remote-controller' }, (event) => {
       this.applyEvent(connectionId, event);
     });
   }
 
   async snapshot(connectionId: string): Promise<AppSnapshot> {
-    const result = await this.request(connectionId, backendMethods.snapshotGet);
+    const result = await this.remoteRequest(connectionId, backendMethods.snapshotGet);
     if (!isClawSnapshotGetResult(result)) throw new Error('Remote snapshot is invalid.');
-    this.snapshots.set(connectionId, result.snapshot);
-    return result.snapshot;
+    const desired = this.options.getSnapshot().general.claudeCodeEnabled;
+    if (result.snapshot.general.claudeCodeEnabled === desired) {
+      this.snapshots.set(connectionId, result.snapshot);
+      return result.snapshot;
+    }
+    const updated = await this.remoteRequest(connectionId, backendMethods.settingsUpdate, {
+      input: { general: { claudeCodeEnabled: desired } },
+    });
+    const decoded = decodeAppSnapshot(updated);
+    if (!decoded) throw new Error('Remote settings snapshot is invalid.');
+    this.snapshots.set(connectionId, decoded.value);
+    return decoded.value;
   }
 
   async resolveTeamForPointerInput(
@@ -230,6 +245,16 @@ export class RemoteTeamService {
       team.remoteConnectionId === connectionId && Boolean(team.remoteTeamId)
     ));
   }
+}
+
+function requestsClaudeBackend(method: string, params: unknown): boolean {
+  if (method !== backendMethods.agentCreate
+    && method !== backendMethods.agentQuickChatCreate
+    && method !== backendMethods.projectCreate
+    && method !== backendMethods.agentUpdate) return false;
+  if (!params || typeof params !== 'object' || !('input' in params)) return false;
+  const input = params.input;
+  return Boolean(input && typeof input === 'object' && 'backend' in input && input.backend === 'claude');
 }
 
 function decodeSnapshotFromRemoteEvent(event: ClawBackendEvent) {
