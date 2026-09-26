@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.22.1",
+  "currentVersion": "0.23.0",
   "releases": [
+    {
+      "version": "0.23.0",
+      "releasedAt": "2026-09-26",
+      "sourceSha256": "eb8fa73b0ee17e24304b30ba85464e72fbb85f78ce7fd12ad5a3200e543635ff",
+      "markdown": "### New features\n\n- Goal mode can now be toggled from the composer menu. Goal and Plan modes are\n  mutually exclusive, whichever entry point activates them.\n- Changed-file headers in Git diffs can open the full file directly in a\n  workspace tab.\n\n### Improvements and fixes\n\n- App, composer, model, and suggestion menus now use consistent spacing,\n  typography, icon emphasis, and selected-state treatment.\n- The backend selector above an empty composer now uses the full shelf row.\n- Go to Agent now shows each repository's chosen icon, falls back to the\n  branch or worktree glyph, and uses the chat icon for Quick Chats.\n- Added and removed line backgrounds now extend across the full horizontally\n  scrolled Git diff."
+    },
     {
       "version": "0.22.1",
       "releasedAt": "2026-09-26",

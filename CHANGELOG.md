@@ -4,6 +4,8 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.23.0] - 2026-09-26
+
 ### New features
 
 - Goal mode can now be toggled from the composer menu. Goal and Plan modes are
@@ -16,6 +18,8 @@ All notable Codex Claw changes are recorded here.
 - App, composer, model, and suggestion menus now use consistent spacing,
   typography, icon emphasis, and selected-state treatment.
 - The backend selector above an empty composer now uses the full shelf row.
+- Go to Agent now shows each repository's chosen icon, falls back to the
+  branch or worktree glyph, and uses the chat icon for Quick Chats.
 - Added and removed line backgrounds now extend across the full horizontally
   scrolled Git diff.
 
