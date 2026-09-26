@@ -218,6 +218,21 @@ describe('SettingsConnectionsPanel', () => {
     expect(wrapper.get('.settings-connections-panel__detail').text()).toContain('Claude 2.1.283');
   });
 
+  it('shows Claude auth only when the backend is enabled for a ready connection', async () => {
+    const ready = {
+      id: 'connection-devbox', kind: 'ssh' as const, name: 'devbox', host: 'devbox', status: 'ready' as const,
+      createdAt: '2026-06-14T10:00:00.000Z', updatedAt: '2026-06-14T10:00:00.000Z',
+    };
+    const wrapper = mount(SettingsConnectionsPanel, {
+      props: { connections: [ready], settings: { preventSleepWhenRemoteAccessEnabled: true, claudeCodeEnabled: false } },
+    });
+    expect(wrapper.find('.remote-claude-auth').exists()).toBe(false);
+    await wrapper.setProps({ settings: { preventSleepWhenRemoteAccessEnabled: true, claudeCodeEnabled: true } });
+    expect(wrapper.find('.remote-claude-auth').exists()).toBe(true);
+    await wrapper.setProps({ connections: [{ ...ready, status: 'error' }] });
+    expect(wrapper.find('.remote-claude-auth').exists()).toBe(false);
+  });
+
   it('loads ssh hosts and adds the selected connection', async () => {
     const listSshHosts = vi.fn().mockResolvedValue([{
       host: 'devbox',

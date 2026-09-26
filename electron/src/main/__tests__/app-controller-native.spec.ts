@@ -280,6 +280,18 @@ describe('AppController', () => {
     expect(() => auth.startCodexChatGptDeviceCodeLogin('')).toThrow('remote connection');
   });
 
+  it('routes Claude auth status to the selected connection without opening a browser', async () => {
+    const request = vi.fn().mockResolvedValue({ loggedIn: false });
+    const openExternal = vi.fn();
+    const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }), fakeAppLifecycle(), async () => undefined, openExternal);
+    const auth = controller as unknown as { getClaudeAuthentication(id: string): Promise<unknown> };
+
+    await expect(auth.getClaudeAuthentication('wall-e')).resolves.toStrictEqual({ loggedIn: false });
+    expect(request).toHaveBeenCalledWith(backendMethods.claudeAuthenticationGet, { connectionId: 'wall-e' });
+    expect(openExternal).not.toHaveBeenCalled();
+    expect(() => auth.getClaudeAuthentication('')).toThrow('remote connection');
+  });
+
   it('restarts the app when the Codex executable setting changes', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {

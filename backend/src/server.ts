@@ -1888,6 +1888,17 @@ export class ClawBackendServer {
       }
       case backendMethods.settingsPluginStatusGet:
         return createClawRpcResult(message.id, await this.inspectPluginStatus());
+      case backendMethods.claudeAuthenticationGet: {
+        const connectionId = requireConnectionId(message.params);
+        const connection = this.snapshot.remoteConnections.connections.find((candidate) => candidate.id === connectionId);
+        if (!connection) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
+        }
+        if (connection.status !== 'ready') {
+          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection is not ready: ${connection.name}`);
+        }
+        return createClawRpcResult(message.id, await this.sshConnections.getRemoteClaudeAuthentication(connection.host));
+      }
       case backendMethods.codexAuthenticationGet:
       case backendMethods.codexLoginCancel:
       case backendMethods.codexChatGptDeviceCodeLoginStart: {

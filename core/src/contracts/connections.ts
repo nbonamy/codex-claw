@@ -41,6 +41,10 @@ export type RemoteConnectionsState = {
   connections: RemoteConnection[];
 };
 
+export type ClaudeAuthentication = {
+  loggedIn: boolean;
+};
+
 export type DevicePairingStatus = {
   status: 'disabled' | 'connecting' | 'connected' | 'errored';
   serverName?: string;

@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { remoteClaudeInstallCommand } from '../remote-claude-install';
+import { remoteClaudeAuthenticationCommand, remoteClaudeInstallCommand } from '../remote-claude-install';
 
 const temporaryHomes: string[] = [];
 
@@ -44,4 +44,25 @@ cp "$FAKE_INSTALLER" "$output"
   expect(result.status).toBe(0);
   expect(result.stdout.trim()).toBe('2.1.283 (Claude Code)');
   expect(await readFile(path.join(home, '.local/bin/claude'), 'utf8')).toContain('Claude Code');
+});
+
+it('returns signed-out JSON even when Claude auth status exits one', async () => {
+  const home = await mkdtemp(path.join(os.tmpdir(), 'claw-remote-claude-auth-'));
+  temporaryHomes.push(home);
+  const bin = path.join(home, '.local/bin');
+  await mkdir(bin, { recursive: true });
+  const claude = path.join(bin, 'claude');
+  await writeFile(claude, `#!/bin/sh
+printf '{"loggedIn":false}\\n'
+exit 1
+`);
+  await chmod(claude, 0o755);
+
+  const result = spawnSync('sh', ['-c', remoteClaudeAuthenticationCommand()], {
+    encoding: 'utf8',
+    env: { HOME: home, PATH: '/usr/bin:/bin' },
+  });
+
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({ loggedIn: false });
 });

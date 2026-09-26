@@ -92,6 +92,13 @@ running Claude agents there. If remote Claude installation fails, Codex remains
 available on that connection, and the next remote Claude creation retries it.
 Runtime discovery includes `~/.local/bin` when launching Claude from a
 non-interactive SSH session.
+For a ready SSH connection, Settings checks the remote user's Claude login with
+`claude auth status` and shows only the logged-in state. When sign-in is needed,
+Settings presents `claude auth login --claudeai` for a Claude subscription and
+`claude auth login --console` for Anthropic Console API billing. The user runs
+one command in an interactive shell on that host, then refreshes status.
+Claude Code owns the login and credentials;
+Claw does not move them between machines.
 
 Each live Claude session owns one long-running Agent SDK query. Claw sends
 subsequent turns through that query's streaming input instead of spawning a new

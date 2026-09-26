@@ -3,12 +3,12 @@ import { constants as fsConstants } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import type { AddSshConnectionInput, RemoteConnection, SshHostCandidate } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, ClaudeAuthentication, RemoteConnection, SshHostCandidate } from '@codex-claw/core/contracts';
 import { createEntityId } from '@codex-claw/core/ids';
 import { backendProviderTokensFilePath } from '../state';
 import { bundledCodexVersion } from '@codex-claw/core/codex-release';
 import { remoteCodexInstallCommand, remoteCodexVersionCommand } from './remote-codex-install';
-import { remoteClaudeInstallCommand, remoteClaudeVersionCommand } from './remote-claude-install';
+import { remoteClaudeAuthenticationCommand, remoteClaudeInstallCommand, remoteClaudeVersionCommand } from './remote-claude-install';
 
 type ExecResult = {
   stdout: string;
@@ -133,6 +133,19 @@ export class SshConnectionService {
       remoteClaudeInstallCommand(),
     ], { timeoutMs: 360_000 });
     return parseRemoteClaudeVersion(result.stdout);
+  }
+
+  async getRemoteClaudeAuthentication(host: string): Promise<ClaudeAuthentication> {
+    try {
+      const result = await (this.deps.run ?? runCommand)('ssh', [
+        '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, remoteClaudeAuthenticationCommand(),
+      ], { timeoutMs: 15_000 });
+      const status: unknown = JSON.parse(result.stdout);
+      if (status && typeof status === 'object' && 'loggedIn' in status && typeof status.loggedIn === 'boolean') {
+        return { loggedIn: status.loggedIn };
+      }
+    } catch { /* Do not forward CLI output or SSH diagnostics to the renderer. */ }
+    throw new Error('Remote Claude authentication status was unavailable.');
   }
 
   private async remoteClaudeVersion(host: string): Promise<string> {

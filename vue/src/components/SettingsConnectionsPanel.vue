@@ -47,6 +47,7 @@
               >{{ $t('surface.settingsConnectionsPanel.upgrade') }}</button>
             </span>
             <RemoteCodexAuthentication v-if="connection.status === 'ready'" :connection="connection" />
+            <RemoteClaudeAuthentication v-if="connection.status === 'ready' && settings.claudeCodeEnabled" :connection="connection" />
           </div>
         </div>
         <div class="settings-connections-panel__actions">
@@ -215,6 +216,7 @@ import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import RemoteCodexAuthentication from './RemoteCodexAuthentication.vue';
+import RemoteClaudeAuthentication from './RemoteClaudeAuthentication.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
 import SettingsSection from './SettingsSection.vue';
@@ -229,7 +231,7 @@ const props = withDefaults(defineProps<{
   teams?: Team[];
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
-  settings?: { preventSleepWhenRemoteAccessEnabled: boolean };
+  settings?: { preventSleepWhenRemoteAccessEnabled: boolean; claudeCodeEnabled?: boolean };
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   getRemoteControlStatus?: () => Promise<DevicePairingStatus>;
   enableRemoteControl?: () => Promise<DevicePairingStatus>;
@@ -254,7 +256,7 @@ const props = withDefaults(defineProps<{
   checkDevicePairing: async () => false,
   listPairedDevices: async () => [],
   revokePairedDevice: async () => undefined,
-  settings: () => ({ preventSleepWhenRemoteAccessEnabled: true }),
+  settings: () => ({ preventSleepWhenRemoteAccessEnabled: true, claudeCodeEnabled: false }),
   updateSettings: async () => undefined,
 });
 

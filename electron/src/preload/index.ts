@@ -120,6 +120,7 @@ const api: CodexClawApi = {
   setCodexResourceSharing: (input: SetCodexResourceSharingInput) => ipc.invoke(ipcChannels.setCodexResourceSharing, input),
   getPluginStatus: () => ipc.invoke(ipcChannels.getPluginStatus),
   getCodexAuthentication: (remoteConnectionId?: string) => ipc.invoke(ipcChannels.getCodexAuthentication, remoteConnectionId),
+  getClaudeAuthentication: (remoteConnectionId: string) => ipc.invoke(ipcChannels.getClaudeAuthentication, remoteConnectionId),
   cancelCodexChatGptLogin: (remoteConnectionId?: string, loginId?: string) => ipc.invoke(ipcChannels.cancelCodexChatGptLogin, remoteConnectionId, loginId),
   startCodexChatGptDeviceCodeLogin: (remoteConnectionId: string) => ipc.invoke(ipcChannels.startCodexChatGptDeviceCodeLogin, remoteConnectionId),
   startCodexChatGptLogin: () => ipc.invoke(ipcChannels.startCodexChatGptLogin),

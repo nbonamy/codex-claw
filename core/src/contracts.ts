@@ -40,6 +40,7 @@ import type {
 } from './contracts/workspace';
 import type {
   AddSshConnectionInput,
+  ClaudeAuthentication,
   DevicePairingSession,
   DevicePairingStatus,
   PairedDevice,
@@ -138,6 +139,7 @@ export type {
 } from './contracts/workspace';
 export type {
   AddSshConnectionInput,
+  ClaudeAuthentication,
   DevicePairingSession,
   DevicePairingStatus,
   PairedDevice,
@@ -660,6 +662,7 @@ export type AppCommand =
   | { type: 'cycle-agents'; direction: -1 | 1 }
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
+  | { type: 'fork-active-agent' }
   | { type: 'debug-approval-request' }
   | { type: 'debug-user-questions' }
   | { type: 'debug-celebrate'; kind: CelebrationKind }
@@ -680,6 +683,7 @@ export type AppCommand =
   | { type: 'open-whats-new' }
   | { type: 'quit' }
   | { type: 'restart-active-agent' }
+  | { type: 'resume-active-session' }
   | { type: 'save-active-prompt-draft' }
   | { type: 'toggle-spoken-announcements-muted' };
 
@@ -877,6 +881,7 @@ export type CodexClawApi = {
   setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot>;
   getPluginStatus(): Promise<AppPluginStatus>;
   getCodexAuthentication(remoteConnectionId?: string): Promise<CodexAuthentication>;
+  getClaudeAuthentication(remoteConnectionId: string): Promise<ClaudeAuthentication>;
   cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication>;
   startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<CodexChatGptDeviceCodeLogin>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;

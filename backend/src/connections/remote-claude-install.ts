@@ -28,3 +28,18 @@ else
   exit 127
 fi`;
 }
+
+export function remoteClaudeAuthenticationCommand(): string {
+  return `set -u
+if [ -x "$HOME/.local/bin/claude" ]; then
+  claude_bin="$HOME/.local/bin/claude"
+elif command -v claude >/dev/null 2>&1; then
+  claude_bin=$(command -v claude)
+else
+  printf 'Claude Code is not installed.\\n' >&2
+  exit 127
+fi
+status=0
+"$claude_bin" auth status || status=$?
+[ "$status" -le 1 ] || exit "$status"`;
+}

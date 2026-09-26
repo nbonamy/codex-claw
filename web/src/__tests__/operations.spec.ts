@@ -54,10 +54,12 @@ describe('Claw web operations', () => {
   it('preserves the host and login identity for remote authentication', async () => {
     const request = vi.fn().mockResolvedValue({});
     await invokeClawWebOperation({ request }, 'getCodexAuthentication', ['wall-e']);
+    await invokeClawWebOperation({ request }, 'getClaudeAuthentication', ['wall-e']);
     await invokeClawWebOperation({ request }, 'startCodexChatGptDeviceCodeLogin', ['wall-e']);
     await invokeClawWebOperation({ request }, 'cancelCodexChatGptLogin', ['wall-e', 'login-1']);
     expect(request.mock.calls).toEqual([
       [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
+      [backendMethods.claudeAuthenticationGet, { connectionId: 'wall-e' }],
       [backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId: 'wall-e' }],
       [backendMethods.codexLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'login-1' }],
     ]);

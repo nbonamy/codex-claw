@@ -93,6 +93,7 @@ export const backendMethods = {
   connectionsRuntimeSync: 'connections/runtime/sync',
   connectionsUpdate: 'connections/update',
   codexAuthenticationGet: 'codex/authentication/get',
+  claudeAuthenticationGet: 'claude/authentication/get',
   codexLoginCancel: 'codex/authentication/login/cancel',
   codexChatGptLoginStart: 'codex/authentication/chatgpt/start',
   codexChatGptDeviceCodeLoginStart: 'codex/authentication/deviceCode/start',

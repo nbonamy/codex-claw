@@ -108,6 +108,7 @@ const requestTimeoutByMethod = {
   [backendMethods.connectionsRuntimeSync]: EXTENDED_REQUEST_TIMEOUT_MS,
   [backendMethods.connectionsUpdate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.codexAuthenticationGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.claudeAuthenticationGet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.codexLoginCancel]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.codexChatGptLoginStart]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.codexChatGptDeviceCodeLoginStart]: LONG_RUNNING_REQUEST_TIMEOUT_MS,

@@ -108,6 +108,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   setCodexResourceSharing: [backendMethods.settingsCodexResourceSharingSet, named('input')],
   getPluginStatus: [backendMethods.settingsPluginStatusGet],
   getCodexAuthentication: [backendMethods.codexAuthenticationGet, namedOptional('remoteConnectionId')],
+  getClaudeAuthentication: [backendMethods.claudeAuthenticationGet, named('connectionId')],
   cancelCodexChatGptLogin: [backendMethods.codexLoginCancel, namedOptional('remoteConnectionId', 'loginId')],
   startCodexChatGptDeviceCodeLogin: [backendMethods.codexChatGptDeviceCodeLoginStart, named('remoteConnectionId')],
   startCodexChatGptLogin: [backendMethods.codexChatGptLoginStart],

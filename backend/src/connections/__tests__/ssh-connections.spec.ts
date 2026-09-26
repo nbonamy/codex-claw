@@ -293,4 +293,21 @@ Host bad;alias
       detail: `Ready (clawd 0.21.1, Codex ${bundledCodexVersion}); Claude unavailable: Claude Code is not installed.`,
     });
   });
+
+  it('reads only the remote Claude login state from the CLI status JSON', async () => {
+    const run = vi.fn().mockResolvedValue({
+      stdout: JSON.stringify({ loggedIn: true, authMethod: 'oauth_token', secret: 'never forward this' }),
+      stderr: '',
+    });
+    const service = new SshConnectionService({ run });
+
+    await expect(service.getRemoteClaudeAuthentication('wall-e')).resolves.toStrictEqual({ loggedIn: true });
+    expect(run).toHaveBeenCalledWith('ssh', expect.arrayContaining(['wall-e', expect.stringContaining('auth status')]), { timeoutMs: 15_000 });
+    run.mockResolvedValueOnce({ stdout: '{"loggedIn":false}', stderr: '' });
+    await expect(service.getRemoteClaudeAuthentication('wall-e')).resolves.toStrictEqual({ loggedIn: false });
+    run.mockResolvedValueOnce({ stdout: 'not json', stderr: '' });
+    await expect(service.getRemoteClaudeAuthentication('wall-e')).rejects.toThrow('Remote Claude authentication status was unavailable.');
+    run.mockRejectedValueOnce(new Error('private SSH diagnostic'));
+    await expect(service.getRemoteClaudeAuthentication('wall-e')).rejects.toThrow('Remote Claude authentication status was unavailable.');
+  });
 });

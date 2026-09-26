@@ -115,6 +115,7 @@ export const ipcChannels = {
   setCodexResourceSharing: 'settings:codex-resource-sharing:set',
   getPluginStatus: 'settings:plugin-status:get',
   getCodexAuthentication: 'codex:authentication:get',
+  getClaudeAuthentication: 'claude:authentication:get',
   cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',
   startCodexChatGptLogin: 'codex:authentication:chatgpt:start',
   startCodexChatGptDeviceCodeLogin: 'codex:authentication:deviceCode:start',

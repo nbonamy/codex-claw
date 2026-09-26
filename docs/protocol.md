@@ -284,6 +284,10 @@ routes to the SDK device-code login on the selected host and returns
 `{ loginId, verificationUrl, userCode }`. Cancellation additionally accepts
 `loginId`, so a client cancels its own pending flow rather than another login.
 Only the selected host's SDK/app-server stores and refreshes credentials.
+`claude/authentication/get` requires `{ connectionId }` for a ready SSH
+connection. Local `clawd` runs the remote Claude CLI's read-only auth-status
+command and returns only `{ loggedIn }`; Claude's interactive login remains on
+the remote host.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |

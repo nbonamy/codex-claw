@@ -38,3 +38,31 @@ describe('host-targeted Codex authentication', () => {
     expect(driverRpc.handle).not.toHaveBeenCalled();
   });
 });
+
+describe('host-targeted Claude authentication', () => {
+  it('checks the selected SSH host and returns only its login state', async () => {
+    const snapshot = createTestSnapshot();
+    const connection = readyRemoteConnection();
+    snapshot.remoteConnections.connections = [connection];
+    const sshConnections = { getRemoteClaudeAuthentication: vi.fn().mockResolvedValue({ loggedIn: true }) };
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, sshConnections: sshConnections as never });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'claude/authentication/get', params: { connectionId: connection.id } }))
+      .resolves.toEqual({ jsonrpc: '2.0', id: 1, result: { loggedIn: true } });
+    expect(sshConnections.getRemoteClaudeAuthentication).toHaveBeenCalledWith(connection.host);
+  });
+
+  it('rejects missing and offline connections before invoking SSH', async () => {
+    const snapshot = createTestSnapshot();
+    const connection = { ...readyRemoteConnection(), status: 'error' as const };
+    snapshot.remoteConnections.connections = [connection];
+    const sshConnections = { getRemoteClaudeAuthentication: vi.fn() };
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, sshConnections: sshConnections as never });
+
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'claude/authentication/get', params: { connectionId: 'missing' } }))
+      .resolves.toMatchObject({ error: { message: 'Remote connection not found: missing' } });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'claude/authentication/get', params: { connectionId: connection.id } }))
+      .resolves.toMatchObject({ error: { message: 'Remote connection is not ready: devbox' } });
+    expect(sshConnections.getRemoteClaudeAuthentication).not.toHaveBeenCalled();
+  });
+});

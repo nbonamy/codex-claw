@@ -36,6 +36,25 @@ export const surfaceMessages = {
     "cancel": "Cancel",
     "retry": "Retry account check"
   },
+  "remoteClaudeAuth": {
+    "connected": "Claude connected",
+    "signInRequired": "Claude needs sign-in on this host.",
+    "unavailable": "Could not check Claude on this host.",
+    "connect": "Connect Claude",
+    "checking": "Checking Claude account…",
+    "dialogTitle": "Sign in to Claude",
+    "runOnHost": "On {host}, run one of these commands:",
+    "subscriptionLabel": "Claude subscription",
+    "consoleLabel": "Anthropic Console (API billing)",
+    "copySubscription": "Copy Claude subscription command",
+    "copiedSubscription": "Claude subscription command copied",
+    "copyConsole": "Copy Anthropic Console command",
+    "copiedConsole": "Anthropic Console command copied",
+    "copyFailed": "Could not copy. Select the command and copy it manually.",
+    "close": "Close",
+    "refresh": "Refresh status",
+    "retry": "Retry account check"
+  },
   "app": {
     "applyingResourceChanges": "Applying resource changes…",
     "restartingTheBackendAndReconnectingYourChats": "Restarting the backend and reconnecting your chats."
