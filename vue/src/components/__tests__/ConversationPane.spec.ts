@@ -168,7 +168,7 @@ describe('ConversationPane', () => {
     expect(wrapper.getComponent({ name: 'CodexConversationPane' }).props('controller')).toStrictEqual(controller);
   });
 
-  it('sends continue from the empty composer through the AppShell controller', async () => {
+  it('keeps empty-composer Send disabled without submitting a fallback prompt', async () => {
     const submit = vi.fn();
     const controller = createCodexConversationPaneController({
       state: {
@@ -178,12 +178,15 @@ describe('ConversationPane', () => {
       actions: { submit },
     });
     const wrapper = mountPane({ controller, agent });
-    const send = wrapper.get('button[aria-label="Send default prompt"]');
+    const send = wrapper.get('button[aria-label="Send prompt"]');
 
+    expect(send.attributes('disabled')).toBeDefined();
     await send.trigger('mouseenter');
     await send.trigger('click');
+    await wrapper.get('[role="textbox"][contenteditable]').trigger('keydown', { key: 'Enter', metaKey: true });
 
-    expect(submit).toHaveBeenCalledWith('continue', undefined);
+    expect(send.attributes('disabled')).toBeDefined();
+    expect(submit).not.toHaveBeenCalled();
   });
 
   it('floats active plan progress independently of controller state', () => {
