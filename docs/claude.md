@@ -77,10 +77,21 @@ shared contracts and capabilities.
 Update, 2026-08-09: Codex Claw's Claude driver lives under
 `backend/src/claude/` and now uses the official
 `@anthropic-ai/claude-agent-sdk` as its default transport. The SDK launches the
-user-installed Claude Code executable, so it keeps Claude Code's coding-agent
+Claude Code executable, so it keeps Claude Code's coding-agent
 behavior, local login, settings, skills, hooks, and project instructions. Claw
 does not call the Messages API directly or replace Claude Code with a generic
 model loop.
+
+Local Claude Code installation remains user-managed. When Claude is enabled,
+Claw's SSH connection setup checks the remote host for Claude Code and runs
+Anthropic's native installer if it is missing. The installer owns its per-user
+`~/.local/bin/claude` launcher and `~/.local/share/claude/versions` directory;
+Claw does not copy Claude into its pinned Codex runtime directory. Remote
+authentication is separate: the remote user signs in with Claude Code before
+running Claude agents there. If remote Claude installation fails, Codex remains
+available on that connection, and the next remote Claude creation retries it.
+Runtime discovery includes `~/.local/bin` when launching Claude from a
+non-interactive SSH session.
 
 Each live Claude session owns one long-running Agent SDK query. Claw sends
 subsequent turns through that query's streaming input instead of spawning a new

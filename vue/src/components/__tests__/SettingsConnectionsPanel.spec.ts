@@ -199,6 +199,25 @@ describe('SettingsConnectionsPanel', () => {
     expect(wrapper.find('.settings-connections-panel__upgrade').exists()).toBe(false);
   });
 
+  it('shows the inspected Claude version in remote connection settings', async () => {
+    const wrapper = mount(SettingsConnectionsPanel, {
+      props: {
+        connections: [{
+          id: 'connection-devbox',
+          kind: 'ssh',
+          name: 'devbox',
+          host: 'devbox',
+          status: 'ready',
+          detail: 'Ready (clawd 0.21.1, Codex 0.155.1, Claude 2.1.283)',
+          createdAt: '2026-06-14T10:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z',
+        }],
+      },
+    });
+
+    expect(wrapper.get('.settings-connections-panel__detail').text()).toContain('Claude 2.1.283');
+  });
+
   it('loads ssh hosts and adds the selected connection', async () => {
     const listSshHosts = vi.fn().mockResolvedValue([{
       host: 'devbox',

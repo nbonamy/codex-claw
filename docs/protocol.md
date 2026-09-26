@@ -288,9 +288,9 @@ Only the selected host's SDK/app-server stores and refreshes credentials.
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
 | `connections/sshHosts/list` | none | `SshHostCandidate[]` | Parses the backend host's `~/.ssh/config` and returns concrete `Host` aliases. Wildcard and negated patterns are ignored. |
-| `connections/ssh/create` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, and records an `ssh` stdio transport when ready. |
-| `connections/runtime/inspect` | `{ connectionId }` | `AppSnapshot` | Probes and records runtime versions without installation or session closure. |
-| `connections/runtime/sync` | `{ connectionId }` | `AppSnapshot` | Closes the cached remote client, installs checksum-verified pinned Codex and bundled clawd, mirrors provider tokens and reloads provider connections. Explicit custom Codex executable settings remain authoritative; standalone CLI, shell profiles and conversation data are preserved. |
+| `connections/ssh/create` | `{ input: AddSshConnectionInput }` | `AppSnapshot` | Saves an SSH connection, probes the host non-interactively, syncs the bundled `clawd` script and provider token file under `~/.codex-claw`, installs Claude Code with Anthropic's per-user native installer when Claude is enabled and missing, and records an `ssh` stdio transport when ready. A Claude install failure is reported without disabling Codex. |
+| `connections/runtime/inspect` | `{ connectionId }` | `AppSnapshot` | Probes and records runtime versions, including Claude Code when enabled, without installation or session closure. The Settings connection row displays the reported versions. |
+| `connections/runtime/sync` | `{ connectionId }` | `AppSnapshot` | Closes the cached remote client, installs checksum-verified pinned Codex and bundled clawd, ensures Claude Code through Anthropic's per-user installer when enabled, mirrors provider tokens and reloads provider connections. Explicit custom Codex executable settings remain authoritative; shell profiles and conversation data are preserved. |
 | `connections/update` | `{ connectionId, input: { sourceFolderPath? } }` | `AppSnapshot` | Updates SSH connection settings. Source-folder changes are forwarded to the remote `clawd` through `settings/update` and mirrored locally for settings UI defaults. |
 | `connections/delete` | `{ connectionId }` | `AppSnapshot` | Removes a saved remote connection and removes local team pointers attached to it. Remote teams, agents, messages, and automations keep running on the SSH host. If every local team used that connection, local `clawd` creates one empty local fallback team first. |
 
@@ -314,6 +314,9 @@ When loading a remote snapshot or selecting Claude for a remote agent, local
 `clawd` mirrors the Mac app's `claudeCodeEnabled` setting to the remote `clawd`
 before the remote backend validates agent creation. This also reconciles a
 remote daemon that started with the default setting disabled.
+Remote Claude agent creation also checks for the CLI and installs it when
+missing, covering a connection created before Claude was enabled. Claude login
+remains an interactive action by the remote user.
 Remote backend events use the same boundary: local `clawd` forwards agent events
 only when the remote agent belongs to a connected remote-team pointer.
 Slash-command interception remains local-only for now; ordinary prompts route

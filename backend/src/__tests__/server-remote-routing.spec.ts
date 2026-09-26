@@ -15,6 +15,7 @@ describe('ClawBackendServer', () => {
 
   it('inspects remote versions without closing or upgrading the connection', async () => {
     const snapshot = createTestSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
     const connection = readyRemoteConnection();
     snapshot.remoteConnections.connections = [connection];
     const sshConnections = {
@@ -27,10 +28,12 @@ describe('ClawBackendServer', () => {
     expect(result).toMatchObject({ result: { remoteConnections: { connections: [expect.objectContaining({ codexVersion: '0.143.0' })] } } });
     expect(remoteClients.closeConnection).not.toHaveBeenCalled();
     expect(sshConnections.checkConnection).not.toHaveBeenCalled();
+    expect(sshConnections.inspectVersions).toHaveBeenCalledWith(connection, { claudeCodeEnabled: true });
   });
 
   it('routes SSH connection discovery and persistence through clawd', async () => {
     const snapshot = createTestSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const sshConnections = {
       listHostCandidates: vi.fn().mockResolvedValue([{
@@ -101,7 +104,7 @@ describe('ClawBackendServer', () => {
       host: 'devbox',
       hostName: 'devbox.internal',
       user: 'nicolas',
-    });
+    }, { claudeCodeEnabled: true });
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
@@ -383,6 +386,55 @@ describe('ClawBackendServer', () => {
     expect(snapshot.agents).toStrictEqual([]);
     expect(snapshot.teams[0]?.agentIds).toStrictEqual([]);
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('ensures Claude is installed before creating a remote Claude Quick Chat', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.general.claudeCodeEnabled = true;
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{
+      id: 'team-pointer',
+      name: 'Remote Core',
+      remoteConnectionId: 'connection-devbox',
+      remoteTeamId: 'team-remote',
+      agentIds: [],
+    }];
+    const remoteAgent = { ...createRemoteAgent(), backend: 'claude' as const, folder: null, sessionKind: 'quickChat' as const };
+    const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
+    remoteSnapshot.general.claudeCodeEnabled = true;
+    const order: string[] = [];
+    const sshConnections = {
+      ensureRemoteClaudeInstalled: vi.fn(async () => { order.push('ensure Claude'); return '2.1.283'; }),
+    };
+    const remoteClients = {
+      request: vi.fn(async (_connection, method: string) => {
+        order.push(method);
+        if (method === 'snapshot/get') return {
+          snapshot: remoteSnapshot,
+          lastEventSeq: 0,
+          clientState: { sourceFolderPath: '', shouldPreventDisplaySleep: false },
+        };
+        if (method === 'agent/quickChat/create') return remoteSnapshot;
+        throw new Error(`Unexpected remote method: ${method}`);
+      }),
+    };
+    const server = new ClawBackendServer({
+      version: 'test-version',
+      snapshot,
+      sshConnections: sshConnections as never,
+      remoteClients: remoteClients as never,
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: '2.0',
+      id: 'create-remote-claude-chat',
+      method: 'agent/quickChat/create',
+      params: { input: { teamId: 'team-pointer', backend: 'claude' } },
+    });
+
+    expect(sshConnections.ensureRemoteClaudeInstalled).toHaveBeenCalledWith('devbox');
+    expect(order.slice(-3)).toStrictEqual(['ensure Claude', 'snapshot/get', 'agent/quickChat/create']);
+    expect(response).toMatchObject({ result: { agents: [expect.objectContaining({ backend: 'claude' })] } });
   });
 
   it('creates team-scoped quick chats without a workspace', async () => {

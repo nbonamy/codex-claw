@@ -124,6 +124,66 @@ Host bad;alias
     ))).toBe(false);
   });
 
+  it('installs Claude Code when enabled and missing on a new remote host', async () => {
+    const run = vi.fn(async (command: string, args: string[]) => {
+      const remoteCommand = args.at(-1) ?? '';
+      if (command === 'ssh' && remoteCommand.includes('claude.ai/install.sh')) {
+        return { stdout: '2.1.283 (Claude Code)\n', stderr: '' };
+      }
+      if (command === 'ssh' && remoteCommand.includes('bin/codex" --version')) {
+        return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
+      }
+      if (command === 'ssh' && remoteCommand.includes('--version')) {
+        return { stdout: 'clawd 0.21.1\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+    const service = new SshConnectionService({
+      accessFile: vi.fn().mockResolvedValue(undefined),
+      assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
+      run,
+    });
+
+    const connection = await service.createConnection({ host: 'devbox' }, { claudeCodeEnabled: true });
+
+    expect(connection).toMatchObject({
+      status: 'ready',
+      detail: `Ready (clawd 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`,
+    });
+    expect(run).toHaveBeenCalledWith('ssh', expect.arrayContaining([
+      'devbox', expect.stringContaining('https://claude.ai/install.sh'),
+    ]), { timeoutMs: 360_000 });
+  });
+
+  it('keeps Codex ready when Claude installation fails', async () => {
+    const run = vi.fn(async (command: string, args: string[]) => {
+      const remoteCommand = args.at(-1) ?? '';
+      if (command === 'ssh' && remoteCommand.includes('claude.ai/install.sh')) {
+        throw new Error('Claude download unavailable');
+      }
+      if (command === 'ssh' && remoteCommand.includes('bin/codex" --version')) {
+        return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
+      }
+      if (command === 'ssh' && remoteCommand.includes('--version')) {
+        return { stdout: 'clawd 0.21.1\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+    const service = new SshConnectionService({
+      accessFile: vi.fn().mockResolvedValue(undefined),
+      assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
+      run,
+    });
+
+    const connection = await service.createConnection({ host: 'devbox' }, { claudeCodeEnabled: true });
+
+    expect(connection).toMatchObject({
+      status: 'ready',
+      detail: expect.stringContaining('Claude download unavailable'),
+      transport: sshStdioTransport('devbox', bundledCodexVersion),
+    });
+  });
+
   it('prefers a remote daemon socket before falling back to one-shot stdio', () => {
     expect(sshStdioTransport('devbox')).toStrictEqual({
       type: 'ssh-stdio',
@@ -200,5 +260,37 @@ Host bad;alias
       ['ssh', 'node ~/.codex-claw/clawd.mjs --version'],
       ['ssh', remoteCodexVersionCommand()],
     ]);
+  });
+
+  it('reports the remote Claude version during read-only inspection when enabled', async () => {
+    const run = vi.fn(async (_command: string, args: string[]) => {
+      const command = args.at(-1) ?? '';
+      if (command.startsWith('node ')) return { stdout: 'clawd 0.21.1\n', stderr: '' };
+      if (command.includes('codex')) return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
+      return { stdout: '2.1.283 (Claude Code)\n', stderr: '' };
+    });
+    const service = new SshConnectionService({ run });
+    const connection = { id: 'remote', kind: 'ssh' as const, host: 'devbox', name: 'Dev', status: 'ready' as const, createdAt: '', updatedAt: '' };
+
+    const inspected = await service.inspectVersions(connection, { claudeCodeEnabled: true });
+
+    expect(inspected.detail).toBe(`Ready (clawd 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`);
+    expect(run.mock.calls.some(([, args]) => (args.at(-1) ?? '').includes('claude.ai/install.sh'))).toBe(false);
+  });
+
+  it('keeps the connection ready when read-only inspection finds no Claude CLI', async () => {
+    const run = vi.fn(async (_command: string, args: string[]) => {
+      const command = args.at(-1) ?? '';
+      if (command.startsWith('node ')) return { stdout: 'clawd 0.21.1\n', stderr: '' };
+      if (command.includes('codex')) return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
+      throw new Error('Claude Code is not installed.');
+    });
+    const service = new SshConnectionService({ run });
+    const connection = { id: 'remote', kind: 'ssh' as const, host: 'devbox', name: 'Dev', status: 'ready' as const, createdAt: '', updatedAt: '' };
+
+    await expect(service.inspectVersions(connection, { claudeCodeEnabled: true })).resolves.toMatchObject({
+      status: 'ready',
+      detail: `Ready (clawd 0.21.1, Codex ${bundledCodexVersion}); Claude unavailable: Claude Code is not installed.`,
+    });
   });
 });

@@ -17,6 +17,7 @@ export type RemoteAgentOwner = RemoteTeamPointer & { agent: Agent };
 export type RemoteTeamServiceOptions = {
   clients: RemoteClawdClientManager;
   getSnapshot: () => AppSnapshot;
+  ensureClaudeInstalled?: (connection: RemoteConnection) => Promise<void>;
   onForwardedEvent: (connectionId: string, event: ClawBackendEvent) => void;
   onProjectedSnapshotChanged: () => void;
 };
@@ -70,7 +71,12 @@ export class RemoteTeamService {
   }
 
   async request<Result = unknown>(connectionId: string, method: string, params?: unknown): Promise<Result> {
-    if (requestsClaudeBackend(method, params)) await this.snapshot(connectionId);
+    if (requestsClaudeBackend(method, params)) {
+      if (this.options.getSnapshot().general.claudeCodeEnabled) {
+        await this.options.ensureClaudeInstalled?.(this.connection(connectionId));
+      }
+      await this.snapshot(connectionId);
+    }
     return this.remoteRequest(connectionId, method, params);
   }
 

@@ -8,6 +8,7 @@ import { createEntityId } from '@codex-claw/core/ids';
 import { backendProviderTokensFilePath } from '../state';
 import { bundledCodexVersion } from '@codex-claw/core/codex-release';
 import { remoteCodexInstallCommand, remoteCodexVersionCommand } from './remote-codex-install';
+import { remoteClaudeInstallCommand, remoteClaudeVersionCommand } from './remote-claude-install';
 
 type ExecResult = {
   stdout: string;
@@ -46,13 +47,13 @@ export class SshConnectionService {
     }
   }
 
-  async createConnection(input: AddSshConnectionInput): Promise<RemoteConnection> {
+  async createConnection(input: AddSshConnectionInput, options: { claudeCodeEnabled?: boolean } = {}): Promise<RemoteConnection> {
     const createdAt = this.nowIso();
     const base = normalizeSshConnectionInput(input, createdAt, this.deps.createId?.() ?? createEntityId('connection'));
-    return this.checkConnection(base);
+    return this.checkConnection(base, options);
   }
 
-  async checkConnection(connection: RemoteConnection): Promise<RemoteConnection> {
+  async checkConnection(connection: RemoteConnection, options: { claudeCodeEnabled?: boolean } = {}): Promise<RemoteConnection> {
     const checkedAt = this.nowIso();
     let next: RemoteConnection = {
       ...connection,
@@ -69,12 +70,22 @@ export class SshConnectionService {
       const clawdVersion = await this.remoteClawdVersion(next.host);
       const codexVersion = await this.remoteCodexVersion(next.host, bundledCodexVersion);
       if (codexVersion !== bundledCodexVersion) throw new Error('Remote Codex version verification failed. Check whether remote Settings overrides the Codex executable path.');
+      const runtimeVersions = [`clawd ${clawdVersion}`, `Codex ${codexVersion}`];
+      let claudeWarning = '';
+      if (options.claudeCodeEnabled) {
+        try {
+          const claudeVersion = await this.ensureRemoteClaudeInstalled(next.host);
+          runtimeVersions.push(`Claude ${claudeVersion}`);
+        } catch (error) {
+          claudeWarning = `; Claude unavailable: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      }
       next = {
         ...next,
         status: 'ready',
         ...(clawdVersion ? { clawdVersion } : {}),
         codexVersion,
-        detail: `Ready (clawd ${clawdVersion}, Codex ${codexVersion})`,
+        detail: `Ready (${runtimeVersions.join(', ')})${claudeWarning}`,
         installedAt: checkedAt,
         transport: sshStdioTransport(next.host, codexVersion),
         updatedAt: checkedAt,
@@ -94,13 +105,41 @@ export class SshConnectionService {
     return next;
   }
 
-  async inspectVersions(connection: RemoteConnection): Promise<RemoteConnection> {
+  async inspectVersions(connection: RemoteConnection, options: { claudeCodeEnabled?: boolean } = {}): Promise<RemoteConnection> {
     const [clawdVersion, codexVersion] = await Promise.all([
       this.remoteClawdVersion(connection.host),
       this.remoteCodexVersion(connection.host, connection.codexVersion),
     ]);
+    const runtimeVersions = [`clawd ${clawdVersion}`, `Codex ${codexVersion || 'unknown'}`];
+    let claudeWarning = '';
+    if (options.claudeCodeEnabled) {
+      try {
+        runtimeVersions.push(`Claude ${await this.remoteClaudeVersion(connection.host)}`);
+      } catch (error) {
+        claudeWarning = `; Claude unavailable: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
     return { ...connection, clawdVersion, codexVersion,
-      detail: `Ready (clawd ${clawdVersion}, Codex ${codexVersion || 'unknown'})` };
+      detail: `Ready (${runtimeVersions.join(', ')})${claudeWarning}` };
+  }
+
+  async ensureRemoteClaudeInstalled(host: string): Promise<string> {
+    const result = await (this.deps.run ?? runCommand)('ssh', [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=10',
+      host,
+      remoteClaudeInstallCommand(),
+    ], { timeoutMs: 360_000 });
+    return parseRemoteClaudeVersion(result.stdout);
+  }
+
+  private async remoteClaudeVersion(host: string): Promise<string> {
+    const result = await (this.deps.run ?? runCommand)('ssh', [
+      '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, remoteClaudeVersionCommand(),
+    ], { timeoutMs: 15_000 });
+    return parseRemoteClaudeVersion(result.stdout);
   }
 
   private async remoteCodexVersion(host: string, managedVersion?: string): Promise<string> {
@@ -353,6 +392,13 @@ function validPort(value: unknown): value is number {
 
 function isConcreteHostAlias(host: string): boolean {
   return /^[A-Za-z0-9._-]+$/.test(host);
+}
+
+function parseRemoteClaudeVersion(output: string): string {
+  const versionLine = output.split(/\r?\n/u).map((line) => line.trim())
+    .filter((line) => /^\d+\.\d+\.\d+ \(Claude Code\)$/u.test(line)).at(-1);
+  if (!versionLine) throw new Error('Remote Claude Code version verification failed.');
+  return versionLine.split(' ')[0]!;
 }
 
 function runCommand(command: string, args: string[], options: { timeoutMs?: number } = {}): Promise<ExecResult> {

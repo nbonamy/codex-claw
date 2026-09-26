@@ -327,6 +327,7 @@ export class ClawBackendServer {
     this.remoteTeams = new RemoteTeamService({
       clients: this.remoteClients,
       getSnapshot: () => this.snapshot,
+      ensureClaudeInstalled: (connection) => this.sshConnections.ensureRemoteClaudeInstalled(connection.host).then(() => undefined),
       onForwardedEvent: (connectionId, event) => this.forwardRemoteBackendEvent(connectionId, event),
       onProjectedSnapshotChanged: () => { void this.emitProjectedSnapshot(); },
     });
@@ -781,7 +782,9 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.sshConnections.listHostCandidates());
       case backendMethods.connectionsSshCreate: {
         const input = requireAddSshConnectionInput(message.params);
-        const connection = await this.sshConnections.createConnection(input);
+        const connection = await this.sshConnections.createConnection(input, {
+          claudeCodeEnabled: this.snapshot.general.claudeCodeEnabled,
+        });
         this.snapshot.remoteConnections.connections = [
           ...this.snapshot.remoteConnections.connections.filter((candidate) => candidate.host !== connection.host),
           connection,
@@ -796,7 +799,9 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
         }
         if (message.method === backendMethods.connectionsRuntimeInspect) {
-          const inspected = await this.sshConnections.inspectVersions(connection);
+          const inspected = await this.sshConnections.inspectVersions(connection, {
+            claudeCodeEnabled: this.snapshot.general.claudeCodeEnabled,
+          });
           // Do not replace a connection edited or deleted while SSH was probing.
           this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
             candidate === connection ? { ...candidate, clawdVersion: inspected.clawdVersion, codexVersion: inspected.codexVersion, detail: inspected.detail } : candidate
@@ -804,7 +809,9 @@ export class ClawBackendServer {
           return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         await this.remoteClients.closeConnection(connectionId);
-        const checked = await this.sshConnections.checkConnection(connection);
+        const checked = await this.sshConnections.checkConnection(connection, {
+          claudeCodeEnabled: this.snapshot.general.claudeCodeEnabled,
+        });
         this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
           candidate.id === connectionId ? checked : candidate
         ));
