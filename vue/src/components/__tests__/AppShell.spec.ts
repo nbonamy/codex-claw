@@ -53,31 +53,6 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
-  it('saves a composer draft through client settings from the composer menu', async () => {
-    const snapshot = reactive(createInitialSnapshot());
-    const existingDraft = { id: 'earlier', agentId: snapshot.activeAgentId!, text: 'Earlier thought', createdAt: 1 };
-    snapshot.general.savedPromptDrafts = [existingDraft];
-    const updateSettings = vi.fn(async (input: unknown) => { structuredClone(input); });
-    const wrapper = mountShell({
-      snapshot,
-      updateSettings,
-      realConversationPane: true,
-      stubAgentWorkspace: false,
-      composerState: { text: 'Park this thought', selectionStart: 0, selectionEnd: 0 },
-    });
-    const item = conversationControllerState(wrapper).composer?.leadingMenuItems?.find((candidate) => candidate.id === 'save-prompt-draft');
-    expect(item).toMatchObject({ label: 'Save draft for later', disabled: false });
-
-    await conversationControllerActions(wrapper).menuSelect?.(item as Exclude<typeof item, undefined> & { type: 'action' });
-    await flushPromises();
-
-    expect(updateSettings).toHaveBeenCalledOnce();
-    expect(updateSettings.mock.calls[0]?.[0]).toStrictEqual({ general: { savedPromptDrafts: [
-      existingDraft,
-      { id: expect.any(String), agentId: snapshot.activeAgentId, text: 'Park this thought', createdAt: expect.any(Number) },
-    ] } });
-    expect(wrapper.emitted('update:composerState')?.at(-1)?.[0]).toMatchObject({ state: { text: '' } });
-  });
   it('uses the provider-owned Codex conversation', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
@@ -1350,6 +1325,7 @@ describe('AppShell authentication and conversation', () => {
     });
 
     expect(conversationControllerState(wrapper).capabilities?.approvalPresets).toStrictEqual([]);
+    expect(conversationControllerState(wrapper).composer?.leadingMenuItems?.map((item) => item.id)).toStrictEqual(['backend-permissions']);
     expect(conversationControllerState(wrapper).composer?.leadingMenuItems?.find((item) => item.id === 'backend-permissions')).toEqual(
       expect.objectContaining({
         id: 'backend-permissions',

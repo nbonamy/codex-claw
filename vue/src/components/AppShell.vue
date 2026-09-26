@@ -1754,14 +1754,6 @@ const permissionModeMenuItems = computed<CodexComposerMenuItem[]>(() => {
     items: modes.map((mode) => permissionModeMenuItem(mode, props.permissionMode)),
   }];
 });
-const composerLeadingMenuItems = computed<CodexComposerMenuItem[]>(() => {
-  const savedCount = props.snapshot.general.savedPromptDrafts.filter((draft) => draft.agentId === currentAgent.value?.id).length;
-  return [
-    { id: 'save-prompt-draft', type: 'action', label: t('chat.savedDrafts.save'), value: '⇧⌘X', disabled: !props.composerState.text.trim(), payload: { kind: 'save-prompt-draft' } },
-    { id: 'open-saved-prompt-drafts', type: 'action', label: `${t('chat.savedDrafts.open')} (${savedCount})`, value: '⇧⌘V', payload: { kind: 'open-saved-prompt-drafts' } },
-    ...(permissionModeMenuItems.value.length ? [{ id: 'saved-prompt-drafts-separator', type: 'separator' as const }, ...permissionModeMenuItems.value] : []),
-  ];
-});
 const currentModelFavorite = computed<ModelFavorite | null>(() => {
   const agent = currentAgent.value;
   const model = props.backendModels.find((candidate) => candidate.id === props.selectedModelId)
@@ -1896,7 +1888,7 @@ const conversationPaneState: CodexConversationPaneState = {
       return translate('surface.appShell.askForFollowUpChanges');
     },
     get approvalPreset() { return props.approvalPreset; },
-    get leadingMenuItems() { return composerLeadingMenuItems.value; },
+    get leadingMenuItems() { return permissionModeMenuItems.value; },
     get modelMenuItems() { return modelFavoriteMenuItems.value; },
     get planMode() { return props.planMode; },
     get selectedModelId() { return props.selectedModelId; },
@@ -1943,16 +1935,6 @@ const conversationPaneActions: CodexConversationPaneActions = {
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   menuSelect: (item) => {
-    if (item.payload && typeof item.payload === 'object' && 'kind' in item.payload) {
-      if (item.payload.kind === 'save-prompt-draft') {
-        saveActivePromptDraft();
-        return;
-      }
-      if (item.payload.kind === 'open-saved-prompt-drafts') {
-        openActiveSavedPromptDrafts();
-        return;
-      }
-    }
     const favoriteCommand = modelFavoriteCommand(item.payload);
     if (favoriteCommand) {
       void handleModelFavoriteCommand(favoriteCommand);
