@@ -18,11 +18,15 @@
         <el-button text size="small" :disabled="busy" @click="cancel">{{ $t('surface.remoteCodexAuth.cancel') }}</el-button>
       </div>
     </template>
-    <button v-else-if="authentication || error" class="claw-button claw-button--secondary" type="button" :disabled="busy" :aria-busy="busy" @click="authentication ? start() : refresh()">
-      {{ $t(authentication ? 'surface.remoteCodexAuth.connect' : 'surface.remoteCodexAuth.retry') }}
-    </button>
+    <template v-else-if="authentication || error">
+      <span v-if="!authentication" :title="error">{{ $t('surface.remoteCodexAuth.unavailable') }}</span>
+      <span v-else>{{ $t('surface.remoteCodexAuth.signInRequired') }}</span>
+      <button class="claw-button claw-button--secondary" type="button" :disabled="busy" :aria-busy="busy" @click="authentication ? start() : refresh()">
+        {{ $t(authentication ? 'surface.remoteCodexAuth.connect' : 'surface.remoteCodexAuth.retry') }}
+      </button>
+    </template>
     <span v-else>{{ $t('surface.remoteCodexAuth.checking') }}</span>
-    <p v-if="error" class="remote-codex-auth__error">{{ error }}</p>
+    <p v-if="error && (authentication || login)" class="remote-codex-auth__error">{{ error }}</p>
   </section>
 </template>
 

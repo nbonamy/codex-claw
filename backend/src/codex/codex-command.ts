@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs';
-
-const chatGptCodexPath = '/Applications/ChatGPT.app/Contents/Resources/codex';
+import path from 'node:path';
+import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { backendHomeDir } from '../state';
 
 export type CodexCommandDependencies = {
   bundledPath?: string;
   existsSync?: (filePath: string) => boolean;
-  platform?: NodeJS.Platform;
 };
 
 export function resolveCodexCommand(
@@ -22,9 +22,8 @@ export function resolveCodexCommand(
     return bundled;
   }
 
-  if ((dependencies.platform ?? process.platform) !== 'darwin') {
-    return undefined;
-  }
-
-  return (dependencies.existsSync ?? existsSync)(chatGptCodexPath) ? chatGptCodexPath : undefined;
+  const exists = dependencies.existsSync ?? existsSync;
+  const managed = path.join(backendHomeDir(), 'codex', bundledCodexVersion, 'bin', 'codex');
+  if (exists(managed)) return managed;
+  return undefined;
 }

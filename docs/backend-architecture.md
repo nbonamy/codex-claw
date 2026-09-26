@@ -699,8 +699,9 @@ The exact script names can change, but the shape should stay:
   conversations, SDK controllers, and event sequence cursors cannot outlive the
   backend instance.
 - Electron supplies every local `clawd` launch with the pinned Codex executable
-  copied into desktop resources. SSH sync uploads only `clawd.mjs`, so a remote
-  `clawd` continues to discover and launch Codex installed on that host.
+  copied into desktop resources. SSH sync uploads `clawd.mjs` and installs the
+  pinned Codex release under `~/.codex-claw/codex/<version>/bin`; remote
+  `clawd` launches that managed binary unless its Settings path overrides it.
 
 Hot reload semantics:
 

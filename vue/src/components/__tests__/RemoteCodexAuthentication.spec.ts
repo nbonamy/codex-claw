@@ -107,14 +107,17 @@ describe('RemoteCodexAuthentication', () => {
     expect(wrapper.get('button').text()).toBe('Connect ChatGPT');
   });
 
-  it('retries a failed account check without starting a login', async () => {
+  it('shows an unavailable Codex state, then offers sign-in after a successful retry', async () => {
     const client = api();
-    client.getCodexAuthentication.mockRejectedValueOnce(new Error('SSH unavailable'));
+    client.getCodexAuthentication.mockRejectedValueOnce(new Error("Error invoking remote method 'codex:authentication:get': Error: Codex app-server transport is not started"));
     const { wrapper } = render(client);
     await flushPromises();
-    expect(wrapper.text()).toContain('SSH unavailable');
+    expect(wrapper.text()).toContain('Could not check Codex on this host.');
+    expect(wrapper.text()).not.toContain('transport is not started');
+    expect(wrapper.get('button').text()).toBe('Retry account check');
     await wrapper.get('button').trigger('click');
     await flushPromises();
+    expect(wrapper.text()).toContain('Codex needs sign-in on this host.');
     expect(wrapper.get('button').text()).toBe('Connect ChatGPT');
     expect(client.startCodexChatGptDeviceCodeLogin).not.toHaveBeenCalled();
   });

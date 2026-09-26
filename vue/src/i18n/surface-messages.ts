@@ -24,6 +24,8 @@ export const surfaceMessages = {
   },
   "remoteCodexAuth": {
     "connected": "Codex connected",
+    "signInRequired": "Codex needs sign-in on this host.",
+    "unavailable": "Could not check Codex on this host.",
     "connect": "Connect ChatGPT",
     "checking": "Checking Codex account…",
     "instructions": "Open the sign-in page and enter this code:",

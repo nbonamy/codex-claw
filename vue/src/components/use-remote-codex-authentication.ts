@@ -30,7 +30,10 @@ export function useRemoteCodexAuthentication(connection: () => RemoteConnection,
       error.value = state.login.error ?? '';
       if (connected.value || state.login.status === 'error' || state.login.status === 'cancelled') login.value = null;
     } catch (cause) {
-      if (expectedRevision === revision) error.value = String(cause instanceof Error ? cause.message : cause);
+      if (expectedRevision === revision) {
+        if (!login.value) authentication.value = null;
+        error.value = String(cause instanceof Error ? cause.message : cause);
+      }
     }
     if (expectedRevision === revision && login.value) {
       clearTimer();
