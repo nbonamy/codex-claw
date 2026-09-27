@@ -113,6 +113,7 @@ describe('ClawBackendServer', () => {
     const invalidRequests: Array<[string, unknown, string]> = [
       [backendMethods.agentCreate, { input: { name: '', folder: '' } }, 'name'],
       [backendMethods.agentUpdate, { input: { id: 'agent-1', name: 42 } }, 'agent name'],
+      [backendMethods.agentUpdate, { input: { id: 'agent-1', modelSelection: { model: 'sol', reasoningEffort: 42, serviceTier: null } } }, 'reasoning effort'],
       [backendMethods.agentFork, { agentId: 'agent-1', turnId: 42 }, 'turnId'],
       [backendMethods.clientAgentExternalApplicationUpdate, { agentId: 'agent-1', application: 'emacs' }, 'application'],
       [backendMethods.teamCreate, { input: { name: '', color: '#123456' } }, 'name'],

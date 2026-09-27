@@ -362,9 +362,12 @@ the model's `defaultReasoningEffort`. Models may also expose `serviceTiers` and
 toggle.
 
 The renderer consumes an app-owned picker shape only. `clawd` fetches and adapts
-the Codex catalog to `BackendModelOption[]`, the renderer stores the selected
-catalog model and reasoning effort, and each prompt request sends the model plus
-Codex-specific reasoning and service tier under `backendOptions`.
+the Codex catalog to `BackendModelOption[]`. An explicit picker choice is saved
+immediately in the agent's `backendDefaults`, marked as user-selected. Provider
+settings hydrate those defaults until the user makes an explicit choice; later
+thread events cannot replace that choice for future prompts or agent actions.
+Each prompt request captures the selected model, reasoning effort, and service
+tier in app-owned prompt options, including when that prompt is queued.
 
 The selected service tier is part of the hydrated thread settings. `clawd`
 emits it through `conversation.settingsUpdated`, including an explicit `null` when

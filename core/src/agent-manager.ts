@@ -85,6 +85,19 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
     agent.backendDefaults = defaultBackendDefaults(backend);
     agent.updatedAt = updatedAt;
   }
+  if (input.modelSelection) {
+    const defaults = agent.backendDefaults?.kind === agent.backend
+      ? agent.backendDefaults
+      : agent.backend === 'codex' ? { kind: 'codex' as const } : { kind: 'claude' as const };
+    const { reasoningEffort: _previousEffort, ...rest } = { reasoningEffort: undefined, ...defaults };
+    agent.backendDefaults = {
+      ...rest,
+      model: input.modelSelection.model,
+      userSelectedModel: true,
+      ...(input.modelSelection.reasoningEffort ? { reasoningEffort: input.modelSelection.reasoningEffort } : {}),
+      ...(agent.backend === 'codex' ? { serviceTier: input.modelSelection.serviceTier } : {}),
+    } as BackendDefaults;
+  }
   if (input.name !== undefined) {
     agent.name = normalizedOptionalString(input.name) ?? null;
     agent.updatedAt = updatedAt;

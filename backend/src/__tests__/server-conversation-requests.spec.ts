@@ -320,6 +320,9 @@ describe('ClawBackendServer', () => {
         agentId: 'agent-dina',
         prompt: 'run next',
         options: {
+          model: 'sol',
+          reasoningEffort: 'high',
+          serviceTier: 'fast',
           attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
           inputMethod: 'dictated',
         },
@@ -329,6 +332,9 @@ describe('ClawBackendServer', () => {
       agentId: 'agent-dina',
       text: 'run next',
       options: {
+        model: 'sol',
+        reasoningEffort: 'high',
+        serviceTier: 'fast',
         attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
         inputMethod: 'dictated',
       },
@@ -364,11 +370,17 @@ describe('ClawBackendServer', () => {
       payload: { type: 'idle' },
     });
     expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', {
+      model: 'sol',
+      reasoningEffort: 'high',
+      serviceTier: 'fast',
       attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
       inputMethod: 'dictated',
     });
     expect(sendPrompt).toHaveBeenCalledTimes(1);
     expect(onPromptStarting).toHaveBeenCalledWith('agent-dina', {
+      model: 'sol',
+      reasoningEffort: 'high',
+      serviceTier: 'fast',
       attachments: [{ type: 'file', path: '/tmp/queue.txt', name: 'queue.txt' }],
       inputMethod: 'dictated',
     });

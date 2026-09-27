@@ -50,6 +50,7 @@ import type {
 } from './contracts/connections';
 import type {
   AccountRateLimits,
+  AgentModelSelection,
   BackendConnectionState,
   BackendDefaults,
   BackendModelOption,
@@ -153,6 +154,7 @@ export type {
 export type {
   AccountRateLimitWindow,
   AccountRateLimits,
+  AgentModelSelection,
   BackendCapabilities,
   BackendCommandSummary,
   BackendConnectionState,
@@ -726,6 +728,7 @@ export type ReorderTeamsInput = {
 export type UpdateAgentInput = {
   id: string;
   backend?: AgentBackend;
+  modelSelection?: AgentModelSelection;
   name?: string | null;
   gitDiffTarget?: AgentGitDiffTarget | null;
 };

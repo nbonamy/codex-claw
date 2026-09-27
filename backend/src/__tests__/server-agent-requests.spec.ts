@@ -63,6 +63,18 @@ describe('ClawBackendServer', () => {
           agents: [{ id: agentId, name: 'Dina Backend', folder: tempDir }],
         },
       });
+      const modelSelection = { model: 'sol', reasoningEffort: 'high', serviceTier: null };
+      await expect(server.handleMessage({
+        jsonrpc: '2.0',
+        id: 'update-model-selection',
+        method: 'agent/update',
+        params: { input: { id: agentId, modelSelection } },
+      })).resolves.toMatchObject({
+        result: { agents: [{ id: agentId, backendDefaults: { kind: 'codex', model: 'sol', reasoningEffort: 'high', serviceTier: null, userSelectedModel: true } }] },
+      });
+      expect(saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+        agents: [expect.objectContaining({ backendDefaults: expect.objectContaining({ model: 'sol', userSelectedModel: true }) })],
+      }));
       await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'update-agent-git-diff-target',
@@ -90,7 +102,7 @@ describe('ClawBackendServer', () => {
         params: { agentId },
       })).resolves.toMatchObject({
         result: {
-          agents: [{ id: agentId }, { name: 'Dina Backend (copy)', openInApplication: 'xcode' }],
+          agents: [{ id: agentId }, { name: 'Dina Backend (copy)', openInApplication: 'xcode', backendDefaults: { model: 'sol', userSelectedModel: true } }],
         },
       });
       const duplicateId = snapshot.agents[1]?.id ?? '';

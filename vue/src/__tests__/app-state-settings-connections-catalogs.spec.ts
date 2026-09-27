@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
+import { createAgentComposerState } from '../agent-composer-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, UpdateAgentInput, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import { updateAgentFromInput } from '@codex-claw/core/agent-manager';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
@@ -197,6 +199,78 @@ describe('useAppState', () => {
 
     expect(state.selectedModelId.value).toBe('gpt-5.4');
     expect(state.selectedReasoningEffort.value).toBe('high');
+  });
+
+  it('keeps a changed model and effort for the next prompt across old thread settings and reload', async () => {
+    const persisted = createInitialSnapshot();
+    persisted.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-1' };
+    persisted.agents[0]!.backendDefaults = { kind: 'codex', model: 'astra', reasoningEffort: 'medium' };
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    let releaseFirstSave = () => undefined;
+    const updateAgent = vi.fn((input: UpdateAgentInput) => {
+      if (updateAgent.mock.calls.length === 1) {
+        return new Promise<AppSnapshot>((resolve) => {
+          releaseFirstSave = () => {
+            updateAgentFromInput(persisted, input);
+            resolve(structuredClone(persisted));
+          };
+        });
+      }
+      updateAgentFromInput(persisted, input);
+      return Promise.resolve(structuredClone(persisted));
+    });
+    const listBackendModels = vi.fn().mockResolvedValue(['astra', 'sol'].map((model) => ({
+      id: model === 'sol' ? 'sol-id' : model, model, displayName: model,
+      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts: [
+        { reasoningEffort: 'medium', description: 'Medium' },
+        { reasoningEffort: 'high', description: 'High' },
+      ],
+      serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Fast responses' }],
+    })));
+    const sendPrompt = vi.fn().mockImplementation(async () => structuredClone(persisted));
+    stubElectronTestWindow({ codexClaw: {
+      getSnapshot: vi.fn().mockImplementation(async () => structuredClone(persisted)),
+      listBackendModels,
+      updateAgent,
+      sendPrompt,
+      onEvent: vi.fn((listener) => { listeners.push(listener); return () => undefined; }),
+    } satisfies Partial<CodexClawApi> });
+
+    const state = useAppState();
+    await state.loadSnapshot();
+    state.selectModel('sol-id');
+    state.selectReasoningEffort('high');
+    state.selectServiceTier('fast');
+    await vi.waitFor(() => expect(updateAgent).toHaveBeenCalledTimes(1));
+    listeners[0]?.({
+      seq: 1, agentId: persisted.agents[0]!.id, backend: 'codex', threadId: 'thread-1',
+      conversationId: 'thread-1', type: 'conversation.settingsUpdated',
+      payload: { settings: { model: 'astra', reasoningEffort: 'medium' } },
+      occurredAt: '2026-09-26T00:00:00.000Z',
+    });
+    expect(state.selectedModelId.value).toBe('sol-id');
+    expect(state.selectedReasoningEffort.value).toBe('high');
+    expect(state.selectedServiceTier.value).toBe('fast');
+
+    await state.sendPrompt('use my next-prompt selection');
+    expect(sendPrompt).toHaveBeenCalledWith(persisted.agents[0]!.id, 'use my next-prompt selection',
+      expect.objectContaining({ model: 'sol', reasoningEffort: 'high', serviceTier: 'fast' }));
+
+    releaseFirstSave();
+    await vi.waitFor(() => expect(persisted.agents[0]!.backendDefaults).toStrictEqual({
+      kind: 'codex', model: 'sol', reasoningEffort: 'high', serviceTier: 'fast', userSelectedModel: true,
+    }));
+
+    const reloaded = createAgentComposerState({ getSnapshot: () => persisted });
+    reloaded.restore(persisted.agents[0]!.id);
+    await reloaded.loadModels(persisted.agents[0]!.id);
+    expect(reloaded.selectedModelId.value).toBe('sol-id');
+    expect(reloaded.selectedReasoningEffort.value).toBe('high');
+    expect(reloaded.selectedServiceTier.value).toBe('fast');
+    expect(reloaded.resolvePromptOptions(persisted.agents[0]!.id, 'after restart')).toMatchObject({
+      model: 'sol', reasoningEffort: 'high', serviceTier: 'fast',
+    });
   });
 
   it('restores Claude thread settings ahead of the agent fallback selection', async () => {

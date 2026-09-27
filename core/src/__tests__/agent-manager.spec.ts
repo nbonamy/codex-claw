@@ -26,7 +26,7 @@ describe('agent-manager', () => {
     const agent = snapshot.agents[0]!;
     delete agent.backendSession;
     agent.status = { type: 'idle' };
-    agent.backendDefaults = { kind: 'codex', model: 'codex-model', approvalPreset: 'full-access' };
+    agent.backendDefaults = { kind: 'codex', model: 'codex-model', approvalPreset: 'full-access', userSelectedModel: true };
     updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' });
     expect(agent.backend).toBe('claude');
     expect(agent.backendDefaults).toStrictEqual({ kind: 'claude' });

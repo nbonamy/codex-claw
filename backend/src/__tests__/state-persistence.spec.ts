@@ -20,6 +20,32 @@ afterEach(async () => {
 });
 
 describe('AppStatePersistence', () => {
+  it('restores a user-selected model, effort, and tier after restarting', async () => {
+    const persistence = new AppStatePersistence(await tempStatePath());
+    const snapshot = createInitialSnapshot();
+    const selection = { kind: 'codex' as const, model: 'sol', reasoningEffort: 'high', serviceTier: null, userSelectedModel: true };
+    snapshot.agents[0]!.backendDefaults = selection;
+
+    await persistence.save(snapshot);
+    const restored = await persistence.load();
+
+    expect(restored.agents[0]!.backendDefaults).toStrictEqual(selection);
+  });
+
+  it('restores a user-selected Claude model after restarting', async () => {
+    const persistence = new AppStatePersistence(await tempStatePath());
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backend = 'claude';
+    snapshot.agents[0]!.backendDefaults = {
+      kind: 'claude', model: 'opus', reasoningEffort: 'high', userSelectedModel: true,
+    };
+
+    await persistence.save(snapshot);
+    const restored = await persistence.load();
+
+    expect(restored.agents[0]!.backendDefaults).toStrictEqual(snapshot.agents[0]!.backendDefaults);
+  });
+
   it('restores saved prompt drafts for the same client after a restart', async () => {
     const persistence = new AppStatePersistence(await tempStatePath());
     const snapshot = createInitialSnapshot();

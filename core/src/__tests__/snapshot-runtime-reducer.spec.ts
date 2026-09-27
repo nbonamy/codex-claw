@@ -151,6 +151,28 @@ describe('snapshot runtime reducer', () => {
     });
   });
 
+  it('does not overwrite an explicit next-prompt model choice with current-thread settings', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
+    snapshot.agents[0].backendDefaults = {
+      kind: 'codex', model: 'sol', reasoningEffort: 'high', serviceTier: null, userSelectedModel: true,
+    };
+
+    applyMainEventToSnapshot(snapshot, {
+      seq: 1,
+      agentId: 'agent-dina',
+      backend: 'codex',
+      conversationId: 'thread-old',
+      type: 'conversation.settingsUpdated',
+      payload: { settings: { model: 'astra', reasoningEffort: 'medium', serviceTier: 'fast', approvalPreset: 'full-access' } },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    expect(snapshot.agents[0].backendDefaults).toMatchObject({
+      model: 'sol', reasoningEffort: 'high', serviceTier: null, userSelectedModel: true, approvalPreset: 'full-access',
+    });
+  });
+
   it('records thread goal updates and clears them from agent metadata', () => {
     const snapshot = createInitialSnapshot();
 

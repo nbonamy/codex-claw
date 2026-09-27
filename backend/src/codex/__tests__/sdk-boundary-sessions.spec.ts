@@ -73,6 +73,20 @@ describe('Codex SDK → Claw session policy', () => {
     await expect(driver.loadOlderHistory(agent)).rejects.toThrow('page unavailable');
   });
 
+  it('restores the selected tier rather than a stale thread default on cold load', async () => {
+    const { driver, conversation } = setup();
+    const session = conversation('conversation-a');
+    session.setSnapshot({ selectedServiceTier: 'fast' });
+    const agent = {
+      ...sdkAgent(),
+      backendDefaults: { kind: 'codex' as const, model: 'sol', reasoningEffort: 'high', serviceTier: null, userSelectedModel: true },
+    };
+
+    await driver.loadConversation(agent);
+
+    expect(session.handle.updateSettings).toHaveBeenCalledWith({ serviceTier: null });
+  });
+
   it.each([false, true])('rolls over via a bounded handoff and archives only after replacement acceptance (failure=%s)', async (fail) => {
     const { driver, surface, conversation, events } = setup();
     const session = conversation('conversation-a');

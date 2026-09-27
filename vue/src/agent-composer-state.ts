@@ -4,6 +4,7 @@ import {
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type {
   Agent,
+  AgentModelSelection,
   AgentFileSearchItem,
   AppSnapshot,
   BackendCapabilities,
@@ -35,6 +36,7 @@ type AgentComposerConfiguration = {
   selectedReasoningEffort: ReasoningEffort | null;
   selectedServiceTier: string | null;
   planMode: boolean;
+  pendingSelection: AgentModelSelection | null;
 };
 
 type ComposerMainEvent = Extract<
@@ -43,7 +45,11 @@ type ComposerMainEvent = Extract<
 >;
 type ComposerModeEvent = Extract<ComposerMainEvent, { type: 'conversation.modeUpdated' | 'conversation.settingsUpdated' }>;
 
-export function createAgentComposerState(options: { getSnapshot: () => AppSnapshot }) {
+export function createAgentComposerState(options: {
+  getSnapshot: () => AppSnapshot;
+  persistSelection?: (agentId: string, selection: AgentModelSelection) => Promise<void>;
+  onSelectionSaveError?: (error: unknown) => void;
+}) {
   const backendModels = ref<BackendModelOption[]>([]);
   const modelCatalogStatus = ref<AsyncCatalogStatus>('notLoaded');
   const modelCatalogError = ref<string | null>(null);
@@ -68,6 +74,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
   const pluginCache = new AsyncCatalogCache<string, BackendPluginSummary>((value) => ({ ...value }));
   const fileCache = new AsyncCatalogCache<string, AgentFileSearchItem>((value) => ({ ...value }));
   const configurationByAgentId = new Map<string, AgentComposerConfiguration>();
+  const selectionSavesByAgentId = new Map<string, Promise<void>>();
   let catalogSessionSource: unknown = null;
 
   function snapshot(): AppSnapshot {
@@ -99,6 +106,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
       selectedReasoningEffort: selection.reasoningEffort,
       selectedServiceTier: selection.serviceTier,
       planMode: false,
+      pendingSelection: null,
     };
     configurationByAgentId.set(agentId, created);
     return created;
@@ -171,6 +179,7 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     pluginCache.clear();
     fileCache.clear();
     configurationByAgentId.clear();
+    selectionSavesByAgentId.clear();
     clearActive();
   }
 
@@ -180,21 +189,54 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
     selectedModelId.value = model.id;
     selectedReasoningEffort.value = defaultReasoningEffort(model);
     selectedServiceTier.value = defaultServiceTier(model);
-    rememberActive();
+    rememberSelection();
   }
 
   function selectReasoningEffort(reasoningEffort: ReasoningEffort): void {
     const model = selectedModel.value;
     if (!model?.supportedReasoningEfforts?.some((option) => option.reasoningEffort === reasoningEffort)) return;
     selectedReasoningEffort.value = reasoningEffort;
-    rememberActive();
+    rememberSelection();
   }
 
   function selectServiceTier(serviceTier: string | null): void {
     const model = selectedModel.value;
     if (!model || (serviceTier !== null && !model.serviceTiers?.some((tier) => tier.id === serviceTier))) return;
     selectedServiceTier.value = serviceTier;
+    rememberSelection();
+  }
+
+  function rememberSelection(): void {
+    const agentId = snapshot().activeAgentId;
+    const agent = snapshot().agents.find((candidate) => candidate.id === agentId);
+    if (!agentId || !agent || !selectedModel.value) return;
+    const backend = agent.backend;
+    const selection: AgentModelSelection = {
+      model: selectedModel.value.model,
+      reasoningEffort: selectedReasoningEffort.value,
+      serviceTier: selectedServiceTier.value,
+    };
+    configuration(agentId).pendingSelection = selection;
     rememberActive();
+    if (!options.persistSelection) return;
+    const previous = selectionSavesByAgentId.get(agentId) ?? Promise.resolve();
+    const save = previous.then(() => {
+      if (snapshot().agents.find((candidate) => candidate.id === agentId)?.backend !== backend) return;
+      return options.persistSelection!(agentId, selection);
+    }).then(() => {
+      const current = configurationByAgentId.get(agentId);
+      if (current && sameSelection(current.pendingSelection, selection)) {
+        current.pendingSelection = null;
+        const savedAgent = snapshot().agents.find((candidate) => candidate.id === agentId);
+        if (savedAgent) synchronizeSelectionWithAgent(current, savedAgent);
+      }
+    }).catch((error: unknown) => {
+      options.onSelectionSaveError?.(error);
+    });
+    selectionSavesByAgentId.set(agentId, save);
+    void save.finally(() => {
+      if (selectionSavesByAgentId.get(agentId) === save) selectionSavesByAgentId.delete(agentId);
+    });
   }
 
   function setPlanMode(enabled: boolean): void {
@@ -460,10 +502,13 @@ export function createAgentComposerState(options: { getSnapshot: () => AppSnapsh
       const settings = event.payload.settings;
       if (!agentId) return;
       const current = configuration(agentId);
-      if (settings.model !== undefined) current.selectedModelId = settings.model;
-      if (settings.reasoningEffort !== undefined) current.selectedReasoningEffort = settings.reasoningEffort;
-      if ('serviceTier' in settings && settings.serviceTier !== undefined) {
-        current.selectedServiceTier = settings.serviceTier;
+      const agent = snapshot().agents.find((candidate) => candidate.id === agentId);
+      if (!current.pendingSelection && agent?.backendDefaults?.userSelectedModel !== true) {
+        if (settings.model !== undefined) current.selectedModelId = settings.model;
+        if (settings.reasoningEffort !== undefined) current.selectedReasoningEffort = settings.reasoningEffort;
+        if ('serviceTier' in settings && settings.serviceTier !== undefined) {
+          current.selectedServiceTier = settings.serviceTier;
+        }
       }
       if (agentId === snapshot().activeAgentId) restore(agentId);
       return;
@@ -570,9 +615,10 @@ function selectionFromAgent(agent: Agent | undefined): {
 } {
   if (!agent) return { source: 'missing', model: null, reasoningEffort: null, serviceTier: null };
   const defaults = agent.backendDefaults?.kind === agent.backend ? agent.backendDefaults : undefined;
+  const preferred = defaults?.userSelectedModel === true ? defaults : undefined;
   const claudeSession = agent.backendSession?.kind === 'claude' ? agent.backendSession : undefined;
-  const model = claudeSession?.model ?? defaults?.model ?? null;
-  const reasoningEffort = claudeSession?.reasoningEffort ?? defaults?.reasoningEffort ?? null;
+  const model = preferred?.model ?? claudeSession?.model ?? defaults?.model ?? null;
+  const reasoningEffort = preferred ? preferred.reasoningEffort ?? null : claudeSession?.reasoningEffort ?? defaults?.reasoningEffort ?? null;
   const serviceTier = defaults?.kind === 'codex' ? defaults.serviceTier ?? null : null;
   const sessionId = agent.backendSession?.kind === 'codex'
     ? agent.backendSession.threadId
@@ -587,6 +633,11 @@ function selectionFromAgent(agent: Agent | undefined): {
 
 function synchronizeSelectionWithAgent(configuration: AgentComposerConfiguration, agent: Agent): void {
   const selection = selectionFromAgent(agent);
+  if (configuration.backend !== agent.backend) configuration.pendingSelection = null;
+  else if (configuration.pendingSelection) {
+    if (agent.backendDefaults?.userSelectedModel !== true || !sameSelection(configuration.pendingSelection, selection)) return;
+    configuration.pendingSelection = null;
+  }
   if (configuration.selectionSource === selection.source) return;
   if (configuration.backend !== agent.backend) {
     configuration.models = [];
@@ -604,6 +655,11 @@ function synchronizeSelectionWithAgent(configuration: AgentComposerConfiguration
   configuration.selectedReasoningEffort = selection.reasoningEffort;
   configuration.selectedServiceTier = selection.serviceTier;
   if (configuration.modelStatus === 'loaded') selectDefaultModel(configuration);
+}
+
+function sameSelection(left: AgentModelSelection | null | undefined, right: { model: string | null; reasoningEffort: ReasoningEffort | null; serviceTier: string | null } | null | undefined): boolean {
+  return Boolean(left && right && left.model === right.model &&
+    left.reasoningEffort === right.reasoningEffort && left.serviceTier === right.serviceTier);
 }
 
 function modelMatchesSelection(model: BackendModelOption, selection: string | null): boolean {

@@ -2884,6 +2884,14 @@ function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
     id: requireString(input.id, 'agent id'),
   };
   if (input.backend !== undefined) result.backend = requireAgentBackend(input.backend);
+  if ('modelSelection' in input) {
+    const selection = requireRecord(input.modelSelection);
+    result.modelSelection = {
+      model: requireString(selection.model, 'composer model'),
+      reasoningEffort: selection.reasoningEffort === null ? null : requireString(selection.reasoningEffort, 'composer reasoning effort'),
+      serviceTier: selection.serviceTier === null ? null : requireString(selection.serviceTier, 'composer service tier'),
+    };
+  }
   if ('name' in input) {
     result.name = input.name === null ? null : requireString(input.name, 'agent name');
   }
@@ -2892,8 +2900,8 @@ function requireAgentUpdateInput(params: unknown): UpdateAgentInput {
       ? null
       : requireAgentGitDiffTarget(input.gitDiffTarget);
   }
-  if (result.name === undefined && result.gitDiffTarget === undefined && result.backend === undefined) {
-    throw new Error('Agent update must include a name, backend, or Git diff target.');
+  if (result.name === undefined && result.gitDiffTarget === undefined && result.backend === undefined && result.modelSelection === undefined) {
+    throw new Error('Agent update must include a name, backend, model selection, or Git diff target.');
   }
   return result;
 }

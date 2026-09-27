@@ -110,15 +110,16 @@ export function applyRuntimeEventToSnapshot(
         const defaults = agent.backendDefaults?.kind === event.backend
           ? agent.backendDefaults
           : { kind: event.backend };
+        const keepUserSelection = agent.backendDefaults?.kind === event.backend && agent.backendDefaults.userSelectedModel === true;
         agent.backendDefaults = {
           ...defaults,
-          ...(payload.settings.model !== undefined
+          ...(!keepUserSelection && payload.settings.model !== undefined
             ? { model: payload.settings.model }
             : {}),
-          ...(payload.settings.reasoningEffort !== undefined
+          ...(!keepUserSelection && payload.settings.reasoningEffort !== undefined
             ? { reasoningEffort: payload.settings.reasoningEffort }
             : {}),
-          ...(payload.settings.serviceTier !== undefined
+          ...(!keepUserSelection && payload.settings.serviceTier !== undefined
             ? { serviceTier: payload.settings.serviceTier }
             : {}),
           ...(payload.settings.permissionMode !== undefined ? { permissionMode: payload.settings.permissionMode } : {}),

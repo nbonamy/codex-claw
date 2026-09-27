@@ -1,6 +1,7 @@
 
 import { translate } from './i18n';
 import { computed, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import type { PlanReviewResolution } from '@codex-claw/core/plan-review';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow } from '@codex-claw/core/contracts';
 import type { AgentCreationProgress } from '@codex-claw/core/contracts';
@@ -98,7 +99,16 @@ const {
   repositoriesByProvider: workRepositoriesByProvider,
   status: workBacklogStatus,
 } = workProviders;
-const agentComposer = createAgentComposerState({ getSnapshot: () => snapshot.value });
+const agentComposer = createAgentComposerState({
+  getSnapshot: () => snapshot.value,
+  persistSelection: async (agentId, modelSelection) => {
+    const api = codexClawApi;
+    if (!api?.updateAgent) throw new Error('Agent settings are unavailable.');
+    const updated = await api.updateAgent({ id: agentId, modelSelection });
+    if (api === codexClawApi) adoptBackgroundSnapshot(updated);
+  },
+  onSelectionSaveError: (error) => ElMessage.error(error instanceof Error ? error.message : String(error)),
+});
 const {
   agentFiles,
   backendModels,

@@ -28,6 +28,7 @@ export type BackendDefaults =
   | {
     kind: 'codex';
     model?: string;
+    userSelectedModel?: boolean;
     approvalPreset?: CodexApprovalPreset;
     approvalPolicy?: string;
     approvalsReviewer?: CodexApprovalsReviewer;
@@ -38,6 +39,7 @@ export type BackendDefaults =
   | {
     kind: 'claude';
     model?: string;
+    userSelectedModel?: boolean;
     reasoningEffort?: ReasoningEffort;
     permissionMode?: string;
     thinking?: {
@@ -45,6 +47,12 @@ export type BackendDefaults =
       budgetTokens?: number;
     };
   };
+
+export type AgentModelSelection = {
+  model: string;
+  reasoningEffort: ReasoningEffort | null;
+  serviceTier: string | null;
+};
 
 export type CodexThreadSettings = {
   cwd?: string;

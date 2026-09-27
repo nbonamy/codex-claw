@@ -79,6 +79,7 @@ function expectBackendDefaults(value: unknown, path: string): void {
   ['model', 'reasoningEffort'].forEach((key) =>
     expectOptional(value, key, path, expectString),
   );
+  expectOptional(value, 'userSelectedModel', path, expectBoolean);
   if (value.kind === 'codex') {
     expectOptional(
       value,

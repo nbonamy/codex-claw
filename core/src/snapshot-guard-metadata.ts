@@ -197,6 +197,7 @@ function isBackendDefaults(value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (value.kind === 'codex') {
     return optional(value, 'model', isString) &&
+      optional(value, 'userSelectedModel', isBoolean) &&
       optional(value, 'approvalPreset', isApprovalPreset) &&
       optional(value, 'approvalPolicy', isString) &&
       optional(value, 'approvalsReviewer', isApprovalsReviewer) &&
@@ -206,6 +207,7 @@ function isBackendDefaults(value: unknown): boolean {
   }
   return value.kind === 'claude' &&
     optional(value, 'model', isString) &&
+    optional(value, 'userSelectedModel', isBoolean) &&
     optional(value, 'reasoningEffort', isString) &&
     optional(value, 'permissionMode', isString) &&
     optional(value, 'thinking', isThinkingDefaults);

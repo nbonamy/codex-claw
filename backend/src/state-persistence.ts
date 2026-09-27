@@ -1364,12 +1364,13 @@ function sanitizeBackendDefaults(value: unknown, expectedBackend: AgentBackend):
     const defaults = {
       kind: 'codex',
       ...(typeof value.model === 'string' ? { model: value.model } : {}),
+      ...(value.userSelectedModel === true ? { userSelectedModel: true } : {}),
       ...(isCodexApprovalPreset(value.approvalPreset) ? { approvalPreset: value.approvalPreset } : {}),
       ...(typeof value.approvalPolicy === 'string' ? { approvalPolicy: value.approvalPolicy } : {}),
       ...(isCodexApprovalsReviewer(value.approvalsReviewer) ? { approvalsReviewer: value.approvalsReviewer } : {}),
       ...(typeof value.sandboxMode === 'string' ? { sandboxMode: value.sandboxMode } : {}),
       ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
-      ...(typeof value.serviceTier === 'string' ? { serviceTier: value.serviceTier } : {}),
+      ...(value.serviceTier === null || typeof value.serviceTier === 'string' ? { serviceTier: value.serviceTier } : {}),
     } satisfies BackendDefaults;
     return defaults.kind === expectedBackend ? defaults : undefined;
   }
@@ -1379,6 +1380,7 @@ function sanitizeBackendDefaults(value: unknown, expectedBackend: AgentBackend):
     const defaults = {
       kind: 'claude',
       ...(typeof value.model === 'string' ? { model: value.model } : {}),
+      ...(value.userSelectedModel === true ? { userSelectedModel: true } : {}),
       ...(typeof value.reasoningEffort === 'string' ? { reasoningEffort: value.reasoningEffort } : {}),
       ...(typeof value.permissionMode === 'string' ? { permissionMode: value.permissionMode } : {}),
       ...(thinking ? { thinking } : {}),
