@@ -4,6 +4,15 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.23.2] - 2026-09-26
+
+### Improvements and fixes
+
+- Model, reasoning-effort, and service-tier choices now persist across restarts
+  and stay selected when an older thread reports its settings. Queued prompts
+  keep the choices captured when they were submitted.
+- The model submenu closes after a model is selected.
+
 ## [0.23.1] - 2026-09-26
 
 ### Improvements and fixes

@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.23.1",
+  "currentVersion": "0.23.2",
   "releases": [
+    {
+      "version": "0.23.2",
+      "releasedAt": "2026-09-26",
+      "sourceSha256": "568055e59ff8b74d7fc4a93a6ebe955ae02b9c2203dd04b1a57cd4cb21613883",
+      "markdown": "### Improvements and fixes\n\n- Model, reasoning-effort, and service-tier choices now persist across restarts\n  and stay selected when an older thread reports its settings. Queued prompts\n  keep the choices captured when they were submitted.\n- The model submenu closes after a model is selected."
+    },
     {
       "version": "0.23.1",
       "releasedAt": "2026-09-26",
