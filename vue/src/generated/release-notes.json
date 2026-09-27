@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.23.2",
+  "currentVersion": "0.23.3",
   "releases": [
+    {
+      "version": "0.23.3",
+      "releasedAt": "2026-09-26",
+      "sourceSha256": "c8119b8bda97aea655e78817688d8711b8b7ebce59e8813143839e6533d5a254",
+      "markdown": "### Improvements and fixes\n\n- Cmd+Enter now submits typed answers to agent questions, while Enter still\n  inserts a newline."
+    },
     {
       "version": "0.23.2",
       "releasedAt": "2026-09-26",

@@ -4,6 +4,13 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.23.3] - 2026-09-26
+
+### Improvements and fixes
+
+- Cmd+Enter now submits typed answers to agent questions, while Enter still
+  inserts a newline.
+
 ## [0.23.2] - 2026-09-26
 
 ### Improvements and fixes
