@@ -1,5 +1,6 @@
 
 import { translate } from './i18n';
+import { localizedErrorMessage } from './i18n/errors';
 import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { PlanReviewResolution } from '@codex-claw/core/plan-review';
@@ -1426,7 +1427,11 @@ export function useAppState() {
       return;
     }
 
-    adoptNavigationSnapshot(await codexClawApi.moveAgentToTeam(input));
+    try {
+      adoptNavigationSnapshot(await codexClawApi.moveAgentToTeam(input));
+    } catch (error) {
+      ElMessage.error(localizedErrorMessage(error, translate));
+    }
   }
 
   async function reorderAgents(input: ReorderAgentsInput): Promise<void> {

@@ -237,8 +237,16 @@ describe('agent-manager', () => {
     expect(removeWorkItemAssignmentFromSnapshot(snapshot, firstItem)).toBe(false);
   });
 
-  it('moves an idle agent to another team and selects it there', () => {
+  it.each([
+    { type: 'idle' },
+    { type: 'working' },
+    { type: 'awaitingInput' },
+    { type: 'error', message: 'Turn failed' },
+  ] satisfies Agent['status'][])('moves a $type agent to another team without changing its session or runtime state', (status) => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0].status = status;
+    snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-running' };
+    const before = structuredClone(snapshot.agents[0]);
     snapshot.teams.push({
       id: 'team-skwad',
       name: 'Skwad',
@@ -247,8 +255,8 @@ describe('agent-manager', () => {
       agentIds: [],
     });
 
-    expect(moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'team-skwad', '2026-06-05T10:11:12.000Z')).toMatchObject({
-      id: 'agent-dina',
+    expect(moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'team-skwad', '2026-06-05T10:11:12.000Z')).toStrictEqual({
+      ...before,
       teamId: 'team-skwad',
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
@@ -463,12 +471,11 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina']);
   });
 
-  it('rejects restart and move while an agent is busy but still allows close', () => {
+  it('rejects restart and resume while an agent is busy but still allows close', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
     expect(() => restartAgentConversation(snapshot, 'agent-dina')).toThrow('Agent must be idle before restarting.');
     expect(() => resumeAgentConversationInSnapshot(snapshot, 'agent-dina', { kind: 'codex', threadId: 'thread-new' })).toThrow('Agent must be idle before resuming a conversation.');
-    expect(() => moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'team-codex-claw')).toThrow('Agent must be idle before moving.');
     expect(closeAgentInSnapshot(snapshot, 'agent-dina')).toMatchObject({ id: 'agent-dina' });
     expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual(['agent-jesse']);
   });

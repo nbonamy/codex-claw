@@ -1,6 +1,7 @@
 import { approvalAgentRequest } from '@codex-claw/core/agent-request';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { nextTick, reactive } from 'vue';
+import { ElMessage } from 'element-plus';
 import { useAppState } from '../app-state';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { AppSnapshot, CodexClawApi, DevicePairingSession, MainToRendererEvent, SourceRepository } from '@codex-claw/core/contracts';
@@ -676,6 +677,24 @@ describe('useAppState', () => {
     expect(state.snapshot.value).toStrictEqual(closedTeamSnapshot);
   });
 
+
+  it('shows a failed team move as a toast and preserves the current membership and selection', async () => {
+    const initialSnapshot = createInitialSnapshot();
+    initialSnapshot.teams.push({ id: 'team-other', name: 'Other', agentIds: [] });
+    const moveAgentToTeam = vi.fn().mockRejectedValue(new Error('Unable to save team membership.'));
+    stubElectronTestWindow({ codexClaw: { moveAgentToTeam } });
+    const state = useAppState();
+    state.snapshot.value = structuredClone(initialSnapshot);
+
+    try {
+      await expect(state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-other' })).resolves.toBeUndefined();
+      await nextTick();
+      expect(document.querySelector('.el-message--error')?.textContent).toContain('Unable to save team membership.');
+      expect(state.snapshot.value).toStrictEqual(structuredClone(initialSnapshot));
+    } finally {
+      ElMessage.closeAll();
+    }
+  });
 
   it('allows removing a sole local remote pointer and adopts the backend fallback team', async () => {
     const remotePointerSnapshot = createInitialSnapshot();

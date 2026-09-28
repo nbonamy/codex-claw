@@ -416,7 +416,6 @@ export function moveAgentToTeamInSnapshot(snapshot: AppSnapshot, agentId: string
     return null;
   }
 
-  ensureAgentCanChange(agent, 'Agent must be idle before moving.');
   for (const team of snapshot.teams) {
     team.agentIds = team.agentIds.filter((candidate) => candidate !== agentId);
     if (team.activeAgentId === agentId) {
