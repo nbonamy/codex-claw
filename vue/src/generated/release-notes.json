@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.24.0",
+  "currentVersion": "0.24.1",
   "releases": [
+    {
+      "version": "0.24.1",
+      "releasedAt": "2026-09-27",
+      "sourceSha256": "2928bc848a5d7766cbf396609f34e9300b639e2940d879cf4ff144a6fe75fc04",
+      "markdown": "### Improvements and fixes\n\n- Fixed an application freeze when attaching an agent whose conversation had\n  not yet been opened since launch."
+    },
     {
       "version": "0.24.0",
       "releasedAt": "2026-09-27",

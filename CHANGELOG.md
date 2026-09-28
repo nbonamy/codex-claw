@@ -4,6 +4,13 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.24.1] - 2026-09-27
+
+### Improvements and fixes
+
+- Fixed an application freeze when attaching an agent whose conversation had
+  not yet been opened since launch.
+
 ## [0.24.0] - 2026-09-27
 
 ### New features
