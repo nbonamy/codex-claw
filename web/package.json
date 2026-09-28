@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/web",
-  "version": "0.23.3",
+  "version": "0.24.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@codex-app-sdk/web": "latest",
-    "@codex-claw/core": "0.23.3",
-    "@codex-claw/vue": "0.23.3",
+    "@codex-claw/core": "0.24.0",
+    "@codex-claw/vue": "0.24.0",
     "express": "^5.1.0",
     "vue": "^3.5.35",
     "ws": "^8.18.0"

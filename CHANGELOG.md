@@ -4,6 +4,31 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.24.0] - 2026-09-27
+
+### New features
+
+- Attach another agent to the current agent from its context menu to open its
+  conversation and composer in a sidebar tab. Its files, diffs, and reviews open
+  alongside it; selecting the attached agent returns to its containing workspace.
+- Attached conversations have a collapsible header with status and Git stats
+  in compact mode, and Git and Open In controls when expanded.
+
+### Improvements and fixes
+
+- Agents can move between teams while working or waiting for input without
+  interrupting their session. Moving either agent breaks its sidebar attachment,
+  and failed moves now show an error message.
+- Sending a prompt resumes following the conversation as replies stream in.
+  Scrolling away pauses following, and the jump-to-bottom button reflects the
+  actual scroll position.
+- Enter now submits typed answers to agent questions; Shift+Enter inserts a
+  newline.
+- Escape no longer interrupts a conversation pane that has been removed.
+- Model selector submenu text is more compact.
+- Independent review handoffs no longer request a redundant summary of fixes
+  already shown to the user.
+
 ## [0.23.3] - 2026-09-26
 
 ### Improvements and fixes

@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.23.3",
+  "currentVersion": "0.24.0",
   "releases": [
+    {
+      "version": "0.24.0",
+      "releasedAt": "2026-09-27",
+      "sourceSha256": "6ede9f106ce5a70c7b48e0cc5244e05e9c8acc297c33936c063fe65d8bad2426",
+      "markdown": "### New features\n\n- Attach another agent to the current agent from its context menu to open its\n  conversation and composer in a sidebar tab. Its files, diffs, and reviews open\n  alongside it; selecting the attached agent returns to its containing workspace.\n- Attached conversations have a collapsible header with status and Git stats\n  in compact mode, and Git and Open In controls when expanded.\n\n### Improvements and fixes\n\n- Agents can move between teams while working or waiting for input without\n  interrupting their session. Moving either agent breaks its sidebar attachment,\n  and failed moves now show an error message.\n- Sending a prompt resumes following the conversation as replies stream in.\n  Scrolling away pauses following, and the jump-to-bottom button reflects the\n  actual scroll position.\n- Enter now submits typed answers to agent questions; Shift+Enter inserts a\n  newline.\n- Escape no longer interrupts a conversation pane that has been removed.\n- Model selector submenu text is more compact.\n- Independent review handoffs no longer request a redundant summary of fixes\n  already shown to the user."
+    },
     {
       "version": "0.23.3",
       "releasedAt": "2026-09-26",

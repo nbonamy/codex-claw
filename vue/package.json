@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/vue",
-  "version": "0.23.3",
+  "version": "0.24.0",
   "description": "Reusable Vue product shell for Codex Claw hosts.",
   "private": true,
   "type": "module",
@@ -31,7 +31,7 @@
   "dependencies": {
     "@codex-app-sdk/core": "latest",
     "@codex-app-sdk/vue": "latest",
-    "@codex-claw/core": "0.23.3",
+    "@codex-claw/core": "0.24.0",
     "@excalidraw/excalidraw": "0.18.1",
     "@excalidraw/mermaid-to-excalidraw": "2.2.2",
     "@tabler/icons-vue": "^3.44.0",
