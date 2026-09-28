@@ -384,6 +384,30 @@ describe('AgentSidebar actions', () => {
     }
   });
 
+  it('places attachment directly above Open In for another agent', async () => {
+    const wrapper = mount(AgentSidebar, {
+      props: {
+        agents: agents.map((agent) => ({ ...agent, teamId: 'team-codex-claw' })),
+        activeAgentId: 'agent-dina',
+        teamName: 'Codex Claw',
+        openInCatalog: {
+          defaultApplication: 'vscode',
+          applications: [{ id: 'vscode', label: 'Visual Studio Code' }],
+        },
+      },
+      global: { components: { ElPopover } },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[1]!.trigger('contextmenu');
+    const labels = portaledMenuItems().map((item) => item.textContent?.trim());
+    const attachIndex = labels.indexOf('Attach to Current Agent');
+    expect(attachIndex).toBeGreaterThan(-1);
+    expect(labels[attachIndex + 1]).toBe('Open In…');
+
+    await clickPortaledMenuItem('Attach to Current Agent');
+    expect(wrapper.emitted('attach-to-current-agent')).toStrictEqual([['agent-jesse']]);
+  });
+
   it('opens an agent folder from the context menu application list', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {

@@ -4,6 +4,32 @@ import { createAgentComposerState } from '../agent-composer-state';
 import { stubElectronTestWindow } from '../test/client';
 
 describe('composer catalog locations', () => {
+  it('uses attached agent model settings for its next prompt without changing the main agent', async () => {
+    const snapshot = createInitialSnapshot();
+    const hostId = snapshot.agents[0]!.id;
+    const guestId = snapshot.agents[1]!.id;
+    snapshot.activeAgentId = hostId;
+    const model = (id: string) => ({
+      id, model: id, displayName: id, isDefault: id.endsWith('default'),
+      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Medium' }, { reasoningEffort: 'high', description: 'High' }],
+    });
+    stubElectronTestWindow({ codexClaw: {
+      listBackendModels: vi.fn(async () => [model('shared-default'), model('guest-high')]),
+    } });
+    const composer = createAgentComposerState({ getSnapshot: () => snapshot });
+    await composer.loadModels(hostId);
+    await composer.loadModels(guestId);
+    const originalHostModel = composer.selectedModelId.value;
+
+    composer.selectModelForAgent(guestId, 'guest-high');
+    composer.selectReasoningEffortForAgent(guestId, 'high');
+
+    expect(composer.selectedModelId.value).toBe(originalHostModel);
+    expect(composer.resolvePromptOptions(guestId, 'review this')).toMatchObject({ model: 'guest-high', reasoningEffort: 'high' });
+    expect(composer.resolvePromptOptions(hostId, 'continue')).toMatchObject({ model: 'shared-default' });
+  });
+
   it('keeps a fresh backend switch isolated from an outstanding old-provider catalog', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

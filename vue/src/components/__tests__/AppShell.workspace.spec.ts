@@ -15,6 +15,9 @@ import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-co
 import { useConfetti } from '../../shared/confetti/use-confetti';
 
 import {
+  clickPortaledMenuItem,
+} from './agent-sidebar-test-harness';
+import {
   conversationControllerActions,
   mountShell as mountRealShell,
   readyBrowserGuest,
@@ -47,6 +50,35 @@ afterEach(() => {
 });
 
 describe('AppShell workspace and plans', () => {
+  it('attaches a second agent as a tab, routes selection to the host, and releases it on close', async () => {
+    const snapshot = createInitialSnapshot();
+    const wrapper = mount(AppShell, {
+      props: {
+        snapshot,
+        activeAgent: snapshot.agents[0],
+        isLoading: false,
+        isSending: false,
+      },
+      global: { plugins: [i18n] },
+    });
+
+    await wrapper.findAll('.agent-sidebar__agent')[1]!.trigger('contextmenu');
+    await clickPortaledMenuItem('Attach to Current Agent');
+
+    expect(wrapper.get('[role="tab"]').text()).toContain('Jesse');
+    expect(wrapper.find('.app-shell__right-workspace').isVisible()).toBe(true);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+
+    await wrapper.setProps({ activeAgent: snapshot.agents[1] });
+    await wrapper.findAll('.agent-sidebar__agent')[1]!.trigger('click');
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-dina']]);
+
+    await wrapper.setProps({ activeAgent: snapshot.agents[0] });
+    await wrapper.get('[aria-label="Close Jesse tab"]').trigger('click');
+    await wrapper.findAll('.agent-sidebar__agent')[1]!.trigger('click');
+    expect(wrapper.emitted('select-agent')).toStrictEqual([['agent-dina'], ['agent-jesse']]);
+  });
+
   it('opens the empty workspace launcher before preserving a selected Browser tab', async () => {
     const snapshot = createInitialSnapshot();
     vi.stubGlobal('ResizeObserver', class {

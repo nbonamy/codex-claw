@@ -18,6 +18,32 @@ describe('useAppState', () => {
     vi.useRealTimers();
   });
 
+  it('reloads a background agent catalog after a provider switch without changing the active agent', async () => {
+    let remote = createInitialSnapshot();
+    const hostId = remote.agents[0]!.id;
+    const guestId = remote.agents[1]!.id;
+    const listBackendModels = vi.fn(async (id: string) => {
+      const backend = remote.agents.find(agent => agent.id === id)!.backend;
+      return [{ id: `${backend}-model`, model: `${backend}-model`, displayName: backend, isDefault: true }];
+    });
+    stubElectronTestWindow({ codexClaw: {
+      getSnapshot: async () => structuredClone(remote),
+      listBackendModels,
+      updateAgent: async input => {
+        remote = { ...remote, agents: remote.agents.map(agent => agent.id === input.id ? { ...agent, backend: input.backend! } : agent) };
+        return structuredClone(remote);
+      },
+    } satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.prepareAgentConversation(guestId);
+    expect(state.agentConversationFor(guestId)?.composer.models[0]?.id).toBe('codex-model');
+    await state.updateAgent({ id: guestId, backend: 'claude' });
+    expect(state.agentConversationFor(guestId)?.composer.models[0]?.id).toBe('claude-model');
+    expect(state.agentConversationFor(hostId)?.composer.models[0]?.id).toBe('codex-model');
+    expect(state.snapshot.value.activeAgentId).toBe(hostId);
+  });
+
   it('updates settings and forwards app quit and restart through the preload bridge', async () => {
     const remoteSnapshot = createInitialSnapshot();
     const updatedSnapshot = createInitialSnapshot();

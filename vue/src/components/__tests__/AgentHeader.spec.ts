@@ -85,6 +85,49 @@ describe('AgentHeader', () => {
     expect(wrapper.get('[aria-label="Run Git action"]').element.tagName).toBe('BUTTON');
   });
 
+  it('collapses an attached header to status, plain Git stats, and an expand control', async () => {
+    const wrapper = mount(AgentHeader, {
+      props: {
+        agent,
+        gitStatus: {
+          folder: '/Users/nbonamy/src/id8', branch: 'main', ahead: 0, behind: 0,
+          changedFiles: 1, addedLines: 12, removedLines: 3, hasUntracked: false,
+          state: 'dirty', updatedAt: '2026-06-05T00:00:00.000Z',
+        },
+        backendRuntime: { backend: 'codex', status: 'running' },
+        isLoading: false,
+        sidebarCollapsed: false,
+        showWorkspaceToggle: false,
+        compact: true,
+        collapsible: true,
+        collapsed: true,
+        openInAvailable: true,
+        openInCatalog: {
+          defaultApplication: 'vscode',
+          applications: [{ id: 'vscode', label: 'VS Code', iconDataUrl: '' }],
+        },
+      },
+    });
+
+    expect(wrapper.find('.agent-header__identity').exists()).toBe(false);
+    expect(wrapper.get('.agent-header__collapsed-status').text()).toContain('Ready to get going');
+    expect(wrapper.find('.agent-header__collapsed-status .agent-header__inline-dot').exists()).toBe(false);
+    expect(wrapper.get('.agent-header__collapsed-stats').text()).toContain('+12');
+    expect(wrapper.get('.agent-header__collapsed-stats').text()).toContain('-3');
+    expect(wrapper.find('.agent-header__collapsed-stats button').exists()).toBe(false);
+    expect(wrapper.find('.git-diff-control').exists()).toBe(false);
+    expect(wrapper.find('.open-in-control').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Toggle right workspace"]').exists()).toBe(false);
+
+    await wrapper.get('[aria-label="Expand agent header"]').trigger('click');
+    expect(wrapper.emitted('toggle-collapse')).toStrictEqual([[]]);
+    await wrapper.setProps({ collapsed: false });
+    expect(wrapper.get('.agent-header__identity').text()).toContain('Dina');
+    expect(wrapper.find('.git-diff-control').exists()).toBe(true);
+    expect(wrapper.find('.open-in-control').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Collapse agent header"]').exists()).toBe(true);
+  });
+
   it('shows the canonical repository name for a linked worktree', () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
       folder: '/Users/nbonamy/src/codex-claw-git-fixture-test',

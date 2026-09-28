@@ -1,7 +1,7 @@
 <template>
   <header
     class="agent-header"
-    :class="{ 'agent-header--with-sidebar-edge': !sidebarCollapsed }"
+    :class="{ 'agent-header--with-sidebar-edge': !sidebarCollapsed, 'agent-header--compact': compact, 'agent-header--collapsed': collapsible && collapsed }"
   >
     <button
       v-if="sidebarCollapsed"
@@ -14,7 +14,7 @@
     </button>
 
     <div
-      v-if="agent"
+      v-if="agent && !(collapsible && collapsed)"
       class="agent-header__identity"
     >
       <AgentAvatar
@@ -46,13 +46,17 @@
       </div>
     </div>
     <div
-      v-else
+      v-else-if="!agent"
       class="agent-header__identity"
     >
       <strong>{{ $t('surface.agentHeader.noAgent') }}</strong>
     </div>
 
-    <div class="agent-header__activity">
+    <div v-if="collapsible && collapsed && agent" class="agent-header__collapsed-status">
+      <span>{{ agentStatusDetail }}</span>
+    </div>
+
+    <div v-if="!(collapsible && collapsed)" class="agent-header__activity">
       <GitDiffControl
         v-if="gitReviewAvailable && agent && gitStatus"
         class="agent-header__git-status"
@@ -101,6 +105,7 @@
         <ListIcon aria-hidden="true" />
       </button>
       <button
+        v-if="showWorkspaceToggle"
         class="agent-header__workspace"
         type="button"
         :aria-label="$t('surface.agentHeader.toggleRightWorkspace')"
@@ -116,6 +121,22 @@
         @install="emit('install-update')"
       />
     </div>
+    <div v-if="collapsible && collapsed && gitReviewAvailable && gitStatus" class="agent-header__collapsed-stats" :aria-label="$t('surface.gitReviewPanel.diffStatistics')">
+      <span class="agent-header__collapsed-added">+{{ gitStatus.addedLines }}</span>
+      <span class="agent-header__collapsed-removed">-{{ gitStatus.removedLines }}</span>
+    </div>
+    <button
+      v-if="collapsible"
+      class="agent-header__collapse-toggle"
+      type="button"
+      :aria-label="collapsed ? $t('surface.agentHeader.expandAttachedHeader') : $t('surface.agentHeader.collapseAttachedHeader')"
+      :title="collapsed ? $t('surface.agentHeader.expandAttachedHeader') : $t('surface.agentHeader.collapseAttachedHeader')"
+      :aria-expanded="!collapsed"
+      @click="emit('toggle-collapse')"
+    >
+      <IconChevronDown v-if="collapsed" aria-hidden="true" />
+      <IconChevronUp v-else aria-hidden="true" />
+    </button>
   </header>
 </template>
 
@@ -126,7 +147,7 @@ import { computed, ref } from 'vue';
 import type { Agent, AgentGitDiffTarget, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog, TurnGitDiff } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
-import { IconLayoutSidebarRight } from '@tabler/icons-vue';
+import { IconChevronDown, IconChevronUp, IconLayoutSidebarRight } from '@tabler/icons-vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
 import OpenInControl from '../shared/OpenInControl.vue';
@@ -135,7 +156,7 @@ import GitWorkflowControl from './GitWorkflowControl.vue';
 import GitDiffControl from './GitDiffControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   agent: Agent | null;
   repositoryIcon?: string;
   gitStatus?: AgentGitStatus | null;
@@ -144,6 +165,10 @@ const props = defineProps<{
   workspaceOpen?: boolean;
   isLoading: boolean;
   sidebarCollapsed: boolean;
+  compact?: boolean;
+  collapsible?: boolean;
+  collapsed?: boolean;
+  showWorkspaceToggle?: boolean;
   updateStatus?: DesktopUpdateStatus;
   executionPlanAvailable?: boolean;
   executionPlanOpen?: boolean;
@@ -159,7 +184,7 @@ const props = defineProps<{
   createGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   mergeGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
   updateGitBranchFromBase?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
-}>();
+}>(), { showWorkspaceToggle: true });
 
 const emit = defineEmits<{
   'expand-sidebar': [];
@@ -170,6 +195,7 @@ const emit = defineEmits<{
   'install-update': [];
   'open-in': [application: OpenInApplication];
   'select-subagent': [conversationId: string];
+  'toggle-collapse': [];
 }>();
 
 const gitWorkflowControl = ref<{
@@ -272,6 +298,83 @@ const gitReviewAvailable = computed(() => {
 
 .agent-header--with-sidebar-edge {
   box-shadow: var(--shadow-content-edge);
+}
+
+.agent-header--compact {
+  gap: var(--space-4);
+  padding-inline: var(--space-4);
+  -webkit-app-region: no-drag;
+}
+
+.agent-header--collapsed {
+  flex-basis: 40px;
+  min-height: 40px;
+}
+
+.agent-header__collapsed-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  overflow: hidden;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.agent-header__collapsed-status span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-header__collapsed-stats {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--space-3);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-header__collapsed-added {
+  color: var(--color-success);
+}
+
+.agent-header__collapsed-removed {
+  color: var(--color-error);
+}
+
+.agent-header__collapse-toggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.agent-header__collapse-toggle:hover {
+  background: var(--color-surface-high);
+  color: var(--color-text);
+}
+
+.agent-header__collapse-toggle svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.agent-header--compact .agent-header__identity {
+  flex: 1 1 0;
+}
+
+.agent-header--compact .agent-header__activity {
+  flex: 0 0 auto;
 }
 
 .agent-header__identity {

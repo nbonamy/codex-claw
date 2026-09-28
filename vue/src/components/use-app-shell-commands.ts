@@ -29,6 +29,7 @@ type AppShellCommandOptions = {
     agents: () => Agent[];
     attachmentsEnabled: () => boolean;
     composerAttachments: () => readonly CodexNativeAttachment[];
+    composerAgent?: () => Agent | null;
     currentAgent: () => Agent | null;
     canReplaceConversation?: () => boolean;
     isAgentWorkspaceVisible: () => boolean;
@@ -48,7 +49,7 @@ type AppShellCommandOptions = {
     duplicateAgent: (agentId: string) => void;
     editAgent: (agentId: string) => void;
     forkAgent: (agentId: string) => void;
-    focusComposer: () => void;
+    focusComposer: (agentId?: string) => void;
     newTeam: () => void;
     openAgentSurface: () => void;
     openAgentPalette: () => void;
@@ -302,7 +303,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     if (command.type === 'open-agent-composer') {
       const agent = command.agentId
         ? options.state.agents().find((candidate) => candidate.id === command.agentId)
-        : currentAgent.value;
+        : options.state.composerAgent?.() ?? currentAgent.value;
       if (!agent) return;
       options.actions.openAgentSurface();
       options.actions.selectAgent(agent.id);
@@ -317,7 +318,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
           selectionEnd: command.prompt.length,
         });
       }
-      void nextTick(options.actions.focusComposer);
+      void nextTick(() => options.actions.focusComposer(agent.id));
       return;
     }
 
@@ -548,7 +549,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       options.actions.openAgentSurface();
       options.actions.updateComposerAttachments(agent.id, [...options.state.composerAttachments(), attachment]);
       await nextTick();
-      options.actions.focusComposer();
+      options.actions.focusComposer(agent.id);
     } catch {
       ElMessage.error(translate('surface.appShell.theAppshotCouldNotBeAttached'));
     }

@@ -6,7 +6,9 @@ export type RightWorkspaceFileTab = `file:${string}`;
 export type RightWorkspaceDiffTab = `diff:${string}`;
 export type RightWorkspaceImageTab = `image:${string}`;
 export type RightWorkspaceSubagentTab = `subagent:${string}`;
-export type RightWorkspaceTab = 'codeReview' | 'visualize' | 'review' | 'backlog' | 'browser' | 'files' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab | RightWorkspaceSubagentTab;
+export type RightWorkspaceArtifactTab = `artifact:${string}`;
+export type RightWorkspaceAgentTab = `agent:${string}`;
+export type RightWorkspaceTab = 'codeReview' | 'visualize' | 'review' | 'backlog' | 'browser' | 'files' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab | RightWorkspaceSubagentTab | RightWorkspaceAgentTab | RightWorkspaceArtifactTab;
 export type RightWorkspaceFilePanel = SidePanelMarkdownState | SidePanelSourceState;
 export type RightWorkspaceDiffPanel = SidePanelGitDiffState;
 export type RightWorkspaceImagePanel = SidePanelImageState;
@@ -65,4 +67,29 @@ export function isRightWorkspaceSubagentTab(tab: RightWorkspaceTab): tab is Righ
 
 export function rightWorkspaceSubagentConversationId(tab: RightWorkspaceSubagentTab): string {
   return decodeURIComponent(tab.slice('subagent:'.length));
+}
+
+export function rightWorkspaceAgentTab(agentId: string): RightWorkspaceAgentTab {
+  return `agent:${encodeURIComponent(agentId)}`;
+}
+
+export function isRightWorkspaceAgentTab(tab: RightWorkspaceTab): tab is RightWorkspaceAgentTab {
+  return tab.startsWith('agent:');
+}
+
+export function rightWorkspaceAgentId(tab: RightWorkspaceAgentTab): string {
+  return decodeURIComponent(tab.slice('agent:'.length));
+}
+
+export function rightWorkspaceArtifactTab(agentId: string, tab: RightWorkspaceTab): RightWorkspaceArtifactTab {
+  return `artifact:${encodeURIComponent(agentId)}:${encodeURIComponent(tab)}`;
+}
+
+export function isRightWorkspaceArtifactTab(tab: RightWorkspaceTab): tab is RightWorkspaceArtifactTab {
+  return tab.startsWith('artifact:');
+}
+
+export function rightWorkspaceArtifact(tab: RightWorkspaceArtifactTab): { agentId: string; tab: RightWorkspaceTab } {
+  const [, agentId, nestedTab] = tab.split(':');
+  return { agentId: decodeURIComponent(agentId!), tab: decodeURIComponent(nestedTab!) as RightWorkspaceTab };
 }

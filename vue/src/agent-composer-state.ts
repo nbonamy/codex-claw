@@ -15,11 +15,11 @@ import type {
   ReasoningEffort,
   RendererSendPromptOptions,
 } from '@codex-claw/core/contracts';
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { AsyncCatalogCache, type AsyncCatalogEntry, type AsyncCatalogStatus } from './async-catalog-cache';
 import { codexClawApi } from './platform-api';
 
-type AgentComposerConfiguration = {
+export type AgentComposerConfiguration = {
   backend: Agent['backend'] | undefined;
   selectionSource: string;
   models: BackendModelOption[];
@@ -73,7 +73,7 @@ export function createAgentComposerState(options: {
   const skillCache = new AsyncCatalogCache<string, BackendSkillSummary>((value) => ({ ...value }));
   const pluginCache = new AsyncCatalogCache<string, BackendPluginSummary>((value) => ({ ...value }));
   const fileCache = new AsyncCatalogCache<string, AgentFileSearchItem>((value) => ({ ...value }));
-  const configurationByAgentId = new Map<string, AgentComposerConfiguration>();
+  const configurationByAgentId = reactive(new Map<string, AgentComposerConfiguration>());
   const selectionSavesByAgentId = new Map<string, Promise<void>>();
   let catalogSessionSource: unknown = null;
 
@@ -192,11 +192,31 @@ export function createAgentComposerState(options: {
     rememberSelection();
   }
 
+  function selectModelForAgent(agentId: string, modelId: string): void {
+    if (agentId === snapshot().activeAgentId) return selectModel(modelId);
+    const current = configuration(agentId);
+    const model = current.models.find((candidate) => candidate.id === modelId);
+    if (!model) return;
+    current.selectedModelId = model.id;
+    current.selectedReasoningEffort = defaultReasoningEffort(model);
+    current.selectedServiceTier = defaultServiceTier(model);
+    rememberSelectionForAgent(agentId, model, current.selectedReasoningEffort, current.selectedServiceTier);
+  }
+
   function selectReasoningEffort(reasoningEffort: ReasoningEffort): void {
     const model = selectedModel.value;
     if (!model?.supportedReasoningEfforts?.some((option) => option.reasoningEffort === reasoningEffort)) return;
     selectedReasoningEffort.value = reasoningEffort;
     rememberSelection();
+  }
+
+  function selectReasoningEffortForAgent(agentId: string, reasoningEffort: ReasoningEffort): void {
+    if (agentId === snapshot().activeAgentId) return selectReasoningEffort(reasoningEffort);
+    const current = configuration(agentId);
+    const model = current.models.find((candidate) => candidate.id === current.selectedModelId);
+    if (!model?.supportedReasoningEfforts?.some((option) => option.reasoningEffort === reasoningEffort)) return;
+    current.selectedReasoningEffort = reasoningEffort;
+    rememberSelectionForAgent(agentId, model, reasoningEffort, current.selectedServiceTier);
   }
 
   function selectServiceTier(serviceTier: string | null): void {
@@ -206,18 +226,29 @@ export function createAgentComposerState(options: {
     rememberSelection();
   }
 
+  function selectServiceTierForAgent(agentId: string, serviceTier: string | null): void {
+    if (agentId === snapshot().activeAgentId) return selectServiceTier(serviceTier);
+    const current = configuration(agentId);
+    const model = current.models.find((candidate) => candidate.id === current.selectedModelId);
+    if (!model || (serviceTier !== null && !model.serviceTiers?.some((tier) => tier.id === serviceTier))) return;
+    current.selectedServiceTier = serviceTier;
+    rememberSelectionForAgent(agentId, model, current.selectedReasoningEffort, serviceTier);
+  }
+
   function rememberSelection(): void {
     const agentId = snapshot().activeAgentId;
     const agent = snapshot().agents.find((candidate) => candidate.id === agentId);
     if (!agentId || !agent || !selectedModel.value) return;
-    const backend = agent.backend;
-    const selection: AgentModelSelection = {
-      model: selectedModel.value.model,
-      reasoningEffort: selectedReasoningEffort.value,
-      serviceTier: selectedServiceTier.value,
-    };
-    configuration(agentId).pendingSelection = selection;
     rememberActive();
+    rememberSelectionForAgent(agentId, selectedModel.value, selectedReasoningEffort.value, selectedServiceTier.value);
+  }
+
+  function rememberSelectionForAgent(agentId: string, model: BackendModelOption, reasoningEffort: ReasoningEffort | null, serviceTier: string | null): void {
+    const agent = snapshot().agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return;
+    const backend = agent.backend;
+    const selection: AgentModelSelection = { model: model.model, reasoningEffort, serviceTier };
+    configuration(agentId).pendingSelection = selection;
     if (!options.persistSelection) return;
     const previous = selectionSavesByAgentId.get(agentId) ?? Promise.resolve();
     const save = previous.then(() => {
@@ -242,6 +273,11 @@ export function createAgentComposerState(options: {
   function setPlanMode(enabled: boolean): void {
     planMode.value = enabled;
     rememberActive();
+  }
+
+  function setPlanModeForAgent(agentId: string, enabled: boolean): void {
+    if (agentId === snapshot().activeAgentId) return setPlanMode(enabled);
+    configuration(agentId).planMode = enabled;
   }
 
   async function loadActive(agentId = snapshot().activeAgentId): Promise<void> {
@@ -522,27 +558,29 @@ export function createAgentComposerState(options: {
 
   function promptOptions(agentId: string, prompt: string): RendererSendPromptOptions | undefined {
     const isActiveAgent = agentId === snapshot().activeAgentId;
-    const model = isActiveAgent ? selectedModel.value : null;
-    const skills = isActiveAgent ? promptSkillInputsFromText(prompt, backendSkills.value) : [];
+    const current = configuration(agentId);
+    const models = isActiveAgent ? backendModels.value : current.models;
+    const model = models.find((candidate) => candidate.id === (isActiveAgent ? selectedModelId.value : current.selectedModelId)) ?? null;
+    const skills = promptSkillInputsFromText(prompt, isActiveAgent ? backendSkills.value : current.skills);
     const agent = snapshot().agents.find((candidate) => candidate.id === agentId) ?? null;
     const capabilities = capabilitiesForAgent(agent);
     const promptModel = capabilities.models ? model : null;
     const selectedSkills = capabilities.skills ? skills : [];
     const reasoningEffort = capabilities.reasoningEffort && promptModel
-      ? selectedReasoningEffort.value ?? defaultReasoningEffort(promptModel)
+      ? (isActiveAgent ? selectedReasoningEffort.value : current.selectedReasoningEffort) ?? defaultReasoningEffort(promptModel)
       : null;
     const serviceTier = capabilities.serviceTier && promptModel?.serviceTiers?.length
-      ? selectedServiceTier.value
+      ? (isActiveAgent ? selectedServiceTier.value : current.selectedServiceTier)
       : undefined;
     if (
       !promptModel &&
-      (capabilities.planMode === 'unsupported' || !isActiveAgent || !planMode.value) &&
+      (capabilities.planMode === 'unsupported' || !(isActiveAgent ? planMode.value : current.planMode)) &&
       !reasoningEffort && serviceTier === undefined && selectedSkills.length === 0
     ) return undefined;
     return {
       ...(promptModel ? { model: promptModel.model } : {}),
-      ...(capabilities.planMode === 'native' && isActiveAgent ? { planMode: planMode.value } : {}),
-      ...(capabilities.planMode === 'prompted' && isActiveAgent && planMode.value ? { planMode: true } : {}),
+      ...(capabilities.planMode === 'native' ? { planMode: isActiveAgent ? planMode.value : current.planMode } : {}),
+      ...(capabilities.planMode === 'prompted' && (isActiveAgent ? planMode.value : current.planMode) ? { planMode: true } : {}),
       ...(reasoningEffort ? { reasoningEffort } : {}),
       ...(serviceTier !== undefined ? { serviceTier } : {}),
       ...(selectedSkills.length > 0 ? { skills: selectedSkills } : {}),
@@ -578,13 +616,18 @@ export function createAgentComposerState(options: {
     resolvePromptOptions,
     restore,
     selectModel,
+    selectModelForAgent,
     selectedModel,
     selectedModelId,
     selectedReasoningEffort,
     selectedServiceTier,
     selectReasoningEffort,
+    selectReasoningEffortForAgent,
     selectServiceTier,
+    selectServiceTierForAgent,
     setPlanMode,
+    setPlanModeForAgent,
+    configurationForAgent: configuration,
     skillCatalogError,
     skillCatalogStatus,
     synchronizeAgentSelection,

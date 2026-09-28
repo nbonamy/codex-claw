@@ -126,6 +126,8 @@ export const surfaceMessages = {
     "openRepositoryBacklog": "Open repository backlog",
     "toggleExecutionPlan": "Toggle execution plan",
     "toggleRightWorkspace": "Toggle right workspace",
+    "expandAttachedHeader": "Expand agent header",
+    "collapseAttachedHeader": "Collapse agent header",
     "closeRightWorkspace": "Close right workspace",
     "openRightWorkspace": "Open right workspace",
     "loading": "Loading",

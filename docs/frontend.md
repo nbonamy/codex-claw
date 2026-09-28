@@ -173,6 +173,13 @@ provider snapshot. Never add a global message list or a provider-neutral
 conversation reducer to `app-state.ts`; Claw-only overlays should read the
 provider frame or consume an explicit coordination projection.
 
+Main and attached conversations render the same `AgentWorkspace`. Embedded
+presentation changes header chrome and suppresses nested workspace panels;
+`useAgentConversation` owns shared controller actions and annotation submission.
+Every conversation operation carries its owning agent ID. Attached artifacts
+retain their agent's workspace state and appear as scoped tabs in the containing
+workspace, so file previews, reviews, and browser content keep the right owner.
+
 For app-owned MCP icons, phase-aware titles, and bounded presentation metadata,
 follow [Custom MCP Tools](custom-tools.md).
 

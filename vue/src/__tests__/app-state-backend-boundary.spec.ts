@@ -33,6 +33,27 @@ describe('unified backend → app state request lifecycle', () => {
     expect(state.snapshot.value.agents.find((agent) => agent.id === other.id)?.planReview?.status).toBe('revise');
   });
 
+  it('routes attached-agent plan, flag, and goal operations without selecting it', async () => {
+    const snapshot = createInitialSnapshot();
+    const guest = snapshot.agents[1]!;
+    guest.threadFlags = { ready_for_review: true };
+    guest.planReview = { id: 'guest-plan', conversationId: null, turnId: 'turn', itemId: 'proposal', markdown: '# Guest plan', status: 'pending' };
+    const { api } = installBackendFixture(snapshot);
+    api.respondToPlanReview.mockResolvedValue(snapshot);
+    api.respondToThreadFlag.mockResolvedValue(snapshot);
+    api.clearAgentGoal.mockResolvedValue(snapshot);
+    const state = useAppState();
+    await state.loadSnapshot();
+    await state.respondToPlanReviewForAgent(guest.id, 'revise', 'Include tests');
+    await state.respondToThreadFlagForAgent(guest.id, { id: 'ready_for_review', action: 'dismiss' });
+    await state.clearGoalForAgent(guest.id);
+    expect(api.respondToPlanReview).toHaveBeenCalledExactlyOnceWith(guest.id, { reviewId: 'guest-plan', resolution: 'revise', feedback: 'Include tests' });
+    expect(api.respondToThreadFlag).toHaveBeenCalledExactlyOnceWith(guest.id, { id: 'ready_for_review', action: 'dismiss' });
+    expect(api.clearAgentGoal).toHaveBeenCalledExactlyOnceWith(guest.id);
+    expect(state.snapshot.value.activeAgentId).toBe(snapshot.activeAgentId);
+    expect(api.selectAgent).not.toHaveBeenCalled();
+  });
+
   it.each(['codex', 'claude'] as const)('keeps %s requests on their agent through navigation and failed response', async (backend) => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backend = backend;

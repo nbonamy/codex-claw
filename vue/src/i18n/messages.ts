@@ -197,6 +197,7 @@ export const messages = {
     },
     agents: {
       actions: 'Agent actions',
+      attachToCurrentAgent: 'Attach to Current Agent',
       close: 'Close Agent',
       replaceConversationWithSummary: 'Compress Session',
       compactSession: 'Compact Session',

@@ -15,6 +15,8 @@
     :send-prompt-action="sendPrompt"
     :respond-to-plan-review="respondToPlanReview"
     :respond-to-thread-flag-action="respondToThreadFlag"
+    :agent-conversation-for="agentConversationFor"
+    :agent-conversation-actions="agentConversationActions"
     :start-visualize="startVisualize"
     :set-visualize-open="setVisualizeOpen"
     :generate-visualization-suggestion="generateVisualizationSuggestion"
@@ -237,6 +239,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
 import AppShell from './components/AppShell.vue';
+import type { AgentConversationActions } from './components/use-agent-conversation';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from './components/PullRequestCleanupDialog.vue';
 import WorkspaceProvisioningProgressDialog from './components/WorkspaceProvisioningProgressDialog.vue';
@@ -274,6 +277,8 @@ const {
   activeBackendCommands,
   activeCodexConversationSnapshot,
   activeClaudeConversationSnapshot,
+  agentConversationFor,
+  prepareAgentConversation,
   backendPlugins,
   activeBackendCapabilities,
   modelCatalogStatus,
@@ -387,23 +392,34 @@ const {
   assignWorkItemToAgent,
   removeWorkItemAssignment,
   resolveBackendApproval,
+  resolveBackendApprovalForAgent,
   respondToClientRequest,
   selectModel,
+  selectModelForAgent,
   selectReasoningEffort,
+  selectReasoningEffortForAgent,
   selectServiceTier,
+  selectServiceTierForAgent,
   setApprovalPreset,
+  setApprovalPresetForAgent,
   setPermissionMode,
+  setPermissionModeForAgent,
   updateComposerState,
   updateComposerAttachments,
   setPlanMode,
+  setPlanModeForAgent,
   clearActiveGoal,
   selectAgent,
   setRendererWindowFocused,
   markDebugAgentsUnread,
   selectTeam,
   sendPrompt,
+  sendPromptToAgent,
   respondToPlanReview,
+  respondToPlanReviewForAgent,
   respondToThreadFlag,
+  respondToThreadFlagForAgent,
+  clearGoalForAgent,
   startVisualize,
   setVisualizeOpen,
   generateVisualizationSuggestion,
@@ -419,18 +435,55 @@ const {
   reviewCodeAgain,
   sendAgentPrompt,
   steerPrompt,
+  steerPromptToAgent,
   interruptActiveAgent,
+  interruptAgentById,
   deleteTurn,
+  deleteTurnForAgent,
   editTurn,
+  editTurnForAgent,
   retryTurn,
+  retryTurnForAgent,
   continueInterruptedTurn,
+  continueInterruptedTurnForAgent,
   steerQueuedPrompt,
+  steerQueuedPromptForAgent,
   updateQueuedPrompt,
+  updateQueuedPromptForAgent,
   removeQueuedPrompt,
+  removeQueuedPromptForAgent,
   quit,
   restartApp,
   getPluginStatus,
 } = useAppState();
+
+const agentConversationActions: AgentConversationActions = {
+  planReview: respondToPlanReviewForAgent,
+  clearGoal: clearGoalForAgent,
+  threadFlag: respondToThreadFlagForAgent,
+  prepare: prepareAgentConversation,
+  loadOlder: loadOlderAgentHistory,
+  send: sendPromptToAgent,
+  steer: steerPromptToAgent,
+  interrupt: interruptAgentById,
+  deleteTurn: deleteTurnForAgent,
+  editTurn: editTurnForAgent,
+  retryTurn: retryTurnForAgent,
+  continueInterruptedTurn: continueInterruptedTurnForAgent,
+  resolveApproval: resolveBackendApprovalForAgent,
+  clientResponse: respondToClientRequest,
+  selectModel: selectModelForAgent,
+  selectReasoningEffort: selectReasoningEffortForAgent,
+  selectServiceTier: selectServiceTierForAgent,
+  setPlanMode: setPlanModeForAgent,
+  setApprovalPreset: setApprovalPresetForAgent,
+  setPermissionMode: setPermissionModeForAgent,
+  updateComposerState,
+  updateAttachments: updateComposerAttachments,
+  deleteQueuedPrompt: removeQueuedPromptForAgent,
+  updateQueuedPrompt: updateQueuedPromptForAgent,
+  steerQueuedPrompt: steerQueuedPromptForAgent,
+};
 
 const updateStatus = ref<DesktopUpdateStatus>({ state: 'idle' });
 const pendingAgentClose = ref<{ agent: Agent; workflow: AgentGitWorkflow } | null>(null);

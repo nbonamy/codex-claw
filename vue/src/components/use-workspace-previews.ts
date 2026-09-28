@@ -37,8 +37,8 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
   let markdownPreviewId = 0;
   const gitDiffRequestIds = new Map<string, number>();
 
-  async function openConversationFile(link: ConversationFileLink): Promise<void> {
-    const agent = options.currentAgent();
+  async function openConversationFile(link: ConversationFileLink, agentId = options.currentAgent()?.id): Promise<void> {
+    const agent = agentId ? agentForId(agentId) : null;
     if (!agent) return;
     const filePath = link.filepath ?? link.path;
     if (link.action === 'edit') {

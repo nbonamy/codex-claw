@@ -1,6 +1,6 @@
 <template>
   <aside class="right-workspace-panel" :aria-label="$t('surface.rightWorkspacePanel.rightWorkspace')">
-    <header class="right-workspace-panel__tabs">
+    <header v-if="!contentOnly" class="right-workspace-panel__tabs">
       <div ref="tabStripRoot" class="right-workspace-panel__tab-strip">
         <button
           v-if="tabsOverflow"
@@ -45,6 +45,7 @@
                   <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
                   <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
                   <IconLego v-else-if="isRightWorkspaceSubagentTab(tab)" aria-hidden="true" />
+                  <MessageCircleIcon v-else-if="isRightWorkspaceAgentTab(tab)" aria-hidden="true" />
                   <FileDiffIcon v-else-if="diffPanel(tab)" aria-hidden="true" />
                   <PhotoIcon v-else-if="imagePanel(tab)" aria-hidden="true" />
                   <FileTextIcon v-else-if="filePanel(tab)?.kind === 'markdown'" aria-hidden="true" />
@@ -261,6 +262,19 @@
       />
     </template>
 
+    <div v-for="tab in artifactTabs" :key="tab" v-show="activeTab === tab" class="right-workspace-panel__attached-agent">
+      <slot name="agent-artifact" v-bind="rightWorkspaceArtifact(tab)" :visible="visible && activeTab === tab" />
+    </div>
+
+    <div
+      v-for="tab in agentTabs"
+      :key="tab"
+      v-show="activeTab === tab"
+      class="right-workspace-panel__attached-agent"
+    >
+      <slot name="attached-agent" :agent-id="rightWorkspaceAgentId(tab)" />
+    </div>
+
     <div
       v-for="tab in fileTabs"
       :key="tab"
@@ -350,7 +364,8 @@ import { ElMessage } from 'element-plus';
 import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, MessageCircleIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { agentDisplayName } from '@codex-claw/core/agent-display';
 import AppContextMenu from '../shared/menu/AppContextMenu.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -371,11 +386,15 @@ import SourcePreviewPanel from './SourcePreviewPanel.vue';
 import SubagentPanel from './SubagentPanel.vue';
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 import {
+  isRightWorkspaceArtifactTab,
+  rightWorkspaceArtifact,
   isRightWorkspaceDiffTab,
+  isRightWorkspaceAgentTab,
   isRightWorkspaceFileTab,
   isRightWorkspaceImageTab,
   isRightWorkspaceSubagentTab,
   rightWorkspaceSubagentConversationId,
+  rightWorkspaceAgentId,
   type RightWorkspaceDiffPanel,
   type RightWorkspaceDiffTab,
   type RightWorkspaceFilePanel,
@@ -383,6 +402,7 @@ import {
   type RightWorkspaceImagePanel,
   type RightWorkspaceImageTab,
   type RightWorkspaceSubagentTab,
+  type RightWorkspaceAgentTab,
   type RightWorkspaceTab,
 } from './right-workspace';
 
@@ -405,6 +425,8 @@ const props = withDefaults(defineProps<{
   filePanels?: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
   imagePanels?: Partial<Record<RightWorkspaceImageTab, RightWorkspaceImagePanel>>;
   tabs: RightWorkspaceTab[];
+  contentOnly?: boolean;
+  artifactLabel?: (agentId: string, tab: RightWorkspaceTab) => string | undefined;
   visible?: boolean;
   browserId?: string;
   browserInitialUrl?: string;
@@ -494,6 +516,8 @@ const fileTabs = computed(() => props.tabs.filter(isRightWorkspaceFileTab));
 const diffTabs = computed(() => props.tabs.filter(isRightWorkspaceDiffTab));
 const imageTabs = computed(() => props.tabs.filter(isRightWorkspaceImageTab));
 const subagentTabs = computed<RightWorkspaceSubagentTab[]>(() => props.tabs.filter(isRightWorkspaceSubagentTab));
+const artifactTabs = computed(() => props.tabs.filter(isRightWorkspaceArtifactTab));
+const agentTabs = computed<RightWorkspaceAgentTab[]>(() => props.tabs.filter(isRightWorkspaceAgentTab));
 const fileExplorerToggleVisible = computed(() => (
   props.activeTab === 'files'
   || (props.activeTab !== null && isRightWorkspaceFileTab(props.activeTab))
@@ -620,6 +644,11 @@ function stopFilesPaneResize(): void {
 }
 
 function tabLabel(tab: RightWorkspaceTab): string {
+  if (isRightWorkspaceArtifactTab(tab)) {
+    const artifact = rightWorkspaceArtifact(tab);
+    const owner = props.agents?.find(agent => agent.id === artifact.agentId);
+    return `${owner ? agentDisplayName(owner) : translate('agents.noAgent')} · ${props.artifactLabel?.(artifact.agentId, artifact.tab) ?? tabLabel(artifact.tab)}`;
+  }
   if (tab === 'backlog') return translate('surface.rightWorkspacePanel.backlog');
   if (tab === 'codeReview') return translate('surface.rightWorkspacePanel.review');
   if (tab === 'visualize') return translate('surface.rightWorkspacePanel.visualize');
@@ -632,6 +661,10 @@ function tabLabel(tab: RightWorkspaceTab): string {
     return node?.agentNickname?.trim()
       || node?.agentPath?.split('/').filter(Boolean).at(-1)?.trim()
       || 'Subagent';
+  }
+  if (isRightWorkspaceAgentTab(tab)) {
+    const agent = props.agents?.find((candidate) => candidate.id === rightWorkspaceAgentId(tab));
+    return agent ? agentDisplayName(agent) : translate('agents.noAgent');
   }
   if (diffPanel(tab)) return diffPanel(tab)?.title ?? 'Diff';
   if (imagePanel(tab)) return imagePanel(tab)?.title ?? 'Image';
@@ -1139,5 +1172,13 @@ function isAbsoluteFilePath(filePath: string): boolean {
   min-width: 0;
   min-height: 0;
   display: flex;
+}
+
+.right-workspace-panel__attached-agent {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>

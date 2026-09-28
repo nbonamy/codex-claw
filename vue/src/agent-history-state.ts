@@ -37,17 +37,34 @@ export function createAgentHistoryState(options: {
 
   async function hydrateActive(): Promise<void> {
     const snapshot = options.getSnapshot();
-    const activeAgent = snapshot.agents.find((agent) => agent.id === snapshot.activeAgentId);
-    if (!activeAgent?.backendSession || !codexClawApi?.loadConversationHistory || hydratingAgentIds.value.has(activeAgent.id)) {
+    if (!snapshot.activeAgentId) return;
+    await hydrate(snapshot.activeAgentId);
+  }
+
+  async function hydrate(agentId: string): Promise<void> {
+    const agent = options.getSnapshot().agents.find((candidate) => candidate.id === agentId);
+    if (!agent?.backendSession || !codexClawApi?.loadConversationHistory || hydratingAgentIds.value.has(agent.id)) {
       return;
     }
-    markHydrating(activeAgent.id, true);
+    markHydrating(agent.id, true);
     try {
-      options.adoptSnapshot(await codexClawApi.loadConversationHistory(activeAgent.id));
-      options.synchronizeComposerSelection(activeAgent.id);
+      options.adoptSnapshot(await codexClawApi.loadConversationHistory(agent.id));
+      options.synchronizeComposerSelection(agent.id);
+    } catch (error) {
+      failedAgentIds.value = new Set(failedAgentIds.value).add(agent.id);
+      throw error;
     } finally {
-      markHydrating(activeAgent.id, false);
+      markHydrating(agent.id, false);
     }
+  }
+
+  function statusFor(agentId: string): { failed: boolean; hasOlder: boolean; hydrating: boolean; loadingOlder: boolean } {
+    return {
+      failed: failedAgentIds.value.has(agentId),
+      hasOlder: hasOlderByAgentId.value[agentId] ?? true,
+      hydrating: hydratingAgentIds.value.has(agentId),
+      loadingOlder: loadingOlderAgentIds.value.has(agentId),
+    };
   }
 
   async function loadOlder(agentId: string): Promise<void> {
@@ -106,6 +123,7 @@ export function createAgentHistoryState(options: {
     activeHistoryHasOlder,
     handleMainEvent,
     hydrateActive,
+    hydrate,
     retryActive: hydrateActive,
     isActiveAgentHistoryFailed,
     isHydratingActiveAgentHistory,
@@ -113,5 +131,6 @@ export function createAgentHistoryState(options: {
     loadOlder,
     markHydrating,
     reset,
+    statusFor,
   };
 }

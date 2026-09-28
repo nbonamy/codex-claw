@@ -58,6 +58,7 @@
       :quick-switch-shortcuts-visible="quickAgentShortcutsVisible"
       :repository-icons="snapshot.general.repositoryIcons"
       @collapse-sidebar="$emit('collapse-sidebar')"
+      @attach-to-current-agent="$emit('attach-to-current-agent', $event)"
       @close-agent="$emit('close-agent', $event)"
       @compress-session="$emit('compress-session', $event)"
       @compact-session="$emit('compact-session', $event)"
@@ -138,6 +139,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  'attach-to-current-agent': [agentId: string];
   'close-agent': [agentId: string];
   'compress-session': [agentId: string];
   'compact-session': [agentId: string];

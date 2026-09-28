@@ -31,7 +31,7 @@ import { appText } from '@codex-claw/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
 import { clawHostCapabilities, codexClawApi } from './platform-api';
 import { createWorkProviderState, isRemoteAutomationLocation } from './work-provider-state';
-import { createAgentComposerState } from './agent-composer-state';
+import { createAgentComposerState, type AgentComposerConfiguration } from './agent-composer-state';
 import { createAgentUnreadState } from './agent-unread-state';
 import { createAgentHistoryState } from './agent-history-state';
 import { createSourceRepositoryState } from './source-repository-state';
@@ -132,12 +132,17 @@ const {
   resolvePromptOptions: resolvedPromptOptions,
   restore: restoreComposerConfiguration,
   selectModel,
+  selectModelForAgent,
   selectedModelId,
   selectedReasoningEffort,
   selectedServiceTier,
   selectReasoningEffort,
+  selectReasoningEffortForAgent,
   selectServiceTier,
+  selectServiceTierForAgent,
   setPlanMode,
+  setPlanModeForAgent,
+  configurationForAgent,
   skillCatalogError,
   skillCatalogStatus,
   synchronizeAgentSelection: synchronizeComposerSelectionForAgent,
@@ -161,6 +166,7 @@ const {
   activeHistoryHasOlder,
   handleMainEvent: syncHistoryPageStateFromMainEvent,
   hydrateActive: hydrateActiveAgentHistory,
+  hydrate: hydrateAgentHistory,
   retryActive: retryActiveAgentHistory,
   isActiveAgentHistoryFailed,
   isHydratingActiveAgentHistory,
@@ -168,7 +174,23 @@ const {
   loadOlder: loadOlderAgentHistory,
   markHydrating: markAgentHistoryHydrating,
   reset: resetAgentHistory,
+  statusFor: agentHistoryStatusFor,
 } = agentHistory;
+
+export type AgentConversationView = {
+  agent: Agent;
+  codexSnapshot: CodexConversationSnapshot | null;
+  claudeSnapshot: ClaudeConversationSnapshot | null;
+  composer: AgentComposerConfiguration;
+  composerState: CodexComposerState;
+  attachments: readonly CodexNativeAttachment[];
+  capabilities: BackendCapabilities;
+  approvals: AppSnapshot['backendApprovals'][string];
+  queuedPrompts: NonNullable<AppSnapshot['queuedPrompts']>;
+  history: ReturnType<typeof agentHistoryStatusFor>;
+  sending: boolean;
+  answeredClientRequestIds: ReadonlySet<string>;
+};
 const sourceRepositoryState = createSourceRepositoryState({ getSnapshot: () => snapshot.value });
 const {
   clone: cloneSourceRepository,
@@ -193,7 +215,12 @@ export function useAppState() {
   }, { immediate: true, flush: 'sync' });
 
   async function respondToPlanReview(resolution: PlanReviewResolution, feedback?: string): Promise<void> {
-    const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
+    const agentId = snapshot.value.activeAgentId;
+    if (agentId) await respondToPlanReviewForAgent(agentId, resolution, feedback);
+  }
+
+  async function respondToPlanReviewForAgent(agentId: string, resolution: PlanReviewResolution, feedback?: string): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
     if (!agent?.planReview || !codexClawApi) throw new Error('No pending plan review.');
     adoptBackgroundSnapshot(await codexClawApi.respondToPlanReview(agent.id, {
       reviewId: agent.planReview.id, resolution, ...(feedback ? { feedback } : {}),
@@ -201,7 +228,12 @@ export function useAppState() {
   }
 
   async function respondToThreadFlag(response: import('@codex-claw/core/thread-flags').ThreadFlagResponse): Promise<void> {
-    const agent = snapshot.value.agents.find((candidate) => candidate.id === snapshot.value.activeAgentId);
+    const agentId = snapshot.value.activeAgentId;
+    if (agentId) await respondToThreadFlagForAgent(agentId, response);
+  }
+
+  async function respondToThreadFlagForAgent(agentId: string, response: import('@codex-claw/core/thread-flags').ThreadFlagResponse): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
     if (!agent || agent.threadFlags?.[response.id] !== true || !codexClawApi) {
       throw new Error('No active thread flag.');
     }
@@ -316,6 +348,38 @@ export function useAppState() {
     const sessionId = agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
     return !frame || (sessionId && frame.snapshot.sessionId !== sessionId) ? null : frame.snapshot;
   });
+
+  function agentConversationFor(agentId: string): AgentConversationView | null {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return null;
+    const codexFrame = codexConversationFramesByAgentId.value[agentId];
+    const claudeFrame = claudeConversationFramesByAgentId.value[agentId];
+    const sessionId = agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
+    return {
+      agent,
+      codexSnapshot: agent.backend === 'codex' && agent.backendSession?.kind === 'codex' && codexFrame?.threadId === agent.backendSession.threadId
+        ? codexFrame.snapshot : null,
+      claudeSnapshot: agent.backend === 'claude' && claudeFrame && (!sessionId || claudeFrame.snapshot.sessionId === sessionId)
+        ? claudeFrame.snapshot : null,
+      composer: configurationForAgent(agentId),
+      composerState: composerStatesByAgentId.value[agentId] ?? emptyComposerState(),
+      attachments: composerAttachmentsByAgentId.value[agentId] ?? [],
+      capabilities: backendCapabilitiesForAgent(agent),
+      approvals: snapshot.value.backendApprovals[agentId] ?? [],
+      queuedPrompts: (snapshot.value.queuedPrompts ?? []).filter((prompt) => prompt.agentId === agentId),
+      history: agentHistoryStatusFor(agentId),
+      sending: isAgentSending(agentId),
+      answeredClientRequestIds: answeredClientRequestIds.value,
+    };
+  }
+
+  async function prepareAgentConversation(agentId: string): Promise<void> {
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId)) return;
+    await Promise.all([
+      loadActiveAgentCatalogs(agentId),
+      ...(agentNeedsHistory(agentId) || agentHistoryStatusFor(agentId).failed ? [hydrateAgentHistory(agentId)] : []),
+    ]);
+  }
 
   const activeQueuedPrompts = computed(() => {
     const agentId = activeAgent.value?.id;
@@ -502,9 +566,11 @@ export function useAppState() {
 
   async function sendPrompt(prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
     const agentId = activeAgent.value?.id;
-    if (!agentId || !codexClawApi) {
-      return;
-    }
+    if (agentId) await sendPromptToAgent(agentId, prompt, submissionOptions);
+  }
+
+  async function sendPromptToAgent(agentId: string, prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId) || !codexClawApi) return;
 
     const parsedGoalCommand = parseGoalSlashCommand(prompt);
     if (parsedGoalCommand) {
@@ -514,7 +580,7 @@ export function useAppState() {
 
     const parsedPlanCommand = parsePlanSlashCommand(prompt);
     if (parsedPlanCommand) {
-      setPlanMode(true);
+      setPlanModeForAgent(agentId, true);
       if (!parsedPlanCommand.prompt) {
         return;
       }
@@ -530,9 +596,11 @@ export function useAppState() {
 
   async function steerPrompt(prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
     const agentId = activeAgent.value?.id;
-    if (!agentId || !codexClawApi) {
-      return;
-    }
+    if (agentId) await steerPromptToAgent(agentId, prompt, submissionOptions);
+  }
+
+  async function steerPromptToAgent(agentId: string, prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId) || !codexClawApi) return;
 
     const trimmed = prompt.trim();
     if (!trimmed && !submissionOptions?.attachments?.length) {
@@ -557,6 +625,10 @@ export function useAppState() {
 
   async function interruptActiveAgent(): Promise<void> {
     const agentId = activeAgent.value?.id;
+    if (agentId) await interruptAgentById(agentId);
+  }
+
+  async function interruptAgentById(agentId: string): Promise<void> {
     if (!agentId || !codexClawApi?.interruptAgent || !isAgentSending(agentId)) {
       return;
     }
@@ -566,6 +638,10 @@ export function useAppState() {
 
   async function deleteTurn(turnId: string): Promise<void> {
     const agentId = snapshot.value.activeAgentId;
+    if (agentId) await deleteTurnForAgent(agentId, turnId);
+  }
+
+  async function deleteTurnForAgent(agentId: string, turnId: string): Promise<void> {
     if (!agentId || !codexClawApi?.deleteTurn || isAgentSending(agentId)) {
       return;
     }
@@ -579,6 +655,10 @@ export function useAppState() {
 
   async function editTurn(payload: { content: string; turnId: string }): Promise<void> {
     const agentId = snapshot.value.activeAgentId;
+    if (agentId) await editTurnForAgent(agentId, payload);
+  }
+
+  async function editTurnForAgent(agentId: string, payload: { content: string; turnId: string }): Promise<void> {
     const trimmed = payload.content.trim();
     if (!agentId || !trimmed || !codexClawApi?.editTurn || isAgentSending(agentId)) {
       return;
@@ -598,6 +678,10 @@ export function useAppState() {
 
   async function retryTurn(turnId: string): Promise<void> {
     const agentId = snapshot.value.activeAgentId;
+    if (agentId) await retryTurnForAgent(agentId, turnId);
+  }
+
+  async function retryTurnForAgent(agentId: string, turnId: string): Promise<void> {
     if (!agentId || !codexClawApi?.retryTurn || isAgentSending(agentId)) {
       return;
     }
@@ -615,7 +699,12 @@ export function useAppState() {
   }
 
   async function continueInterruptedTurn(): Promise<void> {
-    const agent = activeAgent.value;
+    const agentId = activeAgent.value?.id;
+    if (agentId) await continueInterruptedTurnForAgent(agentId);
+  }
+
+  async function continueInterruptedTurnForAgent(agentId: string): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
     if (agent?.backend !== 'codex' || !agent.backendSession || !codexClawApi?.continueInterruptedTurn || isAgentSending(agent.id)) {
       return;
     }
@@ -630,6 +719,10 @@ export function useAppState() {
 
   async function updateQueuedPrompt(promptId: string, prompt: string): Promise<void> {
     const agentId = activeAgent.value?.id;
+    if (agentId) await updateQueuedPromptForAgent(agentId, promptId, prompt);
+  }
+
+  async function updateQueuedPromptForAgent(agentId: string, promptId: string, prompt: string): Promise<void> {
     if (!agentId || !codexClawApi?.updateQueuedPrompt) {
       return;
     }
@@ -638,6 +731,10 @@ export function useAppState() {
 
   async function steerQueuedPrompt(promptId: string, prompt?: string): Promise<void> {
     const agentId = activeAgent.value?.id;
+    if (agentId) await steerQueuedPromptForAgent(agentId, promptId, prompt);
+  }
+
+  async function steerQueuedPromptForAgent(agentId: string, promptId: string, prompt?: string): Promise<void> {
     if (!agentId || !codexClawApi?.steerQueuedPrompt) {
       return;
     }
@@ -646,6 +743,10 @@ export function useAppState() {
 
   async function removeQueuedPrompt(promptId: string): Promise<void> {
     const agentId = activeAgent.value?.id;
+    if (agentId) await removeQueuedPromptForAgent(agentId, promptId);
+  }
+
+  async function removeQueuedPromptForAgent(agentId: string, promptId: string): Promise<void> {
     if (agentId && codexClawApi?.deleteQueuedPrompt) {
       adoptBackgroundSnapshot(await codexClawApi.deleteQueuedPrompt(agentId, promptId));
     }
@@ -1099,7 +1200,7 @@ export function useAppState() {
 
     adoptBackgroundSnapshot(await codexClawApi.updateAgent(input));
     if (input.backend) synchronizeComposerSelectionForAgent(input.id);
-    await loadActiveAgentCatalogs();
+    await loadActiveAgentCatalogs(input.id);
   }
 
   async function updateSettings(input: UpdateSettingsInput): Promise<void> {
@@ -1395,6 +1496,15 @@ export function useAppState() {
     scope: BackendApprovalScope,
   ): Promise<void> {
     const agentId = activeAgent.value?.id;
+    if (agentId) await resolveBackendApprovalForAgent(agentId, approvalId, decision, scope);
+  }
+
+  async function resolveBackendApprovalForAgent(
+    agentId: string,
+    approvalId: string,
+    decision: BackendApprovalDecision,
+    scope: BackendApprovalScope,
+  ): Promise<void> {
     const approval = agentId
       ? snapshot.value.backendApprovals[agentId]?.find((candidate) => candidate.id === approvalId)
       : undefined;
@@ -1410,6 +1520,7 @@ export function useAppState() {
 
     await respondToClientRequest({
       id: approvalId,
+      agentId,
       payload: {
         decision: decision === 'deny'
           ? 'deny'
@@ -1421,7 +1532,12 @@ export function useAppState() {
   }
 
   async function setApprovalPreset(preset: ApprovalPreset): Promise<void> {
-    const agent = activeAgent.value;
+    const agentId = activeAgent.value?.id;
+    if (agentId) await setApprovalPresetForAgent(agentId, preset);
+  }
+
+  async function setApprovalPresetForAgent(agentId: string, preset: ApprovalPreset): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
     const capabilities = agent ? messageActionCapabilities(agent.id) : null;
     if (
       !agent ||
@@ -1436,7 +1552,12 @@ export function useAppState() {
   }
 
   async function setPermissionMode(mode: string): Promise<void> {
-    const agent = activeAgent.value;
+    const agentId = activeAgent.value?.id;
+    if (agentId) await setPermissionModeForAgent(agentId, mode);
+  }
+
+  async function setPermissionModeForAgent(agentId: string, mode: string): Promise<void> {
+    const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
     const supportedModes = agent ? backendCapabilitiesForAgent(agent).permissionModes ?? [] : [];
     if (
       !agent ||
@@ -1474,6 +1595,8 @@ export function useAppState() {
     activeBackendCommands,
     activeCodexConversationSnapshot,
     activeClaudeConversationSnapshot,
+    agentConversationFor,
+    prepareAgentConversation,
     activeBackendCapabilities,
     modelCatalogStatus,
     modelCatalogError,
@@ -1533,7 +1656,10 @@ export function useAppState() {
     previewAgentFile,
     getAgentGitDiff,
     respondToPlanReview,
+    respondToPlanReviewForAgent,
     respondToThreadFlag,
+    respondToThreadFlagForAgent,
+    clearGoalForAgent,
     startCodeReview,
     startVisualize,
     setVisualizeOpen,
@@ -1615,13 +1741,20 @@ export function useAppState() {
     restartAgent,
     closeAgent,
     resolveBackendApproval,
+    resolveBackendApprovalForAgent,
     respondToClientRequest,
     selectModel,
+    selectModelForAgent,
     selectReasoningEffort,
+    selectReasoningEffortForAgent,
     selectServiceTier,
+    selectServiceTierForAgent,
     setPlanMode,
+    setPlanModeForAgent,
     setApprovalPreset,
+    setApprovalPresetForAgent,
     setPermissionMode,
+    setPermissionModeForAgent,
     updateComposerState,
     updateComposerAttachments,
     selectAgent,
@@ -1630,17 +1763,27 @@ export function useAppState() {
     selectTeam,
     clearActiveGoal,
     sendPrompt,
+    sendPromptToAgent,
     sendAgentPrompt,
     steerPrompt,
+    steerPromptToAgent,
     clearAgentCreationProgress,
     interruptActiveAgent,
+    interruptAgentById,
     deleteTurn,
+    deleteTurnForAgent,
     editTurn,
+    editTurnForAgent,
     retryTurn,
+    retryTurnForAgent,
     continueInterruptedTurn,
+    continueInterruptedTurnForAgent,
     steerQueuedPrompt,
+    steerQueuedPromptForAgent,
     updateQueuedPrompt,
+    updateQueuedPromptForAgent,
     removeQueuedPrompt,
+    removeQueuedPromptForAgent,
     quit,
     restartApp,
   };
