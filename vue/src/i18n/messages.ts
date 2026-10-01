@@ -2,6 +2,11 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    split: {
+      layout: 'Conversation layout', single: 'Single agent', '2-vertical': 'Two agents side by side',
+      '2-horizontal': 'Two agents stacked', '4-quadrant': 'Four agents',
+      emptyPane: 'Empty pane', selectAgent: 'Focus this pane, then select an agent from the sidebar.',
+    },
     surface: surfaceMessages,
     missions: {
       acceptedArtifact: 'Accepted artifact',
@@ -197,7 +202,6 @@ export const messages = {
     },
     agents: {
       actions: 'Agent actions',
-      attachToCurrentAgent: 'Attach to Current Agent',
       close: 'Close Agent',
       replaceConversationWithSummary: 'Compress Session',
       compactSession: 'Compact Session',

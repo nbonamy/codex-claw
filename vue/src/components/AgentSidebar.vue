@@ -266,7 +266,6 @@
 
     <AgentContextMenu
       v-if="contextMenuAgentId"
-      :attach-visible="Boolean(activeAgentId && contextMenuAgentId !== activeAgentId)"
       :fork-disabled="!canForkContextMenuAgent"
       :compress-visible="canReplaceContextMenuConversation"
       :compress-disabled="!canCompressContextMenuAgent"
@@ -364,7 +363,6 @@ const props = defineProps<{
 const { t } = useI18n();
 
 const emit = defineEmits<{
-  'attach-to-current-agent': [agentId: string];
   'collapse-sidebar': [];
   'close-agent': [agentId: string];
   'compress-session': [agentId: string];
@@ -651,9 +649,6 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
   }
 
   switch (action) {
-    case 'attach-to-current-agent':
-      emit('attach-to-current-agent', agentId);
-      break;
     case 'close-agent':
       emit('close-agent', agentId);
       break;

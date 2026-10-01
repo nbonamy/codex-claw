@@ -10,6 +10,7 @@
       ref="surface"
       class="conversation-pane__surface"
       :controller="controller"
+      :escape-interrupt="keyboardActive"
       :has-composer-context="textAnnotations.length > 0 || visualizationAnnotations.length > 0"
       :message-text-selection="true"
       :transform-message="transformConversationMessage"
@@ -181,6 +182,7 @@ provideCodexChatTranslate((key, params) => te(key)
 
 const props = withDefaults(defineProps<{
   controller: CodexConversationPaneController;
+  keyboardActive?: boolean;
   agent: Agent | null;
   agents?: readonly Agent[];
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
@@ -200,6 +202,7 @@ const props = withDefaults(defineProps<{
   removePromptDraft?: (id: string) => Promise<void>;
 }>(), {
   agents: () => [],
+  keyboardActive: true,
   attachmentAnnotationCounts: () => ({}),
   textAnnotations: () => [],
   visualizationAnnotations: () => [],

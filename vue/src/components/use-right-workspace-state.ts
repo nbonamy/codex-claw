@@ -1,6 +1,6 @@
 import { PRIMARY_BROWSER_ID, type WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { computed, onScopeDispose, reactive, ref } from 'vue';
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
   isRightWorkspaceBrowserTab,
@@ -42,6 +42,7 @@ export type AgentRightWorkspaceState = {
 
 export function useRightWorkspaceState(options: {
   currentAgentId: () => string | undefined;
+  sharedVisibilityGroupId?: () => string | undefined;
   workspaceBody: () => HTMLElement | null;
 }) {
   const workspaces = reactive<Record<string, AgentRightWorkspaceState>>({});
@@ -51,6 +52,15 @@ export function useRightWorkspaceState(options: {
     const agentId = options.currentAgentId();
     return Boolean(agentId && workspaceFor(agentId).open);
   });
+
+  watch(
+    [options.currentAgentId, () => options.sharedVisibilityGroupId?.()],
+    ([agentId, groupId], [previousAgentId, previousGroupId]) => {
+      if (groupId && groupId === previousGroupId && agentId && previousAgentId && agentId !== previousAgentId) {
+        workspaceFor(agentId).open = workspaceFor(previousAgentId).open;
+      }
+    },
+  );
 
   function workspaceFor(agentId: string): AgentRightWorkspaceState {
     const existing = workspaces[agentId];

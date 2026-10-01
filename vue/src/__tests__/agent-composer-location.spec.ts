@@ -4,7 +4,7 @@ import { createAgentComposerState } from '../agent-composer-state';
 import { stubElectronTestWindow } from '../test/client';
 
 describe('composer catalog locations', () => {
-  it('uses attached agent model settings for its next prompt without changing the main agent', async () => {
+  it('uses background agent model settings for its next prompt without changing the main agent', async () => {
     const snapshot = createInitialSnapshot();
     const hostId = snapshot.agents[0]!.id;
     const guestId = snapshot.agents[1]!.id;

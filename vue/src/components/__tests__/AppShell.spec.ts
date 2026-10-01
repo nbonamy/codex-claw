@@ -139,7 +139,7 @@ describe('AppShell authentication and conversation', () => {
     await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
 
     expect(wrapper.emitted('client-response')).toStrictEqual([[
-      { agentId: snapshot.agents[0]!.id, id: question.id, payload: { answers: { framework: { answers: ['Vue'] } } } },
+      { id: question.id, payload: { answers: { framework: { answers: ['Vue'] } } } },
     ]]);
   });
 

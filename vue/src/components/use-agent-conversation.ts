@@ -22,6 +22,7 @@ export type AgentConversationActions = {
   interrupt: (agentId: string) => void | Promise<void>;
   deleteTurn: (agentId: string, turnId: string) => void | Promise<void>;
   editTurn: (agentId: string, payload: { content: string; turnId: string }) => void | Promise<void>;
+  forkTurn: (agentId: string, turnId: string) => void | Promise<void>;
   retryTurn: (agentId: string, turnId: string) => void | Promise<void>;
   continueInterruptedTurn: (agentId: string) => void | Promise<void>;
   resolveApproval: (agentId: string, approvalId: string, decision: BackendApprovalDecision, scope: BackendApprovalScope) => void | Promise<void>;
@@ -40,7 +41,10 @@ export type AgentConversationActions = {
 };
 
 
-export function agentConversationState(view: () => AgentConversationView): CodexConversationPaneState {
+export function agentConversationState(view: () => AgentConversationView, extensions: {
+  mentionGroups?: () => NonNullable<CodexConversationPaneState['catalogs']>['mentionGroups'];
+  modelMenuItems?: () => CodexComposerMenuItem[];
+} = {}): CodexConversationPaneState {
   const provider = () => view().codexSnapshot ?? view().claudeSnapshot;
   const approvalPreset = () => {
     const allowed = view().capabilities.approvalPresets ?? [];
@@ -76,6 +80,7 @@ export function agentConversationState(view: () => AgentConversationView): Codex
       get placeholder() { return translate('surface.appShell.askForFollowUpChanges'); },
       get approvalPreset() { return approvalPreset(); },
       get leadingMenuItems() { return permissionMenuItems(view()); },
+      get modelMenuItems() { return extensions.modelMenuItems?.(); },
       get planMode() { return view().composer.planMode; },
       get selectedModelId() { return view().composer.selectedModelId; },
       get selectedReasoningEffort() { return view().composer.selectedReasoningEffort; },
@@ -84,6 +89,7 @@ export function agentConversationState(view: () => AgentConversationView): Codex
     catalogs: {
       get files() { return view().composer.files; },
       get models() { return view().composer.models; },
+      get mentionGroups() { return extensions.mentionGroups?.(); },
       get commands() { return defaultBackendCommands(view().agent.backend); },
       get plugins() { return view().composer.plugins; },
       get skills() { return view().composer.skills; },
@@ -105,6 +111,7 @@ export function agentConversationState(view: () => AgentConversationView): Codex
       get attachEnabled() { return view().capabilities.attachments; },
       get canDeleteTurn() { return view().capabilities.deleteTurn; },
       get canEditTurn() { return view().capabilities.editTurn; },
+      get canForkTurn() { return view().capabilities.conversationFork; },
       get canRetryTurn() { return view().capabilities.retryTurn; },
     },
   };
@@ -120,6 +127,7 @@ export function useAgentConversation(options: {
   openVisualization: NonNullable<CodexConversationPaneActions['openVisualization']>;
   overrides?: CodexConversationPaneActions;
   beforeSubmit?: () => Promise<void>;
+  onMenuSelect?: NonNullable<CodexConversationPaneActions['menuSelect']>;
   onThreadFlag?: (agentId: string, response: ThreadFlagResponse) => void;
   debugFallbackImageSource: string;
   notifyError: (message: string) => void;
@@ -166,6 +174,7 @@ export function useAgentConversation(options: {
     menuSelect: (item) => {
       const payload = item.payload as { kind?: string; mode?: string } | undefined;
       if (payload?.kind === 'permission-mode' && payload.mode) return options.actions.setPermissionMode(agentId(), payload.mode);
+      return options.onMenuSelect?.(item);
     },
     cancel: () => options.actions.interrupt(agentId()),
     interrupt: () => options.actions.interrupt(agentId()),
@@ -173,6 +182,7 @@ export function useAgentConversation(options: {
     clientResponse: (response) => options.actions.clientResponse({ ...response, agentId: agentId() }),
     deleteTurn: (turnId) => options.actions.deleteTurn(agentId(), turnId),
     editTurn: (payload) => options.actions.editTurn(agentId(), payload),
+    forkTurn: (turnId) => options.actions.forkTurn(agentId(), turnId),
     retryTurn: (turnId) => options.actions.retryTurn(agentId(), turnId),
     resolveApproval: (id, decision, scope) => options.actions.resolveApproval(agentId(), id, decision, scope),
     sendFollowUp: (prompt) => forward(prompt, undefined, options.actions.send),

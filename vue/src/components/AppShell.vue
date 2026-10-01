@@ -54,7 +54,6 @@
       :unread-team-ids="unreadTeamIds"
       :working-team-ids="workingTeamIds"
       @close-team="$emit('close-team', $event)"
-      @attach-to-current-agent="attachAgentToCurrentAgent"
       @close-agent="$emit('close-agent', $event)"
       @compress-session="$emit('compress-session', $event)"
       @compact-session="compactAgentSession($event)"
@@ -229,9 +228,8 @@
         ref="agentWorkspace"
         :active-attachment-annotation-counts="activeAttachmentAnnotationCounts"
         :add-chat-text-annotation="addChatTextAnnotation"
-        :add-visualization-annotation="addVisualizationAnnotation"
+        :add-visualization-annotation="addFocusedVisualizationAnnotation"
         :agent-files="agentFiles"
-        :attached-agent-ids="Object.keys(attachedHostByAgentId)"
         :agent-sidebar-collapsed="agentSidebarCollapsed"
         :close-right-workspace-tab="closeRightWorkspaceTab"
         :commit-agent-git-changes="props.commitAgentGitChanges"
@@ -248,6 +246,9 @@
         :review-finding-attachment="activeReviewFindingAttachment"
         :create-agent-git-pull-request="props.createAgentGitPullRequest"
         :current-agent="currentAgent"
+        :empty-split-pane="!split.focusedPane.value.agentId"
+        :split-headers="split.layout.value !== 'single'"
+        :latest-turn-id-for-agent="latestTurnIdForAgent"
         :current-agent-git-status="currentAgentGitStatus"
         :current-backend-runtime="currentBackendRuntime"
         :forward-prompt="forwardPrompt"
@@ -305,7 +306,6 @@
         :read-visualization-asset="props.readVisualizationAsset"
         @close-agent="$emit('close-agent', $event)"
         @clarify-code-review-finding="clarifyCodeReviewFinding"
-        @conversation-activated="focusedConversationAgentId = $event"
         @expand-sidebar="agentSidebarCollapsed = false"
         @install-update="emit('install-update')"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
@@ -313,27 +313,29 @@
         @send-prompt="emit('sendPrompt', $event)"
         @update:plan-mode="emit('update:planMode', $event)"
       >
-        <template #attached-agent="{ agentId, workspaceProps }">
-          <AgentWorkspace
-            v-if="agentConversationFor?.(agentId)"
-            :key="agentId"
-            :ref="element => setEmbeddedWorkspace(agentId, element)"
-            v-bind="embeddedWorkspaceProps(agentId, workspaceProps)"
-            embedded
-            @conversation-activated="focusedConversationAgentId = $event"
-            @remove-review-finding-attachment="pendingReviewClarification = null"
-          />
+        <template v-if="props.agentConversationFor && props.agentConversationActions" #layout-control>
+          <SplitLayoutControl :model-value="split.layout.value" @update:model-value="split.setLayout" />
         </template>
-        <template #agent-artifact="{ agentId, tab, visible, workspaceProps }">
-          <AgentWorkspace
-            v-if="agentConversationFor?.(agentId)"
-            :key="`${agentId}:${tab}`"
-            v-bind="embeddedWorkspaceProps(agentId, workspaceProps)"
-            embedded
-            :artifact-tab="tab"
-            :artifact-visible="visible"
-            @clarify-code-review-finding="clarifyCodeReviewFinding"
-          />
+        <template v-if="split.layout.value !== 'single' && props.agentConversationFor && splitActions" #conversation="{ plan, planVisible, closePlan, headerBindingsFor }">
+          <AgentSplitGrid :layout="split.layout.value" :panes="split.panes.value" :focused-pane-id="split.focusedPaneId.value" @focus="split.focus">
+            <template #header="{ agentId, topRight, topLeft }">
+              <AgentHeader v-bind="headerBindingsFor(agentId, topRight, topLeft)" />
+            </template>
+            <template #default="{ agentId, focused }">
+              <AgentConversationPanel v-if="props.agentConversationFor(agentId)" :key="agentId" :ref="instance => setSplitPanel(agentId, instance)"
+                :view="props.agentConversationFor(agentId)!" :actions="splitActions" :agents="snapshot.agents" :focused="focused"
+                :mention-groups="agentMentionGroups" :model-menu-items="splitModelFavoriteMenuItems(agentId)"
+                :select-model-menu-item="item => selectSplitModelMenuItem(agentId, item)"
+                :plan="focused ? plan : null" :plan-visible="planVisible" @close-plan="closePlan"
+                :saved-prompt-drafts="snapshot.general.savedPromptDrafts" :save-prompt-draft="savePromptDraft" :remove-prompt-draft="removePromptDraft"
+                :review-finding="pendingReviewClarification?.agentId === agentId ? pendingReviewClarification.finding : null"
+                :open-link="link => openSplitConversationLink(agentId, link)"
+                :open-image="(image, context) => agentWorkspace?.openConversationImage(image, context, agentId) ?? false"
+                :open-visualization="visualization => agentWorkspace?.openConversationVisualization(visualization, agentId)"
+                @open-review="openRightWorkspaceTab('codeReview', $event)"
+                @remove-review-finding="pendingReviewClarification = null" />
+            </template>
+          </AgentSplitGrid>
         </template>
       </AgentWorkspace>
     </section>
@@ -518,7 +520,7 @@
 import { translate } from '../i18n';
 import { localizedErrorMessage, localizedText } from '../i18n/errors';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentFileActivity } from '@codex-claw/core/contracts';
@@ -548,9 +550,14 @@ import TeamDialog from './TeamDialog.vue';
 import AppShellNavigation from './AppShellNavigation.vue';
 import BackendConnectionBanner from './BackendConnectionBanner.vue';
 import WhatsNewDialog from './WhatsNewDialog.vue';
-import AgentWorkspace, { type AgentWorkspaceProps } from './AgentWorkspace.vue';
+import AgentWorkspace from './AgentWorkspace.vue';
+import AgentSplitGrid from './AgentSplitGrid.vue';
+import AgentHeader from './AgentHeader.vue';
+import AgentConversationPanel from './AgentConversationPanel.vue';
+import SplitLayoutControl from './SplitLayoutControl.vue';
+import { useSplitWorkspace } from './use-split-workspace';
+import type { AgentConversationActions } from './use-agent-conversation';
 import type { AgentConversationView } from '../app-state';
-import { useAgentConversation, type AgentConversationActions } from './use-agent-conversation';
 import MissionCodeReview from './MissionCodeReview.vue';
 import MissionShipBoard from './MissionShipBoard.vue';
 import MissionWorkspace from './MissionWorkspace.vue';
@@ -567,8 +574,10 @@ import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigration
 import ModelFavoritesDialog from './ModelFavoritesDialog.vue';
 import type { SettingsTab } from './settings-tabs';
 import {
+  createCodexConversationPaneController,
   type CodexCapabilities,
   type CodexConversationLink,
+  type CodexConversationPaneActions,
   type CodexConversationPaneState,
   type CodexConversationVisualization,
   type CodexComposerMenuItem,
@@ -595,7 +604,10 @@ import { useFirstRunOnboarding } from './use-first-run-onboarding';
 import { useRepositoryAcquisition } from './use-repository-acquisition';
 import { useRepositorySession } from './use-repository-session';
 import { useRightWorkspaceState } from './use-right-workspace-state';
-import { isRightWorkspaceAgentTab, rightWorkspaceAgentId, rightWorkspaceAgentTab, isRightWorkspaceArtifactTab, rightWorkspaceArtifact, rightWorkspaceArtifactTab, type RightWorkspaceTab } from './right-workspace';
+import type { RightWorkspaceTab } from './right-workspace';
+import { useImageAnnotation } from './use-image-annotation';
+import { useChatTextAnnotations } from './use-chat-text-annotations';
+import { useVisualizationAnnotations } from './use-visualization-annotations';
 import { useCockpitBacklog } from './use-cockpit-backlog';
 import { useWorkspacePreviews } from './use-workspace-previews';
 import { useWorkItemRouting } from './use-work-item-routing';
@@ -612,8 +624,6 @@ const props = withDefaults(defineProps<{
   historyHasOlder?: boolean;
   historyLoadingOlder?: boolean;
   isSending: boolean;
-  agentConversationFor?: (agentId: string) => AgentConversationView | null;
-  agentConversationActions?: AgentConversationActions;
   connectionState?: BackendConnectionState;
   goal?: ThreadGoal | null;
   approvals?: BackendApprovalRequest[];
@@ -725,6 +735,8 @@ const props = withDefaults(defineProps<{
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   retryAgentHistory?: () => Promise<void>;
+  agentConversationFor?: (agentId: string) => AgentConversationView | null;
+  agentConversationActions?: AgentConversationActions;
   sendPromptAction?: (prompt: string, options?: RendererSendPromptOptions) => Promise<void>;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
   respondToThreadFlagAction?: (response: ThreadFlagResponse) => Promise<void>;
@@ -1187,8 +1199,8 @@ const agentWorkspace = ref<{
   saveCurrentDraft(): void;
   handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-browser' }>): void;
   openConversationLink(link: CodexConversationLink): void | Promise<void>;
-  openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext): boolean;
-  openConversationVisualization(visualization: CodexConversationVisualization): void;
+  openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext, agentId?: string): boolean;
+  openConversationVisualization(visualization: CodexConversationVisualization, agentId?: string): void;
   showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void>;
   workspaceBodyElement(): HTMLElement | null;
 } | null>(null);
@@ -1303,7 +1315,7 @@ const workItemRouting = useWorkItemRouting({
       }
     },
     focusComposer: () => {
-      void nextTick(() => agentWorkspace.value?.focusComposer());
+      void nextTick(() => focusedConversationPanel()?.focusComposer());
     },
     openNewAgent: (teamId, repositoryName) => openNewAgent(teamId, repositoryName),
     selectAgent: selectAgentFromShell,
@@ -1500,39 +1512,50 @@ watch(() => currentAgent.value?.id, (agentId) => {
     pendingReviewClarification.value = null;
   }
 });
+const split = useSplitWorkspace({
+  agentIds: () => activeTeamAgents.value.map(agent => agent.id),
+  currentAgentId: () => currentAgent.value?.id,
+  teamId: () => activeTeam.value?.id,
+  selectAgent: id => emit('select-agent', id),
+});
 const rightWorkspaceState = useRightWorkspaceState({
   currentAgentId: () => currentAgent.value?.id,
+  sharedVisibilityGroupId: () => split.layout.value === 'single' ? undefined : activeTeam.value?.id,
   workspaceBody: () => agentWorkspace.value?.workspaceBodyElement() ?? null,
 });
-const attachedHostByAgentId = reactive<Record<string, string>>({});
-const focusedConversationAgentId = ref<string | null>(null);
-const embeddedWorkspaces = new Map<string, {
-  attachVisualizationAnnotation: (annotation: import('./use-visualization-annotations').VisualizationAnnotationInput) => void;
-  focusComposer: () => void;
-  openSavedDraftPicker: () => void;
-  saveCurrentDraft: () => void;
-}>();
-function activeComposerAgentId(agentId = focusedConversationAgentId.value): string | undefined {
-  const hostId = agentId ? attachedHostByAgentId[agentId] : undefined;
-  if (agentId && hostId && hostId === currentAgent.value?.id && isRightWorkspaceVisible(hostId)
-    && rightWorkspaceFor(hostId).activeTab === rightWorkspaceAgentTab(agentId)) {
-    return agentId;
-  }
-  return currentAgent.value?.id;
+const splitPanels = new Map<string, InstanceType<typeof AgentConversationPanel>>();
+function setSplitPanel(agentId: string, instance: unknown): void {
+  if (instance) splitPanels.set(agentId, instance as InstanceType<typeof AgentConversationPanel>);
+  else splitPanels.delete(agentId);
 }
-function activeComposerWorkspace(agentId = focusedConversationAgentId.value) {
-  const targetId = activeComposerAgentId(agentId);
-  if (targetId && targetId !== currentAgent.value?.id) return embeddedWorkspaces.get(targetId) ?? agentWorkspace.value;
-  return agentWorkspace.value;
+function focusedConversationPanel() {
+  return split.layout.value === 'single' ? agentWorkspace.value : splitPanels.get(split.focusedPane.value.agentId ?? '');
 }
-function setEmbeddedWorkspace(agentId: string, instance: unknown): void {
-  if (instance) embeddedWorkspaces.set(agentId, instance as NonNullable<ReturnType<typeof embeddedWorkspaces.get>>);
-  else embeddedWorkspaces.delete(agentId);
+function addFocusedVisualizationAnnotation(annotation: import('./use-visualization-annotations').VisualizationAnnotationInput): void {
+  if (split.layout.value === 'single') addVisualizationAnnotation(annotation);
+  else splitPanels.get(currentAgent.value?.id ?? '')?.addVisualizationAnnotation(annotation);
 }
-function releaseAttachedArtifacts(hostId: string, agentId: string): void {
-  for (const tab of rightWorkspaceFor(hostId).tabs) {
-    if (isRightWorkspaceArtifactTab(tab) && rightWorkspaceArtifact(tab).agentId === agentId) closeRightWorkspaceTabLocal(hostId, tab);
-  }
+const splitActions = computed<AgentConversationActions | undefined>(() => props.agentConversationActions ? {
+  ...props.agentConversationActions,
+  send: async (agentId, prompt, options) => {
+    await backendSwitch.settled();
+    const visualize = prompt.match(/^\/visualize(?:\s+([\s\S]*))?$/u);
+    if (visualize && !options?.attachments?.length) {
+      return startVisualizeForAgent(agentId, visualize[1]?.trim() ? { prompt: visualize[1].trim() } : undefined);
+    }
+    if (prompt.trim() === '/review' && !options?.attachments?.length) { openRightWorkspaceTab('codeReview', agentId); return; }
+    const clarification = pendingReviewClarification.value;
+    if (clarification?.agentId === agentId && !options?.attachments?.length) {
+      await props.discussCodeReviewFinding(agentId, { sessionId: clarification.sessionId, roundId: clarification.roundId, findingId: clarification.findingId, question: prompt });
+      if (pendingReviewClarification.value === clarification) pendingReviewClarification.value = null;
+      return;
+    }
+    return props.agentConversationActions?.send(agentId, prompt, options);
+  },
+} : undefined);
+function openSplitConversationLink(agentId: string, link: CodexConversationLink): void | Promise<void> {
+  if (link.kind === 'external') { window.open(link.href, '_blank', 'noopener,noreferrer'); return; }
+  return workspacePreviews.openConversationFile({ ...link, kind: 'file' }, agentId);
 }
 const {
   closeTab: closeRightWorkspaceTabLocal,
@@ -1549,104 +1572,8 @@ const {
 } = rightWorkspaceState;
 
 function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {
-  const ownerId = agentId ?? currentAgent.value?.id;
-  openRightWorkspaceTabLocal(tab, ownerId);
-  const hostId = ownerId ? attachedHostByAgentId[ownerId] : undefined;
-  if (hostId && !isRightWorkspaceAgentTab(tab) && !isRightWorkspaceArtifactTab(tab)) {
-    openRightWorkspaceTabLocal(rightWorkspaceArtifactTab(ownerId!, tab), hostId);
-  }
+  openRightWorkspaceTabLocal(tab, agentId);
 }
-
-function attachAgentToCurrentAgent(agentId: string): void {
-  const hostId = currentAgent.value?.id;
-  if (!hostId || hostId === agentId || !props.snapshot.agents.some((agent) => agent.id === agentId)) return;
-  for (const [childId, childHostId] of Object.entries(attachedHostByAgentId)) {
-    if (childHostId === agentId) closeRightWorkspaceTab(agentId, rightWorkspaceAgentTab(childId));
-  }
-  const previousHostId = attachedHostByAgentId[agentId];
-  if (previousHostId && previousHostId !== hostId) {
-    closeRightWorkspaceTabLocal(previousHostId, rightWorkspaceAgentTab(agentId));
-    releaseAttachedArtifacts(previousHostId, agentId);
-  }
-  attachedHostByAgentId[agentId] = hostId;
-  openRightWorkspaceTab(rightWorkspaceAgentTab(agentId), hostId);
-}
-
-function embeddedWorkspaceProps(agentId: string, shared: AgentWorkspaceProps): AgentWorkspaceProps {
-  const view = props.agentConversationFor!(agentId)!;
-  const provider = view.codexSnapshot ?? view.claudeSnapshot;
-  const executionPlan = view.codexSnapshot?.executionPlan;
-  const conversationPlan = executionPlan ? {
-    agentId, threadId: view.codexSnapshot?.activeConversationId ?? '', kind: 'execution' as const, turnId: provider?.activeTurnId ?? provider?.turnIds.at(-1) ?? '',
-    status: executionPlan.steps.every(step => step.status === 'completed') ? 'completed' as const : 'inProgress' as const,
-    explanation: executionPlan.explanation ?? '', steps: executionPlan.steps.map(step => ({ ...step })),
-    markdown: executionPlan.markdown, updatedAt: executionPlan.updatedAt,
-  } : view.claudeSnapshot?.plan ?? null;
-  return {
-    ...shared,
-    conversationView: view,
-    conversationActions: props.agentConversationActions,
-    currentAgent: view.agent,
-    currentAgentGitStatus: props.snapshot.agentGitStatuses[agentId] ?? null,
-    currentBackendRuntime: props.snapshot.backendRuntimes.find(runtime => runtime.backend === view.agent.backend) ?? { backend: view.agent.backend, status: 'notConfigured' },
-    conversationPlan,
-    reviewFindingAttachment: pendingReviewClarification.value?.agentId === agentId ? pendingReviewClarification.value.finding : null,
-    addVisualizationAnnotation: annotation => embeddedWorkspaces.get(agentId)?.attachVisualizationAnnotation(annotation),
-    respondToPlanReview: (resolution, feedback) => respondToEmbeddedPlan(agentId, resolution, feedback),
-    confirmPlan: () => { void respondToEmbeddedPlan(agentId, 'accept'); },
-    agentFiles: view.composer.files,
-    agentSidebarCollapsed: false,
-    isAgentEmpty: false,
-    isLoading: view.history.hydrating,
-    isConversationLoading: view.history.hydrating,
-    historyLoadFailed: view.history.failed,
-    hasVisibleMessages: Boolean(provider?.messages.length),
-    hasRunningPlanTool: Boolean(provider?.messages.some(message => message.parts.some(part => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true))),
-    latestConversationTurnId: provider?.turnIds.at(-1) ?? null,
-    retryConversationHistory: async () => { await props.agentConversationActions?.prepare(agentId); },
-    openFilePreview: link => workspacePreviews.openConversationFile(link, agentId),
-    forwardPrompt: (prompt, options) => forwardAgentPrompt(agentId, prompt, options),
-    rightWorkspaceVisible: false,
-    rightWorkspaceResizing: false,
-    updateStatus: undefined,
-  };
-}
-
-async function respondToEmbeddedPlan(agentId: string, resolution: 'accept' | 'revise' | 'cancel', feedback?: string): Promise<void> {
-  try {
-    await props.agentConversationActions?.planReview(agentId, resolution, feedback);
-    props.agentConversationActions?.setPlanMode(agentId, resolution === 'revise');
-    closeRightWorkspaceTab(agentId, 'plan');
-  } catch (error) { ElMessage.error(localizedErrorMessage(error, t)); }
-}
-
-function forwardAgentPrompt(agentId: string, prompt: string, options?: RendererSendPromptOptions): void | Promise<void> {
-  const visualize = prompt.match(/^\/visualize(?:\s+([\s\S]*))?$/u);
-  if (visualize && !options?.attachments?.length) {
-    const direction = visualize[1]?.trim();
-    return startVisualizeForAgent(agentId, direction ? { prompt: direction } : undefined);
-  }
-  if (prompt.trim() === '/review' && !options?.attachments?.length) {
-    openRightWorkspaceTab('codeReview', agentId);
-    return;
-  }
-  const clarification = pendingReviewClarification.value;
-  if (clarification?.agentId === agentId && !options?.attachments?.length) {
-    return props.discussCodeReviewFinding(agentId, { sessionId: clarification.sessionId, roundId: clarification.roundId, findingId: clarification.findingId, question: prompt }).then(() => {
-      if (pendingReviewClarification.value === clarification) pendingReviewClarification.value = null;
-    });
-  }
-  return props.agentConversationActions?.send(agentId, prompt, options);
-}
-
-watch(() => new Map(props.snapshot.agents.map(agent => [agent.id, agent.teamId])), (teams, previousTeams) => {
-  for (const [attachedId, hostId] of Object.entries(attachedHostByAgentId)) {
-    if (teams.has(attachedId) && teams.has(hostId)
-      && teams.get(attachedId) === previousTeams.get(attachedId)
-      && teams.get(hostId) === previousTeams.get(hostId)) continue;
-    closeRightWorkspaceTab(hostId, rightWorkspaceAgentTab(attachedId));
-  }
-});
 
 async function startVisualizeForAgent(agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput): Promise<void> {
   const alreadyOpen = rightWorkspaceFor(agentId).tabs.includes('visualize');
@@ -1661,20 +1588,6 @@ async function startVisualizeForAgent(agentId: string, input?: import('@codex-cl
 
 function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
   closeRightWorkspaceTabLocal(agentId, tab);
-  const containingHost = attachedHostByAgentId[agentId];
-  if (containingHost) closeRightWorkspaceTabLocal(containingHost, rightWorkspaceArtifactTab(agentId, tab));
-  if (isRightWorkspaceArtifactTab(tab)) {
-    const artifact = rightWorkspaceArtifact(tab);
-    closeRightWorkspaceTab(artifact.agentId, artifact.tab);
-    return;
-  }
-  if (isRightWorkspaceAgentTab(tab)) {
-    const attachedAgentId = rightWorkspaceAgentId(tab);
-    if (attachedHostByAgentId[attachedAgentId] === agentId) {
-      releaseAttachedArtifacts(agentId, attachedAgentId);
-      delete attachedHostByAgentId[attachedAgentId];
-    }
-  }
   const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
   if (tab === 'visualize' && visualize?.isOpen) {
     void props.setVisualizeOpen(agentId, { open: false }).catch(error => {
@@ -1690,7 +1603,7 @@ watch(
     for (const entry of entries) {
       const workspace = rightWorkspaceFor(entry.agentId);
       if (entry.visualize?.isOpen && !workspace.tabs.includes('visualize')) {
-        openRightWorkspaceTab('visualize', entry.agentId);
+        openRightWorkspaceTabLocal('visualize', entry.agentId);
       } else if (!entry.visualize?.isOpen && workspace.tabs.includes('visualize')) {
         closeRightWorkspaceTabLocal(entry.agentId, 'visualize');
       }
@@ -1720,6 +1633,53 @@ const {
 function openAgentGitDiffPreview(agentId = currentAgent.value?.id, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<void> {
   return agentId ? openAgentGitDiffForAgent(agentId, target) : Promise.resolve();
 }
+const imageAnnotation = useImageAnnotation({
+  composerAttachments: () => props.composerAttachments,
+  composerState: () => props.composerState,
+  currentAgentId: () => currentAgent.value?.id,
+  debugFallbackImageSource: debugAnnotationScreenshotUrl,
+  notifyError: (message) => ElMessage.error(message),
+  updateComposerAttachments: (agentId, attachments) => {
+    emit('update:composerAttachments', { agentId, attachments });
+  },
+  updateComposerState: (agentId, state) => {
+    emit('update:composerState', { agentId, state });
+  },
+});
+const {
+  activeCounts: activeAttachmentAnnotationCounts,
+  close: closeImageAnnotation,
+  fileName: imageAnnotationFileName,
+  forward: forwardCodexPromptWithImageAnnotations,
+  handleError: handleImageAnnotationError,
+  imageSource: imageAnnotationImageSource,
+  initialAnnotations: imageAnnotationInitialAnnotations,
+  openAttachment: openAttachmentImageAnnotation,
+  openDebug: openDebugImageAnnotation,
+  pixelRatio: imageAnnotationPixelRatio,
+  prune: pruneSavedImageAnnotations,
+  save: saveImageAnnotation,
+  target: attachmentAnnotationTarget,
+  visible: imageAnnotationVisible,
+} = imageAnnotation;
+const chatTextAnnotation = useChatTextAnnotations({
+  currentAgentId: () => currentAgent.value?.id,
+});
+const {
+  activeAnnotations: activeChatTextAnnotations,
+  add: addChatTextAnnotation,
+  forward: forwardCodexPromptWithChatTextAnnotations,
+  remove: removeChatTextAnnotation,
+} = chatTextAnnotation;
+const visualizationAnnotation = useVisualizationAnnotations({
+  currentAgentId: () => currentAgent.value?.id,
+});
+const {
+  activeAnnotations: activeVisualizationAnnotations,
+  add: addVisualizationAnnotation,
+  forward: forwardCodexPromptWithVisualizationAnnotations,
+  remove: removeVisualizationAnnotation,
+} = visualizationAnnotation;
 const cockpitBacklogState = useCockpitBacklog({
   configure: (input) => props.configureWorkBacklog(input),
   confirmLoadAll: async () => {
@@ -1802,6 +1762,10 @@ const conversationMessages = computed(() => {
   return [...messages, fixture.message];
 });
 const conversationLatestTurnId = computed(() => providerConversation.value?.turnIds.at(-1) ?? null);
+function latestTurnIdForAgent(agentId: string): string | null {
+  const view = props.agentConversationFor?.(agentId);
+  return (view?.codexSnapshot ?? view?.claudeSnapshot)?.turnIds.at(-1) ?? null;
+}
 const conversationHasRunningPlanTool = computed(() => conversationMessages.value.some(
   (message) => message.parts.some(
     (part) => part.type === 'tool' && part.status === 'running' && part.metadata?.planProgress === true,
@@ -1891,23 +1855,16 @@ const currentModelFavorite = computed<ModelFavorite | null>(() => {
     serviceTier: props.selectedServiceTier === 'default' ? null : props.selectedServiceTier,
   };
 });
-const visibleModelFavorites = computed(() => {
-  const agent = currentAgent.value;
-  if (!agent) return [];
-  const availableModelIds = new Set(props.backendModels.map((model) => model.id));
-  return props.snapshot.general.modelFavorites.filter((favorite) => (
-    favorite.backend === agent.backend && availableModelIds.has(favorite.modelId)
-  ));
-});
 const managedModelFavorites = computed(() => (
   modelFavoritesDialogBackend.value
     ? props.snapshot.general.modelFavorites.filter((favorite) => favorite.backend === modelFavoritesDialogBackend.value)
     : []
 ));
-const modelFavoriteMenuItems = computed<CodexComposerMenuItem[]>(() => {
-  const current = currentModelFavorite.value;
+const modelFavoriteMenuItems = computed(() => buildModelFavoriteMenuItems(currentModelFavorite.value, props.backendModels));
+function buildModelFavoriteMenuItems(current: ModelFavorite | null, models: BackendModelOption[]): CodexComposerMenuItem[] {
   if (!current) return [];
-  const favorites = visibleModelFavorites.value;
+  const availableModelIds = new Set(models.map(model => model.id));
+  const favorites = props.snapshot.general.modelFavorites.filter(favorite => favorite.backend === current.backend && availableModelIds.has(favorite.modelId));
   const currentIsFavorite = favorites.some((favorite) => sameModelFavorite(favorite, current));
   const items: CodexComposerMenuItem[] = [];
   if (favorites.length > 0) {
@@ -1931,11 +1888,11 @@ const modelFavoriteMenuItems = computed<CodexComposerMenuItem[]>(() => {
       }],
     });
     items.push(...favorites.map((favorite) => {
-      const fastTierLabel = modelFavoriteFastTierLabel(favorite, props.backendModels);
+      const fastTierLabel = modelFavoriteFastTierLabel(favorite, models);
       return {
         closeOnSelect: true,
         id: `model-favorite:${modelFavoriteKey(favorite)}`,
-        label: modelFavoriteModelLabel(favorite, props.backendModels),
+        label: modelFavoriteModelLabel(favorite, models),
         payload: { kind: 'model-favorite-select', favorite },
         type: 'action' as const,
         value: modelFavoriteEffortLabel(favorite),
@@ -1954,7 +1911,25 @@ const modelFavoriteMenuItems = computed<CodexComposerMenuItem[]>(() => {
     });
   }
   return items;
-});
+}
+function splitModelFavoriteMenuItems(agentId: string): CodexComposerMenuItem[] {
+  const view = props.agentConversationFor?.(agentId);
+  if (!view) return [];
+  const composer = view.composer;
+  const model = composer.models.find(model => model.id === composer.selectedModelId)
+    ?? composer.models.find(model => model.isDefault) ?? composer.models[0];
+  if (!model) return [];
+  return buildModelFavoriteMenuItems({
+    backend: view.agent.backend,
+    modelId: model.id,
+    reasoningEffort: composer.selectedReasoningEffort ?? model.defaultReasoningEffort ?? model.supportedReasoningEfforts?.[0]?.reasoningEffort ?? null,
+    serviceTier: composer.selectedServiceTier === 'default' ? null : composer.selectedServiceTier,
+  }, composer.models);
+}
+function selectSplitModelMenuItem(agentId: string, item: Parameters<NonNullable<CodexConversationPaneActions['menuSelect']>>[0]): void | Promise<void> {
+  const command = modelFavoriteCommand(item.payload);
+  if (command) return handleModelFavoriteCommand(command, agentId);
+}
 const conversationPaneState: CodexConversationPaneState = {
   identity: {
     get conversationKey() { return conversationKey.value; },
@@ -2037,92 +2012,52 @@ const conversationPaneState: CodexConversationPaneState = {
     get canRetryTurn() { return props.backendCapabilities.retryTurn; },
   },
 };
-const mainConversationActions: AgentConversationActions = {
-  planReview: (_id, resolution, feedback) => props.respondToPlanReview?.(resolution, feedback),
-  prepare: () => props.retryAgentHistory(),
-  clearGoal: () => emit('clear-goal'),
-  threadFlag: (_id, response) => props.respondToThreadFlagAction?.(response),
-  loadOlder: (id) => props.loadOlderAgentHistory?.(id),
-  send: (_id, prompt, options) => forwardPrompt(prompt, options),
-  steer: (_id, prompt, options) => forwardSteerPrompt(prompt, options),
-  interrupt: () => emit('interrupt-agent'),
-  deleteTurn: (_id, turnId) => props.deleteTurnAction?.(turnId) ?? emit('delete-turn', turnId),
-  editTurn: (_id, payload) => props.editTurnAction?.(payload) ?? emit('edit-turn', payload),
-  retryTurn: (_id, turnId) => props.retryTurnAction?.(turnId) ?? emit('retry-turn', turnId),
+const conversationPaneActions: CodexConversationPaneActions = {
+  cancel: () => emit('interrupt-agent'),
   continueInterruptedTurn: () => props.continueInterruptedTurnAction?.(),
-  resolveApproval: (_id, ...args) => forwardApprovalResolution(...args),
+  clearGoal: () => emit('clear-goal'),
   clientResponse: (response) => {
-    if (debugUserQuestions.value?.requestId === response.id) { debugUserQuestions.value = null; return; }
+    if (debugUserQuestions.value?.requestId === response.id) {
+      debugUserQuestions.value = null;
+      return;
+    }
     emit('client-response', response);
   },
-  selectModel: (_id, value) => emit('select-model', value),
-  selectReasoningEffort: (_id, value) => emit('select-reasoning-effort', value),
-  selectServiceTier: (_id, value) => emit('select-service-tier', value),
-  setPlanMode: (_id, value) => emit('update:planMode', value),
-  setApprovalPreset: (_id, value) => emit('select-approval-preset', value),
-  setPermissionMode: (_id, value) => emit('select-permission-mode', value),
-  updateComposerState: (agentId, state) => emit('update:composerState', { agentId, state }),
-  updateAttachments: (agentId, attachments) => emit('update:composerAttachments', { agentId, attachments }),
-  deleteQueuedPrompt: (_id, promptId) => emit('delete-queued-prompt', promptId),
-  updateQueuedPrompt: (_id, promptId, prompt) => emit('update-queued-prompt', promptId, prompt),
-  steerQueuedPrompt: (_id, promptId, prompt) => emit('steer-queued-prompt', promptId, prompt),
-};
-const mainConversation = useAgentConversation({
-  agentId: () => currentAgent.value?.id,
-  state: conversationPaneState,
-  actions: {
-    ...mainConversationActions,
-    ...props.agentConversationActions,
-    send: mainConversationActions.send,
-    steer: mainConversationActions.steer,
-    clientResponse: mainConversationActions.clientResponse,
-    resolveApproval: mainConversationActions.resolveApproval,
+  deleteTurn: (turnId) => props.deleteTurnAction?.(turnId) ?? emit('delete-turn', turnId),
+  deleteQueuedPrompt: (promptId) => emit('delete-queued-prompt', promptId),
+  editTurn: (payload) => props.editTurnAction?.(payload) ?? emit('edit-turn', payload),
+  forkTurn: (turnId) => emit('fork-turn', turnId),
+  interrupt: () => emit('interrupt-agent'),
+  loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
+  menuSelect: (item) => {
+    const favoriteCommand = modelFavoriteCommand(item.payload);
+    if (favoriteCommand) {
+      void handleModelFavoriteCommand(favoriteCommand);
+      return;
+    }
+    const command = permissionModeCommand(item.payload);
+    if (command) emit('select-permission-mode', command.mode);
   },
-  beforeSubmit: () => backendSwitch.settled(),
-  debugFallbackImageSource: debugAnnotationScreenshotUrl,
-  notifyError: message => ElMessage.error(message),
-  openLink: link => agentWorkspace.value?.openConversationLink(link),
+  openLink: (link) => agentWorkspace.value?.openConversationLink(link),
   openImage: (image, context) => agentWorkspace.value?.openConversationImage(image, context) ?? false,
-  openVisualization: visualization => agentWorkspace.value?.openConversationVisualization(visualization),
-  onThreadFlag: (agentId, response) => {
-    if (response.id === 'ready_for_review' && response.action === 'execute') openRightWorkspaceTab('codeReview', agentId);
+  openVisualization: (visualization) => agentWorkspace.value?.openConversationVisualization(visualization),
+  resolveApproval: forwardApprovalResolution,
+  retryTurn: (turnId) => props.retryTurnAction?.(turnId) ?? emit('retry-turn', turnId),
+  sendFollowUp: forwardCodexPrompt,
+  steer: forwardCodexSteerPrompt,
+  steerQueuedPrompt: (promptId, prompt) => emit('steer-queued-prompt', promptId, prompt),
+  updateQueuedPrompt: (promptId, prompt) => emit('update-queued-prompt', promptId, prompt),
+  submit: forwardCodexPrompt,
+  updateAttachments: updateConversationAttachments,
+  updateComposerState: updateConversationComposerState,
+  updateSettings: (settings) => {
+    if (settings.approvalPreset !== undefined) emit('select-approval-preset', settings.approvalPreset);
+    if (settings.modelId !== undefined) emit('select-model', settings.modelId);
+    if (settings.planMode !== undefined) emit('update:planMode', settings.planMode);
+    if (settings.reasoningEffort !== undefined) emit('select-reasoning-effort', settings.reasoningEffort);
+    if (settings.serviceTier !== undefined) emit('select-service-tier', settings.serviceTier);
   },
-  overrides: {
-    forkTurn: turnId => emit('fork-turn', turnId),
-    menuSelect: item => {
-      const favoriteCommand = modelFavoriteCommand(item.payload);
-      if (favoriteCommand) { void handleModelFavoriteCommand(favoriteCommand); return; }
-      const command = permissionModeCommand(item.payload);
-      if (command) emit('select-permission-mode', command.mode);
-    },
-  },
-});
-const { controller: conversationPaneController, imageAnnotation, chatTextAnnotation, visualizationAnnotation,
-  threadFlagBusy, respondToThreadFlag } = mainConversation;
-const {
-  activeCounts: activeAttachmentAnnotationCounts,
-  close: closeImageAnnotation,
-  fileName: imageAnnotationFileName,
-  handleError: handleImageAnnotationError,
-  imageSource: imageAnnotationImageSource,
-  initialAnnotations: imageAnnotationInitialAnnotations,
-  openAttachment: openAttachmentImageAnnotation,
-  openDebug: openDebugImageAnnotation,
-  pixelRatio: imageAnnotationPixelRatio,
-  save: saveImageAnnotation,
-  target: attachmentAnnotationTarget,
-  visible: imageAnnotationVisible,
-} = imageAnnotation;
-const {
-  activeAnnotations: activeChatTextAnnotations,
-  add: addChatTextAnnotation,
-  remove: removeChatTextAnnotation,
-} = chatTextAnnotation;
-const {
-  activeAnnotations: activeVisualizationAnnotations,
-  add: addVisualizationAnnotation,
-  remove: removeVisualizationAnnotation,
-} = visualizationAnnotation;
+};
 
 type ModelFavoriteCommand =
   | { kind: 'model-favorite-add' | 'model-favorite-select'; favorite: ModelFavorite }
@@ -2139,13 +2074,19 @@ function modelFavoriteCommand(payload: unknown): ModelFavoriteCommand | null {
   return { kind, favorite: copyModelFavorite(favorite as ModelFavorite) };
 }
 
-async function handleModelFavoriteCommand(command: ModelFavoriteCommand): Promise<void> {
+async function handleModelFavoriteCommand(command: ModelFavoriteCommand, agentId?: string): Promise<void> {
   if (command.kind === 'model-favorite-manage') {
-    modelFavoritesDialogBackend.value = currentAgent.value?.backend ?? null;
+    modelFavoritesDialogBackend.value = (agentId ? props.snapshot.agents.find(agent => agent.id === agentId) : currentAgent.value)?.backend ?? null;
     modelFavoritesDialogVisible.value = modelFavoritesDialogBackend.value !== null;
     return;
   }
   if (command.kind === 'model-favorite-select') {
+    if (agentId && props.agentConversationActions) {
+      props.agentConversationActions.selectModel(agentId, command.favorite.modelId);
+      if (command.favorite.reasoningEffort !== null) props.agentConversationActions.selectReasoningEffort(agentId, command.favorite.reasoningEffort);
+      props.agentConversationActions.selectServiceTier(agentId, command.favorite.serviceTier);
+      return;
+    }
     emit('select-model', command.favorite.modelId);
     if (command.favorite.reasoningEffort !== null) {
       emit('select-reasoning-effort', command.favorite.reasoningEffort);
@@ -2195,16 +2136,20 @@ function permissionModeCommand(payload: unknown): { kind: 'permission-mode'; mod
     ? { kind: 'permission-mode', mode: record.mode }
     : null;
 }
+const conversationPaneController = createCodexConversationPaneController({
+  state: conversationPaneState,
+  actions: conversationPaneActions,
+});
 
 function saveActivePromptDraft(): void {
   if (activeSurface.value === 'mission') void missionConversationPane.value?.saveCurrentDraft();
-  else activeComposerWorkspace()?.saveCurrentDraft();
+  else focusedConversationPanel()?.saveCurrentDraft();
 }
 
 function openActiveSavedPromptDrafts(): void {
   void nextTick(() => {
     if (activeSurface.value === 'mission') missionConversationPane.value?.openSavedDraftPicker();
-    else activeComposerWorkspace()?.openSavedDraftPicker();
+    else focusedConversationPanel()?.openSavedDraftPicker();
   });
 }
 
@@ -2243,8 +2188,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     agents: () => props.snapshot.agents,
     attachmentsEnabled: () => props.backendCapabilities.attachments,
     composerAttachments: () => props.composerAttachments,
-    composerAgent: () => props.snapshot.agents.find(agent => agent.id === activeComposerAgentId()) ?? null,
-    currentAgent: () => currentAgent.value,
+    currentAgent: () => split.focusedPane.value.agentId ? currentAgent.value : null,
     canReplaceConversation: () => Boolean(currentAgent.value && summaryReplacementAgentIds.value.includes(currentAgent.value.id)),
     isAgentWorkspaceVisible: () => isAgentWorkspaceVisible.value,
     isModalDialogVisible: () => isModalDialogVisible.value,
@@ -2263,7 +2207,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
     editAgent: openEditAgent,
     forkAgent: (agentId) => { if (forkableAgentIds.value.includes(agentId)) emit('fork-agent', agentId); },
-    focusComposer: (agentId) => activeComposerWorkspace(agentId)?.focusComposer(),
+    focusComposer: () => focusedConversationPanel()?.focusComposer(),
     newTeam: openNewTeam,
     openAgentPalette: () => { agentQuickOpenVisible.value = true; },
     openSavedPromptDrafts: openActiveSavedPromptDrafts,
@@ -2670,25 +2614,21 @@ function selectTeamFromRail(teamId: string): void {
 
 function selectAgentFromShell(agentId: string): void {
   activeSurface.value = 'agent';
-  const hostId = attachedHostByAgentId[agentId];
-  if (hostId && props.snapshot.agents.some((agent) => agent.id === hostId)) {
-    openRightWorkspaceTab(rightWorkspaceAgentTab(agentId), hostId);
-    const host = props.snapshot.agents.find((agent) => agent.id === hostId)!;
-    if (host.teamId && host.teamId !== activeTeam.value?.id) emit('select-team', host.teamId);
-    if (hostId !== currentAgent.value?.id) emit('select-agent', hostId);
-    return;
-  }
+  split.select(agentId);
   emit('select-agent', agentId);
 }
 
 function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): void {
-  if (!attachedHostByAgentId[payload.agentId] && payload.teamId !== activeTeam.value?.id) emit('select-team', payload.teamId);
-  selectAgentFromShell(payload.agentId);
+  activeSurface.value = 'agent';
+  emit('select-team', payload.teamId);
+  emit('select-agent', payload.agentId);
 }
 
 function selectAgentFromPalette(payload: { agentId: string; teamId: string }): void {
-  if (!attachedHostByAgentId[payload.agentId] && payload.teamId !== activeTeam.value?.id) emit('select-team', payload.teamId);
-  selectAgentFromShell(payload.agentId);
+  activeSurface.value = 'agent';
+  if (payload.teamId === activeTeam.value?.id) split.select(payload.agentId);
+  if (payload.teamId !== activeTeam.value?.id) emit('select-team', payload.teamId);
+  emit('select-agent', payload.agentId);
 }
 
 function openResumeSession(agentId: string): void {
@@ -2706,6 +2646,22 @@ async function respondToPlanReview(resolution: 'accept' | 'revise' | 'cancel', f
   }
   if (currentAgent.value?.id === agentId) emit('update:planMode', resolution === 'revise');
   if (agentId) closeRightWorkspaceTab(agentId, 'plan');
+}
+
+const threadFlagBusy = ref(false);
+async function respondToThreadFlag(response: ThreadFlagResponse): Promise<void> {
+  if (!props.respondToThreadFlagAction || threadFlagBusy.value) return;
+  threadFlagBusy.value = true;
+  try {
+    await props.respondToThreadFlagAction(response);
+    if (response.id === 'ready_for_review' && response.action === 'execute') {
+      openRightWorkspaceTab('codeReview');
+    }
+  } catch (error) {
+    ElMessage.error(localizedErrorMessage(error, t));
+  } finally {
+    threadFlagBusy.value = false;
+  }
 }
 
 function confirmPlan(): void {
@@ -2757,10 +2713,7 @@ function clarifyCodeReviewFinding(payload: {
     finding,
   };
   selectAgentFromShell(payload.agentId);
-  void nextTick(() => {
-    if (attachedHostByAgentId[payload.agentId]) embeddedWorkspaces.get(payload.agentId)?.focusComposer();
-    else agentWorkspace.value?.focusComposer();
-  });
+  void nextTick(() => focusedConversationPanel()?.focusComposer());
 }
 
 function prepareMissionReviewDiscussion(payload: PendingMissionReviewDiscussion): void {
@@ -2830,6 +2783,51 @@ function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions)
   } else {
     emit('steerPrompt', prompt);
   }
+}
+
+async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  await backendSwitch.settled();
+  await forwardCodexPromptWithVisualizationAnnotations(
+    prompt,
+    options,
+    (visualizationPrompt, visualizationOptions) => forwardCodexPromptWithChatTextAnnotations(
+      visualizationPrompt,
+      visualizationOptions,
+      (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
+        nextPrompt,
+        nextOptions,
+        forwardPrompt,
+      ),
+    ),
+  );
+}
+
+async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  await forwardCodexPromptWithVisualizationAnnotations(
+    prompt,
+    options,
+    (visualizationPrompt, visualizationOptions) => forwardCodexPromptWithChatTextAnnotations(
+      visualizationPrompt,
+      visualizationOptions,
+      (nextPrompt, nextOptions) => forwardCodexPromptWithImageAnnotations(
+        nextPrompt,
+        nextOptions,
+        forwardSteerPrompt,
+      ),
+    ),
+  );
+}
+
+function updateConversationComposerState(state: CodexComposerState): void {
+  const agentId = currentAgent.value?.id;
+  if (agentId) emit('update:composerState', { agentId, state });
+}
+
+function updateConversationAttachments(attachments: readonly CodexNativeAttachment[]): void {
+  const agentId = currentAgent.value?.id;
+  if (!agentId) return;
+  pruneSavedImageAnnotations(agentId, attachments);
+  emit('update:composerAttachments', { agentId, attachments });
 }
 
 async function openAgentIn(

@@ -1,85 +1,51 @@
 <template>
   <AgentHeader
-    v-if="!artifactTab && !isAgentEmpty && currentAgent"
-    ref="agentHeader"
-    :agent="currentAgent"
-    :repository-icon="repositoryIconForAgent(currentAgent, snapshot.general.repositoryIcons)"
-    :git-status="currentAgentGitStatus"
-    :last-turn-git-diff="lastTurnGitDiff"
-    :backend-runtime="currentBackendRuntime"
-    :workspace-open="rightWorkspaceVisible"
-    :is-loading="isLoading"
-    :sidebar-collapsed="embedded ? false : agentSidebarCollapsed"
-    :compact="embedded"
-    :collapsible="embedded"
-    :collapsed="headerCollapsed"
-    :show-workspace-toggle="!embedded"
-    @toggle-collapse="headerCollapsed = !headerCollapsed"
-    :update-status="clawHostCapabilities.appUpdates ? updateStatus : undefined"
-    :execution-plan-available="Boolean(currentTurnPlan)"
-    :execution-plan-open="executionPlanVisible"
-    :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(currentAgent)"
-    :open-in-catalog="openInApplications"
-    :subagent-tree="currentSubagentTree"
-    :selected-subagent-conversation-id="selectedSubagentConversationIdFor(currentAgent.id)"
-    :get-git-workflow="props.getAgentGitWorkflow"
-    :generate-git-message="props.generateAgentGitMessage"
-    :commit-git-changes="props.commitAgentGitChanges"
-    :push-git-branch="props.pushAgentGitBranch"
-    :create-git-pull-request="props.createAgentGitPullRequest"
-    :merge-git-branch="props.mergeAgentGitBranch"
-    :update-git-branch-from-base="props.updateAgentGitBranchFromBase"
-    :report-back-agent-name="reportBackAgentName"
-    @expand-sidebar="emit('expand-sidebar')"
-    @toggle-execution-plan="toggleExecutionPlan"
-    @toggle-workspace="toggleRightWorkspace"
-    @open-git-diff="openAgentGitDiffPreview(currentAgent.id, $event)"
-    @select-git-diff-target="persistGitDiffTarget(currentAgent.id, $event)"
-    @open-in="openAgentIn(currentAgent.id, $event)"
-    @select-subagent="openSubagent(currentAgent.id, $event)"
-    @install-update="emit('install-update')"
+    v-if="!splitHeaders && !isAgentEmpty && currentAgent"
+    v-bind="headerBindingsFor(emptySplitPane ? null : currentAgent.id, true, true)"
   />
-  <div ref="workspaceBody" class="app-shell__body" @dragstart.capture="linkDrag.start" :class="{ 'app-shell__body--embedded': embedded }">
-    <AgentEmptyState v-if="!artifactTab && isAgentEmpty" @start-work="handleStartWorkAction" />
+  <div ref="workspaceBody" class="app-shell__body" @dragstart.capture="linkDrag.start">
+    <AgentEmptyState v-if="isAgentEmpty" @start-work="handleStartWorkAction" />
+    <div v-else class="app-shell__conversations" :class="{ 'app-shell__conversations--split': splitHeaders }">
+    <div v-if="$slots['layout-control']" class="app-shell__layout-control">
+      <slot name="layout-control" />
+    </div>
+    <slot name="conversation" :plan="currentTurnPlan" :plan-visible="executionPlanVisible" :close-plan="closeExecutionPlan" :header-bindings-for="headerBindingsFor">
     <ConversationPane
-      v-else-if="!artifactTab"
       ref="conversationPane"
-      :controller="pane.controller"
+      :controller="conversationPaneController"
       :agent="currentAgent"
       :agents="snapshot.agents"
       :saved-prompt-drafts="snapshot.general.savedPromptDrafts"
       :save-prompt-draft="savePromptDraft"
       :remove-prompt-draft="removePromptDraft"
-      :attachment-annotation-counts="pane.imageCounts"
-      :text-annotations="pane.textAnnotations"
-      :visualization-annotations="pane.visualizationAnnotations"
+      :attachment-annotation-counts="activeAttachmentAnnotationCounts"
+      :text-annotations="chatTextAnnotations"
+      :visualization-annotations="visualizationAnnotations"
       :review-finding="reviewFindingAttachment"
       :plan="currentTurnPlan"
       :plan-visible="executionPlanVisible"
       :history-load-failed="historyLoadFailed"
       :history-loading="isConversationLoading"
       :has-visible-messages="hasVisibleMessages"
-      :thread-flag-busy="pane.threadFlagBusy"
-      @focusin="currentAgent && emit('conversation-activated', currentAgent.id)"
-      @pointerdown="currentAgent && emit('conversation-activated', currentAgent.id)"
-      @annotate-attachment="pane.openAttachment"
-      @add-text-annotation="pane.addTextAnnotation($event.selection, $event.comment)"
+      :thread-flag-busy="threadFlagBusy"
+      @annotate-attachment="openAttachmentImageAnnotation"
+      @add-text-annotation="addChatTextAnnotation($event.selection, $event.comment)"
       @close-plan="closeExecutionPlan"
       @retry-history="retryConversationHistory"
-      @thread-flag="pane.respondToThreadFlag($event)"
-      @remove-text-annotation="pane.removeTextAnnotation"
-      @remove-visualization-annotation="pane.removeVisualizationAnnotation"
+      @thread-flag="respondToThreadFlag($event)"
+      @remove-text-annotation="removeChatTextAnnotation"
+      @remove-visualization-annotation="removeVisualizationAnnotation"
       @remove-review-finding="emit('removeReviewFindingAttachment')"
     />
+    </slot>
+    </div>
     <RightWorkspacePanel
-      v-for="agent in panelAgents"
+      v-for="agent in snapshot.agents"
       :key="agent.id"
-      v-show="Boolean(artifactTab) || isRightWorkspaceVisible(agent.id)"
+      v-show="!emptySplitPane && isRightWorkspaceVisible(agent.id)"
       class="app-shell__right-workspace"
-      :style="{ flexBasis: artifactTab ? '100%' : `${rightWorkspaceFor(agent.id).width}px` }"
-      :active-tab="artifactTab ?? rightWorkspaceFor(agent.id).activeTab"
-      :content-only="Boolean(artifactTab)"
-      :artifact-label="artifactLabel"
+      :style="{ flexBasis: `${rightWorkspaceFor(agent.id).width}px` }"
+      :active-tab="rightWorkspaceFor(agent.id).activeTab"
       :agent="agent"
       :agents="snapshot.agents"
       :files="agent.id === currentAgent?.id ? agentFiles : []"
@@ -92,8 +58,8 @@
       :file-panels="rightWorkspaceFor(agent.id).filePanels"
       :image-panels="rightWorkspaceFor(agent.id).imagePanels"
       :diff-panels="rightWorkspaceFor(agent.id).diffPanels"
-      :tabs="artifactTab ? [artifactTab] : rightWorkspaceFor(agent.id).tabs"
-      :visible="(artifactTab ? artifactVisible : isRightWorkspaceVisible(agent.id)) && !isModalDialogVisible"
+      :tabs="rightWorkspaceFor(agent.id).tabs"
+      :visible="!emptySplitPane && isRightWorkspaceVisible(agent.id) && !isModalDialogVisible"
       :browser-id="rightWorkspaceFor(agent.id).browserId"
       :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
       :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
@@ -145,14 +111,7 @@
       @annotate-visualization="attachVisualizationAnnotation"
       @dragover="linkDrag.over"
       @drop="linkDrag.drop"
-    >
-      <template #attached-agent="{ agentId }">
-        <slot name="attached-agent" :agent-id="agentId" :workspace-props="props" />
-      </template>
-      <template #agent-artifact="artifact">
-        <slot name="agent-artifact" v-bind="artifact" :workspace-props="props" />
-      </template>
-    </RightWorkspacePanel>
+    />
     <WorkspaceLinkDropTarget
       v-if="linkDrag.draggedLink.value && !rightWorkspaceVisible"
       class="app-shell__closed-workspace-drop"
@@ -160,31 +119,16 @@
       @drop="linkDrag.drop"
     />
     <div
-      v-if="!embedded && rightWorkspaceVisible"
+      v-if="!emptySplitPane && rightWorkspaceVisible"
       class="app-shell__right-workspace-resizer"
       :aria-label="$t('surface.appShell.resizeRightWorkspace')"
       @pointerdown="startRightWorkspaceResize"
     />
-    <div v-if="!embedded && rightWorkspaceResizing" class="app-shell__right-workspace-resize-shield" aria-hidden="true" />
+    <div v-if="rightWorkspaceResizing" class="app-shell__right-workspace-resize-shield" aria-hidden="true" />
   </div>
-  <ImageAnnotationDialog
-    v-if="embeddedConversation && !artifactTab"
-    :visible="embeddedConversation.imageAnnotation.visible.value"
-    :image-src="embeddedConversation.imageAnnotation.imageSource.value"
-    :initial-annotations="embeddedConversation.imageAnnotation.initialAnnotations.value"
-    :initial-pixel-ratio="embeddedConversation.imageAnnotation.pixelRatio.value"
-    :file-name="embeddedConversation.imageAnnotation.fileName.value"
-    @close="embeddedConversation.imageAnnotation.close"
-    @image-error="embeddedConversation.imageAnnotation.handleError"
-    @save="embeddedConversation.imageAnnotation.save"
-  />
 </template>
 
 <script setup lang="ts">
-import { agentConversationState, useAgentConversation, type AgentConversationActions } from './use-agent-conversation';
-import type { AgentConversationView } from '../app-state';
-import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
-import { useBackendSwitch } from './backend-selection';
 import type {
   Agent,
   AgentFileSearchItem,
@@ -224,7 +168,7 @@ import type {
   CodexMessageTextSelection,
 } from '@codex-app-sdk/vue';
 import { ElMessage } from 'element-plus';
-import { computed, reactive, ref, toRefs, watch } from 'vue';
+import { computed, reactive, ref, toRefs, watch, type ComponentPublicInstance } from 'vue';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { translate } from '../i18n';
@@ -243,9 +187,6 @@ import type { VisualizationAnnotation, VisualizationAnnotationInput } from './us
 import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { fileBasename } from './use-workspace-previews';
 import {
-  isRightWorkspaceFileTab,
-  isRightWorkspaceDiffTab,
-  isRightWorkspaceImageTab,
   isRightWorkspaceSubagentTab,
   rightWorkspaceSubagentConversationId,
   rightWorkspaceSubagentTab,
@@ -255,13 +196,7 @@ import {
   type RightWorkspaceBrowserTab,
 } from './right-workspace';
 
-export type AgentWorkspaceProps = {
-  embedded?: boolean;
-  artifactVisible?: boolean;
-  attachedAgentIds?: string[];
-  artifactTab?: RightWorkspaceTab;
-  conversationView?: AgentConversationView;
-  conversationActions?: AgentConversationActions;
+const props = defineProps<{
   activeAttachmentAnnotationCounts: Readonly<Record<string, number>>;
   addChatTextAnnotation: (selection: CodexMessageTextSelection, comment: string) => void;
   addVisualizationAnnotation: (annotation: VisualizationAnnotationInput) => void;
@@ -280,6 +215,9 @@ export type AgentWorkspaceProps = {
   visualizationAnnotations: readonly VisualizationAnnotation[];
   reviewFindingAttachment?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
   currentAgent: Agent | null;
+  emptySplitPane?: boolean;
+  splitHeaders?: boolean;
+  latestTurnIdForAgent?: (agentId: string) => string | null;
   currentAgentGitStatus: AgentGitStatus | null;
   currentBackendRuntime: BackendRuntimeStatus;
   forwardPrompt: (prompt: string, options?: RendererSendPromptOptions) => void;
@@ -349,15 +287,11 @@ export type AgentWorkspaceProps = {
   selectVisualization: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
   deleteVisualization: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
   readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
-};
-const props = defineProps<AgentWorkspaceProps>();
+}>();
 
-const agentHeader = ref<{
-  showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void>;
-} | null>(null);
+const agentHeaders = new Map<string, InstanceType<typeof AgentHeader>>();
 
 const emit = defineEmits<{
-  'conversation-activated': [agentId: string];
   'close-agent': [agentId: string];
   'expand-sidebar': [];
   'install-update': [];
@@ -373,29 +307,18 @@ const emit = defineEmits<{
   'update:planMode': [enabled: boolean];
 }>();
 
-const reportBackAgentName = computed(() => {
-  const delegatedByAgentId = props.currentAgent?.delegatedByAgentId;
-  if (!delegatedByAgentId) return null;
-  const recipient = props.snapshot.agents.find((agent) => agent.id === delegatedByAgentId);
-  return recipient ? agentDisplayName(recipient) : null;
-});
-
 const {
   activeAttachmentAnnotationCounts,
   agentFiles,
-  agentSidebarCollapsed,
   closeRightWorkspaceTab,
   confirmPlan,
   conversationPaneController,
   currentAgent,
-  currentAgentGitStatus,
-  currentBackendRuntime,
   forwardPrompt,
   handleStartWorkAction,
   isAgentEmpty,
   isConversationLoading,
   historyLoadFailed,
-  isLoading,
   isModalDialogVisible,
   isRightWorkspaceVisible,
   openAgentIn,
@@ -421,74 +344,12 @@ const {
   startRightWorkspaceResize,
   toggleFileExplorer,
   toggleRightWorkspace,
-  updateStatus,
 } = toRefs(props);
-
-const headerCollapsed = ref(true);
-const panelAgents = computed(() => props.artifactTab ? (props.currentAgent ? [props.currentAgent] : []) : props.embedded ? [] : props.snapshot.agents.filter(agent => !props.attachedAgentIds?.includes(agent.id)));
-const backendSwitch = useBackendSwitch();
-const embeddedConversation = props.embedded && !props.artifactTab && props.conversationView && props.conversationActions
-  ? useAgentConversation({
-      agentId: () => props.conversationView?.agent.id,
-      state: agentConversationState(() => props.conversationView!),
-      actions: { ...props.conversationActions,
-        send: (_id, prompt, options) => props.forwardPrompt(prompt, options),
-      },
-      beforeSubmit: () => backendSwitch?.settled() ?? Promise.resolve(),
-      debugFallbackImageSource: '',
-      notifyError: message => ElMessage.error(message),
-      openLink: link => openConversationLink(link),
-      openImage: (image, context) => openConversationImage(image, context),
-      openVisualization: visualization => openConversationVisualization(visualization),
-      onThreadFlag: (agentId, response) => {
-        if (response.id === 'ready_for_review' && response.action === 'execute') openRightWorkspaceTab('codeReview', agentId);
-      },
-    }) : null;
-const pane = computed(() => embeddedConversation ? {
-  controller: embeddedConversation.controller,
-  imageCounts: embeddedConversation.imageAnnotation.activeCounts.value,
-  textAnnotations: embeddedConversation.chatTextAnnotation.activeAnnotations.value,
-  visualizationAnnotations: embeddedConversation.visualizationAnnotation.activeAnnotations.value,
-  threadFlagBusy: embeddedConversation.threadFlagBusy.value,
-  openAttachment: embeddedConversation.imageAnnotation.openAttachment,
-  addTextAnnotation: embeddedConversation.chatTextAnnotation.add,
-  removeTextAnnotation: embeddedConversation.chatTextAnnotation.remove,
-  removeVisualizationAnnotation: embeddedConversation.visualizationAnnotation.remove,
-  respondToThreadFlag: embeddedConversation.respondToThreadFlag,
-} : {
-  controller: props.conversationPaneController,
-  imageCounts: props.activeAttachmentAnnotationCounts,
-  textAnnotations: props.chatTextAnnotations,
-  visualizationAnnotations: props.visualizationAnnotations,
-  threadFlagBusy: props.threadFlagBusy,
-  openAttachment: props.openAttachmentImageAnnotation,
-  addTextAnnotation: props.addChatTextAnnotation,
-  removeTextAnnotation: props.removeChatTextAnnotation,
-  removeVisualizationAnnotation: props.removeVisualizationAnnotation,
-  respondToThreadFlag: props.respondToThreadFlag,
-});
-watch(() => [props.conversationView?.agent.id, props.conversationView?.agent.backend, props.conversationView?.agent.backendSession?.kind === 'codex' ? props.conversationView.agent.backendSession.threadId : props.conversationView?.agent.backendSession?.sessionId].join(':'), () => {
-  if (!embeddedConversation || !props.conversationView) return;
-  void Promise.resolve(props.conversationActions?.prepare(props.conversationView.agent.id)).catch(error => ElMessage.error(localizedErrorMessage(error, translate)));
-}, { immediate: true });
 
 const workspaceBody = ref<HTMLElement | null>(null);
 const conversationPane = ref<{ focusComposer(): void; openSavedDraftPicker(): void; saveCurrentDraft(): Promise<void> } | null>(null);
 const rightWorkspaces = props.rightWorkspaces;
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});
-
-watch(() => {
-  const review = props.conversationView?.agent.planReview;
-  return [review?.id, review?.status, review?.markdown].join('\0');
-}, () => {
-  const agent = props.conversationView?.agent;
-  const review = agent?.planReview;
-  if (!embeddedConversation || !agent || review?.status !== 'pending') return;
-  rightWorkspaceFor(agent.id).planPanel = {
-    kind: 'markdown', purpose: 'plan', title: translate('panels.plan'), content: review.markdown, state: 'idle',
-  };
-  openRightWorkspaceTab('plan', agent.id);
-}, { immediate: true });
 
 const currentTurnPlan = computed<ThreadPlan | null>(() => {
   const plan = props.conversationPlan;
@@ -573,14 +434,6 @@ function formatPlanCommentPrompt(comments: PlanReviewComment[]): string {
   return ['Refine the plan using these comments:', '', formattedComments].join('\n');
 }
 
-function artifactLabel(agentId: string, tab: RightWorkspaceTab): string | undefined {
-  const workspace = props.rightWorkspaceFor(agentId);
-  if (isRightWorkspaceFileTab(tab)) return workspace.filePanels[tab]?.title;
-  if (isRightWorkspaceDiffTab(tab)) return workspace.diffPanels[tab]?.title;
-  if (isRightWorkspaceImageTab(tab)) return workspace.imagePanels[tab]?.title;
-  return undefined;
-}
-
 function rightWorkspaceFor(agentId: string): AgentRightWorkspaceState {
   return props.rightWorkspaceFor(agentId);
 }
@@ -592,12 +445,55 @@ async function closeWorkspaceTab(agent: Agent, tab: RightWorkspaceTab): Promise<
   props.closeRightWorkspaceTab(agent.id, tab);
 }
 
-const lastTurnGitDiff = computed(() => {
-  const turnId = props.latestConversationTurnId;
+function headerBindingsFor(agentId: string | null, topRight: boolean, topLeft: boolean) {
+  const agent = props.snapshot.agents.find(candidate => candidate.id === agentId) ?? null;
+  const focused = Boolean(agentId && agentId === props.currentAgent?.id && !props.emptySplitPane);
+  const turnId = focused ? props.latestConversationTurnId : agentId ? props.latestTurnIdForAgent?.(agentId) : null;
   const diff = turnId ? props.snapshot.turnGitDiffs[turnId] : null;
-  if (!diff || diff.agentId !== props.currentAgent?.id || !diff.diff) return null;
-  return diff;
-});
+  const recipient = props.snapshot.agents.find(candidate => candidate.id === agent?.delegatedByAgentId);
+  const backend = agent?.backend ?? props.currentBackendRuntime.backend;
+  return {
+    ref: (instance: Element | ComponentPublicInstance | null) => {
+      if (!agentId) return;
+      if (instance) agentHeaders.set(agentId, instance as InstanceType<typeof AgentHeader>);
+      else agentHeaders.delete(agentId);
+    },
+    class: props.splitHeaders ? 'agent-header--pane' : undefined,
+    agent,
+    repositoryIcon: agent ? repositoryIconForAgent(agent, props.snapshot.general.repositoryIcons) : undefined,
+    gitStatus: focused ? props.currentAgentGitStatus : agentId ? props.snapshot.agentGitStatuses[agentId] ?? null : null,
+    lastTurnGitDiff: diff?.agentId === agentId && diff.diff ? diff : null,
+    backendRuntime: focused ? props.currentBackendRuntime : props.snapshot.backendRuntimes.find(runtime => runtime.backend === backend) ?? { backend, status: 'notConfigured' as const },
+    workspaceOpen: props.rightWorkspaceVisible && !props.emptySplitPane,
+    workspaceToggleAvailable: topRight,
+    workspaceToggleDisabled: !props.currentAgent || Boolean(props.emptySplitPane),
+    isLoading: props.isLoading,
+    sidebarCollapsed: topLeft && props.agentSidebarCollapsed,
+    updateStatus: topRight && clawHostCapabilities.appUpdates ? props.updateStatus : undefined,
+    executionPlanAvailable: focused && Boolean(currentTurnPlan.value),
+    executionPlanOpen: focused && executionPlanVisible.value,
+    openInAvailable: Boolean(agent && clawHostCapabilities.openInApplications && isLocalAgent(agent)),
+    openInCatalog: props.openInApplications,
+    subagentTree: agentId ? subagentTreeFor(agentId) : null,
+    selectedSubagentConversationId: agentId ? selectedSubagentConversationIdFor(agentId) : null,
+    getGitWorkflow: props.getAgentGitWorkflow,
+    generateGitMessage: props.generateAgentGitMessage,
+    commitGitChanges: props.commitAgentGitChanges,
+    pushGitBranch: props.pushAgentGitBranch,
+    createGitPullRequest: props.createAgentGitPullRequest,
+    mergeGitBranch: props.mergeAgentGitBranch,
+    updateGitBranchFromBase: props.updateAgentGitBranchFromBase,
+    reportBackAgentName: recipient ? agentDisplayName(recipient) : null,
+    onExpandSidebar: () => emit('expand-sidebar'),
+    onToggleExecutionPlan: toggleExecutionPlan,
+    onToggleWorkspace: props.toggleRightWorkspace,
+    onOpenGitDiff: (target: AgentGitDiffTarget) => agentId && openAgentGitDiffPreview(agentId, target),
+    onSelectGitDiffTarget: (target: AgentGitDiffTarget) => agentId && persistGitDiffTarget(agentId, target),
+    onOpenIn: (application: OpenInApplication) => agentId && props.openAgentIn(agentId, application),
+    onSelectSubagent: (conversationId: string) => agentId && openSubagent(agentId, conversationId),
+    onInstallUpdate: () => emit('install-update'),
+  };
+}
 
 function openAgentGitDiffPreview(agentId?: string, target?: AgentGitDiffTarget): Promise<void> {
   return props.openAgentGitDiffPreview(agentId, target);
@@ -628,8 +524,8 @@ function openRequestedBrowser(agentId: string, command: Extract<AppCommand, { ty
   openRightWorkspaceTab('browser', agentId);
 }
 
-function openConversationVisualization(visualization: CodexConversationVisualization): void {
-  const agent = currentAgent.value;
+function openConversationVisualization(visualization: CodexConversationVisualization, agentId = currentAgent.value?.id): void {
+  const agent = props.snapshot.agents.find(agent => agent.id === agentId);
   if (!agent || !clawHostCapabilities.embeddedBrowser) return;
   const workspace = rightWorkspaceFor(agent.id);
   workspace.browserId = PRIMARY_BROWSER_ID;
@@ -645,10 +541,10 @@ function handleBrowserOpenCommand(command: Extract<AppCommand, { type: 'open-bro
   openRequestedBrowser(agentId, command);
 }
 
-function openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext): boolean {
+function openConversationImage(image: CodexMessageImage, context?: CodexMessageImageContext, agentId = currentAgent.value?.id): boolean {
   if (context?.intent === 'fullscreen') return false;
 
-  const agent = currentAgent.value;
+  const agent = props.snapshot.agents.find(agent => agent.id === agentId);
   if (!agent) return false;
 
   const durablePath = image.path?.trim() || undefined;
@@ -747,10 +643,6 @@ function subagentTreeFor(agentId: string): AgentSubagentTree | null {
     : null;
 }
 
-const currentSubagentTree = computed<AgentSubagentTree | null>(() => {
-  const agentId = currentAgent.value?.id;
-  return agentId ? subagentTreeFor(agentId) : null;
-});
 watch(
   () =>
     props.snapshot.agents.map(
@@ -854,8 +746,7 @@ function isLocalAgent(agent: Agent): boolean {
 }
 
 function attachVisualizationAnnotation(annotation: VisualizationAnnotationInput): void {
-  if (embeddedConversation) embeddedConversation.visualizationAnnotation.add(annotation);
-  else props.addVisualizationAnnotation(annotation);
+  props.addVisualizationAnnotation(annotation);
   focusComposer();
 }
 
@@ -871,11 +762,10 @@ function workspaceBodyElement(): HTMLElement | null {
 }
 
 function showDebugGitOperationProgress(operation: 'pullRequest' | 'merge'): void | Promise<void> {
-  return agentHeader.value?.showDebugGitOperationProgress(operation);
+  return agentHeaders.get(props.currentAgent?.id ?? '')?.showDebugGitOperationProgress(operation);
 }
 
 defineExpose({
-  attachVisualizationAnnotation,
   focusComposer,
   openSavedDraftPicker,
   saveCurrentDraft,
@@ -904,12 +794,27 @@ defineExpose({
   box-shadow: var(--shadow-content-edge);
 }
 
-.app-shell__body--embedded :deep(.conversation-pane) {
-  min-width: 0;
-}
-
 .app-shell__right-workspace {
   flex: 0 0 420px;
+}
+
+.app-shell__conversations {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-shell__layout-control {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 3;
+}
+
+.app-shell__conversations--split .app-shell__layout-control {
+  top: calc(var(--workbench-appbar-height) + var(--space-3));
 }
 
 .app-shell__right-workspace-resizer {

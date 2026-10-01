@@ -17,7 +17,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -38,7 +37,6 @@ import { openInApplicationFromMenuItem, openInMenuItems } from '../shared/open-i
 
 export type AgentContextMenuAction =
   | 'close-agent'
-  | 'attach-to-current-agent'
   | 'compress-session'
   | 'compact-session'
   | 'duplicate-agent'
@@ -51,7 +49,6 @@ const props = defineProps<{
   compressDisabled?: boolean;
   compressVisible?: boolean;
   compactDisabled?: boolean;
-  attachVisible?: boolean;
   moveTargets?: Team[];
   forkDisabled?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
@@ -98,12 +95,6 @@ const menuItems = computed<AppMenuItem[]>(() => [
     disabled: props.forkDisabled === true,
   },
   { id: 'group-primary', type: 'separator' },
-  ...(props.attachVisible ? [{
-    id: 'attach-to-current-agent',
-    type: 'action',
-    label: t('agents.attachToCurrentAgent'),
-    icon: IconLayoutSidebarRight,
-  } satisfies AppMenuItem] : []),
   ...(props.openInCatalog?.applications.length ? [{
     id: 'open-in',
     type: 'submenu',
@@ -237,8 +228,7 @@ function teamIdFromMoveItemId(itemId: string): string | null {
 }
 
 function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAction {
-  return itemId === 'attach-to-current-agent' ||
-    itemId === 'close-agent' ||
+  return itemId === 'close-agent' ||
     itemId === 'compress-session' ||
     itemId === 'compact-session' ||
     itemId === 'duplicate-agent' ||

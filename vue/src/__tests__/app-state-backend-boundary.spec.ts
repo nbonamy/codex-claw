@@ -33,7 +33,7 @@ describe('unified backend → app state request lifecycle', () => {
     expect(state.snapshot.value.agents.find((agent) => agent.id === other.id)?.planReview?.status).toBe('revise');
   });
 
-  it('routes attached-agent plan, flag, and goal operations without selecting it', async () => {
+  it('routes background-agent plan, flag, and goal operations without selecting it', async () => {
     const snapshot = createInitialSnapshot();
     const guest = snapshot.agents[1]!;
     guest.threadFlags = { ready_for_review: true };

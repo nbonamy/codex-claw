@@ -3,49 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import App from '../App.vue';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { installBackendFixture } from '../test/backend-fixture';
-import { codexConversationSnapshot, codexTextMessage } from '../test/codex-conversation-fixtures';
-import { clickPortaledMenuItem } from '../components/__tests__/agent-sidebar-test-harness';
+import { codexConversationSnapshot } from '../test/codex-conversation-fixtures';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { approvalAgentRequest } from '@codex-claw/core/agent-request';
 
 afterEach(() => { delete window.codexClaw; });
 
 describe('Unified backend → mounted application', () => {
-  it('opens a cold attached conversation while history is loading', async () => {
-    const snapshot = createInitialSnapshot();
-    const guest = snapshot.agents[1]!;
-    guest.backendSession = { kind: 'codex', threadId: 'guest-thread' };
-    const { api, emit } = installBackendFixture(snapshot);
-    let completeHistoryLoad = () => {};
-    api.loadConversationHistory.mockImplementation(async id => {
-      if (id === guest.id) {
-        await new Promise<void>(resolve => { completeHistoryLoad = resolve; });
-        emit({
-          type: 'codex.conversationSnapshotChanged',
-          backend: 'codex', agentId: id, threadId: 'guest-thread',
-          payload: {
-            revision: 1,
-            snapshot: codexConversationSnapshot(
-              [codexTextMessage('loaded', 'assistant', 'Cold guest response')],
-              { activeConversationId: 'guest-thread' },
-            ),
-          },
-        });
-      }
-      return snapshot;
-    });
-    const wrapper = mount(App);
-    await flushPromises();
-    await wrapper.findAll('.agent-sidebar__agent')[1]!.trigger('contextmenu');
-    await clickPortaledMenuItem('Attach to Current Agent');
-    await flushPromises();
-    expect(api.loadConversationHistory).toHaveBeenCalledWith(guest.id);
-    completeHistoryLoad();
-    await flushPromises();
-    expect(wrapper.text()).toContain('Cold guest response');
-    expect(wrapper.findAll('[contenteditable="true"]')).toHaveLength(2);
-  });
-
   it('handles app-owned thread flag execution, dismissal, and review routing through the client seam', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

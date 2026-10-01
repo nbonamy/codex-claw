@@ -173,12 +173,21 @@ provider snapshot. Never add a global message list or a provider-neutral
 conversation reducer to `app-state.ts`; Claw-only overlays should read the
 provider frame or consume an explicit coordination projection.
 
-Main and attached conversations render the same `AgentWorkspace`. Embedded
-presentation changes header chrome and suppresses nested workspace panels;
-`useAgentConversation` owns shared controller actions and annotation submission.
-Every conversation operation carries its owning agent ID. Attached artifacts
-retain their agent's workspace state and appear as scoped tabs in the containing
-workspace, so file previews, reviews, and browser content keep the right owner.
+Split layouts contain equal conversation panes, never parent/child agents.
+`useSplitWorkspace` owns client-local pane assignment and focus for side-by-side,
+stacked, and four-quadrant layouts. Selecting an already visible agent focuses
+its pane; selecting another agent replaces the focused pane. Each team retains
+its own client-local layout, pane assignments, and focus across team switches;
+new teams start with a single pane. Each pane repeats the agent header; only the top-right
+pane shows the shared sidebar toggle, which operates on the focused agent without
+changing focus. One visible artifact sidebar follows the selected agent,
+retaining each agent's tabs separately. Within a team's split layout, its
+open/closed state carries across pane focus changes; agents without tabs show
+the workspace launcher. Conversation
+controllers and asynchronous actions retain an explicit agent ID; background
+updates do not select a pane. Only the focused conversation handles global
+composer/interrupt shortcuts. Hydration watches stable conversation identity,
+not snapshot object identity.
 
 For app-owned MCP icons, phase-aware titles, and bounded presentation metadata,
 follow [Custom MCP Tools](custom-tools.md).

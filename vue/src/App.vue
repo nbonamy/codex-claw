@@ -468,6 +468,7 @@ const agentConversationActions: AgentConversationActions = {
   interrupt: interruptAgentById,
   deleteTurn: deleteTurnForAgent,
   editTurn: editTurnForAgent,
+  forkTurn: forkAgent,
   retryTurn: retryTurnForAgent,
   continueInterruptedTurn: continueInterruptedTurnForAgent,
   resolveApproval: resolveBackendApprovalForAgent,
