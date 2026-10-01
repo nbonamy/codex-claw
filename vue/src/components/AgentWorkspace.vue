@@ -39,7 +39,7 @@
     @select-subagent="openSubagent(currentAgent.id, $event)"
     @install-update="emit('install-update')"
   />
-  <div ref="workspaceBody" class="app-shell__body" :class="{ 'app-shell__body--embedded': embedded }">
+  <div ref="workspaceBody" class="app-shell__body" @dragstart.capture="linkDrag.start" :class="{ 'app-shell__body--embedded': embedded }">
     <AgentEmptyState v-if="!artifactTab && isAgentEmpty" @start-work="handleStartWorkAction" />
     <ConversationPane
       v-else-if="!artifactTab"
@@ -98,6 +98,8 @@
       :browser-initial-url="rightWorkspaceFor(agent.id).browserInitialUrl"
       :browser-open-request-id="rightWorkspaceFor(agent.id).browserOpenRequestId"
       :browser-visualization="rightWorkspaceFor(agent.id).browserVisualization"
+      :browser-panels="rightWorkspaceFor(agent.id).browserPanels"
+      :link-drop-active="Boolean(linkDrag.draggedLink.value) && isRightWorkspaceVisible(agent.id)"
       :browser-available="clawHostCapabilities.embeddedBrowser"
       :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(agent)"
       :open-in-catalog="openInApplications"
@@ -141,6 +143,8 @@
       @select-tab="selectRightWorkspaceTab(agent.id, $event)"
       @send-prompt="forwardPrompt"
       @annotate-visualization="attachVisualizationAnnotation"
+      @dragover="linkDrag.over"
+      @drop="linkDrag.drop"
     >
       <template #attached-agent="{ agentId }">
         <slot name="attached-agent" :agent-id="agentId" :workspace-props="props" />
@@ -149,6 +153,12 @@
         <slot name="agent-artifact" v-bind="artifact" :workspace-props="props" />
       </template>
     </RightWorkspacePanel>
+    <WorkspaceLinkDropTarget
+      v-if="linkDrag.draggedLink.value && !rightWorkspaceVisible"
+      class="app-shell__closed-workspace-drop"
+      @dragover="linkDrag.over"
+      @drop="linkDrag.drop"
+    />
     <div
       v-if="!embedded && rightWorkspaceVisible"
       class="app-shell__right-workspace-resizer"
@@ -224,6 +234,8 @@ import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import ConversationPane from './ConversationPane.vue';
 import RightWorkspacePanel from './RightWorkspacePanel.vue';
+import WorkspaceLinkDropTarget from './WorkspaceLinkDropTarget.vue';
+import { useWorkspaceLinkDrag } from './use-workspace-link-drag';
 import type { AgentRightWorkspaceState } from './use-right-workspace-state';
 import type { PlanReviewComment, SidePanelGitDiffState } from './side-panel';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
@@ -240,6 +252,7 @@ import {
   rightWorkspaceImageTab,
   type RepositoryWorkStartInput,
   type RightWorkspaceTab,
+  type RightWorkspaceBrowserTab,
 } from './right-workspace';
 
 export type AgentWorkspaceProps = {
@@ -686,6 +699,23 @@ function openConversationLink(link: CodexConversationLink): void | Promise<void>
   });
 }
 
+const linkDrag = useWorkspaceLinkDrag({
+  browserAvailable: clawHostCapabilities.embeddedBrowser,
+  open: (agentId, link) => {
+    if (!props.snapshot.agents.some(agent => agent.id === agentId)) return;
+    if (agentId !== currentAgent.value?.id) props.selectAgentFromShell(agentId);
+    if (link.kind === 'file') {
+      void props.openFilePreviewForAgent(agentId, link.filepath ?? link.path);
+      return;
+    }
+    const browserId = crypto.randomUUID();
+    const tab: RightWorkspaceBrowserTab = `browser:${browserId}`;
+    const workspace = rightWorkspaceFor(agentId);
+    workspace.browserPanels[tab] = { browserId, url: link.href, title: new URL(link.href).hostname };
+    openRightWorkspaceTab(tab, agentId);
+  },
+});
+
 function prefillWorkItemForAgent(agentId: string, item: WorkItem): void {
   props.prefillWorkItemForAgent(agentId, item);
 }
@@ -859,6 +889,10 @@ defineExpose({
 </script>
 
 <style scoped>
+.app-shell__closed-workspace-drop {
+  left: auto;
+  width: 240px;
+}
 .app-shell__body {
   position: relative;
   z-index: 1;

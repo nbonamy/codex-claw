@@ -3,6 +3,9 @@ import type { CodexConversationVisualization } from '@codex-app-sdk/vue';
 import { computed, onScopeDispose, reactive, ref } from 'vue';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
 import {
+  isRightWorkspaceBrowserTab,
+  type RightWorkspaceBrowserPanel,
+  type RightWorkspaceBrowserTab,
   isRightWorkspaceDiffTab,
   isRightWorkspaceFileTab,
   isRightWorkspaceImageTab,
@@ -23,6 +26,7 @@ export type AgentRightWorkspaceState = {
   browserInitialUrl: string;
   browserOpenRequestId: number;
   browserVisualization: CodexConversationVisualization | null;
+  browserPanels: Partial<Record<RightWorkspaceBrowserTab, RightWorkspaceBrowserPanel>>;
   filePanels: Partial<Record<RightWorkspaceFileTab, RightWorkspaceFilePanel>>;
   filesPaneOpen: boolean;
   filesPaneWidth: number;
@@ -60,6 +64,7 @@ export function useRightWorkspaceState(options: {
       browserInitialUrl: '',
       browserOpenRequestId: 0,
       browserVisualization: null,
+      browserPanels: {},
       filePanels: {},
       filesPaneOpen: false,
       filesPaneWidth: 280,
@@ -109,6 +114,10 @@ export function useRightWorkspaceState(options: {
     if (tab === 'review') workspace.gitReviewPanel = null;
     if (tab === 'plan') workspace.planPanel = null;
     if (tab === 'files') workspace.filesPaneOpen = false;
+    if (isRightWorkspaceBrowserTab(tab)) {
+      const { [tab]: _closedPanel, ...browserPanels } = workspace.browserPanels;
+      workspace.browserPanels = browserPanels;
+    }
     if (isRightWorkspaceFileTab(tab)) {
       const { [tab]: _closedPanel, ...filePanels } = workspace.filePanels;
       const { [tab]: _closedRequest, ...requestIds } = workspace.filePreviewRequestIds;

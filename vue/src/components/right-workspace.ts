@@ -6,12 +6,18 @@ export type RightWorkspaceFileTab = `file:${string}`;
 export type RightWorkspaceDiffTab = `diff:${string}`;
 export type RightWorkspaceImageTab = `image:${string}`;
 export type RightWorkspaceSubagentTab = `subagent:${string}`;
+export type RightWorkspaceBrowserTab = `browser:${string}`;
+export type RightWorkspaceBrowserPanel = { browserId: string; url: string; title: string };
 export type RightWorkspaceArtifactTab = `artifact:${string}`;
 export type RightWorkspaceAgentTab = `agent:${string}`;
-export type RightWorkspaceTab = 'codeReview' | 'visualize' | 'review' | 'backlog' | 'browser' | 'files' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab | RightWorkspaceSubagentTab | RightWorkspaceAgentTab | RightWorkspaceArtifactTab;
+export type RightWorkspaceTab = 'codeReview' | 'visualize' | 'review' | 'backlog' | 'browser' | 'files' | 'plan' | RightWorkspaceFileTab | RightWorkspaceDiffTab | RightWorkspaceImageTab | RightWorkspaceSubagentTab | RightWorkspaceAgentTab | RightWorkspaceArtifactTab | RightWorkspaceBrowserTab;
 export type RightWorkspaceFilePanel = SidePanelMarkdownState | SidePanelSourceState;
 export type RightWorkspaceDiffPanel = SidePanelGitDiffState;
 export type RightWorkspaceImagePanel = SidePanelImageState;
+
+export function isRightWorkspaceBrowserTab(tab: RightWorkspaceTab): tab is RightWorkspaceBrowserTab {
+  return tab.startsWith('browser:');
+}
 
 export type RepositoryWorkStartInput = {
   backend?: import('@codex-claw/core/contracts').AgentBackend;

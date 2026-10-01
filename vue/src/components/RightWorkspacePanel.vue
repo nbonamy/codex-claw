@@ -1,5 +1,6 @@
 <template>
   <aside class="right-workspace-panel" :aria-label="$t('surface.rightWorkspacePanel.rightWorkspace')">
+    <WorkspaceLinkDropTarget v-if="linkDropActive" />
     <header v-if="!contentOnly" class="right-workspace-panel__tabs">
       <div ref="tabStripRoot" class="right-workspace-panel__tab-strip">
         <button
@@ -41,7 +42,7 @@
                   <IconChecklist v-if="tab === 'codeReview'" aria-hidden="true" />
                   <IconSitemap v-else-if="tab === 'visualize'" aria-hidden="true" />
                   <FileDiffIcon v-else-if="tab === 'review'" aria-hidden="true" />
-                  <IconWorld v-else-if="tab === 'browser'" aria-hidden="true" />
+                  <IconWorld v-else-if="tab === 'browser' || isRightWorkspaceBrowserTab(tab)" aria-hidden="true" />
                   <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
                   <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
                   <IconLego v-else-if="isRightWorkspaceSubagentTab(tab)" aria-hidden="true" />
@@ -230,6 +231,20 @@
       @url-change="browserUrl = $event"
     />
 
+    <template v-if="browserAvailable">
+      <BrowserPanel
+        v-for="tab in browserTabs"
+        :key="tab"
+        v-show="activeTab === tab"
+        :agent-id="agent.id"
+        :browser-id="browserPanels[tab]!.browserId"
+        :initial-url="browserPanels[tab]!.url"
+        :visible="visible && activeTab === tab"
+        @send-prompt="emit('sendPrompt', $event)"
+        @url-change="browserUrls[tab] = $event"
+      />
+    </template>
+
         <div
           v-if="tabs.includes('files')"
           v-show="activeTab === 'files'"
@@ -372,6 +387,7 @@ import type { AppMenuItem } from '../shared/menu/app-menu';
 import OpenInControl from '../shared/OpenInControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 import BrowserPanel from './BrowserPanel.vue';
+import WorkspaceLinkDropTarget from './WorkspaceLinkDropTarget.vue';
 import { externalBrowserUrl, openInExternalBrowser } from './browser-external';
 import CodeReviewPanel from './CodeReviewPanel.vue';
 import VisualizePanel from './VisualizePanel.vue';
@@ -386,6 +402,9 @@ import SourcePreviewPanel from './SourcePreviewPanel.vue';
 import SubagentPanel from './SubagentPanel.vue';
 import type { PlanReviewComment, SidePanelGitDiffState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 import {
+  isRightWorkspaceBrowserTab,
+  type RightWorkspaceBrowserPanel,
+  type RightWorkspaceBrowserTab,
   isRightWorkspaceArtifactTab,
   rightWorkspaceArtifact,
   isRightWorkspaceDiffTab,
@@ -409,6 +428,8 @@ import {
 const workspaceShortcuts = { changes: '⌘G', browser: '⌘B' } as const;
 
 const props = withDefaults(defineProps<{
+  linkDropActive?: boolean;
+  browserPanels?: Partial<Record<RightWorkspaceBrowserTab, RightWorkspaceBrowserPanel>>;
   activeTab: RightWorkspaceTab | null;
   agent: Agent;
   agents?: readonly Agent[];
@@ -458,6 +479,7 @@ const props = withDefaults(defineProps<{
   deleteVisualization?: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
   readVisualizationAsset?: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
 }>(), {
+  browserPanels: () => ({}),
   filesPaneWidth: 280,
   backlogItems: () => [],
   backlogStatus: 'notLoaded',
@@ -507,6 +529,8 @@ const tabTrackRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
 const tabContextMenu = ref<{ tab: RightWorkspaceTab; x: number; y: number } | null>(null);
 const browserUrl = ref('');
+const browserUrls = ref<Partial<Record<RightWorkspaceBrowserTab, string>>>({});
+const browserTabs = computed(() => props.tabs.filter(isRightWorkspaceBrowserTab).filter(tab => props.browserPanels[tab]));
 const tabsOverflow = ref(false);
 const canScrollTabsLeft = ref(false);
 const canScrollTabsRight = ref(false);
@@ -545,6 +569,7 @@ const addMenuItems = computed<AppMenuItem[]>(() => [
 const tabContextMenuItems = computed(() => tabContextMenu.value ? menuItemsForTab(tabContextMenu.value.tab) : []);
 
 watch(() => props.tabs, (tabs) => {
+  browserUrls.value = Object.fromEntries(Object.entries(browserUrls.value).filter(([tab]) => tabs.includes(tab as RightWorkspaceTab)));
   if (tabContextMenu.value && !tabs.includes(tabContextMenu.value.tab)) tabContextMenu.value = null;
   if (!tabs.includes('browser')) browserUrl.value = '';
   void nextTick(() => {
@@ -654,6 +679,7 @@ function tabLabel(tab: RightWorkspaceTab): string {
   if (tab === 'visualize') return translate('surface.rightWorkspacePanel.visualize');
   if (tab === 'review') return translate('surface.rightWorkspacePanel.changes');
   if (tab === 'browser') return props.browserVisualization?.title || 'Browser';
+  if (isRightWorkspaceBrowserTab(tab)) return props.browserPanels[tab]?.title ?? 'Browser';
   if (tab === 'files') return translate('surface.rightWorkspacePanel.openFile');
   if (tab === 'plan') return props.planPanel?.title ?? 'Plan';
   if (isRightWorkspaceSubagentTab(tab)) {
@@ -681,10 +707,10 @@ function filePanel(tab: RightWorkspaceTab): RightWorkspaceFilePanel | undefined 
 
 function menuItemsForTab(tab: RightWorkspaceTab): AppMenuItem[] {
   const specificItems: AppMenuItem[] = [
-    ...(tab === 'browser' && !props.browserVisualization
+    ...((tab === 'browser' && !props.browserVisualization) || isRightWorkspaceBrowserTab(tab)
       ? [
-        { id: 'copy-url', type: 'action', label: translate('surface.rightWorkspacePanel.copyUrl'), icon: CopyIcon, disabled: !browserUrl.value } satisfies AppMenuItem,
-        { id: 'open-external', type: 'action', label: translate('surface.browserPanel.openInExternalBrowser'), icon: ArrowUpRightIcon, disabled: !externalBrowserUrl(browserUrl.value) } satisfies AppMenuItem,
+        { id: 'copy-url', type: 'action', label: translate('surface.rightWorkspacePanel.copyUrl'), icon: CopyIcon, disabled: !urlForTab(tab) } satisfies AppMenuItem,
+        { id: 'open-external', type: 'action', label: translate('surface.browserPanel.openInExternalBrowser'), icon: ArrowUpRightIcon, disabled: !externalBrowserUrl(urlForTab(tab)) } satisfies AppMenuItem,
       ] : []),
     ...(absoluteFilePathForTab(tab)
       ? [{ id: 'copy-path', type: 'action', label: translate('surface.rightWorkspacePanel.copyPath'), icon: CopyIcon } satisfies AppMenuItem]
@@ -736,18 +762,18 @@ async function selectTabContextMenuItem(itemId: string): Promise<void> {
     }
     return;
   }
-  if (tab === 'browser' && itemId === 'open-external') {
+  if ((tab === 'browser' || isRightWorkspaceBrowserTab(tab)) && itemId === 'open-external') {
     try {
-      await openInExternalBrowser(browserUrl.value);
+      await openInExternalBrowser(urlForTab(tab));
     } catch {
       ElMessage.error(translate('surface.browserPanel.openExternalFailed'));
     }
     return;
   }
-  if (tab === 'browser' && itemId === 'copy-url') {
-    if (!browserUrl.value) return;
+  if ((tab === 'browser' || isRightWorkspaceBrowserTab(tab)) && itemId === 'copy-url') {
+    if (!urlForTab(tab)) return;
     try {
-      await navigator.clipboard.writeText(browserUrl.value);
+      await navigator.clipboard.writeText(urlForTab(tab));
     } catch {
       ElMessage.error(translate('surface.rightWorkspacePanel.copyUrlFailed'));
     }
@@ -816,10 +842,17 @@ function closeAddMenuOnOutsideClick(event: MouseEvent): void {
 function isAbsoluteFilePath(filePath: string): boolean {
   return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/u.test(filePath);
 }
+
+function urlForTab(tab: RightWorkspaceTab): string {
+  return isRightWorkspaceBrowserTab(tab)
+    ? browserUrls.value[tab] ?? props.browserPanels[tab]?.url ?? ''
+    : browserUrl.value;
+}
 </script>
 
 <style scoped>
 .right-workspace-panel {
+  position: relative;
   flex: 0 0 420px;
   order: 2;
   min-width: 0;

@@ -687,6 +687,7 @@ export const surfaceMessages = {
     "close": "Close"
   },
   "rightWorkspacePanel": {
+    "dropLink": "Drop link to open in sidebar",
     "rightWorkspace": "Right workspace",
     "rightWorkspaceTabs": "Right workspace tabs",
     "scrollTabsLeft": "Scroll tabs left",

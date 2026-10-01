@@ -50,6 +50,109 @@ afterEach(() => {
 });
 
 describe('AppShell workspace and plans', () => {
+  it('drops chat file links into additive sidebar tabs, including when the sidebar is closed', async () => {
+    const previewAgentFile = vi.fn().mockImplementation(async (_agentId: string, path: string) => ({
+      kind: 'text', path, content: `# Content of ${path}`, size: 40,
+    }));
+    const wrapper = mountShell({
+      realConversationPane: true,
+      previewAgentFile,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('links', 'assistant', '[First](docs/first.md) [Second](docs/second.md:12)'),
+      ]),
+    });
+    const transfer = { effectAllowed: 'all', dropEffect: 'none' };
+    await wrapper.get('a[href="docs/first.md"]').trigger('dragstart', { dataTransfer: transfer });
+    const closedTarget = wrapper.get('[aria-label="Drop link to open in sidebar"]');
+    await closedTarget.trigger('dragover', { dataTransfer: transfer });
+    expect(transfer.dropEffect).toBe('copy');
+    await closedTarget.trigger('drop', { dataTransfer: transfer });
+    await flushPromises();
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'docs/first.md');
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['first.md']);
+    expect(wrapper.text()).toContain('Content of docs/first.md');
+
+    await wrapper.get('a[href="docs/second.md:12"]').trigger('dragstart', { dataTransfer: transfer });
+    await wrapper.get('[aria-label="Drop link to open in sidebar"]').trigger('drop', { dataTransfer: transfer });
+    await flushPromises();
+    expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'docs/second.md');
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['first.md', 'second.md']);
+    expect(wrapper.find('[aria-label="Drop link to open in sidebar"]').exists()).toBe(false);
+  });
+
+  it('opens dropped web links in independent browser tabs without replacing the existing browser', async () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    const browserOpen = vi.fn().mockImplementation(async (_agent: string, _browser: string, url: string) => ({
+      url, title: '', canGoBack: false, canGoForward: false,
+    }));
+    const browserClose = vi.fn().mockResolvedValue(undefined);
+    setElectronTestClient({ browserOpen, browserClose });
+    const externalOpen = vi.spyOn(window, 'open');
+    const wrapper = mountShell({
+      realConversationPane: true,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('links', 'assistant', '[Example](https://example.com/docs) [Other](https://example.org/)'),
+      ]),
+    });
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    await wrapper.findAll('.right-workspace-panel__launcher button').find(button => button.text().includes('Browser'))!.trigger('click');
+    readyBrowserGuest(wrapper.get('webview').element, 41);
+    await flushPromises();
+    for (const [index, href] of ['https://example.com/docs', 'https://example.org/'].entries()) {
+      await wrapper.get(`a[href="${href}"]`).trigger('dragstart', { dataTransfer: { effectAllowed: 'all' } });
+      await wrapper.get('[aria-label="Drop link to open in sidebar"]').trigger('drop');
+      await nextTick();
+      readyBrowserGuest(wrapper.findAll('webview')[index + 1]!.element, 42 + index);
+      await flushPromises();
+    }
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['Browser', 'example.com', 'example.org']);
+    const opens = browserOpen.mock.calls;
+    expect(opens.map(call => call[2])).toStrictEqual(['', 'https://example.com/docs', 'https://example.org/']);
+    expect(new Set(opens.map(call => call[1])).size).toBe(3);
+    expect(externalOpen).not.toHaveBeenCalled();
+    await wrapper.get('[aria-label="Close example.com tab"]').trigger('click');
+    await flushPromises();
+    expect(browserClose).toHaveBeenCalledWith('agent-dina', opens[1]![1]);
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['Browser', 'example.org']);
+  });
+
+  it('clears a cancelled link drag and ignores text drags and unsupported link protocols', async () => {
+    const previewAgentFile = vi.fn();
+    const wrapper = mountShell({
+      realConversationPane: true, previewAgentFile,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('links', 'assistant', '[File](docs/first.md) [Email](mailto:hello@example.com)'),
+      ]),
+    });
+    await wrapper.get('a[href="docs/first.md"]').trigger('dragstart', { dataTransfer: {} });
+    expect(wrapper.find('[aria-label="Drop link to open in sidebar"]').exists()).toBe(true);
+    window.dispatchEvent(new Event('dragend'));
+    await nextTick();
+    expect(wrapper.find('[aria-label="Drop link to open in sidebar"]').exists()).toBe(false);
+    await wrapper.get('a[href^="mailto:"]').trigger('dragstart', { dataTransfer: {} });
+    expect(wrapper.find('[aria-label="Drop link to open in sidebar"]').exists()).toBe(false);
+    await wrapper.get('.conversation-pane').trigger('dragstart', { dataTransfer: {} });
+    expect(wrapper.find('[aria-label="Drop link to open in sidebar"]').exists()).toBe(false);
+    expect(previewAgentFile).not.toHaveBeenCalled();
+  });
+
+  it('resolves a dropped relative file against its source agent even if focus changes during the drag', async () => {
+    const snapshot = createInitialSnapshot();
+    const previewAgentFile = vi.fn().mockResolvedValue({ kind: 'text', path: 'README.md', content: '# Dina project', size: 14 });
+    const wrapper = mountShell({
+      snapshot, realConversationPane: true, previewAgentFile,
+      codexConversationSnapshot: codexConversationSnapshot([
+        codexTextMessage('link', 'assistant', '[Readme](README.md)'),
+      ]),
+    });
+    await wrapper.get('a[href="README.md"]').trigger('dragstart', { dataTransfer: {} });
+    await wrapper.setProps({ activeAgent: snapshot.agents[1] });
+    await wrapper.get('[aria-label="Drop link to open in sidebar"]').trigger('drop');
+    await flushPromises();
+    expect(previewAgentFile.mock.calls).toStrictEqual([['agent-dina', 'README.md']]);
+    expect(wrapper.emitted('select-agent')?.at(-1)).toStrictEqual(['agent-dina']);
+  });
+
   it('attaches a second agent as a tab, routes selection to the host, and releases it on close', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {

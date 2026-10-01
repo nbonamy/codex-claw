@@ -68,6 +68,20 @@ function mountPanel(
 }
 
 describe('RightWorkspacePanel', () => {
+  it('covers the browser with a drop target without unmounting its page', async () => {
+    const wrapper = mountPanel(['browser'], 'browser');
+    await wrapper.setProps({ linkDropActive: true });
+    const target = wrapper.get('[aria-label="Drop link to open in sidebar"]');
+    // The real stylesheet must place the hit target above the guest, not in the tab layout.
+    expect(getComputedStyle(target.element).position).toBe('absolute');
+    expect(Number(getComputedStyle(target.element).zIndex)).toBeGreaterThan(0);
+    expect(getComputedStyle(target.element).pointerEvents).toBe('auto');
+    expect(getComputedStyle(wrapper.element).position).toBe('relative');
+    expect(wrapper.findComponent(BrowserPanel).exists()).toBe(true);
+    await wrapper.setProps({ linkDropActive: false });
+    expect(wrapper.find('[aria-label="Drop link to open in sidebar"]').exists()).toBe(false);
+    expect(wrapper.findComponent(BrowserPanel).exists()).toBe(true);
+  });
   it('shows a Claw launcher when no workspace tab has been opened', async () => {
     const wrapper = mountPanel([], null);
 

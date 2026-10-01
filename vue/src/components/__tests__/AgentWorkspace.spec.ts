@@ -18,6 +18,7 @@ function createWorkspaceState(): AgentRightWorkspaceState {
     browserInitialUrl: '',
     browserOpenRequestId: 0,
     browserVisualization: null,
+    browserPanels: {},
     diffPanels: {},
     filePanels: {},
     filePreviewRequestIds: {},

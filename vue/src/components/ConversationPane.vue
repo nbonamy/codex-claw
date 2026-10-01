@@ -1,5 +1,5 @@
 <template>
-  <div class="conversation-pane" @keydown.capture="handleDraftShortcut" @focusin.capture="handleDraftFocusIn">
+  <div class="conversation-pane" :data-conversation-agent-id="agent?.id" @keydown.capture="handleDraftShortcut" @focusin.capture="handleDraftFocusIn">
     <ConversationLoadError
       v-if="historyLoadFailed && !hasVisibleMessages"
       :loading="historyLoading"
