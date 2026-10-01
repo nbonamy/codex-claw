@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.226",
-    "@codex-app-sdk/backend": "latest",
-    "@codex-app-sdk/core": "latest",
+    "@codex-app-sdk/backend": "0.12.6",
+    "@codex-app-sdk/core": "0.12.6",
     "@codex-claw/core": "0.24.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "pino": "^10.3.1",

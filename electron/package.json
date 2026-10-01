@@ -28,7 +28,7 @@
     "@codex-claw/core": "0.24.1",
     "@codex-claw/vue": "0.24.1",
     "autolib": "github:nbonamy/witsy-autolib#v1.2.3",
-    "@codex-app-sdk/electron": "latest",
+    "@codex-app-sdk/electron": "0.12.6",
     "electron-log": "^5.4.4",
     "electron-squirrel-startup": "^1.0.1",
     "vue": "^3.5.35"
