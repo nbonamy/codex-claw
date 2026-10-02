@@ -31,15 +31,15 @@ describe('RemoteClaudeAuthentication', () => {
       expect(document.body.textContent).toContain('Anthropic Console (API billing)');
       const commandRows = Array.from(document.body.querySelectorAll('.remote-claude-auth__command-row'));
       expect(commandRows.map((row) => row.querySelector('code')?.textContent)).toEqual([
-        'claude auth login --claudeai',
-        'claude auth login --console',
+        'env -u CLAUDE_CONFIG_DIR claude auth login --claudeai',
+        'env -u CLAUDE_CONFIG_DIR claude auth login --console',
       ]);
       (commandRows[0]?.querySelector('[aria-label="Copy Claude subscription command"]') as HTMLButtonElement).click();
       await flushPromises();
-      expect(writeText).toHaveBeenLastCalledWith('claude auth login --claudeai');
+      expect(writeText).toHaveBeenLastCalledWith('env -u CLAUDE_CONFIG_DIR claude auth login --claudeai');
       (commandRows[1]?.querySelector('[aria-label="Copy Anthropic Console command"]') as HTMLButtonElement).click();
       await flushPromises();
-      expect(writeText).toHaveBeenLastCalledWith('claude auth login --console');
+      expect(writeText).toHaveBeenLastCalledWith('env -u CLAUDE_CONFIG_DIR claude auth login --console');
       expect(writeText).toHaveBeenCalledTimes(2);
       (document.body.querySelector('.claw-dialog__footer .claw-button--primary') as HTMLButtonElement).click();
       await flushPromises();

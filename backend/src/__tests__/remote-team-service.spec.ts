@@ -8,6 +8,26 @@ import {
 } from './server-test-fixtures';
 
 describe('RemoteTeamService', () => {
+  it('includes remote engine availability in the first projected snapshot', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.remoteConnections.connections = [readyRemoteConnection()];
+    snapshot.teams = [{ id: 'pointer', name: 'Remote', remoteConnectionId: 'connection-devbox', remoteTeamId: 'team-remote', agentIds: [] }];
+    const remote = createRemoteTeamSnapshot([createRemoteAgent()]);
+    remote.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    const service = new RemoteTeamService({
+      clients: { request: vi.fn().mockResolvedValue({ snapshot: remote, lastEventSeq: 0, clientState: { sourceFolderPath: '', shouldPreventDisplaySleep: false } }) } as never,
+      getSnapshot: () => snapshot,
+      onForwardedEvent: vi.fn(),
+      onProjectedSnapshotChanged: vi.fn(),
+    });
+
+    const projected = await service.clientSnapshot();
+
+    expect(projected.remoteConnections.connections[0]?.providerConnections).toEqual(remote.providerConnections);
+    expect(projected.agents).toEqual(expect.arrayContaining([expect.objectContaining({ id: remote.agents[0]!.id })]));
+    expect(projected.providerConnections).toEqual(snapshot.providerConnections);
+  });
+
   it('requires an explicit valid team instead of consulting shared navigation', () => {
     const service = new RemoteTeamService({ clients: {} as never, getSnapshot: createTestSnapshot, onForwardedEvent: vi.fn(), onProjectedSnapshotChanged: vi.fn() });
     expect(() => service.pointerForAgentInput({})).toThrow('target team');
@@ -86,7 +106,7 @@ describe('RemoteTeamService', () => {
     expect(service.knownSnapshot('connection-devbox')).toBeUndefined();
   });
 
-  it('applies the Mac Claude setting before remote agent creation', async () => {
+  it('leaves remote engine policy independent from the local legacy flags', async () => {
     const snapshot = createTestSnapshot();
     snapshot.general.claudeCodeEnabled = true;
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
@@ -106,7 +126,6 @@ describe('RemoteTeamService', () => {
           return structuredClone(remoteSnapshot);
         }
         if (method === 'agent/quickChat/create') {
-          if (!remoteSnapshot.general.claudeCodeEnabled) throw new Error('Backend is not enabled: claude');
           return structuredClone(remoteSnapshot);
         }
         throw new Error(`Unexpected remote method: ${method}`);
@@ -121,14 +140,14 @@ describe('RemoteTeamService', () => {
 
     await expect(service.request('connection-devbox', 'agent/quickChat/create', {
       input: { backend: 'claude', teamId: 'team-remote' },
-    })).resolves.toMatchObject({ general: { claudeCodeEnabled: true } });
-    expect(requests).toStrictEqual(['snapshot/get', 'settings/update', 'agent/quickChat/create']);
+    })).resolves.toMatchObject({ general: { claudeCodeEnabled: false } });
+    expect(requests).toStrictEqual(['agent/quickChat/create']);
 
     snapshot.general.claudeCodeEnabled = false;
     await expect(service.snapshot('connection-devbox')).resolves.toMatchObject({
       general: { claudeCodeEnabled: false },
     });
-    expect(requests.slice(-2)).toStrictEqual(['snapshot/get', 'settings/update']);
+    expect(requests).toStrictEqual(['agent/quickChat/create', 'snapshot/get']);
   });
 
   it('adopts and forwards provider frames without restoring a global transcript', async () => {

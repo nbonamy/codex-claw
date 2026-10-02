@@ -251,7 +251,12 @@ backend-owned and are read through the asset method.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `settings/update` | `{ input: UpdateSettingsInput }` | `AppSnapshot` | Updates backend execution policy, provider configuration and source-folder settings. Rejects presentation preferences. |
+| `settings/update` | `{ input: UpdateSettingsInput }` | `AppSnapshot` | Updates backend execution policy, provider configuration and source-folder settings. Rejects presentation preferences and direct provider-home changes. |
+| `provider/setup/get` | `{ remoteConnectionId? }` | `ProviderSetupStatus[]` | Detects target-host CLIs and reports persisted per-provider home/skill choices. Detection does not imply authentication. |
+| `provider/connections/get` | `{ remoteConnectionId? }` | `ProviderConnection[]` | Reads target-host startup-cached installation/authentication and current enablement. Also published in local snapshots and remote connection metadata. Reads do not re-probe. Old remotes must update rather than assuming Codex is available. |
+| `provider/enabled/set` | `{ backend, enabled, remoteConnectionId? }` | `ProviderConnection[]` | Persists engine enablement on the owning host and publishes updated availability without probing authentication, logging out, or interrupting active work. |
+| `provider/setup/configure` | `{ backend, choice: { isolated, shareSkills } }` | `ProviderSetupStatus` | Configures separate or existing homes before the provider owns agents. Never copies credentials or overwrites private skills. |
+| `provider/install` | `{ backend, remoteConnectionId? }` | `ProviderSetupStatus` | Explicit installation on the target host using the existing provider installer; installs Codex into the Claw-owned pinned runtime. |
 | `client/preferences/update` | `{ input: UpdateSettingsInput }` | `AppSnapshot` | Updates client-scoped appearance, ordering and presentation preferences. Rejects backend policy. |
 | `settings/codexResourceSharing/get` | none | `CodexResourceSharingStatus` | Reports whether an enabled existing home still needs explicit migration. |
 | `settings/codexResourceSharing/set` | `{ input: { enabled: true } \| { enabled: false, mode: "fresh" \| "copy" \| "keep" } }` | `AppSnapshot` | Links or isolates Claw skills/plugins; folder-changing modes require idle chats. |
@@ -285,10 +290,12 @@ routes to the SDK device-code login on the selected host and returns
 `{ loginId, verificationUrl, userCode }`. Cancellation additionally accepts
 `loginId`, so a client cancels its own pending flow rather than another login.
 Only the selected host's SDK/app-server stores and refreshes credentials.
-`claude/authentication/get` requires `{ connectionId }` for a ready SSH
-connection. Local `clawd` runs the remote Claude CLI's read-only auth-status
-command and returns only `{ loggedIn }`; Claude's interactive login remains on
-the remote host.
+`claude/authentication/get` accepts an optional `{ connectionId }` for a ready
+SSH connection. With no connection ID, `clawd` runs the local CLI's read-only
+auth-status command with the same `CLAUDE_CONFIG_DIR` as its SDK runtime and
+returns `{ loggedIn, configDirectory }`. Remote checks return `{ loggedIn }`.
+Neither path returns account details or credentials. Interactive Claude login
+remains on the owning host, with subscription or Console API billing supported.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
@@ -315,13 +322,11 @@ cleanup, or migrations because remote team ids can collide with local team ids.
 Generic location-scoped requests first resolve an internal `BackendLocation`.
 Agent-scoped requests resolve an internal `AgentLocation` so projected remote
 agents can still route to the owning remote `clawd` over SSH stdio.
-When loading a remote snapshot or selecting Claude for a remote agent, local
-`clawd` mirrors the Mac app's `claudeCodeEnabled` setting to the remote `clawd`
-before the remote backend validates agent creation. This also reconciles a
-remote daemon that started with the default setting disabled.
-Remote Claude agent creation also checks for the CLI and installs it when
-missing, covering a connection created before Claude was enabled. Claude login
-remains an interactive action by the remote user.
+Each remote `clawd` owns engine availability and admission. Local enable flags
+are not mirrored. SSH readiness depends on `clawd`, not Codex installation;
+engine installation is an explicit Settings action. Remote authentication
+checks use the daemon's configured provider home. Claude login remains an
+interactive action by the remote user, with commands targeting that home.
 Remote backend events use the same boundary: local `clawd` forwards agent events
 only when the remote agent belongs to a connected remote-team pointer.
 Slash-command interception remains local-only for now; ordinary prompts route
@@ -486,6 +491,25 @@ Scoped projections carry an opaque `conversationId` when bound; attachment
 requires it. Common settings carry model/effort/service tier/permission fields,
 not a Codex protocol object. Rate limits, goals and usage use exactly one wrapper:
 `{ rateLimits }`, `{ goal }`, and `{ contextUsage }`.
+
+Account quota events update `AppSnapshot.backendAccountRateLimits` by engine;
+`accountRateLimits` remains the Codex projection. The account menu describes
+local enabled engines, so remote account quota events stay on their owning
+host. Claude subscription SDK events contribute only reported overall five-hour
+and weekly windows; missing utilization is not interpreted as zero usage.
+The per-engine quota cache is live runtime state, not a persisted credential or
+an authentication check.
+
+Connection observations also carry optional app-owned authentication metadata
+from the startup or explicit-login check. Clients restore account identity and
+login state from this cache without another provider probe. This metadata is
+runtime-only and contains no credentials.
+
+Opening the account menu requests `provider/usage/get` for each enabled local
+engine. The optional driver `getAccountRateLimits` capability supplies fresh
+quotas; engines without it retain their event-fed snapshot. A `null` result
+means no subscription quota, not a failed request. Failures reject separately.
+This does not recheck engine availability or start a conversation.
 
 Navigation, ordering, external-application choice, theme and presentation
 preferences are persisted under `clientPreferences`, not remote agent runtime.

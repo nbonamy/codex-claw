@@ -17,7 +17,6 @@ export type RemoteAgentOwner = RemoteTeamPointer & { agent: Agent };
 export type RemoteTeamServiceOptions = {
   clients: RemoteClawdClientManager;
   getSnapshot: () => AppSnapshot;
-  ensureClaudeInstalled?: (connection: RemoteConnection) => Promise<void>;
   onForwardedEvent: (connectionId: string, event: ClawBackendEvent) => void;
   onProjectedSnapshotChanged: () => void;
 };
@@ -64,6 +63,8 @@ export class RemoteTeamService {
 
   rememberSnapshot(connectionId: string, snapshot: AppSnapshot): void {
     this.snapshots.set(connectionId, snapshot);
+    const connection = this.options.getSnapshot().remoteConnections.connections.find(item => item.id === connectionId);
+    if (connection) connection.providerConnections = snapshot.providerConnections;
   }
 
   adoptCreatedAgentSnapshot(pointer: RemoteTeamPointer, remoteSnapshot: AppSnapshot): void {
@@ -71,12 +72,6 @@ export class RemoteTeamService {
   }
 
   async request<Result = unknown>(connectionId: string, method: string, params?: unknown): Promise<Result> {
-    if (requestsClaudeBackend(method, params)) {
-      if (this.options.getSnapshot().general.claudeCodeEnabled) {
-        await this.options.ensureClaudeInstalled?.(this.connection(connectionId));
-      }
-      await this.snapshot(connectionId);
-    }
     return this.remoteRequest(connectionId, method, params);
   }
 
@@ -89,18 +84,8 @@ export class RemoteTeamService {
   async snapshot(connectionId: string): Promise<AppSnapshot> {
     const result = await this.remoteRequest(connectionId, backendMethods.snapshotGet);
     if (!isClawSnapshotGetResult(result)) throw new Error('Remote snapshot is invalid.');
-    const desired = this.options.getSnapshot().general.claudeCodeEnabled;
-    if (result.snapshot.general.claudeCodeEnabled === desired) {
-      this.snapshots.set(connectionId, result.snapshot);
-      return result.snapshot;
-    }
-    const updated = await this.remoteRequest(connectionId, backendMethods.settingsUpdate, {
-      input: { general: { claudeCodeEnabled: desired } },
-    });
-    const decoded = decodeAppSnapshot(updated);
-    if (!decoded) throw new Error('Remote settings snapshot is invalid.');
-    this.snapshots.set(connectionId, decoded.value);
-    return decoded.value;
+    this.rememberSnapshot(connectionId, result.snapshot);
+    return result.snapshot;
   }
 
   async resolveTeamForPointerInput(
@@ -115,7 +100,7 @@ export class RemoteTeamService {
       : await this.request<AppSnapshot>(connectionId, backendMethods.teamCreate, {
           input: { name: input.name, color: input.color },
         });
-    this.snapshots.set(connectionId, remoteSnapshot);
+    this.rememberSnapshot(connectionId, remoteSnapshot);
 
     const remoteTeam = requestedRemoteTeamId
       ? remoteSnapshot.teams.find((team) => team.id === requestedRemoteTeamId)
@@ -176,20 +161,16 @@ export class RemoteTeamService {
   }
 
   async clientSnapshot(): Promise<AppSnapshot> {
-    const snapshot = this.clientSnapshotFromKnownRemotes();
-    for (const team of snapshot.teams) {
+    for (const team of this.options.getSnapshot().teams) {
       const pointer = this.pointerForTeam(team);
       if (!pointer || this.snapshots.has(pointer.connectionId)) continue;
       try {
-        const remoteSnapshot = await this.snapshot(pointer.connectionId);
-        projectRemoteTeam(snapshot, team, remoteSnapshot, pointer.remoteTeamId);
+        await this.snapshot(pointer.connectionId);
       } catch {
-        team.agentIds = [];
-        delete team.activeAgentId;
+        // Unknown remotes are projected as empty without losing their local pointer.
       }
     }
-    applyRemoteActiveAgent(snapshot);
-    return snapshot;
+    return this.clientSnapshotFromKnownRemotes();
   }
 
   clientSnapshotFromKnownRemotes(): AppSnapshot {
@@ -222,13 +203,13 @@ export class RemoteTeamService {
   private applyEvent(connectionId: string, event: ClawBackendEvent): void {
     const decodedSnapshot = decodeSnapshotFromRemoteEvent(event);
     if (decodedSnapshot) {
-      this.snapshots.set(connectionId, decodedSnapshot.value);
+      this.rememberSnapshot(connectionId, decodedSnapshot.value);
     } else if (event.type !== 'snapshot.updated') {
       const remoteSnapshot = this.snapshots.get(connectionId);
       if (remoteSnapshot) applyMainEventToSnapshot(remoteSnapshot, event);
     }
     if (event.type === 'snapshot.updated') {
-      if (this.hasTeamPointer(connectionId)) this.options.onProjectedSnapshotChanged();
+      this.options.onProjectedSnapshotChanged();
       return;
     }
     if (this.shouldForwardEvent(connectionId, event)) this.options.onForwardedEvent(connectionId, event);
@@ -251,16 +232,6 @@ export class RemoteTeamService {
       team.remoteConnectionId === connectionId && Boolean(team.remoteTeamId)
     ));
   }
-}
-
-function requestsClaudeBackend(method: string, params: unknown): boolean {
-  if (method !== backendMethods.agentCreate
-    && method !== backendMethods.agentQuickChatCreate
-    && method !== backendMethods.projectCreate
-    && method !== backendMethods.agentUpdate) return false;
-  if (!params || typeof params !== 'object' || !('input' in params)) return false;
-  const input = params.input;
-  return Boolean(input && typeof input === 'object' && 'backend' in input && input.backend === 'claude');
 }
 
 function decodeSnapshotFromRemoteEvent(event: ClawBackendEvent) {

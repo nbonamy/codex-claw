@@ -14,6 +14,8 @@
     :spoken-announcements-muted="snapshot.general.spokenAnnouncementsMuted"
     :agent-sidebar-expanded="showAgentSidebar"
     :rate-limits="snapshot.accountRateLimits"
+    :enabled-backends="enabledAgentBackends(snapshot)"
+    :backend-rate-limits="snapshot.backendAccountRateLimits"
     :account="authentication?.account ?? null"
     class="app-shell__team-rail"
     @close-team="$emit('close-team', $event)"
@@ -86,6 +88,7 @@
 </template>
 
 <script setup lang="ts">
+import { enabledAgentBackends } from '@codex-claw/core/agent-backends';
 import type {
   Agent,
   AppSnapshot,

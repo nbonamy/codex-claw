@@ -109,6 +109,8 @@
           :active="settingsActive"
           :account="account"
           :rate-limits="rateLimits"
+          :enabled-backends="enabledBackends"
+          :backend-rate-limits="backendRateLimits"
           @logout="emit('logout')"
           @open-settings="emit('open-settings')"
           @open-whats-new="emit('open-whats-new')"
@@ -134,7 +136,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { AccountRateLimits, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { teamInitials } from '@codex-claw/core/team-manager';
 import { AutomationIcon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
@@ -153,6 +155,8 @@ const props = defineProps<{
   cockpitActive?: boolean;
   automationsActive?: boolean;
   rateLimits?: AccountRateLimits;
+  enabledBackends?: AgentBackend[];
+  backendRateLimits?: AppSnapshot['backendAccountRateLimits'];
   account?: CodexAccount | null;
   settingsActive?: boolean;
   spokenAnnouncementsEnabled?: boolean;

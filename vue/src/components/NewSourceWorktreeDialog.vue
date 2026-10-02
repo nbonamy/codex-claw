@@ -82,7 +82,7 @@
       </template>
     </form>
 
-    <template v-if="backendChoices.length > 1" #footer-left>
+    <template v-if="backendChoices.length !== 1" #footer-left>
       <BackendSelector v-model="backend" :disabled="creating" />
     </template>
     <template #footer>
@@ -113,9 +113,10 @@ import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 import BackendSelector from './BackendSelector.vue';
-import { useBackendChoices } from './backend-selection';
+import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
-const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
+const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend');
+useNewAgentBackend(backend, backendChoices);
 
 const props = withDefaults(defineProps<{
   allowDestinationOverride?: boolean;
@@ -154,6 +155,7 @@ const orderedBranches = computed(() => [...props.branches].sort((left, right) =>
 )));
 const canCreate = computed(() => Boolean(
   props.repo
+  && backend.value && backendChoices.value.includes(backend.value)
   && branchName.value.trim()
   && (!orderedBranches.value.length || baseBranch.value)
   && !props.branchesLoading
@@ -161,7 +163,7 @@ const canCreate = computed(() => Boolean(
 ));
 const destinationPath = computed(() => customDestinationPath.value || suggestedDestinationPath.value);
 const creationProgress = computed<AgentCreationProgress | null>(() => {
-  if (!props.visible || !creationState.value || !props.repo) return null;
+  if (!props.visible || !creationState.value || !props.repo || !backend.value) return null;
   return {
     id: 'manual-worktree-creation',
     state: creationState.value,

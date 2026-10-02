@@ -1,46 +1,57 @@
 <template>
   <el-select
-    v-if="choices.length > 1"
+    v-if="choices.length > 1 || (preserveSelection && backend && !choices.includes(backend) && choices.length > 0)"
     v-model="backend"
     class="backend-selector"
     :size="size"
     :disabled="disabled"
     :aria-label="t('surface.agentDialog.codingAgent')"
+    @update:model-value="rememberBackend"
   >
     <template #prefix>
-      <BackendIcon :backend="backend" />
+      <BackendIcon v-if="backend" :backend="backend" />
     </template>
     <el-option
       v-for="choice in choices"
       :key="choice"
       :value="choice"
-      :label="t(choice === 'codex' ? 'surface.agentDialog.codex' : 'surface.agentDialog.claudeCode')"
+      :label="backendDisplayName(choice)"
     >
       <span class="backend-selector__option">
         <BackendIcon :backend="choice" />
-        {{ t(choice === 'codex' ? 'surface.agentDialog.codex' : 'surface.agentDialog.claudeCode') }}
+        {{ backendDisplayName(choice) }}
       </span>
     </el-option>
   </el-select>
+  <button v-else-if="choices.length === 0" class="claw-button claw-button--tertiary" type="button" @click="connectEngine">{{ t('engineConnection.required') }}</button>
 </template>
 
 <script setup lang="ts">
 import { watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { AgentBackend } from '@codex-claw/core/contracts';
-import { useBackendChoices } from './backend-selection';
+import { useBackendChoices, useConnectEngine, useRememberBackend } from './backend-selection';
+import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import BackendIcon from './BackendIcon.vue';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
+  teamId?: string | null;
   size?: 'small' | 'default' | 'large';
   disabled?: boolean;
+  preserveSelection?: boolean;
 }>(), { size: 'default', disabled: false });
-const backend = defineModel<AgentBackend>({ default: 'codex' });
-const choices = useBackendChoices();
+const backend = defineModel<AgentBackend>();
+const choices = useBackendChoices(() => props.teamId);
+const rememberBackend = useRememberBackend(() => props.teamId);
+const connectEngine = useConnectEngine();
 const { t } = useI18n();
 watch(choices, (enabled) => {
-  if (!enabled.includes(backend.value) && enabled[0]) backend.value = enabled[0];
+  if (props.disabled || (props.preserveSelection && backend.value)) return;
+  if (!backend.value || !enabled.includes(backend.value)) backend.value = enabled[0];
 }, { immediate: true });
+watch(() => props.teamId, () => {
+  if (!props.disabled && !props.preserveSelection) backend.value = choices.value[0];
+});
 </script>
 
 <style scoped>

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClawBackendServer } from '../server';
 import { createTestSnapshot, readyRemoteConnection } from './server-test-fixtures';
+import { getLocalClaudeAuthentication } from '../claude/authentication';
+import { ClaudeBackendDriver } from '../claude/claude-driver';
+import { BackendDriverRpc } from '../driver-rpc';
+
+vi.mock('../claude/authentication', () => ({ getLocalClaudeAuthentication: vi.fn() }));
 
 describe('host-targeted Codex authentication', () => {
   it.each([
@@ -40,16 +45,29 @@ describe('host-targeted Codex authentication', () => {
 });
 
 describe('host-targeted Claude authentication', () => {
-  it('checks the selected SSH host and returns only its login state', async () => {
+  it('checks local authentication only when a connection is omitted', async () => {
+    vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true, configDirectory: '/tmp/claude-home' });
+    const sshConnections = { getRemoteClaudeAuthentication: vi.fn() };
+    const driverRpc = new BackendDriverRpc(new Map([['claude', new ClaudeBackendDriver()]]));
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot: createTestSnapshot(), sshConnections: sshConnections as never, driverRpc });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'claude/authentication/get' }))
+      .resolves.toStrictEqual({ jsonrpc: '2.0', id: 1, result: { loggedIn: true, configDirectory: '/tmp/claude-home' } });
+    expect(sshConnections.getRemoteClaudeAuthentication).not.toHaveBeenCalled();
+    vi.mocked(getLocalClaudeAuthentication).mockClear();
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'claude/authentication/get', params: { connectionId: '' } }))
+      .rejects.toThrow('Invalid connectionId');
+    expect(getLocalClaudeAuthentication).not.toHaveBeenCalled();
+  });
+  it('checks the selected daemon and its configured Claude home, not the SSH default home', async () => {
     const snapshot = createTestSnapshot();
     const connection = readyRemoteConnection();
     snapshot.remoteConnections.connections = [connection];
-    const sshConnections = { getRemoteClaudeAuthentication: vi.fn().mockResolvedValue({ loggedIn: true }) };
-    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, sshConnections: sshConnections as never });
+    const remoteClients = { request: vi.fn().mockResolvedValue({ loggedIn: true, configDirectory: '/remote/claw/claude' }), close: vi.fn() };
+    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, remoteClients: remoteClients as never });
 
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'claude/authentication/get', params: { connectionId: connection.id } }))
-      .resolves.toEqual({ jsonrpc: '2.0', id: 1, result: { loggedIn: true } });
-    expect(sshConnections.getRemoteClaudeAuthentication).toHaveBeenCalledWith(connection.host);
+      .resolves.toEqual({ jsonrpc: '2.0', id: 1, result: { loggedIn: true, configDirectory: '/remote/claw/claude' } });
+    expect(remoteClients.request).toHaveBeenCalledWith(connection, 'claude/authentication/get', { _clientId: 'remote-controller' }, expect.any(Function));
   });
 
   it('rejects missing and offline connections before invoking SSH', async () => {

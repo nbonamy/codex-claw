@@ -102,7 +102,9 @@ import type { WorkItem } from '@codex-claw/core/contracts';
 import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 import BackendSelector from './BackendSelector.vue';
-const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
+import { useBackendChoices, useNewAgentBackend } from './backend-selection';
+const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend');
+useNewAgentBackend(backend, useBackendChoices());
 
 export type WorkItemAssignmentDestination = 'existing' | 'new';
 
@@ -147,7 +149,7 @@ const secondaryAction = computed<WorkItemAssignmentAction>(() => props.item.kind
 const primaryAction = computed<WorkItemAssignmentAction>(() => props.item.kind === 'pullRequest' ? 'review' : 'fix');
 const canSubmit = computed(() => !props.busy
   && props.branchName.trim().length > 0
-  && (destination.value === 'new' || Boolean(selectedAgentId.value)));
+  && (destination.value === 'new' ? Boolean(backend.value) : Boolean(selectedAgentId.value)));
 
 watch(() => [props.item.id, props.sessions.map((session) => session.agentId).join('|')] as const, () => {
   destination.value = 'new';

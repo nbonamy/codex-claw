@@ -4,6 +4,24 @@
     :class="{ 'app-shell--auth-gated': showOnboardingGate }"
   >
     <FirstRunOnboardingGate
+      :provider-setup="providerSetup"
+      :customized-setup="customizedSetup"
+      :setup-busy="setupBusy"
+      :updating-provider="updatingProvider"
+      :setup-error="setupError"
+      @customize="customizeProvider"
+      @close-setup="customizingProvider = null"
+      @save-setup="saveProviderSetup"
+      v-model:claude-dialog-visible="claudeDialogVisible"
+      :claude-authentication="claudeAuthentication"
+      :claude-connected="claudeConnected"
+      :claude-loading="claudeLoading"
+      :claude-error="claudeError"
+      :codex-connected="codexConnected"
+      :continuing="continuing"
+      @connect-claude="connectClaude"
+      @refresh-claude="refreshClaude"
+      @continue="continueWithProviders"
       :authentication="authentication"
       :authentication-cancelling="authenticationCancelling"
       :authentication-error="authenticationError"
@@ -95,6 +113,17 @@
       <BackendConnectionBanner :connection-state="connectionState" />
       <SettingsView
         v-if="settingsVisible"
+        :codex-connected="codexConnected"
+        :claude-connected="claudeConnected"
+        :codex-connection-busy="authenticationLoading || snapshot.providerConnections?.some(engine => engine.backend === 'codex' && engine.checking)"
+        :set-provider-enabled="setEngineEnabled"
+        :claude-connection-busy="claudeLoading || snapshot.providerConnections?.some(engine => engine.backend === 'claude' && engine.checking)"
+        :codex-login-pending="authentication?.login.status === 'pending'"
+        :codex-connection-error="authenticationError ?? authentication?.login.error ?? snapshot.providerConnections?.find(engine => engine.backend === 'codex')?.error"
+        :claude-connection-error="claudeError ?? snapshot.providerConnections?.find(engine => engine.backend === 'claude')?.error"
+        :connect-codex="startChatGptLogin"
+        :connect-claude="connectClaude"
+        :cancel-codex-login="cancelChatGptLogin"
         :active-tab="settingsActiveTab"
         :general-settings="snapshot.general"
         :settings="snapshot.theme"
@@ -523,7 +552,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import type { AgentFileActivity } from '@codex-claw/core/contracts';
+import type { AgentBackend, AgentFileActivity } from '@codex-claw/core/contracts';
 import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
@@ -538,7 +567,7 @@ import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RepositoryAcquireDialog from './RepositoryAcquireDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import NewProjectDialog from './NewProjectDialog.vue';
-import { provideBackendChoices, provideBackendSwitch } from './backend-selection';
+import { preferredBackendChoices, provideBackendChoices, provideBackendSwitch } from './backend-selection';
 import CockpitView from './CockpitView.vue';
 import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
@@ -946,7 +975,7 @@ type PendingMissionReviewDiscussion = {
 };
 
 type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
-provideBackendChoices(() => props.snapshot.general);
+provideBackendChoices(() => props.snapshot, openSettings);
 const backendSwitch = provideBackendSwitch((id, backend) => props.updateAgent({ id, backend }));
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
@@ -1225,9 +1254,14 @@ const githubConnection = computed<WorkIntegrationConnection>(() => (
 ));
 const firstRunOnboarding = useFirstRunOnboarding({
   getApi: () => codexClawApi,
+  getConnections: () => props.snapshot.providerConnections ?? [],
+  hasExistingWorkspace: () => props.snapshot.agents.length > 0 || props.snapshot.general.providerOnboardingComplete === true,
   isGitHubConnected: () => githubConnection.value.status === 'connected',
 });
 const {
+  claudeAuthentication, claudeConnected, claudeLoading, claudeError, claudeDialogVisible,
+  providerSetup, customizedSetup, customizingProvider, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
+  codexConnected, continuing, connectClaude, refreshClaude, continueWithProviders,
   authentication,
   authenticationCancelling,
   authenticationError,
@@ -1407,10 +1441,12 @@ const repositoryAcquisition = useRepositoryAcquisition({
   listSourceRepositories: (remoteConnectionId) => props.listSourceRepositories(remoteConnectionId),
   loadGitHubRepositories: () => props.loadWorkRepositories('github'),
   openFolder: async (folder, teamId) => {
+    const backend = preferredBackendChoices(props.snapshot, teamId)[0];
+    if (!backend) { openSettings(); return; }
     await props.createAgent({
       name: null,
       folder,
-      backend: 'codex',
+      backend,
       ...(teamId ? { teamId } : {}),
     });
   },
@@ -2167,6 +2203,10 @@ const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
 const backlogVisible = computed(() => activeSurface.value === 'backlog');
 const automationsVisible = computed(() => activeSurface.value === 'automations');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
+async function setEngineEnabled(backend: AgentBackend, enabled: boolean) {
+  if (!codexClawApi) throw new Error('Backend connection is unavailable.');
+  await codexClawApi.setProviderEnabled(backend, enabled);
+}
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
@@ -2422,7 +2462,9 @@ function repositorySessionContext(source?: Pick<RepositorySessionSource, 'agentI
 async function createQuickChat(): Promise<void> {
   const { teamId } = repositorySessionContext(null);
   try {
-    await props.createQuickChat(teamId ? { teamId } : {});
+    const backend = preferredBackendChoices(props.snapshot, teamId)[0];
+    if (!backend) { openSettings(); return; }
+    await props.createQuickChat({ backend, ...(teamId ? { teamId } : {}) });
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : String(error));
   }
@@ -2447,7 +2489,7 @@ function closeNewProjectDialog(): void {
   newProjectError.value = null;
 }
 
-async function createNewProject(name: string, backend: Agent['backend'] = 'codex'): Promise<void> {
+async function createNewProject(name: string, backend: Agent['backend']): Promise<void> {
   const { teamId } = repositorySessionContext(null);
   newProjectBusy.value = true;
   newProjectError.value = null;
@@ -2787,6 +2829,7 @@ function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions)
 
 async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
   await backendSwitch.settled();
+  requireConnectedConversation();
   await forwardCodexPromptWithVisualizationAnnotations(
     prompt,
     options,
@@ -2803,6 +2846,7 @@ async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMes
 }
 
 async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  requireConnectedConversation();
   await forwardCodexPromptWithVisualizationAnnotations(
     prompt,
     options,
@@ -2816,6 +2860,13 @@ async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSe
       ),
     ),
   );
+}
+
+function requireConnectedConversation(): void {
+  const agent = currentAgent.value;
+  if (agent && !preferredBackendChoices(props.snapshot, agent.teamId).includes(agent.backend)) {
+    throw new Error(t('engineConnection.required'));
+  }
 }
 
 function updateConversationComposerState(state: CodexComposerState): void {

@@ -1,4 +1,5 @@
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { preferredBackendChoices } from './backend-selection';
 import type {
   Agent,
   AgentBackend,
@@ -43,7 +44,7 @@ export function useRepositorySession(options: {
   suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
 }) {
   const source = ref<RepositorySessionSource | null>(null);
-  const backend = ref<AgentBackend>('codex');
+  const backend = ref<AgentBackend | undefined>();
   const visible = ref(false);
   const branches = ref<SourceBranch[]>([]);
   const workItems = ref<WorkItem[]>([]);
@@ -78,6 +79,7 @@ export function useRepositorySession(options: {
   });
 
   async function open(nextSource: RepositorySessionSource): Promise<void> {
+    backend.value = preferredBackendChoices(options.getSnapshot(), context(nextSource).teamId)[0];
     const requestId = ++sourceRequestId;
     source.value = nextSource;
     visible.value = true;
@@ -128,7 +130,7 @@ export function useRepositorySession(options: {
   }
 
   function createOnBranch(payload: RepositorySessionSource & { branch: SourceBranch }): void {
-    backend.value = 'codex';
+    backend.value = preferredBackendChoices(options.getSnapshot(), context(payload).teamId)[0];
     const { branch, ...nextSource } = payload;
     void createSession(nextSource, branch, context(nextSource).teamId);
   }

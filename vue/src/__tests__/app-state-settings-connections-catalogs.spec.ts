@@ -88,7 +88,7 @@ describe('useAppState', () => {
 
   it('adopts the resource sharing result from the preload bridge', async () => {
     const updatedSnapshot = createInitialSnapshot();
-    updatedSnapshot.general.shareCodexSkillsAndPlugins = false;
+    updatedSnapshot.general.providerHomes = { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } };
     const setCodexResourceSharing = vi.fn().mockResolvedValue(updatedSnapshot);
     const reloadRenderer = vi.fn().mockResolvedValue(undefined);
     stubElectronTestWindow({
@@ -102,7 +102,7 @@ describe('useAppState', () => {
     await state.setCodexResourceSharing({ enabled: false, mode: 'copy' });
 
     expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'copy' });
-    expect(state.snapshot.value.general.shareCodexSkillsAndPlugins).toBe(false);
+    expect(state.snapshot.value.general.providerHomes?.codex?.shareSkills).toBe(false);
     expect(reloadRenderer).toHaveBeenCalledOnce();
     state.backendRestartInProgress.value = false;
   });

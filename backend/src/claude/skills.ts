@@ -1,8 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import path from 'node:path';
 import type { Agent, BackendSkillSummary } from '@codex-claw/core/contracts';
 import { agentFolder } from '@codex-claw/core/agent-folder';
+import { claudeConfigDirectory } from './config-directory';
 
 type ClaudeSkillScope = 'project' | 'user';
 
@@ -16,6 +16,7 @@ type ClaudeSkillSource = {
 };
 type DirectoryEntry = {
   isDirectory(): boolean;
+  isSymbolicLink(): boolean;
   name: string;
 };
 
@@ -23,7 +24,7 @@ export async function listClaudeSkills(agent: Agent, options: ClaudeSkillCatalog
   const folder = agentFolder(agent);
   const sources: ClaudeSkillSource[] = [
     {
-      root: path.join(options.homeDir ?? homedir(), '.claude', 'skills'),
+      root: path.join(options.homeDir ? path.join(options.homeDir, '.claude') : claudeConfigDirectory(), 'skills'),
       scope: 'user',
     },
     ...(folder ? [{
@@ -56,7 +57,7 @@ async function readSkillsFromSource(source: ClaudeSkillSource): Promise<BackendS
   }
 
   const skills = await Promise.all(entries
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
     .map((entry) => readSkill(path.join(source.root, entry.name), entry.name, source)));
 
   return skills.filter((skill): skill is BackendSkillSummary => Boolean(skill));
@@ -159,5 +160,5 @@ function skillSortLabel(skill: BackendSkillSummary): string {
 }
 
 function isMissingDirectory(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && (error as { code?: string }).code === 'ENOENT';
+  return error instanceof Error && 'code' in error && ['ENOENT', 'ENOTDIR'].includes(String(error.code));
 }

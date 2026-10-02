@@ -541,6 +541,7 @@ describe('AppShell dialogs and commands', () => {
       onEvent: vi.fn(() => vi.fn()),
     } as Partial<CodexClawApi> as CodexClawApi;
     const wrapper = mountShell({ realAgentSidebar: true });
+    await flushPromises();
     try {
       expect(wrapper.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
 
@@ -621,6 +622,7 @@ describe('AppShell dialogs and commands', () => {
     const quit = vi.fn().mockResolvedValue(undefined);
     const getAgentGitDiff = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountRealShell({ snapshot, quit, getAgentGitDiff });
+    await flushPromises();
 
     expect(onAppCommand).toHaveBeenCalledOnce();
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('compact')).toBe(true);

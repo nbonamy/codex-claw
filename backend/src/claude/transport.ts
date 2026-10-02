@@ -69,6 +69,7 @@ export type ClaudePermissionResponse = {
 };
 
 export type ClaudeTurnTransport = {
+  generateText?(input: import('@codex-claw/core/backend-driver').BackendTextGenerationInput): Promise<import('@codex-claw/core/backend-driver').BackendTextGenerationResult>;
   startTurn(
     params: ClaudeTurnParams,
     onMessage: (message: ClaudeSdkMessage) => void,

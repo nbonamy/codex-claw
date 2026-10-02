@@ -37,6 +37,7 @@ export type AutomationRunnerOptions = {
   createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createExecutionId?: IdGenerator;
   now?: () => Date;
+  requireConnectedEngine?: (backend: Agent['backend']) => Promise<unknown>;
 };
 
 type CreatedAutomationAssignment = {
@@ -74,6 +75,7 @@ export class AutomationRunner {
       repositoryCount: automation.repositories.length,
     });
     try {
+      await this.options.requireConnectedEngine?.(automation.backend ?? 'codex');
       await this.createAssignmentsForAutomation(automation, executionId, startedAt, createdAssignments);
       if (createdAssignments.length === 0) {
         automation.lastRunAt = startedAt;
@@ -258,7 +260,7 @@ export class AutomationRunner {
       {
         name: dedicatedTeamName(item),
         folder: worktree.path,
-        backend: 'codex',
+        backend: automation.backend ?? 'codex',
         teamId: team.id,
       },
       createdAt,

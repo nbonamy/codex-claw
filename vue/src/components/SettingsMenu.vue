@@ -28,23 +28,23 @@
         </div>
       </div>
 
-      <div class="settings-menu__rate-limits" :aria-label="$t('surface.settingsMenu.rateLimits')">
+      <div v-if="usageGroups.length" class="settings-menu__rate-limits" :aria-label="$t('surface.settingsMenu.rateLimits')">
         <div class="settings-menu__rate-limits-header">
           <BrandSpeedTest />
-          <span>{{ $t('surface.settingsMenu.usageRemaining') }}</span>
+          <span>{{ $t('surface.settingsMenu.usage') }}</span>
         </div>
-        <div
-          v-for="row in rateLimitRows"
-          :key="row.label"
-          class="settings-menu__rate-limit"
-        >
-          <span class="settings-menu__rate-limit-label">{{ row.label }}</span>
-          <span class="settings-menu__rate-limit-remaining">{{ row.remaining }}</span>
-          <span class="settings-menu__rate-limit-reset">{{ row.reset }}</span>
+        <div v-for="group in usageGroups" :key="group.backend" class="settings-menu__usage-group" :aria-label="group.name">
+          <strong class="settings-menu__engine" :style="{ gridRow: `1 / span ${Math.max(1, group.rows.length)}` }">{{ group.name }}</strong>
+          <span v-if="group.failed" class="settings-menu__usage-error">{{ $t('surface.settingsMenu.loadFailed') }}</span>
+          <div v-for="row in group.rows" :key="row.label" class="settings-menu__rate-limit" :title="row.label" :aria-label="row.label">
+            <span class="settings-menu__rate-limit-remaining" :aria-label="$t('surface.settingsMenu.remainingValue', { value: row.remaining })">{{ row.remaining }}</span>
+            <span class="settings-menu__rate-limit-reset" :aria-label="row.reset ? $t('surface.settingsMenu.resetValue', { value: row.reset }) : undefined">{{ row.reset }}</span>
+          </div>
         </div>
       </div>
 
       <div
+        v-if="usageGroups.length"
         class="settings-menu__usage-divider"
         role="separator"
         :aria-label="$t('surface.settingsMenu.usageActionsDivider')"
@@ -63,18 +63,21 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
-import type { AccountRateLimitWindow, AccountRateLimits, CodexAccount } from '@codex-claw/core/contracts';
+import type { AccountRateLimitWindow, AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount } from '@codex-claw/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { BrandSpeedTest, QuitIcon, SettingsIcon, SparklesIcon, UserCircleIcon } from '../shared/icons/app-icons';
-import { clawHostCapabilities } from '../platform-api';
+import { clawHostCapabilities, codexClawApi } from '../platform-api';
 
 const props = withDefaults(defineProps<{
   active?: boolean;
   rateLimits?: AccountRateLimits;
+  enabledBackends?: AgentBackend[];
+  backendRateLimits?: AppSnapshot['backendAccountRateLimits'];
   account?: CodexAccount | null;
 }>(), {
   active: false,
+  enabledBackends: () => [],
 });
 
 const emit = defineEmits<{
@@ -85,11 +88,26 @@ const emit = defineEmits<{
 }>();
 const popoverVisible = ref(false);
 const nowMs = ref(Date.now());
-watch(popoverVisible, (visible, _previous, onCleanup) => {
+const fetchedUsage = ref<Partial<Record<AgentBackend, AccountRateLimits | null>>>({});
+const usageErrors = ref<Partial<Record<AgentBackend, boolean>>>({});
+const quotaBackends = computed(() => props.enabledBackends.filter(backend => backend !== 'codex' || props.account?.type !== 'apiKey'));
+watch([popoverVisible, () => quotaBackends.value.join(','), () => JSON.stringify(props.account)], ([visible], _previous, onCleanup) => {
+  fetchedUsage.value = {};
+  usageErrors.value = {};
   if (!visible) return;
+  let cancelled = false;
+  async function refreshUsage(backend: AgentBackend): Promise<void> {
+    try {
+      const limits = await codexClawApi?.getProviderUsage(backend);
+      if (!cancelled && limits !== undefined) fetchedUsage.value[backend] = limits;
+    } catch {
+      if (!cancelled) usageErrors.value[backend] = true;
+    }
+  }
+  for (const backend of quotaBackends.value) void refreshUsage(backend);
   nowMs.value = Date.now();
   const timer = window.setInterval(() => { nowMs.value = Date.now(); }, 60_000);
-  onCleanup(() => window.clearInterval(timer));
+  onCleanup(() => { cancelled = true; window.clearInterval(timer); });
 });
 const menuItems = computed<AppMenuItem[]>(() => [
   {
@@ -132,14 +150,15 @@ type RateLimitRow = {
   reset: string;
 };
 
-const rateLimitRows = computed<RateLimitRow[]>(() => {
+const usageGroups = computed(() => quotaBackends.value.map(backend => {
+  const limits = fetchedUsage.value[backend] !== undefined ? fetchedUsage.value[backend]
+    : props.backendRateLimits?.[backend] ?? (backend === 'codex' ? props.rateLimits : undefined);
   const rows = [
-    rateLimitRow(props.rateLimits?.primary ?? null, 'Usage'),
-    rateLimitRow(props.rateLimits?.secondary ?? null, 'Weekly'),
+    rateLimitRow(limits?.primary ?? null, translate('surface.settingsMenu.usage')),
+    rateLimitRow(limits?.secondary ?? null, translate('surface.settingsMenu.weekly')),
   ].filter((row): row is RateLimitRow => Boolean(row));
-
-  return rows.length > 0 ? rows : [{ label: translate('surface.settingsMenu.usage'), remaining: 'Unknown', reset: '' }];
-});
+  return { backend, name: translate(`surface.settingsMenu.engine.${backend}`), rows, failed: usageErrors.value[backend] && !rows.length };
+}).filter(group => group.rows.length > 0 || group.failed));
 
 function rateLimitRow(window: AccountRateLimitWindow | null, fallbackLabel: string): RateLimitRow | null {
   if (!window) {
@@ -182,21 +201,13 @@ function rateLimitReset(window: AccountRateLimitWindow): string {
     return '';
   }
 
-  const date = new Date(window.resetsAt * 1000);
-  if (window.windowDurationMins === 10_080 || (window.windowDurationMins ?? 0) >= 24 * 60) {
-    const remainingMinutes = Math.max(0, Math.ceil((date.getTime() - nowMs.value) / 60_000));
-    const days = Math.floor(remainingMinutes / 1_440);
-    const hours = Math.floor((remainingMinutes % 1_440) / 60);
-    const minutes = remainingMinutes % 60;
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
+  const remainingMinutes = Math.max(0, Math.ceil((window.resetsAt * 1000 - nowMs.value) / 60_000));
+  const days = Math.floor(remainingMinutes / 1_440);
+  const hours = Math.floor((remainingMinutes % 1_440) / 60);
+  const minutes = remainingMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
 }
 
 function selectMenuItem(itemId: string): void {
@@ -294,17 +305,27 @@ function selectMenuItem(itemId: string): void {
 
 .settings-menu__rate-limit {
   display: grid;
-  grid-template-columns: minmax(56px, 1fr) auto auto;
+  grid-column: 2 / -1;
+  grid-template-columns: subgrid;
   align-items: baseline;
-  column-gap: var(--space-4);
+  column-gap: var(--space-2);
   min-width: 0;
   font-size: var(--font-size-13);
-  padding: 0 var(--space-4) 0 var(--space-10);
 }
 
-.settings-menu__rate-limit-label {
-  min-width: 0;
-  font-weight: var(--font-weight-regular);
+.settings-menu__usage-group {
+  display: grid;
+  grid-template-columns: minmax(54px, 1fr) 38px 62px;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: var(--font-size-13);
+}
+
+.settings-menu__engine { font-weight: var(--font-weight-medium); }
+
+.settings-menu__usage-error {
+  grid-column: 2 / -1;
+  color: var(--color-text-muted);
 }
 
 .settings-menu__rate-limit-remaining,
@@ -312,6 +333,7 @@ function selectMenuItem(itemId: string): void {
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: right;
 }
 
 .settings-menu__usage-divider {

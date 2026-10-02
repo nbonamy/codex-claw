@@ -36,6 +36,25 @@ the `claude server` path.
 
 ## Existing Claw Integration Shape
 
+Subscription usage is fetched on demand by `clawd`, using the configured Claude
+home's OAuth login in place (macOS Keychain, credential file fallback elsewhere).
+Credentials never enter IPC, snapshots, or renderer state. The internal
+`api.anthropic.com/api/oauth/usage` endpoint requires `user:inference` and
+`user:profile` scopes and provides overall five-hour and weekly percentages.
+This is a CLI-internal endpoint, not a stable public SDK API; errors are bounded
+and surfaced separately from accounts without quotas. API-key/third-party
+billing has no subscription usage row. Claw does not refresh or rewrite OAuth
+credentials; an expired login needs to be refreshed through Claude Code.
+
+First-run onboarding offers Codex and Claude independently and requires an
+explicit Continue after at least one authenticates. Local Claude status is
+checked by `clawd` against the SDK's configured home; sign-in instructions use
+that exact directory and support both Claude subscriptions and Console API
+billing. Onboarding completion is persisted, but live engine authentication is
+not. A Claude-only installation does not need successful Codex authentication.
+Existing workspaces remain accessible when an engine is disconnected; new work
+requires a connected engine on its owning host.
+
 Codex Claw currently talks to provider runtimes through `clawd`. The daemon
 owns the Codex app-server and Claude Code child processes, request routing, and
 provider-to-app event adaptation. Electron and Web clients consume app-owned
@@ -82,18 +101,19 @@ behavior, local login, settings, skills, hooks, and project instructions. Claw
 does not call the Messages API directly or replace Claude Code with a generic
 model loop.
 
-Local Claude Code installation remains user-managed. When Claude is enabled,
-Claw's SSH connection setup checks the remote host for Claude Code and runs
-Anthropic's native installer if it is missing. The installer owns its per-user
+Claude Code installation is explicit in onboarding or Settings, including on
+remote hosts. SSH connection setup does not install a coding engine. The
+Anthropic installer owns its per-user
 `~/.local/bin/claude` launcher and `~/.local/share/claude/versions` directory;
 Claw does not copy Claude into its pinned Codex runtime directory. Remote
 authentication is separate: the remote user signs in with Claude Code before
 running Claude agents there. If remote Claude installation fails, Codex remains
-available on that connection, and the next remote Claude creation retries it.
+available on that connection. Settings can retry installation independently.
 Runtime discovery includes `~/.local/bin` when launching Claude from a
 non-interactive SSH session.
 For a ready SSH connection, Settings checks the remote user's Claude login with
-`claude auth status` and shows only the logged-in state. When sign-in is needed,
+the remote daemon's `claude auth status` in its configured home and shows only
+the logged-in state. When sign-in is needed,
 Settings presents `claude auth login --claudeai` for a Claude subscription and
 `claude auth login --console` for Anthropic Console API billing. The user runs
 one command in an interactive shell on that host, then refreshes status.
@@ -289,6 +309,73 @@ GUI-launched Electron processes often do not inherit the user's shell PATH. Set
 resolution. If Claude Code emits the common unauthenticated stream result, Claw
 normalizes it to an actionable app error telling the user to open Claude Code
 and run `/login`.
+
+## Configured Home Foundation
+
+Claw honors a process-wide `CLAUDE_CONFIG_DIR` for Claude SDK queries,
+transcript hydration, Resume Session discovery, personal skill discovery, and
+private plan streaming. SDK session deletion uses that same process environment.
+On startup, provider setup applies the persisted Claude home to the process;
+per-query home overrides are not supported. Project settings
+and skills remain workspace-scoped. The skill catalog follows symlinked skill
+directories and skips broken links.
+
+Personalization reads and writes `CLAUDE.md` in that configured home, so the
+editor and Claude's native instruction loading address the same file.
+
+New setups default to `~/.codex-claw/claude-home`, with personal skills linked
+from the existing Claude home. Onboarding can select the existing home instead,
+or disable skill sharing. Existing private skill folders are never replaced.
+Existing Claude-enabled installations retain their current home; no history or
+credentials are copied. Provider homes are persisted in `general.providerHomes`.
+Changing a home is disallowed once that provider owns Claw agents. Before that,
+only its idle driver is replaced, without restarting the app or other provider.
+An isolated home requires its own authentication.
+
+`providerHomes.<backend>.shareSkills` is the single sharing preference. Codex's
+legacy sharing flag is migrated on state load only if its provider home is
+absent; it is not written back. Codex setup and Settings use the same resource
+sharing operations for skills and plugins, preserving private resources until
+the user explicitly chooses a migration.
+
+Leave `CLAUDE_CONFIG_DIR` unset when invoking Claude with the default
+`~/.claude` home. The CLI treats explicitly setting even that same path
+differently for credential lookup. Authentication checks, SDK child processes,
+and displayed login commands must agree; local authentication returns a null
+`configDirectory` to indicate the default, unset environment.
+
+For an isolated authentication probe, use the unmodified CLI's own flow. Choose
+subscription login (`--claudeai`) or Console/API billing (`--console`):
+
+```sh
+CLAUDE_CONFIG_DIR="$HOME/.codex-claw/claude-home" claude auth login --claudeai
+# Alternatively, for Console/API billing:
+CLAUDE_CONFIG_DIR="$HOME/.codex-claw/claude-home" claude auth login --console
+CLAUDE_CONFIG_DIR="$HOME/.codex-claw/claude-home" claude auth status
+```
+
+For an isolated Console-key probe, choose the CLI's API-key creation option
+when offered. Keyless Console profiles live outside `CLAUDE_CONFIG_DIR` and
+must not be treated as isolated credentials merely because this variable is set.
+
+Credentials remain Claude-owned; do not copy login tokens or settings from the
+normal Claude home. Each SSH host must authenticate its own home. The current
+remote Settings login instructions still address that host's default home;
+remote cutover must update the instructions and status check together.
+
+`configured-home.spec.ts` covers restart/history/resume routing, symlinked
+skills, private plan streaming, and real SDK deletion against temporary homes.
+Its scripted query tests prove Claw's routing, not browser login or live-model
+session persistence. A live probe on 2026-10-02 with Claude Code 2.1.283 confirmed
+an authenticated first prompt followed by history hydration and a second prompt
+in a fresh Node process, retaining the same session ID and recalling the first
+prompt's marker. The probe used Claw's real driver/SDK transport with tools
+disabled; it did not restart the desktop app or migrate existing conversations.
+
+That probe exposed Claude's canonical cwd storage (`/tmp` becomes `/private/tmp`
+on macOS). History reads and Resume Session discovery now check both the agent's
+logical path and its resolved filesystem path, deduplicating session IDs while
+preserving logical-path history and reads for removed workspaces.
 
 ## Claude Websocket Surfaces
 

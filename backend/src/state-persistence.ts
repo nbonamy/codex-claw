@@ -2,6 +2,7 @@ import { isMission } from '@codex-claw/core/missions';
 import { isThreadFlags } from '@codex-claw/core/thread-flags';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { backendCodexHomeDir } from './state';
 import { isPlanReview } from '@codex-claw/core/plan-review';
 import { sanitizeClientPreferences } from '@codex-claw/core/client-preferences';
 import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
@@ -136,6 +137,16 @@ export class AppStatePersistence {
   }
 }
 
+function migrateGeneralSettings(value: unknown): AppGeneralSettings {
+  const settings = normalizeGeneralSettings(value);
+  if (isRecord(value) && typeof value.shareCodexSkillsAndPlugins === 'boolean' && !settings.providerHomes?.codex) {
+    settings.providerHomes = { ...settings.providerHomes, codex: {
+      isolated: true, shareSkills: value.shareCodexSkillsAndPlugins, homePath: backendCodexHomeDir(),
+    } };
+  }
+  return settings;
+}
+
 export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedState {
   return {
     ...(snapshot.clientPreferences ? { clientPreferences: structuredClone(snapshot.clientPreferences) } : {}),
@@ -242,7 +253,7 @@ export function snapshotFromPersistedState(value: unknown): AppSnapshot {
     subagentTrees: sanitizeSubagentTrees(value.subagentTrees),
     workBacklog,
     remoteConnections,
-    general: normalizeGeneralSettings(value.general),
+    general: migrateGeneralSettings(value.general),
     sourceFolder: normalizeSourceFolderState(value.sourceFolder),
     theme: normalizeThemeSettings(value.theme),
     queuedPrompts: [],
@@ -739,7 +750,7 @@ function nullableString(value: unknown): string | null {
 
 function cloneRemoteConnectionsState(state: RemoteConnectionsState): RemoteConnectionsState {
   return {
-    connections: state.connections.map((connection) => ({
+    connections: state.connections.map(({ providerConnections: _runtimeConnections, ...connection }) => ({
       ...connection,
       ...(connection.transport ? { transport: cloneRemoteConnectionTransport(connection.transport) } : {}),
     })),
@@ -1098,6 +1109,7 @@ function sanitizeAutomation(value: unknown): Automation | null {
   return {
     id: value.id,
     name: value.name.trim() || 'Automation',
+    backend: value.backend === 'claude' ? 'claude' : 'codex',
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
     repositories,
     teamId,

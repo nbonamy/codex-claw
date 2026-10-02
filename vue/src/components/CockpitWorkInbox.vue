@@ -225,10 +225,10 @@
 
       <template #footer>
         <div class="claw-dialog__footer">
-          <BackendSelector v-model="selectedBackend" :disabled="startingWork" class="cockpit-inbox__backend" />
+          <BackendSelector v-model="selectedBackend" :team-id="selectedTeamId" :disabled="startingWork" class="cockpit-inbox__backend" />
           <button class="claw-button claw-button--tertiary" type="button" :disabled="startingWork" @click="closeStartWorkDialog(false)">{{ $t('surface.cockpitWorkInbox.cancel') }}</button>
-          <button class="claw-button claw-button--secondary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('investigate')">{{ $t('surface.cockpitWorkInbox.investigate') }}</button>
-          <button class="claw-button claw-button--primary" type="button" :disabled="startingWork || !selectedTeamId" @click="startSelectedWork('fix')">{{ $t('surface.cockpitWorkInbox.fix') }}</button>
+          <button class="claw-button claw-button--secondary" type="button" :disabled="startingWork || !selectedTeamId || !selectedBackend" @click="startSelectedWork('investigate')">{{ $t('surface.cockpitWorkInbox.investigate') }}</button>
+          <button class="claw-button claw-button--primary" type="button" :disabled="startingWork || !selectedTeamId || !selectedBackend" @click="startSelectedWork('fix')">{{ $t('surface.cockpitWorkInbox.fix') }}</button>
         </div>
       </template>
     </el-dialog>
@@ -296,7 +296,7 @@ const startWorkDialogOpen = ref(false);
 const startingWork = ref(false);
 const startWorkError = ref<string | null>(null);
 const selectedTeamId = ref('');
-const selectedBackend = ref<Agent['backend']>('codex');
+const selectedBackend = ref<Agent['backend']>();
 const localActiveView = ref<InboxView>(props.activeView);
 const activeView = computed(() => localActiveView.value);
 const effectiveSearchQuery = ref(props.searchQuery);
@@ -493,7 +493,7 @@ function closeStartWorkDialog(visible = false): void {
 
 async function startSelectedWork(action: 'investigate' | 'fix'): Promise<void> {
   const items = [...selectedItems.value];
-  if (!selectedTeamId.value || items.length === 0) return;
+  if (!selectedTeamId.value || !selectedBackend.value || items.length === 0) return;
   startingWork.value = true;
   startWorkError.value = null;
   try {

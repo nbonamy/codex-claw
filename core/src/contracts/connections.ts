@@ -17,6 +17,7 @@ export type RemoteConnectionTransport = {
 };
 
 export type RemoteConnection = {
+  providerConnections?: import('./provider-setup').ProviderConnection[];
   id: string;
   kind: 'ssh';
   name: string;
@@ -43,6 +44,8 @@ export type RemoteConnectionsState = {
 
 export type ClaudeAuthentication = {
   loggedIn: boolean;
+  /** Local CLI override; null means leave CLAUDE_CONFIG_DIR unset for the default login. */
+  configDirectory?: string | null;
 };
 
 export type DevicePairingStatus = {

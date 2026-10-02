@@ -36,7 +36,7 @@ export async function deleteBackendMissionHome(missionId: string): Promise<void>
   await rm(backendMissionHomeDir(missionId), { recursive: true, force: true });
 }
 
-/** Isolated Codex app-server state; never share the user's ~/.codex threads. */
+/** Claw-owned default Codex home; provider setup may select an existing home instead. */
 export function backendCodexHomeDir(): string {
   return path.join(backendHomeDir(), 'codex-home');
 }

@@ -41,7 +41,9 @@ export function applyRuntimeEventToSnapshot(
   }
 
   if (event.type === 'account.rateLimitsUpdated') {
-    snapshot.accountRateLimits = accountRateLimits(event.payload);
+    const limits = accountRateLimits(event.payload);
+    snapshot.backendAccountRateLimits = { ...snapshot.backendAccountRateLimits, [event.backend]: limits };
+    if (event.backend === 'codex') snapshot.accountRateLimits = limits;
     return;
   }
 

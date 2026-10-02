@@ -29,7 +29,7 @@
       />
     </form>
 
-    <template v-if="backendChoices.length > 1" #footer-left>
+    <template v-if="backendChoices.length !== 1" #footer-left>
       <BackendSelector v-model="backend" :disabled="busy" />
     </template>
     <template #footer>
@@ -40,7 +40,7 @@
         class="claw-button claw-button--primary"
         type="button"
         :aria-busy="busy"
-        :disabled="busy || !name.trim()"
+        :disabled="busy || !name.trim() || !backend"
         @click="submit"
       >
         {{ t('newProjectDialog.create') }}
@@ -55,7 +55,7 @@ import { useI18n } from 'vue-i18n';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import BackendSelector from './BackendSelector.vue';
-import { useBackendChoices } from './backend-selection';
+import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
 import type { AgentBackend } from '@codex-claw/core/contracts';
 
@@ -75,7 +75,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const name = ref('');
-const backend = ref<AgentBackend>('codex');
+const backend = ref<AgentBackend>();
+useNewAgentBackend(backend, backendChoices);
 const nameInput = ref<HTMLInputElement | null>(null);
 const validationError = ref<string | null>(null);
 
@@ -97,7 +98,7 @@ function onVisibilityChanged(visible: boolean): void {
 
 function submit(): void {
   const projectName = name.value.trim();
-  if (!projectName) return;
+  if (!projectName || !backend.value || !backendChoices.value.includes(backend.value)) return;
   if (projectName === '.' || projectName === '..' || /[/\\]/u.test(projectName)) {
     validationError.value = t('newProjectDialog.invalidName');
     return;

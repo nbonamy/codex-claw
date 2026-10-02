@@ -62,11 +62,15 @@ describe('SettingsView', () => {
 
   it('routes Codex and Claude Code controls to separate provider panels', async () => {
     setElectronTestClient({});
+    const connectCodex = vi.fn().mockResolvedValue(undefined);
+    const connectClaude = vi.fn().mockResolvedValue(undefined);
+    const setProviderEnabled = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsView, {
       props: {
         activeTab: 'codex',
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
+        connectCodex, connectClaude, setProviderEnabled,
       },
     });
 
@@ -74,12 +78,23 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('Share skills and plugins with ChatGPT');
     expect(wrapper.text()).toContain('Codex executable');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
+    await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
+    expect(connectCodex).toHaveBeenCalledOnce();
 
     await wrapper.setProps({ activeTab: 'claude-code' } as never);
 
-    expect(wrapper.text()).toContain('Enable Claude Code (experimental)');
+    expect(wrapper.text()).toContain('Status');
+    expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Codex executable');
+    await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
+    expect(connectClaude).toHaveBeenCalledOnce();
+    await wrapper.setProps({ claudeConnected: true });
+    await wrapper.get('input[aria-label="Enable engine"]').setValue(false);
+    expect(setProviderEnabled).toHaveBeenCalledWith('claude', false);
+    await wrapper.setProps({ activeTab: 'codex', codexConnected: true });
+    await wrapper.get('input[aria-label="Enable engine"]').setValue(false);
+    expect(setProviderEnabled).toHaveBeenLastCalledWith('codex', false);
   });
 
   it('renders controlled appearance settings and emits appearance updates', async () => {

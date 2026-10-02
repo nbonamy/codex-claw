@@ -166,6 +166,7 @@ import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import AutomationEditor from './AutomationEditor.vue';
+import { provideBackendHost } from './backend-selection';
 import AutomationExecutionLog from './AutomationExecutionLog.vue';
 import AutomationWelcome from './AutomationWelcome.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
@@ -239,6 +240,9 @@ const selectedLocation = computed<AutomationLocation>(() =>
   selectedRemoteConnectionId.value ? { kind: 'remote', remoteConnectionId: selectedRemoteConnectionId.value } : { kind: 'local' },
 );
 const isRemoteLocation = computed(() => selectedLocation.value.kind === 'remote');
+provideBackendHost(() => selectedRemoteConnectionId.value
+  ? { host: selectedRemoteConnectionId.value, connections: remoteSnapshot.value?.providerConnections ?? [] }
+  : null);
 const locationAutomations = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.automations ?? []) : props.automations));
 const locationTeams = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.teams ?? []) : props.teams));
 const locationWorkBacklog = computed(() =>

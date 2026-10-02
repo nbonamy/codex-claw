@@ -41,7 +41,7 @@ describe('agent chat service', () => {
       {
         backend: 'claude',
         status: 'starting',
-        detail: 'Starting Claude backend...',
+        detail: 'Starting Claude Code backend...',
         capabilities: { approvalPresets: [] },
       },
     ]);
@@ -58,13 +58,13 @@ describe('agent chat service', () => {
       {
         backend: 'claude',
         status: 'starting',
-        detail: 'Starting Claude backend...',
+        detail: 'Starting Claude Code backend...',
         capabilities: { approvalPresets: [] },
       },
       {
         backend: 'claude',
         status: 'running',
-        detail: { key: 'backend.connected', params: { backend: 'Claude' } },
+        detail: { key: 'backend.connected', params: { backend: 'Claude Code' } },
         capabilities: { approvalPresets: [] },
       },
     ]);

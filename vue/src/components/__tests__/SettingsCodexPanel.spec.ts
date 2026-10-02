@@ -71,7 +71,7 @@ describe('SettingsCodexPanel', () => {
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountPanel({
-      settings: { ...defaultGeneralSettings, shareCodexSkillsAndPlugins: false },
+      settings: { ...defaultGeneralSettings, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } } },
       setCodexResourceSharing,
     });
 

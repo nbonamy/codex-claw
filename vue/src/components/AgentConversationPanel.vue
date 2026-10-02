@@ -49,6 +49,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
+import { translate } from '../i18n';
+import { useBackendChoices } from './backend-selection';
 import type {
   Agent,
   SavedPromptDraft,
@@ -103,7 +105,11 @@ const state = agentConversationState(() => props.view, {
   mentionGroups: () => props.mentionGroups,
   modelMenuItems: () => props.modelMenuItems,
 });
+const engineChoices = useBackendChoices(() => props.view.agent.teamId);
 const conversation = useAgentConversation({
+  beforeSubmit: async () => {
+    if (!engineChoices.value.includes(props.view.agent.backend)) throw new Error(translate('engineConnection.required'));
+  },
   agentId: () => props.view.agent.id,
   state,
   actions: props.actions,

@@ -18,11 +18,13 @@ describe('AutomationRunner', () => {
 
   it('checks every selected repository and creates isolated agents in the selected team', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     createAutomationInSnapshot(
       snapshot,
       {
         repositories: [repository('nbonamy/codex-claw', '/src/codex-claw'), repository('nbonamy/witsy', '/src/witsy')],
         teamId: 'team-codex-claw',
+        backend: 'claude',
         selectionPrompt: 'Only actionable bugs.',
         assignmentPrompt: 'Run the focused tests.',
         schedule: { intervalMinutes: 60 },
@@ -71,6 +73,7 @@ describe('AutomationRunner', () => {
     });
     expect(snapshot.agents.filter((agent) => agent.name?.startsWith('GitHub #'))).toHaveLength(2);
     expect(snapshot.agents.find((agent) => agent.name === 'GitHub #12')).toMatchObject({
+      backend: 'claude',
       folder: '/src/codex-claw-automation-github-12',
       teamId: 'team-codex-claw',
     });
@@ -82,9 +85,33 @@ describe('AutomationRunner', () => {
     });
     expect(sendPrompt).toHaveBeenCalledTimes(2);
     expect(selectWorkItems).toHaveBeenCalledWith(snapshot.automations[0], items);
+    expect(selectWorkItems.mock.calls[0]?.[0].backend).toBe('claude');
     expect(sendPrompt.mock.calls[0]?.[1]).toContain('Assignment instructions:\nRun the focused tests.');
     expect(saveSnapshot).toHaveBeenCalledOnce();
     expect(notifySnapshotUpdated).toHaveBeenCalledOnce();
+  });
+
+  it('does not provision work or fall back when the stored engine disconnects', async () => {
+    const snapshot = snapshotWithAutomation({ backend: 'claude' });
+    const requireConnectedEngine = vi.fn().mockRejectedValue(new Error('Claude Code is not connected.'));
+    const listItems = vi.fn();
+    const selectWorkItems = vi.fn();
+    const createWorktree = vi.fn();
+    const sendPrompt = vi.fn();
+    const runner = new AutomationRunner({
+      getSnapshot: () => snapshot,
+      requireConnectedEngine,
+      listWorkItems: { listItems }, selectWorkItems, createWorktree, sendPrompt,
+      saveSnapshot: vi.fn().mockResolvedValue(undefined), notifySnapshotUpdated: vi.fn(),
+      now: () => new Date('2026-06-09T11:00:00.000Z'),
+    });
+    await runner.runAll();
+    expect(requireConnectedEngine).toHaveBeenCalledExactlyOnceWith('claude');
+    expect(listItems).not.toHaveBeenCalled();
+    expect(selectWorkItems).not.toHaveBeenCalled();
+    expect(createWorktree).not.toHaveBeenCalled();
+    expect(sendPrompt).not.toHaveBeenCalled();
+    expect(snapshot.automations[0]).toMatchObject({ backend: 'claude', lastError: 'Claude Code is not connected.' });
   });
 
   it('records a due check even when there is no new work', async () => {
@@ -212,6 +239,7 @@ describe('automation scheduling and matching', () => {
 
 function snapshotWithAutomation(overrides: Partial<Automation> = {}) {
   const snapshot = createInitialSnapshot();
+  snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
   createAutomationInSnapshot(
     snapshot,
     {

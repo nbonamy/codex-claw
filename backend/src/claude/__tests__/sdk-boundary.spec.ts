@@ -34,6 +34,32 @@ describe('Claude Agent SDK → Claw backend', () => {
   }
   afterEach(async () => { await Promise.all(servers.splice(0).map((server) => server.close())); });
 
+  it('projects Claude quota windows separately from Codex and retains the other reported window', async () => {
+    const { sdk, send, snapshot, events } = setup();
+    const pending = send('claude-a', 'hello');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await pending;
+    const quota = (rateLimitType: string, utilization?: number) => sdk.emit({
+      type: 'rate_limit_event', session_id: 'session-a',
+      rate_limit_info: { status: 'allowed', rateLimitType, utilization, resetsAt: 1_800_000_000 },
+    });
+    quota('five_hour', 0.2);
+    quota('seven_day', 0.1);
+    await vi.waitFor(() => expect(snapshot.backendAccountRateLimits?.claude).toMatchObject({
+      primary: { usedPercent: 20, windowDurationMins: 300, resetsAt: 1_800_000_000 },
+      secondary: { usedPercent: 10, windowDurationMins: 10_080, resetsAt: 1_800_000_000 },
+    }));
+    expect(snapshot.accountRateLimits).toBeUndefined();
+    quota('seven_day_opus', 0.9);
+    quota('five_hour');
+    quota('five_hour', -1);
+    quota('five_hour', 0.3);
+    await vi.waitFor(() => expect(snapshot.backendAccountRateLimits?.claude?.primary?.usedPercent).toBe(30));
+    expect(snapshot.backendAccountRateLimits?.claude?.secondary?.usedPercent).toBe(10);
+    expect(events.filter(event => event.type === 'account.rateLimitsUpdated')).toHaveLength(3);
+  });
+
   it('turns an SDK ExitPlanMode item into a durable review without UI semantics', async () => {
     const { sdk, driver, server, snapshot, events } = setup();
     const pending = driver.sendPrompt(agent(), 'plan it', { planMode: true });

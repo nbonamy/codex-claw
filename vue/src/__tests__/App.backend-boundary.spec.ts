@@ -86,6 +86,7 @@ describe('Unified backend → mounted application', () => {
 
   it('enforces advertised composer capabilities in the visible menu and submitted options', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const { api, emit } = installBackendFixture(snapshot);
     api.sendPrompt.mockResolvedValue(snapshot);
     const wrapper = mount(App);
@@ -202,6 +203,7 @@ describe('Unified backend → mounted application', () => {
 
   it('adopts durable review findings and decisions through the unified client seam', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const agent = snapshot.agents[0]!;
     const { api } = installBackendFixture(snapshot);
     const wrapper = mount(App);

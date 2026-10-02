@@ -15,6 +15,13 @@ const EXTENDED_REQUEST_TIMEOUT_MS = 10 * 60_000;
  * and EXTENDED only for operations designed to run for several minutes.
  */
 const requestTimeoutByMethod = {
+  [backendMethods.providerUsageGet]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.driverAccountRateLimitsGet]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerConnectionsGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerEnabledSet]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerSetupGet]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerSetupConfigure]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerInstall]: EXTENDED_REQUEST_TIMEOUT_MS,
   [backendMethods.engineInstructionsRead]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.engineInstructionsSave]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.agentApprovalPresetUpdate]: QUICK_REQUEST_TIMEOUT_MS,
@@ -116,6 +123,7 @@ const requestTimeoutByMethod = {
   [backendMethods.codexLogout]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.driverApprovalPresetUpdate]: QUICK_REQUEST_TIMEOUT_MS,
   [backendMethods.driverCodexAuthenticationGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.driverProviderAuthentication]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.driverCodexLoginCancel]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.driverCodexChatGptLoginStart]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.driverCodexChatGptDeviceCodeLoginStart]: LONG_RUNNING_REQUEST_TIMEOUT_MS,

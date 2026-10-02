@@ -20,6 +20,15 @@ afterEach(async () => {
 });
 
 describe('AppStatePersistence', () => {
+  it.each([true, false])('migrates legacy Codex sharing once (%s), preserving newer choices', enabled => {
+    const legacy = { ...persistedStateFromSnapshot(createEmptySnapshot()), general: { shareCodexSkillsAndPlugins: enabled } };
+    const restored = snapshotFromPersistedState(legacy);
+    expect(restored.general.providerHomes?.codex).toMatchObject({ isolated: true, shareSkills: enabled });
+    expect(persistedStateFromSnapshot(restored).general).not.toHaveProperty('shareCodexSkillsAndPlugins');
+    const newer = { isolated: true, shareSkills: !enabled, homePath: '/claw/codex-home' };
+    const reloaded = snapshotFromPersistedState({ ...legacy, general: { ...legacy.general, providerHomes: { codex: newer } } });
+    expect(reloaded.general.providerHomes?.codex).toEqual(newer);
+  });
   it('restores a user-selected model, effort, and tier after restarting', async () => {
     const persistence = new AppStatePersistence(await tempStatePath());
     const snapshot = createInitialSnapshot();
@@ -952,7 +961,7 @@ describe('AppStatePersistence', () => {
 
     expect(persisted.automations).toStrictEqual(snapshot.automations);
     expect(persisted).not.toHaveProperty('loops');
-    expect(restored.automations).toStrictEqual(snapshot.automations);
+    expect(restored.automations).toStrictEqual(snapshot.automations.map(automation => ({ ...automation, backend: 'codex' })));
 
   });
 
@@ -1197,7 +1206,7 @@ describe('AppStatePersistence', () => {
         serviceTier: 'priority',
       }],
       savedPromptDrafts: [],
-      shareCodexSkillsAndPlugins: false,
+      providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } },
       sessionCompressionWarningEnabled: false,
       worktreeInitializationMode: 'repository',
       repositoryIcons: { '/src/codex-claw': '🦞' },

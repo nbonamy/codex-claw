@@ -70,9 +70,10 @@
           v-if="showBackendSelector && agent && backendSwitch"
           class="conversation-pane__backend-selector"
           :model-value="agent.backend"
+          :team-id="agent.teamId"
           size="small"
           :disabled="disabled || backendSwitch.busy.value"
-          @update:model-value="selectBackend"
+          @update:model-value="$event && selectBackend($event)"
         />
         <div v-if="activeThreadFlags.length > 0" class="conversation-pane__thread-flags">
           <ThreadFlagAffordance
@@ -86,6 +87,9 @@
         </div>
       </template>
       <template #before-composer>
+        <button v-if="agent && !backendChoices.includes(agent.backend)" class="claw-button claw-button--tertiary" type="button" @click="connectEngine">
+          {{ t('engineConnection.required') }}
+        </button>
         <div v-if="draftPickerOpen" class="conversation-pane__draft-anchor">
           <SavedPromptDraftPicker
             :drafts="agentDrafts"
@@ -153,7 +157,7 @@ import ChatTextSelectionAnnotation from './ChatTextSelectionAnnotation.vue';
 import ThreadFlagAffordance from './ThreadFlagAffordance.vue';
 import BackendSelector from './BackendSelector.vue';
 import SavedPromptDraftPicker from './SavedPromptDraftPicker.vue';
-import { useBackendChoices, useBackendSwitch } from './backend-selection';
+import { useBackendChoices, useBackendSwitch, useConnectEngine } from './backend-selection';
 import { canSelectAgentBackend } from '@codex-claw/core/agent-backends';
 import { ElMessage } from 'element-plus';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
@@ -166,7 +170,8 @@ import {
 } from '../shared/collaboration-message';
 import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
 const backendSwitch = useBackendSwitch();
-const backendChoices = useBackendChoices();
+const backendChoices = useBackendChoices(() => props.agent?.teamId);
+const connectEngine = useConnectEngine();
 async function selectBackend(backend: Agent['backend']): Promise<void> {
   if (!props.agent || !backendSwitch) return;
   try { await backendSwitch.select(props.agent.id, backend); }

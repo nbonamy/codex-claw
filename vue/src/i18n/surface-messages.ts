@@ -914,6 +914,10 @@ export const surfaceMessages = {
     "issuesAndPullRequests": "Issues and pull requests"
   },
   "settingsMenu": {
+    "loadFailed": "Couldn’t load usage",
+    "remainingValue": "{value} remaining",
+    "resetValue": "Resets in {value}",
+    "engine": { "codex": "Codex", "claude": "Claude" },
     "settingsMenu": "Settings menu",
     "rateLimits": "Rate limits",
     "usageRemaining": "Usage remaining",

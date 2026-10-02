@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import type {
   CodexComposerMenuSelectableItem,
   CodexNativeAttachment,
@@ -6,9 +6,10 @@ import type {
 } from '@codex-app-sdk/vue';
 import type { CodexSurfaceClientRequest } from '@codex-app-sdk/core/surface';
 import { nextTick, reactive } from 'vue';
+import { ElRadio, ElRadioGroup } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { CodexClawApi, RendererMessage } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
@@ -255,39 +256,53 @@ describe('AppShell authentication and conversation', () => {
     expect(retryTurnAction).toHaveBeenCalledWith('turn-retry');
   });
 
-  it('shows passive connection progress while discovering existing ChatGPT credentials', async () => {
-    let resolveAuthentication!: (value: {
-      account: { type: 'apiKey' };
-      requiresOpenaiAuth: false;
-      login: { status: 'idle'; error: null };
-    }) => void;
+  it('opens an existing workspace while cached connection data loads, without new authentication probes', async () => {
+    let resolveConnections!: (value: []) => void;
+    const getCodexAuthentication = vi.fn();
+    const getClaudeAuthentication = vi.fn();
     window.codexClaw = {
-      getCodexAuthentication: vi.fn().mockReturnValue(new Promise((resolve) => {
-        resolveAuthentication = resolve;
+      getCodexAuthentication, getClaudeAuthentication,
+      getProviderConnections: vi.fn().mockReturnValue(new Promise((resolve) => {
+        resolveConnections = resolve;
       })),
     } as Partial<CodexClawApi> as CodexClawApi;
 
     const wrapper = mountShell();
     await nextTick();
 
-    expect(wrapper.get('[aria-label="Connecting Codex Claw"]').text()).toContain('Connecting to ChatGPT…');
-    expect(wrapper.find('[aria-label="Connecting Codex Claw"] button').exists()).toBe(false);
+    expect(wrapper.find('.codex-login').exists()).toBe(false);
+    expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--auth-gated');
 
-    resolveAuthentication({
-      account: { type: 'apiKey' },
-      requiresOpenaiAuth: false,
-      login: { status: 'idle', error: null },
-    });
+    resolveConnections([]);
     await flushPromises();
 
     expect(wrapper.find('.codex-login').exists()).toBe(false);
     expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+    expect(getCodexAuthentication).not.toHaveBeenCalled();
+    expect(getClaudeAuthentication).not.toHaveBeenCalled();
     wrapper.unmount();
+  });
+
+  it('restores the account menu from cached connection metadata without probing authentication', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false,
+      authentication: { kind: 'codex', connected: true, state: {
+        account: { type: 'chatgpt', email: 'cached@example.com', planType: 'plus' }, requiresOpenaiAuth: true,
+        login: { status: 'idle', error: null },
+      } },
+    }];
+    const getCodexAuthentication = vi.fn();
+    window.codexClaw = { getCodexAuthentication } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
+    await flushPromises();
+    expect(wrapper.get('.settings-menu__account').text()).toContain('cached@example.com');
+    expect(getCodexAuthentication).not.toHaveBeenCalled();
   });
 
   it('offers skippable GitHub setup after the first ChatGPT sign-in', async () => {
     vi.useFakeTimers();
     const snapshot = createInitialSnapshot();
+    snapshot.agents = [];
     const getCodexAuthentication = vi.fn()
       .mockResolvedValueOnce({
         account: null,
@@ -302,6 +317,7 @@ describe('AppShell authentication and conversation', () => {
     window.codexClaw = {
       getCodexAuthentication,
       startCodexChatGptLogin: vi.fn().mockResolvedValue(undefined),
+      updateSettings: vi.fn().mockResolvedValue(snapshot),
     } as Partial<CodexClawApi> as CodexClawApi;
 
     const wrapper = mountShell({ snapshot });
@@ -310,7 +326,12 @@ describe('AppShell authentication and conversation', () => {
     await flushPromises();
     vi.advanceTimersByTime(1000);
     await flushPromises();
+    await wrapper.setProps({ snapshot: { ...snapshot, providerConnections: [{ backend: 'codex', installed: true, connected: true, checking: false }] } });
 
+    expect(wrapper.get('.codex-login').text()).toContain('Codex connected');
+    expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+    await wrapper.get('.codex-login__continue').trigger('click');
+    await flushPromises();
     expect(wrapper.find('.codex-login').exists()).toBe(false);
     expect(wrapper.get('.github-onboarding').text()).toContain('Connect GitHub.');
     expect(wrapper.get('.app-shell').classes()).toContain('app-shell--auth-gated');
@@ -364,7 +385,7 @@ describe('AppShell authentication and conversation', () => {
     wrapper.unmount();
   });
 
-  it('keeps first-run GitHub setup pending across a renderer reload', async () => {
+  it('keeps provider selection pending across a reload even after Codex signs in', async () => {
     window.codexClaw = {
       getCodexAuthentication: vi.fn().mockResolvedValue({
         account: null,
@@ -373,7 +394,7 @@ describe('AppShell authentication and conversation', () => {
       }),
     } as Partial<CodexClawApi> as CodexClawApi;
 
-    const signedOutShell = mountShell();
+    const signedOutShell = mountShell({ snapshot: createEmptySnapshot() });
     await flushPromises();
     signedOutShell.unmount();
 
@@ -385,12 +406,151 @@ describe('AppShell authentication and conversation', () => {
       }),
     } as Partial<CodexClawApi> as CodexClawApi;
 
-    const reloadedShell = mountShell();
+    const reloadedSnapshot = createEmptySnapshot();
+    reloadedSnapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    const reloadedShell = mountShell({ snapshot: reloadedSnapshot });
     await flushPromises();
 
-    expect(reloadedShell.find('.codex-login').exists()).toBe(false);
-    expect(reloadedShell.find('.github-onboarding').exists()).toBe(true);
+    expect(reloadedShell.get('.codex-login').text()).toContain('Codex connected');
+    expect(reloadedShell.find('.github-onboarding').exists()).toBe(false);
     reloadedShell.unmount();
+  });
+
+  it('recognizes an already authenticated Claude during initial provider discovery before it is enabled', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [];
+    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    snapshot.general.claudeCodeEnabled = false;
+    window.codexClaw = {
+      getCodexAuthentication: vi.fn().mockResolvedValue({ account: null, requiresOpenaiAuth: true, login: { status: 'idle', error: null } }),
+      getClaudeAuthentication: vi.fn().mockResolvedValue({ loggedIn: true, configDirectory: null }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    expect(wrapper.findAll('.codex-login__detection')[1]!.text()).toContain('Connected');
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeUndefined();
+    expect(wrapper.find('.claude-login-command').exists()).toBe(false);
+  });
+
+  it('connects Claude without Codex and persists onboarding completion rather than enable flags', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [];
+    const getCodexAuthentication = vi.fn().mockRejectedValue(new Error('Codex unavailable'));
+    let finishClaudeCheck!: (result: { loggedIn: boolean; configDirectory: string }) => void;
+    const getClaudeAuthentication = vi.fn()
+      .mockReturnValueOnce(new Promise(resolve => { finishClaudeCheck = resolve; }))
+      .mockResolvedValue({ loggedIn: true, configDirectory: '/tmp/private-claude-home' });
+    const updateSettings = vi.fn().mockResolvedValue(snapshot);
+    window.codexClaw = { getCodexAuthentication, getClaudeAuthentication, updateSettings } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+    await wrapper.get('.codex-login__providers').findAll('.el-button')[1]!.trigger('click');
+    expect(wrapper.findAll('.claude-login-command').map(command => command.text())).toStrictEqual([
+      "CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --claudeai",
+      "CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --console",
+    ]);
+    finishClaudeCheck({ loggedIn: false, configDirectory: '/tmp/private-claude-home' });
+    await flushPromises();
+    expect(document.body.textContent + wrapper.text()).toContain("CLAUDE_CONFIG_DIR='/tmp/private-claude-home' claude auth login --console");
+    const checkConnection = wrapper.findAll('button').find(button => button.text() === i18n.global.t('surface.remoteClaudeAuth.refresh'));
+    expect(checkConnection).toBeDefined();
+    await checkConnection!.trigger('click');
+    await flushPromises();
+    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    await wrapper.setProps({ snapshot: { ...snapshot } });
+    expect(wrapper.get('.codex-login').text()).toContain('Claude Code connected');
+    expect(wrapper.findAll('.codex-login__detection')[1]!.text()).toContain('Connected');
+    expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+    await wrapper.get('.codex-login__continue').trigger('click');
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith({ general: { providerOnboardingComplete: true } });
+    expect(wrapper.find('.github-onboarding').exists()).toBe(true);
+    wrapper.unmount();
+
+    window.sessionStorage.clear();
+    snapshot.general.codexEnabled = false;
+    snapshot.general.claudeCodeEnabled = true;
+    snapshot.general.providerOnboardingComplete = true;
+    getCodexAuthentication.mockClear();
+    const reloaded = mountShell({ snapshot });
+    await flushPromises();
+    expect(reloaded.find('.codex-login').exists()).toBe(false);
+    expect(reloaded.get('.app-shell').classes()).not.toContain('app-shell--auth-gated');
+    expect(getCodexAuthentication).not.toHaveBeenCalled();
+    reloaded.unmount();
+  });
+
+  it.each([false, true])('installs an undetected provider and preserves a locked home (%s)', async (locked) => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [];
+    const setup = { backend: 'claude' as const, installed: false, isolated: true, shareSkills: true, locked, homePath: '/claw/claude-home' };
+    const configureProviderSetup = vi.fn().mockResolvedValue(setup);
+    const installProvider = vi.fn().mockResolvedValue({ ...setup, installed: true });
+    const getClaudeAuthentication = vi.fn().mockResolvedValue({ loggedIn: true, configDirectory: setup.homePath });
+    const getCodexAuthentication = vi.fn();
+    window.codexClaw = {
+      getProviderSetup: vi.fn().mockResolvedValue([setup, { ...setup, backend: 'codex', homePath: '/claw/codex-home' }]),
+      configureProviderSetup, installProvider, getClaudeAuthentication, getCodexAuthentication,
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    expect(getCodexAuthentication).not.toHaveBeenCalled();
+    await wrapper.findAll('.codex-login__providers .el-button')[1]!.trigger('click');
+    await flushPromises();
+    expect(getClaudeAuthentication).not.toHaveBeenCalled();
+    expect(installProvider).not.toHaveBeenCalled();
+    const install = wrapper.findAll('button').find(button => button.text() === 'Install');
+    expect(install).toBeDefined();
+    await install!.trigger('click');
+    await flushPromises();
+    if (locked) expect(configureProviderSetup).not.toHaveBeenCalled();
+    else expect(configureProviderSetup).toHaveBeenCalledWith('claude', { isolated: true, shareSkills: true });
+    expect(installProvider).toHaveBeenCalledWith('claude');
+    await wrapper.setProps({ snapshot: { ...snapshot, providerConnections: [{ backend: 'claude', installed: true, connected: true, checking: false }] } });
+    expect(wrapper.get('.codex-login').text()).toContain('Claude Code connected');
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeUndefined();
+  });
+
+  it.each(['codex', 'claude'] as const)('recognizes existing %s authentication after separation is disabled', async backend => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [];
+    const setups = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, isolated: true, shareSkills: true, locked: false, homePath: `/claw/${backend}-home` }));
+    const configureProviderSetup = vi.fn().mockResolvedValue({ ...setups.find(setup => setup.backend === backend), isolated: false, homePath: `/existing/${backend}` });
+    const startCodexChatGptLogin = vi.fn();
+    let finishAuthentication!: () => void;
+    const authenticationReady = new Promise<void>(resolve => { finishAuthentication = resolve; });
+    window.codexClaw = {
+      getProviderSetup: vi.fn().mockResolvedValue(setups), configureProviderSetup, startCodexChatGptLogin,
+      getCodexAuthentication: vi.fn()
+        .mockImplementation(async () => { await authenticationReady; return { account: { type: 'chatgpt' }, requiresOpenaiAuth: true, login: { status: 'idle', error: null } }; }),
+      getClaudeAuthentication: vi.fn()
+        .mockImplementation(async () => { await authenticationReady; return { loggedIn: true, configDirectory: '/existing/claude' }; }),
+    } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mount(AppShell, {
+      props: { snapshot, activeAgent: null, isLoading: false, isSending: false },
+      global: { components: { ElRadio, ElRadioGroup } },
+    });
+    await flushPromises();
+    const index = backend === 'codex' ? 0 : 1;
+    await wrapper.findAll('.codex-login__detection button')[index]!.trigger('click');
+    const dialog = new DOMWrapper(document.body).get('[role="dialog"]');
+    await dialog.get('input[type="radio"][value="false"]').setValue();
+    await dialog.get('.claw-form-dialog__footer .claw-button--primary').trigger('click');
+    await flushPromises();
+    expect(configureProviderSetup).toHaveBeenCalledWith(backend, { isolated: false, shareSkills: true });
+    expect(wrapper.findAll('.codex-login__detection > span').map(status => status.text())).toStrictEqual(
+      backend === 'codex' ? ['Checking…', 'Detected'] : ['Detected', 'Checking…'],
+    );
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+    finishAuthentication();
+    await flushPromises();
+    await wrapper.setProps({ snapshot: { ...snapshot, providerConnections: [{ backend, installed: true, connected: true, checking: false }] } });
+    expect(wrapper.findAll('.codex-login__detection > span').map(status => status.text())).toStrictEqual(
+      backend === 'codex' ? ['Connected', 'Detected'] : ['Detected', 'Connected'],
+    );
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeUndefined();
+    expect(startCodexChatGptLogin).not.toHaveBeenCalled();
   });
 
   it('keeps the workspace visible while reporting automatic clawd reconnection', () => {
@@ -411,21 +571,31 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.find('.app-shell__content').exists()).toBe(true);
   });
 
-  it('gates the workspace and shortcuts when the isolated Codex home is signed out', async () => {
-    window.codexClaw = {
-      getCodexAuthentication: vi.fn().mockResolvedValue({
-        account: null,
-        requiresOpenaiAuth: true,
-        login: { status: 'idle', error: null },
-      }),
-    } as Partial<CodexClawApi> as CodexClawApi;
-    const wrapper = mountShell();
+  it.each([false, true])('returns an existing workspace to setup when its only engine is unavailable (authenticated=%s)', async connected => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.providerOnboardingComplete = true;
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected, enabled: false, checking: false }];
+    const setProviderEnabled = vi.fn().mockResolvedValue([{ ...snapshot.providerConnections[0], enabled: true }]);
+    const startCodexChatGptLogin = vi.fn().mockResolvedValue(undefined);
+    window.codexClaw = { setProviderEnabled, startCodexChatGptLogin, updateSettings: vi.fn().mockResolvedValue(snapshot) } as Partial<CodexClawApi> as CodexClawApi;
+    const wrapper = mountShell({ snapshot });
     await flushPromises();
 
     expect(wrapper.get('.app-shell').classes()).toContain('app-shell--auth-gated');
-    expect(wrapper.get('[aria-label="Sign in to Codex Claw"]').text()).toContain('Sign in to ChatGPT');
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', metaKey: true, cancelable: true }));
-    expect(wrapper.emitted('duplicate-agent')).toBeUndefined();
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+    if (connected) {
+      const enable = wrapper.findAll('.codex-login__providers .el-button').find(button => button.text().includes('Enable Codex'))!;
+      await enable.trigger('click');
+      await flushPromises();
+      expect(setProviderEnabled).toHaveBeenCalledWith('codex', true);
+      expect(startCodexChatGptLogin).not.toHaveBeenCalled();
+      await wrapper.setProps({ snapshot: { ...snapshot, providerConnections: [{ ...snapshot.providerConnections[0]!, enabled: true }] } });
+      await wrapper.get('.codex-login__continue').trigger('click');
+      await flushPromises();
+      expect(wrapper.find('.codex-login').exists()).toBe(false);
+      expect(wrapper.find('.github-onboarding').exists()).toBe(false);
+      expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--auth-gated');
+    }
 
     wrapper.unmount();
   });
@@ -443,8 +613,12 @@ describe('AppShell authentication and conversation', () => {
         login: { status: 'pending', error: null },
       }),
       cancelCodexChatGptLogin,
+      startCodexChatGptLogin: vi.fn().mockResolvedValue(undefined),
     } as Partial<CodexClawApi> as CodexClawApi;
-    const wrapper = mountShell();
+    const wrapper = mountShell({ snapshot: createEmptySnapshot() });
+    await flushPromises();
+
+    await wrapper.get('.codex-login .el-button').trigger('click');
     await flushPromises();
 
     const cancel = wrapper.get('.codex-login__cancel');
@@ -454,7 +628,7 @@ describe('AppShell authentication and conversation', () => {
 
     expect(cancelCodexChatGptLogin).toHaveBeenCalledOnce();
     expect(wrapper.find('.codex-login__cancel').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Sign in to start your first session.');
+    expect(wrapper.find('.codex-login__continue').exists()).toBe(true);
 
     wrapper.unmount();
   });
@@ -683,6 +857,7 @@ describe('AppShell authentication and conversation', () => {
 
   it('forwards prompts from the composer', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const wrapper = mount(AppShell, {
       props: {
         snapshot,
@@ -720,6 +895,7 @@ describe('AppShell authentication and conversation', () => {
 
   it('uses the promise-returning prompt action when the host provides one', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(AppShell, {
       props: {
@@ -968,6 +1144,7 @@ describe('AppShell authentication and conversation', () => {
     const snapshot = createInitialSnapshot();
     const activeAgent = snapshot.agents[0];
     if (!activeAgent) throw new Error('Expected seeded agent.');
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     activeAgent.backendSession = { kind: 'codex', threadId: 'thread-dina' };
     const providerSnapshot = codexConversationSnapshot([], {
       activeConversationId: 'thread-dina',

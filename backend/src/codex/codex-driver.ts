@@ -40,6 +40,12 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.getAuthentication();
   }
 
+  async authenticate(request: import('@codex-claw/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@codex-claw/core/contracts/provider-setup').ProviderAuthentication> {
+    const state = await (request.action === 'logout' ? this.logout()
+      : request.action === 'cancel' ? this.cancelChatGptLogin(request.loginId) : this.getAuthentication());
+    return { kind: 'codex', connected: request.action !== 'logout' && Boolean(state.account || !state.requiresOpenaiAuth), state };
+  }
+
   startChatGptLogin(): Promise<CodexChatGptLogin> {
     return this.sessionManager.startChatGptLogin();
   }

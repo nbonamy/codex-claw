@@ -6,9 +6,8 @@ implementation/review role policy remains a separate decision.
 ## Problem
 
 Claw can create agents through several manual and automated entry points.
-The original New agent dialog offers Codex or Claude Code when Claude is
-enabled, but newer creation paths frequently force Codex. A provider setting
-that exists in only one dialog no longer covers the product.
+Codex and Claude Code are peers. Either, both, or neither may be connected on a
+host. Installation and process health are distinct from authentication.
 
 We need a consistent way to choose the coding agent without adding friction to
 quick actions such as starting a session on main.
@@ -22,13 +21,14 @@ quick actions such as starting a session on main.
   A reviewer's provider is an independent choice; inheritance alone is not
   sufficient.
 - Reuse the creation services and selection controls across entry points.
-- Show a provider selector only when multiple backends are enabled. With one
-  enabled backend, use it automatically and keep the existing simple interaction.
-- Populate choices from enabled backends. Availability is a user configuration
-  concept here, not whether a backend process is currently running.
+- For new work, show a selector only with multiple connected engines. Use the
+  sole connected engine automatically. With none, offer connection in Settings
+  and reject new work. Existing chats remain accessible.
+- Populate choices from the owning host's runtime `providerConnections`, never
+  from legacy enable flags or backend process health.
 - Any fresh, empty chat allows changing its backend before the first prompt,
   even when creation already selected one. Show this control only when multiple
-  backends are enabled.
+  backends are connected.
 
 ## Decisions by creation route
 
@@ -48,7 +48,7 @@ quick actions such as starting a session on main.
 | Delegate/create agent through MCP, with or without a worktree | Tool call | Optional backend argument; default to the caller's backend |
 | Create project from Quick Chat | Tool call and provisioning progress | Same tool-call rule: optional backend, default to the caller's backend |
 | New Mission | Empty requirements chat | Choose or override the lead's backend before the first prompt |
-| Independent code review | Start-review flow | Optional provider select, shown only with multiple enabled backends |
+| Independent code review | Start-review flow | Optional provider select, shown only with multiple connected backends |
 
 Progress dialogs display the provider selected before creation begins.
 Acquisition flows carry an explicit selection through subsequent steps.
@@ -77,7 +77,7 @@ Switching and sending must be coordinated so a prompt cannot reach the previous
 backend while the composer displays the new selection. Once the first prompt
 has been submitted, this pre-conversation switch is no longer offered.
 
-The backend control sits on the composer shelf. With one enabled backend,
+The backend control sits on the composer shelf. With one connected backend,
 the control is hidden.
 
 ## Dialog details
@@ -117,11 +117,37 @@ policy for later implementation and review roles remains to be agreed.
 ## Shared implementation boundary
 
 `BackendSelector` is the shared product control, with small, default, and large
-sizes. `AppShell` provides the enabled choices once through `backend-selection`;
+sizes. `AppShell` provides the connected choices once through `backend-selection`;
 dialogs do not read settings independently.
-Current configuration always enables Codex and optionally enables Claude Code.
+`clawd` owns connection observations and publishes them in snapshots. Observations
+are not persisted. Installation and authentication are checked once per backend
+startup and cached for that process. Reading status, opening Settings, sending
+prompts, and provider errors do not trigger another check. Explicit connection,
+installation, or home/runtime changes update the cache. External changes are not
+monitored. Remote hosts report their own connections;
+they do not inherit local provider settings.
 
-`core/agent-backends` owns enabled-provider resolution and fresh-agent
+Manual choices are remembered per client and host. An unavailable remembered
+engine falls back for new work without overwriting the preference. Existing
+conversations, delegated work, duplicate/fork, and persisted automations keep
+their explicit or inherited engine; they never silently switch on auth loss.
+Automations persist their backend for both filtering and execution, with legacy
+automations migrated to Codex. Claude filtering uses a non-persisted, tool-free
+Agent SDK query. Disconnected engines fail automation runs before provisioning.
+
+Settings shows Connect for an unauthenticated engine and an enable/disable toggle
+for an authenticated one. Enablement is persisted separately in `providerEnabled`;
+availability requires installation, authentication, and enablement. Toggling never
+probes authentication or signs out. The owning host rejects disabling its last
+available engine; another connected engine must be enabled first. Startup with
+no available engines shows setup even for an existing workspace. Setup can enable
+an already-authenticated engine without another sign-in, and returning users go
+straight back to their workspace after Continue. Disabling preserves histories, drafts, queues,
+and running turns, while preventing new work. Pending Claw prompts resume when
+the engine is enabled again. External auth loss surfaces as a request failure;
+an explicit connection action refreshes the cached authentication state.
+
+`core/agent-backends` owns connected-provider resolution and fresh-agent
 eligibility. Selected providers travel through app-owned contracts to existing
 creation services. The existing provider-specific catalogs supply model options.
 
@@ -142,7 +168,7 @@ late catalog responses from the former provider are ignored.
 ## Validation
 
 Exercise representative manual flows with Claude selected, including the empty
-chat created on main and a dialog flow. With one enabled backend, verify selectors disappear
+chat created on main and a dialog flow. With one connected backend, verify selectors disappear
 and creation uses that backend.
 Verify tool calls honor explicit overrides and otherwise use the caller's
 backend. Cover Codex-authored work reviewed by Claude, as well as incompatible

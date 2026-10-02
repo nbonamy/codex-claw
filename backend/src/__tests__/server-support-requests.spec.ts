@@ -235,7 +235,7 @@ describe('ClawBackendServer', () => {
       params: { input: { enabled: false, mode: 'copy' } },
     })).resolves.toMatchObject({
       result: {
-        general: { shareCodexSkillsAndPlugins: false },
+        general: { providerHomes: { codex: { shareSkills: false } } },
       },
     });
 
@@ -296,7 +296,7 @@ describe('ClawBackendServer', () => {
       method: backendMethods.settingsCodexResourceSharingSet,
       params: { input: { enabled: false, mode: 'keep' } },
     })).resolves.toMatchObject({
-      result: { general: { shareCodexSkillsAndPlugins: false } },
+      result: { general: { providerHomes: { codex: { shareSkills: false } } } },
     });
 
     expect(configureCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode: 'keep' });

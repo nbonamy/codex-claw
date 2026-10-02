@@ -1,9 +1,28 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
+import { ElDialog } from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import FormDialog from '../FormDialog.vue';
 import FormDialogField from '../FormDialogField.vue';
 
 describe('FormDialog', () => {
+  it('teleports outside a hidden shell when requested', async () => {
+    const shell = document.createElement('main');
+    shell.style.visibility = 'hidden';
+    document.body.append(shell);
+    const wrapper = mount(FormDialog, {
+      attachTo: shell,
+      props: { modelValue: true, title: 'Provider setup', teleported: true },
+      slots: { default: '<input aria-label="Setup" />' },
+      global: { components: { ElDialog }, stubs: { ElDialog: false, teleport: false } },
+    });
+    try {
+      await flushPromises();
+      expect(shell.querySelector('[role="dialog"]')).toBeNull();
+      const dialog = document.body.querySelector('[role="dialog"]');
+      expect(dialog?.querySelector('input')?.getAttribute('aria-label')).toBe('Setup');
+      expect(getComputedStyle(dialog!).visibility).toBe('visible');
+    } finally { wrapper.unmount(); shell.remove(); }
+  });
   it('renders canonical header, body, and split footer regions', () => {
     const wrapper = mount(FormDialog, {
       props: {

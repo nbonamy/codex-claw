@@ -43,6 +43,28 @@ describe('BackendSelector', () => {
     choices.value = ['codex'];
     await wrapper.vm.$nextTick();
     expect(wrapper.find('select').exists()).toBe(false);
-    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['codex']);
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toStrictEqual(['claude']);
+  });
+
+  it('selects the sole connected engine and clears a new-work selection when none remain', async () => {
+    const choices = ref<AgentBackend[]>(['claude']);
+    const wrapper = mount(BackendSelector, {
+      global: { provide: { [backendChoicesKey as symbol]: computed(() => choices.value) } },
+    });
+    expect(wrapper.find('select').exists()).toBe(false);
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['claude']);
+    await wrapper.setProps({ modelValue: 'claude' });
+    choices.value = [];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('button').text()).toContain('Connect');
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([undefined]);
+  });
+
+  it('never silently reassigns a persisted automation to another engine', () => {
+    const wrapper = mount(BackendSelector, {
+      props: { modelValue: 'claude', preserveSelection: true },
+      global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex']) } },
+    });
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
   });
 });

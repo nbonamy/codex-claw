@@ -141,8 +141,8 @@
       @select="selectRemoteFolder"
     />
 
-    <template v-if="!isEditing && backendChoices.length > 1" #footer-left>
-      <BackendSelector v-if="!isEditing" id="agent-dialog-backend" v-model="backend" :disabled="submitting" />
+    <template v-if="!isEditing && backendChoices.length !== 1" #footer-left>
+      <BackendSelector id="agent-dialog-backend" v-model="backend" :team-id="selectedTeam?.id" :disabled="submitting" />
     </template>
     <template #footer>
       <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
@@ -175,8 +175,8 @@ import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, 
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import BackendSelector from './BackendSelector.vue';
-import { useBackendChoices } from './backend-selection';
-const backendChoices = useBackendChoices();
+import { useBackendChoices, useNewAgentBackend } from './backend-selection';
+const backendChoices = useBackendChoices(() => selectedTeam.value?.id);
 import NewSourceWorktreeDialog from './NewSourceWorktreeDialog.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 
@@ -229,7 +229,7 @@ const emit = defineEmits<{
 
 const name = ref('');
 const folder = ref('');
-const backend = ref<AgentBackend>('codex');
+const backend = ref<AgentBackend>();
 const clientNavigationSelectTeamion = ref('');
 const newTeamName = ref('');
 const errorMessage = ref<string | null>(null);
@@ -258,6 +258,7 @@ const submitLabel = computed(() => isEditing.value ? translate('surface.agentDia
 const teams = computed(() => props.teams);
 const showTeamSelector = computed(() => props.showTeamField && !isEditing.value);
 const selectedTeam = computed(() => teams.value.find((team) => team.id === clientNavigationSelectTeamion.value) ?? null);
+useNewAgentBackend(backend, backendChoices);
 const selectedRemoteConnectionId = computed(() => {
   if (showTeamSelector.value) {
     return clientNavigationSelectTeamion.value === newTeamOptionId
@@ -328,6 +329,7 @@ const teamCanSave = computed(() => (
 const canSave = computed(() => (
   !submitting.value &&
   (isEditing.value || (
+    Boolean(backend.value && backendChoices.value.includes(backend.value)) &&
     folder.value.trim().length > 0 &&
     teamCanSave.value
   ))
@@ -634,7 +636,7 @@ function resetForm(): void {
 
   name.value = props.initialAgentName.trim();
   folder.value = '';
-  backend.value = 'codex';
+  backend.value = backendChoices.value[0];
   clientNavigationSelectTeamion.value = initialTeamSelection();
   newTeamName.value = props.initialNewTeamName;
   selectedSourceRepositoryPath.value = '';

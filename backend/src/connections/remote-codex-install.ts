@@ -1,10 +1,10 @@
 import { bundledCodexVersion } from '@codex-claw/core/codex-release';
 
 // All paths are Claw-owned; never replace the user's CLI or change shell profiles.
-export function remoteCodexInstallCommand(): string {
+export function remoteCodexInstallCommand(runtimeRoot?: string): string {
   if (!/^\d+\.\d+\.\d+$/u.test(bundledCodexVersion)) throw new Error('Invalid bundled Codex release.');
   return `set -eu
-runtime_root="$HOME/.codex-claw/codex"
+runtime_root=${runtimeRoot ? `'${runtimeRoot.replaceAll("'", "'\\''")}'` : '"$HOME/.codex-claw/codex"'}
 runtime_release="$runtime_root/${bundledCodexVersion}"
 if [ -x "$runtime_release/bin/codex" ] && [ -x "$runtime_release/bin/codex-code-mode-host" ] && [ "$("$runtime_release/bin/codex" --version)" = "codex-cli ${bundledCodexVersion}" ]; then exit 0; fi
 case "$(uname -s)/$(uname -m)" in

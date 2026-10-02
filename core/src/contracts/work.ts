@@ -161,6 +161,8 @@ export type AutomationExecutionLogEntry = {
 };
 
 export type Automation = {
+  /** Absent only in legacy snapshots, whose engine was Codex. */
+  backend?: import('../contracts').AgentBackend;
   id: string;
   name: string;
   enabled: boolean;
@@ -187,6 +189,7 @@ export type AutomationLocation =
   };
 
 export type CreateAutomationInput = {
+  backend?: import('../contracts').AgentBackend;
   name?: string;
   enabled?: boolean;
   repositories: AutomationRepositoryTarget[];

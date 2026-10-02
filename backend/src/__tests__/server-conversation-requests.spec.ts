@@ -369,6 +369,7 @@ describe('ClawBackendServer', () => {
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     });
+    await flushMicrotasks();
     expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', {
       model: 'sol',
       reasoningEffort: 'high',

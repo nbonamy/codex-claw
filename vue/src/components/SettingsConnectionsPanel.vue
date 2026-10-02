@@ -46,8 +46,7 @@
                 @click="checkConnection(connection.id)"
               >{{ $t('surface.settingsConnectionsPanel.upgrade') }}</button>
             </span>
-            <RemoteCodexAuthentication v-if="connection.status === 'ready'" :connection="connection" />
-            <RemoteClaudeAuthentication v-if="connection.status === 'ready' && settings.claudeCodeEnabled" :connection="connection" />
+            <RemoteEngineConnections v-if="connection.status === 'ready'" :connection="connection" />
           </div>
         </div>
         <div class="settings-connections-panel__actions">
@@ -215,8 +214,7 @@ import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shar
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
-import RemoteCodexAuthentication from './RemoteCodexAuthentication.vue';
-import RemoteClaudeAuthentication from './RemoteClaudeAuthentication.vue';
+import RemoteEngineConnections from './RemoteEngineConnections.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
 import SettingsSection from './SettingsSection.vue';
@@ -231,7 +229,7 @@ const props = withDefaults(defineProps<{
   teams?: Team[];
   updateRemoteConnection?: (connectionId: string, input: UpdateRemoteConnectionInput) => Promise<void>;
   removeRemoteConnection?: (connectionId: string) => Promise<void>;
-  settings?: { preventSleepWhenRemoteAccessEnabled: boolean; claudeCodeEnabled?: boolean };
+  settings?: { preventSleepWhenRemoteAccessEnabled: boolean };
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   getRemoteControlStatus?: () => Promise<DevicePairingStatus>;
   enableRemoteControl?: () => Promise<DevicePairingStatus>;
@@ -256,7 +254,7 @@ const props = withDefaults(defineProps<{
   checkDevicePairing: async () => false,
   listPairedDevices: async () => [],
   revokePairedDevice: async () => undefined,
-  settings: () => ({ preventSleepWhenRemoteAccessEnabled: true, claudeCodeEnabled: false }),
+  settings: () => ({ preventSleepWhenRemoteAccessEnabled: true }),
   updateSettings: async () => undefined,
 });
 

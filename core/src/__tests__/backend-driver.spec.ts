@@ -19,9 +19,9 @@ import {
 describe('backend driver helpers', () => {
   it('uses product-facing backend names in unsupported feature errors', () => {
     expect(backendDisplayName('codex')).toBe('Codex');
-    expect(backendDisplayName('claude')).toBe('Claude');
+    expect(backendDisplayName('claude')).toBe('Claude Code');
     expect(unsupportedBackendFeature(agent('claude'), 'rollback').message)
-      .toBe('Claude does not support rollback.');
+      .toBe('Claude Code does not support rollback.');
   });
 
   it('finds a runtime in a snapshot and supplies a safe fallback', () => {

@@ -22,6 +22,18 @@ vi.mock('@codex-claw/core/runtime-discovery', () => ({
 }));
 
 describe('ClaudeAgentSdkTransport', () => {
+  it('returns structured automation selection without tools or a persisted conversation', async () => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
+    const result = transport.generateText({ cwd: '/tmp/project', prompt: 'Pick issues', outputSchema: { type: 'object' } });
+    await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+    expect(harness.options[0]).toMatchObject({ persistSession: false, tools: [], mcpServers: {}, outputFormat: { type: 'json_schema', schema: { type: 'object' } } });
+    harness.emit({ type: 'result', subtype: 'success', session_id: 'selection', is_error: false, result: '', structured_output: { ids: ['1'] } } as ClaudeSdkMessage);
+    await expect(result).resolves.toEqual({ text: '{"ids":["1"]}' });
+    expect(harness.runtimes[0]?.close).toHaveBeenCalledOnce();
+    await transport.close();
+  });
+
   it('deletes a review-owned SDK session from the workspace store', async () => {
     const deleteSession = vi.fn().mockResolvedValue(undefined);
     const transport = new ClaudeAgentSdkTransport({ deleteSession });

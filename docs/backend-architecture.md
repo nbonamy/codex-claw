@@ -40,6 +40,14 @@ JSON-RPC framing, pending requests, timeouts, and server callbacks to one shared
 session implementation. Do not copy lifecycle logic into a second transport or
 grow a request switch into the owner of the workflow it exposes.
 
+Local engine setup follows the same boundary: provider-owned `ProviderLifecycle`
+adapters own executable detection, installation, home selection and preparation,
+and resource-sharing semantics. `ProviderSetup` owns locking, serialization,
+persistence, and driver replacement. Authentication enters through the optional
+`AgentBackendDriver.authenticate` capability; each driver returns app-owned account
+metadata and connection status. The server caches that result and routes account
+actions without interpreting provider credentials or probing provider CLIs itself.
+
 Do not make packaging the architecture. Author the backend as a normal Node
 program, then choose the packaged runtime after a spike. Node single executable
 applications are the better long-term candidate for a real standalone backend

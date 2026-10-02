@@ -3,6 +3,7 @@
     :title="$t('surface.settingsCodexPanel.codex')"
     title-id="settings-codex-title"
   >
+    <SettingsEngineConnectionRow :connected="connected" :enabled="settings.providerEnabled?.codex !== false" :set-enabled="setEnabled" :busy="connectionBusy" :pending="loginPending" :error="connectionError" @connect="emit('connect')" @cancel="emit('cancel')" />
     <SettingsSection
       :title="$t('surface.settingsCodexPanel.chatGPT')"
       title-id="settings-codex-chatgpt-title"
@@ -28,7 +29,7 @@
       >
         <template #control>
           <el-switch
-            :model-value="settings.shareCodexSkillsAndPlugins"
+            :model-value="settings.providerHomes?.codex?.shareSkills !== false"
             :loading="changingCodexResourceSharing"
             :aria-label="$t('surface.settingsCodexPanel.shareSkillsAndPluginsWithChatGPT')"
             @update:model-value="updateCodexResourceSharing"
@@ -84,8 +85,16 @@ import { clawHostCapabilities, clawPlatformActions } from '../platform-api';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
+import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
+
+const emit = defineEmits<{ connect: []; cancel: [] }>();
 
 const props = defineProps<{
+  connected?: boolean;
+  setEnabled?: (enabled: boolean) => unknown;
+  connectionBusy?: boolean;
+  loginPending?: boolean;
+  connectionError?: string | null;
   chooseCodexBinary?: () => Promise<string | null>;
   codexResourceSharingBlocked?: boolean;
   launchChatGptApp?: () => Promise<void>;

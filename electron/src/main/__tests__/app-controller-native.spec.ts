@@ -124,7 +124,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...snapshot,
-      general: { ...snapshot.general, shareCodexSkillsAndPlugins: false },
+      general: { ...snapshot.general, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } } },
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
     const lifecycle: string[] = [];
@@ -198,7 +198,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...snapshot,
-      general: { ...snapshot.general, shareCodexSkillsAndPlugins: false },
+      general: { ...snapshot.general, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } } },
     };
     const request = vi.fn(async (method: string) => (
       method === backendMethods.settingsCodexResourceSharingGet
@@ -284,10 +284,12 @@ describe('AppController', () => {
     const request = vi.fn().mockResolvedValue({ loggedIn: false });
     const openExternal = vi.fn();
     const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }), fakeAppLifecycle(), async () => undefined, openExternal);
-    const auth = controller as unknown as { getClaudeAuthentication(id: string): Promise<unknown> };
+    const auth = controller as unknown as { getClaudeAuthentication(id?: string): Promise<unknown> };
 
     await expect(auth.getClaudeAuthentication('wall-e')).resolves.toStrictEqual({ loggedIn: false });
     expect(request).toHaveBeenCalledWith(backendMethods.claudeAuthenticationGet, { connectionId: 'wall-e' });
+    await expect(auth.getClaudeAuthentication()).resolves.toStrictEqual({ loggedIn: false });
+    expect(request).toHaveBeenLastCalledWith(backendMethods.claudeAuthenticationGet, undefined);
     expect(openExternal).not.toHaveBeenCalled();
     expect(() => auth.getClaudeAuthentication('')).toThrow('remote connection');
   });

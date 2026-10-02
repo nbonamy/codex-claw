@@ -452,7 +452,7 @@ export class ClawMcpService {
     const progressId = `agent-creation-${randomUUID()}`;
     const progress = {
       id: progressId,
-      backend: resolveAgentBackend(this.snapshot.general, input.backend ?? caller.backend),
+      backend: resolveAgentBackend(this.snapshot, input.backend ?? caller.backend),
       repositoryName: fileBasename(repoPath),
       createWorktree: input.createWorktree === true,
       ...(branchName ? { branchName } : {}),

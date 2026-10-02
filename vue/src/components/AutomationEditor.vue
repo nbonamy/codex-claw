@@ -99,6 +99,7 @@
     </div>
 
     <footer class="automation-editor__footer">
+      <BackendSelector v-model="form.backend" :team-id="form.teamId" :preserve-selection="Boolean(automation)" />
       <el-button @click="emit('cancel')">{{ $t('surface.automationEditor.cancel') }}</el-button>
       <el-button type="primary" native-type="submit" :disabled="!canSubmit">
         {{ $t('surface.automationEditor.saveAutomation') }}
@@ -121,6 +122,8 @@ import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '../i18n';
 import VoiceTextarea from '../shared/VoiceTextarea.vue';
+import BackendSelector from './BackendSelector.vue';
+import { useBackendChoices } from './backend-selection';
 
 const props = withDefaults(
   defineProps<{
@@ -155,6 +158,7 @@ const scheduleOptions = [
 ];
 
 const form = reactive({
+  backend: props.automation ? props.automation.backend ?? 'codex' : undefined as import('@codex-claw/core/contracts').AgentBackend | undefined,
   enabled: props.automation?.enabled ?? true,
   repositoryIds: props.automation?.repositories.map(repositoryValue) ?? [],
   teamId: props.automation?.teamId ?? props.teams[0]?.id ?? '',
@@ -163,6 +167,7 @@ const form = reactive({
   intervalMinutes: props.automation?.schedule.intervalMinutes ?? 60,
 });
 const selectionPromptBusy = ref(false);
+const engineChoices = useBackendChoices(() => form.teamId);
 const assignmentPromptBusy = ref(false);
 
 const githubConnected = computed(() => props.connection?.provider === 'github' && props.connection.status === 'connected');
@@ -199,6 +204,7 @@ const canSubmit = computed(
     githubConnected.value &&
     form.repositoryIds.length > 0 &&
     Boolean(form.teamId) &&
+    Boolean(form.backend && (engineChoices.value.includes(form.backend) || form.backend === props.automation?.backend || (props.automation && !props.automation.backend && form.backend === 'codex'))) &&
     Number.isFinite(form.intervalMinutes) &&
     form.intervalMinutes >= 1 &&
     !selectionPromptBusy.value &&
@@ -222,6 +228,7 @@ function submit(): void {
   emit('submit', {
     ...(props.automation?.name ? { name: props.automation.name } : {}),
     enabled: form.enabled,
+    backend: form.backend,
     repositories: repositoryOptions.value.filter((option) => selectedValues.has(option.value)).map((option) => option.target),
     teamId: form.teamId,
     ...(form.selectionPrompt.trim() ? { selectionPrompt: form.selectionPrompt.trim() } : {}),

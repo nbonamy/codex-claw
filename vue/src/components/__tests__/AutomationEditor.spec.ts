@@ -15,6 +15,7 @@ describe('AutomationEditor submission', () => {
     expect(wrapper.emitted('submit')).toStrictEqual([
       [
         {
+          backend: 'codex',
           enabled: true,
           repositories: [
             {
@@ -43,6 +44,7 @@ describe('AutomationEditor submission', () => {
     await wrapper.find('form').trigger('submit');
 
     expect(wrapper.emitted('submit')?.[0]?.[0]).toStrictEqual({
+      backend: 'codex',
       name: 'GitHub bugs',
       enabled: true,
       repositories: [

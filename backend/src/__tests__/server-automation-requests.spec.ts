@@ -261,7 +261,8 @@ describe('ClawBackendServer', () => {
       expect.any(Function),
     );
     expect(snapshot.activeTeamId).toBe('team-test');
-    expect(events).not.toContainEqual(expect.objectContaining({ type: 'snapshot.updated' }));
+    expect(snapshot.automations).not.toContainEqual(expect.objectContaining({ id: 'automation-remote' }));
+    expect(snapshot.providerConnections).toEqual(createTestSnapshot().providerConnections);
     await server.close();
   });
 

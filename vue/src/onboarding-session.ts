@@ -1,10 +1,10 @@
-export type FirstRunOnboardingStage = 'github' | 'complete';
+export type FirstRunOnboardingStage = 'providers' | 'github' | 'complete';
 
 const firstRunOnboardingStageKey = 'codexClaw:firstRunOnboardingStage';
 
 export function getFirstRunOnboardingStage(): FirstRunOnboardingStage | null {
   const stage = globalThis.sessionStorage?.getItem(firstRunOnboardingStageKey);
-  return stage === 'github' || stage === 'complete' ? stage : null;
+  return stage === 'providers' || stage === 'github' || stage === 'complete' ? stage : null;
 }
 
 export function setFirstRunOnboardingStage(stage: FirstRunOnboardingStage): void {

@@ -3,7 +3,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TeamRail from '../TeamRail.vue';
-import type { AccountRateLimits, RemoteConnection, Team } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, AgentBackend, RemoteConnection, Team } from '@codex-claw/core/contracts';
 import { setElectronTestClient } from '../../test/client';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
@@ -306,6 +306,7 @@ describe('TeamRail', () => {
     const wrapper = mountRail({
       teams,
       activeTeamId: 'team-sk',
+      enabledBackends: ['codex'],
       rateLimits: {
         limitId: 'codex',
         limitName: 'Codex',
@@ -326,9 +327,9 @@ describe('TeamRail', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('5h');
+    expect(wrapper.find('[aria-label="5h"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('68%');
-    expect(wrapper.text()).toContain('Weekly');
+    expect(wrapper.find('[aria-label="Weekly"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('50%');
     await wrapper.findAll('button').find((button) => {
       const label = button.find('.app-menu__label');
@@ -568,6 +569,7 @@ function mountRail(props: {
   cockpitActive?: boolean;
   automationsActive?: boolean;
   rateLimits?: AccountRateLimits;
+  enabledBackends?: AgentBackend[];
   settingsActive?: boolean;
   agentSidebarExpanded?: boolean;
   spokenAnnouncementsEnabled?: boolean;

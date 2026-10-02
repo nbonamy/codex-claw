@@ -17,6 +17,7 @@ type ReviewScript = (handlers: ReviewToolHandlers) => Promise<{ text: string }>;
 
 function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent): Promise<void> => undefined) {
   const snapshot: AppSnapshot = createEmptySnapshot();
+  snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
   const owner = agent('owner');
   snapshot.agents = [owner];
   let context = 0;
@@ -420,6 +421,7 @@ describe('CodeReviewService', () => {
 
   it('keeps one review tool URL alive when the provider caches it for the reviewer thread', async () => {
     const snapshot = createEmptySnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const owner = agent('owner');
     owner.backendSession = { kind: 'codex', threadId: 'current-thread' };
     snapshot.agents = [owner];

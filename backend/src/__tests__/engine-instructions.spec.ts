@@ -1,12 +1,22 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readEngineInstructions, saveEngineInstructions } from '../engine-instructions';
 
 const homes: string[] = [];
-afterEach(async () => { await Promise.all(homes.splice(0).map(home => rm(home, { recursive: true, force: true }))); });
+afterEach(async () => { vi.unstubAllEnvs(); await Promise.all(homes.splice(0).map(home => rm(home, { recursive: true, force: true }))); });
 describe('engine instruction files', () => {
+  it('reads and saves Claude personalization in the configured provider home', async () => {
+    const home = await mkdtemp(path.join(tmpdir(), 'claw-claude-instructions-')); homes.push(home);
+    vi.stubEnv('CLAUDE_CONFIG_DIR', home);
+    vi.stubEnv('HOME', path.join(home, 'personal'));
+    const file = path.join(home, 'CLAUDE.md');
+    expect(await readEngineInstructions('claude')).toEqual({ path: file, text: '' });
+    await saveEngineInstructions({ engine: 'claude', text: 'Use the configured instructions.\n' });
+    expect(await readFile(file, 'utf8')).toBe('Use the configured instructions.\n');
+    expect(await readEngineInstructions('claude')).toEqual({ path: file, text: 'Use the configured instructions.\n' });
+  });
   it('reads missing files as empty and saves exactly the selected global file', async () => {
     const home = await mkdtemp(path.join(tmpdir(), 'claw-instructions-')); homes.push(home);
     expect(await readEngineInstructions('codex', home)).toEqual({ path: path.join(home, '.codex/AGENTS.md'), text: '' });

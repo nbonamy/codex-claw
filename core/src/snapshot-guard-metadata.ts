@@ -1,4 +1,5 @@
 import { isMission } from './missions';
+import { isProviderConnection } from './contracts/provider-setup';
 import { isThreadFlags } from './thread-flags';
 import { isAppTextDescriptor } from './app-text';
 import { isApprovalPreset, isApprovalsReviewer } from './approval-presets';
@@ -51,7 +52,9 @@ export function isSnapshotMetadata(value: unknown): value is Record<string, unkn
     isRecordMapOf(value.turnGitDiffs, isTurnGitDiff) &&
     isRecordMapOf(value.subagentTrees, isSubagentTree) &&
     isArrayOf(value.backendRuntimes, isBackendRuntimeStatus) &&
+    optional(value, 'providerConnections', candidate => isArrayOf(candidate, isProviderConnection)) &&
     optional(value, 'accountRateLimits', isAccountRateLimits) &&
+    optional(value, 'backendAccountRateLimits', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, limits]) => isAgentBackend(backend) && isAccountRateLimits(limits))) &&
     isWorkBacklog(value.workBacklog) &&
     isRemoteConnections(value.remoteConnections) &&
     isGeneralSettings(value.general) &&
@@ -506,6 +509,7 @@ function isRemoteConnection(value: unknown): boolean {
     includes(['saved', 'checking', 'ready', 'error'], value.status) &&
     optional(value, 'clawdVersion', isString) &&
     optional(value, 'codexVersion', isString) &&
+    optional(value, 'providerConnections', candidate => isArrayOf(candidate, isProviderConnection)) &&
     optional(value, 'detail', isString) &&
     optional(value, 'sourceFolderPath', isString) &&
     optional(value, 'transport', isRemoteConnectionTransport) &&
@@ -537,12 +541,16 @@ function isGeneralSettings(value: unknown): boolean {
     includes(spokenAnnouncementVoices, value.spokenAnnouncementVoice) &&
     typeof value.codexBinaryPath === 'string' &&
     typeof value.claudeCodeEnabled === 'boolean' &&
+    (value.codexEnabled === undefined || typeof value.codexEnabled === 'boolean') &&
+    (value.providerOnboardingComplete === undefined || typeof value.providerOnboardingComplete === 'boolean') &&
+    optional(value, 'providerEnabled', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && isBoolean(enabled))) &&
+    optional(value, 'providerHomes', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, home]) =>
+      (backend === 'codex' || backend === 'claude') && isRecord(home) && isString(home.homePath) && isBoolean(home.isolated) && isBoolean(home.shareSkills))) &&
     typeof value.agentListCompact === 'boolean' &&
     includes(['teams', 'recent'], value.cockpitAgentViewMode) &&
     isArrayOf(value.collapsedRepositoryKeys, isString) &&
     isArrayOf(value.savedPromptDrafts, (draft) => isRecord(draft)
       && isString(draft.id) && isString(draft.agentId) && isString(draft.text) && isNumber(draft.createdAt)) &&
-    typeof value.shareCodexSkillsAndPlugins === 'boolean' &&
     typeof value.sessionCompressionWarningEnabled === 'boolean' &&
     includes(['automatic', 'repository', 'off'], value.worktreeInitializationMode) &&
     isRecordMapOf(value.repositoryIcons, isString) &&

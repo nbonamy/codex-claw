@@ -57,11 +57,13 @@ describe('Claw web operations', () => {
     await invokeClawWebOperation({ request }, 'getClaudeAuthentication', ['wall-e']);
     await invokeClawWebOperation({ request }, 'startCodexChatGptDeviceCodeLogin', ['wall-e']);
     await invokeClawWebOperation({ request }, 'cancelCodexChatGptLogin', ['wall-e', 'login-1']);
+    await invokeClawWebOperation({ request }, 'getProviderUsage', ['claude']);
     expect(request.mock.calls).toEqual([
       [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
       [backendMethods.claudeAuthenticationGet, { connectionId: 'wall-e' }],
       [backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId: 'wall-e' }],
       [backendMethods.codexLoginCancel, { remoteConnectionId: 'wall-e', loginId: 'login-1' }],
+      [backendMethods.providerUsageGet, { backend: 'claude' }],
     ]);
   });
   it('maps allowlisted product operations to clawd methods', async () => {

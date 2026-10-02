@@ -65,7 +65,7 @@ export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQu
   const agent = createAgentFromInput({
     name: null,
     folder: '',
-    backend: resolveAgentBackend(snapshot.general, input.backend),
+    backend: resolveAgentBackend(snapshot, input.backend),
     ...(input.teamId ? { teamId: input.teamId } : {}),
   }, createdAt, targetTeamId(snapshot, input.teamId), id);
   agent.folder = null;
@@ -79,7 +79,7 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
     return null;
   }
   if (input.backend !== undefined && input.backend !== agent.backend) {
-    const backend = resolveAgentBackend(snapshot.general, input.backend);
+    const backend = resolveAgentBackend(snapshot, input.backend);
     if (!canSelectAgentBackend(agent)) throw new Error('Backend can only be changed before the first prompt.');
     agent.backend = backend;
     agent.backendDefaults = defaultBackendDefaults(backend);

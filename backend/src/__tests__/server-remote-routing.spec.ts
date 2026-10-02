@@ -28,7 +28,7 @@ describe('ClawBackendServer', () => {
     expect(result).toMatchObject({ result: { remoteConnections: { connections: [expect.objectContaining({ codexVersion: '0.143.0' })] } } });
     expect(remoteClients.closeConnection).not.toHaveBeenCalled();
     expect(sshConnections.checkConnection).not.toHaveBeenCalled();
-    expect(sshConnections.inspectVersions).toHaveBeenCalledWith(connection, { claudeCodeEnabled: true });
+    expect(sshConnections.inspectVersions).toHaveBeenCalledWith(connection);
   });
 
   it('routes SSH connection discovery and persistence through clawd', async () => {
@@ -104,7 +104,7 @@ describe('ClawBackendServer', () => {
       host: 'devbox',
       hostName: 'devbox.internal',
       user: 'nicolas',
-    }, { claudeCodeEnabled: true });
+    });
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
@@ -388,7 +388,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
-  it('ensures Claude is installed before creating a remote Claude Quick Chat', async () => {
+  it('lets the remote host admit Claude work without implicitly installing it', async () => {
     const snapshot = createTestSnapshot();
     snapshot.general.claudeCodeEnabled = true;
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
@@ -432,8 +432,8 @@ describe('ClawBackendServer', () => {
       params: { input: { teamId: 'team-pointer', backend: 'claude' } },
     });
 
-    expect(sshConnections.ensureRemoteClaudeInstalled).toHaveBeenCalledWith('devbox');
-    expect(order.slice(-3)).toStrictEqual(['ensure Claude', 'snapshot/get', 'agent/quickChat/create']);
+    expect(sshConnections.ensureRemoteClaudeInstalled).not.toHaveBeenCalled();
+    expect(order.slice(-2)).toStrictEqual(['snapshot/get', 'agent/quickChat/create']);
     expect(response).toMatchObject({ result: { agents: [expect.objectContaining({ backend: 'claude' })] } });
   });
 
@@ -1153,5 +1153,11 @@ describe('ClawBackendServer', () => {
     expect(events).toEqual([
       expect.objectContaining({ type: 'skills.changed', agentId: remoteAgent.id }),
     ]);
+    events.length = 0;
+    onRemoteEvent?.({
+      seq: 5, type: 'account.rateLimitsUpdated', backend: 'claude', occurredAt: '2026-06-13T00:00:04.000Z',
+      payload: { rateLimits: { limitId: 'claude', limitName: null, primary: { usedPercent: 20, windowDurationMins: 300, resetsAt: null }, secondary: null, credits: null, individualLimit: null, planType: null, rateLimitReachedType: null } },
+    });
+    expect(events).toEqual([]);
   });
 });

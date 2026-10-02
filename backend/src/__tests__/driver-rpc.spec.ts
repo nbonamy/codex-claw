@@ -4,11 +4,93 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { Agent } from '@codex-claw/core/contracts';
+import { defaultGeneralSettings } from '@codex-claw/core/settings';
 import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
 import { readEngineInstructions } from '../engine-instructions';
+import { ClawBackendServer } from '../server';
+import { createTestSnapshot } from './server-test-fixtures';
+import { CodexBackendDriver } from '../codex/codex-driver';
 vi.mock('../engine-instructions', () => ({ readEngineInstructions: vi.fn().mockResolvedValue({ text: '', path: '/fake/AGENTS.md' }) }));
 
 describe('BackendDriverRpc', () => {
+  it.each([
+    { account: null, requiresOpenaiAuth: true, connected: false },
+    { account: null, requiresOpenaiAuth: false, connected: true },
+    { account: { type: 'apiKey' }, requiresOpenaiAuth: true, connected: true },
+  ])('lets the Codex driver normalize its authentication state: %j', async ({ account, requiresOpenaiAuth, connected }) => {
+    const state = { account, requiresOpenaiAuth, login: { status: 'idle', error: null } };
+    const adapter = { getAuthentication: vi.fn().mockResolvedValue(state), logout: vi.fn().mockResolvedValue(state) };
+    const driver = new CodexBackendDriver(adapter as never);
+    expect(await driver.authenticate({ action: 'check' })).toEqual({ kind: 'codex', connected, state });
+    expect(await driver.authenticate({ action: 'logout' })).toEqual({ kind: 'codex', connected: false, state });
+    expect(adapter.getAuthentication).toHaveBeenCalledOnce();
+  });
+
+  it('uses driver-owned authentication for the connection gate and explicit account actions', async () => {
+    const snapshot = createTestSnapshot();
+    const state = { account: null, requiresOpenaiAuth: true, login: { status: 'idle', error: null } };
+    // The server must honor driver policy rather than infer connection from the account payload.
+    const authenticate = vi.fn().mockResolvedValue({ kind: 'codex', connected: true, state });
+    const driver = createDriver({ authenticate });
+    const rpc = new BackendDriverRpc(new Map([['codex', driver]]));
+    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: rpc,
+      providerSetup: { list: () => [{ backend: 'codex', installed: true }] } as never });
+    try {
+      await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/connections/get' });
+      expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: true, authentication: { state } });
+      await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'provider/connections/get' });
+      expect(authenticate).toHaveBeenCalledExactlyOnceWith({ action: 'check' });
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 3, method: 'codex/authentication/login/cancel', params: { loginId: 'login-1' } }))
+        .resolves.toMatchObject({ result: state });
+      expect(authenticate).toHaveBeenLastCalledWith({ action: 'cancel', loginId: 'login-1' });
+      authenticate.mockResolvedValue({ kind: 'codex', connected: false, state });
+      await server.handleMessage({ jsonrpc: '2.0', id: 4, method: 'codex/authentication/logout' });
+      expect(authenticate).toHaveBeenLastCalledWith({ action: 'logout' });
+      expect(snapshot.providerConnections?.[0]?.connected).toBe(false);
+      expect(driver.sendPrompt).not.toHaveBeenCalled();
+    } finally { await server.close(); }
+  });
+
+  it('fetches local engine quotas through the server without starting a chat or probing authentication', async () => {
+    const snapshot = createTestSnapshot();
+    const limits = { limitId: 'claude', limitName: null, primary: { usedPercent: 1, windowDurationMins: 300, resetsAt: null }, secondary: null, credits: null, individualLimit: null, planType: null, rateLimitReachedType: null };
+    const getAccountRateLimits = vi.fn().mockResolvedValue(limits);
+    const claude = createDriver({ backend: 'claude', getAccountRateLimits });
+    const codex = createDriver();
+    const rpc = new BackendDriverRpc(new Map([['claude', claude], ['codex', codex]]));
+    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: rpc });
+    try {
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/usage/get', params: { backend: 'claude' } })).resolves.toMatchObject({ result: limits });
+      expect(snapshot.backendAccountRateLimits?.claude).toEqual(limits);
+      expect(snapshot.accountRateLimits).toBeUndefined();
+      expect(claude.sendPrompt).not.toHaveBeenCalled();
+      snapshot.accountRateLimits = { ...limits, limitId: 'codex' };
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'provider/usage/get', params: { backend: 'codex' } })).resolves.toMatchObject({ result: { limitId: 'codex' } });
+      getAccountRateLimits.mockResolvedValueOnce(null);
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 3, method: 'provider/usage/get', params: { backend: 'claude' } })).resolves.toMatchObject({ result: null });
+      snapshot.providerConnections!.find(engine => engine.backend === 'claude')!.enabled = false;
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 4, method: 'provider/usage/get', params: { backend: 'claude' } })).resolves.toMatchObject({ result: null });
+      expect(getAccountRateLimits).toHaveBeenCalledTimes(2);
+    } finally { await server.close(); }
+  });
+
+  it('uses the selected Codex home and replaces only the configured provider driver', async () => {
+    expect(codexClawSurfaceOptions({ generalSettings: { ...defaultGeneralSettings, providerHomes: { codex: { isolated: false, shareSkills: true, homePath: '/existing/codex' } } } }).codexHome).toBe('/existing/codex');
+    const unsubscribe = vi.fn();
+    const previous = createDriver({ onEvent: vi.fn(() => unsubscribe) });
+    const next = createDriver();
+    const claude = createDriver();
+    const drivers = new Map([['codex' as const, previous], ['claude' as const, claude]]);
+    const rpc = new BackendDriverRpc(drivers);
+    await rpc.replaceDriver('codex', () => next);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(previous.close).toHaveBeenCalledOnce();
+    expect(claude.close).not.toHaveBeenCalled();
+    expect(drivers.get('codex')).toBe(next);
+    await rpc.close();
+    expect(next.close).toHaveBeenCalledOnce();
+    expect(claude.close).toHaveBeenCalledOnce();
+  });
   it('appends global and agent-specific context after the default Claw instructions', async () => {
     vi.mocked(readEngineInstructions).mockResolvedValueOnce({ text: 'Use concise answers.', path: '/fake/AGENTS.md' });
     const options = codexClawSurfaceOptions({

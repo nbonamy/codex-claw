@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { onScopeDispose, ref, watch } from 'vue';
+import { computed, onScopeDispose, ref, watch } from 'vue';
 import type { ClaudeAuthentication, CodexClawApi, RemoteConnection } from '@codex-claw/core/contracts';
 import { CheckIcon, CopyIcon } from '../shared/icons/app-icons';
 import { codexClawApi } from '../platform-api';
@@ -51,12 +51,17 @@ import FormDialogField from '../shared/dialog/FormDialogField.vue';
 
 type ClaudeAuthApi = Pick<CodexClawApi, 'getClaudeAuthentication'>;
 const props = defineProps<{ connection: RemoteConnection; api?: ClaudeAuthApi }>();
-const loginOptions = [
+const emit = defineEmits<{ connected: [] }>();
+const baseLoginOptions = [
   { id: 'claudeai', labelKey: 'surface.remoteClaudeAuth.subscriptionLabel', copyKey: 'surface.remoteClaudeAuth.copySubscription', copiedKey: 'surface.remoteClaudeAuth.copiedSubscription', command: 'claude auth login --claudeai' },
   { id: 'console', labelKey: 'surface.remoteClaudeAuth.consoleLabel', copyKey: 'surface.remoteClaudeAuth.copyConsole', copiedKey: 'surface.remoteClaudeAuth.copiedConsole', command: 'claude auth login --console' },
 ] as const;
-type LoginOptionId = (typeof loginOptions)[number]['id'];
+type LoginOptionId = (typeof baseLoginOptions)[number]['id'];
 const authentication = ref<ClaudeAuthentication | null>(null);
+const loginOptions = computed(() => baseLoginOptions.map(option => ({
+  ...option,
+  command: `${authentication.value?.configDirectory ? `CLAUDE_CONFIG_DIR='${authentication.value.configDirectory.replaceAll("'", "'\\''")}' ` : 'env -u CLAUDE_CONFIG_DIR '}${option.command}`,
+})));
 const checking = ref(false);
 const error = ref('');
 const dialogVisible = ref(false);
@@ -74,7 +79,7 @@ async function refresh(): Promise<void> {
     const result = await client.getClaudeAuthentication(props.connection.id);
     if (expectedRevision !== revision) return;
     authentication.value = result;
-    if (result.loggedIn) dialogVisible.value = false;
+      if (result.loggedIn) { dialogVisible.value = false; emit('connected'); }
   } catch (cause) {
     if (expectedRevision !== revision) return;
     authentication.value = null;
@@ -85,7 +90,7 @@ async function refresh(): Promise<void> {
 }
 
 async function copyCommand(optionId: LoginOptionId): Promise<void> {
-  const command = loginOptions.find((option) => option.id === optionId)?.command;
+  const command = loginOptions.value.find((option) => option.id === optionId)?.command;
   if (!command) return;
   try {
     await navigator.clipboard.writeText(command);

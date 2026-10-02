@@ -41,7 +41,6 @@ describe('useWorkItemRouting', () => {
     expect(harness.createAgent).toHaveBeenCalledWith({
       name: null,
       folder: '/workspace/codex-claw-feature',
-      backend: 'codex',
       sourceRepositoryName: 'codex-claw',
       teamId: harness.teamId,
     });

@@ -100,7 +100,9 @@ export type BackendCodeReviewResult = {
 
 export type AgentBackendDriver = {
   readonly backend: AgentBackend;
+  authenticate?(request: import('./contracts/provider-setup').ProviderAuthenticationAction): Promise<import('./contracts/provider-setup').ProviderAuthentication>;
   getRuntimeStatus(): BackendRuntimeStatus;
+  getAccountRateLimits?(): Promise<import('./contracts').AccountRateLimits | null>;
   getCapabilities(agent: Agent): BackendCapabilities;
   generateText?(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult>;
   runCodeReview?(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult>;
@@ -150,7 +152,7 @@ export function unsupportedBackendFeature(agent: Agent, feature: string): Error 
 }
 
 export function backendDisplayName(backend: AgentBackend): string {
-  return backend === 'claude' ? 'Claude' : 'Codex';
+  return { codex: 'Codex', claude: 'Claude Code' }[backend];
 }
 
 export function backendRuntimeFromSnapshot(snapshot: AppSnapshot, backend: AgentBackend): BackendRuntimeStatus {

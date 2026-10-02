@@ -37,10 +37,12 @@ import type { RemoteConnection } from '@codex-claw/core/contracts';
 import { useRemoteCodexAuthentication, type RemoteCodexAuthApi } from './use-remote-codex-authentication';
 
 const props = defineProps<{ connection: RemoteConnection; api?: RemoteCodexAuthApi }>();
+const emit = defineEmits<{ connected: [] }>();
 const state = props.api
   ? useRemoteCodexAuthentication(() => props.connection, () => props.api)
   : useRemoteCodexAuthentication(() => props.connection);
 const { authentication, login, connected, busy, error, start, cancel, refresh } = state;
+watch(connected, value => { if (value) emit('connected'); });
 const codeCopied = ref(false);
 const copyFailed = ref(false);
 watch(() => login.value?.userCode, () => { codeCopied.value = false; copyFailed.value = false; });

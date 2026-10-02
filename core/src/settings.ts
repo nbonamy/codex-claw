@@ -31,7 +31,6 @@ export const defaultGeneralSettings: AppGeneralSettings = {
   collapsedRepositoryKeys: [],
   modelFavorites: [],
   savedPromptDrafts: [],
-  shareCodexSkillsAndPlugins: true,
   worktreeInitializationMode: 'automatic',
   sessionCompressionWarningEnabled: true,
   repositoryIcons: {},
@@ -55,9 +54,19 @@ export const defaultThemeSettings: AppThemeSettings = {
 
 export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSettingsInput): AppSnapshot {
   if (input.general) {
+    const enabledChanges = input.general.providerEnabled;
+    if (enabledChanges) {
+      const authenticated = (snapshot.providerConnections ?? []).filter(engine => engine.installed && engine.connected);
+      const disablesActiveEngine = authenticated.some(engine => engine.enabled !== false && enabledChanges[engine.backend] === false);
+      const leavesAvailableEngine = authenticated.some(engine => (enabledChanges[engine.backend] ?? engine.enabled) !== false);
+      if (disablesActiveEngine && !leavesAvailableEngine) {
+        throw new Error('Cannot disable the last engine. Enable another one first.');
+      }
+    }
     snapshot.general = normalizeGeneralSettings({
       ...snapshot.general,
       ...input.general,
+      ...(enabledChanges ? { providerEnabled: { ...snapshot.general.providerEnabled, ...enabledChanges } } : {}),
       plugins: {
         ...snapshot.general.plugins,
         ...input.general.plugins,
@@ -119,18 +128,33 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     spokenAnnouncementVoice: normalizeSpokenAnnouncementVoice(value.spokenAnnouncementVoice),
     codexBinaryPath: normalizeString(value.codexBinaryPath) ?? defaultGeneralSettings.codexBinaryPath,
     claudeCodeEnabled: value.claudeCodeEnabled === true,
+    ...(typeof value.codexEnabled === 'boolean' ? { codexEnabled: value.codexEnabled } : {}),
+    ...(value.providerOnboardingComplete === true || typeof value.codexEnabled === 'boolean' ? { providerOnboardingComplete: true } : {}),
+    ...(isRecord(value.providerHomes) ? { providerHomes: normalizeProviderHomes(value.providerHomes) } : {}),
+    ...(isRecord(value.providerEnabled) ? { providerEnabled: Object.fromEntries(Object.entries(value.providerEnabled).filter(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && typeof enabled === 'boolean')) } : {}),
     agentListCompact: value.agentListCompact === true,
     cockpitAgentViewMode: value.cockpitAgentViewMode === 'recent' ? 'recent' : 'teams',
     collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
     modelFavorites: normalizeModelFavorites(value.modelFavorites),
     savedPromptDrafts: normalizeSavedPromptDrafts(value.savedPromptDrafts),
-    shareCodexSkillsAndPlugins: value.shareCodexSkillsAndPlugins !== false,
     worktreeInitializationMode: normalizeWorktreeInitializationMode(value.worktreeInitializationMode),
     sessionCompressionWarningEnabled: value.sessionCompressionWarningEnabled !== false,
     repositoryIcons: normalizeRepositoryIcons(value.repositoryIcons),
     appshots: normalizeAppshotSettings(value.appshots),
     plugins: normalizePluginSettings(value.plugins),
   };
+}
+
+function normalizeProviderHomes(value: Record<string, unknown>): NonNullable<AppGeneralSettings['providerHomes']> {
+  const homes: NonNullable<AppGeneralSettings['providerHomes']> = {};
+  for (const backend of ['codex', 'claude'] as const) {
+    const entry = value[backend];
+    if (isRecord(entry) && typeof entry.homePath === 'string' && entry.homePath.trim()
+      && typeof entry.isolated === 'boolean' && typeof entry.shareSkills === 'boolean') {
+      homes[backend] = { homePath: entry.homePath, isolated: entry.isolated, shareSkills: entry.shareSkills };
+    }
+  }
+  return homes;
 }
 
 function normalizeSpokenAnnouncementVoice(value: unknown): SpokenAnnouncementVoice {

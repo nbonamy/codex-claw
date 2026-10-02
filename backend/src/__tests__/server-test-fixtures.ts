@@ -18,6 +18,10 @@ export function createTestSnapshot(): AppSnapshot {
     turnGitDiffs: {},
     subagentTrees: {},
     backendRuntimes: [],
+    providerConnections: [
+      { backend: 'codex', installed: true, connected: true, checking: false },
+      { backend: 'claude', installed: true, connected: true, checking: false },
+    ],
     workBacklog: {
       connections: [],
       providerConfigurations: {},
@@ -46,7 +50,6 @@ export function createTestSnapshot(): AppSnapshot {
       collapsedRepositoryKeys: [],
       modelFavorites: [],
       savedPromptDrafts: [],
-      shareCodexSkillsAndPlugins: true,
       sessionCompressionWarningEnabled: true,
       worktreeInitializationMode: 'automatic',
       repositoryIcons: {},

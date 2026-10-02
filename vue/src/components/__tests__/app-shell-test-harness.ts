@@ -202,6 +202,9 @@ export function mountShell(overrides: Partial<{
   ) => Promise<AppSnapshot>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
+  if (snapshot.agents.length && snapshot.providerConnections === undefined) {
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+  }
   return mount(AppShell, {
     props: {
       snapshot,

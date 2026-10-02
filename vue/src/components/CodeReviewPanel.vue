@@ -86,7 +86,7 @@
                   </span>
                 </span>
               </button>
-              <BackendSelector v-model="reviewBackend" class="code-review-panel__backend" size="small" :disabled="busy || threadMode === 'current'" />
+              <BackendSelector v-model="reviewBackend" :team-id="agent.teamId" class="code-review-panel__backend" size="small" :disabled="busy || threadMode === 'current'" />
             </div>
           </fieldset>
         </div>
@@ -278,6 +278,7 @@ import {
 import type { Agent, AgentGitStatus, AppSnapshot } from "@codex-claw/core/contracts";
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 import BackendSelector from './BackendSelector.vue';
+import { useBackendChoices } from './backend-selection';
 
 const props = defineProps<{
   agent: Agent;
@@ -308,7 +309,8 @@ const busy = ref(false);
 const error = ref<string | null>(null);
 const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
 const threadMode = ref<CodeReviewThreadMode>("independent");
-const reviewBackend = ref(props.agent.backend);
+const reviewBackend = ref<Agent['backend'] | undefined>(props.agent.backend);
+const connectedBackends = useBackendChoices(() => props.agent.teamId);
 watch(() => props.agent.id, () => { reviewBackend.value = props.agent.backend; });
 const selectedRoundId = ref("");
 const session = computed(() => props.agent.codeReview ?? null);
@@ -492,6 +494,10 @@ function submitRound(): void {
 
 function startSelectedReview(): void {
   if (nothingToReview.value) return;
+  if (!connectedBackends.value.includes(threadMode.value === 'current' ? props.agent.backend : reviewBackend.value!)) {
+    error.value = t('engineConnection.required');
+    return;
+  }
   const reviewScope: CodeReviewStartInput["scope"] = scope.value === "branch" && branchScope.value
     ? { type: "branch", baseRef: branchScope.value.baseRef }
     : { type: "uncommitted" };

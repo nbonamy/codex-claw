@@ -1,10 +1,16 @@
-import { computed, inject, provide, ref, type ComputedRef, type InjectionKey } from 'vue';
-import { enabledAgentBackends } from '@codex-claw/core/agent-backends';
-import type { AgentBackend, AppGeneralSettings } from '@codex-claw/core/contracts';
+import { computed, inject, provide, ref, watch, type ComputedRef, type InjectionKey, type Ref } from 'vue';
+import { enabledAgentBackends, providerConnectionsForTeam } from '@codex-claw/core/agent-backends';
+import type { AgentBackend, AppSnapshot } from '@codex-claw/core/contracts';
+import type { ProviderConnection } from '@codex-claw/core/contracts/provider-setup';
 
 export const backendChoicesKey: InjectionKey<ComputedRef<AgentBackend[]>> = Symbol('backendChoices');
 type BackendSwitch = ReturnType<typeof provideBackendSwitch>;
 const backendSwitchKey: InjectionKey<BackendSwitch> = Symbol('backendSwitch');
+const backendSnapshotKey: InjectionKey<() => AppSnapshot> = Symbol('backendSnapshot');
+const connectEngineKey: InjectionKey<() => void> = Symbol('connectEngine');
+const backendHostKey: InjectionKey<() => { host: string; connections: ProviderConnection[] } | null> = Symbol('backendHost');
+const remembered = ref<Record<string, AgentBackend>>({});
+const preferenceKey = 'codexClaw:preferredEngines';
 
 export function provideBackendSwitch(update: (id: string, backend: AgentBackend) => Promise<void>) {
   const busy = ref(false);
@@ -27,10 +33,62 @@ export function useBackendSwitch() {
   return inject(backendSwitchKey, undefined);
 }
 
-export function provideBackendChoices(settings: () => AppGeneralSettings): void {
-  provide(backendChoicesKey, computed(() => enabledAgentBackends(settings())));
+export function provideBackendChoices(snapshot: () => AppSnapshot, connect: () => void = () => undefined): void {
+  provide(backendSnapshotKey, snapshot);
+  provide(connectEngineKey, connect);
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(preferenceKey) ?? '{}');
+    remembered.value = value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).filter(([, backend]) => backend === 'codex' || backend === 'claude'))
+      : {};
+  } catch { remembered.value = {}; }
+  provide(backendChoicesKey, computed(() => enabledAgentBackends({ providerConnections: providerConnectionsForTeam(snapshot()) })));
 }
 
-export function useBackendChoices(): ComputedRef<AgentBackend[]> {
-  return inject(backendChoicesKey, computed(() => ['codex']));
+export function useConnectEngine(): () => void {
+  return inject(connectEngineKey, () => undefined);
+}
+
+export function useNewAgentBackend(backend: Ref<AgentBackend | undefined>, choices: ComputedRef<AgentBackend[]>) {
+  watch(choices, enabled => {
+    if (!backend.value || !enabled.includes(backend.value)) backend.value = enabled[0];
+  }, { immediate: true });
+}
+
+export function useBackendChoices(teamId?: () => string | null | undefined): ComputedRef<AgentBackend[]> {
+  const snapshot = inject(backendSnapshotKey, undefined);
+  const hostOverride = inject(backendHostKey, undefined);
+  const fallback = inject(backendChoicesKey, computed<AgentBackend[]>(() => []));
+  return computed(() => {
+    const override = hostOverride?.();
+    if (override) return preferredChoices(enabledAgentBackends({ providerConnections: override.connections }), override.host);
+    const state = snapshot?.();
+    return state ? preferredBackendChoices(state, teamId?.() ?? state.activeTeamId) : fallback.value;
+  });
+}
+
+export function preferredBackendChoices(state: AppSnapshot, teamId = state.activeTeamId): AgentBackend[] {
+  const choices = enabledAgentBackends({ providerConnections: providerConnectionsForTeam(state, teamId) });
+  const host = state.teams.find(team => team.id === teamId)?.remoteConnectionId ?? 'local';
+  return preferredChoices(choices, host);
+}
+
+function preferredChoices(choices: AgentBackend[], host: string): AgentBackend[] {
+  const preferred = remembered.value[host];
+  return preferred && choices.includes(preferred) ? [preferred, ...choices.filter(choice => choice !== preferred)] : choices;
+}
+
+export function useRememberBackend(teamId?: () => string | null | undefined) {
+  const snapshot = inject(backendSnapshotKey, undefined);
+  const hostOverride = inject(backendHostKey, undefined);
+  return (backend: AgentBackend) => {
+    const state = snapshot?.();
+    const host = hostOverride?.()?.host ?? state?.teams.find(team => team.id === (teamId?.() ?? state.activeTeamId))?.remoteConnectionId ?? 'local';
+    remembered.value = { ...remembered.value, [host]: backend };
+    try { localStorage.setItem(preferenceKey, JSON.stringify(remembered.value)); } catch { /* Session preference remains usable. */ }
+  };
+}
+
+export function provideBackendHost(host: () => { host: string; connections: ProviderConnection[] } | null) {
+  provide(backendHostKey, host);
 }

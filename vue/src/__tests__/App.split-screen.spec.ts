@@ -275,6 +275,7 @@ describe('split-screen conversations', () => {
 
   it('keeps draft shortcuts, submissions and late completions tied to their pane rather than the latest focus', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const [first, second] = snapshot.agents;
     const { api, emitAppCommand } = installBackendFixture(snapshot);
     api.selectAgent.mockImplementation(async (id) => ({
@@ -393,6 +394,7 @@ describe('split-screen conversations', () => {
 
   it('applies a model favorite to its own pane and sends that configuration', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const second = snapshot.agents[1]!;
     snapshot.general.modelFavorites = [
       {

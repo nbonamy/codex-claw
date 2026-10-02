@@ -1,6 +1,9 @@
 import path from 'node:path';
+import { getLocalClaudeAuthentication } from './authentication';
+import { getClaudeAccountUsage } from './account-usage';
 import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import type {
+  AccountRateLimits,
   Agent,
   AppPluginSettings,
   BackendConversationRef,
@@ -23,6 +26,7 @@ import {
 import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
 import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
 import { claudeWorkingDirectory } from './working-directory';
+import { claudeConfigDirectory } from './config-directory';
 import { agentScopedMcpUrl, clawMcpUrlForAgent } from '../mcp/codex-config';
 import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
@@ -107,9 +111,18 @@ type ClaudeReviewTurnConfiguration = {
 };
 
 export class ClaudeConversationHost implements AgentBackendDriver {
+  async authenticate(request: import('@codex-claw/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@codex-claw/core/contracts/provider-setup').ProviderAuthentication> {
+    if (request.action !== 'check') throw new Error('Manage Claude authentication through its CLI.');
+    const state = await getLocalClaudeAuthentication();
+    return { kind: 'claude', connected: state.loggedIn, state };
+  }
   readonly backend = 'claude' as const;
 
   private readonly listeners = new Set<EventListener>();
+  private accountLimits: AccountRateLimits = {
+    limitId: 'claude', limitName: null, primary: null, secondary: null,
+    credits: null, individualLimit: null, planType: null, rateLimitReachedType: null,
+  };
   private readonly activeTurnsByAgentId = new Map<string, ActiveClaudeTurn>();
   private readonly conversationReplicasByAgentId = new Map<string, ClaudeConversationReplica>();
   private readonly conversationRevisionsByAgentId = new Map<string, number>();
@@ -146,6 +159,11 @@ export class ClaudeConversationHost implements AgentBackendDriver {
 
   async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
     return this.catalog.listSkills(agent);
+  }
+
+  async generateText(_agent: Agent, input: import('@codex-claw/core/backend-driver').BackendTextGenerationInput) {
+    if (!this.transport.generateText) throw new Error('Claude text generation is unavailable.');
+    return this.transport.generateText(input);
   }
 
   async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult> {
@@ -514,6 +532,12 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     };
   }
 
+  async getAccountRateLimits(): Promise<AccountRateLimits | null> {
+    const limits = await getClaudeAccountUsage();
+    if (limits) this.accountLimits = limits;
+    return limits;
+  }
+
   async close(): Promise<void> {
     const interrupts: Promise<void>[] = [];
     for (const activeTurn of this.activeTurnsByAgentId.values()) {
@@ -529,6 +553,21 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   private handleSdkMessage(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
+    if (message.type === 'rate_limit_event') {
+      const info = 'rate_limit_info' in message ? message.rate_limit_info : undefined;
+      if (!info || typeof info !== 'object') return;
+      const { rateLimitType, utilization, resetsAt } = info as Record<string, unknown>;
+      const slot = rateLimitType === 'five_hour' ? 'primary' : rateLimitType === 'seven_day' ? 'secondary' : null;
+      // Model-specific and overage limits must not replace the overall weekly quota.
+      if (!slot || typeof utilization !== 'number' || !Number.isFinite(utilization) || utilization < 0) return;
+      this.accountLimits = { ...this.accountLimits, [slot]: {
+        usedPercent: utilization * 100,
+        windowDurationMins: slot === 'primary' ? 300 : 10_080,
+        resetsAt: typeof resetsAt === 'number' && Number.isFinite(resetsAt) ? resetsAt : null,
+      } };
+      this.emit({ type: 'account.rateLimitsUpdated', backend: 'claude', payload: { rateLimits: this.accountLimits } });
+      return;
+    }
     const sessionId = claudeMessageSessionId(message);
     if (sessionId) {
       this.resolveTurnStart(activeTurn, sessionId);
@@ -1466,7 +1505,8 @@ function claudeThreadId(activeTurn: ActiveClaudeTurn): string {
 
 function isClaudePlanWriteInput(input: Record<string, unknown> | null): input is { file_path: string; content: string } {
   return typeof input?.file_path === 'string' &&
-    input.file_path.includes('/.claude/plans/') &&
+    (input.file_path.includes('/.claude/plans/') ||
+      path.dirname(input.file_path) === path.join(claudeConfigDirectory(), 'plans')) &&
     typeof input.content === 'string';
 }
 

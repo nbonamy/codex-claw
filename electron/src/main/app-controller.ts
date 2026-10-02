@@ -482,7 +482,13 @@ export class AppController {
     ipc.handle(ipcChannels.readEngineInstructions, (_event, engine) => this.requireBackendClient().request<{ text: string; path: string }>(backendMethods.engineInstructionsRead, { engine }));
     ipc.handle(ipcChannels.saveEngineInstructions, (_event, input) => this.requireBackendClient().request<void>(backendMethods.engineInstructionsSave, { input }));
     ipc.handle(ipcChannels.getCodexAuthentication, (_event, remoteConnectionId?: string) => this.getCodexAuthentication(remoteConnectionId));
-    ipc.handle(ipcChannels.getClaudeAuthentication, (_event, remoteConnectionId: string) => this.getClaudeAuthentication(remoteConnectionId));
+    ipc.handle(ipcChannels.getClaudeAuthentication, (_event, remoteConnectionId?: string) => this.getClaudeAuthentication(remoteConnectionId));
+    ipc.handle(ipcChannels.getProviderSetup, (_event, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerSetupGet, { remoteConnectionId }));
+    ipc.handle(ipcChannels.getProviderConnections, (_event, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerConnectionsGet, { remoteConnectionId }));
+    ipc.handle(ipcChannels.getProviderUsage, (_event, backend) => this.requireBackendClient().request(backendMethods.providerUsageGet, { backend }));
+    ipc.handle(ipcChannels.setProviderEnabled, (_event, backend, enabled, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerEnabledSet, { backend, enabled, remoteConnectionId }));
+    ipc.handle(ipcChannels.configureProviderSetup, (_event, backend, choice) => this.requireBackendClient().request(backendMethods.providerSetupConfigure, { backend, choice }));
+    ipc.handle(ipcChannels.installProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerInstall, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.cancelCodexChatGptLogin, (_event, remoteConnectionId?: string, loginId?: string) => this.cancelCodexChatGptLogin(remoteConnectionId, loginId));
     ipc.handle(ipcChannels.startCodexChatGptDeviceCodeLogin, (_event, remoteConnectionId: string) => {
       return this.startCodexChatGptDeviceCodeLogin(remoteConnectionId);
@@ -996,9 +1002,9 @@ export class AppController {
     return this.requireBackendClient().request(backendMethods.codexAuthenticationGet, remoteConnectionId ? { remoteConnectionId } : undefined);
   }
 
-  private getClaudeAuthentication(remoteConnectionId: string): Promise<ClaudeAuthentication> {
-    if (typeof remoteConnectionId !== 'string' || !remoteConnectionId.trim()) throw new Error('A remote connection is required.');
-    return this.requireBackendClient().request(backendMethods.claudeAuthenticationGet, { connectionId: remoteConnectionId });
+  private getClaudeAuthentication(remoteConnectionId?: string): Promise<ClaudeAuthentication> {
+    if (remoteConnectionId !== undefined && (typeof remoteConnectionId !== 'string' || !remoteConnectionId.trim())) throw new Error('A remote connection is required.');
+    return this.requireBackendClient().request(backendMethods.claudeAuthenticationGet, remoteConnectionId === undefined ? undefined : { connectionId: remoteConnectionId });
   }
 
   private startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<import('@codex-claw/core/contracts').CodexChatGptDeviceCodeLogin> {

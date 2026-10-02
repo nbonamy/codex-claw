@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
   ensureBackendCodexHome: vi.fn(),
   ensureBackendMissionHome: vi.fn(),
   deleteBackendMissionHome: vi.fn(),
-  initializeCodexResourceSharing: vi.fn(),
+  initializeProviderSetup: vi.fn(),
   loadPluginStatus: vi.fn(),
   saveBackendSnapshot: vi.fn(),
   backendCodexHomeDir: vi.fn(() => '/tmp/codex-home'),
@@ -79,9 +79,7 @@ vi.mock('../state', () => ({
   backendProviderTokensFilePath: mocks.backendProviderTokensFilePath,
 }));
 
-vi.mock('../codex-resource-sharing', () => ({
-  initializeCodexResourceSharing: mocks.initializeCodexResourceSharing,
-}));
+vi.mock('../provider-setup', () => ({ ProviderSetup: class { initialize = mocks.initializeProviderSetup; } }));
 
 vi.mock('../plugin-status', () => ({
   loadPluginStatus: mocks.loadPluginStatus,
@@ -151,6 +149,7 @@ vi.mock('../scheduling/runtime-scheduler', () => ({
 vi.mock('../server', () => ({
   ClawBackendServer: class {
     initialize = vi.fn().mockResolvedValue(undefined);
+    requireConnectedEngine = vi.fn(async (backend: string) => backend);
     constructor(options: unknown) { mocks.serverOptions.push(options); }
     emitEvent = mocks.serverEmitEvent;
     close = mocks.serverClose;
@@ -261,7 +260,7 @@ describe('clawd runtime', () => {
     mocks.drivers.set('codex', driver);
     mocks.loadBackendSnapshot.mockResolvedValue(mocks.snapshot);
     mocks.ensureBackendCodexHome.mockResolvedValue(undefined);
-    mocks.initializeCodexResourceSharing.mockResolvedValue(undefined);
+    mocks.initializeProviderSetup.mockResolvedValue(undefined);
     mocks.loadPluginStatus.mockResolvedValue({ chromeEnabled: false });
     mocks.saveBackendSnapshot.mockResolvedValue(undefined);
     mocks.backendProviderTokensFilePath.mockReturnValue('/tmp/provider-tokens.json');
@@ -285,7 +284,7 @@ describe('clawd runtime', () => {
     await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
 
     expect(mocks.loadBackendSnapshot).toHaveBeenCalledOnce();
-    expect(mocks.initializeCodexResourceSharing).toHaveBeenCalledWith(undefined);
+    expect(mocks.initializeProviderSetup).toHaveBeenCalledOnce();
     expect(mocks.ensureBackendCodexHome).toHaveBeenCalledOnce();
     expect(mocks.mcpStart).toHaveBeenCalledOnce();
     expect(mocks.createDefaultBackendDrivers).toHaveBeenCalledWith(expect.objectContaining({

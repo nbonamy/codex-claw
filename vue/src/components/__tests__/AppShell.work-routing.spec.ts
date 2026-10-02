@@ -262,7 +262,7 @@ describe('AppShell work routing', () => {
     wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('create-quick-chat');
     await flushPromises();
 
-    expect(createQuickChat).toHaveBeenCalledWith({ teamId: 'team-codex-claw' });
+    expect(createQuickChat).toHaveBeenCalledWith({ teamId: 'team-codex-claw', backend: 'codex' });
   });
 
   it('creates a new Git project and opens an agent in it', async () => {
@@ -289,7 +289,9 @@ describe('AppShell work routing', () => {
 
     wrapper.getComponent({ name: 'AgentEmptyState' }).vm.$emit('start-work', 'new');
     await flushPromises();
-    wrapper.getComponent({ name: 'NewProjectDialog' }).vm.$emit('create', 'fresh-project');
+    const dialog = wrapper.getComponent({ name: 'NewProjectDialog' });
+    await dialog.get('#new-project-name').setValue('fresh-project');
+    await dialog.get('.claw-button--primary').trigger('click');
     await flushPromises();
 
     expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-remote', backend: 'codex' });
@@ -1047,6 +1049,9 @@ describe('AppShell work routing', () => {
 
 function remoteEmptyTeamSnapshot() {
   const snapshot = createInitialSnapshot();
+  snapshot.remoteConnections.connections = [{ id: 'connection-devbox', kind: 'ssh', host: 'devbox', name: 'Devbox', status: 'ready', createdAt: '', updatedAt: '',
+    providerConnections: [{ backend: 'codex', installed: true, connected: true, checking: false }],
+  }];
   snapshot.teams = [{
     id: 'team-remote',
     name: 'Devbox',

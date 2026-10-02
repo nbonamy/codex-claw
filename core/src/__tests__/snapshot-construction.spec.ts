@@ -176,7 +176,6 @@ function expectedEmptySnapshot(): AppSnapshot {
       collapsedRepositoryKeys: [],
       modelFavorites: [],
       savedPromptDrafts: [],
-      shareCodexSkillsAndPlugins: true,
       sessionCompressionWarningEnabled: true,
       worktreeInitializationMode: 'automatic',
       repositoryIcons: {},

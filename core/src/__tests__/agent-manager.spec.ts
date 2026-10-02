@@ -22,6 +22,7 @@ import { workItemAssignmentKey } from '../work-assignments';
 describe('agent-manager', () => {
   it('switches a fresh agent without carrying model or permission settings across providers', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.claudeCodeEnabled = true;
     const agent = snapshot.agents[0]!;
     delete agent.backendSession;
@@ -40,12 +41,13 @@ describe('agent-manager', () => {
     agent.hasSubmittedPrompt = true;
     expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' })).toThrow('before the first prompt');
     delete agent.hasSubmittedPrompt;
-    snapshot.general.claudeCodeEnabled = false;
-    expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' })).toThrow('not enabled');
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' })).toThrow('not connected');
     expect(agent.backend).toBe('codex');
   });
   it('duplicates an agent in the same team and selects the copy', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-duplicate-dina');
 
     expect(duplicate).toStrictEqual({
@@ -67,6 +69,7 @@ describe('agent-manager', () => {
 
   it('duplicates an agent without changing the active agent when selection is disabled', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const activeAgentId = snapshot.activeAgentId;
     const duplicate = duplicateAgentInSnapshot(
       snapshot,
@@ -83,6 +86,7 @@ describe('agent-manager', () => {
 
   it('duplicates an agent with a caller-provided name', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const duplicate = duplicateAgentInSnapshot(
       snapshot,
       'agent-dina',
@@ -97,6 +101,7 @@ describe('agent-manager', () => {
 
   it('generates collision-safe ids for duplicated agents', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     const duplicateIds = ['agent-duplicate-dina', 'agent-duplicate-dina', 'agent-duplicate-dina-2'];
     const firstDuplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => duplicateIds.shift() ?? 'agent-fallback');
@@ -107,6 +112,7 @@ describe('agent-manager', () => {
 
   it('forks an agent conversation directly below its source and selects it', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const forked = forkAgentInSnapshot(
       snapshot,
       'agent-dina',
@@ -128,6 +134,7 @@ describe('agent-manager', () => {
 
   it('duplicates legacy agents into the active team when they have no team id', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     delete snapshot.agents[0].teamId;
 
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-duplicate-dina');
@@ -138,6 +145,7 @@ describe('agent-manager', () => {
 
   it('assigns each work item key to one agent at a time', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const firstItem = workItem(12, 'Fix cockpit drag target');
     const secondItem = workItem(13, 'Polish backlog panel');
 
@@ -174,6 +182,7 @@ describe('agent-manager', () => {
 
   it('marks assigned work items as completed by the owning agent', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const item = workItem(12, 'Fix cockpit drag target');
     assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', item, '2026-06-09T13:00:00.000Z');
 
@@ -193,6 +202,7 @@ describe('agent-manager', () => {
 
   it('updates assigned work through blocked, resumed, and review-ready states', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const item = workItem(12, 'Fix cockpit drag target');
     assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', item, '2026-06-09T13:00:00.000Z');
     const workItemId = workItemAssignmentKey(item);
@@ -214,6 +224,7 @@ describe('agent-manager', () => {
 
   it('removes assigned work item keys', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const firstItem = workItem(12, 'Fix cockpit drag target');
     const secondItem = workItem(13, 'Polish backlog panel');
 
@@ -244,6 +255,7 @@ describe('agent-manager', () => {
     { type: 'error', message: 'Turn failed' },
   ] satisfies Agent['status'][])('moves a $type agent to another team without changing its session or runtime state', (status) => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0].status = status;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-running' };
     const before = structuredClone(snapshot.agents[0]);
@@ -269,6 +281,7 @@ describe('agent-manager', () => {
 
   it('reorders agents within a team before a target or to the end', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
     expect(duplicate?.id).toBe('agent-abby');
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-abby', 'agent-jesse']);
@@ -283,6 +296,7 @@ describe('agent-manager', () => {
 
   it('keeps agent order unchanged when dropping an agent onto itself', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-dina', 'agent-dina')).toStrictEqual(snapshot.agents[0]);
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse']);
@@ -290,6 +304,7 @@ describe('agent-manager', () => {
 
   it('ignores agent reorders outside the requested team', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const otherTeam = createTeamInSnapshot(snapshot, {
       name: 'Skwad Core',
       color: '#46A857',
@@ -304,6 +319,7 @@ describe('agent-manager', () => {
 
   it('keeps agent reorders inside their repository group', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0]!.workspace = gitWorkspace('claw');
     snapshot.agents[1]!.workspace = gitWorkspace('sdk');
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
@@ -317,6 +333,7 @@ describe('agent-manager', () => {
 
   it('reorders a repository as one block with all of its agents', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0]!.workspace = gitWorkspace('claw');
     snapshot.agents[1]!.workspace = gitWorkspace('sdk');
     duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
@@ -337,6 +354,7 @@ describe('agent-manager', () => {
 
   it('restarts an idle agent by clearing conversation and runtime state', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const agent = snapshot.agents[0];
     agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
     agent.contextUsage = {
@@ -395,6 +413,7 @@ describe('agent-manager', () => {
 
   it('resumes an idle agent with the selected provider session', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const agent = snapshot.agents[0];
     agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
     agent.contextUsage = {
@@ -431,6 +450,7 @@ describe('agent-manager', () => {
 
   it('closes an idle agent and selects the next available agent', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', workItem(12, 'Fix cockpit drag target'));
 
     expect(closeAgentInSnapshot(snapshot, 'agent-dina')).toMatchObject({ id: 'agent-dina' });
@@ -443,6 +463,7 @@ describe('agent-manager', () => {
 
   it('closes the last active team agent without selecting another team agent', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const otherTeam = createTeamInSnapshot(snapshot, {
       name: 'Skwad Core',
       color: '#46A857',
@@ -463,6 +484,7 @@ describe('agent-manager', () => {
 
   it('closes a non-active idle agent without changing active selection', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     expect(closeAgentInSnapshot(snapshot, 'agent-jesse')).toMatchObject({ id: 'agent-jesse' });
 
@@ -473,6 +495,7 @@ describe('agent-manager', () => {
 
   it('rejects restart and resume while an agent is busy but still allows close', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0].status = { type: 'working' };
     expect(() => restartAgentConversation(snapshot, 'agent-dina')).toThrow('Agent must be idle before restarting.');
     expect(() => resumeAgentConversationInSnapshot(snapshot, 'agent-dina', { kind: 'codex', threadId: 'thread-new' })).toThrow('Agent must be idle before resuming a conversation.');
@@ -482,6 +505,7 @@ describe('agent-manager', () => {
 
   it('returns null for missing agents', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     expect(duplicateAgentInSnapshot(snapshot, 'missing-agent')).toBeNull();
     expect(moveAgentToTeamInSnapshot(snapshot, 'missing-agent', 'team-codex-claw')).toBeNull();

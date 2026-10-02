@@ -1,4 +1,4 @@
-import { shallowMount } from '@vue/test-utils';
+import { flushPromises, shallowMount } from '@vue/test-utils';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { describe, expect, it } from 'vitest';
 import FirstRunOnboardingGate from '../FirstRunOnboardingGate.vue';
@@ -7,6 +7,12 @@ function mountGate(overrides: Partial<InstanceType<typeof FirstRunOnboardingGate
   return shallowMount(FirstRunOnboardingGate, {
     props: {
       authentication: null,
+      claudeDialogVisible: false,
+      codexConnected: false,
+      claudeConnected: false,
+      claudeLoading: false,
+      claudeError: null,
+      continuing: false,
       authenticationCancelling: false,
       authenticationError: null,
       authenticationLoading: false,
@@ -21,10 +27,24 @@ function mountGate(overrides: Partial<InstanceType<typeof FirstRunOnboardingGate
       workProviderAuthorization: null,
       ...overrides,
     },
+    global: { stubs: { LocalClaudeAuthenticationDialog: false, FormDialog: false, FormDialogField: false, teleport: true } },
   });
 }
 
 describe('FirstRunOnboardingGate', () => {
+  it('keeps the default login environment unset instead of falling back to an explicit home', async () => {
+    const wrapper = mountGate({
+      claudeDialogVisible: true,
+      claudeAuthentication: { loggedIn: false, configDirectory: null },
+      providerSetup: [{ backend: 'claude', installed: true, isolated: false, shareSkills: true, locked: false, homePath: '/users/test/.claude' }],
+    });
+    await flushPromises();
+    expect(wrapper.findAll('code').map(command => command.text())).toStrictEqual([
+      'env -u CLAUDE_CONFIG_DIR claude auth login --claudeai',
+      'env -u CLAUDE_CONFIG_DIR claude auth login --console',
+    ]);
+  });
+
   it('gives ChatGPT sign-in precedence and forwards its actions', () => {
     const wrapper = mountGate({
       githubOnboardingVisible: true,

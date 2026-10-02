@@ -24,7 +24,7 @@
       </FormDialogField>
       <p v-if="error" class="repository-acquire-dialog__url-error">{{ error }}</p>
     </form>
-    <template v-if="backendChoices.length > 1" #footer-left>
+    <template v-if="backendChoices.length !== 1" #footer-left>
       <BackendSelector v-model="backend" :disabled="busy" />
     </template>
     <template #footer>
@@ -135,11 +135,12 @@ import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { GitHubIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
 import BackendSelector from './BackendSelector.vue';
-import { useBackendChoices } from './backend-selection';
+import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
-const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend', { default: 'codex' });
+const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend');
+useNewAgentBackend(backend, backendChoices);
 
 const props = withDefaults(defineProps<{
   busy?: boolean;
@@ -198,7 +199,7 @@ function onVisibilityChanged(visible: boolean): void {
 }
 
 function submitUrl(): void {
-  if (canSubmitUrl.value && !props.busy) emit('clone-url', url.value.trim());
+  if (canSubmitUrl.value && !props.busy && backend.value && backendChoices.value.includes(backend.value)) emit('clone-url', url.value.trim());
 }
 
 function isRepositoryLocal(repository: WorkRepository): boolean {

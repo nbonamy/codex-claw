@@ -469,12 +469,16 @@ export type AppGeneralSettings = {
   spokenAnnouncementVoice: SpokenAnnouncementVoice;
   codexBinaryPath: string;
   claudeCodeEnabled: boolean;
+  /** Undefined preserves Codex for existing installations. */
+  codexEnabled?: boolean;
+  providerOnboardingComplete?: boolean;
+  providerHomes?: Partial<Record<AgentBackend, import('./contracts/provider-setup').ProviderHomeSettings>>;
+  providerEnabled?: Partial<Record<AgentBackend, boolean>>;
   agentListCompact: boolean;
   cockpitAgentViewMode: CockpitAgentViewMode;
   collapsedRepositoryKeys: string[];
   modelFavorites: ModelFavorite[];
   savedPromptDrafts: SavedPromptDraft[];
-  shareCodexSkillsAndPlugins: boolean;
   worktreeInitializationMode: WorktreeInitializationMode;
   sessionCompressionWarningEnabled: boolean;
   repositoryIcons: Record<string, string>;
@@ -599,6 +603,7 @@ export type CodexResourceSharingStatus = {
 };
 
 export type AppSnapshot = {
+  providerConnections?: import('./contracts/provider-setup').ProviderConnection[];
   missions?: import('./missions').Mission[];
   repositoryVisualizations?: import('./visualize').RepositoryVisualizations;
   clientPreferences?: Record<string, import('./client-preferences').ClientPreferences>;
@@ -615,6 +620,8 @@ export type AppSnapshot = {
   subagentTrees: Record<string, AgentSubagentTree>;
   backendRuntimes: BackendRuntimeStatus[];
   accountRateLimits?: AccountRateLimits;
+  /** Live account quotas, kept separate for each local engine. */
+  backendAccountRateLimits?: Partial<Record<AgentBackend, AccountRateLimits>>;
   workBacklog: WorkBacklogState;
   remoteConnections: RemoteConnectionsState;
   general: AppGeneralSettings;
@@ -884,7 +891,13 @@ export type CodexClawApi = {
   setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<AppSnapshot>;
   getPluginStatus(): Promise<AppPluginStatus>;
   getCodexAuthentication(remoteConnectionId?: string): Promise<CodexAuthentication>;
-  getClaudeAuthentication(remoteConnectionId: string): Promise<ClaudeAuthentication>;
+  getClaudeAuthentication(remoteConnectionId?: string): Promise<ClaudeAuthentication>;
+  getProviderSetup(remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus[]>;
+  getProviderConnections(remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;
+  getProviderUsage(backend: AgentBackend): Promise<AccountRateLimits | null>;
+  setProviderEnabled(backend: AgentBackend, enabled: boolean, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;
+  configureProviderSetup(backend: AgentBackend, choice: import('./contracts/provider-setup').ProviderSetupChoice): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
+  installProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
   cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication>;
   startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<CodexChatGptDeviceCodeLogin>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;

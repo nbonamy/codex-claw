@@ -8,6 +8,7 @@ import type {
   UpdateAutomationInput,
 } from './contracts';
 import { createEntityId, type IdGenerator } from './ids';
+import { resolveAgentBackend } from './agent-backends';
 
 const MAX_AUTOMATION_EXECUTION_LOG_ENTRIES = 50;
 
@@ -33,6 +34,7 @@ export function createAutomationInSnapshot(
     enabled: normalized.enabled,
     repositories: normalized.repositories,
     teamId: normalized.teamId,
+    backend: normalized.backend,
     ...(normalized.selectionPrompt ? { selectionPrompt: normalized.selectionPrompt } : {}),
     ...(normalized.assignmentPrompt ? { assignmentPrompt: normalized.assignmentPrompt } : {}),
     schedule: normalized.schedule,
@@ -51,7 +53,7 @@ export function updateAutomationInSnapshot(
   updatedAt = new Date().toISOString(),
 ): Automation | null {
   const automation = snapshot.automations.find((candidate) => candidate.id === input.id);
-  const normalized = normalizeAutomationInput(snapshot, input);
+  const normalized = normalizeAutomationInput(snapshot, { ...input, backend: input.backend ?? automation?.backend ?? 'codex' }, automation?.backend ?? 'codex');
   if (!automation || !normalized) {
     return null;
   }
@@ -60,6 +62,7 @@ export function updateAutomationInSnapshot(
   automation.enabled = normalized.enabled;
   automation.repositories = normalized.repositories;
   automation.teamId = normalized.teamId;
+  automation.backend = normalized.backend;
   automation.schedule = normalized.schedule;
   if (normalized.selectionPrompt) {
     automation.selectionPrompt = normalized.selectionPrompt;
@@ -208,6 +211,7 @@ export function updateAutomationExecutionAgentConversationInSnapshot(
 function normalizeAutomationInput(
   snapshot: AppSnapshot,
   input: CreateAutomationInput,
+  existingBackend?: Automation['backend'],
 ): Omit<Automation, 'createdAt' | 'id' | 'lastCreatedCount' | 'lastError' | 'lastRunAt' | 'updatedAt'> | null {
   const repositories = normalizeAutomationRepositories(input.repositories);
   const teamId = input.teamId.trim();
@@ -230,6 +234,7 @@ function normalizeAutomationInput(
     enabled: input.enabled !== false,
     repositories,
     teamId,
+    backend: input.backend && input.backend === existingBackend ? input.backend : resolveAgentBackend(snapshot, input.backend),
     ...(selectionPrompt ? { selectionPrompt } : {}),
     ...(assignmentPrompt ? { assignmentPrompt } : {}),
     schedule: { intervalMinutes },

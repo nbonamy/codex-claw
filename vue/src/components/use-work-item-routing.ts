@@ -183,7 +183,7 @@ export function useWorkItemRouting(options: {
     const agent = await options.actions.createAgent({
       name: null,
       folder: worktree.path,
-      backend: creationOptions.backend ?? 'codex',
+      ...(creationOptions.backend ? { backend: creationOptions.backend } : {}),
       sourceRepositoryName: repository.name,
       teamId: team.id,
     });

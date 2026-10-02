@@ -3,7 +3,7 @@
     class="claw-dialog claw-form-dialog-shell"
     :model-value="modelValue"
     :width="width"
-    :teleported="teleported"
+    :append-to-body="teleported"
     :show-close="false"
     :destroy-on-close="destroyOnClose"
     @update:model-value="emit('update:modelValue', $event)"

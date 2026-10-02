@@ -15,6 +15,7 @@ import { createInitialSnapshot } from '../snapshot';
 describe('automation manager', () => {
   it('normalizes and updates the simple automation contract', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const automation = createAutomationInSnapshot(
       snapshot,
       {
@@ -34,6 +35,7 @@ describe('automation manager', () => {
     );
 
     expect(automation).toStrictEqual({
+      backend: 'codex',
       id: 'automation-github-work',
       name: 'nbonamy/codex-claw +1',
       enabled: true,
@@ -75,6 +77,7 @@ describe('automation manager', () => {
 
   it('rejects invalid repositories, teams, schedules, and missing updates', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     expect(
       createAutomationInSnapshot(snapshot, {
         ...automationInput(),
@@ -111,6 +114,7 @@ describe('automation manager', () => {
 
   it('records, completes, updates, deletes, and clears execution history', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const automation = createAutomationInSnapshot(snapshot, automationInput(), '2026-06-09T11:00:00.000Z', () => 'automation-backlog');
 
     expect(recordAutomationExecutionInSnapshot(snapshot, 'missing', execution('run-1'))).toBeNull();

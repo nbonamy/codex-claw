@@ -1,9 +1,10 @@
 import type { Dirent } from 'node:fs';
-import { access, readFile, readdir, stat } from 'node:fs/promises';
+import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/core/contracts';
 import { claudeWorkingDirectory } from './working-directory';
+import { claudeConfigDirectory } from './config-directory';
 import { claudeToolPart, completedClaudeToolPart } from './claude-tool-part-adapter';
 import { claudeToolResultText } from './claude-tool-result';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
@@ -45,7 +46,7 @@ export async function loadClaudeTranscriptHistory(
     return null;
   }
 
-  const projectsRoot = options.projectsRoot ?? path.join(os.homedir(), '.claude', 'projects');
+  const projectsRoot = options.projectsRoot ?? path.join(claudeConfigDirectory(), 'projects');
   const transcriptPath = await findClaudeTranscriptPath(projectsRoot, claudeWorkingDirectory(agent), sessionId);
   if (!transcriptPath) {
     return {
@@ -107,39 +108,38 @@ export async function listClaudeTranscriptSummaries(
   agent: Agent,
   options: ClaudeTranscriptHistoryOptions = {},
 ): Promise<ConversationSummary[]> {
-  const projectsRoot = options.projectsRoot ?? path.join(os.homedir(), '.claude', 'projects');
+  const projectsRoot = options.projectsRoot ?? path.join(claudeConfigDirectory(), 'projects');
   const folder = agent.folder;
-  const projectDir = path.join(projectsRoot, claudeProjectDirectoryName(expandHome(claudeWorkingDirectory(agent))));
   const files: Array<{ filePath: string; sessionId: string; updatedAt: string; updatedAtMs: number }> = [];
+  const seen = new Set<string>();
 
-  let entries: Dirent[];
-  try {
-    entries = await readdir(projectDir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.jsonl')) {
-      continue;
-    }
-
-    const sessionId = entry.name.slice(0, -'.jsonl'.length);
-    if (!isSafeSessionId(sessionId)) {
-      continue;
-    }
-
-    const filePath = path.join(projectDir, entry.name);
+  for (const cwd of await claudeWorkspacePaths(claudeWorkingDirectory(agent))) {
+    const projectDir = path.join(projectsRoot, claudeProjectDirectoryName(cwd));
+    let entries: Dirent[];
     try {
-      const fileStat = await stat(filePath);
-      files.push({
-        filePath,
-        sessionId,
-        updatedAt: fileStat.mtime.toISOString(),
-        updatedAtMs: fileStat.mtimeMs,
-      });
+      entries = await readdir(projectDir, { withFileTypes: true });
     } catch {
       continue;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
+      const sessionId = entry.name.slice(0, -'.jsonl'.length);
+      if (!isSafeSessionId(sessionId) || seen.has(sessionId)) continue;
+
+      const filePath = path.join(projectDir, entry.name);
+      try {
+        const fileStat = await stat(filePath);
+        files.push({
+          filePath,
+          sessionId,
+          updatedAt: fileStat.mtime.toISOString(),
+          updatedAtMs: fileStat.mtimeMs,
+        });
+        seen.add(sessionId);
+      } catch {
+        continue;
+      }
     }
   }
 
@@ -326,14 +326,29 @@ function compactTitle(value: string): string {
 }
 
 async function findClaudeTranscriptPath(projectsRoot: string, folder: string, sessionId: string): Promise<string | null> {
-  const expandedFolder = expandHome(folder);
-  const directPath = path.join(projectsRoot, claudeProjectDirectoryName(expandedFolder), `${sessionId}.jsonl`);
-  if (await fileExists(directPath)) {
-    return directPath;
+  const folders = await claudeWorkspacePaths(folder);
+  for (const cwd of folders) {
+    const directPath = path.join(projectsRoot, claudeProjectDirectoryName(cwd), `${sessionId}.jsonl`);
+    if (await fileExists(directPath)) return directPath;
   }
 
-  const indexedPath = await findIndexedTranscriptPath(projectsRoot, expandedFolder, sessionId);
-  return indexedPath && await fileExists(indexedPath) ? indexedPath : null;
+  for (const cwd of folders) {
+    const indexedPath = await findIndexedTranscriptPath(projectsRoot, cwd, sessionId);
+    if (indexedPath && await fileExists(indexedPath)) return indexedPath;
+  }
+  return null;
+}
+
+async function claudeWorkspacePaths(folder: string): Promise<string[]> {
+  const expanded = expandHome(folder);
+  try {
+    // Claude canonicalizes cwd (for example /tmp becomes /private/tmp on macOS).
+    const canonical = await realpath(expanded);
+    return canonical === expanded ? [expanded] : [expanded, canonical];
+  } catch {
+    // History remains readable even after the original workspace is removed.
+    return [expanded];
+  }
 }
 
 async function findIndexedTranscriptPath(projectsRoot: string, folder: string, sessionId: string): Promise<string | null> {

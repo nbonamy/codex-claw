@@ -8,6 +8,7 @@ import { AgentGitService } from '../git/agent-git-service';
 describe('mission backend boundary', () => {
   it('creates, broadcasts, updates and reloads a team-scoped mission without a repository', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     let disk: unknown;
     const onEvent = vi.fn();
     const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); }, onEvent });
@@ -42,6 +43,7 @@ describe('mission backend boundary', () => {
 
   it('deletes every tracked Mission worktree and the Mission data directory when requested', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const mission = createMission(snapshot, {
       outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
       teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
@@ -80,6 +82,7 @@ describe('mission backend boundary', () => {
 
   it('keeps tracked worktrees while still deleting Mission data', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const mission = createMission(snapshot, {
       outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
       teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
@@ -109,6 +112,7 @@ describe('mission backend boundary', () => {
 
   it('keeps the Mission and its data when a tracked worktree cannot be deleted', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const mission = createMission(snapshot, {
       outcome: 'Add billing', workflowType: 'shapeAndShipFeature',
       teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
@@ -167,6 +171,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
     await exec('git', ['add', '.'], { cwd: repo });
     await exec('git', ['commit', '-m', 'initial'], { cwd: repo });
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     snapshot.agents[0]!.folder = repo;
     const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
     const interrupt = vi.fn().mockResolvedValue({ backendSession: { kind: 'codex', threadId: 'mission-thread' } });
@@ -280,6 +285,7 @@ it('recovers a persisted preparing mission without starting its provider convers
     await exec('git', ['add', '.'], { cwd: repo });
     await exec('git', ['commit', '-m', 'initial'], { cwd: repo });
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     mission.execution = {
       teamId: snapshot.teams[0]!.id,

@@ -16,6 +16,7 @@ import { createInitialSnapshot } from '../snapshot';
 describe('agent-manager lifecycle', () => {
   it('updates the agent folder and clears the old thread mapping', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
     snapshot.agents[0].contextUsage = {
       totalTokens: 397_740,
@@ -67,6 +68,7 @@ describe('agent-manager lifecycle', () => {
 
   it('stores workspace identity and clears it when the folder changes', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const workspace = {
       kind: 'git' as const,
       folder: '/Users/nbonamy/src/codex-claw',
@@ -149,6 +151,7 @@ describe('agent-manager lifecycle', () => {
 
   it('creates agents in the active team and selects the new agent', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     createAgentInSnapshot(snapshot, {
       name: ' Jules ',
@@ -177,6 +180,7 @@ describe('agent-manager lifecycle', () => {
 
   it('creates agents in a requested team from overview add actions', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.teams.push({
       id: 'team-skwad',
       name: 'Skwad',
@@ -205,6 +209,7 @@ describe('agent-manager lifecycle', () => {
 
   it('uses the stable default instead of shared active navigation for legacy creation', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.teams.push({
       id: 'team-skwad',
       name: 'Skwad',
@@ -231,6 +236,7 @@ describe('agent-manager lifecycle', () => {
 
   it('appends an unselected agent without changing active selection', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     const result = createAgentInSnapshot(snapshot, {
       name: 'Background agent',
@@ -255,6 +261,7 @@ describe('agent-manager lifecycle', () => {
 
   it('creates selected quick chats without a folder in the requested team', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.teams.push({
       id: 'team-skwad',
       name: 'Skwad',
@@ -287,6 +294,7 @@ describe('agent-manager lifecycle', () => {
 
   it('creates agents without storing execution connection on the agent', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
 
     createAgentInSnapshot(snapshot, {
@@ -304,6 +312,7 @@ describe('agent-manager lifecycle', () => {
 
   it('stores a blank created agent name as null', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     createAgentInSnapshot(snapshot, {
       name: ' ',
@@ -316,6 +325,7 @@ describe('agent-manager lifecycle', () => {
 
   it('renames working agents without clearing runtime state', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const agent = snapshot.agents[0];
     agent.status = { type: 'working', detail: 'Running tests' };
     agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
@@ -374,6 +384,7 @@ describe('agent-manager lifecycle', () => {
 
   it('clears an edited name without changing the existing agent workspace', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-existing' };
 
     updateAgentFromInput(snapshot, {
@@ -389,6 +400,7 @@ describe('agent-manager lifecycle', () => {
 
   it('updates the Git diff target without changing the agent name', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const previousUpdatedAt = snapshot.agents[0].updatedAt;
 
     updateAgentFromInput(snapshot, {
@@ -405,6 +417,7 @@ describe('agent-manager lifecycle', () => {
 
   it('returns null when updating a missing agent', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     expect(updateAgentFromInput(snapshot, {
       id: 'agent-missing',
@@ -414,6 +427,7 @@ describe('agent-manager lifecycle', () => {
 
   it('updates the preferred application and returns null for a missing agent', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     expect(updateAgentOpenInApplication(
       snapshot,
@@ -430,6 +444,7 @@ describe('agent-manager lifecycle', () => {
 
   it('selects the active agent on its team when switching agents', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     selectAgent(snapshot, 'agent-jesse');
 

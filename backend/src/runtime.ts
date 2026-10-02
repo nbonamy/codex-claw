@@ -9,7 +9,8 @@ import { updateAutomationExecutionAgentConversationInSnapshot } from '@codex-cla
 import { automationSelectionOutputSchema, automationSelectionPrompt, parseAutomationSelection } from '@codex-claw/core/automation-prompts';
 import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { BackendDriverRpc, createDefaultBackendDrivers } from './driver-rpc';
+import { BackendDriverRpc, createBackendDriver, createDefaultBackendDrivers, type BackendDriverRegistryOptions } from './driver-rpc';
+import { ProviderSetup } from './provider-setup';
 import { RemoteClawdClientManager } from './connections/remote-clawd-client';
 import { SshConnectionService } from './connections/ssh-connections';
 import { AutomationRunner } from './automations/runner';
@@ -23,7 +24,6 @@ import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-st
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
 import { warnMain } from './log';
-import { initializeCodexResourceSharing } from './codex-resource-sharing';
 import { loadPluginStatus } from './plugin-status';
 import { AgentGitService } from './git/agent-git-service';
 import { PullRequestMonitor } from './git/pull-request-monitor';
@@ -53,9 +53,12 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const computerUseAvailable = options.features?.computerUse !== false;
   const embeddedBrowserAvailable = options.features?.embeddedBrowser !== false;
   const snapshot = await loadBackendSnapshot();
-  await initializeCodexResourceSharing(snapshot.general.shareCodexSkillsAndPlugins);
   await ensureBackendCodexHome();
-  let pluginStatus = await loadPluginStatus();
+  const providerSetup = new ProviderSetup(snapshot, () => saveBackendSnapshot(snapshot), async backend => {
+    await driverRpc.replaceDriver(backend, () => createBackendDriver(backend, { ...driverOptions, generalSettings: snapshot.general }));
+  });
+  await providerSetup.initialize();
+  let pluginStatus = await loadPluginStatus(snapshot.general.providerHomes?.codex?.homePath);
   const pluginSettings = () => ({
     ...(snapshot.general.plugins ?? { computerUseEnabled: false, chromeEnabled: false }),
     computerUseEnabled: computerUseAvailable && snapshot.general.plugins?.computerUseEnabled === true,
@@ -119,7 +122,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService)],
   });
   const mcpServerUrl = await mcpService.start();
-  const backendDrivers = createDefaultBackendDrivers({
+  const driverOptions: BackendDriverRegistryOptions = {
     clawMcpServerUrl: mcpServerUrl,
     hostedMcpServerUrls: () => mcpService.hostedMcpServerUrls(),
     generalSettings: snapshot.general,
@@ -129,9 +132,11 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
       server?.missionDeveloperInstructions(agent.id),
       visualizeService.developerInstructions(),
     ].filter(Boolean).join('\n\n') || undefined,
-  });
-  const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager);
+  };
+  const backendDrivers = createDefaultBackendDrivers(driverOptions);
+  const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager, backend => server.requireConnectedEngine(backend));
   const automationRunner = new AutomationRunner({
+    requireConnectedEngine: backend => server.requireConnectedEngine(backend),
     getSnapshot: () => snapshot,
     listWorkItems: workIntegrations,
     createWorktree: async (input) => (await worktreeManager.create(input)).worktree,
@@ -141,9 +146,10 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     }),
     saveSnapshot: () => saveBackendSnapshot(snapshot),
     selectWorkItems: async (automation, candidates) => {
+      const backend = await server.requireConnectedEngine(automation.backend ?? 'codex');
       const folder = automation.repositories[0]?.sourceRepositoryPath ?? '';
-      const pickerAgent = snapshot.agents.find((agent) => agent.teamId === automation.teamId && agent.backend === 'codex')
-        ?? createAgentFromInput({ name: null, folder, backend: 'codex', teamId: automation.teamId });
+      const pickerAgent = snapshot.agents.find((agent) => agent.teamId === automation.teamId && agent.backend === backend)
+        ?? createAgentFromInput({ name: null, folder, backend, teamId: automation.teamId });
       const driver = requireBackendDriver(backendDrivers, pickerAgent);
       if (!driver.generateText) {
         throw new Error('The selected automation backend cannot evaluate work item criteria.');
@@ -218,6 +224,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     run: () => pullRequestMonitor.check(),
   });
   server = new ClawBackendServer({
+    providerSetup,
     version: options.version,
     snapshot,
     agentGitService,
@@ -230,7 +237,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     ensureMissionHome: ensureBackendMissionHome,
     deleteMissionHome: deleteBackendMissionHome,
     inspectPluginStatus: async () => {
-      pluginStatus = await loadPluginStatus();
+      pluginStatus = await loadPluginStatus(snapshot.general.providerHomes?.codex?.homePath);
       return pluginStatus;
     },
     sendAgentMessage: (fromAgentId, toAgentId, content) => mcpService.sendMessage(fromAgentId, toAgentId, content),

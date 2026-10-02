@@ -1,4 +1,7 @@
 import { readWorktreeHead } from './git-worktrees';
+import { ProviderConnections } from './provider-connections';
+import { backendCodexHomeDir } from './state';
+import { isProviderConnection, type ProviderAuthentication } from '@codex-claw/core/contracts/provider-setup';
 import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
 import { createVisualizeDebugFixture } from './visualize-debug-fixtures';
@@ -69,6 +72,7 @@ import { VisualizeService, directVisualizationPrompt, generateVisualizationSugge
 import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@codex-claw/core/visualize';
 
 export type ClawBackendServerOptions = {
+  providerSetup?: import('./provider-setup').ProviderSetup;
   version: string;
   pid?: number;
   snapshot?: AppSnapshot;
@@ -163,11 +167,30 @@ export class ClawBackendServer {
   private unsubscribeDriverEvents?: () => void;
   private lastEventSeq = 0;
   private conversationsReconciliation?: Promise<void>;
+  private readonly providerSetup?: import('./provider-setup').ProviderSetup;
+  private readonly providerConnections?: ProviderConnections;
 
   constructor(options: ClawBackendServerOptions) {
+    this.providerSetup = options.providerSetup;
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
     this.snapshot = options.snapshot ?? createEmptySnapshot();
+    if (options.providerSetup) {
+      this.providerConnections = new ProviderConnections({
+        detect: () => options.providerSetup!.list(),
+        enabled: backend => this.snapshot.general.providerEnabled?.[backend] !== false,
+        authenticate: backend => this.authenticateProvider(backend),
+        changed: connections => {
+          const reconnected = connections.filter(connection => connection.connected && connection.installed && connection.enabled !== false && !connection.checking
+            && !this.snapshot.providerConnections?.some(previous => previous.backend === connection.backend && previous.connected && previous.installed && previous.enabled !== false));
+          this.snapshot.providerConnections = connections;
+          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          for (const agent of this.snapshot.agents) {
+            if (reconnected.some(connection => connection.backend === agent.backend)) this.agentPrompts?.drain(agent.id);
+          }
+        },
+      });
+    }
     this.missions = new MissionService(this.snapshot, async snapshot => { await options.saveSnapshot?.(snapshot); });
     this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.projectCreation = new ProjectCreationService({
@@ -200,8 +223,10 @@ export class ClawBackendServer {
     this.sshConnections = options.sshConnections ?? new SshConnectionService();
     this.remoteClients = options.remoteClients ?? new RemoteClawdClientManager();
     this.sendAgentMessage = options.sendAgentMessage;
-    this.configureCodexResourceSharing = options.configureCodexResourceSharing ?? setCodexResourceSharing;
-    this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? getCodexResourceSharingStatus;
+    this.configureCodexResourceSharing = options.configureCodexResourceSharing ?? (options.providerSetup
+      ? input => options.providerSetup!.setResourceSharing('codex', input) : setCodexResourceSharing);
+    this.inspectCodexResourceSharing = options.inspectCodexResourceSharing ?? (options.providerSetup
+      ? () => options.providerSetup!.getResourceSharingStatus('codex') : getCodexResourceSharingStatus);
     this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
     this.agentGitService = options.agentGitService ?? new AgentGitService();
     this.agentWorkspaces = new AgentWorkspaceService({
@@ -226,6 +251,7 @@ export class ClawBackendServer {
       refreshWorkspaceIdentity: async (agentId) => { await this.agentWorkspaces.refreshIdentity(agentId); },
     });
     this.agentPrompts = new AgentPromptManager({
+      isEngineConnected: agent => this.snapshot.providerConnections?.some(connection => connection.backend === agent.backend && connection.connected && connection.installed && connection.enabled !== false) === true,
       getSnapshot: () => this.snapshot,
       driverForAgent: (agent) => this.backendDriverForAgent(agent),
       applyEvent: (event) => this.applyAndEmitBackendEvent(event),
@@ -327,7 +353,6 @@ export class ClawBackendServer {
     this.remoteTeams = new RemoteTeamService({
       clients: this.remoteClients,
       getSnapshot: () => this.snapshot,
-      ensureClaudeInstalled: (connection) => this.sshConnections.ensureRemoteClaudeInstalled(connection.host).then(() => undefined),
       onForwardedEvent: (connectionId, event) => this.forwardRemoteBackendEvent(connectionId, event),
       onProjectedSnapshotChanged: () => { void this.emitProjectedSnapshot(); },
     });
@@ -404,7 +429,7 @@ export class ClawBackendServer {
     return this.projectCreation.create({
       name,
       teamId: caller.teamId,
-      backend: resolveAgentBackend(this.snapshot.general, backend ?? caller.backend),
+      backend: resolveAgentBackend(this.snapshot, backend ?? caller.backend),
       backendDefaults: !backend || backend === caller.backend ? caller.backendDefaults : undefined,
       prompt,
     }, payload => this.applyAndEmitBackendEvent({ agentId: caller.id, type: 'agentCreation.progress', payload }));
@@ -494,14 +519,33 @@ export class ClawBackendServer {
   }
 
   async initialize(): Promise<void> {
+    await this.providerConnections?.refresh();
     await this.initializeSourceFolderIfNeeded();
-    await this.ensureRemoteControlStatus();
+    if (this.snapshot.providerConnections?.some(provider => provider.backend === 'codex' && provider.connected)) await this.ensureRemoteControlStatus();
     await this.agentWorkspaces.reconcile();
     await this.reconcileConversationsOnce();
     await this.subagentIdentities.backfill();
     await this.missionExecution.refreshOwnedSkills();
     await this.missionExecution.recoverInterruptedRuns();
     for (const agent of this.snapshot.agents) await this.codeReviews?.resumeInterrupted(agent);
+  }
+
+  async requireConnectedEngine(backend?: Agent['backend']): Promise<Agent['backend']> {
+    await this.providerConnections?.refresh();
+    return resolveAgentBackend(this.snapshot, backend);
+  }
+
+  private async authenticateProvider(backend: Agent['backend'], action: 'check' | 'cancel' | 'logout' = 'check', loginId?: string): Promise<ProviderAuthentication> {
+    return await this.requireDriverRpc().handle(backendMethods.driverProviderAuthentication, { backend, action, ...(loginId ? { loginId } : {}) }) as ProviderAuthentication;
+  }
+
+  private async observeAuthentication(authentication: ProviderAuthentication): Promise<void> {
+    const { kind: backend, connected } = authentication;
+    if (connected) {
+      this.snapshot.general.providerEnabled = { ...this.snapshot.general.providerEnabled, [backend]: true };
+    }
+    this.providerConnections?.observe(backend, connected, authentication);
+    await this.persistAndEmitSnapshot();
   }
 
   async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {
@@ -537,6 +581,23 @@ export class ClawBackendServer {
       request.params = { ...params, input: { ...input, teamId } };
     }
     const creation: { id?: string } = {};
+    const startsWork = createsAgent || [backendMethods.agentPromptSend, backendMethods.agentPromptSteer,
+      backendMethods.agentUpdate, backendMethods.sourceWorktreeCreate, backendMethods.missionExecute].some(method => method === message.method);
+    if (startsWork && this.providerConnections) {
+      const effectiveParams = isRecord(request.params) ? request.params : {};
+      const input = isRecord(effectiveParams.input) ? effectiveParams.input : {};
+      const agent = (before ?? this.remoteTeams.clientSnapshotFromKnownRemotes()).agents.find(candidate => candidate.id === (params?.agentId ?? input.id));
+      const teamId = typeof input.teamId === 'string' ? input.teamId : agent?.teamId;
+      const remote = params?.remoteConnectionId || input.remoteConnectionId || this.snapshot.teams.find(team => team.id === teamId)?.remoteConnectionId;
+      if (!remote && (message.method !== backendMethods.agentUpdate || input.backend !== undefined)) {
+        try {
+          const requested = input.backend === 'codex' || input.backend === 'claude' ? input.backend : agent?.backend;
+          await this.requireConnectedEngine(requested);
+        } catch (error) {
+          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error));
+        }
+      }
+    }
     const response = await this.dispatchMessage(request, (id) => { creation.id = id; });
     if (response && 'result' in response) {
       if (isAppSnapshot(response.result) && (createsAgent || createsTeam)) {
@@ -782,9 +843,7 @@ export class ClawBackendServer {
         return createClawRpcResult(message.id, await this.sshConnections.listHostCandidates());
       case backendMethods.connectionsSshCreate: {
         const input = requireAddSshConnectionInput(message.params);
-        const connection = await this.sshConnections.createConnection(input, {
-          claudeCodeEnabled: this.snapshot.general.claudeCodeEnabled,
-        });
+        const connection = await this.sshConnections.createConnection(input);
         this.snapshot.remoteConnections.connections = [
           ...this.snapshot.remoteConnections.connections.filter((candidate) => candidate.host !== connection.host),
           connection,
@@ -799,9 +858,7 @@ export class ClawBackendServer {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
         }
         if (message.method === backendMethods.connectionsRuntimeInspect) {
-          const inspected = await this.sshConnections.inspectVersions(connection, {
-            claudeCodeEnabled: this.snapshot.general.claudeCodeEnabled,
-          });
+          const inspected = await this.sshConnections.inspectVersions(connection);
           // Do not replace a connection edited or deleted while SSH was probing.
           this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
             candidate === connection ? { ...candidate, clawdVersion: inspected.clawdVersion, codexVersion: inspected.codexVersion, detail: inspected.detail } : candidate
@@ -809,9 +866,7 @@ export class ClawBackendServer {
           return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         await this.remoteClients.closeConnection(connectionId);
-        const checked = await this.sshConnections.checkConnection(connection, {
-          claudeCodeEnabled: this.snapshot.general.claudeCodeEnabled,
-        });
+        const checked = await this.sshConnections.checkConnection(connection);
         this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
           candidate.id === connectionId ? checked : candidate
         ));
@@ -910,7 +965,7 @@ export class ClawBackendServer {
         }
         const team = this.snapshot.teams.find(candidate => candidate.id === input.teamId);
         if (!team) throw new Error(`Team not found: ${input.teamId}`);
-        const created = await this.projectCreation.create({ ...input, teamId: team.id, backend: resolveAgentBackend(this.snapshot.general, input.backend) });
+        const created = await this.projectCreation.create({ ...input, teamId: team.id, backend: resolveAgentBackend(this.snapshot, input.backend) });
         onCreated(created.agent.id);
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
@@ -1861,8 +1916,15 @@ export class ClawBackendServer {
 
       case backendMethods.settingsUpdate: {
         const { policy, preferences } = splitSettingsInput(requireSettingsUpdateInput(message.params));
+        if (policy.general && 'providerHomes' in policy.general) throw new Error('Provider homes must be changed through provider setup.');
         if (Object.keys(preferences).length) throw new Error('Presentation settings must use client/preferences/update.');
         updateSettingsInSnapshot(this.snapshot, policy);
+        if (policy.general?.providerEnabled) this.providerConnections?.updateEnabled();
+        if (policy.general?.codexBinaryPath !== undefined) {
+          this.providerSetup?.invalidateInstallation('codex');
+          this.providerConnections?.invalidate('codex');
+          await this.providerConnections?.refresh();
+        }
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.engineInstructionsRead: {
@@ -1880,24 +1942,97 @@ export class ClawBackendServer {
       case backendMethods.settingsCodexResourceSharingGet:
         return createClawRpcResult(
           message.id,
-          await this.inspectCodexResourceSharing(this.snapshot.general.shareCodexSkillsAndPlugins),
+          await this.inspectCodexResourceSharing(this.snapshot.general.providerHomes?.codex?.shareSkills !== false),
         );
       case backendMethods.settingsCodexResourceSharingSet: {
         const input = requireCodexResourceSharingInput(message.params);
+        if (this.snapshot.general.providerHomes?.codex?.isolated === false) throw new Error('Codex uses your existing setup, including its skills and plugins.');
         if (hasActiveChats(this.snapshot) && !(input.enabled === false && input.mode === 'keep')) {
           throw new Error('Skills and plugins sharing cannot be changed while chats are running.');
         }
         await this.configureCodexResourceSharing(input);
-        if (this.snapshot.general.shareCodexSkillsAndPlugins !== input.enabled) {
-          updateSettingsInSnapshot(this.snapshot, {
-            general: { shareCodexSkillsAndPlugins: input.enabled },
-          });
-        }
+        const home = this.snapshot.general.providerHomes?.codex ?? { isolated: true, homePath: backendCodexHomeDir() };
+        this.snapshot.general.providerHomes = { ...this.snapshot.general.providerHomes, codex: { ...home, shareSkills: input.enabled } };
         return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.settingsPluginStatusGet:
         return createClawRpcResult(message.id, await this.inspectPluginStatus());
+      case backendMethods.providerSetupGet: {
+        const connectionId = requireOptionalConnectionId(message.params);
+        if (connectionId) return createClawRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method));
+        if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
+        return createClawRpcResult(message.id, this.providerSetup.list());
+      }
+      case backendMethods.providerEnabledSet: {
+        const input = requireRecord(message.params);
+        if ((input.backend !== 'codex' && input.backend !== 'claude') || typeof input.enabled !== 'boolean') throw new Error('Invalid engine availability setting.');
+        const connectionId = requireOptionalConnectionId(message.params);
+        if (connectionId) {
+          const providers = await this.remoteTeams.request(connectionId, message.method, { backend: input.backend, enabled: input.enabled });
+          if (!Array.isArray(providers) || !providers.every(isProviderConnection)) throw new Error('Remote engine connections are unavailable. Update the remote runtime.');
+          const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
+          if (connection) connection.providerConnections = providers;
+          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          return createClawRpcResult(message.id, providers);
+        }
+        if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
+        updateSettingsInSnapshot(this.snapshot, { general: { providerEnabled: { ...this.snapshot.general.providerEnabled, [input.backend]: input.enabled } } });
+        this.providerConnections.updateEnabled();
+        await this.persistAndEmitSnapshot();
+        return createClawRpcResult(message.id, this.providerConnections.list());
+      }
+      case backendMethods.providerUsageGet: {
+        const backend = requireRecord(message.params).backend;
+        if (backend !== 'codex' && backend !== 'claude') throw new Error('Unknown provider.');
+        if (!this.snapshot.providerConnections?.some(item => item.backend === backend && item.installed && item.connected && item.enabled !== false)) return createClawRpcResult(message.id, null);
+        const result = await this.requireDriverRpc().handle(backendMethods.driverAccountRateLimitsGet, { backend }) as { supported: boolean; rateLimits?: import('@codex-claw/core/contracts').AccountRateLimits | null };
+        const limits = result.supported ? result.rateLimits ?? null : this.snapshot.backendAccountRateLimits?.[backend] ?? (backend === 'codex' ? this.snapshot.accountRateLimits : undefined) ?? null;
+        if (limits) this.applyAndEmitBackendEvent({ type: 'account.rateLimitsUpdated', backend, payload: { rateLimits: limits } });
+        return createClawRpcResult(message.id, limits);
+      }
+      case backendMethods.providerConnectionsGet: {
+        const connectionId = requireOptionalConnectionId(message.params);
+        if (connectionId) {
+          let providers: unknown;
+          try { providers = await this.remoteTeams.request(connectionId, backendMethods.providerConnectionsGet); }
+          catch { throw new Error('Could not read remote engine connections. Check the connection and update the remote runtime.'); }
+          if (!Array.isArray(providers) || !providers.every(isProviderConnection)) throw new Error('Remote engine connections are unavailable. Update the remote runtime.');
+          const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
+          if (connection) connection.providerConnections = providers;
+          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          return createClawRpcResult(message.id, providers);
+        }
+        if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
+        return createClawRpcResult(message.id, await this.providerConnections.refresh());
+      }
+      case backendMethods.providerSetupConfigure:
+      case backendMethods.providerInstall: {
+        const connectionId = requireOptionalConnectionId(message.params);
+        if (connectionId && message.method === backendMethods.providerInstall) {
+          const input = requireRecord(message.params);
+          return createClawRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method, { backend: input.backend }));
+        }
+        if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
+        const input = requireRecord(message.params);
+        if (input.backend !== 'codex' && input.backend !== 'claude') throw new Error('Unknown provider.');
+        this.providerConnections?.invalidate(input.backend);
+        let result;
+        if (message.method === backendMethods.providerInstall) result = await this.providerSetup.install(input.backend);
+        else {
+          const choice = requireRecord(input.choice);
+          if (typeof choice.isolated !== 'boolean' || typeof choice.shareSkills !== 'boolean') throw new Error('Invalid provider setup.');
+          result = await this.providerSetup.configure(input.backend, { isolated: choice.isolated, shareSkills: choice.shareSkills });
+        }
+        await this.providerConnections?.refresh();
+        await this.persistAndEmitSnapshot();
+        return createClawRpcResult(message.id, result);
+      }
       case backendMethods.claudeAuthenticationGet: {
+        if (!isRecord(message.params) || message.params.connectionId === undefined) {
+          const auth = await this.authenticateProvider('claude');
+          await this.observeAuthentication(auth);
+          return createClawRpcResult(message.id, auth.state);
+        }
         const connectionId = requireConnectionId(message.params);
         const connection = this.snapshot.remoteConnections.connections.find((candidate) => candidate.id === connectionId);
         if (!connection) {
@@ -1906,7 +2041,7 @@ export class ClawBackendServer {
         if (connection.status !== 'ready') {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection is not ready: ${connection.name}`);
         }
-        return createClawRpcResult(message.id, await this.sshConnections.getRemoteClaudeAuthentication(connection.host));
+        return createClawRpcResult(message.id, await this.remoteTeams.request(connectionId, backendMethods.claudeAuthenticationGet));
       }
       case backendMethods.codexAuthenticationGet:
       case backendMethods.codexLoginCancel:
@@ -1923,26 +2058,28 @@ export class ClawBackendServer {
         if (remoteConnectionId && message.method === backendMethods.codexLoginCancel && !loginId) {
           return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Remote cancellation requires a loginId.');
         }
-        const driverMethod = message.method === backendMethods.codexAuthenticationGet
-          ? backendMethods.driverCodexAuthenticationGet
-          : message.method === backendMethods.codexLoginCancel
-            ? backendMethods.driverCodexLoginCancel
-            : backendMethods.driverCodexChatGptDeviceCodeLoginStart;
         const params = loginId ? { loginId } : undefined;
         return this.respondInLocation(message.id,
           this.locationFromRemoteConnectionId(remoteConnectionId), message.method, params,
-          () => this.requireDriverRpc().handle(driverMethod, params));
+          async () => {
+            if (message.method === backendMethods.codexChatGptDeviceCodeLoginStart) {
+              return this.requireDriverRpc().handle(backendMethods.driverCodexChatGptDeviceCodeLoginStart, params);
+            }
+            const auth = await this.authenticateProvider('codex', message.method === backendMethods.codexLoginCancel ? 'cancel' : 'check', loginId as string | undefined);
+            await this.observeAuthentication(auth);
+            return auth.state;
+          });
       }
       case backendMethods.codexChatGptLoginStart:
         return createClawRpcResult(
           message.id,
           await this.requireDriverRpc().handle(backendMethods.driverCodexChatGptLoginStart, undefined),
         );
-      case backendMethods.codexLogout:
-        return createClawRpcResult(
-          message.id,
-          await this.requireDriverRpc().handle(backendMethods.driverCodexLogout, undefined),
-        );
+      case backendMethods.codexLogout: {
+        const auth = await this.authenticateProvider('codex', 'logout');
+        await this.observeAuthentication(auth);
+        return createClawRpcResult(message.id, auth.state);
+      }
       case backendMethods.sourceRepositoriesList: {
         return this.respondInLocation(
           message.id,
@@ -2271,6 +2408,7 @@ export class ClawBackendServer {
   }
 
   async close(): Promise<void> {
+    this.providerConnections?.close();
     this.agentWorkspaces.close();
     this.delegatedWorkReports.close();
     this.agentPrompts.close();
@@ -2424,6 +2562,8 @@ export class ClawBackendServer {
   }
 
   private forwardRemoteBackendEvent(connectionId: string, event: ClawBackendEvent): void {
+    // The account menu describes local engines, not accounts on SSH hosts.
+    if (event.type === 'account.rateLimitsUpdated') return;
     // Catalog broadcasts belong to one host. Scope them to its projected agents
     // before crossing the client boundary, which otherwise treats them as local.
     if (!event.agentId && (event.type === 'models.changed' || event.type === 'skills.changed')) {

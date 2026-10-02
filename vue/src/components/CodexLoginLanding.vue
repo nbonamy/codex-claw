@@ -39,25 +39,40 @@
             {{ t('auth.signInTitleDetailSecond') }}
           </span>
         </h1>
-        <el-button
-          type="primary"
-          size="large"
-          :loading="loading"
-          @click="emit('login')"
-        >
-          {{ loading ? t('auth.waiting') : t('auth.continue') }}
-        </el-button>
-        <button
-          v-if="cancellable"
-          class="codex-login__cancel"
-          type="button"
-          :disabled="cancelling"
-          @click="emit('cancel')"
-        >
-          {{ t('auth.cancel') }}
-        </button>
-        <p v-else class="codex-login__description">{{ t('auth.signInDescription') }}</p>
+        <p class="codex-login__description">{{ t('auth.signInDescription') }}</p>
+        <div class="codex-login__providers">
+          <div class="codex-login__provider">
+          <el-button size="large" :disabled="loading || (codexConnected && codexEnabled) || continuing || Boolean(updatingProvider)" @click="emit('login')">
+            <BackendIcon backend="codex" />
+            {{ t(codexConnected ? (codexEnabled ? 'auth.codexConnected' : 'auth.enableCodex') : 'auth.connectCodex') }}
+          </el-button>
+          <div class="codex-login__detection">
+            <button v-if="cancellable" class="codex-login__cancel" type="button" :disabled="cancelling" @click="emit('cancel')"><i class="codex-login__spinner" aria-hidden="true" />{{ t('auth.cancel') }}</button>
+            <template v-else>
+            <span v-if="updatingProvider === 'codex'" class="codex-login__checking" role="status" aria-busy="true"><i class="codex-login__spinner" aria-hidden="true" /> {{ t('auth.checking') }}</span>
+            <span v-else-if="codexConnected || detected('codex')"><CheckIcon aria-hidden="true" /> {{ t(codexConnected ? 'auth.connected' : 'auth.detected') }}</span>
+            <button v-if="updatingProvider !== 'codex'" type="button" :disabled="loading || continuing || Boolean(updatingProvider)" @click="emit('customize', 'codex')">{{ t('auth.customize') }}</button>
+            </template>
+          </div>
+          </div>
+          <div class="codex-login__provider">
+          <el-button size="large" :disabled="claudeLoading || (claudeConnected && claudeEnabled) || continuing || Boolean(updatingProvider)" @click="emit('connect-claude')">
+            <BackendIcon backend="claude" />
+            {{ t(claudeConnected ? (claudeEnabled ? 'auth.claudeConnected' : 'auth.enableClaude') : 'auth.connectClaude') }}
+          </el-button>
+          <div class="codex-login__detection">
+            <span v-if="updatingProvider === 'claude' || claudeLoading" class="codex-login__checking" role="status" aria-busy="true"><i class="codex-login__spinner" aria-hidden="true" /> {{ t('auth.checking') }}</span>
+            <span v-else-if="claudeConnected || detected('claude')"><CheckIcon aria-hidden="true" /> {{ t(claudeConnected ? 'auth.connected' : 'auth.detected') }}</span>
+            <button v-if="updatingProvider !== 'claude' && !claudeLoading" type="button" :disabled="continuing || Boolean(updatingProvider)" @click="emit('customize', 'claude')">{{ t('auth.customize') }}</button>
+          </div>
+          </div>
+          <el-button class="codex-login__continue" size="large" :loading="continuing" :disabled="Boolean(updatingProvider) || !(codexConnected && codexEnabled || claudeConnected && claudeEnabled)" @click="emit('continue')">
+            {{ t('auth.continue') }}
+          </el-button>
+        </div>
         <p v-if="error" class="codex-login__error" role="alert">{{ error }}</p>
+        <p v-if="claudeError" class="codex-login__error" role="alert">{{ claudeError }}</p>
+        <p v-if="setupError" class="codex-login__error" role="alert">{{ setupError }}</p>
       </template>
     </div>
   </OnboardingLandingFrame>
@@ -66,21 +81,38 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import OnboardingLandingFrame from './OnboardingLandingFrame.vue';
+import BackendIcon from './BackendIcon.vue';
+import { CheckIcon } from '../shared/icons/app-icons';
+import type { AgentBackend } from '@codex-claw/core/contracts';
+import type { ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
 
 const appIconUrl = new URL('../../assets/icon.png', import.meta.url).href;
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
+  providerSetup?: ProviderSetupStatus[];
+  updatingProvider?: AgentBackend | null;
+  setupError?: string | null;
   variant?: 'connecting' | 'sign-in';
   loading?: boolean;
   cancellable?: boolean;
   cancelling?: boolean;
   error?: string | null;
+  claudeError?: string | null;
+  codexConnected?: boolean;
+  claudeConnected?: boolean;
+  codexEnabled?: boolean;
+  claudeEnabled?: boolean;
+  claudeLoading?: boolean;
+  continuing?: boolean;
 }>(), {
   variant: 'sign-in',
+  codexEnabled: true,
+  claudeEnabled: true,
 });
 
-const emit = defineEmits<{ cancel: []; login: [] }>();
+const emit = defineEmits<{ cancel: []; login: []; 'connect-claude': []; continue: []; customize: [backend: AgentBackend] }>();
 const { t } = useI18n();
+const detected = (backend: AgentBackend) => props.providerSetup?.some(setup => setup.backend === backend && setup.installed);
 </script>
 
 <style scoped>
@@ -125,12 +157,74 @@ const { t } = useI18n();
 }
 
 .codex-login .el-button {
-  margin-top: var(--space-24);
+  margin-top: var(--space-12);
   -webkit-app-region: no-drag;
 }
 
+.codex-login__providers {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+}
+
+.codex-login__detection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: var(--space-6);
+  min-height: var(--line-height-20);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-20);
+}
+
+.codex-login__detection span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-success);
+}
+
+.codex-login__detection svg { width: 14px; height: 14px; }
+
+.codex-login__detection .codex-login__checking {
+  color: var(--color-text-muted);
+}
+
+.codex-login__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border);
+  border-top-color: currentColor;
+  border-radius: var(--radius-full);
+  animation: codex-login-spin 900ms linear infinite;
+}
+
+@keyframes codex-login-spin {
+  to { transform: rotate(360deg); }
+}
+
+.codex-login__detection button {
+  -webkit-app-region: no-drag;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.codex-login__detection button:hover { color: var(--color-text); }
+
+.codex-login__providers .el-button + .el-button {
+  margin-left: 0;
+}
+
+.codex-login__providers :deep(.backend-icon) {
+  margin-right: var(--space-6);
+}
+
 .codex-login__description {
-  margin: var(--space-6) 0 0;
+  margin: var(--space-12) 0 0;
   color: var(--color-text-muted);
   line-height: var(--line-height-20);
 }
@@ -172,25 +266,15 @@ const { t } = useI18n();
   animation: codex-login-status-pulse 1.4s ease-in-out infinite;
 }
 
-.codex-login__cancel {
-  margin-top: var(--space-6);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-size: var(--font-size-15);
-  line-height: var(--line-height-20);
-  -webkit-app-region: no-drag;
-}
-
-.codex-login__cancel:hover:not(:disabled) {
-  color: var(--color-text);
-}
-
 .codex-login__cancel:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+.codex-login__cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .codex-login__error {
@@ -226,6 +310,10 @@ const { t } = useI18n();
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .codex-login__spinner {
+    animation: none;
+  }
+
   .codex-login__progress-segment {
     animation: none;
     transform: translateX(150%);

@@ -28,6 +28,7 @@ import {
   type ClaudeTurnTransport,
 } from './transport';
 import { claudeMessageSessionId, type ClaudeSdkMessage } from './protocol';
+import { claudeConfigDirectoryOverride } from './config-directory';
 
 export type ClaudeAgentSdkTransportOptions = {
   command?: string;
@@ -244,6 +245,36 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     } finally {
       input.close();
       queryRuntime.close();
+    }
+  }
+
+  async generateText(input: import('@codex-claw/core/backend-driver').BackendTextGenerationInput): Promise<{ text: string }> {
+    if (this.closing) throw new Error('Claude transport is closed.');
+    const prompt = new AsyncPushQueue<SDKUserMessage>();
+    const sessionId = this.createSessionId();
+    const runtime = this.createQuery({
+      prompt,
+      options: {
+        ...claudeQueryOptions({ cwd: input.cwd, prompt: input.prompt, appendSystemPrompt: input.developerInstructions }, sessionId, null, denyInspectionToolUse, this.options),
+        persistSession: false,
+        tools: [],
+        mcpServers: {},
+        ...(input.outputSchema ? { outputFormat: { type: 'json_schema' as const, schema: input.outputSchema as Record<string, unknown> } } : {}),
+      },
+    });
+    this.inspectionQueries.add(runtime);
+    try {
+      prompt.push({ type: 'user', session_id: sessionId, parent_tool_use_id: null, message: { role: 'user', content: input.prompt } });
+      for await (const message of runtime) {
+        if (message.type !== 'result') continue;
+        if (message.subtype !== 'success' || message.is_error) throw new Error('Claude text generation failed.');
+        return { text: message.structured_output !== undefined ? JSON.stringify(message.structured_output) : message.result };
+      }
+      throw new Error('Claude text generation ended without a result.');
+    } finally {
+      this.inspectionQueries.delete(runtime);
+      prompt.close();
+      runtime.close();
     }
   }
 
@@ -794,6 +825,9 @@ function claudeEnvironment(
   runtimeDiscovery: RuntimeDiscoveryDependencies | undefined,
 ): NodeJS.ProcessEnv {
   const env = withDiscoveredRuntimePath(overrides, runtimeDiscovery);
+  // Session mutations run in this process, so query-only home overrides would
+  // send reads and deletes to a different store than the running conversation.
+  env.CLAUDE_CONFIG_DIR = claudeConfigDirectoryOverride();
   delete env.NODE_OPTIONS;
   env.CLAUDE_AGENT_SDK_CLIENT_APP = 'codex-claw';
   return env;

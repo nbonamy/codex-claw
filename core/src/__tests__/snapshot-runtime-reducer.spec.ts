@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { decodeClawBackendEvent } from '../backend-protocol/events';
+import { decodeAppSnapshot } from '../snapshot-guards';
 import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
   createInitialSnapshot,
@@ -345,6 +346,18 @@ describe('snapshot runtime reducer', () => {
       planType: 'pro',
       rateLimitReachedType: null,
     });
+  });
+
+  it('does not let Claude quota updates replace Codex account state', () => {
+    const snapshot = createInitialSnapshot();
+    const limits = { limitId: null, limitName: null, primary: null, secondary: null, credits: null, individualLimit: null, planType: null, rateLimitReachedType: null };
+    applyMainEventToSnapshot(snapshot, { seq: 1, type: 'account.rateLimitsUpdated', backend: 'codex', payload: { rateLimits: { ...limits, primary: { usedPercent: 5, windowDurationMins: 300, resetsAt: null } } }, occurredAt: '' });
+    applyMainEventToSnapshot(snapshot, { seq: 2, type: 'account.rateLimitsUpdated', backend: 'claude', payload: { rateLimits: { ...limits, primary: { usedPercent: 20, windowDurationMins: 300, resetsAt: null } } }, occurredAt: '' });
+    expect(snapshot.accountRateLimits?.primary?.usedPercent).toBe(5);
+    const restored = decodeAppSnapshot(JSON.parse(JSON.stringify(snapshot)))?.value;
+    expect(restored?.backendAccountRateLimits?.codex?.primary?.usedPercent).toBe(5);
+    expect(restored?.backendAccountRateLimits?.claude?.primary?.usedPercent).toBe(20);
+    expect(decodeAppSnapshot({ ...snapshot, backendAccountRateLimits: { claude: 'invalid' } })).toBeNull();
   });
 
   it('rejects legacy flat account rate-limit payloads', () => {

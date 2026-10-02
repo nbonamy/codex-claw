@@ -23,6 +23,7 @@ describe('ClawMcpService', () => {
 
   it('offers create-project only to Quick Chats and routes the handoff through the shared project operation', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     createQuickChatInSnapshot(snapshot, { teamId: 'team-codex-claw' }, undefined, 'agent-quick-chat', { select: false });
     const createProject = vi.fn().mockResolvedValue({
       repository: { name: 'new-product', path: '/src/new-product', worktrees: [] },
@@ -60,6 +61,7 @@ describe('ClawMcpService', () => {
 
   it('serializes an explicit null when set-status clears the current text', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: unknown[] = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
@@ -79,6 +81,7 @@ describe('ClawMcpService', () => {
 
   it('clears the current status when the agent turn ends', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: any[] = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
@@ -117,6 +120,7 @@ describe('ClawMcpService', () => {
 
   it('finishes turns by clearing status and replacing the proposed action in one update', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: any[] = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
@@ -158,6 +162,7 @@ describe('ClawMcpService', () => {
 
   it('adds only model-owned finding actions to a scoped review context', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     service = new ClawMcpService({ snapshot });
     const ordinaryUrl = await service.start();
     const reportFinding = vi.fn().mockResolvedValue({ id: 'finding-1' });
@@ -334,6 +339,7 @@ describe('ClawMcpService', () => {
 
   it('serves Claw collaboration tools from clawd and delivers teammate messages through backend drivers', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: unknown[] = [];
     const sendPrompt = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-jesse' },
@@ -386,6 +392,7 @@ describe('ClawMcpService', () => {
 
   it('exposes mission tools only to the active mission worker over HTTP', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     let active = true;
     const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
     service = new ClawMcpService({
@@ -439,6 +446,7 @@ describe('ClawMcpService', () => {
 
   it('attaches a mode-specific tool module through the service extension seam', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     service = new ClawMcpService({
       snapshot,
       toolModuleProviders: [{
@@ -469,6 +477,7 @@ describe('ClawMcpService', () => {
 
   it('advertises Visualize tools before the pane opens while rejecting inactive calls', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const visualize = new VisualizeService({
       snapshot,
       generatedImagesRoot: process.cwd(),
@@ -512,6 +521,7 @@ describe('ClawMcpService', () => {
 
   it('exposes the same message delivery path to backend-owned debug fixtures', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const sendPrompt = vi.fn().mockResolvedValue({
       backendSession: { kind: 'codex', threadId: 'thread-jesse' },
       turnId: 'turn-jesse',
@@ -530,6 +540,7 @@ describe('ClawMcpService', () => {
 
   it('steers teammate messages into a recipient with an active turn', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;
     recipient.status = { type: 'working' };
     recipient.backendSession = { kind: 'codex', threadId: 'thread-jesse' };
@@ -557,6 +568,7 @@ describe('ClawMcpService', () => {
 
   it('shows busy teammate messages in the backend-owned queue until it reports dequeue', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const recipient = snapshot.agents.find((agent) => agent.id === 'agent-jesse')!;
     recipient.status = { type: 'working' };
     const events: any[] = [];
@@ -605,6 +617,7 @@ describe('ClawMcpService', () => {
 
   it('marks collaboration messages already submitted when an idle delivery fails', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: any[] = [];
     const sendPrompt = vi.fn().mockRejectedValue(new Error('transport disconnected'));
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
@@ -708,6 +721,7 @@ describe('ClawMcpService', () => {
 
   it('displays generated Markdown, requests celebrations, and creates agents through the service boundary', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.claudeCodeEnabled = true;
     const events: any[] = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
@@ -791,6 +805,7 @@ describe('ClawMcpService', () => {
 
   it('creates a background agent and starts its initial prompt as one MCP operation', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0]!.backendDefaults = {
       kind: 'codex',
       model: 'gpt-5.6-sol',
@@ -891,6 +906,7 @@ describe('ClawMcpService', () => {
 
   it('lets create-agent override inherited model settings and avoids cross-backend inheritance', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.claudeCodeEnabled = true;
     snapshot.agents[0]!.backendDefaults = {
       kind: 'codex',
@@ -924,6 +940,7 @@ describe('ClawMcpService', () => {
 
   it('leaves celebration display policy to the receiving client', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.celebrationsEnabled = false;
     const events: Array<{ type?: string }> = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
@@ -948,6 +965,7 @@ describe('ClawMcpService', () => {
 
   it('emits celebration requests independently of legacy shared selection', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.activeAgentId = 'agent-dina';
     const events: Array<{ type?: string }> = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
@@ -972,6 +990,7 @@ describe('ClawMcpService', () => {
 
   it('retains global speech enablement but delegates selection, mute and voice to the client', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const queueSpokenAnnouncement = vi.fn().mockResolvedValue({ queued: true });
     service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
     const url = await service.start();
@@ -1034,6 +1053,7 @@ describe('ClawMcpService', () => {
 
   it('queues spoken announcements only for dictated prompts when configured', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.spokenAnnouncementsEnabled = true;
     snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = true;
     snapshot.activeAgentId = 'agent-dina';
@@ -1070,6 +1090,7 @@ describe('ClawMcpService', () => {
 
   it('keeps TTS failures best-effort and rejects invalid MCP text before routing', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.spokenAnnouncementsEnabled = true;
     snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
     snapshot.activeAgentId = 'agent-dina';
@@ -1094,6 +1115,7 @@ describe('ClawMcpService', () => {
 
   it('keeps client-side playback suppression private from the model', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.spokenAnnouncementsEnabled = true;
     snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
     snapshot.activeAgentId = 'agent-dina';
@@ -1115,6 +1137,7 @@ describe('ClawMcpService', () => {
 
   it('keeps celebrations enabled when a migrated live snapshot omits the setting', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     delete (snapshot.general as Partial<typeof snapshot.general>).celebrationsEnabled;
     const events: Array<{ type?: string }> = [];
     service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
@@ -1133,6 +1156,7 @@ describe('ClawMcpService', () => {
 
   it('updates only the caller-owned assignment and requires blocked context', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12'] = {
       provider: 'github',
       itemId: 'nbonamy/codex-claw#12',
@@ -1298,6 +1322,7 @@ function createAutomationSnapshot(input: {
   createdAgents: Automation['executionLog'][number]['createdAgents'];
 }): AppSnapshot {
   const snapshot = createEmptySnapshot();
+  snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
   const targetTeamId = 'team-codex-claw';
   const createdAgentIds = input.createdAgents.map((createdAgent) => createdAgent.agentId);
   snapshot.teams[0] = {

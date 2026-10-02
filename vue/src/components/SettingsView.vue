@@ -32,6 +32,13 @@
         <SettingsPersonalizationPanel v-else-if="activeTab === 'personalization'" />
         <SettingsCodexPanel
           v-else-if="activeTab === 'codex'"
+          :connected="codexConnected"
+          :set-enabled="enabled => setProviderEnabled?.('codex', enabled)"
+          :connection-busy="codexConnectionBusy"
+          :login-pending="codexLoginPending"
+          :connection-error="codexConnectionError"
+          @connect="connectCodex"
+          @cancel="cancelCodexLogin"
           :choose-codex-binary="chooseCodexBinary"
           :launch-chat-gpt-app="launchChatGptApp"
           :settings="generalSettings"
@@ -41,8 +48,12 @@
         />
         <SettingsClaudeCodePanel
           v-else-if="activeTab === 'claude-code'"
-          :settings="generalSettings"
-          :update-settings="updateSettings"
+          :connected="claudeConnected"
+          :enabled="generalSettings.providerEnabled?.claude !== false"
+          :set-enabled="enabled => setProviderEnabled?.('claude', enabled)"
+          :busy="claudeConnectionBusy"
+          :error="claudeConnectionError"
+          @connect="connectClaude"
         />
         <SettingsAppearancePanel
           v-else-if="activeTab === 'appearance'"
@@ -120,6 +131,17 @@ import appPackage from '../../package.json';
 const appVersion = appPackage.version;
 
 withDefaults(defineProps<{
+  codexConnected?: boolean;
+  setProviderEnabled?: (backend: 'codex' | 'claude', enabled: boolean) => unknown;
+  claudeConnected?: boolean;
+  codexConnectionBusy?: boolean;
+  claudeConnectionBusy?: boolean;
+  codexLoginPending?: boolean;
+  codexConnectionError?: string | null;
+  claudeConnectionError?: string | null;
+  connectCodex?: () => Promise<void>;
+  connectClaude?: () => Promise<void>;
+  cancelCodexLogin?: () => Promise<void>;
   activeTab?: SettingsTab;
   settings: AppThemeSettings;
   generalSettings?: AppGeneralSettings;

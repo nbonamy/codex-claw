@@ -10,6 +10,7 @@ export type AgentPromptManagerOptions = {
   persistSnapshot: () => Promise<unknown>;
   setNewConversationTitle: (agentId: string, wasNewSession: boolean) => void;
   onPromptStarting?: (agentId: string, options?: SendPromptOptions) => void;
+  isEngineConnected?: (agent: Agent) => boolean;
 };
 
 /** Owns prompt admission, queued delivery, and bounded retry scheduling. */
@@ -34,6 +35,7 @@ export class AgentPromptManager {
     const snapshot = this.options.getSnapshot();
     const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) return snapshot;
+    if (this.options.isEngineConnected?.(agent) === false) throw new Error('Engine is not connected. Reconnect in Settings.');
 
     if (!canStartPrompt(agent)) {
       this.options.applyEvent({
@@ -90,6 +92,10 @@ export class AgentPromptManager {
 
   private start(agent: Agent, prompt: string, promptOptions?: SendPromptOptions, queuedPromptId?: string, acceptance?: { resolve: () => void; reject: (error: Error) => void }): AppSnapshot {
     const snapshot = this.options.getSnapshot();
+    if (this.options.isEngineConnected?.(agent) === false) {
+      acceptance?.reject(new Error('Engine is not connected. Reconnect in Settings.'));
+      return snapshot;
+    }
     const inFlightKey = queuedPromptId ? queuedPromptKey(agent.id, queuedPromptId) : undefined;
     if (inFlightKey && this.inFlightQueuedPrompts.has(inFlightKey)) return snapshot;
     if (queuedPromptId) this.clearRetry(queuedPromptId);
