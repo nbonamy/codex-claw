@@ -23,9 +23,9 @@ async function chooseLayout(wrapper: ReturnType<typeof mount>, label: string) {
 
 describe('split-screen conversations', () => {
   it.each([
-    ['Two agents side by side', 2, 1],
-    ['Two agents stacked', 2, 0],
-    ['Four agents', 4, 1],
+    ['Vertical Split', 2, 1],
+    ['Horizontal Split', 2, 0],
+    ['4-Pane Split', 4, 1],
   ] as const)('repeats agent headers in %s with one fixed top-right sidebar toggle', async (layout, count, toggleIndex) => {
     const snapshot = createInitialSnapshot();
     const [first, second] = snapshot.agents;
@@ -65,7 +65,7 @@ describe('split-screen conversations', () => {
     expect(wrapper.get('.agent-split-grid__pane--focused').attributes('data-agent-id')).toBe(first!.id);
     expect(api.selectAgent).not.toHaveBeenCalled();
     expect(wrapper.findAll('.app-shell__right-workspace').filter(panel => panel.isVisible())).toHaveLength(1);
-    if (layout === 'Two agents side by side') {
+    if (layout === 'Vertical Split') {
       await panes[0]!.get('[aria-label="Open repository diff"]').trigger('click');
       await flushPromises();
       expect(api.getAgentGitDiff).toHaveBeenCalledExactlyOnceWith(first!.id, { type: 'uncommitted' });
@@ -78,7 +78,7 @@ describe('split-screen conversations', () => {
     expect(emptyWorkspace).toHaveLength(1);
     expect(emptyWorkspace[0]!.get('[aria-label="Open a workspace tab"]').isVisible()).toBe(true);
     expect(emptyWorkspace[0]!.findAll('[role="tab"]')).toHaveLength(0);
-    if (layout === 'Two agents side by side') {
+    if (layout === 'Vertical Split') {
       await panes[1]!.get('[aria-label="Open repository diff"]').trigger('click');
       await flushPromises();
       expect(api.getAgentGitDiff).toHaveBeenLastCalledWith(second!.id, { type: 'uncommitted' });
@@ -102,7 +102,7 @@ describe('split-screen conversations', () => {
       global: { components: { ElPopover } },
     });
     await flushPromises();
-    await chooseLayout(wrapper, 'Two agents side by side');
+    await chooseLayout(wrapper, 'Vertical Split');
     const editor = wrapper.findAll<HTMLElement>('[contenteditable="true"]')[0]!;
     editor.element.focus();
     editor.element.textContent = 'Keep this draft';
@@ -140,7 +140,7 @@ describe('split-screen conversations', () => {
     expect(getComputedStyle(wrapper.get('.app-shell__layout-control').element).position).toBe('absolute');
     expect(getComputedStyle(layoutButton.element).width).toBe('24px');
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
-    await chooseLayout(wrapper, 'Four agents');
+    await chooseLayout(wrapper, '4-Pane Split');
     await wrapper.findAll('.agent-split-grid__pane')[3]!.trigger('pointerdown');
     expect(
       wrapper
@@ -215,7 +215,7 @@ describe('split-screen conversations', () => {
       global: { components: { ElPopover } },
     });
     await flushPromises();
-    await chooseLayout(wrapper, 'Two agents side by side');
+    await chooseLayout(wrapper, 'Vertical Split');
     expect(wrapper.get('.agent-split-grid').attributes('data-layout')).toBe(
       '2-vertical',
     );
@@ -253,14 +253,14 @@ describe('split-screen conversations', () => {
         .findAll('.app-shell__right-workspace')
         .filter((panel) => panel.isVisible()),
     ).toHaveLength(1);
-    await chooseLayout(wrapper, 'Two agents stacked');
+    await chooseLayout(wrapper, 'Horizontal Split');
     expect(wrapper.get('.agent-split-grid').attributes('data-layout')).toBe(
       '2-horizontal',
     );
     expect(wrapper.findAll('[contenteditable="true"]')[0]!.element).toBe(
       firstEditor,
     );
-    await chooseLayout(wrapper, 'Four agents');
+    await chooseLayout(wrapper, '4-Pane Split');
     expect(wrapper.get('.agent-split-grid').attributes('data-layout')).toBe(
       '4-quadrant',
     );
@@ -268,7 +268,7 @@ describe('split-screen conversations', () => {
     for (const agent of agents)
       expect(wrapper.text()).toContain(`Conversation ${agent.id}`);
     await wrapper.findAll('.agent-split-grid__pane')[3]!.trigger('pointerdown');
-    await chooseLayout(wrapper, 'Single agent');
+    await chooseLayout(wrapper, 'Single Pane');
     expect(wrapper.findAll('[contenteditable="true"]')).toHaveLength(1);
     expect(wrapper.get('.agent-header').text()).toContain(agents[3]!.name);
   });
@@ -295,7 +295,7 @@ describe('split-screen conversations', () => {
       global: { components: { ElPopover } },
     });
     await flushPromises();
-    await chooseLayout(wrapper, 'Two agents side by side');
+    await chooseLayout(wrapper, 'Vertical Split');
     const panes = wrapper.findAll('.agent-split-grid__pane');
     const firstEditor = panes[0]!.get('[contenteditable="true"]');
     firstEditor.element.textContent = 'First agent draft';
@@ -352,7 +352,7 @@ describe('split-screen conversations', () => {
       global: { components: { ElPopover } },
     });
     await flushPromises();
-    await chooseLayout(wrapper, 'Two agents side by side');
+    await chooseLayout(wrapper, 'Vertical Split');
     const editor = wrapper.findAll('[contenteditable="true"]')[1]!;
     (editor.element as HTMLElement).focus();
     await flushPromises();
@@ -427,7 +427,7 @@ describe('split-screen conversations', () => {
       global: { components: { ElPopover } },
     });
     await flushPromises();
-    await chooseLayout(wrapper, 'Two agents side by side');
+    await chooseLayout(wrapper, 'Vertical Split');
     const pane = wrapper.findAll('.agent-split-grid__pane')[1]!;
     await pane.trigger('pointerdown');
     await flushPromises();

@@ -17,7 +17,7 @@ describe('SplitLayoutControl', () => {
     await wrapper.get('button').trigger('click');
     await flushPromises();
     const option = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')]
-      .find((item) => item.textContent?.includes('Two agents side by side'));
+      .find((item) => item.textContent?.includes('Vertical Split'));
     expect(option).toBeDefined();
     const row = new DOMWrapper(option!);
     await vi.waitFor(() => expect(row.isVisible()).toBe(true));
