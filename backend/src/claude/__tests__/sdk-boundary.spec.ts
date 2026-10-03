@@ -99,7 +99,7 @@ describe('Claude Agent SDK → Claw backend', () => {
   });
 
   it('exposes an SDK permission as a normalized pending request and returns the targeted decision', async () => {
-    const { sdk, driver, snapshot, events } = setup();
+    const { sdk, driver, server, snapshot, events } = setup();
     const pending = driver.sendPrompt(agent(), 'edit');
     await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
     sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
@@ -109,7 +109,7 @@ describe('Claude Agent SDK → Claw backend', () => {
     });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'agentRequest.created')).toBe(true));
     expect(snapshot.agentRequests?.['claude-a']).toMatchObject([{ id: 'permission', kind: 'toolConfirmation', conversationId: 'session-a' }]);
-    await driver.respondToAgentRequest({ agentId: 'claude-a', id: 'permission', outcome: { kind: 'decision', decision: 'deny' } });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'answer', method: 'agent/request/respond', params: { response: { agentId: 'claude-a', id: 'permission', outcome: { kind: 'decision', decision: 'deny' } } } })).resolves.not.toHaveProperty('error');
     await expect(permission).resolves.toMatchObject({ behavior: 'deny' });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'agentRequest.resolved')).toBe(true));
   });

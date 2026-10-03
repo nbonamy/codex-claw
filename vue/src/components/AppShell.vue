@@ -586,6 +586,7 @@ import AgentConversationPanel from './AgentConversationPanel.vue';
 import SplitLayoutControl from './SplitLayoutControl.vue';
 import { useSplitWorkspace } from './use-split-workspace';
 import type { AgentConversationActions } from './use-agent-conversation';
+import { claudePaneClientRequests } from './claude-pane-client-requests';
 import type { AgentConversationView } from '../app-state';
 import MissionCodeReview from './MissionCodeReview.vue';
 import MissionShipBoard from './MissionShipBoard.vue';
@@ -1989,7 +1990,9 @@ const conversationPaneState: CodexConversationPaneState = {
   thread: {
     get approvals() { return effectiveApprovals.value; },
     get clientRequests() {
-      return currentAgent.value?.backend === 'codex' ? props.codexConversationSnapshot?.clientRequests ?? [] : [];
+      return currentAgent.value?.backend === 'codex'
+        ? props.codexConversationSnapshot?.clientRequests ?? []
+        : claudePaneClientRequests(props.claudeConversationSnapshot);
     },
     get answeredClientRequestIds() {
       return providerConversation.value

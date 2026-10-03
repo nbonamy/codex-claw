@@ -18,6 +18,7 @@ import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setFirstRunOnboardingStage } from '../../onboarding-session';
 import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtures';
+import { createClaudeConversationReplica } from '@codex-claw/core/claude-conversation-replica';
 
 import {
   conversationControllerActions,
@@ -54,6 +55,37 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
+  it('projects Claude approvals into the controlled pane with their exact transcript item identity', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backend = 'claude';
+    agent.backendDefaults = { kind: 'claude' };
+    agent.backendSession = { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' };
+    const replica = createClaudeConversationReplica(claudeConversationSnapshot([], { agentId: agent.id }));
+    const confirmation = { integrationId: 'claude', integrationName: 'Claude', toolName: 'Bash', summary: 'Run the tests?', argumentsPreview: '{"command":"npm test"}', allowConversation: true, allowAlways: false };
+    replica.apply({ type: 'approval.requested', agentId: agent.id, backend: 'claude', seq: 1, occurredAt: '2026-10-03T00:00:00Z', turnId: 'turn-approval', payload: { id: 'permission', kind: 'confirm_tool', payload: { confirmation } } });
+    const draft = { text: 'Keep my draft', selectionStart: 4, selectionEnd: 4 };
+    const attachment: CodexNativeAttachment = { id: 'notes', type: 'file', reference: '/tmp/notes.txt', name: 'notes.txt', mimeType: 'text/plain', size: 10 };
+    const wrapper = mountShell({ snapshot, claudeConversationSnapshot: replica.getSnapshot(), stubAgentWorkspace: false, realConversationPane: true, composerState: draft, composerAttachments: [attachment] });
+    expect(conversationControllerState(wrapper).thread?.clientRequests).toStrictEqual([{
+      id: 'permission', kind: 'confirm_tool', conversationId: 'claude-session-1', turnId: 'turn-approval', itemId: 'approval-permission', payload: { confirmation },
+    }]);
+    const footer = wrapper.get('.codex-conversation-pane__footer');
+    expect(footer.text()).toContain('Run the tests?');
+    expect(wrapper.findAll('.chat-tool-confirmation')).toHaveLength(1);
+    expect(wrapper.find('.codex-composer').exists()).toBe(false);
+    expect(footer.findAll('button').map(button => button.text())).toEqual(['Allow', 'Allow for session', 'Deny']);
+    await footer.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    expect(wrapper.emitted('client-response')).toEqual([[{ id: 'permission', payload: { decision: 'allow_conversation' } }]]);
+    replica.apply({ type: 'clientRequest.resolved', agentId: agent.id, backend: 'claude', seq: 2, occurredAt: '2026-10-03T00:00:01Z', payload: { id: 'permission' } });
+    await wrapper.setProps({ claudeConversationSnapshot: replica.getSnapshot() });
+    expect(conversationControllerState(wrapper).thread?.clientRequests).toEqual([]);
+    expect(conversationControllerState(wrapper).identity.messages).toHaveLength(1);
+    expect(wrapper.get('.chat-rich-text-editor').text()).toBe(draft.text);
+    expect(wrapper.text()).toContain('notes.txt');
+    expect(wrapper.text()).toContain('Allowed tool call');
+  });
   it('uses the provider-owned Codex conversation', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

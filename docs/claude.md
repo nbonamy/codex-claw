@@ -190,6 +190,10 @@ is normalized to the provider's multi-question form, and the response is
 routed back to the blocked SDK tool call. Session-scoped and persistent
 permission suggestions back Claw's Allow for conversation and Always allow
 choices.
+The main and split panes project pending permission parts into the shared SDK
+composer's `confirm_tool` requests, using the exact transcript tool-part ID.
+Resolution stays on the existing agent-targeted client-response path; the SDK
+hides pending inline duplicates and restores the retained draft and attachments.
 Claude's proactive permission posture remains distinct from Codex approval
 presets. The composer renders a capability-driven Permissions submenu with
 Claude's own `default`, `acceptEdits`, `dontAsk`, `auto`, and

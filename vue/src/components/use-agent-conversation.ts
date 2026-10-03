@@ -10,6 +10,7 @@ import { localizedText } from '../i18n/errors';
 import { useImageAnnotation } from './use-image-annotation';
 import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useVisualizationAnnotations } from './use-visualization-annotations';
+import { claudePaneClientRequests } from './claude-pane-client-requests';
 
 export type AgentConversationActions = {
   planReview: (agentId: string, resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => void | Promise<void>;
@@ -68,7 +69,7 @@ export function agentConversationState(view: () => AgentConversationView, extens
     },
     thread: {
       get approvals() { return view().codexSnapshot?.approvals ?? view().approvals; },
-      get clientRequests() { return view().codexSnapshot?.clientRequests ?? []; },
+      get clientRequests() { return view().codexSnapshot?.clientRequests ?? claudePaneClientRequests(view().claudeSnapshot); },
       get answeredClientRequestIds() { return new Set(provider()?.answeredClientRequestIds ?? view().answeredClientRequestIds); },
       get goal() { return view().codexSnapshot?.goal ?? view().agent.goal ?? null; },
       get queuedPrompts() { return view().queuedPrompts; },
