@@ -344,8 +344,8 @@ whether display sleep should be prevented; Electron runs the native APIs but
 does not derive those decisions from agent/product state.
 
 `@codex-claw/core` is intentionally runtime-thin: contracts, protocol types, and pure
-normalization helpers only. Node filesystem persistence such as `state.json`
-loading/saving belongs in `clawd`, so desktop, mobile, and web clients share the
+normalization helpers only. Node filesystem persistence such as the roster and
+settings files belongs in `clawd`, so desktop, mobile, and web clients share the
 same backend contract without inheriting local file-read authority.
 
 The workspace layers are explicit:
@@ -861,26 +861,47 @@ Shiki theme or equivalent syntax theme adapter.
 
 ## Persistence
 
-Durable persistence is a versioned JSON file under the `clawd` backend home.
-The default backend home is `~/.codex-claw`; `CODEX_CLAW_HOME` is the only
-supported override. Electron does not pass its app data directory to `clawd`,
-and only the backend reads and writes `state.json`. Keep the schema explicit
-and migration-friendly:
+Durable persistence is a small set of versioned JSON files under the `clawd`
+backend home. The default backend home is `~/.codex-claw`; `CODEX_CLAW_HOME` is
+the only supported override. Electron does not pass its app data directory to
+`clawd`, and only the backend reads and writes these files:
 
-```ts
-type PersistedStateV1 = {
-  version: 1
-  teams: Team[]
-  agents: Agent[]
-  settings: AppSettings
-}
 ```
+roster.json                       active team, teams, agents, automations, missions,
+                                  work assignments, subagent nodes
+settings.json                     preferences, theme, source folder, remote connections,
+                                  work integrations
+visualizations/<repo>-<hash>/<id>.json   one file per visualization (user content)
+backups/                          verified copies made before a migration
+```
+
+Every file is `{ schemaVersion, writtenBy, data }`. Each field has one home;
+there are no per-client profiles, so order, selection, theme and preferences are
+shared by every client. A build refuses to read or rewrite a file whose
+`schemaVersion` is newer than it supports, and a file that fails to parse stops
+startup instead of being replaced by an empty state. The only exception is an
+unreadable visualization, which is skipped and left on disk. Schema versions are
+frozen shapes: a change to what is persisted bumps the version and adds a typed
+step in `backend/src/persistence/migrations.ts`. `persistence/layout.ts` maps the
+shared persisted state to and from the files, and `persistence/schema.ts` is the
+runtime schema of each file.
+
+Files written before this layout (a single unversioned `state.json`) are migrated
+on the first start: the original is copied to `backups/` and verified byte for
+byte, the new files are written, and `state.json` is replaced by a text marker
+that older builds cannot parse so they fail to start rather than create an empty
+state. Restoring a backup as `state.json` migrates it again, keeping the
+previous layout in `backups/`.
+
+Not persisted: subagent operations and activities (nothing reads them), plans
+and goals that are finished, plan reviews once resolved, and the Codex approval
+policy, reviewer and sandbox when a preset already defines them.
 
 Move to SQLite only when `clawd` needs queryable app state beyond what provider
 backends already persist. Conversation history should not be duplicated in
 Codex Claw unless we need an app-specific cache for performance.
 
-Runtime catalog data is not persisted in `state.json`. The renderer warms model
+Runtime catalog data is not persisted. The renderer warms model
 catalogs once per backend at startup and caches skills and file listings by
 working folder, so switching agents does not repeat backend RPCs. A catalog
 change event or explicit refresh may invalidate the relevant cache. Snapshot
@@ -911,7 +932,7 @@ the target agent and its conversation remain intact. Every new round receives
 the cumulative ledger inside a `<context>`
 block. Its exclusions therefore include every finding skipped by the user
 across the review, not only exclusions from the immediately preceding round.
-`clawd` persists the ledger and opaque reviewer session reference in `state.json`
+`clawd` persists the ledger and opaque reviewer session reference in `roster.json`
 so reloads and agent switches do not lose unfinished arbitration while the Review
 pane remains open. Finishing the review or closing its pane removes the ledger;
 reopening Review starts from zero, and completed findings are not permanent project

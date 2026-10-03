@@ -37,12 +37,42 @@ it('recovers only the matching Codex agent thread', () => {
   expect(nextState.agents[1]).toBe(currentState.agents[1]);
 });
 
+it('recovers a thread in the roster layout and still reads a backup of the older state file', () => {
+  const current = roster('thread-broken');
+  const recovery = agentRecovery(current, state('thread-recovered'), '/tmp/repo');
+  expect(recovery.currentThreadId).toBe('thread-broken');
+  expect(recovery.recoveredThreadId).toBe('thread-recovered');
+
+  const next = stateWithRecoveredThread(current, recovery.currentAgent.id, recovery.recoveredThreadId, '2026-10-03T12:00:00.000Z');
+  expect(next.data.agents[0]).toEqual({
+    ...current.data.agents[0],
+    engine: { kind: 'codex', session: { threadId: 'thread-recovered' } },
+    updatedAt: '2026-10-03T12:00:00.000Z',
+  });
+  expect(next.schemaVersion).toBe(1);
+});
+
 it('rejects an ambiguous folder instead of changing multiple agents', () => {
   const currentState = state('thread-current');
   currentState.agents.push({ ...currentState.agents[0], id: 'agent-2' });
   expect(() => agentRecovery(currentState, state('thread-backup'), '/tmp/repo'))
     .toThrow(/Expected exactly one Codex agent.*found 2/);
 });
+
+function roster(threadId) {
+  return {
+    schemaVersion: 1,
+    writtenBy: 'clawd test',
+    data: {
+      agents: [{
+        id: 'agent-1',
+        folder: '/tmp/repo',
+        engine: { kind: 'codex', session: { threadId } },
+        updatedAt: 'before',
+      }],
+    },
+  };
+}
 
 function state(threadId) {
   return {

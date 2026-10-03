@@ -128,7 +128,7 @@ Current implementation checkpoint:
   `snapshot/get` also returns a transcript-free snapshot (`messages: []`) so
   reconnect synchronization stays bounded; the renderer restores the selected
   transcript through lazy `agent/conversation/load` events. Electron does not
-  keep transcript bodies, read or write `state.json`, keep a local snapshot
+  keep transcript bodies, read or write the state files, keep a local snapshot
   service shim, or validate agent folders before backend mutations.
   Main-process product IPC handlers adopt snapshots returned by backend RPCs;
   they do not perform direct product-state updates. Desktop-native state is
@@ -1007,8 +1007,9 @@ and future remote.
 
 ## State And Migration
 
-`clawd` owns the durable `AppSnapshot` and persists `state.json` under
-`~/.codex-claw` by default. It also stores work-integration tokens in
+`clawd` owns the durable `AppSnapshot` and persists it as `roster.json`,
+`settings.json` and `visualizations/` under `~/.codex-claw` by default (see
+`docs/architecture.md`, Persistence). It also stores work-integration tokens in
 `~/.codex-claw/provider-tokens.json`. Electron main
 owns only desktop-window state plus a
 volatile renderer-facing snapshot cache. That cache is hydrated through
@@ -1031,9 +1032,9 @@ Local migration path:
 
 1. `clawd` creates `~/.codex-claw` on startup and treats it as the backend
    home.
-2. `clawd` loads `~/.codex-claw/state.json` through the backend
-   `AppStatePersistence` serializer/parser and writes backend-owned future
-   changes using the same schema.
+2. `clawd` loads the versioned store through `AppStateStore`, migrating a
+   legacy `~/.codex-claw/state.json` once (with a verified backup), and writes
+   backend-owned future changes using the same schema.
 3. `CODEX_CLAW_HOME` is the only supported alternate backend home, used for
    deliberate local isolation such as tests or one-off experiments.
 
@@ -1120,7 +1121,7 @@ already running; otherwise the shell fallback keeps the previous one-shot
 remote daemon.
 Sync mirrors `provider-tokens.json` to the remote, then asks the remote
 `clawd` to run `workProvider/connections/reload`; it does not copy local
-`state.json`. The remote `clawd` hydrates safe work-integration connection
+state files. The remote `clawd` hydrates safe work-integration connection
 metadata from those tokens during startup and on explicit reload, so remote
 automation management can see GitHub as connected while preserving the remote's own
 teams, agents, and automations.

@@ -2,7 +2,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AppStatePersistence, persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
+import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
+import { AppStateStore } from '../persistence/store';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
@@ -19,7 +20,7 @@ afterEach(async () => {
   }
 });
 
-describe('AppStatePersistence', () => {
+describe('state persistence', () => {
   it.each([true, false])('migrates legacy Codex sharing once (%s), preserving newer choices', enabled => {
     const legacy = { ...persistedStateFromSnapshot(createEmptySnapshot()), general: { shareCodexSkillsAndPlugins: enabled } };
     const restored = snapshotFromPersistedState(legacy);
@@ -30,7 +31,7 @@ describe('AppStatePersistence', () => {
     expect(reloaded.general.providerHomes?.codex).toEqual(newer);
   });
   it('restores a user-selected model, effort, and tier after restarting', async () => {
-    const persistence = new AppStatePersistence(await tempStatePath());
+    const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();
     const selection = { kind: 'codex' as const, model: 'sol', reasoningEffort: 'high', serviceTier: null, userSelectedModel: true };
     snapshot.agents[0]!.backendDefaults = selection;
@@ -42,7 +43,7 @@ describe('AppStatePersistence', () => {
   });
 
   it('restores a user-selected Claude model after restarting', async () => {
-    const persistence = new AppStatePersistence(await tempStatePath());
+    const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backend = 'claude';
     snapshot.agents[0]!.backendDefaults = {
@@ -55,8 +56,8 @@ describe('AppStatePersistence', () => {
     expect(restored.agents[0]!.backendDefaults).toStrictEqual(snapshot.agents[0]!.backendDefaults);
   });
 
-  it('restores saved prompt drafts for the same client after a restart', async () => {
-    const persistence = new AppStatePersistence(await tempStatePath());
+  it('restores saved prompt drafts after a restart', async () => {
+    const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();
     const draft = { id: 'draft-1', agentId: snapshot.agents[0]!.id, text: 'Finish this after the review', createdAt: 1000 };
     snapshot.clientPreferences = { desktop: { general: { savedPromptDrafts: [draft] } } };
@@ -64,33 +65,13 @@ describe('AppStatePersistence', () => {
     await persistence.save(snapshot);
     const restored = await persistence.load();
 
-    expect(projectClientSnapshot(restored, 'desktop').general.savedPromptDrafts).toStrictEqual([draft]);
-    expect(projectClientSnapshot(restored, 'other').general.savedPromptDrafts).toStrictEqual([]);
+    expect(restored.general.savedPromptDrafts).toStrictEqual([draft]);
+    expect(restored.clientPreferences).toBeUndefined();
   });
   it('loads the default team with no agents when no state file exists', async () => {
-    const persistence = new AppStatePersistence(await tempStatePath());
+    const persistence = new AppStateStore(await tempHome());
 
     await expect(persistence.load()).resolves.toStrictEqual(createEmptySnapshot());
-  });
-
-  it('coalesces overlapping saves and writes the latest pending snapshot', async () => {
-    const filePath = await tempStatePath();
-    const persistence = new AppStatePersistence(filePath);
-    const first = createInitialSnapshot();
-    first.general.agentListCompact = false;
-    const second = createInitialSnapshot();
-    second.general.agentListCompact = true;
-    const third = createInitialSnapshot();
-    third.general.agentListCompact = false;
-
-    const firstSave = persistence.save(first);
-    first.general.agentListCompact = true;
-    const secondSave = persistence.save(second);
-    const thirdSave = persistence.save(third);
-    await Promise.all([firstSave, secondSave, thirdSave]);
-
-    const written = JSON.parse(await readFile(filePath, 'utf8')) as { general: { agentListCompact: boolean } };
-    expect(written.general.agentListCompact).toBe(false);
   });
 
   it('keeps persisted empty agents empty while defaulting missing teams', () => {
@@ -174,7 +155,7 @@ describe('AppStatePersistence', () => {
   });
 
   it('keeps repository diagrams after their worktree agent is deleted', async () => {
-    const filePath = await tempStatePath();
+    const home = await tempHome();
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
     agent.folder = '/projects/claw-feature';
@@ -190,15 +171,15 @@ describe('AppStatePersistence', () => {
       selectedVisualizationId: 'diagram-feature', createdAt: agent.createdAt, updatedAt: agent.updatedAt,
     };
     snapshot.repositoryVisualizations = { '/projects/claw': agent.visualize.visualizations };
-    await writeFile(filePath, JSON.stringify(persistedStateFromSnapshot(snapshot)), 'utf8');
+    await writeFile(path.join(home, 'state.json'), JSON.stringify(persistedStateFromSnapshot(snapshot)), 'utf8');
 
-    const loaded = await new AppStatePersistence(filePath).load();
+    const loaded = await new AppStateStore(home).load();
     expect(loaded.repositoryVisualizations?.['/projects/claw']).toStrictEqual(agent.visualize.visualizations);
     expect(isAppSnapshot(loaded)).toBe(true);
     expect(loaded.agents[0].visualize?.visualizations).toBe(loaded.repositoryVisualizations?.['/projects/claw']);
     closeAgentInSnapshot(loaded, agent.id);
-    await new AppStatePersistence(filePath).save(loaded);
-    const reloaded = await new AppStatePersistence(filePath).load();
+    await new AppStateStore(home).save(loaded);
+    const reloaded = await new AppStateStore(home).load();
     expect(reloaded.repositoryVisualizations?.['/projects/claw'])
       .toStrictEqual(agent.visualize.visualizations);
     expect(reloaded.agents.some(candidate => candidate.id === agent.id)).toBe(false);
@@ -420,8 +401,8 @@ describe('AppStatePersistence', () => {
   });
 
   it('saves metadata, backend session, context usage, and collaboration status without transcripts or runtime state', async () => {
-    const filePath = await tempStatePath();
-    const persistence = new AppStatePersistence(filePath);
+    const home = await tempHome();
+    const persistence = new AppStateStore(home);
     const snapshot = createInitialSnapshot();
     snapshot.backendRuntimes = [{ backend: 'codex', status: 'running', detail: 'connected' }];
     snapshot.accountRateLimits = {
@@ -507,15 +488,24 @@ describe('AppStatePersistence', () => {
     };
     await persistence.save(snapshot);
 
-    const written = JSON.parse(await readFile(filePath, 'utf8')) as Record<string, unknown>;
-    expect(written).not.toHaveProperty('messages');
-    expect(written).not.toHaveProperty('backendRuntimes');
-    expect(written).not.toHaveProperty('appServer');
+    const readData = async (name: string) => (JSON.parse(await readFile(path.join(home, name), 'utf8')) as { data: Record<string, unknown> }).data;
+    const written = await readData('roster.json');
+    const writtenSettings = await readData('settings.json');
+    for (const data of [written, writtenSettings]) {
+      expect(data).not.toHaveProperty('messages');
+      expect(data).not.toHaveProperty('backendRuntimes');
+      expect(data).not.toHaveProperty('appServer');
+    }
     expect(written.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
     expect(written.activeTeamId).toBe('team-codex-claw');
     const writtenAgent = (written.agents as Array<Record<string, unknown>>)[0];
-    expect(writtenAgent.backend).toBe('codex');
-    expect(writtenAgent.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
+    expect(writtenAgent.engine).toStrictEqual({
+      kind: 'codex',
+      session: { threadId: 'thread-dina' },
+      settings: { approvalPreset: 'approve-for-me', serviceTier: 'fast' },
+    });
+    expect(writtenAgent).not.toHaveProperty('backend');
+    expect(writtenAgent).not.toHaveProperty('teamId');
     expect(writtenAgent.openInApplication).toBe('xcode');
     expect(writtenAgent).not.toHaveProperty('codexThreadId');
     expect(writtenAgent.contextUsage).toStrictEqual({
@@ -552,7 +542,7 @@ describe('AppStatePersistence', () => {
       updatedAt: 1_780_000_030,
     });
     expect(writtenAgent).not.toHaveProperty('assignedWorkItems');
-    expect((written.workBacklog as Record<string, unknown>).assignments).toStrictEqual({
+    expect(written.workAssignments).toStrictEqual({
       'github:nbonamy/codex-claw#12': {
         provider: 'github',
         itemId: 'nbonamy/codex-claw#12',
@@ -1147,8 +1137,8 @@ describe('AppStatePersistence', () => {
   });
 
   it('repairs team membership and selected agent when persisted ids drift', async () => {
-    const filePath = await tempStatePath();
-    await writeFile(filePath, JSON.stringify({
+    const home = await tempHome();
+    await writeFile(path.join(home, 'state.json'), JSON.stringify({
       teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: [] }],
       agents: [{ id: 'agent-jules', teamId: 'team-codex-claw', name: 'Jules', folder: '/tmp/jules', createdAt: 'now', updatedAt: 'now' }],
       activeTeamId: 'missing-team',
@@ -1156,7 +1146,7 @@ describe('AppStatePersistence', () => {
       theme: defaultThemeSettings,
     }), 'utf8');
 
-    const restored = await new AppStatePersistence(filePath).load();
+    const restored = await new AppStateStore(home).load();
 
     expect(restored.activeAgentId).toBe('agent-jules');
     expect(restored.activeTeamId).toBe('team-codex-claw');
@@ -1460,9 +1450,9 @@ describe('AppStatePersistence', () => {
   });
 });
 
-async function tempStatePath(): Promise<string> {
+async function tempHome(): Promise<string> {
   tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-state-'));
-  return path.join(tempDir, 'state.json');
+  return tempDir;
 }
 
 function readyRemoteConnection(): RemoteConnection {

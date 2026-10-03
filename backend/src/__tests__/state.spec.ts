@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { backendCodexHomeDir, backendHomeDir, backendProviderTokensFilePath, backendStateFilePath, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from '../state';
+import { backendCodexHomeDir, backendHomeDir, backendLegacyStateFilePath, backendProviderTokensFilePath, backendSettingsFilePath, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from '../state';
 import { persistedStateFromSnapshot } from '../state-persistence';
 
 describe('backend state loading', () => {
@@ -29,7 +29,8 @@ describe('backend state loading', () => {
   it('uses CODEX_CLAW_HOME as the only backend home override', () => {
     expect(backendHomeDir()).toBe(homeDir);
     expect(backendCodexHomeDir()).toBe(path.join(homeDir, 'codex-home'));
-    expect(backendStateFilePath()).toBe(path.join(homeDir, 'state.json'));
+    expect(backendLegacyStateFilePath()).toBe(path.join(homeDir, 'state.json'));
+    expect(backendSettingsFilePath()).toBe(path.join(homeDir, 'settings.json'));
     expect(backendProviderTokensFilePath()).toBe(path.join(homeDir, 'provider-tokens.json'));
   });
 
@@ -62,7 +63,7 @@ describe('backend state loading', () => {
     await expect(readFile(path.join(homeDir, 'state.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('loads an existing app snapshot from state.json', async () => {
+  it('migrates an existing state.json on first load', async () => {
     const snapshot = await loadBackendSnapshot();
     const persisted = {
       ...persistedStateFromSnapshot(snapshot),
@@ -77,12 +78,14 @@ describe('backend state loading', () => {
     });
   });
 
-  it('saves backend snapshots using the shared persisted state shape', async () => {
+  it('saves backend snapshots into the versioned roster and settings files', async () => {
     const snapshot = await loadBackendSnapshot();
     await saveBackendSnapshot(snapshot);
 
-    const persisted = JSON.parse(await readFile(path.join(homeDir, 'state.json'), 'utf8')) as Record<string, unknown>;
-    expect(persisted).not.toHaveProperty('messages');
+    const persisted = JSON.parse(await readFile(path.join(homeDir, 'roster.json'), 'utf8')) as { schemaVersion: number; data: Record<string, unknown> };
+    expect(persisted.schemaVersion).toBe(1);
+    expect(persisted.data).not.toHaveProperty('messages');
+    await expect(readFile(path.join(homeDir, 'state.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(loadBackendSnapshot()).resolves.toMatchObject({ activeTeamId: 'team-codex-claw' });
   });
 

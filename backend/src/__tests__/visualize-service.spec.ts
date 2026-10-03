@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { AppStatePersistence } from '../state-persistence';
+import { AppStateStore } from '../persistence/store';
 import { VisualizeService, generateVisualizationSuggestionPrompt } from '../visualize-service';
 
 let temporaryDirectory: string | null = null;
@@ -49,7 +49,7 @@ describe('VisualizeService', () => {
 
   it('persists user-edited canvases and assets, rejects stale batches and preserves untouched edits across reload', async () => {
     temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'claw-canvas-'));
-    const persistence = new AppStatePersistence(path.join(temporaryDirectory, 'state.json'));
+    const persistence = new AppStateStore(temporaryDirectory);
     const snapshot = createInitialSnapshot();
     const agentId = snapshot.agents[0].id;
     const service = new VisualizeService({ snapshot, generatedImagesRoot: temporaryDirectory, persist: () => persistence.save(snapshot), publish: () => undefined });

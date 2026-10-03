@@ -38,6 +38,7 @@ export function remoteCodexVersionCommand(connectionVersion?: string): string {
   const managed = connectionVersion && /^\d+\.\d+\.\d+$/u.test(connectionVersion)
     ? `"$HOME/.codex-claw/codex/${connectionVersion}/bin/codex"`
     : '"$HOME/.local/bin/codex"';
-  return `runtime_custom=$(node -e 'try { const s = JSON.parse(require("fs").readFileSync(require("os").homedir() + "/.codex-claw/state.json", "utf8")); process.stdout.write(s.general?.codexBinaryPath?.trim() || ""); } catch {}')
+  // Newer hosts keep the setting in settings.json; hosts that have not migrated yet still use state.json.
+  return `runtime_custom=$(node -e 'const fs = require("fs"); const dir = require("os").homedir() + "/.codex-claw/"; const read = (name) => { try { return JSON.parse(fs.readFileSync(dir + name, "utf8")); } catch { return null; } }; const value = read("settings.json")?.data?.settings?.codexBinaryPath || read("state.json")?.general?.codexBinaryPath; process.stdout.write(typeof value === "string" ? value.trim() : "")')
 if [ -n "$runtime_custom" ]; then "$runtime_custom" --version; else ${managed} --version 2>/dev/null || codex --version 2>/dev/null || true; fi`;
 }

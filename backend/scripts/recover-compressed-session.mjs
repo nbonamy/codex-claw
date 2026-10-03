@@ -9,9 +9,9 @@ import { createCodexSurface } from '@codex-app-sdk/backend';
 
 const scriptFolder = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptFolder, '..', '..');
-const defaultStatePath = path.join(homedir(), '.codex-claw', 'state.json');
+const defaultStatePath = path.join(homedir(), '.codex-claw', 'roster.json');
 const defaultCodexHome = path.join(homedir(), '.codex-claw', 'codex-home');
-const stateArchiveEntry = '.codex-claw/state.json';
+const stateArchiveEntries = ['.codex-claw/roster.json', '.codex-claw/state.json'];
 
 export function parseRecoveryArguments(argv) {
   const args = [...argv];
@@ -37,19 +37,25 @@ export function agentRecovery(currentState, backupState, agentFolder) {
   return { currentAgent, currentThreadId, recoveredThreadId };
 }
 
+// Current state is roster.json ({ data: { agents: [{ engine }] } }); backups of older builds hold state.json
+// ({ agents: [{ backend, backendSession }] }). Both shapes are understood.
+function agentsOf(state) {
+  if (Array.isArray(state?.data?.agents)) return state.data.agents;
+  return Array.isArray(state?.agents) ? state.agents : null;
+}
+
+function isCodexAgent(agent) {
+  return agent?.engine?.kind === 'codex' || agent?.backend === 'codex';
+}
+
 export function stateWithRecoveredThread(currentState, agentId, recoveredThreadId, now) {
-  return {
-    ...currentState,
-    agents: currentState.agents.map((agent) => (
-      agent.id === agentId
-        ? {
-            ...agent,
-            backendSession: { kind: 'codex', threadId: recoveredThreadId },
-            updatedAt: now,
-          }
-        : agent
-    )),
-  };
+  const recovered = (agent) => (agent.engine
+    ? { ...agent, engine: { ...agent.engine, session: { threadId: recoveredThreadId } }, updatedAt: now }
+    : { ...agent, backendSession: { kind: 'codex', threadId: recoveredThreadId }, updatedAt: now });
+  const replace = (agents) => agents.map((agent) => (agent.id === agentId ? recovered(agent) : agent));
+  return Array.isArray(currentState.data?.agents)
+    ? { ...currentState, data: { ...currentState.data, agents: replace(currentState.data.agents) } }
+    : { ...currentState, agents: replace(currentState.agents) };
 }
 
 async function main() {
@@ -74,7 +80,7 @@ async function main() {
   }
 
   assertClawStopped();
-  const codexCommand = await resolveCodexCommand(currentState);
+  const codexCommand = await resolveCodexCommand(statePath);
   const surface = createCodexSurface({
     autoSelectFirstConversation: false,
     codexHome,
@@ -109,22 +115,25 @@ async function main() {
 }
 
 function readBackupState(backupPath) {
-  const result = spawnSync('tar', ['-xOf', backupPath, stateArchiveEntry], {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (result.status !== 0) {
-    throw new Error(`Could not read ${stateArchiveEntry} from ${backupPath}: ${result.stderr.trim()}`);
+  const failures = [];
+  for (const entry of stateArchiveEntries) {
+    const result = spawnSync('tar', ['-xOf', backupPath, entry], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    if (result.status === 0) return JSON.parse(result.stdout);
+    failures.push(`${entry}: ${result.stderr.trim()}`);
   }
-  return JSON.parse(result.stdout);
+  throw new Error(`Could not read the state from ${backupPath} (${failures.join('; ')})`);
 }
 
 function uniqueCodexAgent(state, agentFolder, source) {
-  if (!state || !Array.isArray(state.agents)) {
+  const agents = agentsOf(state);
+  if (!agents) {
     throw new Error(`The ${source} state does not contain an agents array.`);
   }
-  const matches = state.agents.filter((agent) => (
-    agent?.backend === 'codex'
+  const matches = agents.filter((agent) => (
+    isCodexAgent(agent)
     && [agent.folder, agent.workspace?.folder, agent.workspace?.repositoryRoot]
       .some((folder) => typeof folder === 'string' && path.resolve(folder) === agentFolder)
   ));
@@ -135,7 +144,9 @@ function uniqueCodexAgent(state, agentFolder, source) {
 }
 
 function codexThreadId(agent, source) {
-  const threadId = agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : null;
+  const threadId = agent.engine?.kind === 'codex'
+    ? agent.engine.session?.threadId
+    : agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : null;
   if (typeof threadId !== 'string' || !threadId.trim()) {
     throw new Error(`The ${source} agent does not have a Codex thread id.`);
   }
@@ -160,8 +171,23 @@ function assertClawStopped() {
   }
 }
 
-async function resolveCodexCommand(currentState) {
-  const configured = currentState.general?.codexBinaryPath?.trim();
+async function configuredCodexBinary(statePath) {
+  for (const [file, read] of [
+    ['settings.json', (value) => value?.data?.settings?.codexBinaryPath],
+    [path.basename(statePath), (value) => value?.general?.codexBinaryPath],
+  ]) {
+    try {
+      const value = read(JSON.parse(await readFile(path.join(path.dirname(statePath), file), 'utf8')));
+      if (typeof value === 'string' && value.trim()) return value;
+    } catch {
+      // Try the next location.
+    }
+  }
+  return undefined;
+}
+
+async function resolveCodexCommand(statePath) {
+  const configured = (await configuredCodexBinary(statePath))?.trim();
   if (configured) return configured;
   const bundled = path.join(repositoryRoot, 'electron', 'resources', 'codex', 'codex');
   try {

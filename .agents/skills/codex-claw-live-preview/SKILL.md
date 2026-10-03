@@ -21,8 +21,10 @@ that mounted tests can miss.
 3. Build the current worktree with `npm run build:web`.
 4. Create a uniquely named temporary Claw home outside the repository. Include
    the agent or worktree identity in the prefix and let `mktemp` add uniqueness.
-   Put the seed at `<preview-home>/state.json`; never point the preview at the
-   user's normal `state.json`.
+   Put the seed at `<preview-home>/state.json` (a legacy-shaped seed is migrated
+   on first start, with its backup kept in `<preview-home>/backups/`) or write
+   `roster.json` and `settings.json` directly; never point the preview at the
+   user's normal Claw home.
 5. If the normal Claw installation is already authenticated, copy only its
    `codex-home/auth.json` into `<preview-home>/codex-home/auth.json`, preserve
    restrictive permissions, and never read or print its contents. Otherwise,

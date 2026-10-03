@@ -668,13 +668,13 @@ Mode notifications stay app-owned:
 - `turn/plan/updated` is the structured plan artifact event. `clawd` stores it as
   an execution-kind `agent.plan` and derives completion only when every step is
   complete. `turn/completed` finalizes any remaining execution plan as
-  incomplete, interrupted, or failed before it is persisted to `state.json`.
+  incomplete, interrupted, or failed before it is persisted.
 - Codex plan-mode output is a separate `ThreadItem` with `type: "plan"`, not a
   normal assistant message. `clawd` stores `item/plan/delta` as a draft
   proposed-kind `agent.plan` artifact only; the app-server marks those deltas
   experimental. Its item status is not execution task-list status.
 - `item/completed` with `item.type === "plan"` is authoritative. `clawd` overwrites
-  any draft plan with the completed item text, persists it to `state.json`, and
+  any draft plan with the completed item text, persists it, and
   opens it in the markdown side panel when the corresponding turn completes.
 - Raw response assistant messages are diagnostic only for this path. Do not use
   them as the primary plan renderer; Codex core already parses
@@ -753,7 +753,7 @@ context fraction.
 
 The rate-limit notification is a sparse account-level update, not tied to an
 agent. `clawd` emits `account.rateLimitsUpdated` and the reducer stores it as
-global app state. `clawd` also persists the latest snapshot to `state.json` when
+global app state. `clawd` also persists the latest snapshot when
 this event arrives because the app-server only sends it opportunistically
 during streaming.
 

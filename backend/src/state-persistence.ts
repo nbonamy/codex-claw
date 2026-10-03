@@ -1,7 +1,5 @@
 import { isMission } from '@codex-claw/core/missions';
 import { isThreadFlags } from '@codex-claw/core/thread-flags';
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { backendCodexHomeDir } from './state';
 import { isPlanReview } from '@codex-claw/core/plan-review';
 import { sanitizeClientPreferences } from '@codex-claw/core/client-preferences';
@@ -18,7 +16,7 @@ import { cloneCodeReviewSession, isCodeReviewSession } from '@codex-claw/core/co
 import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
 import { cloneVisualizeSession, isVisualization, isVisualizeSession, visualizationRepositoryRoot, type RepositoryVisualizations, type Visualization, type VisualizeSession } from '@codex-claw/core/visualize';
 
-type PersistedState = {
+export type PersistedState = {
   missions?: AppSnapshot['missions'];
   repositoryVisualizations?: RepositoryVisualizations;
   clientPreferences?: AppSnapshot['clientPreferences'];
@@ -36,7 +34,17 @@ type PersistedState = {
   theme: AppSnapshot['theme'];
 };
 
-type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
+/** What `persistedStateFromSnapshot` always produces; the optional keys exist for older files. */
+export type FullPersistedState = PersistedState & {
+  automations: Automation[];
+  subagentTrees: Record<string, AgentSubagentTree>;
+  workBacklog: WorkBacklogState;
+  remoteConnections: RemoteConnectionsState;
+  general: AppGeneralSettings;
+  sourceFolder: SourceFolderState;
+};
+
+export type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
   delegatedByAgentId?: string;
   pullRequest?: Agent['pullRequest'];
   sessionKind?: Agent['sessionKind'];
@@ -61,82 +69,6 @@ type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'upda
   teamId?: string;
 };
 
-export class AppStatePersistence {
-  private pendingSerialized: string | null = null;
-  private pendingWaiters: Array<{ resolve(): void; reject(error: unknown): void }> = [];
-  private writeInFlight = false;
-  private lastSerialized: string | null = null;
-
-  constructor(private readonly filePath: string) {}
-
-  async load(): Promise<AppSnapshot> {
-    try {
-      const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as unknown;
-      return snapshotFromPersistedState(parsed);
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return createEmptySnapshot();
-      }
-      throw error;
-    }
-  }
-
-  save(snapshot: AppSnapshot): Promise<void> {
-    const persisted = persistedStateFromSnapshot(snapshot);
-    const serialized = `${JSON.stringify(persisted, null, 2)}\n`;
-    if (!this.writeInFlight && this.pendingSerialized === null && serialized === this.lastSerialized) {
-      return Promise.resolve();
-    }
-
-    this.pendingSerialized = serialized;
-    const operation = new Promise<void>((resolve, reject) => {
-      this.pendingWaiters.push({ resolve, reject });
-    });
-    void this.flushPendingSaves();
-    return operation;
-  }
-
-  private async flushPendingSaves(): Promise<void> {
-    if (this.writeInFlight) {
-      return;
-    }
-
-    this.writeInFlight = true;
-    try {
-      while (this.pendingSerialized !== null) {
-        const serialized = this.pendingSerialized;
-        this.pendingSerialized = null;
-        const waiters = this.pendingWaiters.splice(0);
-        try {
-          await this.writeAtomically(serialized);
-          this.lastSerialized = serialized;
-          for (const waiter of waiters) waiter.resolve();
-        } catch (error) {
-          for (const waiter of waiters) waiter.reject(error);
-        }
-      }
-    } finally {
-      this.writeInFlight = false;
-      if (this.pendingSerialized !== null) {
-        void this.flushPendingSaves();
-      }
-    }
-  }
-
-  private async writeAtomically(serialized: string): Promise<void> {
-    await mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
-    const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
-    try {
-      await writeFile(temporaryPath, serialized, { encoding: 'utf8', mode: 0o600 });
-      await rename(temporaryPath, this.filePath);
-    } finally {
-      await unlink(temporaryPath).catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT') throw error;
-      });
-    }
-  }
-}
-
 function migrateGeneralSettings(value: unknown): AppGeneralSettings {
   const settings = normalizeGeneralSettings(value);
   if (isRecord(value) && typeof value.shareCodexSkillsAndPlugins === 'boolean' && !settings.providerHomes?.codex) {
@@ -147,7 +79,7 @@ function migrateGeneralSettings(value: unknown): AppGeneralSettings {
   return settings;
 }
 
-export function persistedStateFromSnapshot(snapshot: AppSnapshot): PersistedState {
+export function persistedStateFromSnapshot(snapshot: AppSnapshot): FullPersistedState {
   return {
     ...(snapshot.clientPreferences ? { clientPreferences: structuredClone(snapshot.clientPreferences) } : {}),
     ...(snapshot.missions ? { missions: structuredClone(snapshot.missions) } : {}),
