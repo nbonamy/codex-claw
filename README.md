@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="electron/assets/icon.png" width="112" height="112" alt="Codex Claw app icon" />
+  <img src="vue/assets/icon.png" width="112" height="112" alt="Codex Claw app icon" />
 </p>
 
 <h1 align="center">Codex Claw</h1>
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="website/assets/claw-screenshot.png" alt="Codex Claw coordinating a team of coding agents" width="960" />
+  <img src="website/assets/claw-screenshot.png" alt="Codex Claw with repository-grouped agents, a conversation, and input-needed status, shown with demo data" width="960" />
 </p>
 
 Codex Claw brings Codex and Claude Code into one workspace. Use either engine
