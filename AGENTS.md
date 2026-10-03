@@ -86,6 +86,8 @@ changes; specify feature behavior in tests:
   lifecycle, generated types, and test fixtures.
 - `docs/claude.md`: Claude Code websocket/SDK protocol research, support
   strategy, and remaining Claude-driver questions.
+- `docs/research/synara.md`: competitive analysis for Synara comparisons and
+  provider-neutral workflow decisions; dated source evidence, not a roadmap.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
 - `docs/custom-tools.md`: use when adding or presenting a `codex_claw` MCP tool,
