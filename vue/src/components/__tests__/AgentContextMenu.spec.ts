@@ -24,6 +24,7 @@ describe('AgentContextMenu', () => {
       'Edit Agent',
       'Duplicate Agent',
       'Fork Agent',
+      'Hand off…',
       'Move to Other Team',
       'Compact Session⇧⌘K',
       'Resume Session',
@@ -71,7 +72,7 @@ describe('AgentContextMenu', () => {
       'Edit Agent',
       'Duplicate Agent',
       'Fork Agent',
-      'Move to Other Team',
+      'Hand off…',
     ]);
     expect(items.find((item) => item.text() === 'Fork Agent')?.attributes()).toHaveProperty('disabled');
   });
@@ -95,11 +96,11 @@ describe('AgentContextMenu', () => {
   it('groups compact with compression and emits compact', async () => {
     const wrapper = mountMenu({ compressVisible: true });
     const items = wrapper.findAll('[role="menuitem"]');
-    expect(items.map((item) => item.text()).slice(4, 6)).toStrictEqual([
+    expect(items.map((item) => item.text()).slice(5, 7)).toStrictEqual([
       'Compact Session⇧⌘K',
       'Compress Session',
     ]);
-    expect(items[4]?.findComponent(ViewportShortIcon).exists()).toBe(true);
+    expect(items[5]?.findComponent(ViewportShortIcon).exists()).toBe(true);
     await items.find((item) => item.text().startsWith('Compact Session'))?.trigger('click');
     expect(wrapper.emitted('action')).toStrictEqual([['compact-session']]);
   });

@@ -22,6 +22,25 @@ vi.mock('@codex-claw/core/runtime-discovery', () => ({
 }));
 
 describe('ClaudeAgentSdkTransport', () => {
+  it('waits for SDK iterator cleanup before reporting a handoff session closed', async () => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery, createSessionId: () => 'handoff-session' });
+    const turn = transport.startTurn({ cwd: '/tmp/project', prompt: 'note' }, () => undefined);
+    await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+    harness.emit({ type: 'result', subtype: 'success', session_id: 'handoff-session', is_error: false });
+    await turn.done;
+    let finish!: () => void;
+    const returned = vi.fn(() => new Promise<IteratorResult<never, void>>(resolve => { finish = () => resolve({ done: true, value: undefined }); }));
+    Object.assign(harness.runtimes[0]!, { return: returned });
+    let closed = false;
+    const closing = transport.closeSession('handoff-session').then(() => { closed = true; });
+    await Promise.resolve();
+    expect(closed).toBe(false);
+    expect(returned).toHaveBeenCalledOnce();
+    finish();
+    await closing;
+    await transport.close();
+  });
   it('returns structured automation selection without tools or a persisted conversation', async () => {
     const harness = createQueryHarness();
     const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });

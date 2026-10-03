@@ -381,6 +381,7 @@ const emit = defineEmits<{
   'create-agent-worktree-in-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
+  'handoff-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'open-in': [payload: { agentId: string; application: OpenInApplication }];
@@ -670,6 +671,9 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'fork-agent':
       emit('fork-agent', agentId);
+      break;
+    case 'handoff-agent':
+      emit('handoff-agent', agentId);
       break;
     case 'edit-agent':
       emit('edit-agent', agentId);

@@ -1,4 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { handoffInProgress } from '@codex-claw/core/agent-handoff';
 import { isAgentRequestResponse } from '@codex-claw/core/agent-request';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
@@ -128,7 +129,7 @@ export class BackendDriverRpc {
   async refreshConversationContext(agent: Agent): Promise<void> {
     const driver = this.requireDriver(agent.backend);
     if (!agent.backendSession || !driver.releaseConversation || !driver.loadConversation) return;
-    driver.releaseConversation(agent.id);
+    await driver.releaseConversation(agent.id);
     await driver.loadConversation(agent);
   }
 
@@ -310,7 +311,14 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationRelease: {
         const { backend, agentId } = requireBackendAgentIdParams(params);
-        this.requireDriver(backend).releaseConversation?.(agentId);
+        await this.requireDriver(backend).releaseConversation?.(agentId);
+        return null;
+      }
+      case backendMethods.driverHandoffCheck: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.assertHandoffReady) throw unsupportedBackendFeature(agent, 'handoff readiness checks');
+        await driver.assertHandoffReady(agent);
         return null;
       }
       case backendMethods.driverConversationArchive: {
@@ -407,6 +415,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverPromptSteer: {
         const { agent } = requireAgentParams(params);
+        if (handoffInProgress(agent)) throw new Error('Wait for the handoff to finish.');
         await this.ensureConnected?.(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);

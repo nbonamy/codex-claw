@@ -1410,6 +1410,20 @@ export function useAppState() {
     await loadActiveAgentCatalogs();
   }
 
+  async function handoffAgent(agentId: string, input: import('@codex-claw/core/agent-handoff').AgentHandoffInput): Promise<void> {
+    if (!codexClawApi?.handoffAgent) throw new Error('Handoff is unavailable on this host.');
+    try {
+      const next = await codexClawApi.handoffAgent(agentId, input);
+      const target = next.agents.find(agent => agent.handoff?.operationId === input.operationId && agent.handoff.sourceAgentId === agentId);
+      if (target) next.activeAgentId = target.id;
+      adoptNavigationSnapshot(next);
+      await loadActiveAgentCatalogs();
+    } catch (error) {
+      ElMessage.error(localizedErrorMessage(error, translate));
+      throw error;
+    }
+  }
+
   async function forkActiveAgentTurn(turnId: string): Promise<void> {
     const agentId = snapshot.value.activeAgentId;
     if (!agentId) {
@@ -1739,6 +1753,7 @@ export function useAppState() {
     removeWorkItemAssignment,
     duplicateAgent,
     forkAgent,
+    handoffAgent,
     forkActiveAgentTurn,
     moveAgentToTeam,
     reorderAgents,

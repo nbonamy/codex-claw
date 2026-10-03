@@ -320,6 +320,14 @@ export class CodexSurfaceAgentAdapter {
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
+  async assertHandoffReady(agent: Agent): Promise<void> {
+    const session = await this.ensureSession(agent);
+    const snapshot = session.handle.getSnapshot();
+    if (snapshot.activeTurnId || snapshot.busy || snapshot.queuedPrompts.length || snapshot.approvals.length || snapshot.clientRequests.length) {
+      throw new Error('Resolve the Codex turn, queue and requests before handing off.');
+    }
+  }
+
   async replaceConversationWithSummary(agent: Agent) {
     const currentSession = await this.ensureSession(agent);
     const currentSnapshot = currentSession.handle.getSnapshot();

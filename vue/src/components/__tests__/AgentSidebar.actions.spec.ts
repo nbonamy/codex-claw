@@ -354,6 +354,7 @@ describe('AgentSidebar actions', () => {
       'Edit Agent',
       'Duplicate Agent',
       'Fork Agent',
+      'Hand off…',
       'Move to Other Team',
       'Compact Session⇧⌘K',
       'Compress Session',
@@ -368,6 +369,7 @@ describe('AgentSidebar actions', () => {
     expect(document.body.querySelector('.agent-context-menu')).toBeNull();
 
     const expectedActions = [
+      ['Hand off…', 'handoff-agent'],
       ['Duplicate Agent', 'duplicate-agent'],
       ['Resume Session', 'resume-session'],
       ['Restart Agent', 'restart-agent'],

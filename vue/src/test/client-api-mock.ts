@@ -124,6 +124,7 @@ export function createClientApiMock(
     removeWorkItemAssignment: unscripted('removeWorkItemAssignment'),
     duplicateAgent: unscripted('duplicateAgent'),
     forkAgent: unscripted('forkAgent'),
+    handoffAgent: unscripted('handoffAgent'),
     moveAgentToTeam: unscripted('moveAgentToTeam'),
     reorderAgents: unscripted('reorderAgents'),
     reorderRepositories: unscripted('reorderRepositories'),

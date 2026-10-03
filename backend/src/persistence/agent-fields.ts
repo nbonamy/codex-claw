@@ -9,6 +9,7 @@ type Policy = 'persisted' | 'derived' | 'runtime';
  */
 const agentFieldPolicy = {
   id: 'persisted',
+  handoff: 'persisted',
   teamId: 'derived',
   delegatedByAgentId: 'persisted',
   pullRequest: 'persisted',

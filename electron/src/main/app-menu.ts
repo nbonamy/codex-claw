@@ -429,6 +429,10 @@ function buildAgentMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
         label: mainT('menu.forkAgent'),
         click: () => callbacks.sendAppCommand({ type: 'fork-active-agent' }),
       },
+      {
+        label: mainT('menu.handoffAgent'),
+        click: () => callbacks.sendAppCommand({ type: 'handoff-active-agent' }),
+      },
       { type: 'separator' },
       {
         label: mainT('menu.compactSession'),

@@ -1,3 +1,4 @@
+import { isAgentHandoff } from '@codex-claw/core/agent-handoff';
 import { isMission } from '@codex-claw/core/missions';
 import { isThreadFlags } from '@codex-claw/core/thread-flags';
 import { backendCodexHomeDir } from './state';
@@ -45,6 +46,7 @@ export type FullPersistedState = PersistedState & {
 };
 
 export type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' | 'updatedAt'> & {
+  handoff?: Agent['handoff'];
   delegatedByAgentId?: string;
   pullRequest?: Agent['pullRequest'];
   sessionKind?: Agent['sessionKind'];
@@ -115,6 +117,7 @@ function persistedAgentFromSnapshot(agent: Agent, libraries?: RepositoryVisualiz
   }
   return {
     id: agent.id,
+    ...(agent.handoff ? { handoff: structuredClone(agent.handoff) } : {}),
     teamId: agent.teamId,
     ...(agent.delegatedByAgentId ? { delegatedByAgentId: agent.delegatedByAgentId } : {}),
     ...(agent.pullRequest ? { pullRequest: { ...agent.pullRequest } } : {}),
@@ -357,6 +360,7 @@ function sanitizeAgent(value: unknown, libraries: RepositoryVisualizations): Age
   const visualize = sanitizeVisualizeSession(value.visualize ?? value.design, repositoryRoot ? libraries[repositoryRoot] : undefined);
   return {
     id: value.id,
+    ...(isAgentHandoff(value.handoff) ? { handoff: structuredClone(value.handoff) } : {}),
     teamId: typeof value.teamId === 'string' ? value.teamId : undefined,
     ...(typeof value.delegatedByAgentId === 'string' && value.delegatedByAgentId.trim()
       ? { delegatedByAgentId: value.delegatedByAgentId.trim() }

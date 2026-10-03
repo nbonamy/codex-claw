@@ -2,6 +2,7 @@ import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import type { Agent, AppSnapshot, SendPromptOptions } from '@codex-claw/core/contracts';
 import { createEntityId } from '@codex-claw/core/ids';
+import { handoffInProgress } from '@codex-claw/core/agent-handoff';
 
 export type AgentPromptManagerOptions = {
   getSnapshot: () => AppSnapshot;
@@ -35,6 +36,7 @@ export class AgentPromptManager {
     const snapshot = this.options.getSnapshot();
     const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
     if (!agent) return snapshot;
+    if (handoffInProgress(agent)) throw new Error('Wait for the handoff to finish.');
     if (this.options.isEngineConnected?.(agent) === false) throw new Error('Engine is not connected. Reconnect in Settings.');
 
     if (!canStartPrompt(agent)) {
@@ -177,7 +179,7 @@ export class AgentPromptManager {
 }
 
 function canStartPrompt(agent: Agent): boolean {
-  return agent.status.type !== 'working' && agent.status.type !== 'awaitingInput';
+  return !handoffInProgress(agent) && agent.status.type !== 'working' && agent.status.type !== 'awaitingInput';
 }
 
 function queuedPromptKey(agentId: string, promptId: string): string {

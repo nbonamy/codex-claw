@@ -1,4 +1,5 @@
 import { isMission } from './missions';
+import { isAgentHandoff } from './agent-handoff';
 import { isProviderConnection } from './contracts/provider-setup';
 import { isThreadFlags } from './thread-flags';
 import { isAppTextDescriptor } from './app-text';
@@ -104,6 +105,7 @@ function isAgent(value: unknown): boolean {
     typeof value.id === 'string' &&
     optional(value, 'teamId', isString) &&
     optional(value, 'delegatedByAgentId', isString) &&
+    optional(value, 'handoff', isAgentHandoff) &&
     optional(value, 'pullRequest', isAgentPullRequestTracking) &&
     optional(value, 'sessionKind', (candidate) => candidate === 'quickChat') &&
     isNullableString(value.name) &&
