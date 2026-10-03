@@ -929,9 +929,6 @@ export const surfaceMessages = {
     "quit": "Quit",
     "usage": "Usage",
     "accountMenu": "Account menu",
-    "openAIAPIKey": "OpenAI API key",
-    "codexAccount": "Codex account",
-    "usageBasedBilling": "Usage-based billing",
     "weekly": "Weekly",
     "unknown": "Unknown"
   },

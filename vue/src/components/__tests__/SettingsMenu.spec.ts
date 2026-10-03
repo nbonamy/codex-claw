@@ -157,14 +157,14 @@ describe('SettingsMenu', () => {
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
 
-  it('shows the ChatGPT account and emits logout', async () => {
+  it('omits the Codex account header while preserving menu actions', async () => {
     const wrapper = mountMenu(undefined, {
       account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
     });
 
     await openMenu(wrapper);
-    expect(wrapper.text()).toContain('nico@example.com');
-    expect(wrapper.text()).toContain('pro');
+    expect(wrapper.text()).not.toContain('nico@example.com');
+    expect(wrapper.text()).not.toContain('pro');
     expect(wrapper.get('[aria-label="Account menu"]').element).toBeInstanceOf(HTMLElement);
     await wrapper.findAll('button').find((button) => button.text() === 'Log out')?.trigger('click');
 

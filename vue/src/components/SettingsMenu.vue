@@ -20,14 +20,6 @@
     </template>
 
     <div class="settings-menu" :aria-label="$t('surface.settingsMenu.settingsMenu')">
-      <div v-if="account" class="settings-menu__account">
-        <UserCircleIcon aria-hidden="true" />
-        <div>
-          <strong>{{ accountLabel }}</strong>
-          <span>{{ accountDescription }}</span>
-        </div>
-      </div>
-
       <div v-if="usageGroups.length" class="settings-menu__rate-limits" :aria-label="$t('surface.settingsMenu.rateLimits')">
         <div class="settings-menu__rate-limits-header">
           <BrandSpeedTest />
@@ -137,12 +129,6 @@ const menuItems = computed<AppMenuItem[]>(() => [
     danger: true,
   } satisfies AppMenuItem] : []),
 ]);
-const accountLabel = computed(() => props.account?.type === 'chatgpt'
-  ? props.account.email ?? translate('dynamic.misc.chatGptAccount')
-  : props.account?.type === 'apiKey' ? translate('surface.settingsMenu.openAIAPIKey') : translate('surface.settingsMenu.codexAccount'));
-const accountDescription = computed(() => props.account?.type === 'chatgpt'
-  ? props.account.planType
-  : props.account?.type === 'apiKey' ? translate('surface.settingsMenu.usageBasedBilling') : '');
 
 type RateLimitRow = {
   label: string;
@@ -247,38 +233,6 @@ function selectMenuItem(itemId: string): void {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-}
-
-.settings-menu__account {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.settings-menu__account > svg {
-  flex: 0 0 auto;
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-}
-
-.settings-menu__account > div {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-menu__account strong,
-.settings-menu__account span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-menu__account span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
 }
 
 .settings-menu__rate-limits {
