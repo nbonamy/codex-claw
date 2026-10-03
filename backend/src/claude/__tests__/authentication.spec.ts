@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLocalClaudeAuthentication } from '../authentication';
+import { ClaudeBackendDriver } from '../claude-driver';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -18,6 +19,30 @@ vi.mock('@codex-claw/core/runtime-discovery', () => ({ withDiscoveredRuntimePath
 beforeEach(() => { cli.error = null; cli.calls.mockClear(); });
 
 describe('local Claude authentication', () => {
+  it.each(['/tmp/claw-auth-home', path.join(homedir(), '.claude')])('logs out through the CLI in the selected home: %s', async (directory) => {
+    vi.stubEnv('CLAUDE_CONFIG_DIR', directory);
+    vi.stubEnv('CODEX_CLAW_CLAUDE_COMMAND', '/custom/bin/claude');
+    cli.stdout = 'Logged out';
+    const driver = new ClaudeBackendDriver();
+    try {
+      const configDirectory = directory === path.join(homedir(), '.claude') ? null : directory;
+      await expect(driver.authenticate({ action: 'logout' })).resolves.toEqual({
+        kind: 'claude', connected: false, state: { loggedIn: false, configDirectory },
+      });
+      expect(cli.calls).toHaveBeenCalledExactlyOnceWith('/custom/bin/claude', ['auth', 'logout'], expect.objectContaining({
+        env: { CLAUDE_CONFIG_DIR: configDirectory ?? undefined }, timeout: 15_000,
+      }));
+    } finally { await driver.close(); vi.unstubAllEnvs(); }
+  });
+
+  it('reports failed logout without exposing CLI output or pretending to disconnect', async () => {
+    cli.error = { code: 1 };
+    const driver = new ClaudeBackendDriver();
+    try {
+      await expect(driver.authenticate({ action: 'logout' })).rejects.toThrow('Could not sign out of Claude Code. Please try again.');
+    } finally { await driver.close(); }
+  });
+
   it('leaves the default home implicit so Claude can find the normal login', async () => {
     vi.stubEnv('CLAUDE_CONFIG_DIR', path.join(homedir(), '.claude'));
     cli.stdout = JSON.stringify({ loggedIn: true });

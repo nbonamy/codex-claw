@@ -126,6 +126,7 @@
         :claude-connection-error="claudeError ?? snapshot.providerConnections?.find(engine => engine.backend === 'claude')?.error"
         :connect-codex="startChatGptLogin"
         :connect-claude="connectClaude"
+        :disconnect-provider="disconnectProvider"
         :cancel-codex-login="cancelChatGptLogin"
         :active-tab="settingsActiveTab"
         :general-settings="snapshot.general"
@@ -1263,7 +1264,7 @@ const firstRunOnboarding = useFirstRunOnboarding({
 const {
   claudeAuthentication, claudeConnected, claudeLoading, claudeError, claudeDialogVisible,
   providerSetup, customizedSetup, customizingProvider, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
-  codexConnected, continuing, connectClaude, refreshClaude, continueWithProviders,
+  codexConnected, continuing, connectClaude, disconnectProvider, refreshClaude, continueWithProviders,
   authentication,
   authenticationCancelling,
   authenticationError,

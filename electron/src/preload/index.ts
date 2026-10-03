@@ -125,6 +125,7 @@ const api: CodexClawApi = {
   getProviderConnections: (remoteConnectionId) => ipc.invoke(ipcChannels.getProviderConnections, remoteConnectionId),
   getProviderUsage: (backend) => ipc.invoke(ipcChannels.getProviderUsage, backend),
   setProviderEnabled: (backend, enabled, remoteConnectionId) => ipc.invoke(ipcChannels.setProviderEnabled, backend, enabled, remoteConnectionId),
+  disconnectProvider: (backend, remoteConnectionId) => ipc.invoke(ipcChannels.disconnectProvider, backend, remoteConnectionId),
   configureProviderSetup: (backend, choice) => ipc.invoke(ipcChannels.configureProviderSetup, backend, choice),
   installProvider: (backend, remoteConnectionId) => ipc.invoke(ipcChannels.installProvider, backend, remoteConnectionId),
   cancelCodexChatGptLogin: (remoteConnectionId?: string, loginId?: string) => ipc.invoke(ipcChannels.cancelCodexChatGptLogin, remoteConnectionId, loginId),
