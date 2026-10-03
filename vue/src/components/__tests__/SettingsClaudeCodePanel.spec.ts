@@ -22,8 +22,9 @@ describe('SettingsClaudeCodePanel', () => {
     await wrapper.get('[role="switch"]').trigger('click');
     await flushPromises();
     expect(setEnabled).toHaveBeenLastCalledWith(true);
-    await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
-    expect(wrapper.emitted('connect')).toHaveLength(2);
+    await wrapper.findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
+    expect(wrapper.emitted('disconnect')).toEqual([[]]);
+    expect(wrapper.emitted('connect')).toHaveLength(1);
     await wrapper.findAll('button').find(button => button.text() === 'Customize')!.trigger('click');
     expect(wrapper.emitted('customize')).toEqual([[]]);
   });

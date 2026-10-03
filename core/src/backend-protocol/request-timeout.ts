@@ -21,6 +21,7 @@ const requestTimeoutByMethod = {
   [backendMethods.driverAccountRateLimitsGet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.providerConnectionsGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.providerEnabledSet]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerDisconnect]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.providerSetupGet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.providerSetupConfigure]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.providerInstall]: EXTENDED_REQUEST_TIMEOUT_MS,

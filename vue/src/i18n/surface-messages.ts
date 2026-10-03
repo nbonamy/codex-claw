@@ -925,7 +925,6 @@ export const surfaceMessages = {
     "settingsActions": "Settings actions",
     "settings": "Settings",
     "whatSNew": "What’s New",
-    "logOut": "Log out",
     "quit": "Quit",
     "usage": "Usage",
     "accountMenu": "Account menu",

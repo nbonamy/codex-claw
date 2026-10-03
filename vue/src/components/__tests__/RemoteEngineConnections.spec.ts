@@ -24,12 +24,36 @@ describe('RemoteEngineConnections', () => {
     await wrapper.get('[role="switch"]').trigger('click');
     await flushPromises();
     expect(api.setProviderEnabled).toHaveBeenCalledExactlyOnceWith('claude', false, 'wall-e');
-    expect(wrapper.get('.settings-row__control button').text()).toBe('Connect');
-    await wrapper.get('.settings-row__control button').trigger('click');
+    expect(wrapper.get('.settings-row__control button').text()).toBe('Disconnect');
+    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('false');
+    await wrapper.get('[role="switch"]').trigger('click');
     await flushPromises();
     expect(api.setProviderEnabled).toHaveBeenLastCalledWith('claude', true, 'wall-e');
     expect(wrapper.get('.settings-row__control button').text()).toBe('Disconnect');
     expect(api.getClaudeAuthentication).not.toHaveBeenCalled();
+    expect(api.disconnectProvider).not.toHaveBeenCalled();
+  });
+
+  it.each(['codex', 'claude'] as const)('keeps remote %s connected on logout failure and refreshes after successful logout', async backend => {
+    const { api } = createClientApiMock();
+    const engine = { backend, installed: true, connected: true, checking: false, enabled: false };
+    api.getProviderConnections.mockResolvedValueOnce([engine]).mockResolvedValue([{ ...engine, connected: false }]);
+    api.disconnectProvider.mockRejectedValueOnce(new Error('private CLI output')).mockResolvedValue({ kind: 'claude', connected: false, state: { loggedIn: false } });
+    configureClawClient({ platform: 'desktop', api });
+    const wrapper = mount(RemoteEngineConnections, { props: { connection } });
+    await flushPromises();
+    await wrapper.get('.settings-row__control button').trigger('click');
+    await flushPromises();
+    expect(api.disconnectProvider).toHaveBeenCalledExactlyOnceWith(backend, 'wall-e');
+    expect(wrapper.get('[role="alert"]').text()).toBe('Could not sign out. Please try again.');
+    expect(wrapper.get('.settings-row__control button').text()).toBe('Disconnect');
+    await wrapper.get('.settings-row__control button').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.get('.settings-row__control button').text()).toBe('Connect');
+    expect(api.getProviderConnections).toHaveBeenLastCalledWith('wall-e');
+    expect(api.setProviderEnabled).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it('installs only the selected remote engine and signs in to its configured home', async () => {

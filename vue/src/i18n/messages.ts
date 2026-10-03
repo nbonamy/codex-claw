@@ -19,7 +19,7 @@ export const messages = {
       lastEngine: 'To turn this engine off, first connect or enable another one.',
       updateFailed: 'Could not update engine status. Please try again.',
       required: 'Connect or enable an engine in Settings to start new work.',
-      preserveLogin: 'Disconnecting only turns this engine off in Claw. Your CLI sign-in and chats are kept.',
+      disconnectFailed: 'Could not sign out. Please try again.',
     },
     engineSetup: {
       title: 'Location',

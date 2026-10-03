@@ -111,7 +111,6 @@
           :rate-limits="rateLimits"
           :enabled-backends="enabledBackends"
           :backend-rate-limits="backendRateLimits"
-          @logout="emit('logout')"
           @open-settings="emit('open-settings')"
           @open-whats-new="emit('open-whats-new')"
           @quit="emit('quit')"
@@ -173,7 +172,6 @@ const emit = defineEmits<{
   'new-team': [];
   'open-settings': [];
   'open-whats-new': [];
-  logout: [];
   quit: [];
   'reorder-teams': [input: ReorderTeamsInput];
   'select-cockpit': [];

@@ -490,6 +490,7 @@ export class AppController {
     ipc.handle(ipcChannels.getProviderConnections, (_event, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerConnectionsGet, { remoteConnectionId }));
     ipc.handle(ipcChannels.getProviderUsage, (_event, backend) => this.requireBackendClient().request(backendMethods.providerUsageGet, { backend }));
     ipc.handle(ipcChannels.setProviderEnabled, (_event, backend, enabled, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerEnabledSet, { backend, enabled, remoteConnectionId }));
+    ipc.handle(ipcChannels.disconnectProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerDisconnect, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.configureProviderSetup, (_event, backend, choice) => this.requireBackendClient().request(backendMethods.providerSetupConfigure, { backend, choice }));
     ipc.handle(ipcChannels.installProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerInstall, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.cancelCodexChatGptLogin, (_event, remoteConnectionId?: string, loginId?: string) => this.cancelCodexChatGptLogin(remoteConnectionId, loginId));

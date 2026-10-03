@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { getLocalClaudeAuthentication } from './authentication';
+import { getLocalClaudeAuthentication, logoutLocalClaude } from './authentication';
 import { getClaudeAccountUsage } from './account-usage';
 import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import type {
@@ -112,8 +112,8 @@ type ClaudeReviewTurnConfiguration = {
 
 export class ClaudeConversationHost implements AgentBackendDriver {
   async authenticate(request: import('@codex-claw/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@codex-claw/core/contracts/provider-setup').ProviderAuthentication> {
-    if (request.action !== 'check') throw new Error('Manage Claude authentication through its CLI.');
-    const state = await getLocalClaudeAuthentication();
+    if (request.action === 'cancel') throw new Error('Manage Claude authentication through its CLI.');
+    const state = await (request.action === 'logout' ? logoutLocalClaude() : getLocalClaudeAuthentication());
     return { kind: 'claude', connected: state.loggedIn, state };
   }
   readonly backend = 'claude' as const;

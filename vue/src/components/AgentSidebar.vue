@@ -250,6 +250,15 @@
               :data-status="session.status.type"
               :aria-label="session.isUnread ? t('sidebar.unread') : statusLabel(session.status.type)"
             />
+            <span
+              v-if="agentsById.get(session.agentId)"
+              class="agent-sidebar__engine"
+              role="img"
+              :aria-label="backendDisplayName(agentsById.get(session.agentId)!.backend)"
+              :title="backendDisplayName(agentsById.get(session.agentId)!.backend)"
+            >
+              <BackendIcon :backend="agentsById.get(session.agentId)!.backend" monochrome />
+            </span>
           </button>
           <el-tooltip
             v-if="isPullRequestFinished(session)"
@@ -333,6 +342,8 @@ import {
   TargetArrowIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
+import BackendIcon from './BackendIcon.vue';
+import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import MissionContextMenu from './MissionContextMenu.vue';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
@@ -414,6 +425,7 @@ const workspaceGroups = computed(() => projectWorkspaceSidebar({
   quickChatsLabel: t('sidebar.chats'),
   unreadAgentIds: props.unreadAgentIds,
 }).sort((left, right) => Number(right.kind === 'quickChats') - Number(left.kind === 'quickChats')));
+const agentsById = computed(() => new Map(props.agents.map(agent => [agent.id, agent])));
 const quickChatGroup = computed(() => workspaceGroups.value.find((group) => group.kind === 'quickChats') ?? null);
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuMissionId = ref<string | null>(null);
@@ -753,6 +765,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-workspace-column-gap: 4px;
   --agent-sidebar-workspace-inline-padding: 4px;
   --agent-sidebar-status-column-width: 12px;
+  --agent-sidebar-engine-column-width: 18px;
   --agent-status-dot-size: 8px;
   position: relative;
   container-type: inline-size;
@@ -1036,7 +1049,8 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: grid;
   grid-template-columns:
     var(--agent-sidebar-repository-icon-column-width) minmax(0, 1fr)
-    var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width));
+    var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width))
+    var(--agent-sidebar-engine-column-width);
   align-items: center;
   gap: var(--agent-sidebar-workspace-column-gap);
   margin: 0;
@@ -1063,6 +1077,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   top: 50%;
   right: calc(
     var(--space-6) +
+      var(--agent-sidebar-engine-column-width) + var(--agent-sidebar-workspace-column-gap) +
       (var(--agent-sidebar-status-column-width) - var(--agent-status-dot-size)) / 2 +
       1px
   );
@@ -1095,7 +1110,9 @@ function onResizePointerEnd(event: PointerEvent): void {
   .agent-sidebar__agent,
 .agent-sidebar__workspace-group[data-group-kind="missions"]
   .agent-sidebar__agent {
-  grid-template-columns: minmax(0, 1fr) var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width));
+  grid-template-columns: 0 minmax(0, 1fr)
+    var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width))
+    var(--agent-sidebar-engine-column-width);
   padding-left: calc(
     var(--agent-sidebar-workspace-inline-padding) + var(--space-10)
   );
@@ -1175,6 +1192,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__meta {
+  grid-column: 2;
   min-width: 0;
   display: grid;
   gap: 1.5px;
@@ -1198,6 +1216,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__status {
+  grid-column: 3;
   width: var(--agent-status-dot-size);
   height: var(--agent-status-dot-size);
   border-radius: var(--radius-full);
@@ -1205,6 +1224,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__input-needed {
+  grid-column: 3;
   padding: var(--space-1) var(--space-4);
   border-radius: var(--radius-sm);
   color: var(--color-primary);
@@ -1217,6 +1237,20 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__input-needed--with-cleanup {
   margin-right: calc(var(--agent-sidebar-status-column-width) + var(--space-4));
+}
+
+.agent-sidebar__engine {
+  grid-column: 4;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.agent-sidebar:hover .agent-sidebar__engine,
+.agent-sidebar:focus-within .agent-sidebar__engine {
+  opacity: 1;
 }
 
 .agent-sidebar__status[data-status="working"],
@@ -1234,6 +1268,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__quick-switch-shortcut {
+  grid-column: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;

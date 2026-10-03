@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClawBackendServer } from '../server';
-import { getLocalClaudeAuthentication } from '../claude/authentication';
+import { getLocalClaudeAuthentication, logoutLocalClaude } from '../claude/authentication';
 import { ClaudeBackendDriver } from '../claude/claude-driver';
 import { createTestSnapshot, readyRemoteConnection } from './server-test-fixtures';
 import { normalizeGeneralSettings } from '@codex-claw/core/settings';
 
-vi.mock('../claude/authentication', () => ({ getLocalClaudeAuthentication: vi.fn() }));
+vi.mock('../claude/authentication', () => ({ getLocalClaudeAuthentication: vi.fn(), logoutLocalClaude: vi.fn() }));
 
 describe('connected engine admission', () => {
   it('persists disablement without probing, interrupting a turn, or losing queued work; external auth changes are ignored', async () => {
@@ -81,13 +81,34 @@ describe('connected engine admission', () => {
       expect(driverRpc.handle).toHaveBeenCalledExactlyOnceWith('driver/provider/authentication', { backend: 'claude', action: 'check' });
       const agent = snapshot.agents[0]!;
       snapshot.queuedPrompts = [{ id: 'queued', agentId: agent.id, text: 'Later', createdAt: '' }];
-      vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: false });
-      await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'claude/authentication/get' });
+      vi.mocked(logoutLocalClaude).mockRejectedValueOnce(new Error('Sign-out failed')).mockResolvedValue({ loggedIn: false });
+      const disconnect = { jsonrpc: '2.0' as const, id: 2, method: 'provider/disconnect', params: { backend: 'claude' } };
+      await expect(server.handleMessage(disconnect)).resolves.toMatchObject({ error: { message: 'Sign-out failed' } });
+      expect(snapshot.providerConnections?.find(engine => engine.backend === 'claude')?.connected).toBe(true);
+      await expect(server.handleMessage(disconnect)).resolves.toMatchObject({ result: { kind: 'claude', connected: false } });
+      expect(driverRpc.handle).toHaveBeenLastCalledWith('driver/provider/authentication', { backend: 'claude', action: 'logout' });
+      expect(snapshot.general.providerEnabled?.claude).not.toBe(false);
       const rejected = await server.handleMessage({ jsonrpc: '2.0', id: 3, method: 'agent/prompt/send', params: { agentId: agent.id, prompt: 'New work' } });
       expect(rejected).toMatchObject({ error: { message: expect.stringContaining('not connected') } });
       expect(snapshot.agents).toHaveLength(1);
       expect(snapshot.agents[0]?.backend).toBe('claude');
       expect(snapshot.queuedPrompts).toMatchObject([{ id: 'queued', text: 'Later' }]);
+    } finally { await server.close(); }
+  });
+
+  it.each(['codex', 'claude'])('signs out remote %s only on its owning host', async backend => {
+    const snapshot = createTestSnapshot();
+    const connection = readyRemoteConnection();
+    snapshot.remoteConnections.connections = [connection];
+    const localConnections = structuredClone(snapshot.providerConnections);
+    const result = { kind: backend, connected: false, state: {} };
+    const clients = { request: vi.fn().mockResolvedValue(result), close: vi.fn() };
+    const server = new ClawBackendServer({ version: 'test', snapshot, remoteClients: clients as never });
+    try {
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/disconnect', params: { backend, remoteConnectionId: connection.id } }))
+        .resolves.toMatchObject({ result });
+      expect(clients.request).toHaveBeenCalledWith(connection, 'provider/disconnect', expect.objectContaining({ backend }), expect.any(Function));
+      expect(snapshot.providerConnections).toEqual(localConnections);
     } finally { await server.close(); }
   });
 

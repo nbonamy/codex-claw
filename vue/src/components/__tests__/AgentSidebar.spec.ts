@@ -9,6 +9,23 @@ import type { Agent } from '@codex-claw/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
+  it('identifies each engine in a reserved column after status, including quick chats and input requests', async () => {
+    const claude: Agent = { ...agents[1]!, backend: 'claude', backendDefaults: { kind: 'claude' }, sessionKind: 'quickChat', status: { type: 'awaitingInput' } };
+    const wrapper = mount(AgentSidebar, { props: { agents: [agents[0]!, claude], activeAgentId: null, teamName: 'Team' } });
+    const rows = [agents[0]!, claude].map(agent => wrapper.get(`[data-reorder-id="${agent.id}"]`));
+    const icons = rows.map(row => row.get('[role="img"]'));
+    expect(icons.map(icon => icon.attributes('aria-label'))).toEqual(['Codex', 'Claude Code']);
+    for (const [index, icon] of icons.entries()) {
+      expect(icon.element.previousElementSibling?.getAttribute('aria-label')).toBe(index === 0 ? 'Idle' : 'Awaiting input');
+      expect(getComputedStyle(icon.element).gridColumn).toBe('4');
+      expect(getComputedStyle(icon.element).opacity).toBe('0');
+    }
+    await wrapper.setProps({ agents: [agents[0]!, { ...claude, backend: 'codex', backendDefaults: { kind: 'codex' } }] });
+    expect(rows[1]!.get('[role="img"]').attributes('aria-label')).toBe('Codex');
+    await rows[1]!.trigger('click');
+    expect(wrapper.emitted('select-agent')).toEqual([[claude.id]]);
+  });
+
   it('keeps the input label visible over unread and shortcut indicators until the agent resumes', async () => {
     const waiting: Agent = { ...agents[0]!, status: { type: 'awaitingInput' } };
     const wrapper = mount(AgentSidebar, {

@@ -42,7 +42,7 @@ describe('BackendDriverRpc', () => {
         .resolves.toMatchObject({ result: state });
       expect(authenticate).toHaveBeenLastCalledWith({ action: 'cancel', loginId: 'login-1' });
       authenticate.mockResolvedValue({ kind: 'codex', connected: false, state });
-      await server.handleMessage({ jsonrpc: '2.0', id: 4, method: 'codex/authentication/logout' });
+      await server.handleMessage({ jsonrpc: '2.0', id: 4, method: 'provider/disconnect', params: { backend: 'codex' } });
       expect(authenticate).toHaveBeenLastCalledWith({ action: 'logout' });
       expect(snapshot.providerConnections?.[0]?.connected).toBe(false);
       expect(driver.sendPrompt).not.toHaveBeenCalled();
