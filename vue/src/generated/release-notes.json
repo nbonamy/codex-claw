@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.25.0",
+  "currentVersion": "0.25.1",
   "releases": [
+    {
+      "version": "0.25.1",
+      "releasedAt": "2026-10-03",
+      "sourceSha256": "cabb8d6bff6e7df17d2f452dbe9117efb2e4c8d547c77d0ce3c80a1a88b450d3",
+      "markdown": "### New features\n\n- Use Hand off from an agent's context menu or the Agent menu to continue its\n  work with a new Codex or Claude agent in the same workspace. Choose the\n  engine and model, optionally add instructions, and let the current agent\n  write a handoff note before Claw closes it and starts its replacement.\n  Hand off is available for idle workspace agents after pending work is resolved.\n- Identify each agent's engine by hovering over the sidebar or focusing it\n  with the keyboard. Icons appear beside the right-aligned status without\n  reserving space when hidden, and are omitted when only one engine is enabled.\n\n### Improvements and fixes\n\n- Disconnect in Settings now signs out of Codex or Claude in the configured\n  home, including on SSH hosts, instead of only disabling the engine.\n  Reconnecting opens the sign-in flow. The separate enable toggle preserves\n  sign-in, and the Codex-only Log out action has been removed from the user menu.\n- Selecting an agent focuses its composer, including after a cold conversation\n  finishes loading. Clicking controls in another split pane keeps their focus.\n- Merging a worktree no longer reports failure just because its remote-tracking\n  branch is behind. If branch or worktree cleanup cannot finish, Claw reports\n  the successful merge separately from the cleanup warning."
+    },
     {
       "version": "0.25.0",
       "releasedAt": "2026-10-03",
