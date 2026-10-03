@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.25.1",
+  "currentVersion": "0.25.2",
   "releases": [
+    {
+      "version": "0.25.2",
+      "releasedAt": "2026-10-03",
+      "sourceSha256": "ef8b09ab1da913790e50fec236afca2cb8f84bcf8ff0dac66e8a1e4cba4bba65",
+      "markdown": "### Fixes\n\n- The sidebar's Input label now clears when a Codex question or approval is\n  answered, returning to Working or Idle without waiting for another activity\n  update. It remains visible if another request still needs a response."
+    },
     {
       "version": "0.25.1",
       "releasedAt": "2026-10-03",

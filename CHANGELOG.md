@@ -4,6 +4,14 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.25.2] - 2026-10-03
+
+### Fixes
+
+- The sidebar's Input label now clears when a Codex question or approval is
+  answered, returning to Working or Idle without waiting for another activity
+  update. It remains visible if another request still needs a response.
+
 ## [0.25.1] - 2026-10-03
 
 ### New features
