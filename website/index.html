@@ -38,7 +38,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=0.14.1" />
+    <link rel="stylesheet" href="styles.css?v=0.25.0-docs-2" />
   </head>
   <body>
     <header class="site-header shell">
@@ -52,12 +52,17 @@
         <a href="#workspace">Workspace</a>
         <a href="#automations">Automations</a>
       </nav>
-      <a
-        class="header-cta"
-        href="/desktop/downloads/codex-claw-macos-arm64.dmg"
-        download
-        >Download for macOS <span aria-hidden="true">↓</span></a
-      >
+      <div class="header-actions">
+        <a class="header-docs" href="/docs/">Docs</a>
+        <a
+          class="header-cta"
+          href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+          aria-label="Download for macOS"
+          download
+          >Download<span class="header-platform"> for macOS</span>
+          <span class="header-download-icon" aria-hidden="true">↓</span></a
+        >
+      </div>
     </header>
 
     <main id="top">

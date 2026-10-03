@@ -7,9 +7,11 @@ REMOTE_ROOT="${CODEX_CLAW_WEBSITE_ROOT:-/var/www/codex-claw}"
 NGINX_CONFIG="${CODEX_CLAW_NGINX_CONFIG:-/etc/nginx/sites-available/codex-claw.nabocorp.com.conf}"
 NGINX_BOOTSTRAP_CONFIG="/etc/nginx/sites-available/codex-claw.nabocorp.com.bootstrap.conf"
 
+npm --prefix "$ROOT_DIR/.." run build:website
+
 echo "Deploying Codex Claw website to ${HOST}:${REMOTE_ROOT}"
 ssh "$HOST" "sudo mkdir -p '$REMOTE_ROOT/site' && sudo chown -R \"\$(id -un):\$(id -gn)\" '$REMOTE_ROOT'"
-tar --exclude 'deploy.sh' -czf - -C "$ROOT_DIR" . | ssh "$HOST" "tar -xzf - -C '$REMOTE_ROOT/site'"
+tar -czf - -C "$ROOT_DIR/../dist/website" . | ssh "$HOST" "tar -xzf - -C '$REMOTE_ROOT/site'"
 if ! ssh "$HOST" "test -f /etc/letsencrypt/live/codex-claw.nabocorp.com/fullchain.pem"; then
   echo "No TLS certificate found; provisioning one with Certbot"
   scp "$ROOT_DIR/nginx-bootstrap.conf" "$HOST:/tmp/codex-claw.nabocorp.com.bootstrap.conf"

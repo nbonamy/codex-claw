@@ -145,6 +145,9 @@ types.
 
 ## Documentation
 
+- [User guide](website/docs/index.md): setup, providers, workflows, features, and troubleshooting.
+- Run `npm run docs:dev` for a local VitePress preview, or `npm run test:docs`
+  to build the public website and check its generated documentation links.
 - [Architecture](docs/architecture.md)
 - [Backend protocol](docs/protocol.md)
 - [Codex integration](docs/codex.md)

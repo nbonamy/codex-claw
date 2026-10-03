@@ -100,6 +100,9 @@ changes; specify feature behavior in tests:
   backend seam, persistence, and open architecture decisions.
 - `plans/codex-claw.md`: current product progression and commit checkpoints.
 - `docs/codex.png`: visual reference for the target shell.
+- `website/README.md`: read before changing the public VitePress guide in
+  `website/docs/` or the website build and deployment. Public user guides are
+  separate from the internal engineering notes in `docs/`.
 
 When a new doc is needed, discuss it with Nicolas first. If approved, add it
 under `docs/` and link it here.
