@@ -47,6 +47,7 @@ export function createAgentInSnapshot(
   options: { select?: boolean; afterAgentId?: string } = {},
 ): AppSnapshot {
   const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
+  if (!input.backendDefaults) applyProviderModelDefaults(snapshot, agent);
   const source = options.afterAgentId
     ? snapshot.agents.find((candidate) => candidate.id === options.afterAgentId)
     : undefined;
@@ -68,6 +69,7 @@ export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQu
     backend: resolveAgentBackend(snapshot, input.backend),
     ...(input.teamId ? { teamId: input.teamId } : {}),
   }, createdAt, targetTeamId(snapshot, input.teamId), id);
+  applyProviderModelDefaults(snapshot, agent);
   agent.folder = null;
   agent.sessionKind = 'quickChat';
   return insertAgentInSnapshot(snapshot, agent, options.select);
@@ -97,6 +99,10 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
       ...(input.modelSelection.reasoningEffort ? { reasoningEffort: input.modelSelection.reasoningEffort } : {}),
       ...(agent.backend === 'codex' ? { serviceTier: input.modelSelection.serviceTier } : {}),
     } as BackendDefaults;
+    snapshot.general.providerModelDefaults = {
+      ...snapshot.general.providerModelDefaults,
+      [agent.backend]: { ...input.modelSelection },
+    };
   }
   if (input.name !== undefined) {
     agent.name = normalizedOptionalString(input.name) ?? null;
@@ -211,6 +217,18 @@ function clearAgentRuntimeState(agent: Agent): void {
 
 function normalizedBackend(value: AgentBackend | undefined): AgentBackend {
   return value === 'claude' ? 'claude' : 'codex';
+}
+
+function applyProviderModelDefaults(snapshot: AppSnapshot, agent: Agent): void {
+  const selection = snapshot.general.providerModelDefaults?.[agent.backend];
+  if (!selection) return;
+  agent.backendDefaults = {
+    ...(agent.backendDefaults?.kind === agent.backend ? agent.backendDefaults : defaultBackendDefaults(agent.backend)),
+    model: selection.model,
+    userSelectedModel: true,
+    ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+    ...(agent.backend === 'codex' ? { serviceTier: selection.serviceTier } : {}),
+  } as BackendDefaults;
 }
 
 function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {

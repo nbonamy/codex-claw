@@ -132,6 +132,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     ...(value.providerOnboardingComplete === true || typeof value.codexEnabled === 'boolean' ? { providerOnboardingComplete: true } : {}),
     ...(isRecord(value.providerHomes) ? { providerHomes: normalizeProviderHomes(value.providerHomes) } : {}),
     ...(isRecord(value.providerEnabled) ? { providerEnabled: Object.fromEntries(Object.entries(value.providerEnabled).filter(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && typeof enabled === 'boolean')) } : {}),
+    ...(isRecord(value.providerModelDefaults) ? { providerModelDefaults: normalizeProviderModelDefaults(value.providerModelDefaults) } : {}),
     agentListCompact: value.agentListCompact === true,
     cockpitAgentViewMode: value.cockpitAgentViewMode === 'recent' ? 'recent' : 'teams',
     collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
@@ -155,6 +156,21 @@ function normalizeProviderHomes(value: Record<string, unknown>): NonNullable<App
     }
   }
   return homes;
+}
+
+function normalizeProviderModelDefaults(value: Record<string, unknown>): NonNullable<AppGeneralSettings['providerModelDefaults']> {
+  const defaults: NonNullable<AppGeneralSettings['providerModelDefaults']> = {};
+  for (const backend of ['codex', 'claude'] as const) {
+    const entry = value[backend];
+    const model = isRecord(entry) ? normalizeString(entry.model) : undefined;
+    if (!isRecord(entry) || !model) continue;
+    defaults[backend] = {
+      model,
+      reasoningEffort: normalizeString(entry.reasoningEffort) || null,
+      serviceTier: normalizeString(entry.serviceTier) || null,
+    } as NonNullable<typeof defaults[typeof backend]>;
+  }
+  return defaults;
 }
 
 function normalizeSpokenAnnouncementVoice(value: unknown): SpokenAnnouncementVoice {

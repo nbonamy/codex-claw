@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   assignWorkItemToAgentInSnapshot,
+  createAgentInSnapshot,
+  createQuickChatInSnapshot,
   closeAgentInSnapshot,
   completeWorkItemAssignmentInSnapshot,
   duplicateAgentInSnapshot,
@@ -44,6 +46,30 @@ describe('agent-manager', () => {
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' })).toThrow('not connected');
     expect(agent.backend).toBe('codex');
+  });
+  it('makes a chat model selection the provider default for new agents and quick chats only', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
+    snapshot.general.claudeCodeEnabled = true;
+    const first = snapshot.agents[0]!;
+    updateAgentFromInput(snapshot, { id: first.id, modelSelection: { model: 'gpt-x', reasoningEffort: 'high', serviceTier: 'fast' } });
+    expect(snapshot.general.providerModelDefaults).toStrictEqual({ codex: { model: 'gpt-x', reasoningEffort: 'high', serviceTier: 'fast' } });
+
+    createAgentInSnapshot(snapshot, { name: null, folder: '/tmp/a', backend: 'codex' }, undefined, 'agent-codex');
+    createAgentInSnapshot(snapshot, { name: null, folder: '/tmp/b', backend: 'claude' }, undefined, 'agent-claude');
+    createQuickChatInSnapshot(snapshot, { backend: 'codex' }, undefined, 'quick-codex');
+    createAgentInSnapshot(snapshot, { name: null, folder: '/tmp/c', backend: 'codex', backendDefaults: { kind: 'codex', model: 'explicit' } }, undefined, 'agent-explicit');
+    const byId = (id: string) => snapshot.agents.find(agent => agent.id === id)!;
+    expect(byId('agent-codex').backendDefaults).toStrictEqual({ kind: 'codex', model: 'gpt-x', reasoningEffort: 'high', serviceTier: 'fast', userSelectedModel: true });
+    expect(byId('quick-codex').backendDefaults).toStrictEqual({ kind: 'codex', model: 'gpt-x', reasoningEffort: 'high', serviceTier: 'fast', userSelectedModel: true });
+    expect(byId('agent-claude').backendDefaults).toStrictEqual({ kind: 'claude' });
+    expect(byId('agent-explicit').backendDefaults).toStrictEqual({ kind: 'codex', model: 'explicit' });
+
+    updateAgentFromInput(snapshot, { id: 'agent-claude', modelSelection: { model: 'opus', reasoningEffort: null, serviceTier: null } });
+    expect(snapshot.general.providerModelDefaults).toStrictEqual({
+      codex: { model: 'gpt-x', reasoningEffort: 'high', serviceTier: 'fast' },
+      claude: { model: 'opus', reasoningEffort: null, serviceTier: null },
+    });
   });
   it('duplicates an agent in the same team and selects the copy', () => {
     const snapshot = createInitialSnapshot();

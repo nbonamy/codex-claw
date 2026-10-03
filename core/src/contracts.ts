@@ -474,6 +474,8 @@ export type AppGeneralSettings = {
   providerOnboardingComplete?: boolean;
   providerHomes?: Partial<Record<AgentBackend, import('./contracts/provider-setup').ProviderHomeSettings>>;
   providerEnabled?: Partial<Record<AgentBackend, boolean>>;
+  /** Last model selection made in a chat, per provider; seeds new agents. */
+  providerModelDefaults?: Partial<Record<AgentBackend, AgentModelSelection>>;
   agentListCompact: boolean;
   cockpitAgentViewMode: CockpitAgentViewMode;
   collapsedRepositoryKeys: string[];

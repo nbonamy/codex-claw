@@ -295,4 +295,16 @@ describe('settings contracts', () => {
     });
     expect(snapshot.workBacklog.providerSettings).toStrictEqual({});
   });
+
+  it('keeps only well-formed provider model defaults when loading general settings', () => {
+    expect(normalizeGeneralSettings({
+      providerModelDefaults: {
+        codex: { model: ' gpt-x ', reasoningEffort: 'high', serviceTier: '' },
+        claude: { model: '', reasoningEffort: 'low' },
+        other: { model: 'ignored' },
+      },
+    }).providerModelDefaults).toStrictEqual({
+      codex: { model: 'gpt-x', reasoningEffort: 'high', serviceTier: null },
+    });
+  });
 });
