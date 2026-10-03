@@ -613,7 +613,7 @@ export function useAppState() {
       return;
     }
 
-    if (!codexClawApi.steerPrompt) {
+    if (!messageActionCapabilities(agentId).steerPrompt || !codexClawApi.steerPrompt) {
       await sendPromptForAgent(agentId, trimmed, submissionOptions);
       return;
     }
@@ -736,7 +736,7 @@ export function useAppState() {
   }
 
   async function steerQueuedPromptForAgent(agentId: string, promptId: string, prompt?: string): Promise<void> {
-    if (!agentId || !codexClawApi?.steerQueuedPrompt) {
+    if (!agentId || !messageActionCapabilities(agentId).steerPrompt || !codexClawApi?.steerQueuedPrompt) {
       return;
     }
     adoptBackgroundSnapshot(await codexClawApi.steerQueuedPrompt(agentId, promptId, prompt));

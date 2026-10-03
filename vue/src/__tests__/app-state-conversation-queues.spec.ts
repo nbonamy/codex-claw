@@ -235,6 +235,32 @@ describe('useAppState', () => {
 
   });
 
+  it('queues an unsupported steer for the targeted Claude agent without steering or consuming its queue', async () => {
+    const remoteSnapshot = createInitialSnapshot();
+    const agent = remoteSnapshot.agents.find(candidate => candidate.id === 'agent-jesse')!;
+    agent.backend = 'claude';
+    agent.backendDefaults = { kind: 'claude' };
+    agent.status = { type: 'working' };
+    remoteSnapshot.queuedPrompts = [{ id: 'queued-claude', agentId: agent.id, text: 'Keep queued', createdAt: '2026-10-03T00:00:00Z' }];
+    const sendPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
+    const steerPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
+    const steerQueuedPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
+    stubElectronTestWindow({ codexClaw: {
+      getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot), sendPrompt, steerPrompt, steerQueuedPrompt,
+    } });
+    const state = useAppState();
+    await state.loadSnapshot();
+    const options = { attachments: [{ type: 'file' as const, reference: 'electron-attachment:notes' }] };
+
+    await state.steerPromptToAgent(agent.id, 'New instruction', options);
+    expect(sendPrompt).toHaveBeenCalledExactlyOnceWith(agent.id, 'New instruction', options);
+    expect(steerPrompt).not.toHaveBeenCalled();
+    await state.steerQueuedPromptForAgent(agent.id, 'queued-claude');
+    expect(steerQueuedPrompt).not.toHaveBeenCalled();
+    expect(state.snapshot.value.queuedPrompts).toStrictEqual(remoteSnapshot.queuedPrompts);
+    expect(state.activeAgent.value?.id).toBe('agent-dina');
+  });
+
   it('interrupts the active busy agent through preload', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0].status = { type: 'working' };
