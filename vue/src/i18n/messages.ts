@@ -262,6 +262,7 @@ export const messages = {
       expandRepository: 'Expand {repository} sessions',
       expandFolder: 'Expand {folder} sessions',
       hide: 'Hide agent sidebar',
+      input: 'Input',
       loadingDefaultBranch: 'Loading default branch…',
       newSession: 'New session',
       newSessionIn: 'New session in {repository}',

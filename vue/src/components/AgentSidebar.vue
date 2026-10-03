@@ -200,7 +200,7 @@
             v-show="!isWorkspaceCollapsed(group)"
             class="agent-sidebar__agent"
             :class="[
-              { 'agent-sidebar__agent--active': session.isActive },
+              { 'agent-sidebar__agent--active': session.isActive, 'agent-sidebar__agent--awaiting-input': session.status.type === 'awaitingInput' },
               clientAgentOrderUpdate.dropTargetClass(session.agentId),
             ]"
             type="button"
@@ -232,7 +232,14 @@
               >{{ session.displayTitle }}</strong>
             </span>
             <span
-              v-if="!isPullRequestFinished(session) && !session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
+              v-if="session.status.type === 'awaitingInput'"
+              class="agent-sidebar__input-needed"
+              :class="{ 'agent-sidebar__input-needed--with-cleanup': isPullRequestFinished(session) }"
+              :title="statusLabel(session.status.type)"
+              :aria-label="statusLabel(session.status.type)"
+            >{{ t('sidebar.input') }}</span>
+            <span
+              v-else-if="!isPullRequestFinished(session) && !session.isUnread && quickSwitchShortcutsVisible && session.quickSwitchIndex < 9"
               class="agent-sidebar__quick-switch-shortcut"
               :aria-label="t('sidebar.switchShortcut', { session: session.displayTitle, number: session.quickSwitchIndex + 1 })"
             ><span aria-hidden="true">⌘</span>{{ session.quickSwitchIndex + 1 }}</span>
@@ -1025,7 +1032,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: grid;
   grid-template-columns:
     var(--agent-sidebar-repository-icon-column-width) minmax(0, 1fr)
-    var(--agent-sidebar-status-column-width);
+    var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width));
   align-items: center;
   gap: var(--agent-sidebar-workspace-column-gap);
   margin: 0;
@@ -1041,6 +1048,10 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__agent-row {
   position: relative;
+}
+
+.agent-sidebar__agent--awaiting-input {
+  --agent-sidebar-trailing-column-width: max-content;
 }
 
 .agent-sidebar__pull-request-attention {
@@ -1080,7 +1091,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   .agent-sidebar__agent,
 .agent-sidebar__workspace-group[data-group-kind="missions"]
   .agent-sidebar__agent {
-  grid-template-columns: minmax(0, 1fr) var(--agent-sidebar-status-column-width);
+  grid-template-columns: minmax(0, 1fr) var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width));
   padding-left: calc(
     var(--agent-sidebar-workspace-inline-padding) + var(--space-10)
   );
@@ -1187,6 +1198,21 @@ function onResizePointerEnd(event: PointerEvent): void {
   height: var(--agent-status-dot-size);
   border-radius: var(--radius-full);
   background: var(--color-success);
+}
+
+.agent-sidebar__input-needed {
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-18);
+  white-space: nowrap;
+}
+
+.agent-sidebar__input-needed--with-cleanup {
+  margin-right: calc(var(--agent-sidebar-status-column-width) + var(--space-4));
 }
 
 .agent-sidebar__status[data-status="working"],

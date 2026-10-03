@@ -9,6 +9,23 @@ import type { Agent } from '@codex-claw/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
+  it('keeps the input label visible over unread and shortcut indicators until the agent resumes', async () => {
+    const waiting: Agent = { ...agents[0]!, status: { type: 'awaitingInput' } };
+    const wrapper = mount(AgentSidebar, {
+      props: { agents: [waiting], activeAgentId: null, teamName: 'Team', unreadAgentIds: [waiting.id], quickSwitchShortcutsVisible: true },
+    });
+    const row = wrapper.get('.agent-sidebar__agent');
+    expect(row.get('[aria-label="Awaiting input"]').text()).toBe('Input');
+    expect(row.find('.agent-sidebar__quick-switch-shortcut').exists()).toBe(false);
+    await row.trigger('click');
+    expect(wrapper.emitted('select-agent')).toEqual([[waiting.id]]);
+    await wrapper.setProps({ unreadAgentIds: [] });
+    expect(row.get('[aria-label="Awaiting input"]').text()).toBe('Input');
+    await wrapper.setProps({ agents: [{ ...waiting, status: { type: 'working' } }], quickSwitchShortcutsVisible: false });
+    expect(row.text()).not.toContain('Input');
+    expect(row.find('[aria-label="Working"]').exists()).toBe(true);
+  });
+
   it('renders repository headers, branch sessions, statuses, and active selection', () => {
     const wrapper = mount(AgentSidebar, {
       props: {
