@@ -591,6 +591,12 @@ export class CodexSurfaceAgentAdapter {
     await this.surface.archiveConversation(threadId);
   }
 
+  async deleteAgentConversation(agent: Agent): Promise<void> {
+    const threadId = codexThreadId(agent);
+    if (!threadId) return;
+    await this.surface.deleteConversation(threadId);
+  }
+
   async reconcileConversations(agents: Agent[]): Promise<void> {
     const retainedThreadIds = new Set(agents.flatMap((agent) => {
       const threadId = codexThreadId(agent);

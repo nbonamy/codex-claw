@@ -324,6 +324,13 @@ export class BackendDriverRpc {
         await driver.archiveAgentConversation(agent);
         return { supported: true };
       }
+      case backendMethods.driverConversationDelete: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.deleteAgentConversation) return { supported: false };
+        await driver.deleteAgentConversation(agent);
+        return { supported: true };
+      }
       case backendMethods.driverConversationsReconcile: {
         const record = requireRecord(params);
         const backend = requireBackend(record.backend);

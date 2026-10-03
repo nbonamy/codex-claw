@@ -92,6 +92,7 @@ export function codexSdkFixture(closeRuntime?: () => Promise<void>) {
     forgetConversation: vi.fn<CodexSurface['forgetConversation']>(),
     createConversation: vi.fn<CodexSurface['createConversation']>(),
     archiveConversation: vi.fn<CodexSurface['archiveConversation']>(async (id) => sdkSnapshot(id)),
+    deleteConversation: vi.fn<CodexSurface['deleteConversation']>(async (id) => sdkSnapshot(id)),
     unarchiveConversation: vi.fn<CodexSurface['unarchiveConversation']>(async (id) => sdkSnapshot(id)),
     listConversations: vi.fn<CodexSurface['listConversations']>().mockResolvedValue([]),
     listModels: vi.fn<CodexSurface['listModels']>().mockResolvedValue([]),

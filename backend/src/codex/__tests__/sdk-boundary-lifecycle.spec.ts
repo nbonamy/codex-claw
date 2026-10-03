@@ -48,6 +48,14 @@ describe('Codex SDK → Claw backend lifecycle', () => {
     expect(conversation('broken').listenerCount()).toBe(0);
   });
 
+  it('deletes the attached conversation through the SDK, and does nothing without a thread', async () => {
+    const { driver, surface } = setup();
+    await driver.deleteAgentConversation(sdkAgent());
+    expect(surface.deleteConversation).toHaveBeenCalledExactlyOnceWith('conversation-a');
+    await driver.deleteAgentConversation({ ...sdkAgent(), backendSession: undefined });
+    expect(surface.deleteConversation).toHaveBeenCalledOnce();
+  });
+
   it('does not detach an attached conversation when archive fails', async () => {
     const { driver, surface, conversation } = setup();
     await driver.loadConversation(sdkAgent());

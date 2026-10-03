@@ -117,6 +117,8 @@ export type AgentBackendDriver = {
   setPermissionMode?(agent: Agent, mode: string): Promise<BackendPermissionModeResult>;
   releaseConversation?(agentId: string): void;
   archiveAgentConversation?(agent: Agent): Promise<void>;
+  /** Removes the provider-side conversation for good; callers fall back to archiving when absent. */
+  deleteAgentConversation?(agent: Agent): Promise<void>;
   reconcileConversations?(agents: Agent[]): Promise<void>;
   interrupt(agent: Agent): Promise<BackendSendResult>;
   respondToAgentRequest(response: AgentRequestResponse): Promise<void>;

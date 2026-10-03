@@ -199,7 +199,9 @@ identities are canonical and credential-free.
 
 `sessionKind` distinguishes quick chats from agents. An agent may use a Git
 repository or an ordinary folder; Git identity only enables repository-specific
-grouping and actions, never decides whether a session is a quick chat.
+grouping and actions, never decides whether a session is a quick chat. Closing a
+quick chat deletes its provider session (`deleteAgentConversation`, falling back
+to archive when the driver cannot delete); closing any other agent archives it.
 
 Backend domain events, provider conversation frames, explicit client effects,
 and client transport events have separate contracts. A headless consumer can
@@ -492,6 +494,7 @@ type AgentBackendDriver = {
   respondToAgentRequest(response: ClientRequestResponse): Promise<void>
   loadConversation?(agent: Agent): Promise<BackendSession | null>
   archiveAgentConversation?(agent: Agent): Promise<void>
+  deleteAgentConversation?(agent: Agent): Promise<void>
   reconcileConversations?(agents: Agent[]): Promise<void>
   listConversations?(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]>
   resumeConversation?(agent: Agent, target: ConversationResumeTarget): Promise<BackendConversationResumeResult>

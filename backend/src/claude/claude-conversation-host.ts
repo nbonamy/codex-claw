@@ -244,6 +244,16 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     }
   }
 
+  async deleteAgentConversation(agent: Agent): Promise<void> {
+    const sessionId = claudeSessionId(agent);
+    if (!sessionId) return;
+    if (this.transport.deleteSession) {
+      await this.transport.deleteSession(sessionId, claudeWorkingDirectory(agent));
+    } else {
+      await this.transport.closeSession?.(sessionId);
+    }
+  }
+
   async setPermissionMode(agent: Agent, mode: string): Promise<BackendPermissionModeResult> {
     return this.catalog.setPermissionMode(agent, mode);
   }

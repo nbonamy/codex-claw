@@ -278,6 +278,45 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
+  it.each([
+    { label: 'deletes the provider session when a quick chat is closed', sessionKind: 'quickChat' as const, withDelete: true, expected: 'delete' },
+    { label: 'archives the conversation of a project agent', sessionKind: undefined, withDelete: true, expected: 'archive' },
+    { label: 'archives a quick chat when the provider cannot delete', sessionKind: 'quickChat' as const, withDelete: false, expected: 'archive' },
+  ])('$label', async ({ sessionKind, withDelete, expected }) => {
+    const snapshot = createTestSnapshot();
+    const agent = {
+      id: 'agent-chat', teamId: 'team-test', name: null, folder: sessionKind ? null : '/repo', ...(sessionKind ? { sessionKind } : {}),
+      backend: 'codex' as const, backendSession: { kind: 'codex' as const, threadId: 'thread-chat' },
+      status: { type: 'idle' as const }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    snapshot.teams[0]!.agentIds = [agent.id];
+    snapshot.agents = [agent];
+    snapshot.activeAgentId = agent.id;
+    const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
+    const deleteAgentConversation = vi.fn().mockResolvedValue(undefined);
+    const driver: AgentBackendDriver = {
+      backend: 'codex',
+      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
+      getCapabilities: () => codexBackendCapabilities,
+      sendPrompt: async () => ({ backendSession: agent.backendSession }),
+      interrupt: async () => ({ backendSession: agent.backendSession }),
+      respondToAgentRequest: async () => undefined,
+      releaseConversation: vi.fn(),
+      archiveAgentConversation,
+      ...(withDelete ? { deleteAgentConversation } : {}),
+      onEvent: () => () => undefined,
+      close: async () => undefined,
+    };
+    const server = new ClawBackendServer({ version: 'test', snapshot, saveSnapshot: vi.fn().mockResolvedValue(undefined), driverRpc: new BackendDriverRpc(new Map([['codex', driver]])) });
+    try {
+      await server.handleMessage({ jsonrpc: '2.0', id: 'close-chat', method: backendMethods.agentDelete, params: { agentId: agent.id } });
+
+      expect(deleteAgentConversation).toHaveBeenCalledTimes(expected === 'delete' ? 1 : 0);
+      expect(archiveAgentConversation).toHaveBeenCalledTimes(expected === 'archive' ? 1 : 0);
+      expect(snapshot.agents).toStrictEqual([]);
+    } finally { await server.close(); }
+  });
+
   it('deletes an explicitly confirmed linked worktree before removing its agent', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];

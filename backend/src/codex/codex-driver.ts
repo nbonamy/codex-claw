@@ -293,6 +293,10 @@ export class CodexBackendDriver implements AgentBackendDriver {
     await this.sessionManager.archiveAgentConversation(agent);
   }
 
+  async deleteAgentConversation(agent: Agent): Promise<void> {
+    await this.sessionManager.deleteAgentConversation(agent);
+  }
+
   async reconcileConversations(agents: Agent[]): Promise<void> {
     await this.sessionManager.reconcileConversations(agents);
   }

@@ -502,6 +502,15 @@ export class ClawBackendServer {
     });
   }
 
+  /** A quick chat has no project to come back to, so closing it deletes the provider session; everything else is archived. */
+  private async retireConversation(agent: Agent): Promise<void> {
+    if (agent.sessionKind === 'quickChat') {
+      const deleted = await this.driverRpc?.handle(backendMethods.driverConversationDelete, { agent });
+      if (isRecord(deleted) && deleted.supported === true) return;
+    }
+    await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+  }
+
   private async disposeAndReleaseReviewConversation(agent: Agent): Promise<void> {
     if (agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
       await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }).catch(() => undefined);
@@ -1157,7 +1166,7 @@ export class ClawBackendServer {
             );
           }
           if (existingAgent.backendSession) {
-            await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent: existingAgent });
+            await this.retireConversation(existingAgent);
             await this.driverRpc?.handle(backendMethods.driverConversationRelease, {
               backend: existingAgent.backend,
               agentId,
@@ -1879,7 +1888,7 @@ export class ClawBackendServer {
               .map((agentId) => this.snapshot.agents.find((candidate) => candidate.id === agentId))
               .filter((agent): agent is Agent => agent !== undefined && agent.backendSession !== undefined);
             for (const agent of agents) {
-              await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+              await this.retireConversation(agent);
             }
             for (const agent of agents) {
               await this.driverRpc?.handle(backendMethods.driverConversationRelease, {

@@ -114,6 +114,10 @@ export type ClawBackendRequestMap = {
     params: { agent: import('../contracts').Agent };
     result: { supported: boolean };
   };
+  [backendMethods.driverConversationDelete]: {
+    params: { agent: import('../contracts').Agent };
+    result: { supported: boolean };
+  };
   [backendMethods.backendHealthGet]: {
     params: undefined;
     result: ClawBackendHealth;

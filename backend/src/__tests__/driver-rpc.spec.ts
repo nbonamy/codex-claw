@@ -527,6 +527,14 @@ describe('BackendDriverRpc', () => {
       payload: { type: 'working' },
     });
   });
+
+  it('deletes a conversation when the driver can and reports unsupported otherwise', async () => {
+    const agent = { id: 'agent-chat', backend: 'codex', backendSession: { kind: 'codex', threadId: 'thread-chat' } } as unknown as Agent;
+    const deleteAgentConversation = vi.fn().mockResolvedValue(undefined);
+    await expect(new BackendDriverRpc(new Map([['codex', createDriver({ deleteAgentConversation })]])).handle('driver/conversation/delete', { agent })).resolves.toStrictEqual({ supported: true });
+    expect(deleteAgentConversation).toHaveBeenCalledExactlyOnceWith(agent);
+    await expect(new BackendDriverRpc(new Map([['codex', createDriver()]])).handle('driver/conversation/delete', { agent })).resolves.toStrictEqual({ supported: false });
+  });
 });
 
 function createDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {

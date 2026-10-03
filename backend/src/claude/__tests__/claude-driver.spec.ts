@@ -648,6 +648,22 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.deleteSession).not.toHaveBeenCalled();
   });
 
+  it('deletes the stored Claude session of an agent, from its own folder, and ignores an agent without one', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const chat = {
+      id: 'agent-chat', name: null, folder: null, sessionKind: 'quickChat', backend: 'claude',
+      backendSession: { kind: 'claude', sessionId: 'session-chat', transport: 'stdio' },
+      status: { type: 'idle' }, createdAt: 'now', updatedAt: 'now',
+    } as unknown as Agent;
+
+    await driver.deleteAgentConversation(chat);
+    expect(transport.deleteSession).toHaveBeenCalledExactlyOnceWith('session-chat', homedir());
+
+    await driver.deleteAgentConversation({ ...chat, backendSession: undefined });
+    expect(transport.deleteSession).toHaveBeenCalledOnce();
+  });
+
   it('maps Agent SDK permission requests through the app-owned approval contract', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
