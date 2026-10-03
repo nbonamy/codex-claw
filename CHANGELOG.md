@@ -4,6 +4,67 @@ All notable Codex Claw changes are recorded here.
 
 ## Unreleased
 
+## [0.25.0] - 2026-10-03
+
+### New features
+
+- Work with two agents side by side or stacked, or four agents in a grid.
+  Split panes replace attached-agent sidebar tabs. Each team keeps its layout
+  while switching teams, and one shared artifact sidebar follows the focused
+  agent without closing when that agent has no open tabs.
+- Use Codex, Claude Code, or both. Setup detects installed engines, offers
+  installation and sign-in, and lets each engine use a separate Claw home or
+  its existing setup. New setups separate chats while reusing existing skills.
+  Engine pickers appear only when more than one engine is available.
+- Manage each engine's account, conversation location, skill sharing, and
+  enabled status in Settings, with engine connection controls on SSH hosts too.
+  Changing conversation location requires explicit acknowledgment before
+  removing that engine's local agents and Quick Chats from Claw.
+- See Codex and Claude subscription usage together in the user menu, including
+  remaining allowance and reset times. API-billed Claude accounts have no
+  subscription quota row.
+- Drag supported file and web links from conversations into the sidebar to
+  open their content in a new tab.
+- Model, reasoning-effort, service-tier, and approval or permission choices
+  become defaults for new agents and Quick Chats using the same engine,
+  without changing existing agents.
+- Agents waiting for a response or approval show a prominent blue Input label
+  in the sidebar.
+
+### Improvements and fixes
+
+- Codex and Claude tool approvals use a consistent card in the composer,
+  preserving the draft, attachments, and caret when the request is resolved.
+- Free-text Other answers to agent questions are immediately editable and grow
+  as you type.
+- Split composers no longer steal focus or selection from one another during
+  background updates.
+- For engines without steering, including Claude Code, the steering shortcut
+  sends through the normal queue path and the queue shelf's Steer action is
+  disabled.
+- Fixed Codex Device Pairing in Settings so Allow connections reaches the
+  backend instead of silently remaining off.
+- Engine connection checks are cached for the session and refreshed by explicit
+  connection or setup actions. Startup returns to setup when no engine is
+  available, and Claw prevents disabling the last active engine.
+- Claude authentication, saved conversations, skills, plans, and personalized
+  instructions follow the configured Claude home. Codex personalization also
+  follows its selected home.
+- Repository skills no longer disappear when a global catalog refresh arrives;
+  skill updates stay scoped to their engine and folder. Exact skill aliases
+  rank ahead of substring matches.
+- Composer action menus respect the app's theme colors.
+
+### Upgrade notes
+
+- App state migrates automatically from `state.json` to separate roster,
+  settings, and visualization files after creating a verified backup. Older
+  Claw builds cannot open the migrated state directly; downgrading requires
+  restoring the pre-migration backup.
+- Closing a Quick Chat now deletes its provider session, with archive as a
+  fallback when deletion is unavailable. Closing a regular agent still archives
+  its conversation.
+
 ## [0.24.1] - 2026-09-27
 
 ### Improvements and fixes
