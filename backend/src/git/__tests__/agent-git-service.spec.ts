@@ -831,7 +831,7 @@ describe('agent git service parsers', () => {
       warning: { type: 'worktreeFolderRetained', folder: '/repo-feature' },
     });
 
-    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-d', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'feature']);
   });
 
   it('requires a commit message before starting a squash merge', async () => {
@@ -865,7 +865,7 @@ describe('agent git service parsers', () => {
     );
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature']);
     expect(runGit.mock.calls.some(([, args]) => (
-      args[0] === 'merge' || args[0] === 'worktree' && args[1] === 'remove' || args[0] === 'branch' && args[1] === '-d'
+      args[0] === 'merge' || args[0] === 'worktree' && args[1] === 'remove' || args[0] === 'branch' && ['-d', '-D'].includes(args[1]!)
     ))).toBe(false);
   });
 
@@ -940,7 +940,8 @@ describe('agent git service parsers', () => {
     await service.merge('/repo-feature', 'merge', true, true);
 
     expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--no-ff', 'feature']);
-    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-d', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'feature', 'HEAD']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'feature']);
     expect(runGit.mock.calls.some(([, args]) => args[0] === 'push')).toBe(false);
   });
 

@@ -489,13 +489,17 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
   });
 
-  it('shows a non-blocking warning when the worktree folder remains after a successful merge', async () => {
+  it.each([
+    { warning: { type: 'worktreeFolderRetained' as const, folder: '/repo-feature' }, title: 'Worktree folder remains', detail: '/repo-feature' },
+    { warning: { type: 'branchRetained' as const, branch: 'feature/demo' }, title: 'Merge complete — cleanup incomplete', detail: 'feature/demo' },
+    { warning: { type: 'branchRetained' as const, branch: 'feature/demo', folder: '/repo-feature' }, title: 'Merge complete — cleanup incomplete', detail: '/repo-feature' },
+  ])('shows a non-blocking $warning.type warning after a successful merge', async ({ warning, title, detail }) => {
     const mergeBranch = vi.fn(async () => ({
       ...workflow,
       folder: '/repo',
       branch: 'main',
       isLinkedWorktree: false,
-      warning: { type: 'worktreeFolderRetained' as const, folder: '/repo-feature' },
+      warning,
     }));
     const wrapper = mountControl({ mergeBranch });
     await flushPromises();
@@ -506,9 +510,9 @@ describe('GitWorkflowControl', () => {
     await submitButton(wrapper, 'Merge').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('.git-operation-feedback--warning').text()).toContain('Worktree folder remains');
-    expect(wrapper.text()).toContain('The worktree was removed, but its folder could not be deleted.');
-    expect(wrapper.text()).toContain('/repo-feature');
+    expect(wrapper.get('.git-operation-feedback--warning').text()).toContain(title);
+    expect(wrapper.text()).toContain(detail);
+    expect(wrapper.text()).not.toContain('Merge failed');
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
     expect(wrapper.findAll('button').some((button) => button.text() === 'Close')).toBe(true);
   });

@@ -130,7 +130,10 @@ describe('AgentGitWorkflowService', () => {
     expect(persistAndEmitSnapshot).toHaveBeenCalledOnce();
   });
 
-  it('closes the merged agent while returning a non-blocking retained-folder warning', async () => {
+  it.each([
+    { type: 'worktreeFolderRetained', folder: '/repo-feature' },
+    { type: 'branchRetained', branch: 'feature' },
+  ])('closes the merged agent while returning a non-blocking $type warning', async (warning) => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0] as Agent;
     agent.folder = '/repo-feature';
@@ -139,7 +142,7 @@ describe('AgentGitWorkflowService', () => {
     const persistAndEmitSnapshot = vi.fn().mockResolvedValue(snapshot);
     const merge = vi.fn().mockResolvedValue({
       targetFolder: '/repo',
-      warning: { type: 'worktreeFolderRetained', folder: '/repo-feature' },
+      warning,
     });
     const workflow = vi.fn().mockResolvedValue({
       repository: 'owner/repo', folder: '/repo', isLinkedWorktree: false,
@@ -159,7 +162,7 @@ describe('AgentGitWorkflowService', () => {
       agentId: agent.id,
       params: { input: { strategy: 'merge', deleteBranch: true, deleteWorktree: true, confirmed: true } },
     }, agent)).resolves.toMatchObject({
-      warning: { type: 'worktreeFolderRetained', folder: '/repo-feature' },
+      warning,
     });
 
     expect(releaseConversation).toHaveBeenCalledWith(agent);
