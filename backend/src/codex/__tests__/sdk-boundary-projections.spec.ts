@@ -27,6 +27,42 @@ describe('Codex SDK → app-owned projections', () => {
     expect(conversation('conversation-a').handle.interrupt).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['question', true, false, 'working'],
+    ['question', false, false, 'idle'],
+    ['question', true, true, 'awaitingInput'],
+    ['approval', true, false, 'working'],
+    ['approval', false, false, 'idle'],
+    ['approval', true, true, 'awaitingInput'],
+  ] as const)('refreshes Input when %s resolves without another activity event (busy=%s, pending=%s)', async (kind, busy, pending, status) => {
+    const { driver, conversation, events } = setup();
+    const session = conversation('conversation-a');
+    const request = {
+      id: 'question', conversationId: 'conversation-a', turnId: 'turn', itemId: 'item',
+      kind: 'ask_user' as const,
+      payload: { request: { itemId: 'item', delivery: 'tool' as const, blocking: true, questions: [] } },
+    };
+    const approval = {
+      id: 'approval', conversationId: 'conversation-a', itemId: 'item',
+      kind: 'command' as const, title: 'Run tests', canDeny: true, allowedScopes: ['once' as const],
+    };
+    session.setSnapshot({ busy, clientRequests: kind === 'question' ? [request] : [], approvals: kind === 'approval' ? [approval] : [] });
+    await driver.loadConversation(sdkAgent());
+    const latestStatus = () => events.filter(event => event.type === 'agent.statusChanged').at(-1)?.payload;
+    expect(latestStatus()).toMatchObject({ type: 'awaitingInput' });
+
+    // SDK activity events are deduplicated by busy/threadStatus/error, not pending requests.
+    session.setSnapshot({ busy, answeredClientRequestIds: [request.id], clientRequests: pending ? [{ ...request, id: 'another-question' }] : [] });
+    if (kind === 'question') session.emit({ ...metadata, origin: 'action', type: 'clientRequest.resolved', payload: {
+      request, response: { id: request.id, payload: { answers: {} } }, reason: 'host',
+    } });
+    else session.emit({ ...metadata, origin: 'action', type: 'approval.resolved', payload: {
+      approval, decision: 'approve', scope: 'once', reason: 'host',
+    } });
+
+    expect(latestStatus()).toMatchObject({ type: status });
+  });
+
   it('projects goal changes and clearing but does not duplicate action-owned updates', async () => {
     const { driver, conversation, events } = setup();
     await driver.loadConversation(sdkAgent());

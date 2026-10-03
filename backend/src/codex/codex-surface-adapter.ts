@@ -1156,6 +1156,7 @@ export class CodexSurfaceAgentAdapter {
           id: event.payload.approval.id,
           outcome: approvalOutcome(event.payload.decision, event.payload.scope, event.payload.reason),
         }, ...metadata });
+        this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
       case 'clientRequest.requested':
         this.clientRequestOwners.set(JSON.stringify([session.agent.id, event.payload.request.id]), session);
@@ -1167,6 +1168,7 @@ export class CodexSurfaceAgentAdapter {
           id: event.payload.request.id,
           outcome: event.payload.response ? agentResponseFromClientResponse(event.payload.response).outcome : approvalOutcome(null, null, event.payload.reason),
         }, ...metadata });
+        this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
       default:
         return;
