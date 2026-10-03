@@ -493,8 +493,8 @@ export function createAgentComposerState(options: {
     const cwd = event.payload.cwd;
     const skills = event.payload.skills.map((skill) => ({ ...skill }));
     const agents = snapshot().agents.filter((agent) => (
-      agent.backend === 'codex' &&
-      (event.agentId === agent.id || (!event.agentId && !connectionId(agent) && (cwd === null || agent.folder === cwd)))
+      agent.backend === event.backend &&
+      (event.agentId === agent.id || (!event.agentId && !connectionId(agent) && agent.folder === cwd))
     ));
     for (const agent of agents) {
       const cache = skillCache.entry(catalogKey(agent));

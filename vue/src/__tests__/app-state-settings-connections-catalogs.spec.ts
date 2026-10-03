@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
+import { mount } from '@vue/test-utils';
+import { createCodexConversationPaneController } from '@codex-app-sdk/vue';
+import ConversationPane from '../components/ConversationPane.vue';
+import { agentConversationState } from '../components/use-agent-conversation';
 import { useAppState } from '../app-state';
 import { createAgentComposerState } from '../agent-composer-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
@@ -593,9 +597,57 @@ describe('useAppState', () => {
     expect(state.agentFiles.value).toStrictEqual([]);
   });
 
-  it('refreshes active agent skills after a skills changed event', async () => {
+  it('keeps repository skills when the global catalog refresh finishes later', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const snapshot = createInitialSnapshot();
+    const skill = { name: 'prepare-release', path: `${snapshot.agents[0]!.folder}/.agents/skills/prepare-release/SKILL.md`, enabled: true };
+    const globalSkill = { name: 'cp', path: '/skills/cp/SKILL.md', enabled: true };
+    stubElectronTestWindow({ codexClaw: {
+      getSnapshot: async () => snapshot,
+      listBackendSkills: async () => [skill, globalSkill],
+      onEvent: listener => { listeners.push(listener); return () => undefined; },
+    } satisfies Partial<CodexClawApi> });
+    const state = useAppState();
+    await state.loadSnapshot();
+    expect(state.backendSkills.value).toStrictEqual([skill, globalSkill]);
+    const agent = snapshot.agents[0]!;
+    const controller = createCodexConversationPaneController({
+      state: agentConversationState(() => state.agentConversationFor(agent.id)!),
+      actions: { updateComposerState: value => state.updateComposerState(agent.id, value) },
+    });
+    const wrapper = mount(ConversationPane, { attachTo: document.body, props: { agent, controller } });
+    const editor = wrapper.get<HTMLElement>('.chat-rich-text-editor');
+    editor.element.focus();
+    editor.element.textContent = '$prepare';
+    const selection = window.getSelection()!;
+    selection.selectAllChildren(editor.element);
+    selection.collapseToEnd();
+    await editor.trigger('input');
+    await editor.trigger('keyup');
+    expect(wrapper.get('[role="option"]').text()).toContain('prepare-release');
+
+    listeners[0]?.({
+      seq: 1, type: 'skills.changed', backend: 'codex',
+      payload: { cwd: null, status: 'loaded', skills: [globalSkill] },
+      occurredAt: '2026-06-05T00:00:01.000Z',
+    });
+
+    await nextTick();
+    expect(wrapper.get('[role="option"]').text()).toContain('prepare-release');
+    await wrapper.get('[role="option"]').trigger('mousedown');
+    expect(state.agentConversationFor(agent.id)?.composerState.text).toContain('$prepare-release');
+  });
+
+  it.each(['codex', 'claude'] as const)('refreshes %s skills without applying another engine’s catalog', async (backend) => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
+    const active = remoteSnapshot.agents[0]!;
+    active.backend = backend;
+    active.backendDefaults = { kind: backend };
+    const other = remoteSnapshot.agents[1]!;
+    other.backend = backend === 'codex' ? 'claude' : 'codex';
+    other.backendDefaults = { kind: other.backend };
+    other.folder = active.folder;
     const listBackendSkills = vi.fn().mockResolvedValue([]);
 
     stubElectronTestWindow({
@@ -612,13 +664,13 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
 
-    listeners[0]?.({
+    listBackendSkills.mockClear();
+    const event: Extract<MainToRendererEvent, { type: 'skills.changed' }> = {
       seq: 1,
       type: 'skills.changed',
-      agentId: 'agent-dina',
-      backend: 'codex',
+      backend,
       payload: {
-        cwd: '/Users/nbonamy/src/codex-claw',
+        cwd: active.folder,
         status: 'loaded',
         skills: [{
           name: 'skill-creator',
@@ -629,30 +681,23 @@ describe('useAppState', () => {
         }],
       },
       occurredAt: '2026-06-05T00:00:01.000Z',
-    });
+    };
+    listeners[0]?.(event);
     await vi.waitFor(() => {
       expect(state.backendSkills.value.map((skill) => skill.name)).toStrictEqual(['skill-creator']);
     });
-    expect(listBackendSkills).toHaveBeenCalledTimes(1);
+    expect(state.agentConversationFor(other.id)?.composer.skills).toStrictEqual([]);
+    expect(listBackendSkills).not.toHaveBeenCalled();
     const skillsReference = state.backendSkills.value;
     listeners[0]?.({
+      ...event,
       seq: 2,
-      agentId: 'agent-dina',
-      type: 'skills.changed',
-      backend: 'codex',
-      payload: {
-        cwd: '/Users/nbonamy/src/codex-claw',
-        status: 'loaded',
-        skills: [{
-          name: 'skill-creator',
-          description: 'Create or update Codex skills.',
-          path: '/Users/nbonamy/.codex/skills/skill-creator/SKILL.md',
-          scope: 'user',
-          enabled: true,
-        }],
-      },
-      occurredAt: '2026-06-05T00:00:02.000Z',
+      agentId: active.id,
+      backend: other.backend,
+      payload: { ...event.payload, skills: [] },
     });
+    expect(state.backendSkills.value).toBe(skillsReference);
+    listeners[0]?.({ ...event, seq: 3, agentId: active.id });
     expect(state.backendSkills.value).toBe(skillsReference);
   });
 
