@@ -17,6 +17,7 @@ import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItem
 import { agentDisplayName } from './agent-display';
 import { canSelectAgentBackend, resolveAgentBackend } from './agent-backends';
 import { seedTeamId } from './seed-ids';
+import { approvalBackendDefaultsWithPreset } from './approval-presets';
 import { workspaceSidebarGroupIdForAgent, workspaceSidebarRepositoryRootForAgent } from './workspace-sidebar';
 
 export function createAgentFromInput(input: CreateAgentInput, createdAt = new Date().toISOString(), teamId = seedTeamId, id = createEntityId('agent')): Agent {
@@ -47,7 +48,7 @@ export function createAgentInSnapshot(
   options: { select?: boolean; afterAgentId?: string } = {},
 ): AppSnapshot {
   const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
-  if (!input.backendDefaults) applyProviderModelDefaults(snapshot, agent);
+  if (!input.backendDefaults) applyProviderDefaults(snapshot, agent);
   const source = options.afterAgentId
     ? snapshot.agents.find((candidate) => candidate.id === options.afterAgentId)
     : undefined;
@@ -69,7 +70,7 @@ export function createQuickChatInSnapshot(snapshot: AppSnapshot, input: CreateQu
     backend: resolveAgentBackend(snapshot, input.backend),
     ...(input.teamId ? { teamId: input.teamId } : {}),
   }, createdAt, targetTeamId(snapshot, input.teamId), id);
-  applyProviderModelDefaults(snapshot, agent);
+  applyProviderDefaults(snapshot, agent);
   agent.folder = null;
   agent.sessionKind = 'quickChat';
   return insertAgentInSnapshot(snapshot, agent, options.select);
@@ -85,6 +86,7 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
     if (!canSelectAgentBackend(agent)) throw new Error('Backend can only be changed before the first prompt.');
     agent.backend = backend;
     agent.backendDefaults = defaultBackendDefaults(backend);
+    applyProviderDefaults(snapshot, agent);
     agent.updatedAt = updatedAt;
   }
   if (input.modelSelection) {
@@ -219,16 +221,21 @@ function normalizedBackend(value: AgentBackend | undefined): AgentBackend {
   return value === 'claude' ? 'claude' : 'codex';
 }
 
-function applyProviderModelDefaults(snapshot: AppSnapshot, agent: Agent): void {
+function applyProviderDefaults(snapshot: AppSnapshot, agent: Agent): void {
   const selection = snapshot.general.providerModelDefaults?.[agent.backend];
-  if (!selection) return;
-  agent.backendDefaults = {
+  if (selection) agent.backendDefaults = {
     ...(agent.backendDefaults?.kind === agent.backend ? agent.backendDefaults : defaultBackendDefaults(agent.backend)),
     model: selection.model,
     userSelectedModel: true,
     ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
     ...(agent.backend === 'codex' ? { serviceTier: selection.serviceTier } : {}),
   } as BackendDefaults;
+  const approvals = snapshot.general.providerApprovalDefaults;
+  if (agent.backend === 'codex' && approvals?.codex) {
+    agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, approvals.codex);
+  } else if (agent.backend === 'claude' && approvals?.claude) {
+    agent.backendDefaults = { ...agent.backendDefaults, kind: 'claude', permissionMode: approvals.claude };
+  }
 }
 
 function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {

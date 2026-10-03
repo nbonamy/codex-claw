@@ -307,4 +307,10 @@ describe('settings contracts', () => {
       codex: { model: 'gpt-x', reasoningEffort: 'high', serviceTier: null },
     });
   });
+
+  it('loads supported approval defaults without accepting malformed or unknown modes', () => {
+    expect(normalizeGeneralSettings({ providerApprovalDefaults: { codex: 'ask-for-approval', claude: 'acceptEdits', other: 'ignored' } }).providerApprovalDefaults)
+      .toStrictEqual({ codex: 'ask-for-approval', claude: 'acceptEdits' });
+    expect(normalizeGeneralSettings({ providerApprovalDefaults: { codex: 'invalid', claude: 'invalid' } }).providerApprovalDefaults).toStrictEqual({});
+  });
 });

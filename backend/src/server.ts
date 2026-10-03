@@ -1597,6 +1597,9 @@ export class ClawBackendServer {
           agent.backendSession = result.backendSession;
           this.agentConversations.setNewTitle(agentId, wasNewSession);
           agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, result.approvalPreset);
+          this.snapshot.general.providerApprovalDefaults = {
+            ...this.snapshot.general.providerApprovalDefaults, codex: result.approvalPreset,
+          };
           return this.persistAndEmitSnapshot();
         });
       }
@@ -1607,6 +1610,9 @@ export class ClawBackendServer {
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentPermissionModeUpdate, { agentId, mode }, async (agent) => {
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverPermissionModeUpdate, { agent, mode }) as BackendPermissionModeResult;
           agent.backendDefaults = result.backendDefaults;
+          this.snapshot.general.providerApprovalDefaults = {
+            ...this.snapshot.general.providerApprovalDefaults, [agent.backend]: mode,
+          };
           return this.persistAndEmitSnapshot();
         });
       }

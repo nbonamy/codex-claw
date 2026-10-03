@@ -414,6 +414,7 @@ describe('ClawBackendServer', () => {
     expect(setGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'Ship the goal shelf');
     expect(clearGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }));
     expect(setApprovalPreset).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'approve-for-me');
+    expect(snapshot.general.providerApprovalDefaults).toEqual({ codex: 'approve-for-me' });
     expect(setConversationTitle).toHaveBeenCalledOnce();
     expect(setConversationTitle).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), expect.stringContaining('Dina'));
     expect(events).toEqual(expect.arrayContaining([
@@ -427,6 +428,7 @@ describe('ClawBackendServer', () => {
 
   it('persists Claude permission modes independently of Codex approval presets', async () => {
     const snapshot = createTestSnapshot();
+    snapshot.general.providerApprovalDefaults = { codex: 'ask-for-approval' };
     snapshot.teams[0]!.agentIds = ['agent-claude'];
     snapshot.agents = [{
       id: 'agent-claude',
@@ -477,6 +479,7 @@ describe('ClawBackendServer', () => {
     });
 
     expect(setPermissionMode).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-claude' }), 'bypassPermissions');
+    expect(snapshot.general.providerApprovalDefaults).toEqual({ codex: 'ask-for-approval', claude: 'bypassPermissions' });
     expect(snapshot.agents[0]?.backendSession).toBeUndefined();
     expect(saveSnapshot).toHaveBeenCalledOnce();
     await server.close();

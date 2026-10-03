@@ -476,6 +476,8 @@ export type AppGeneralSettings = {
   providerEnabled?: Partial<Record<AgentBackend, boolean>>;
   /** Last model selection made in a chat, per provider; seeds new agents. */
   providerModelDefaults?: Partial<Record<AgentBackend, AgentModelSelection>>;
+  /** Last explicitly selected approval mode; seeds new chats without changing existing ones. */
+  providerApprovalDefaults?: { codex?: ApprovalPreset; claude?: string };
   agentListCompact: boolean;
   cockpitAgentViewMode: CockpitAgentViewMode;
   collapsedRepositoryKeys: string[];

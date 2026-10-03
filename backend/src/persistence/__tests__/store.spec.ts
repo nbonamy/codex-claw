@@ -43,6 +43,7 @@ describe('AppStateStore', () => {
 
   it('restores the saved snapshot in a fresh process', async () => {
     const snapshot = snapshotWithVisualizations();
+    snapshot.general.providerApprovalDefaults = { codex: 'ask-for-approval', claude: 'acceptEdits' };
     await new AppStateStore(home).save(snapshot);
 
     const restored = await new AppStateStore(home).load();
@@ -51,6 +52,8 @@ describe('AppStateStore', () => {
     // The selection is stored once, on the active team.
     expected.teams[0]!.activeAgentId = expected.activeAgentId ?? undefined;
     expect(restored).toStrictEqual(expected);
+    expect(restored.general.providerApprovalDefaults).toStrictEqual({ codex: 'ask-for-approval', claude: 'acceptEdits' });
+    expect((await readJson('settings.json')).schemaVersion).toBe(1);
     expect(restored.repositoryVisualizations?.['/projects/claw']?.map((item) => item.id)).toStrictEqual(['visualization-a', 'visualization-b']);
   });
 

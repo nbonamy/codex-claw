@@ -544,6 +544,8 @@ function isGeneralSettings(value: unknown): boolean {
     (value.codexEnabled === undefined || typeof value.codexEnabled === 'boolean') &&
     (value.providerOnboardingComplete === undefined || typeof value.providerOnboardingComplete === 'boolean') &&
     optional(value, 'providerEnabled', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && isBoolean(enabled))) &&
+    optional(value, 'providerApprovalDefaults', candidate => isRecord(candidate)
+      && optional(candidate, 'codex', isApprovalPreset) && optional(candidate, 'claude', isString)) &&
     optional(value, 'providerModelDefaults', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, selection]) =>
       (backend === 'codex' || backend === 'claude') && isRecord(selection) && isString(selection.model)
       && (selection.reasoningEffort === null || isString(selection.reasoningEffort))

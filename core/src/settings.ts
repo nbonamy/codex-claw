@@ -1,5 +1,7 @@
 import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type ModelFavorite, type SavedPromptDraft, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
 import { repositoryIconKeyForRemote } from './git-remote';
+import { isApprovalPreset } from './approval-presets';
+import { claudeBackendCapabilities } from './backend-capabilities';
 
 export const defaultPluginSettings: AppPluginSettings = {
   computerUseEnabled: false,
@@ -133,6 +135,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     ...(isRecord(value.providerHomes) ? { providerHomes: normalizeProviderHomes(value.providerHomes) } : {}),
     ...(isRecord(value.providerEnabled) ? { providerEnabled: Object.fromEntries(Object.entries(value.providerEnabled).filter(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && typeof enabled === 'boolean')) } : {}),
     ...(isRecord(value.providerModelDefaults) ? { providerModelDefaults: normalizeProviderModelDefaults(value.providerModelDefaults) } : {}),
+    ...(isRecord(value.providerApprovalDefaults) ? { providerApprovalDefaults: normalizeProviderApprovalDefaults(value.providerApprovalDefaults) } : {}),
     agentListCompact: value.agentListCompact === true,
     cockpitAgentViewMode: value.cockpitAgentViewMode === 'recent' ? 'recent' : 'teams',
     collapsedRepositoryKeys: normalizeStringList(value.collapsedRepositoryKeys, 200),
@@ -171,6 +174,14 @@ function normalizeProviderModelDefaults(value: Record<string, unknown>): NonNull
     } as NonNullable<typeof defaults[typeof backend]>;
   }
   return defaults;
+}
+
+function normalizeProviderApprovalDefaults(value: Record<string, unknown>): NonNullable<AppGeneralSettings['providerApprovalDefaults']> {
+  const { codex, claude } = value;
+  return {
+    ...(isApprovalPreset(codex) ? { codex } : {}),
+    ...(typeof claude === 'string' && claudeBackendCapabilities.permissionModes?.some(option => option.id === claude) ? { claude } : {}),
+  };
 }
 
 function normalizeSpokenAnnouncementVoice(value: unknown): SpokenAnnouncementVoice {

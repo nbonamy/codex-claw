@@ -22,6 +22,26 @@ import type { Agent, WorkItem } from '../contracts';
 import { workItemAssignmentKey } from '../work-assignments';
 
 describe('agent-manager', () => {
+  it('seeds new agents and quick chats with per-provider approvals without overriding explicit settings or existing chats', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
+    snapshot.general.claudeCodeEnabled = true;
+    snapshot.general.providerApprovalDefaults = { codex: 'ask-for-approval', claude: 'acceptEdits' };
+    const existing = structuredClone(snapshot.agents);
+    for (const backend of ['codex', 'claude'] as const) {
+      createAgentInSnapshot(snapshot, { name: 'New', folder: '/repo', backend }, undefined, `agent-${backend}`);
+      createQuickChatInSnapshot(snapshot, { backend }, undefined, `quick-${backend}`);
+      for (const id of [`agent-${backend}`, `quick-${backend}`]) {
+        expect(snapshot.agents.find(agent => agent.id === id)?.backendDefaults).toMatchObject(backend === 'codex'
+          ? { kind: 'codex', approvalPreset: 'ask-for-approval', approvalPolicy: 'on-request', sandboxMode: 'workspace-write' }
+          : { kind: 'claude', permissionMode: 'acceptEdits' });
+      }
+    }
+    createAgentInSnapshot(snapshot, { name: 'Explicit', folder: '/repo', backend: 'codex', backendDefaults: { kind: 'codex', approvalPreset: 'full-access' } }, undefined, 'explicit');
+    expect(snapshot.agents.find(agent => agent.id === 'explicit')?.backendDefaults).toEqual({ kind: 'codex', approvalPreset: 'full-access' });
+    expect(snapshot.agents.slice(0, existing.length)).toEqual(existing);
+  });
+
   it('switches a fresh agent without carrying model or permission settings across providers', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
@@ -30,9 +50,10 @@ describe('agent-manager', () => {
     delete agent.backendSession;
     agent.status = { type: 'idle' };
     agent.backendDefaults = { kind: 'codex', model: 'codex-model', approvalPreset: 'full-access', userSelectedModel: true };
+    snapshot.general.providerApprovalDefaults = { claude: 'acceptEdits' };
     updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' });
     expect(agent.backend).toBe('claude');
-    expect(agent.backendDefaults).toStrictEqual({ kind: 'claude' });
+    expect(agent.backendDefaults).toStrictEqual({ kind: 'claude', permissionMode: 'acceptEdits' });
     agent.status = { type: 'working' };
     expect(() => updateAgentFromInput(snapshot, { id: agent.id, backend: 'codex' })).toThrow('before the first prompt');
     agent.status = { type: 'idle' };

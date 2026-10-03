@@ -883,11 +883,14 @@ there are no per-client profiles, so order, selection, theme and preferences are
 shared by every client. A build refuses to read or rewrite a file whose
 `schemaVersion` is newer than it supports, and a file that fails to parse stops
 startup instead of being replaced by an empty state. The only exception is an
-unreadable visualization, which is skipped and left on disk. Schema versions are
-frozen shapes: a change to what is persisted bumps the version and adds a typed
-step in `backend/src/persistence/migrations.ts`. `persistence/layout.ts` maps the
-shared persisted state to and from the files, and `persistence/schema.ts` is the
-runtime schema of each file.
+unreadable visualization, which is skipped and left on disk. Bump the schema
+version only for breaking changes to persisted data, with a typed migration
+step in `backend/src/persistence/migrations.ts`. Additive optional fields and new
+settings with backward-compatible defaults keep the current version and need
+no migration. Older builds may ignore or drop settings they do not understand;
+that alone does not make an additive setting a breaking change.
+`persistence/layout.ts` maps the shared persisted state to and from the files,
+and `persistence/schema.ts` is the runtime schema of each file.
 
 Files written before this layout (a single unversioned `state.json`) are migrated
 on the first start: the original is copied to `backups/` and verified byte for
