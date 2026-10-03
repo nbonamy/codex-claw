@@ -44,12 +44,12 @@
     @update:model-value="emit('update:claudeDialogVisible', $event)"
     @refresh="emit('refresh-claude')"
   />
-  <ProviderSetupDialog :setup="customizedSetup ?? null" :busy="setupBusy ?? false" :error="setupError ?? null" @close="emit('close-setup')" @save="emit('save-setup', $event)" />
+  <ProviderSetupDialog :setup="customizedSetup ?? null" :allow-reset="allowSetupReset" :busy="setupBusy ?? false" :error="setupError ?? null" @close="emit('close-setup')" @save="emit('save-setup', $event)" />
 </template>
 
 <script setup lang="ts">
 import type { AgentBackend, AppSnapshot, ClaudeAuthentication, CodexAuthentication, WorkProviderAuthorization } from '@codex-claw/core/contracts';
-import type { ProviderSetupChoice, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
 import ProviderSetupDialog from './ProviderSetupDialog.vue';
 import { toRefs } from 'vue';
 import CodexLoginLanding from './CodexLoginLanding.vue';
@@ -59,6 +59,7 @@ import LocalClaudeAuthenticationDialog from './LocalClaudeAuthenticationDialog.v
 
 const props = defineProps<{
   providerSetup?: ProviderSetupStatus[];
+  allowSetupReset?: boolean;
   customizedSetup?: ProviderSetupStatus | null;
   setupBusy?: boolean;
   updatingProvider?: AgentBackend | null;
@@ -88,7 +89,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   customize: [backend: AgentBackend];
   'close-setup': [];
-  'save-setup': [choice: ProviderSetupChoice];
+  'save-setup': [choice: ProviderSetupChange];
   cancel: [];
   complete: [];
   'connect-github': [];

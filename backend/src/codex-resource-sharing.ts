@@ -1,4 +1,4 @@
-import { cp, lstat, mkdir, readlink, rm, symlink } from 'node:fs/promises';
+import { cp, lstat, mkdir, readdir, readlink, rm, symlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { CodexResourceSharingStatus, SetCodexResourceSharingInput } from '@codex-claw/core/contracts';
@@ -129,7 +129,9 @@ async function hasConflictingCodexResources(paths: CodexResourceSharingPaths): P
     const clawPath = path.join(paths.clawCodexHome, name);
     const sharedPath = path.join(paths.userCodexHome, name);
     try {
-      await lstat(clawPath);
+      const stats = await lstat(clawPath);
+      // Turning sharing off creates empty directories; relinking them loses no data.
+      if (stats.isDirectory() && (await readdir(clawPath)).length === 0) continue;
       if (!await isLinkTo(clawPath, sharedPath)) return true;
     } catch (error) {
       if (!isNodeError(error) || error.code !== 'ENOENT') throw error;

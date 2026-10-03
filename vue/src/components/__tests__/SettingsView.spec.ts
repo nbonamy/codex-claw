@@ -75,7 +75,7 @@ describe('SettingsView', () => {
     });
 
     expect(wrapper.text()).toContain('Launch ChatGPT');
-    expect(wrapper.text()).toContain('Share skills and plugins with ChatGPT');
+    expect(wrapper.text()).not.toContain('Share skills and plugins with ChatGPT');
     expect(wrapper.text()).toContain('Codex executable');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
@@ -83,17 +83,17 @@ describe('SettingsView', () => {
 
     await wrapper.setProps({ activeTab: 'claude-code' } as never);
 
-    expect(wrapper.text()).toContain('Status');
+    expect(wrapper.text()).toContain('Account');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Codex executable');
     await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
     expect(connectClaude).toHaveBeenCalledOnce();
     await wrapper.setProps({ claudeConnected: true });
-    await wrapper.get('input[aria-label="Enable engine"]').setValue(false);
+    await wrapper.findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
     expect(setProviderEnabled).toHaveBeenCalledWith('claude', false);
     await wrapper.setProps({ activeTab: 'codex', codexConnected: true });
-    await wrapper.get('input[aria-label="Enable engine"]').setValue(false);
+    await wrapper.findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
     expect(setProviderEnabled).toHaveBeenLastCalledWith('codex', false);
   });
 

@@ -5,6 +5,42 @@ import ProviderSetupDialog from '../ProviderSetupDialog.vue';
 import { i18n } from '../../i18n';
 
 describe('ProviderSetupDialog', () => {
+  it('lets Settings change skills reuse for existing chats without requesting roster removal', async () => {
+    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: true, affectedAgentIds: ['agent-one'] };
+    const wrapper = mount(ProviderSetupDialog, {
+      props: { setup, allowReset: true, busy: false, error: null },
+      global: { components: { ElCheckbox, ElRadio, ElRadioGroup }, stubs: { teleport: true } },
+    });
+    const checkbox = wrapper.get('input[type="checkbox"]');
+    expect(checkbox.attributes('disabled')).toBeUndefined();
+    await checkbox.setValue(false);
+    expect(wrapper.get('.claw-button--primary').attributes('disabled')).toBeUndefined();
+    await wrapper.get('.claw-button--primary').trigger('click');
+    expect(wrapper.emitted('save')).toStrictEqual([[{ isolated: true, shareSkills: false }]]);
+    expect(wrapper.find('.provider-setup__acknowledgment').exists()).toBe(false);
+  });
+  it('requires a separate acknowledgment before removing the exact displayed roster, and Cancel makes no change', async () => {
+    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: true, affectedAgentIds: ['agent-one', 'quick-chat'] };
+    const wrapper = mount(ProviderSetupDialog, {
+      props: { setup, allowReset: true, busy: false, error: null },
+      global: { components: { ElCheckbox, ElRadio, ElRadioGroup }, stubs: { teleport: true } },
+    });
+    await wrapper.findAll('input[type="radio"]')[1]!.setValue();
+    await wrapper.get('.claw-button--primary').trigger('click');
+    expect(wrapper.emitted('save')).toBeUndefined();
+    expect(wrapper.text()).toContain('all 2 local Codex agents');
+    expect(wrapper.get('.claw-button--primary').attributes('disabled')).toBeDefined();
+    await wrapper.get('.claw-button--tertiary').trigger('click');
+    expect(wrapper.emitted('close')).toEqual([[]]);
+    expect(wrapper.emitted('save')).toBeUndefined();
+    await wrapper.get('input[type="checkbox"]').setValue(true);
+    await wrapper.get('.claw-button--primary').trigger('click');
+    expect(wrapper.emitted('save')).toEqual([[{ isolated: false, shareSkills: true, removeAgentIds: ['agent-one', 'quick-chat'] }]]);
+    await wrapper.setProps({ setup: { ...setup } });
+    await wrapper.findAll('input[type="radio"]')[1]!.setValue();
+    await wrapper.get('.claw-button--primary').trigger('click');
+    expect(wrapper.get('input[type="checkbox"]').element).toHaveProperty('checked', false);
+  });
   it('defaults a missing CLI to separate chats/shared skills and submits explicit installation', async () => {
     const wrapper = mount(ProviderSetupDialog, {
       attachTo: document.body,

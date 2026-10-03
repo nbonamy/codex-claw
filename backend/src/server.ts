@@ -540,6 +540,7 @@ export class ClawBackendServer {
   }
 
   async requireConnectedEngine(backend?: Agent['backend']): Promise<Agent['backend']> {
+    if (this.providerSetup?.isChanging(backend)) throw new Error('Engine setup is changing. Try again when it finishes.');
     await this.providerConnections?.refresh();
     return resolveAgentBackend(this.snapshot, backend);
   }
@@ -559,6 +560,9 @@ export class ClawBackendServer {
 
   async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {
     if (!isClawRpcRequest(message)) return this.dispatchMessage(message);
+    if (this.providerSetup?.isChanging() && ![backendMethods.snapshotGet, backendMethods.providerSetupGet].some(method => method === message.method)) {
+      return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Engine setup is changing. Try again when it finishes.');
+    }
     const params = isRecord(message.params) ? { ...message.params } : undefined;
     const clientId = typeof params?._clientId === 'string' ? params._clientId : 'desktop';
     if (!clientId.trim() || clientId.length > 200) return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid client identity.');
@@ -2024,14 +2028,20 @@ export class ClawBackendServer {
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         const input = requireRecord(message.params);
         if (input.backend !== 'codex' && input.backend !== 'claude') throw new Error('Unknown provider.');
-        this.providerConnections?.invalidate(input.backend);
         let result;
         if (message.method === backendMethods.providerInstall) result = await this.providerSetup.install(input.backend);
         else {
+          if (connectionId) throw new Error('Change remote engine setup on its owning host.');
           const choice = requireRecord(input.choice);
           if (typeof choice.isolated !== 'boolean' || typeof choice.shareSkills !== 'boolean') throw new Error('Invalid provider setup.');
-          result = await this.providerSetup.configure(input.backend, { isolated: choice.isolated, shareSkills: choice.shareSkills });
+          if (choice.removeAgentIds !== undefined && (!Array.isArray(choice.removeAgentIds) || !choice.removeAgentIds.every(id => typeof id === 'string'))) throw new Error('Invalid provider reset confirmation.');
+          const previousIds = this.snapshot.agents.map(agent => agent.id);
+          result = await this.providerSetup.configure(input.backend, { isolated: choice.isolated, shareSkills: choice.shareSkills, ...(choice.removeAgentIds === undefined ? {} : { removeAgentIds: choice.removeAgentIds as string[] }) });
+          for (const agentId of previousIds) {
+            if (!this.snapshot.agents.some(agent => agent.id === agentId)) this.agentRequests.clearAgent(agentId);
+          }
         }
+        this.providerConnections?.invalidate(input.backend);
         await this.providerConnections?.refresh();
         await this.persistAndEmitSnapshot();
         return createClawRpcResult(message.id, result);

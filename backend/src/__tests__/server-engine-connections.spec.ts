@@ -18,7 +18,7 @@ describe('connected engine admission', () => {
     const server = new ClawBackendServer({
       version: 'test', snapshot, driverRpc: driverRpc as never,
       saveSnapshot: async value => { saved = structuredClone(value.general); },
-      providerSetup: { list: () => [{ backend: 'claude', installed: true, homePath: '/claw/claude' }, { backend: 'codex', installed: true, homePath: '/claw/codex' }] } as never,
+      providerSetup: { isChanging: () => false, list: () => [{ backend: 'claude', installed: true, homePath: '/claw/claude' }, { backend: 'codex', installed: true, homePath: '/claw/codex' }] } as never,
     });
     try {
       await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'agent/quickChat/create', params: { input: { teamId: 'team-test' } } });
@@ -69,7 +69,7 @@ describe('connected engine admission', () => {
     const snapshot = createTestSnapshot();
     snapshot.providerConnections = [];
     const driverRpc = { handle: vi.fn((_method, params) => new ClaudeBackendDriver().authenticate(params)), onEvent: vi.fn(() => () => undefined), close: vi.fn() };
-    const providerSetup = { list: () => [
+    const providerSetup = { isChanging: () => false, list: () => [
       { backend: 'codex', installed: false, homePath: '/absent' },
       { backend: 'claude', installed: true, homePath: '/claw/claude' },
     ] };

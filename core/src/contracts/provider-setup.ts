@@ -33,7 +33,10 @@ function isProviderAuthentication(value: unknown): value is ProviderAuthenticati
   if (!record(value) || typeof value.connected !== 'boolean' || !record(value.state)) return false;
   const state = value.state;
   if (value.kind === 'claude') return typeof state.loggedIn === 'boolean'
-    && (state.configDirectory === undefined || state.configDirectory === null || typeof state.configDirectory === 'string');
+    && (state.configDirectory === undefined || state.configDirectory === null || typeof state.configDirectory === 'string')
+    && (state.account === undefined || (record(state.account) && ['subscription', 'apiKey'].includes(String(state.account.type))
+      && (state.account.email === undefined || typeof state.account.email === 'string')
+      && (state.account.subscription === undefined || typeof state.account.subscription === 'string')));
   if (value.kind !== 'codex' || typeof state.requiresOpenaiAuth !== 'boolean' || !record(state.login)) return false;
   const account = state.account;
   return ['idle', 'starting', 'pending', 'completed', 'cancelled', 'error'].includes(String(state.login.status))
@@ -46,9 +49,12 @@ function isProviderAuthentication(value: unknown): value is ProviderAuthenticati
 function record(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
 
 export type ProviderSetupChoice = { isolated: boolean; shareSkills: boolean };
+/** Destructive setup changes must name the exact local roster shown in the confirmation. */
+export type ProviderSetupChange = ProviderSetupChoice & { removeAgentIds?: string[] };
 export type ProviderHomeSettings = ProviderSetupChoice & { homePath: string };
 export type ProviderSetupStatus = ProviderHomeSettings & {
   backend: AgentBackend;
   installed: boolean;
   locked: boolean;
+  affectedAgentIds?: string[];
 };

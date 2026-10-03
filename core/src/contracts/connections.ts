@@ -44,6 +44,7 @@ export type RemoteConnectionsState = {
 
 export type ClaudeAuthentication = {
   loggedIn: boolean;
+  account?: { type: 'subscription' | 'apiKey'; email?: string; subscription?: string };
   /** Local CLI override; null means leave CLAUDE_CONFIG_DIR unset for the default login. */
   configDirectory?: string | null;
 };

@@ -6,7 +6,7 @@ import { claudeConfigDirectoryOverride } from './config-directory';
 
 const run = promisify(execFile);
 
-/** Return only authentication state, never CLI account or credential details. */
+/** Return only safe account metadata, never credential material or raw CLI output. */
 export async function getLocalClaudeAuthentication(): Promise<ClaudeAuthentication> {
   const configDirectory = claudeConfigDirectoryOverride();
   let stdout: string;
@@ -31,5 +31,12 @@ export async function getLocalClaudeAuthentication(): Promise<ClaudeAuthenticati
   if (!status || typeof status !== 'object' || !('loggedIn' in status) || typeof status.loggedIn !== 'boolean') {
     throw new Error('Claude Code returned an invalid authentication status.');
   }
-  return { loggedIn: status.loggedIn, configDirectory: configDirectory ?? null };
+  const metadata = status as Record<string, unknown>;
+  const account = !status.loggedIn ? undefined : metadata.authMethod === 'claude.ai'
+    ? { type: 'subscription' as const,
+      ...(typeof metadata.email === 'string' ? { email: metadata.email } : {}),
+      ...(typeof metadata.subscriptionType === 'string' ? { subscription: metadata.subscriptionType } : {}),
+    }
+    : metadata.authMethod === 'api_key' ? { type: 'apiKey' as const } : undefined;
+  return { loggedIn: status.loggedIn, configDirectory: configDirectory ?? null, ...(account ? { account } : {}) };
 }

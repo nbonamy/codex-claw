@@ -911,6 +911,22 @@ change event or explicit refresh may invalidate the relevant cache. Snapshot
 writes are coalesced so bursts of backend metadata events write only the latest
 durable projection.
 
+Engine settings show safe cached account metadata and offer app-only
+Connect/Disconnect controls. Disconnect disables the engine in Claw without
+logging out its CLI or removing agents. Skills-only changes keep the same home
+and roster, require idle agents, and preserve private skills rather than
+overwriting them. Changing between a separate Claw home
+and the existing CLI setup is an explicit roster reset: the client confirms the
+exact local agent IDs, including Quick Chats, with an acknowledgment checkbox.
+`ProviderSetup` checks the roster again after asynchronous preparation, refuses
+active agents and unfinished linked review/Mission work, and removes the affected
+roster references without archiving provider sessions or deleting worktrees.
+Remote agents and other engines remain untouched. The runtime makes verified
+roster/settings backups first; a failed switch restores the previous home and
+roster. App RPC mutations are paused during the switch. Original provider
+conversation files remain in the old home, but switching back does not recreate
+their Claw agents.
+
 An in-progress code review is app-owned state, not provider transcript state.
 The visible reviewer agent carries one active review ledger containing rounds, structured
 findings, user decisions, linked discussion, remediation progress, the selected

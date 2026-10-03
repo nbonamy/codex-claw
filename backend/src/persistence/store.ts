@@ -63,6 +63,14 @@ export class AppStateStore {
     return operation;
   }
 
+  /** Verified recovery copies before an explicit destructive provider reset. */
+  async backupProviderSetup(snapshot: AppSnapshot): Promise<void> {
+    await this.save(snapshot);
+    for (const name of [rosterFile, settingsFile]) {
+      await backupFile(this.absolute(name), this.absolute(backupsDirectory), `provider-setup-${name.slice(0, -5)}`);
+    }
+  }
+
   private async migrateLegacy(text: string): Promise<AppSnapshot> {
     let parsed: unknown;
     try {

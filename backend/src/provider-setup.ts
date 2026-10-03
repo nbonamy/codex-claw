@@ -1,11 +1,13 @@
 import type { AgentBackend, AppSnapshot, SetCodexResourceSharingInput } from '@codex-claw/core/contracts';
-import type { ProviderHomeSettings, ProviderSetupChoice, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderHomeSettings, ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import { createProviderLifecycles, type ProviderLifecycle } from './provider-lifecycle';
+import { localProviderAgents, resetProviderRoster, validateProviderReset } from './provider-roster-reset';
 
 /** Owns local provider homes. Never copies authentication or moves existing chats. */
 export class ProviderSetup {
   private busy = false;
+  private changingBackend: AgentBackend | null = null;
   private readonly installations = new Map<AgentBackend, boolean>();
 
   constructor(
@@ -13,6 +15,7 @@ export class ProviderSetup {
     private readonly persist: () => Promise<void>,
     private readonly reconnect: (backend: AgentBackend) => Promise<void>,
     private readonly lifecycles: ReadonlyMap<AgentBackend, ProviderLifecycle> = createProviderLifecycles(),
+    private readonly backup?: () => Promise<void>,
   ) {}
 
   async initialize(): Promise<void> {
@@ -34,27 +37,50 @@ export class ProviderSetup {
     return [...this.lifecycles.keys()].map(backend => this.status(backend));
   }
 
-  async configure(backend: AgentBackend, choice: ProviderSetupChoice): Promise<ProviderSetupStatus> {
+  isChanging(backend?: AgentBackend): boolean { return this.changingBackend !== null && (!backend || this.changingBackend === backend); }
+
+  async configure(backend: AgentBackend, choice: ProviderSetupChange): Promise<ProviderSetupStatus> {
     if (this.busy) throw new Error('Provider setup is already in progress.');
-    if (this.locked(backend)) throw new Error('This provider already has chats. Its setup cannot be changed here.');
     const lifecycle = this.lifecycle(backend);
     const previous = this.home(backend);
+    const changesHome = previous.isolated !== choice.isolated;
+    const changesSharing = previous.shareSkills !== choice.shareSkills;
+    if (!changesHome && !changesSharing && this.locked(backend)) throw new Error('This provider already has chats. Only its conversation setup can be changed here.');
+    const sharingAgentIds = !changesHome && changesSharing ? localProviderAgents(this.snapshot, backend).map(agent => agent.id) : null;
+    if (sharingAgentIds) validateProviderReset(this.snapshot, backend, sharingAgentIds);
+    const confirmedIds = changesHome ? validateProviderReset(this.snapshot, backend, choice.removeAgentIds) : [];
     this.busy = true;
+    this.changingBackend = backend;
+    let undoRoster: (() => void) | undefined;
+    let setupStarted = false;
     try {
-      const next = lifecycle.home(this.snapshot, choice);
+      if (confirmedIds.length) await this.backup?.();
+      setupStarted = true;
+      const next = changesHome
+        ? lifecycle.home(this.snapshot, { isolated: choice.isolated, shareSkills: choice.shareSkills })
+        : { ...previous, shareSkills: choice.shareSkills };
       await lifecycle.prepareHome(next, true);
       this.snapshot.general.providerHomes = { ...this.snapshot.general.providerHomes, [backend]: next };
       lifecycle.applyHome?.(next);
       await this.reconnect(backend);
+      if (sharingAgentIds) validateProviderReset(this.snapshot, backend, sharingAgentIds);
+      if (changesHome) {
+        // Recheck after async setup: a new or now-active agent invalidates consent.
+        validateProviderReset(this.snapshot, backend, choice.removeAgentIds);
+        if (confirmedIds.length) undoRoster = resetProviderRoster(this.snapshot, confirmedIds);
+      }
       await this.persist();
       return this.status(backend);
     } catch (error) {
+      if (!setupStarted) throw error;
+      undoRoster?.();
       this.snapshot.general.providerHomes = { ...this.snapshot.general.providerHomes, [backend]: previous };
       lifecycle.applyHome?.(previous);
       await lifecycle.prepareHome(previous, false);
       await this.reconnect(backend);
+      await this.persist();
       throw error;
-    } finally { this.busy = false; }
+    } finally { this.busy = false; this.changingBackend = null; }
   }
 
   async install(backend: AgentBackend): Promise<ProviderSetupStatus> {
@@ -77,16 +103,15 @@ export class ProviderSetup {
   }
 
   private locked(backend: AgentBackend): boolean {
-    return this.snapshot.agents.some(agent => agent.backend === backend);
+    return localProviderAgents(this.snapshot, backend).length > 0;
   }
 
   invalidateInstallation(backend: AgentBackend): void { this.installations.delete(backend); }
 
   private status(backend: AgentBackend): ProviderSetupStatus {
-    if (this.installations.has(backend)) return { backend, ...this.home(backend), installed: this.installations.get(backend)!, locked: this.locked(backend) };
-    const installed = this.lifecycle(backend).installed(this.snapshot);
+    const installed = this.installations.get(backend) ?? this.lifecycle(backend).installed(this.snapshot);
     this.installations.set(backend, installed);
-    return { backend, ...this.home(backend), installed, locked: this.locked(backend) };
+    return { backend, ...this.home(backend), installed, locked: this.locked(backend), affectedAgentIds: localProviderAgents(this.snapshot, backend).map(agent => agent.id) };
   }
 
   private lifecycle(backend: AgentBackend): ProviderLifecycle {

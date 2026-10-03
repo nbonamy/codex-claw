@@ -1,7 +1,8 @@
 import type { AgentBackend, ClaudeAuthentication, CodexAuthentication, CodexClawApi } from '@codex-claw/core/contracts';
-import type { ProviderConnection, ProviderSetupChoice, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderConnection, ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
 import { computed, onScopeDispose, ref, watch } from 'vue';
 import { translate } from '../i18n';
+import { localizedErrorMessage } from '../i18n/errors';
 import { clearFirstRunOnboardingStage, getFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
 
 type FirstRunOnboardingOptions = {
@@ -138,12 +139,15 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     return providerSetup.value.some(setup => setup.backend === backend && setup.installed);
   }
 
-  function customizeProvider(backend: AgentBackend): void {
+  async function customizeProvider(backend: AgentBackend): Promise<void> {
     setupError.value = null;
+    try { providerSetup.value = await requireApi().getProviderSetup(); }
+    catch (error) { setupError.value = errorMessage(error); return; }
+    if (disposed) return;
     customizingProvider.value = backend;
   }
 
-  async function saveProviderSetup(choice: ProviderSetupChoice): Promise<void> {
+  async function saveProviderSetup(choice: ProviderSetupChange): Promise<void> {
     const backend = customizingProvider.value;
     if (!backend || setupBusy.value) return;
     updatingProvider.value = backend;
@@ -154,7 +158,9 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
         if (authentication.value?.login.status === 'pending') await requireApi().cancelCodexChatGptLogin();
       }
       const current = providerSetup.value.find(setup => setup.backend === backend);
-      let next = current?.locked ? current : await requireApi().configureProviderSetup(backend, choice);
+      const unchangedLockedSetup = current?.locked && !choice.removeAgentIds
+        && current.isolated === choice.isolated && current.shareSkills === choice.shareSkills;
+      let next = unchangedLockedSetup ? current : await requireApi().configureProviderSetup(backend, choice);
       if (backend === 'codex') authentication.value = null;
       else claudeAuthentication.value = null;
       providerSetup.value = providerSetup.value.map(setup => setup.backend === backend ? next : setup);
@@ -287,5 +293,5 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return localizedErrorMessage(error, translate).replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
 }

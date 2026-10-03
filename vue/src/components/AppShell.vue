@@ -5,6 +5,7 @@
   >
     <FirstRunOnboardingGate
       :provider-setup="providerSetup"
+      :allow-setup-reset="settingsVisible"
       :customized-setup="customizedSetup"
       :setup-busy="setupBusy"
       :updating-provider="updatingProvider"
@@ -114,6 +115,8 @@
       <SettingsView
         v-if="settingsVisible"
         :codex-connected="codexConnected"
+        :provider-connections="snapshot.providerConnections"
+        :customize-provider="customizeProvider"
         :claude-connected="claudeConnected"
         :codex-connection-busy="authenticationLoading || snapshot.providerConnections?.some(engine => engine.backend === 'codex' && engine.checking)"
         :set-provider-enabled="setEngineEnabled"
@@ -157,8 +160,6 @@
         :complete-work-provider-connection="pollWorkProviderAuthorization"
         :disconnect-work-provider="disconnectWorkProvider"
         :update-settings="updateSettings"
-        :set-codex-resource-sharing="setCodexResourceSharing"
-        :codex-resource-sharing-blocked="codexResourceSharingBlocked"
         :get-plugin-status="getPluginStatus"
         :set-daemon-enabled="setDaemonEnabled"
         :restart-app="restartApp"

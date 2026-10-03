@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { ElMessageBox } from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CodexClawApi } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
@@ -15,13 +14,15 @@ describe('SettingsCodexPanel', () => {
     vi.restoreAllMocks();
   });
 
-  it('groups ChatGPT launch, resource sharing, and runtime settings', () => {
+  it('groups engine setup, ChatGPT launch and runtime settings without a duplicate skills toggle', () => {
     const wrapper = mountPanel();
 
     expect(wrapper.text()).toContain('Launch ChatGPT');
-    expect(wrapper.text()).toContain('Share skills and plugins with ChatGPT');
+    expect(wrapper.find('input[aria-label="Share skills and plugins with ChatGPT"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('Codex executable');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
+    const connectionBlock = wrapper.findAll('.settings-section')[0]!;
+    expect(connectionBlock.findAll('.settings-row__copy strong').map(row => row.text())).toEqual(['Account', 'Location', 'Enable engine']);
   });
 
   it('launches ChatGPT and keeps launch failures visible', async () => {
@@ -67,53 +68,6 @@ describe('SettingsCodexPanel', () => {
     });
   });
 
-  it('warns before sharing ChatGPT skills and plugins', async () => {
-    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
-    const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({
-      settings: { ...defaultGeneralSettings, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } } },
-      setCodexResourceSharing,
-    });
-
-    await switchInput(wrapper, 'Share skills and plugins with ChatGPT').setValue(true);
-    await flushPromises();
-
-    expect(confirm).toHaveBeenCalledWith(
-      'You are going to lose all plugins and skills installed only in Codex Claw. Continue?',
-      'Share skills and plugins with ChatGPT?',
-      expect.objectContaining({ confirmButtonText: 'Continue', cancelButtonText: 'Cancel' }),
-    );
-    expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: true });
-  });
-
-  it.each([
-    ['confirm', 'copy'],
-    ['cancel', 'fresh'],
-  ] as const)('uses %s to select the %s isolated resource mode', async (dialogResult, mode) => {
-    const dialog = vi.spyOn(ElMessageBox, 'confirm');
-    if (dialogResult === 'confirm') dialog.mockResolvedValue('confirm' as never);
-    else dialog.mockRejectedValue('cancel');
-    const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ setCodexResourceSharing });
-
-    await switchInput(wrapper, 'Share skills and plugins with ChatGPT').setValue(false);
-    await flushPromises();
-
-    expect(setCodexResourceSharing).toHaveBeenCalledWith({ enabled: false, mode });
-  });
-
-  it('blocks resource sharing changes while chats are running', async () => {
-    const alert = vi.spyOn(ElMessageBox, 'alert').mockResolvedValue('confirm' as never);
-    const setCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ codexResourceSharingBlocked: true, setCodexResourceSharing });
-
-    await switchInput(wrapper, 'Share skills and plugins with ChatGPT').setValue(false);
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('This option cannot be changed while chats are running.');
-    expect(alert).toHaveBeenCalledOnce();
-    expect(setCodexResourceSharing).not.toHaveBeenCalled();
-  });
 });
 
 function mountPanel(props: Record<string, unknown> = {}) {
@@ -123,8 +77,4 @@ function mountPanel(props: Record<string, unknown> = {}) {
       ...props,
     },
   });
-}
-
-function switchInput(wrapper: ReturnType<typeof mountPanel>, label: string) {
-  return wrapper.get<HTMLInputElement>(`input[aria-label="${label}"]`);
 }

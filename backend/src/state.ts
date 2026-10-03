@@ -67,6 +67,10 @@ export async function saveBackendSnapshot(snapshot: AppSnapshot): Promise<void> 
   await backendStateStore().save(snapshot);
 }
 
+export async function backupProviderSetup(snapshot: AppSnapshot): Promise<void> {
+  await backendStateStore().backupProviderSetup(snapshot);
+}
+
 function backendStateStore(): AppStateStore {
   const home = backendHomeDir();
   if (!store || storeHome !== home) {

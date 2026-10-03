@@ -1,4 +1,4 @@
-import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
+import { config, DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import type {
   CodexComposerMenuSelectableItem,
   CodexNativeAttachment,
@@ -18,6 +18,7 @@ import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setFirstRunOnboardingStage } from '../../onboarding-session';
 import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtures';
+import { encodeAppErrorDescriptor } from '@codex-claw/core/app-error';
 import { createClaudeConversationReplica } from '@codex-claw/core/claude-conversation-replica';
 
 import {
@@ -315,7 +316,7 @@ describe('AppShell authentication and conversation', () => {
     wrapper.unmount();
   });
 
-  it('restores the account menu from cached connection metadata without probing authentication', async () => {
+  it('shows the cached account in engine settings without probing authentication', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false,
       authentication: { kind: 'codex', connected: true, state: {
@@ -327,8 +328,64 @@ describe('AppShell authentication and conversation', () => {
     window.codexClaw = { getCodexAuthentication } as Partial<CodexClawApi> as CodexClawApi;
     const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
     await flushPromises();
-    expect(wrapper.get('.settings-menu__account').text()).toContain('cached@example.com');
+    await wrapper.get('.settings-menu').findAll('[role="menuitem"]').find(item => item.text().startsWith('Settings'))!.trigger('click');
+    await wrapper.get('.settings-sidebar').findAll('.el-menu-item').find(item => item.text() === 'Codex')!.trigger('click');
+    expect(wrapper.get('.settings-view .settings-row').text()).toContain('cached@example.com');
     expect(getCodexAuthentication).not.toHaveBeenCalled();
+  });
+
+  it('saves a skills-only change from Settings for an engine that already has chats', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: true };
+    const configureProviderSetup = vi.fn().mockResolvedValue({ ...setup, shareSkills: false });
+    setElectronTestClient({ getProviderSetup: vi.fn().mockResolvedValue([setup]), configureProviderSetup });
+    const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
+    await flushPromises();
+    await wrapper.get('.settings-menu').findAll('[role="menuitem"]').find(item => item.text().startsWith('Settings'))!.trigger('click');
+    await wrapper.get('.settings-sidebar').findAll('.el-menu-item').find(item => item.text() === 'Codex')!.trigger('click');
+    await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Customize')!.trigger('click');
+    await flushPromises();
+    const dialog = wrapper.getComponent({ name: 'ProviderSetupDialog' });
+    await dialog.get('input[type="checkbox"]').setValue(false);
+    await dialog.get('.claw-button--primary').trigger('click');
+    await flushPromises();
+    expect(configureProviderSetup).toHaveBeenCalledExactlyOnceWith('codex', { isolated: true, shareSkills: false });
+    expect(wrapper.find('.provider-setup__acknowledgment').exists()).toBe(false);
+  });
+
+  it('routes a confirmed Settings setup switch with the exact agent list', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: true, affectedAgentIds: snapshot.agents.map(agent => agent.id) };
+    const configureProviderSetup = vi.fn()
+      .mockRejectedValueOnce(new Error(`Error invoking remote method 'provider:setup:configure': ${encodeAppErrorDescriptor({ kind: 'appError', code: 'engineSetup.agentsBusy' }, 'diagnostic fallback')}`))
+      .mockResolvedValue({ ...setup, isolated: false, locked: false, affectedAgentIds: [] });
+    setElectronTestClient({ getProviderSetup: vi.fn().mockResolvedValue([setup]), configureProviderSetup });
+    const components = config.global.components;
+    config.global.components = { ...components, ElRadio, ElRadioGroup };
+    const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
+    config.global.components = components;
+    await flushPromises();
+    await wrapper.get('.settings-menu').findAll('[role="menuitem"]').find(item => item.text().startsWith('Settings'))!.trigger('click');
+    await wrapper.get('.settings-sidebar').findAll('.el-menu-item').find(item => item.text() === 'Codex')!.trigger('click');
+    await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Customize')!.trigger('click');
+    await flushPromises();
+    const dialog = wrapper.getComponent({ name: 'ProviderSetupDialog' });
+    // Real controls own exclusive selection and the acknowledgment gate.
+    expect(dialog.findAll('input[type="radio"]')).toHaveLength(2);
+    await dialog.findAll('input[type="radio"]')[1]!.setValue();
+    await dialog.get('.claw-button--primary').trigger('click');
+    expect(configureProviderSetup).not.toHaveBeenCalled();
+    await dialog.get('input[type="checkbox"]').setValue(true);
+    await dialog.get('.claw-button--primary').trigger('click');
+    await flushPromises();
+    expect(configureProviderSetup).toHaveBeenCalledWith('codex', { isolated: false, shareSkills: true, removeAgentIds: setup.affectedAgentIds });
+    expect(dialog.get('[role="alert"]').text()).toBe('Wait for this engine’s agents to finish before changing their setup.');
+    expect(dialog.text()).not.toContain('Error invoking remote method');
+    await dialog.get('.claw-button--primary').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('.provider-setup__acknowledgment').exists()).toBe(false);
   });
 
   it('offers skippable GitHub setup after the first ChatGPT sign-in', async () => {

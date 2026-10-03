@@ -3,13 +3,23 @@ import { surfaceMessages } from './surface-messages';
 export const messages = {
   en: {
     engineConnection: {
-      title: 'Status', connect: 'Connect', connected: 'Connected',
+      title: 'Account', connect: 'Connect', connected: 'Connected',
+      disconnect: 'Disconnect', disconnected: 'Disconnected', apiKey: 'API key', subscription: 'Claude subscription', amazonBedrock: 'Amazon Bedrock',
       enabled: 'Enable engine',
       updateFailedTitle: 'Engine status unchanged',
       lastEngineTitle: 'Claw needs an active engine',
       lastEngine: 'To turn this engine off, first connect or enable another one.',
       updateFailed: 'Could not update engine status. Please try again.',
       required: 'Connect or enable an engine in Settings to start new work.',
+      preserveLogin: 'Disconnecting only turns this engine off in Claw. Your CLI sign-in and chats are kept.',
+    },
+    engineSetup: {
+      title: 'Location',
+      confirmTitle: 'Change conversation setup?',
+      warning: 'This will remove all {count} local {provider} agents, including Quick Chats, from Claw.',
+      historyPreserved: 'Their conversation files will remain in the previous setup. Switching back will not restore these agents in Claw.',
+      acknowledgment: 'I understand that my current agents and Quick Chats will be removed from Claw and will not return if I switch back.',
+      removeAndSwitch: 'Remove agents and switch',
     },
     split: {
       layout: 'Conversation layout', single: 'Single Pane', '2-vertical': 'Vertical Split',
@@ -456,6 +466,13 @@ export const messages = {
       untitled: 'Untitled session',
     },
     errors: {
+      engineSetup: {
+        confirmationRequired: 'Confirm removal of this engine’s current agents before changing its setup.',
+        rosterChanged: 'This engine’s agents have changed. Close this dialog and reopen Customize to confirm the updated list.',
+        agentsBusy: 'Wait for this engine’s agents to finish before changing their setup.',
+        reviewActive: 'Finish or discard this engine’s code reviews before changing its setup.',
+        missionActive: 'Finish this engine’s Mission runs before changing its setup.',
+      },
       branchesLoad: 'Could not load branches.',
       branchesLoadWithDetail: 'Could not load branches: {detail}',
       clone: {

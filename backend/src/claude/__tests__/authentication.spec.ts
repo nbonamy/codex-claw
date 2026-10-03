@@ -36,6 +36,18 @@ describe('local Claude authentication', () => {
     vi.unstubAllEnvs();
   });
 
+  it.each([
+    { metadata: { authMethod: 'claude.ai', email: 'user@example.com', subscriptionType: 'max' }, account: { type: 'subscription', email: 'user@example.com', subscription: 'max' } },
+    { metadata: { authMethod: 'claude.ai', email: null, subscriptionType: null }, account: { type: 'subscription' } },
+    { metadata: { authMethod: 'api_key', email: 'private' }, account: { type: 'apiKey' } },
+  ])('exposes safe account metadata for $metadata.authMethod without credentials or organization details', async ({ metadata, account }) => {
+    vi.stubEnv('CLAUDE_CONFIG_DIR', '/tmp/claw-auth-home');
+    cli.stdout = JSON.stringify({ loggedIn: true, ...metadata, accessToken: 'secret', orgId: 'private' });
+    try {
+      await expect(getLocalClaudeAuthentication()).resolves.toStrictEqual({ loggedIn: true, configDirectory: '/tmp/claw-auth-home', account });
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it.each(['invalid json', '{"loggedIn":"yes"}'])('rejects malformed status without exposing raw output', async (output) => {
     cli.stdout = output;
     await expect(getLocalClaudeAuthentication()).rejects.toThrow('invalid authentication status');

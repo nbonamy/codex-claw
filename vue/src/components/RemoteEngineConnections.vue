@@ -5,7 +5,7 @@
         {{ $t('auth.installProvider') }} {{ backendDisplayName(engine.backend) }}
       </button>
       <template v-else>
-        <SettingsEngineConnectionRow :title="backendDisplayName(engine.backend)" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @connect="signingIn = engine.backend" />
+        <SettingsEngineConnectionRow :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @connect="connect(engine)" />
         <RemoteCodexAuthentication v-if="signingIn === engine.backend && engine.backend === 'codex'" :connection="connection" @connected="finishConnection" />
         <RemoteClaudeAuthentication v-if="signingIn === engine.backend && engine.backend === 'claude'" :connection="connection" @connected="finishConnection" />
       </template>
@@ -22,6 +22,7 @@ import type { AgentBackend, RemoteConnection } from '@codex-claw/core/contracts'
 import type { ProviderConnection } from '@codex-claw/core/contracts/provider-setup';
 import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import { codexClawApi } from '../platform-api';
+import { translate } from '../i18n';
 import RemoteCodexAuthentication from './RemoteCodexAuthentication.vue';
 import RemoteClaudeAuthentication from './RemoteClaudeAuthentication.vue';
 import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
@@ -61,6 +62,15 @@ async function setEnabled(backend: AgentBackend, enabled: boolean) {
   const expected = revision;
   const result = await codexClawApi.setProviderEnabled(backend, enabled, props.connection.id);
   if (expected === revision) engines.value = result;
+}
+async function connect(engine: ProviderConnection) {
+  if (!engine.connected) { signingIn.value = engine.backend; return; }
+  busy.value = true;
+  error.value = '';
+  const expected = revision;
+  try { await setEnabled(engine.backend, true); }
+  catch { if (expected === revision) error.value = translate('engineConnection.updateFailed'); }
+  finally { if (expected === revision) busy.value = false; }
 }
 async function finishConnection() { signingIn.value = null; await refresh(); }
 watch(() => props.connection.id, () => { engines.value = []; signingIn.value = null; void refresh(); }, { immediate: true });

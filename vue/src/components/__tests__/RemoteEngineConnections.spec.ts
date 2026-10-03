@@ -4,6 +4,7 @@ import type { RemoteConnection } from '@codex-claw/core/contracts';
 import { configureClawClient } from '../../platform-api';
 import { createClientApiMock } from '../../test/client-api-mock';
 import RemoteEngineConnections from '../RemoteEngineConnections.vue';
+import { ElSwitch } from 'element-plus';
 
 const connection: RemoteConnection = {
   id: 'wall-e', host: 'wall-e', name: 'wall-e', kind: 'ssh', status: 'ready', createdAt: '', updatedAt: '',
@@ -16,15 +17,18 @@ describe('RemoteEngineConnections', () => {
     const { api } = createClientApiMock();
     const engine = { backend: 'claude' as const, installed: true, connected: true, checking: false, enabled: true };
     api.getProviderConnections.mockResolvedValue([engine]);
-    api.setProviderEnabled.mockResolvedValue([{ ...engine, enabled: false }]);
+    api.setProviderEnabled.mockResolvedValueOnce([{ ...engine, enabled: false }]).mockResolvedValue([engine]);
     configureClawClient({ platform: 'desktop', api });
-    const wrapper = mount(RemoteEngineConnections, { props: { connection } });
+    const wrapper = mount(RemoteEngineConnections, { props: { connection }, global: { components: { ElSwitch } } });
     await flushPromises();
-    await wrapper.get('input[role="switch"]').setValue(false);
+    await wrapper.get('[role="switch"]').trigger('click');
     await flushPromises();
     expect(api.setProviderEnabled).toHaveBeenCalledExactlyOnceWith('claude', false, 'wall-e');
-    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('false');
-    expect(wrapper.find('button').exists()).toBe(false);
+    expect(wrapper.get('.settings-row__control button').text()).toBe('Connect');
+    await wrapper.get('.settings-row__control button').trigger('click');
+    await flushPromises();
+    expect(api.setProviderEnabled).toHaveBeenLastCalledWith('claude', true, 'wall-e');
+    expect(wrapper.get('.settings-row__control button').text()).toBe('Disconnect');
     expect(api.getClaudeAuthentication).not.toHaveBeenCalled();
   });
 

@@ -9,7 +9,12 @@ export type AppErrorCode =
   | 'createRepository.invalidName'
   | 'createRepository.nameRequired'
   | 'createRepository.sourceFolderMissing'
-  | 'git.pullRequestChangesRequired';
+  | 'git.pullRequestChangesRequired'
+  | 'engineSetup.confirmationRequired'
+  | 'engineSetup.rosterChanged'
+  | 'engineSetup.agentsBusy'
+  | 'engineSetup.reviewActive'
+  | 'engineSetup.missionActive';
 
 export const appErrorCodes: readonly AppErrorCode[] = [
   'clone.alreadyExists',
@@ -23,6 +28,11 @@ export const appErrorCodes: readonly AppErrorCode[] = [
   'createRepository.nameRequired',
   'createRepository.sourceFolderMissing',
   'git.pullRequestChangesRequired',
+  'engineSetup.confirmationRequired',
+  'engineSetup.rosterChanged',
+  'engineSetup.agentsBusy',
+  'engineSetup.reviewActive',
+  'engineSetup.missionActive',
 ];
 
 export type AppErrorDescriptor = {

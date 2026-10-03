@@ -1,20 +1,26 @@
 <template>
-  <FormDialog :model-value="Boolean(setup)" :title="t('auth.customizeProvider', { provider: setup?.backend === 'codex' ? 'Codex' : 'Claude Code' })" teleported @update:model-value="!$event && !busy && emit('close')">
-    <div class="claw-form-dialog">
+  <FormDialog :model-value="Boolean(setup)" :title="confirming ? t('engineSetup.confirmTitle') : t('auth.customizeProvider', { provider: setup?.backend === 'codex' ? 'Codex' : 'Claude Code' })" teleported @update:model-value="!$event && !busy && emit('close')">
+    <div v-if="confirming" class="claw-form-dialog provider-setup__confirmation">
+      <p>{{ t('engineSetup.warning', { count: setup?.affectedAgentIds?.length ?? 0, provider: setup?.backend === 'codex' ? 'Codex' : 'Claude Code' }) }}</p>
+      <p>{{ t('engineSetup.historyPreserved') }}</p>
+      <el-checkbox v-model="acknowledged" :disabled="busy" class="provider-setup__acknowledgment">{{ t('engineSetup.acknowledgment') }}</el-checkbox>
+      <p v-if="error" role="alert">{{ error }}</p>
+    </div>
+    <div v-else class="claw-form-dialog">
       <p v-if="setup && !setup.installed">{{ t('auth.installExplanation') }}</p>
       <FormDialogField :label="t('auth.conversations')" :help="t('auth.separateExplanation')">
-        <el-radio-group v-model="isolated" class="provider-setup__choices" :disabled="busy || setup?.locked">
+        <el-radio-group v-model="isolated" class="provider-setup__choices" :disabled="busy || (setup?.locked && !allowReset)">
           <el-radio :value="true">{{ t('auth.separateChats') }}</el-radio>
-          <el-checkbox v-if="isolated" v-model="shareSkills" class="provider-setup__skills" :disabled="busy || setup?.locked">{{ t('auth.shareSkills') }}</el-checkbox>
+          <el-checkbox v-if="isolated" v-model="shareSkills" class="provider-setup__skills" :disabled="busy || (setup?.locked && !allowReset)">{{ t('auth.shareSkills') }}</el-checkbox>
           <el-radio :value="false" class="provider-setup__existing">{{ t('auth.existingSetup') }}</el-radio>
         </el-radio-group>
       </FormDialogField>
-      <p v-if="setup?.locked">{{ t('auth.setupLocked') }}</p>
+      <p v-if="setup?.locked && !allowReset">{{ t('auth.setupLocked') }}</p>
       <p v-if="error" role="alert">{{ error }}</p>
     </div>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')">{{ t('surface.remoteClaudeAuth.close') }}</button>
-      <button class="claw-button claw-button--primary" type="button" :disabled="busy || (setup?.locked && setup.installed)" @click="emit('save', { isolated, shareSkills })">{{ t(busy ? 'auth.settingUp' : setup?.installed ? 'auth.saveSetup' : 'auth.installProvider') }}</button>
+      <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')">{{ t(confirming ? 'common.cancel' : 'surface.remoteClaudeAuth.close') }}</button>
+      <button class="claw-button claw-button--primary" type="button" :disabled="busy || (confirming ? !acknowledged : setup?.locked && setup.installed && (!allowReset || (isolated === setup.isolated && shareSkills === setup.shareSkills)))" @click="save">{{ t(busy ? 'auth.settingUp' : confirming ? 'engineSetup.removeAndSwitch' : setup?.installed ? 'auth.saveSetup' : 'auth.installProvider') }}</button>
     </template>
   </FormDialog>
 </template>
@@ -22,22 +28,44 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { ProviderSetupChoice, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 
-const props = defineProps<{ setup: ProviderSetupStatus | null; busy: boolean; error: string | null }>();
-const emit = defineEmits<{ close: []; save: [choice: ProviderSetupChoice] }>();
+const props = defineProps<{ setup: ProviderSetupStatus | null; busy: boolean; error: string | null; allowReset?: boolean }>();
+const emit = defineEmits<{ close: []; save: [choice: ProviderSetupChange] }>();
 const { t } = useI18n();
 const isolated = ref(true);
 const shareSkills = ref(true);
+const confirming = ref(false);
+const acknowledged = ref(false);
 watch(() => props.setup, setup => {
   isolated.value = setup?.isolated ?? true;
   shareSkills.value = setup?.shareSkills ?? true;
+  confirming.value = false;
+  acknowledged.value = false;
 }, { immediate: true });
+function save() {
+  if (props.busy) return;
+  const changesHome = props.setup && isolated.value !== props.setup.isolated;
+  if (changesHome && props.setup?.locked && props.allowReset) {
+    if (!confirming.value) { confirming.value = true; return; }
+    if (!acknowledged.value || !props.setup.affectedAgentIds) return;
+    emit('save', { isolated: isolated.value, shareSkills: shareSkills.value, removeAgentIds: [...props.setup.affectedAgentIds] });
+  } else emit('save', { isolated: isolated.value, shareSkills: shareSkills.value });
+}
 </script>
 
 <style scoped>
+.provider-setup__confirmation {
+  gap: var(--space-6);
+}
+
+.provider-setup__confirmation p {
+  margin: 0;
+  line-height: var(--line-height-20);
+}
+
 .provider-setup__choices {
   display: flex;
   flex-direction: column;
@@ -54,5 +82,21 @@ watch(() => props.setup, setup => {
 
 .provider-setup__existing {
   margin-top: var(--space-6);
+}
+
+.provider-setup__acknowledgment {
+  height: auto;
+  margin-top: var(--space-2);
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.provider-setup__acknowledgment :deep(.el-checkbox__input) {
+  margin-top: var(--space-1);
+}
+
+.provider-setup__acknowledgment :deep(.el-checkbox__label) {
+  line-height: var(--line-height-20);
+  white-space: normal;
 }
 </style>

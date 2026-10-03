@@ -19,7 +19,7 @@ import { ClawMcpService } from './mcp/service';
 import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
 import { runtimeGitHubOAuthClientId } from './runtime-config';
 import { ClawBackendServer } from './server';
-import { backendCodexHomeDir, backendProviderTokensFilePath, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { backendCodexHomeDir, backendProviderTokensFilePath, backupProviderSetup, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
@@ -56,7 +56,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   await ensureBackendCodexHome();
   const providerSetup = new ProviderSetup(snapshot, () => saveBackendSnapshot(snapshot), async backend => {
     await driverRpc.replaceDriver(backend, () => createBackendDriver(backend, { ...driverOptions, generalSettings: snapshot.general }));
-  });
+  }, undefined, () => backupProviderSetup(snapshot));
   await providerSetup.initialize();
   let pluginStatus = await loadPluginStatus(snapshot.general.providerHomes?.codex?.homePath);
   const pluginSettings = () => ({

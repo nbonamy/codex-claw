@@ -34,7 +34,7 @@ describe('BackendDriverRpc', () => {
     const driver = createDriver({ authenticate });
     const rpc = new BackendDriverRpc(new Map([['codex', driver]]));
     const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: rpc,
-      providerSetup: { list: () => [{ backend: 'codex', installed: true }] } as never });
+      providerSetup: { isChanging: () => false, list: () => [{ backend: 'codex', installed: true }] } as never });
     try {
       await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/connections/get' });
       expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: true, authentication: { state } });
