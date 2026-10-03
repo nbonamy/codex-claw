@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { handoffInProgress } from '@codex-claw/core/agent-handoff';
 import { requireAgentFolder } from '@codex-claw/core/agent-folder';
 import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
@@ -189,6 +190,11 @@ export class ClawMcpService {
 
     const messages = this.coordinator.peekUnreadMessages(agentId);
     if (messages.length === 0) {
+      return;
+    }
+
+    if (handoffInProgress(agent)) {
+      this.emitQueuedMessages(agentId, messages);
       return;
     }
 

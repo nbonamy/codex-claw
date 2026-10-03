@@ -31,6 +31,8 @@ export const backendMethods = {
   agentDelete: 'agent/delete',
   agentDuplicate: 'agent/duplicate',
   agentFork: 'agent/fork',
+  agentHandoff: 'agent/handoff/start',
+  driverHandoffCheck: 'driver/handoff/check',
   agentFilePreview: 'agent/file/preview',
   agentFilesList: 'agent/files/list',
   workspaceFolderValidate: 'workspace/folder/validate',

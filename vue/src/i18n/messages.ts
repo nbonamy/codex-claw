@@ -2,6 +2,14 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    handoff: {
+      action: 'Hand off…', submit: 'Hand off', cancel: 'Cancel', hide: 'Hide',
+      engine: 'Coding agent', model: 'Model', defaultModel: 'Provider default',
+      instructions: 'Additional handoff instructions', optional: 'Optional — what should the current agent emphasize in its note?',
+      permissions: 'The new agent uses the selected provider’s default permissions.',
+      preparing: 'Preparing the note and replacement. You can hide this dialog; the handoff will continue.',
+      savedNote: 'Saved handoff note', source: 'Source conversation',
+    },
     engineConnection: {
       title: 'Account', connect: 'Connect', connected: 'Connected',
       disconnect: 'Disconnect', disconnected: 'Disconnected', apiKey: 'API key', subscription: 'Claude subscription', amazonBedrock: 'Amazon Bedrock',

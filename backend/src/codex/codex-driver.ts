@@ -65,6 +65,9 @@ export class CodexBackendDriver implements AgentBackendDriver {
   getCapabilities(agent: Agent): BackendCapabilities {
     return this.sessionManager.getCapabilities?.(agent) ?? codexBackendCapabilities;
   }
+  async assertHandoffReady(agent: Agent): Promise<void> {
+    await this.sessionManager.assertHandoffReady(agent);
+  }
 
   async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<BackendTextGenerationResult> {
     return this.sessionManager.generateText(agent, input);

@@ -60,6 +60,15 @@ const executionPlan: ThreadPlan = {
 };
 
 describe('ConversationPane', () => {
+  it('keeps an interrupted handoff and its saved note visible after restoring the agent', () => {
+    const wrapper = mountPane({ controller: controllerFor([]), agent: { ...agent, handoff: {
+      operationId: 'once', backend: 'codex', sourceAgentId: 'old', sourceTitle: 'Original',
+      sourceRef: { backend: 'claude', sessionId: 'old-session', folder: '/repo' },
+      phase: 'failed', error: 'Check the target conversation before resending.', note: 'The next action is to review the diff.',
+    } } });
+    expect(wrapper.get('[role="status"]').text()).toContain('Check the target conversation before resending.');
+    expect(wrapper.get('details pre').text()).toBe('The next action is to review the diff.');
+  });
   it('parks only the selected composer text and restores a saved draft at the caret', async () => {
     const composerState = ref<CodexComposerState>({ text: 'first then second', selectionStart: 6, selectionEnd: 10 });
     const conversationId = ref(agent.id);

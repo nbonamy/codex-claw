@@ -13,6 +13,7 @@ const messages = {
     'menu.editAgent': 'Edit Agent',
     'menu.file': 'File',
     'menu.forkAgent': 'Fork Agent',
+    'menu.handoffAgent': 'Hand off…',
     'menu.goToAgent': 'Go to Agent...',
     'menu.help': 'Help',
     'menu.installUpdate': 'Install Update and Relaunch',

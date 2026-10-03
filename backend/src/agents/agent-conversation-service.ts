@@ -78,6 +78,7 @@ export class AgentConversationService {
     )));
     if (storedAutomationConversation) return true;
     const agent = this.agent(agentId);
+    if (agent?.handoff && sameConversationRef(agent.handoff.sourceRef, ref)) return true;
     const tree = snapshot.subagentTrees[agentId];
     return ref.backend === 'codex' &&
       agent?.backendSession?.kind === 'codex' &&
