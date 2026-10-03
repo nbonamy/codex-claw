@@ -17,20 +17,24 @@ describe('engine instruction files', () => {
     expect(await readFile(file, 'utf8')).toBe('Use the configured instructions.\n');
     expect(await readEngineInstructions('claude')).toEqual({ path: file, text: 'Use the configured instructions.\n' });
   });
-  it('reads missing files as empty and saves exactly the selected global file', async () => {
+  it('reads missing files as empty and saves the selected existing provider home', async () => {
     const home = await mkdtemp(path.join(tmpdir(), 'claw-instructions-')); homes.push(home);
-    expect(await readEngineInstructions('codex', home)).toEqual({ path: path.join(home, '.codex/AGENTS.md'), text: '' });
-    await saveEngineInstructions({ engine: 'codex', text: '  Keep formatting.\n' }, home);
-    expect((await readEngineInstructions('codex', home)).text).toBe('  Keep formatting.\n');
-    expect((await readEngineInstructions('claude', home)).text).toBe('');
-    await saveEngineInstructions({ engine: 'claude', text: 'Claude only' }, home);
-    await expect(saveEngineInstructions({ engine: 'codex', text: 'Both', all: true }, home)).rejects.toThrow('confirmation');
-    expect((await readEngineInstructions('claude', home)).text).toBe('Claude only');
-    await saveEngineInstructions({ engine: 'codex', text: 'Both', all: true, confirmed: true }, home);
-    expect((await readEngineInstructions('codex', home)).text).toBe('Both');
-    expect((await readEngineInstructions('claude', home)).text).toBe('Both');
-    await saveEngineInstructions({ engine: 'codex', text: '' }, home);
-    expect((await readEngineInstructions('codex', home)).text).toBe('');
-    await expect(readEngineInstructions('../bad' as never, home)).rejects.toThrow('Unknown');
+    const providerHomes = {
+      codex: { homePath: path.join(home, '.codex'), isolated: false, shareSkills: true },
+      claude: { homePath: path.join(home, '.claude'), isolated: false, shareSkills: true },
+    };
+    expect(await readEngineInstructions('codex', providerHomes)).toEqual({ path: path.join(home, '.codex/AGENTS.md'), text: '' });
+    await saveEngineInstructions({ engine: 'codex', text: '  Keep formatting.\n' }, providerHomes);
+    expect((await readEngineInstructions('codex', providerHomes)).text).toBe('  Keep formatting.\n');
+    expect((await readEngineInstructions('claude', providerHomes)).text).toBe('');
+    await saveEngineInstructions({ engine: 'claude', text: 'Claude only' }, providerHomes);
+    await expect(saveEngineInstructions({ engine: 'codex', text: 'Both', all: true }, providerHomes)).rejects.toThrow('confirmation');
+    expect((await readEngineInstructions('claude', providerHomes)).text).toBe('Claude only');
+    await saveEngineInstructions({ engine: 'codex', text: 'Both', all: true, confirmed: true }, providerHomes);
+    expect((await readEngineInstructions('codex', providerHomes)).text).toBe('Both');
+    expect((await readEngineInstructions('claude', providerHomes)).text).toBe('Both');
+    await saveEngineInstructions({ engine: 'codex', text: '' }, providerHomes);
+    expect((await readEngineInstructions('codex', providerHomes)).text).toBe('');
+    await expect(readEngineInstructions('../bad' as never, providerHomes)).rejects.toThrow('Unknown');
   });
 });

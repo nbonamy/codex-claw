@@ -12,11 +12,13 @@ it('autosaves and flushes the original engine before switching', async () => {
   const { api, wrapper } = render(); await flushPromises();
   await vi.advanceTimersByTimeAsync(700);
   expect(api.saveEngineInstructions).not.toHaveBeenCalled();
+  expect(wrapper.find('.settings-personalization__path').text()).toBe('/codex');
   expect(wrapper.findAll('button').map(b => b.text())).toEqual(['Save to all']);
   await wrapper.get('textarea').setValue('Codex edit');
   wrapper.getComponent(ElSelect).vm.$emit('update:modelValue', 'claude'); await flushPromises();
   expect(api.saveEngineInstructions).toHaveBeenCalledExactlyOnceWith({ engine: 'codex', text: 'Codex edit' });
   expect(api.readEngineInstructions).toHaveBeenLastCalledWith('claude');
+  expect(wrapper.find('.settings-personalization__path').text()).toBe('/claude');
   await wrapper.get('textarea').setValue('Claude edit');
   await vi.advanceTimersByTimeAsync(600); await flushPromises();
   expect(api.saveEngineInstructions).toHaveBeenLastCalledWith({ engine: 'claude', text: 'Claude edit' });

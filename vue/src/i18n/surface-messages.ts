@@ -16,7 +16,7 @@ export const surfaceMessages = {
     "worktreeInitializationAutomatic": "Auto-detect",
     "worktreeInitializationRepository": "Repo instructions only",
     "worktreeInitializationDisabled": "Disabled",
-    "personalizationHint": "Edits the global instruction file on this host, also used outside Claw. Changes apply when sessions start or resume; project instructions remain in place.",
+    "personalizationHint": "Edits the selected engine's instruction file on this host. Isolated setups stay separate; existing setups are shared outside Claw. Changes apply when sessions start or resume; project instructions remain in place.",
     "engine": "Engine",
     "saveAll": "Save to all",
     "overwrite": "Replace",

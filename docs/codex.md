@@ -164,16 +164,17 @@ continue to require a Codex installation on the remote host.
 
 ## Thread And Agent Mapping
 
-Personalization edits the owning host's global `~/.codex/AGENTS.md` or
-`~/.claude/CLAUDE.md` directly; it is not another instruction string in app
-state. Saving to all requires explicit confirmation before overwriting both
-files. Codex's conversation-configuration extension reads the global Codex
-file and appends it to Claw's developer instructions, because the isolated
-Claw Codex home does not otherwise load that file. Claude loads its global
-file through its existing user/project/local settings sources. Project-level
-instructions remain provider-owned. Changes apply when sessions start/resume,
-not by injecting a user message into an active turn. Remote hosts keep their
-own instruction files; the editor does not overwrite files on other hosts.
+Personalization edits `AGENTS.md` or `CLAUDE.md` in each provider's configured
+home on the owning host; it is not another instruction string in app state.
+Isolated homes keep these instructions separate from the user's existing Codex
+or Claude setup. Saving to all requires explicit confirmation before
+overwriting both configured files. Codex discovers its home instructions
+natively; Claw adds only its own coordination and task-specific developer
+instructions. Claude loads its home instructions through its existing
+user/project/local settings sources. Project-level instructions remain
+provider-owned. Changes apply when sessions start/resume, not by injecting a
+user message into an active turn. Remote hosts keep their own instruction
+files; the editor does not overwrite files on other hosts.
 
 Mission workers use the same conversation configuration boundary. Claw appends
 the active Mission contract after its normal developer instructions inside a

@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { ClawBackendServer } from '../server';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
@@ -7,6 +10,42 @@ import {
 } from './server-test-fixtures';
 
 describe('ClawBackendServer', () => {
+
+  it('edits instructions in each configured provider home', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'claw-personalization-'));
+    const codexHome = path.join(root, 'codex-home');
+    const claudeHome = path.join(root, 'claude-home');
+    const codexFile = path.join(codexHome, 'AGENTS.md');
+    const claudeFile = path.join(claudeHome, 'CLAUDE.md');
+    const snapshot = createTestSnapshot();
+    snapshot.general.providerHomes = {
+      codex: { homePath: codexHome, isolated: true, shareSkills: false },
+      claude: { homePath: claudeHome, isolated: true, shareSkills: false },
+    };
+    await Promise.all([mkdir(codexHome), mkdir(claudeHome)]);
+    await Promise.all([writeFile(codexFile, 'Codex only'), writeFile(claudeFile, 'Claude only')]);
+    const server = new ClawBackendServer({ version: 'test', snapshot });
+    const request = (id: string, method: string, params: object) => server.handleMessage({ jsonrpc: '2.0', id, method, params });
+    try {
+      const codexRead = await request('codex-read', backendMethods.engineInstructionsRead, { engine: 'codex' });
+      const claudeRead = await request('claude-read', backendMethods.engineInstructionsRead, { engine: 'claude' });
+      expect((codexRead as { result: { path: string } }).result.path).toBe(codexFile);
+      expect((claudeRead as { result: { path: string } }).result.path).toBe(claudeFile);
+      expect((codexRead as { result: { text: string } }).result.text).toBe('Codex only');
+      expect((claudeRead as { result: { text: string } }).result.text).toBe('Claude only');
+
+      await request('codex-save', backendMethods.engineInstructionsSave, { input: { engine: 'codex', text: 'Updated Codex' } });
+      expect(await readFile(codexFile, 'utf8')).toBe('Updated Codex');
+      expect(await readFile(claudeFile, 'utf8')).toBe('Claude only');
+
+      await request('save-all', backendMethods.engineInstructionsSave, { input: { engine: 'claude', text: 'Shared', all: true, confirmed: true } });
+      expect(await readFile(codexFile, 'utf8')).toBe('Shared');
+      expect(await readFile(claudeFile, 'utf8')).toBe('Shared');
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 
   it('routes work provider requests through backend-owned work integrations', async () => {
     const snapshot = createTestSnapshot();

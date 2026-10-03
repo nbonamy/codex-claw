@@ -1949,13 +1949,13 @@ export class ClawBackendServer {
       case backendMethods.engineInstructionsRead: {
         const { engine } = requireRecord(message.params);
         if (engine !== 'codex' && engine !== 'claude') throw new Error('Unknown instruction engine.');
-        return createClawRpcResult(message.id, await readEngineInstructions(engine));
+        return createClawRpcResult(message.id, await readEngineInstructions(engine, this.snapshot.general.providerHomes));
       }
       case backendMethods.engineInstructionsSave: {
         const input = requireRecord(requireRecord(message.params).input);
         if (input.engine !== 'codex' && input.engine !== 'claude') throw new Error('Unknown instruction engine.');
         if (typeof input.text !== 'string') throw new Error('Invalid instruction text.');
-        await saveEngineInstructions({ engine: input.engine, text: input.text, all: input.all as boolean | undefined, confirmed: input.confirmed === true });
+        await saveEngineInstructions({ engine: input.engine, text: input.text, all: input.all as boolean | undefined, confirmed: input.confirmed === true }, this.snapshot.general.providerHomes);
         return createClawRpcResult(message.id, null);
       }
       case backendMethods.settingsCodexResourceSharingGet:

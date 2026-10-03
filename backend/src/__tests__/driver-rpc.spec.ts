@@ -6,11 +6,9 @@ import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/bac
 import type { Agent } from '@codex-claw/core/contracts';
 import { defaultGeneralSettings } from '@codex-claw/core/settings';
 import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
-import { readEngineInstructions } from '../engine-instructions';
 import { ClawBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
 import { CodexBackendDriver } from '../codex/codex-driver';
-vi.mock('../engine-instructions', () => ({ readEngineInstructions: vi.fn().mockResolvedValue({ text: '', path: '/fake/AGENTS.md' }) }));
 
 describe('BackendDriverRpc', () => {
   it.each([
@@ -91,19 +89,16 @@ describe('BackendDriverRpc', () => {
     expect(next.close).toHaveBeenCalledOnce();
     expect(claude.close).toHaveBeenCalledOnce();
   });
-  it('appends global and agent-specific context after the default Claw instructions', async () => {
-    vi.mocked(readEngineInstructions).mockResolvedValueOnce({ text: 'Use concise answers.', path: '/fake/AGENTS.md' });
+  it('appends agent-specific context after the default Claw instructions', async () => {
     const options = codexClawSurfaceOptions({
       clawMcpServerUrl: 'http://localhost:4321/mcp',
       additionalDeveloperInstructions: () => '<context>\nMission contract\n</context>',
     });
     const extension = await options.extensions?.[0]?.configureConversation?.({ extensionContext: createAgent() } as never);
-    expect(extension?.developerInstructions).toContain('Use concise answers.');
     expect(extension?.developerInstructions).toContain('Your Codex Claw agent ID');
     expect(extension?.developerInstructions).toContain('<context>\nMission contract\n</context>');
     expect(extension!.developerInstructions!.indexOf('Your Codex Claw agent ID'))
       .toBeLessThan(extension!.developerInstructions!.indexOf('<context>'));
-    expect(readEngineInstructions).toHaveBeenCalledWith('codex');
   });
 
   it('configures the Claw MCP tools for a new Quick Chat without a folder', async () => {
