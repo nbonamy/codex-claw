@@ -347,7 +347,7 @@
           <SplitLayoutControl :model-value="split.layout.value" @update:model-value="split.setLayout" />
         </template>
         <template v-if="split.layout.value !== 'single' && props.agentConversationFor && splitActions" #conversation="{ plan, planVisible, closePlan, headerBindingsFor }">
-          <AgentSplitGrid :layout="split.layout.value" :panes="split.panes.value" :focused-pane-id="split.focusedPaneId.value" @focus="split.focus">
+          <AgentSplitGrid :layout="split.layout.value" :panes="split.panes.value" :focused-pane-id="split.focusedPaneId.value" @focus="focusSplitPane">
             <template #header="{ agentId, topRight, topLeft }">
               <AgentHeader v-bind="headerBindingsFor(agentId, topRight, topLeft)" />
             </template>
@@ -1568,6 +1568,31 @@ function setSplitPanel(agentId: string, instance: unknown): void {
 function focusedConversationPanel() {
   return split.layout.value === 'single' ? agentWorkspace.value : splitPanels.get(split.focusedPane.value.agentId ?? '');
 }
+const pendingComposerFocusAgentId = ref<string | null>(null);
+// A cold conversation has no composer until history hydration replaces its loader.
+// Only navigation requests focus; clicking a split-pane control keeps its focus.
+function focusSplitPane(paneId: number): void {
+  pendingComposerFocusAgentId.value = null;
+  split.focus(paneId);
+}
+watch([
+  pendingComposerFocusAgentId,
+  () => currentAgent.value?.id,
+  () => {
+    const id = pendingComposerFocusAgentId.value;
+    const view = id ? props.agentConversationFor?.(id) : null;
+    return view
+      ? view.history.hydrating || (view.codexSnapshot ?? view.claudeSnapshot)?.historyLoading
+      : props.isConversationLoading;
+  },
+], ([requestedId, activeId, loading]) => {
+  if (!requestedId || requestedId !== activeId || loading) return;
+  void nextTick(() => {
+    if (pendingComposerFocusAgentId.value !== requestedId || currentAgent.value?.id !== requestedId) return;
+    pendingComposerFocusAgentId.value = null;
+    if (activeSurface.value === 'agent' && !isModalDialogVisible.value) focusedConversationPanel()?.focusComposer();
+  });
+}, { flush: 'post' });
 function addFocusedVisualizationAnnotation(annotation: import('./use-visualization-annotations').VisualizationAnnotationInput): void {
   if (split.layout.value === 'single') addVisualizationAnnotation(annotation);
   else splitPanels.get(currentAgent.value?.id ?? '')?.addVisualizationAnnotation(annotation);
@@ -2659,18 +2684,21 @@ function selectTeamFromRail(teamId: string): void {
 
 function selectAgentFromShell(agentId: string): void {
   activeSurface.value = 'agent';
+  pendingComposerFocusAgentId.value = agentId;
   split.select(agentId);
   emit('select-agent', agentId);
 }
 
 function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): void {
   activeSurface.value = 'agent';
+  pendingComposerFocusAgentId.value = payload.agentId;
   emit('select-team', payload.teamId);
   emit('select-agent', payload.agentId);
 }
 
 function selectAgentFromPalette(payload: { agentId: string; teamId: string }): void {
   activeSurface.value = 'agent';
+  pendingComposerFocusAgentId.value = payload.agentId;
   if (payload.teamId === activeTeam.value?.id) split.select(payload.agentId);
   if (payload.teamId !== activeTeam.value?.id) emit('select-team', payload.teamId);
   emit('select-agent', payload.agentId);

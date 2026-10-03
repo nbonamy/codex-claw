@@ -23,6 +23,55 @@ async function chooseLayout(wrapper: ReturnType<typeof mount>, label: string) {
 
 describe('split-screen conversations', () => {
   it.each([
+    ['Single Pane', false], ['Vertical Split', false], ['Horizontal Split', false], ['4-Pane Split', false],
+    ['Single Pane', true], ['Vertical Split', true],
+  ] as const)('focuses navigation in %s (leave before history completes: %s) without stealing pane-control focus', async (layout, leaveBeforeLoad) => {
+    const snapshot = createInitialSnapshot();
+    const [first, second] = snapshot.agents;
+    second!.backendSession = { kind: 'codex', threadId: 'cold-thread' };
+    const { api, emit } = installBackendFixture(snapshot);
+    api.selectAgent.mockImplementation(async (id) => ({
+      ...snapshot, activeAgentId: id,
+      teams: snapshot.teams.map(team => ({ ...team, activeAgentId: id })),
+    }));
+    let finishHistory = () => {};
+    const coldHistory = new Promise<void>(resolve => { finishHistory = resolve; });
+    api.loadConversationHistory.mockImplementation(async (id) => {
+      if (id === second!.id) {
+        await coldHistory;
+        emit({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: second!.id,
+          threadId: 'cold-thread', payload: { revision: 1, snapshot: codexConversationSnapshot([], { activeConversationId: 'cold-thread' }) } });
+      }
+      return snapshot;
+    });
+    const wrapper = mount(App, { attachTo: document.body, global: { components: { ElPopover } } });
+    await flushPromises();
+    if (layout !== 'Single Pane') await chooseLayout(wrapper, layout);
+    const select = async (id: string) => {
+      const row = wrapper.findAll<HTMLButtonElement>('.agent-sidebar__agent').find(row => row.text().includes(snapshot.agents.find(agent => agent.id === id)!.name!))!;
+      row.element.focus();
+      await row.trigger('click');
+      await flushPromises();
+    };
+    await select(second!.id);
+    expect(wrapper.find(`[data-conversation-agent-id="${second!.id}"] [contenteditable="true"]`).exists()).toBe(false);
+    if (leaveBeforeLoad) await select(first!.id);
+    finishHistory();
+    await flushPromises();
+    expect(document.activeElement).toBe(wrapper.get(`[data-conversation-agent-id="${leaveBeforeLoad ? first!.id : second!.id}"] [contenteditable="true"]`).element);
+    // Re-selecting the active agent must focus its composer too.
+    await select(first!.id);
+    expect(document.activeElement).toBe(wrapper.get(`[data-conversation-agent-id="${first!.id}"] [contenteditable="true"]`).element);
+    if (layout !== 'Single Pane') {
+      const button = wrapper.get<HTMLButtonElement>(`[data-conversation-agent-id="${second!.id}"] button[aria-label="Composer actions"]`);
+      button.element.focus();
+      await flushPromises();
+      expect(document.activeElement).toBe(button.element);
+      expect(wrapper.get('.agent-split-grid__pane--focused').attributes('data-agent-id')).toBe(second!.id);
+    }
+  });
+
+  it.each([
     ['Vertical Split', 2, 1],
     ['Horizontal Split', 2, 0],
     ['4-Pane Split', 4, 1],
