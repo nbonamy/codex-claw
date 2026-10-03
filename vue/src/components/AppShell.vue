@@ -87,7 +87,6 @@
       @edit-agent="openEditAgent"
       @edit-team="openEditTeam"
       @fork-agent="$emit('fork-agent', $event)"
-      @logout="logoutCodex"
       @move-agent-to-team="$emit('move-agent-to-team', $event)"
       @new-team="openNewTeam"
       @open-automations="openAutomations"
@@ -1277,7 +1276,6 @@ const {
   cancelChatGptLogin,
   finish: finishFirstRunOnboarding,
   load: loadAuthentication,
-  logout: logoutCodex,
   startChatGptLogin,
 } = firstRunOnboarding;
 const teamDialogVisible = ref(false);

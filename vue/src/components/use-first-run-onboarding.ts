@@ -239,15 +239,6 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     }
   }
 
-  async function logout(): Promise<void> {
-    authenticationError.value = null;
-    authentication.value = await requireApi().logoutCodex();
-    githubVisible.value = false;
-    completeVisible.value = false;
-    providersVisible.value = !options.hasExistingWorkspace();
-    if (providersVisible.value) setFirstRunOnboardingStage('providers');
-  }
-
   function completeGitHub(): void {
     githubVisible.value = false;
     completeVisible.value = true;
@@ -306,7 +297,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     claudeAuthentication, claudeLoading, claudeError, claudeDialogVisible,
     codexConnected, claudeConnected, canContinue, continuing,
     completeVisible, gated, githubVisible, initialAuthenticationLoading, showLogin,
-    cancelChatGptLogin, completeGitHub, finish, load, logout, startChatGptLogin,
+    cancelChatGptLogin, completeGitHub, finish, load, startChatGptLogin,
     connectClaude, disconnectProvider, refreshClaude, refreshConnections, continueWithProviders,
     providerSetup, customizingProvider, customizedSetup, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
   };
