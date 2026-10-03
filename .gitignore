@@ -3,6 +3,7 @@ node_modules/
 dist/
 out/
 .vite/
+/website/docs/.vitepress/cache/
 coverage/
 *.log
 .env

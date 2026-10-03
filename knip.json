@@ -6,9 +6,11 @@
       "entry": [
         "scripts/**/*.mjs",
         "website/script.js",
+        "website/docs/.vitepress/config.mts",
+        "website/docs/.vitepress/theme/index.mts",
         "vite.sdk-aliases.ts"
       ],
-      "project": ["scripts/**/*.mjs", "website/**/*.{js,mjs}", "*.ts"],
+      "project": ["scripts/**/*.mjs", "website/**/*.{js,mjs,mts}", "*.ts"],
       "stylelint": {
         "config": [".stylelintrc.json"]
       }

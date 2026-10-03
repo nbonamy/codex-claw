@@ -102,6 +102,20 @@ input {
 .text-link:hover {
   color: var(--ink);
 }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.header-docs {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.header-docs:hover {
+  color: var(--blue);
+}
 .header-cta {
   padding: 10px 16px;
   color: var(--ink);
@@ -112,7 +126,7 @@ input {
   font-weight: 700;
   text-decoration: none;
 }
-.header-cta span {
+.header-cta .header-download-icon {
   margin-left: 7px;
   color: var(--blue);
 }
@@ -2267,7 +2281,10 @@ input {
   .header-cta {
     padding: 9px 12px;
   }
-  .header-cta span {
+  .header-actions {
+    gap: 12px;
+  }
+  .header-cta .header-download-icon {
     display: none;
   }
   .hero {
@@ -2383,6 +2400,9 @@ input {
 }
 
 @media (max-width: 430px) {
+  .header-platform {
+    display: none;
+  }
   .eyebrow {
     font-size: 9px;
   }

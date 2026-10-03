@@ -1,6 +1,6 @@
 # Codex Claw website
 
-This is a dependency-free static landing page for [codex-claw.nabocorp.com](https://codex-claw.nabocorp.com).
+This contains the static landing page and VitePress documentation for [codex-claw.nabocorp.com](https://codex-claw.nabocorp.com).
 
 ## Local preview
 
@@ -9,6 +9,42 @@ python3 -m http.server 4173 --directory website
 ```
 
 Then open <http://127.0.0.1:4173>.
+
+## Documentation
+
+The public user guide lives in `website/docs/` and uses VitePress with a
+customized default theme. The navigation follows Getting started, Providers,
+Workflows, Features, Reference, and Troubleshooting. Internal engineering notes
+stay in the repository's top-level `docs/` directory and are not published.
+
+Run from the repository root:
+
+```bash
+npm run docs:dev
+```
+
+Open the `/docs/` URL reported by VitePress. Edit the Markdown pages and keep
+the sidebar in `website/docs/.vitepress/config.mts` in sync. Search uses the
+local page index and requires no hosted search service. The theme reuses the
+landing page's public assets and supplies light and dark tokens.
+
+Build, check, and preview the complete static website:
+
+```bash
+npm run test:docs
+npm run docs:check
+python3 -m http.server 4173 --directory dist/website
+```
+
+Visit <http://127.0.0.1:4173/docs/>. `test:docs` builds the site and checks the
+generated links, anchors, asset paths, and exclusion of authoring files.
+`npm run docs:preview` previews just the VitePress production output after
+`npm run docs:build`.
+
+Use a file extension on raw HTML card links so direct loads work on the static
+host. Keep VitePress's dead-link checking enabled. The site uses `/docs/` as
+its base path and standard `.html` page URLs, so nginx needs no SPA rewrite
+for documentation routes.
 
 ## Product preview
 
@@ -30,6 +66,14 @@ Run the static-site checks with:
 
 ```bash
 npm run test:website
+```
+
+The header keeps **Docs** visible beside the download button at all screen
+widths. Its responsive browser regression test uses Chromium:
+
+```bash
+npx playwright install chromium
+npm run test:website:browser
 ```
 
 ## Mission product film
@@ -88,7 +132,9 @@ The source thumbnail is `videos/assets/visualize-film-thumbnail.png`.
 
 ## Deploy
 
-The deploy helper streams the static site over SSH, provisions the Let’s Encrypt certificate if this is the first deploy, and installs the matching nginx site on `joshua`:
+The deploy helper first builds the landing page and generated documentation into
+`dist/website/`, then streams that artifact over SSH, provisions the Let’s Encrypt
+certificate if this is the first deploy, and installs the matching nginx site on `joshua`:
 
 ```bash
 ./website/deploy.sh
