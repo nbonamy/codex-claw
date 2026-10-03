@@ -504,6 +504,8 @@ export const surfaceMessages = {
     "mergeComplete": "Merge complete",
     "mergeCompleteButPushFailed": "Merge complete, but push failed",
     "mergeFailed": "Merge failed",
+    "mergeCleanupIncomplete": "Merge complete — cleanup incomplete",
+    "mergedBranchRetained": "Your changes were merged successfully. The local branch {branch} could not be removed and has been kept.",
     "worktreeFolderRemains": "Worktree folder remains",
     "worktreeFolderCouldNotBeDeleted": "The worktree was removed, but its folder could not be deleted. Remove {folder} manually.",
     "commitChangesInBranchFirst": "Commit changes in {branch} first",

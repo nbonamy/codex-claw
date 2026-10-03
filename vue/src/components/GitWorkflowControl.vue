@@ -432,13 +432,14 @@ type PullRequestOperation =
   | { status: 'error'; message: string };
 const pullRequestOperation = ref<PullRequestOperation>({ status: 'editing' });
 const pullRequestBackgrounded = ref(false);
+type MergeCleanupWarning = NonNullable<AgentGitWorkflow['warning']>;
 type MergeOperation =
   | { status: 'confirming' }
   | { status: 'merging'; branch: string; pushAfter: boolean; closeAgentAfterPush: boolean }
   | { status: 'pushing'; branch: string; closeAgentAfterPush: boolean }
   | { status: 'success'; branch: string; pushed: boolean }
-  | { status: 'warning'; branch: string; pushed: boolean; folder: string }
-  | { status: 'error'; branch: string; mergeCreated: boolean; pushAfter: boolean; closeAgentAfterPush: boolean; message: string; retainedFolder?: string };
+  | { status: 'warning'; branch: string; pushed: boolean; warning: MergeCleanupWarning }
+  | { status: 'error'; branch: string; mergeCreated: boolean; pushAfter: boolean; closeAgentAfterPush: boolean; message: string; cleanupWarning?: MergeCleanupWarning };
 const mergeOperation = ref<MergeOperation>({ status: 'confirming' });
 const mergeBackgrounded = ref(false);
 const mergeTargetDirtyWarning = ref(false);
@@ -515,7 +516,9 @@ const mergeFeedbackStatus = computed<'running' | 'success' | 'warning' | 'error'
 const mergeOperationTitle = computed(() => mergeOperation.value.status === 'success'
   ? mergeOperation.value.pushed ? translate('surface.gitWorkflowControl.mergedAndPushed') : translate('surface.gitWorkflowControl.mergeComplete')
   : mergeOperation.value.status === 'warning'
-    ? translate('surface.gitWorkflowControl.worktreeFolderRemains')
+    ? mergeOperation.value.warning.type === 'branchRetained'
+      ? translate('surface.gitWorkflowControl.mergeCleanupIncomplete')
+      : translate('surface.gitWorkflowControl.worktreeFolderRemains')
   : mergeOperation.value.status === 'error'
     ? mergeOperation.value.mergeCreated ? translate('surface.gitWorkflowControl.mergeCompleteButPushFailed') : translate('surface.gitWorkflowControl.mergeFailed')
     : gitOperationProgress.value?.operation === 'merge' && gitOperationProgress.value.phase === 'handoff'
@@ -528,7 +531,7 @@ const mergeOperationTitle = computed(() => mergeOperation.value.status === 'succ
 const mergeOperationDetail = computed(() => mergeOperation.value.status === 'error'
   ? mergeOperation.value.message
   : mergeOperation.value.status === 'warning'
-    ? translate('surface.gitWorkflowControl.worktreeFolderCouldNotBeDeleted', { folder: mergeOperation.value.folder })
+    ? mergeCleanupDetail(mergeOperation.value.warning)
   : mergeOperation.value.status === 'success'
     ? mergeOperation.value.pushed ? `${mergeOperation.value.branch} merged and pushed successfully` : `${mergeOperation.value.branch} merged successfully`
     : gitOperationProgress.value?.operation === 'merge' && gitOperationProgress.value.phase === 'handoff'
@@ -916,7 +919,7 @@ async function merge(pushAfter: boolean): Promise<void> {
   };
   mergeOperation.value = { status: 'merging', branch, pushAfter, closeAgentAfterPush };
   let mergeCreated = false;
-  let retainedFolder: string | undefined;
+  let cleanupWarning: MergeCleanupWarning | undefined;
   try {
     const mergeResult = await props.mergeBranch!(agentId, {
       strategy: mergeStrategy.value,
@@ -927,7 +930,7 @@ async function merge(pushAfter: boolean): Promise<void> {
       ...(props.reportBackAgentName ? { reportBack: reportBack.value } : {}),
       confirmed: true,
     });
-    retainedFolder = mergeResult.warning?.folder;
+    cleanupWarning = mergeResult.warning;
     if (props.agent.id === agentId) workflow.value = mergeResult;
     mergeCreated = true;
     if (pushAfter && props.pushBranch) {
@@ -940,11 +943,11 @@ async function merge(pushAfter: boolean): Promise<void> {
       if (props.agent.id === agentId) workflow.value = pushResult;
     }
     emit('delivery-complete', { kind: 'merge' });
-    showMergeSuccess(branch, pushAfter, retainedFolder);
+    showMergeSuccess(branch, pushAfter, cleanupWarning);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
-    mergeOperation.value = { status: 'error', branch, mergeCreated, pushAfter, closeAgentAfterPush, message, ...(retainedFolder ? { retainedFolder } : {}) };
+    mergeOperation.value = { status: 'error', branch, mergeCreated, pushAfter, closeAgentAfterPush, message, ...(cleanupWarning ? { cleanupWarning } : {}) };
     if (mergeBackgrounded.value) {
       ElMessage.error(`${mergeOperationTitle.value}: ${message}`);
       resetMergeOperation();
@@ -993,7 +996,7 @@ async function retryMergePush(): Promise<void> {
   if (!props.pushBranch || mergeOperation.value.status !== 'error' || !mergeOperation.value.mergeCreated) return;
   const branch = mergeOperation.value.branch;
   const closeAgentAfterPush = mergeOperation.value.closeAgentAfterPush;
-  const retainedFolder = mergeOperation.value.retainedFolder;
+  const cleanupWarning = mergeOperation.value.cleanupWarning;
   busy.value = true;
   workflowError.value = null;
   mergeOperation.value = { status: 'pushing', branch, closeAgentAfterPush };
@@ -1004,11 +1007,11 @@ async function retryMergePush(): Promise<void> {
       ...(closeAgentAfterPush ? { closeAgentAfterPush: true } : {}),
     });
     emit('delivery-complete', { kind: 'merge' });
-    showMergeSuccess(branch, true, retainedFolder);
+    showMergeSuccess(branch, true, cleanupWarning);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
-    mergeOperation.value = { status: 'error', branch, mergeCreated: true, pushAfter: true, closeAgentAfterPush, message, ...(retainedFolder ? { retainedFolder } : {}) };
+    mergeOperation.value = { status: 'error', branch, mergeCreated: true, pushAfter: true, closeAgentAfterPush, message, ...(cleanupWarning ? { cleanupWarning } : {}) };
   } finally {
     busy.value = false;
   }
@@ -1071,9 +1074,19 @@ function resetMergeOperation(): void {
   gitOperationProgress.value = null;
   mergeOperation.value = { status: 'confirming' };
 }
-function showMergeSuccess(branch: string, pushed: boolean, retainedFolder?: string): void {
-  if (retainedFolder) {
-    mergeOperation.value = { status: 'warning', branch, pushed, folder: retainedFolder };
+function mergeCleanupDetail(warning: MergeCleanupWarning): string {
+  const details: string[] = [];
+  if (warning.type === 'branchRetained') {
+    details.push(translate('surface.gitWorkflowControl.mergedBranchRetained', { branch: warning.branch }));
+  }
+  if (warning.folder) {
+    details.push(translate('surface.gitWorkflowControl.worktreeFolderCouldNotBeDeleted', { folder: warning.folder }));
+  }
+  return details.join(' ');
+}
+function showMergeSuccess(branch: string, pushed: boolean, warning?: MergeCleanupWarning): void {
+  if (warning) {
+    mergeOperation.value = { status: 'warning', branch, pushed, warning };
     ElMessage.warning(mergeOperationDetail.value);
     return;
   }
