@@ -1982,6 +1982,16 @@ export class ClawBackendServer {
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         return createClawRpcResult(message.id, this.providerSetup.list());
       }
+      case backendMethods.providerDisconnect: {
+        const backend = requireAgentBackend(requireRecord(message.params).backend);
+        return this.respondInLocation(message.id,
+          this.locationFromRemoteConnectionId(requireOptionalConnectionId(message.params)), message.method, { backend },
+          async () => {
+            const authentication = await this.authenticateProvider(backend, 'logout');
+            await this.observeAuthentication(authentication);
+            return authentication;
+          });
+      }
       case backendMethods.providerEnabledSet: {
         const input = requireRecord(message.params);
         if ((input.backend !== 'codex' && input.backend !== 'claude') || typeof input.enabled !== 'boolean') throw new Error('Invalid engine availability setting.');

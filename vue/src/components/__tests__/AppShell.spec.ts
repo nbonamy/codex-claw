@@ -56,6 +56,61 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
+  it.each(['codex', 'claude'] as const)('disconnects %s from Settings and offers its sign-in flow again', async backend => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend, installed: true, connected: true, checking: false }];
+    const state = backend === 'claude'
+      ? { loggedIn: false, configDirectory: '/claw/claude-home' }
+      : { account: null, requiresOpenaiAuth: true, login: { status: 'idle', error: null } };
+    const disconnectProvider = vi.fn().mockRejectedValueOnce(new Error("Error invoking remote method 'provider:disconnect': Error: Sign-out failed"))
+      .mockResolvedValue({ kind: backend, connected: false, state });
+    const setProviderEnabled = vi.fn();
+    const startCodexChatGptLogin = vi.fn().mockResolvedValue(undefined);
+    const getClaudeAuthentication = vi.fn().mockResolvedValue(state);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    window.codexClaw = { disconnectProvider, setProviderEnabled, startCodexChatGptLogin, getClaudeAuthentication } as unknown as CodexClawApi;
+    const components = config.global.components;
+    config.global.components = { ...components, ElRadio, ElRadioGroup };
+    const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
+    config.global.components = components;
+    try {
+      await flushPromises();
+      await wrapper.get('.settings-menu').findAll('[role="menuitem"]').find(item => item.text().startsWith('Settings'))!.trigger('click');
+      await wrapper.get('.settings-sidebar').findAll('.el-menu-item').find(item => item.text() === (backend === 'claude' ? 'Claude Code' : 'Codex'))!.trigger('click');
+      await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
+      await flushPromises();
+      expect(disconnectProvider).toHaveBeenCalledExactlyOnceWith(backend);
+      expect(setProviderEnabled).not.toHaveBeenCalled();
+      expect(wrapper.get('.settings-row__error').text()).toBe('Sign-out failed');
+      await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
+      await flushPromises();
+      expect(disconnectProvider).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('.settings-row__error').exists()).toBe(false);
+      snapshot.providerConnections[0]!.connected = false;
+      await wrapper.setProps({ snapshot: { ...snapshot } });
+      await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
+      await flushPromises();
+      if (backend === 'claude') {
+        const commands = wrapper.findAll('.claude-login-command');
+        expect(commands).toHaveLength(2);
+        expect(commands[0]!.text()).toContain("CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --claudeai");
+        await commands[0]!.get('button').trigger('click');
+        expect(writeText).toHaveBeenLastCalledWith("CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --claudeai");
+        await commands[1]!.get('button').trigger('click');
+        expect(writeText).toHaveBeenLastCalledWith("CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --console");
+      } else {
+        expect(startCodexChatGptLogin).toHaveBeenCalledOnce();
+        expect(wrapper.get('.settings-view').text()).toContain('Cancel sign-in');
+      }
+    } finally {
+      wrapper.unmount();
+      if (previousClipboard) Object.defineProperty(navigator, 'clipboard', previousClipboard);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+    }
+  });
+
   it('queues the Claude steer shortcut and disables shelf steering through the installed SDK', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.claudeCodeEnabled = true;

@@ -3,7 +3,7 @@
     :title="$t('surface.settingsCodexPanel.codex')"
     title-id="settings-codex-title"
   >
-    <SettingsEngineConnectionRow :authentication="authentication" :connected="connected" :enabled="settings.providerEnabled?.codex !== false" :set-enabled="setEnabled" :busy="connectionBusy" :pending="loginPending" :error="connectionError" @connect="emit('connect')" @cancel="emit('cancel')">
+    <SettingsEngineConnectionRow :authentication="authentication" :connected="connected" :enabled="settings.providerEnabled?.codex !== false" :set-enabled="setEnabled" :busy="connectionBusy" :pending="loginPending" :error="connectionError" @connect="emit('connect')" @disconnect="emit('disconnect')" @cancel="emit('cancel')">
       <SettingsEngineSetupRow :home="settings.providerHomes?.codex" @customize="emit('customize')" />
     </SettingsEngineConnectionRow>
     <SettingsSection
@@ -74,7 +74,7 @@ import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
 import SettingsEngineSetupRow from './SettingsEngineSetupRow.vue';
 import type { ProviderAuthentication } from '@codex-claw/core/contracts/provider-setup';
 
-const emit = defineEmits<{ connect: []; cancel: []; customize: [] }>();
+const emit = defineEmits<{ connect: []; disconnect: []; cancel: []; customize: [] }>();
 
 const props = defineProps<{
   connected?: boolean;

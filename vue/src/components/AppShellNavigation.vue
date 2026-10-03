@@ -24,7 +24,6 @@
     @new-team="openNewTeam"
     @open-settings="openSettings"
     @open-whats-new="openWhatsNew"
-    @logout="logoutCodex"
     @quit="quit"
     @reorder-teams="$emit('reorder-teams', $event)"
     @select-cockpit="openCockpit"
@@ -159,7 +158,6 @@ const emit = defineEmits<{
   'edit-agent': [agentId: string];
   'edit-team': [teamId: string];
   'fork-agent': [agentId: string];
-  logout: [];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'new-team': [];
   'open-automations': [];
@@ -282,10 +280,6 @@ function openSettings(): void {
 
 function openWhatsNew(): void {
   emit('open-whats-new');
-}
-
-function logoutCodex(): void {
-  emit('logout');
 }
 
 function quit(): void {
