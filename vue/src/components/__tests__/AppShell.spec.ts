@@ -24,6 +24,7 @@ import { createClaudeConversationReplica } from '@codex-claw/core/claude-convers
 import {
   conversationControllerActions,
   conversationControllerState,
+  clickPortaledMenuItem,
   mountShell as mountRealShell,
   readyBrowserGuest,
 } from './app-shell-test-harness';
@@ -56,6 +57,16 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
+  it('opens handoff from the sidebar through shell navigation', async () => {
+    const wrapper = mountShell({ realAgentSidebar: true });
+    await flushPromises();
+    await wrapper.findAll('.agent-sidebar__agent')[0]!.trigger('contextmenu', { clientX: 100, clientY: 100 });
+    await clickPortaledMenuItem('Hand off…');
+    await flushPromises();
+    expect(wrapper.find('#agent-handoff-form').exists()).toBe(true);
+    expect(wrapper.find('#handoff-instructions').exists()).toBe(true);
+  });
+
   it.each(['codex', 'claude'] as const)('disconnects %s from Settings and offers its sign-in flow again', async backend => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend, installed: true, connected: true, checking: false }];

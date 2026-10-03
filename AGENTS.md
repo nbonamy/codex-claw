@@ -76,6 +76,9 @@ changes; specify feature behavior in tests:
   canonical UI, visual references, and design tokens.
 - `docs/team-cockpit.md`: design note for a possible team-scoped Cockpit entry
   inside the agent sidebar while preserving the global Cockpit.
+- `docs/research/provider-handoff.md`: read when designing cross-provider
+  continuation; handoff goals, source evidence, lifecycle and persistence
+  contracts, and validation limits.
 - `docs/agent-provider-selection.md`: draft for provider choice across manual
   agent creation, delegation, projects, Missions, and independent review.
 - `docs/codex.md`: read before changing Codex conversation state, rendering,

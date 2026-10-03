@@ -1,5 +1,12 @@
 <template>
   <div class="conversation-pane" :data-conversation-agent-id="agent?.id" @keydown.capture="handleDraftShortcut" @focusin.capture="handleDraftFocusIn">
+    <div v-if="agent?.handoff?.phase === 'failed'" class="conversation-pane__handoff" role="status">
+      <p>{{ agent.handoff.error }}</p>
+      <details v-if="agent.handoff.note">
+        <summary>{{ t('handoff.savedNote') }}</summary>
+        <pre>{{ agent.handoff.note }}</pre>
+      </details>
+    </div>
     <ConversationLoadError
       v-if="historyLoadFailed && !hasVisibleMessages"
       :loading="historyLoading"
@@ -462,11 +469,26 @@ defineExpose({ focusComposer, openSavedDraftPicker, saveCurrentDraft });
 .conversation-pane {
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-width: 360px;
   min-height: 0;
   overflow: hidden;
   background: var(--color-shell-main);
+}
+
+.conversation-pane__handoff {
+  flex: 0 0 auto;
+  max-height: 240px;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-shell-main);
+}
+
+.conversation-pane__handoff pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .conversation-pane__surface {

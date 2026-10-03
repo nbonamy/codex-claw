@@ -241,8 +241,8 @@ export class AppController {
       return this.listWorkItems(provider, repositoryId, location, query);
     });
 
-    ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
-      return this.listBackendModels(agentId);
+    ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string, backend?: import('@codex-claw/core/contracts').AgentBackend) => {
+      return this.listBackendModels(agentId, backend);
     });
 
     ipc.handle(ipcChannels.listBackendPlugins, async (_event, agentId: string) => {
@@ -429,6 +429,9 @@ export class AppController {
 
     ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, turnId?: string) => {
       return this.forkAgent(agentId, turnId);
+    });
+    ipc.handle(ipcChannels.handoffAgent, async (_event, agentId: string, input: import('@codex-claw/core/agent-handoff').AgentHandoffInput) => {
+      return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHandoff, { agentId, input }));
     });
 
     ipc.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
@@ -1328,8 +1331,8 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPermissionModeUpdate, { agentId, mode }));
   }
 
-  private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {
-    return this.requireBackendClient().request(backendMethods.agentModelsList, { agentId });
+  private async listBackendModels(agentId: string, backend?: import('@codex-claw/core/contracts').AgentBackend): Promise<BackendModelOption[]> {
+    return this.requireBackendClient().request(backendMethods.agentModelsList, { agentId, ...(backend ? { backend } : {}) });
   }
 
   private async listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]> {

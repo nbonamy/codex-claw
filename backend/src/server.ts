@@ -51,6 +51,10 @@ import { getCodexResourceSharingStatus, setCodexResourceSharing } from './codex-
 import { AgentGitService } from './git/agent-git-service';
 import { AgentGitWorkflowService, parseAgentGitRequest } from './git/agent-git-workflow-service';
 import { AgentPromptManager } from './agents/agent-prompt-manager';
+import { AgentHandoffService } from './agents/agent-handoff-service';
+import { requestHandoffNote } from './agents/handoff-note';
+import { handoffInProgress, type AgentHandoffInput } from '@codex-claw/core/agent-handoff';
+import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
 import { AgentPlanReviewService } from './agents/agent-plan-review-service';
 import { AgentThreadFlagService } from './agents/agent-thread-flag-service';
 import type { PlanReviewResponse } from '@codex-claw/core/plan-review';
@@ -155,6 +159,8 @@ export class ClawBackendServer {
   private readonly threadFlags: AgentThreadFlagService;
   private readonly agentConversations: AgentConversationService;
   private readonly delegatedWorkReports: DelegatedWorkReportPort;
+  private readonly agentHandoffs: AgentHandoffService;
+  private readonly handoffListeners = new Set<(event: BackendPublishedEvent) => void>();
   private readonly agentWorkspaces: AgentWorkspaceService;
   private readonly subagentIdentities: SubagentIdentityService;
   private readonly agentGitService: AgentGitService;
@@ -329,6 +335,22 @@ export class ClawBackendServer {
       },
       sendPrompt: (agentId, prompt) => { this.agentPrompts.send(agentId, prompt); },
       sendMessage: this.sendAgentMessage,
+    });
+    this.agentHandoffs = new AgentHandoffService({
+      snapshot: this.snapshot,
+      assertReady: async agent => { await this.requireDriverRpc().handle(backendMethods.driverHandoffCheck, { agent }); },
+      create: input => this.agentCreation.create(input, { select: false }),
+      persist: () => this.persistAndEmitSnapshot(),
+      requestNote: (agent, prompt) => requestHandoffNote(agent, prompt, {
+        subscribe: listener => { this.handoffListeners.add(listener); return () => { this.handoffListeners.delete(listener); }; },
+        send: (source, text) => this.sendHandoffPrompt(source, text),
+        read: agent => this.requireDriverRpc().handle(backendMethods.driverConversationMessagesGet, { ref: conversationRefFromAgent(agent), agentId: agent.id }) as Promise<RendererMessage[]>,
+      }),
+      retire: async agent => {
+        await this.retireConversation(agent);
+        await this.requireDriverRpc().handle(backendMethods.driverConversationRelease, { backend: agent.backend, agentId: agent.id });
+      },
+      start: async (agent, prompt) => { await this.sendHandoffPrompt(agent, prompt); },
     });
     this.subagentIdentities = new SubagentIdentityService({
       applyEvent: (event) => this.handleBackendEvent(event, { persist: false }),
@@ -528,6 +550,7 @@ export class ClawBackendServer {
   }
 
   async initialize(): Promise<void> {
+    await this.agentHandoffs.recover();
     await this.providerConnections?.refresh();
     await this.initializeSourceFolderIfNeeded();
     if (this.snapshot.providerConnections?.some(provider => provider.backend === 'codex' && provider.connected)) await this.ensureRemoteControlStatus();
@@ -1117,6 +1140,33 @@ export class ClawBackendServer {
           return this.persistAndEmitSnapshot();
         }, onCreated);
       }
+      case backendMethods.agentHandoff: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const value = requireRecord(params.input);
+        const operationId = requireString(value.operationId, 'operationId');
+        if (!operationId.trim() || operationId.length > 128 || !['codex', 'claude'].includes(String(value.backend))) throw new Error('Invalid handoff request.');
+        if (value.instructions !== undefined && (typeof value.instructions !== 'string' || value.instructions.length > 4000)) throw new Error('Handoff instructions must be at most 4,000 characters.');
+        const input: AgentHandoffInput = {
+          operationId, backend: value.backend as Agent['backend'],
+          ...(value.model === undefined ? {} : { model: requireString(value.model, 'model') }),
+          ...(value.instructions === undefined ? {} : { instructions: value.instructions as string }),
+        };
+        const replacement = this.snapshot.agents.find(agent => agent.handoff?.sourceAgentId === agentId && agent.handoff.operationId === operationId);
+        if (replacement && replacement.id !== agentId) {
+          await this.agentHandoffs.run(agentId, input);
+          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        }
+        if (!this.localAgentForId(agentId)) {
+          const projected = await this.remoteTeams.clientSnapshot();
+          const remoteTarget = projected.agents.find(agent => agent.handoff?.sourceAgentId === agentId && agent.handoff.operationId === operationId);
+          if (remoteTarget) return this.routeAgentSnapshotRequest(message.id, remoteTarget.id, message.method, { agentId, input }, async () => { throw new Error('Remote handoff owner is unavailable.'); });
+        }
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async () => {
+          await this.agentHandoffs.run(agentId, input);
+          return this.persistAndEmitSnapshot();
+        });
+      }
       case backendMethods.agentTeamMove: {
         const input = requireMoveAgentInput(message.params);
         const route = await this.locationForAgentId(input.agentId);
@@ -1128,6 +1178,7 @@ export class ClawBackendServer {
         if (!movingAgent || !targetTeam) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent or team not found: ${input.agentId} -> ${input.teamId}`);
         }
+        if (handoffInProgress(movingAgent)) throw new Error('Wait for the handoff to finish.');
         if (this.remoteTeams.pointerForTeam(targetTeam)) {
           return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Agents cannot be moved between backend locations.');
         }
@@ -1293,7 +1344,12 @@ export class ClawBackendServer {
       }
       case backendMethods.agentModelsList: {
         const agentId = requireAgentId(message.params);
-        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentModelsList, { agentId }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.driverModelsList, { agent }));
+        const backend = requireRecord(message.params).backend;
+        if (backend !== undefined && backend !== 'codex' && backend !== 'claude') throw new Error('Invalid model provider.');
+        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentModelsList, { agentId, ...(backend ? { backend } : {}) }, (agent) => {
+          const modelAgent = backend ? { ...agent, backend: resolveAgentBackend(this.snapshot, backend), backendSession: undefined, backendDefaults: undefined } : agent;
+          return this.handleAgentDriverRequest(modelAgent, backendMethods.driverModelsList, { agent: modelAgent });
+        });
       }
       case backendMethods.agentPluginsList: {
         const agentId = requireAgentId(message.params);
@@ -2488,6 +2544,17 @@ export class ClawBackendServer {
       .request(method, params, () => this.requireDriverRpc().handle(method, params));
   }
 
+  private sendHandoffPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
+    return new Promise((resolve, reject) => {
+      sendAgentPrompt(this.snapshot, this.backendDriverForAgent(agent), agent.id, prompt, undefined,
+        event => this.applyAndEmitBackendEvent(event), {
+          handoff: true,
+          onPromptStarted: resolve,
+          onPromptFailed: reject,
+        });
+    });
+  }
+
   private async locationForAgentId(agentId: string): Promise<AgentLocation | null> {
     const localAgent = this.localAgentForId(agentId);
     if (localAgent) {
@@ -2515,6 +2582,9 @@ export class ClawBackendServer {
       return createClawRpcError(messageId, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
     }
     if (route.kind === 'local') {
+      if (handoffInProgress(route.agent) && method !== backendMethods.agentHandoff && method !== backendMethods.agentInterrupt) {
+        throw new Error('Wait for the handoff to finish.');
+      }
       return createClawRpcResult(messageId, await localHandler(route.agent));
     }
     const result = await this.backendHandleForAgentLocation(route).request<AppSnapshot>(method, params, () => localHandler(route.agent));
@@ -2788,6 +2858,7 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.delegatedWorkReports?.handleEvent(fullEvent);
+    for (const listener of this.handoffListeners) listener(fullEvent);
     this.agentRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
     this.emitDerivedDomainEvents(fullEvent);
@@ -2820,6 +2891,7 @@ export class ClawBackendServer {
     const fullEvent = this.nextMainEvent(event);
     applyMainEventToSnapshot(this.snapshot, fullEvent);
     this.delegatedWorkReports.handleEvent(fullEvent);
+    for (const listener of this.handoffListeners) listener(fullEvent);
     if (fullEvent.agentId && providerConversationEventView(fullEvent).type === 'turn.completed') {
       void this.missionExecution.agentFinished(fullEvent.agentId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
     }

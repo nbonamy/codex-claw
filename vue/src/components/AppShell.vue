@@ -87,6 +87,7 @@
       @edit-agent="openEditAgent"
       @edit-team="openEditTeam"
       @fork-agent="$emit('fork-agent', $event)"
+      @handoff-agent="openHandoff"
       @move-agent-to-team="$emit('move-agent-to-team', $event)"
       @new-team="openNewTeam"
       @open-automations="openAutomations"
@@ -197,6 +198,7 @@
         @close-agent="$emit('close-agent', $event)"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @fork-agent="$emit('fork-agent', $event)"
+        @handoff-agent="openHandoff"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
@@ -451,6 +453,15 @@
       :resume-conversation="resumeAgentConversation"
       @close="resumeSessionAgentId = null"
     />
+    <AgentHandoffDialog
+      v-if="handoffAgent"
+      :agent="handoffAgent"
+      :blocker="agentHandoffBlocker(snapshot, handoffAgent)"
+      :submit="handoffAgentAction"
+      :list-models="listHandoffModels"
+      :read-messages="readConversationMessages"
+      @close="handoffAgentId = null"
+    />
     <ModelFavoritesDialog
       :favorites="managedModelFavorites"
       :models="backendModels"
@@ -572,6 +583,8 @@ import { preferredBackendChoices, provideBackendChoices, provideBackendSwitch } 
 import CockpitView from './CockpitView.vue';
 import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
+import AgentHandoffDialog from './AgentHandoffDialog.vue';
+import { agentHandoffBlocker, type AgentHandoffInput } from '@codex-claw/core/agent-handoff';
 import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
 import AgentQuickOpen from './AgentQuickOpen.vue';
@@ -752,6 +765,7 @@ const props = withDefaults(defineProps<{
   deleteAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   listAgentConversations?: (agentId: string, input?: ConversationListInput) => Promise<ConversationSummary[]>;
   resumeAgentConversation?: (agentId: string, target: ConversationResumeTarget) => Promise<void>;
+  handoffAgentAction?: (agentId: string, input: AgentHandoffInput) => Promise<void>;
   readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
@@ -903,6 +917,7 @@ const props = withDefaults(defineProps<{
   deleteAutomation: async () => undefined,
   listAgentConversations: async () => [],
   resumeAgentConversation: async () => undefined,
+  handoffAgentAction: async () => { throw new Error('Handoff is unavailable.'); },
   readConversationMessages: async () => [],
   connectWorkProvider: async () => undefined,
   openWorkProviderAuthorization: async () => undefined,
@@ -1243,6 +1258,12 @@ const newProjectBusy = ref(false);
 const newProjectError = ref<string | null>(null);
 const modelFavoritesDialogBackend = ref<ModelFavorite['backend'] | null>(null);
 const resumeSessionAgentId = ref<string | null>(null);
+const handoffAgentId = ref<string | null>(null);
+const handoffAgent = computed(() => props.snapshot.agents.find(agent => agent.id === handoffAgentId.value) ?? null);
+function openHandoff(agentId: string) { handoffAgentId.value = agentId; }
+async function listHandoffModels(agentId: string, backend: AgentBackend) {
+  return await codexClawApi?.listBackendModels(agentId, backend) ?? [];
+}
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
@@ -2238,6 +2259,7 @@ async function setEngineEnabled(backend: AgentBackend, enabled: boolean) {
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
+  || handoffAgentId.value !== null
   || modelFavoritesDialogVisible.value
   || newProjectDialogVisible.value
   || teamDialogVisible.value
@@ -2275,6 +2297,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
     editAgent: openEditAgent,
     forkAgent: (agentId) => { if (forkableAgentIds.value.includes(agentId)) emit('fork-agent', agentId); },
+    handoffAgent: openHandoff,
     focusComposer: () => focusedConversationPanel()?.focusComposer(),
     newTeam: openNewTeam,
     openAgentPalette: () => { agentQuickOpenVisible.value = true; },

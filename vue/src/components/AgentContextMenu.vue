@@ -42,6 +42,7 @@ export type AgentContextMenuAction =
   | 'duplicate-agent'
   | 'edit-agent'
   | 'fork-agent'
+  | 'handoff-agent'
   | 'resume-session'
   | 'restart-agent';
 
@@ -95,6 +96,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
     disabled: props.forkDisabled === true,
   },
   { id: 'group-primary', type: 'separator' },
+  { id: 'handoff-agent', type: 'action', label: t('handoff.action'), icon: SwitchHorizontalIcon },
   ...(props.openInCatalog?.applications.length ? [{
     id: 'open-in',
     type: 'submenu',
@@ -234,6 +236,7 @@ function isAgentContextMenuAction(itemId: string): itemId is AgentContextMenuAct
     itemId === 'duplicate-agent' ||
     itemId === 'edit-agent' ||
     itemId === 'fork-agent' ||
+    itemId === 'handoff-agent' ||
     itemId === 'resume-session' ||
     itemId === 'restart-agent';
 }

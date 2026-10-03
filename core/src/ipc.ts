@@ -101,6 +101,7 @@ export const ipcChannels = {
   removeWorkItemAssignment: 'agent:work-item:unassign',
   duplicateAgent: 'agent:duplicate',
   forkAgent: 'agent:fork',
+  handoffAgent: 'agent:handoff',
   moveAgentToTeam: 'agent:move-to-team',
   reorderAgents: 'agent:reorder',
   reorderRepositories: 'repository:reorder',

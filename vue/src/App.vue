@@ -136,6 +136,7 @@
     :delete-automation="deleteAutomation"
     :list-agent-conversations="listAgentConversations"
     :resume-agent-conversation="resumeAgentConversation"
+    :handoff-agent-action="handoffAgent"
     :read-conversation-messages="readConversationMessages"
     :configure-work-backlog="configureWorkBacklog"
     :load-work-repositories="loadWorkRepositories"
@@ -348,6 +349,7 @@ const {
   updateAgent,
   duplicateAgent,
   forkAgent,
+  handoffAgent,
   forkActiveAgentTurn,
   moveAgentToTeam,
   reorderAgents,

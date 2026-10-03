@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { Agent, AppSnapshot, Automation, BackendPublishedEvent } from '@codex-claw/core/contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
@@ -536,6 +536,23 @@ describe('ClawMcpService', () => {
       expect.stringContaining('Debug menu delivery'),
       undefined,
     ));
+  });
+
+  it('queues teammate messages during the idle handoff boundary without starting another turn', async () => {
+    const snapshot = createInitialSnapshot();
+    const recipient = snapshot.agents.find(agent => agent.id === 'agent-jesse')!;
+    recipient.status = { type: 'idle' };
+    recipient.handoff = { operationId: 'handoff', backend: 'claude', sourceAgentId: recipient.id, sourceTitle: 'Jesse', sourceRef: { backend: 'codex', threadId: 'original' }, phase: 'closing' };
+    const events: BackendEvent[] = [];
+    const sendPrompt = vi.fn();
+    service = new ClawMcpService({ snapshot, onEvent: event => events.push(event) });
+    service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
+    service.sendMessage('agent-dina', recipient.id, 'Keep this requirement.');
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
+      agentId: recipient.id, type: 'agent.promptQueued',
+      payload: expect.objectContaining({ text: expect.stringContaining('Keep this requirement.') }),
+    })));
+    expect(sendPrompt).not.toHaveBeenCalled();
   });
 
   it('steers teammate messages into a recipient with an active turn', async () => {
