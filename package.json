@@ -69,7 +69,7 @@
     "package:electron": "npm run build:sdk && npm run build -w @codex-claw/backend && node scripts/package-backend.mjs && npm run package -w @codex-claw/electron",
     "preview:web": "npm run build:web && npm run start:web",
     "publish": "npm run publish:electron",
-    "publish:electron": "npm run check-publish:macos && npm run make:electron && npm run publish:macos",
+    "publish:electron": "npm run test:ai && npm run test:coverage && npm run check-publish:macos && npm run make:electron && npm run publish:macos",
     "publish:macos": "node scripts/publish-macos.mjs",
     "release-notes:check": "node scripts/release-notes.mjs check",
     "release-notes:generate": "node scripts/release-notes.mjs generate",

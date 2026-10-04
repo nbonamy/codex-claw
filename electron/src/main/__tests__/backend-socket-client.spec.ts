@@ -3,6 +3,58 @@ import { describe, expect, it, vi } from 'vitest';
 import { ClawBackendSocketClient } from '../backend-socket-client';
 
 describe('ClawBackendSocketClient', () => {
+  it('rejects pending requests on close and bounds shutdown when the socket never acknowledges it', async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = createFakeSocket();
+      socket.end.mockImplementation(() => socket);
+      const connectSocket = vi.fn().mockReturnValue(socket);
+      const client = new ClawBackendSocketClient({ socketPath: '/test/clawd.sock', connectSocket });
+      const starting = client.start();
+      socket.emit('connect');
+      await starting;
+      await client.start();
+      expect(connectSocket).toHaveBeenCalledOnce();
+      const request = client.request('snapshot/get');
+      const rejected = expect(request).rejects.toThrow('client closed');
+      let closed = false;
+      const closing = client.close().then(() => { closed = true; });
+      await rejected;
+      await vi.advanceTimersByTimeAsync(999);
+      expect(closed).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await closing;
+      expect(socket.end).toHaveBeenCalledOnce();
+      await expect(client.request('snapshot/get')).rejects.toThrow('not connected');
+      await client.close();
+      expect(socket.end).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects failed connections and ignores late close events from a replaced socket', async () => {
+    const first = createFakeSocket();
+    const second = createFakeSocket();
+    const client = new ClawBackendSocketClient({
+      socketPath: '/test/clawd.sock',
+      connectSocket: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
+    });
+    const listener = vi.fn();
+    client.onConnectionState(listener);
+    const starting = client.start();
+    first.emit('error', new Error('connection refused'));
+    await expect(starting).rejects.toThrow('connection refused');
+    const reconnect = client.start();
+    second.emit('connect');
+    await reconnect;
+    listener.mockClear();
+    first.emit('close');
+    expect(listener).not.toHaveBeenCalled();
+    await client.close();
+    expect(second.end).toHaveBeenCalledOnce();
+  });
+
   it('sends backend health over the socket and resolves the response', async () => {
     const socket = createFakeSocket();
     const client = new ClawBackendSocketClient({

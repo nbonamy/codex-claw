@@ -1,0 +1,375 @@
+import { EventEmitter } from 'node:events';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { ipcChannels } from '@codex-claw/core/ipc';
+import type { ClawBackendClientPort } from '../backend-client';
+import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+
+const native = vi.hoisted(() => ({
+  handlers: new Map<string, (...args: any[]) => any>(),
+  dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn() },
+  shell: { openExternal: vi.fn(), beep: vi.fn() },
+  factory: vi.fn(), createWindow: vi.fn(), maintenance: vi.fn(), capture: vi.fn(),
+  keyStart: vi.fn((_hotkey: string, _capture: () => void) => true), keyStop: vi.fn(), ready: false,
+}));
+vi.mock('electron', async () => {
+  const { EventEmitter } = await import('node:events');
+  return {
+    app: Object.assign(new EventEmitter(), {
+      isPackaged: true, getAppPath: () => '/test/app', getPath: () => '/test/data',
+      isReady: () => native.ready, whenReady: vi.fn(), requestSingleInstanceLock: vi.fn(() => true),
+      quit: vi.fn(), exit: vi.fn(), relaunch: vi.fn(), setAsDefaultProtocolClient: vi.fn(),
+    }),
+    BrowserWindow: { getAllWindows: vi.fn(() => []) },
+    ipcMain: {
+      handle: (channel: string, handler: (...args: any[]) => any) => native.handlers.set(channel, handler),
+      removeHandler: (channel: string) => native.handlers.delete(channel),
+    },
+    powerMonitor: Object.assign(new EventEmitter(), { isOnBatteryPower: () => false }),
+    powerSaveBlocker: { start: vi.fn(() => 1), stop: vi.fn() },
+    clipboard: {}, dialog: native.dialog, shell: native.shell,
+    protocol: { handle: vi.fn() }, net: { fetch: vi.fn() },
+  };
+});
+vi.mock('../main-window', () => ({ createMainWindow: native.createWindow }));
+vi.mock('../app-menu', () => ({ installAppMenu: vi.fn() }));
+vi.mock('../backend-client', () => ({ createRuntimeClawBackendClient: native.factory }));
+vi.mock('../daemon-startup-maintenance', () => ({ ensureCurrentClawdDaemonForStartup: native.maintenance }));
+vi.mock('../appshots', () => ({ captureAppshot: native.capture }));
+vi.mock('../spoken-announcements', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../spoken-announcements')>(),
+  createRuntimeSpokenAnnouncementQueue: () => ({ dispose: vi.fn(), queue: vi.fn(), queueWithCompletion: vi.fn() }),
+}));
+vi.mock('../appshots-key-monitor', () => ({
+  AppshotsKeyMonitor: class { start = native.keyStart; stop = native.keyStop; },
+}));
+vi.mock('../auto-update', () => ({
+  DesktopAutoUpdateService: class {
+    start = vi.fn(); stop = vi.fn(); getStatus = () => ({ state: 'idle' });
+  },
+}));
+import { app, powerMonitor, BrowserWindow } from 'electron';
+import { AppController, startMainApp } from '../app-controller';
+import { AppshotsKeyMonitor } from '../appshots-key-monitor';
+import type { DesktopAutoUpdateService } from '../auto-update';
+
+let controllers: AppController[] = [];
+function windowFixture() {
+  return Object.assign(new EventEmitter(), {
+    webContents: Object.assign(new EventEmitter(), { send: vi.fn(), reload: vi.fn() }),
+    isDestroyed: vi.fn(() => false), isMinimized: vi.fn(() => false),
+    isFocused: () => true, restore: vi.fn(), show: vi.fn(), focus: vi.fn(),
+  });
+}
+function backendFixture() {
+  const snapshot = createInitialSnapshot();
+  const state = { snapshot, lastEventSeq: 0, clientState: { sourceFolderPath: '/projects', shouldPreventDisplaySleep: false } };
+  let emit = (_event: ClawBackendEvent) => {};
+  let disconnect = (_state: 'connected' | 'disconnected', _error?: Error) => {};
+  const unsubscribe = vi.fn();
+  const unsubscribeConnection = vi.fn();
+  const backend = {
+    start: vi.fn().mockResolvedValue(undefined),
+    health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: 'test', pid: 123 }),
+    request: vi.fn(async (method: string): Promise<unknown> => {
+      if (method === 'snapshot/get') return state;
+      if (method === 'client/state/get') return state.clientState;
+      throw new Error('Unexpected request: ' + method);
+    }),
+    onEvent: vi.fn((listener: typeof emit) => { emit = listener; return unsubscribe; }),
+    onConnectionState: vi.fn((listener: typeof disconnect) => { disconnect = listener; return unsubscribeConnection; }),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+  return { backend, state, unsubscribe, unsubscribeConnection, emit: (event: ClawBackendEvent) => emit(event),
+    disconnect: (error?: Error) => disconnect('disconnected', error) };
+}
+function setup() {
+  const fixture = backendFixture();
+  const window = windowFixture();
+  native.createWindow.mockReturnValue(window);
+  const controller = new AppController(fixture.state.snapshot, fixture.backend as ClawBackendClientPort,
+    undefined, undefined, undefined, new AppshotsKeyMonitor());
+  controllers.push(controller);
+  controller.registerIpcHandlers();
+  return { ...fixture, window, controller };
+}
+function invoke(channel: string, ...args: unknown[]) { return native.handlers.get(channel)!({}, ...args); }
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+  native.handlers.clear();
+  native.factory.mockReturnValue(null);
+  native.maintenance.mockResolvedValue(undefined);
+  native.ready = false;
+  app.removeAllListeners();
+  powerMonitor.removeAllListeners();
+  vi.mocked(app.requestSingleInstanceLock).mockReturnValue(true);
+});
+afterEach(async () => {
+  for (const controller of controllers) await controller.shutdown();
+  controllers = [];
+  app.removeAllListeners();
+  powerMonitor.removeAllListeners();
+  vi.useRealTimers();
+});
+
+describe('controller desktop lifecycle', () => {
+  it('settles backend browser requests on replacement, timeout, IPC failure, and shutdown', async () => {
+    const fixture = backendFixture();
+    native.factory.mockReturnValue(fixture.backend);
+    native.createWindow.mockReturnValue(windowFixture());
+    const controller = new AppController(fixture.state.snapshot);
+    controllers.push(controller);
+    controller.registerIpcHandlers();
+    const browserOpen = native.factory.mock.calls[0]![0].browserOpen as (agent: string, browser: string, url: string) => Promise<unknown>;
+    await expect(browserOpen('agent-dina', 'primary', 'https://example.com')).rejects.toThrow('window is not available');
+    controller.createWindow();
+    const first = browserOpen('agent-dina', 'primary', 'https://one.example');
+    const firstRejected = expect(first).rejects.toThrow('superseded');
+    const second = browserOpen('agent-dina', 'primary', 'https://two.example');
+    const secondRejected = expect(second).rejects.toThrow('Timed out');
+    await firstRejected;
+    await vi.advanceTimersByTimeAsync(30000);
+    await secondRejected;
+    const missing = browserOpen('missing-agent', 'primary', 'https://example.com');
+    const missingRejected = expect(missing).rejects.toThrow('Agent not found');
+    await expect(invoke(ipcChannels.browserOpen, 'missing-agent', 'primary', 'https://example.com', 99)).rejects.toThrow('Agent not found');
+    await missingRejected;
+    const final = browserOpen('agent-dina', 'primary', 'https://example.com');
+    const finalRejected = expect(final).rejects.toThrow('shutting down');
+    await controller.shutdown();
+    controllers = [];
+    await finalRejected;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('handles native deep-link and activation events after successful startup', async () => {
+    const fixture = backendFixture();
+    native.factory.mockReturnValue(fixture.backend);
+    const window = windowFixture();
+    native.createWindow.mockReturnValue(window);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    startMainApp();
+    await vi.advanceTimersByTimeAsync(0);
+    window.webContents.emit('did-finish-load');
+    native.ready = true;
+    vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([window as never]);
+    const event = { preventDefault: vi.fn() };
+    app.emit('open-url', event, 'codex-claw://new?prompt=from-url');
+    app.emit('second-instance', {}, ['claw', 'codex-claw://new?prompt=from-argv']);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.appCommand, {
+      type: 'open-agent-composer', prompt: 'from-argv', submit: true,
+    });
+    app.emit('activate');
+    expect(native.createWindow).toHaveBeenCalledOnce();
+    window.isDestroyed.mockReturnValue(true);
+    vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([]);
+    native.createWindow.mockReturnValue(windowFixture());
+    app.emit('activate');
+    expect(native.createWindow).toHaveBeenCalledTimes(2);
+    app.emit('before-quit', { preventDefault: vi.fn() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fixture.unsubscribe).toHaveBeenCalledOnce();
+    expect(fixture.backend.close).toHaveBeenCalledOnce();
+  });
+
+  it('serializes appshot capture, queues it across loading, and recovers after capture failure', async () => {
+    const { controller, window } = setup();
+    controller.createWindow();
+    await controller.initialize();
+    const capture = native.keyStart.mock.calls[0]![1];
+    let complete!: (value: unknown) => void;
+    native.capture.mockReturnValueOnce(new Promise(resolve => { complete = resolve; }));
+    capture();
+    capture();
+    expect(native.capture).toHaveBeenCalledOnce();
+    const appshot = { appName: 'Editor', windowTitle: 'Test', accessibilityText: 'Selected text' };
+    complete(appshot);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.webContents.send.mock.calls.filter(([channel]) => channel === ipcChannels.appCommand)).toHaveLength(0);
+    expect(native.shell.beep).toHaveBeenCalledOnce();
+    window.webContents.emit('did-finish-load');
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.appCommand, { type: 'attach-appshot', ...appshot });
+    native.capture.mockRejectedValueOnce(new Error('capture denied'));
+    capture();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.appCommand, { type: 'appshot-failed', message: 'capture denied' });
+    native.capture.mockResolvedValueOnce(appshot);
+    capture();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(native.capture).toHaveBeenCalledTimes(3);
+    expect(window.focus).toHaveBeenCalledTimes(3);
+  });
+
+  it('routes menu update checks, renderer status, and confirmed installation through one service', async () => {
+    const { controller, window } = setup();
+    const service = {
+      getStatus: () => ({ state: 'idle' }), start: vi.fn(), stop: vi.fn(),
+      check: vi.fn(() => true), install: vi.fn(),
+    };
+    controller.setAutoUpdateService(service as unknown as DesktopAutoUpdateService);
+    controller.createWindow();
+    const menu = native.createWindow.mock.calls[0]![0];
+    menu.checkForUpdates();
+    expect(service.check).toHaveBeenCalledOnce();
+    native.dialog.showMessageBox.mockResolvedValue({ response: 0 });
+    controller.setDesktopUpdateStatus({ state: 'error', error: 'network unavailable' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.updateStatusChanged, { state: 'error', error: 'network unavailable' });
+    expect(native.dialog.showMessageBox).toHaveBeenCalledWith(window, expect.objectContaining({ type: 'error', detail: 'network unavailable' }));
+    controller.setDesktopUpdateStatus({ state: 'downloaded', version: '9.0.0' });
+    menu.installUpdate();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(service.install).toHaveBeenCalledOnce();
+    await controller.shutdown();
+    controllers = [];
+    expect(service.stop).toHaveBeenCalledOnce();
+  });
+
+  it('delivers deep links only after each renderer load and reuses or replaces its native window', async () => {
+    const { controller, window } = setup();
+    controller.openDeepLink('codex-claw://new?prompt=first');
+    controller.createWindow();
+    expect(window.webContents.send).not.toHaveBeenCalled();
+    window.webContents.emit('did-finish-load');
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.appCommand, {
+      type: 'open-agent-composer', prompt: 'first', submit: true,
+    });
+    window.webContents.send.mockClear();
+    window.webContents.emit('did-start-loading');
+    controller.openDeepLink('codex-claw://new?prompt=second');
+    expect(window.webContents.send).not.toHaveBeenCalled();
+    window.webContents.emit('did-finish-load');
+    expect(window.webContents.send).toHaveBeenCalledTimes(1);
+    window.isMinimized.mockReturnValue(true);
+    controller.createWindow();
+    expect(native.createWindow).toHaveBeenCalledOnce();
+    expect(window.restore).toHaveBeenCalledOnce();
+    window.isDestroyed.mockReturnValue(true);
+    native.createWindow.mockReturnValue(windowFixture());
+    controller.createWindow();
+    expect(native.createWindow).toHaveBeenCalledTimes(2);
+  });
+
+  it('backs off failed reconnects, exposes cached state, and cancels retries and subscriptions at shutdown', async () => {
+    const { controller, backend, state, disconnect, unsubscribe, unsubscribeConnection } = setup();
+    controller.createWindow();
+    await controller.initialize();
+    backend.start.mockRejectedValue(new Error('daemon down'));
+    disconnect(new Error('socket closed'));
+    disconnect(new Error('socket closed again'));
+    await vi.advanceTimersByTimeAsync(249);
+    expect(backend.start).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(backend.start).toHaveBeenCalledTimes(2);
+    expect(await invoke(ipcChannels.getSnapshotState)).toMatchObject({
+      snapshot: state.snapshot, connection: { status: 'reconnecting', detail: 'daemon down' },
+    });
+    await vi.advanceTimersByTimeAsync(499);
+    expect(backend.start).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(backend.start).toHaveBeenCalledTimes(3);
+    await controller.shutdown();
+    controllers = [];
+    disconnect();
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(backend.start).toHaveBeenCalledTimes(3);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(unsubscribeConnection).toHaveBeenCalledOnce();
+    expect(powerMonitor.listenerCount('on-ac')).toBe(0);
+    expect(powerMonitor.listenerCount('on-battery')).toBe(0);
+  });
+
+  it('subscribes to backend events when startup first fails and the scheduled retry connects', async () => {
+    const { controller, backend, emit, window } = setup();
+    controller.createWindow();
+    backend.start.mockRejectedValueOnce(new Error('daemon still starting'));
+    await controller.initialize();
+    await vi.advanceTimersByTimeAsync(250);
+    emit({ seq: 1, occurredAt: '2026-10-04T00:00:00Z', type: 'agent.statusChanged',
+      agentId: 'agent-dina', payload: { type: 'working' } });
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'agent.statusChanged', agentId: 'agent-dina', payload: { type: 'working' },
+    }));
+    expect(backend.onConnectionState).toHaveBeenCalledOnce();
+  });
+
+  it('retries an inconsistent snapshot and publishes only the recovered state after a sequence gap', async () => {
+    const { controller, backend, state, emit, window } = setup();
+    controller.createWindow();
+    await controller.initialize();
+    const event = (seq: number): ClawBackendEvent => ({
+      seq, occurredAt: '2026-10-04T00:00:00Z', type: 'agent.statusChanged',
+      agentId: 'agent-dina', payload: { type: 'working' },
+    });
+    let reads = 0;
+    backend.request.mockImplementation(async () => {
+      reads++;
+      if (reads === 1) { emit(event(4)); return { ...state, lastEventSeq: 1 }; }
+      return { ...state, lastEventSeq: 4 };
+    });
+    emit(event(3));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads).toBe(2);
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.event, expect.objectContaining({
+      type: 'snapshot.updated', payload: state.snapshot,
+    }));
+    const sent = window.webContents.send.mock.calls.length;
+    emit(event(4));
+    expect(window.webContents.send).toHaveBeenCalledTimes(sent);
+  });
+
+  it('returns native chooser cancellation and uses the client source folder as its default', async () => {
+    const { controller } = setup();
+    await controller.initialize();
+    native.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/chosen'] });
+    expect(await invoke(ipcChannels.chooseSourceFolder)).toBe('/chosen');
+    expect(native.dialog.showOpenDialog).toHaveBeenLastCalledWith(expect.objectContaining({
+      defaultPath: '/projects', properties: ['openDirectory'],
+    }));
+    native.dialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: ['/ignored'] });
+    expect(await invoke(ipcChannels.chooseAgentFolder)).toBeNull();
+    native.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [] });
+    expect(await invoke(ipcChannels.chooseCodexBinary)).toBeNull();
+    expect(native.dialog.showOpenDialog).toHaveBeenLastCalledWith(expect.objectContaining({ properties: ['openFile'] }));
+    native.dialog.showSaveDialog.mockResolvedValue({ canceled: false, filePath: '/projects/branch' });
+    expect(await invoke(ipcChannels.chooseSourceWorktreeDestination, '/projects/suggested')).toBe('/projects/branch');
+    expect(native.dialog.showSaveDialog).toHaveBeenCalledWith(expect.objectContaining({
+      defaultPath: '/projects/suggested', properties: ['createDirectory'],
+    }));
+  });
+
+  it('rejects a second packaged instance before registering application handlers', () => {
+    vi.mocked(app.requestSingleInstanceLock).mockReturnValue(false);
+    startMainApp();
+    expect(app.quit).toHaveBeenCalledOnce();
+    expect(native.handlers.size).toBe(0);
+    expect(native.createWindow).not.toHaveBeenCalled();
+  });
+
+  it('opens recovery UI after maintenance failure and waits for cleanup before exiting', async () => {
+    const fixture = backendFixture();
+    native.factory.mockReturnValue(fixture.backend);
+    native.createWindow.mockReturnValue(windowFixture());
+    native.maintenance.mockRejectedValue(new Error('maintenance failed'));
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    startMainApp();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(native.createWindow).toHaveBeenCalledOnce();
+    expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith('codex-claw');
+    let release!: () => void;
+    fixture.backend.close.mockReturnValue(new Promise<void>(resolve => { release = resolve; }));
+    const quit = { preventDefault: vi.fn() };
+    app.emit('before-quit', quit);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(quit.preventDefault).toHaveBeenCalledOnce();
+    expect(app.exit).not.toHaveBeenCalled();
+    app.emit('before-quit', quit);
+    expect(quit.preventDefault).toHaveBeenCalledOnce();
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(app.exit).toHaveBeenCalledWith(0);
+    expect(native.keyStop).toHaveBeenCalledOnce();
+  });
+});

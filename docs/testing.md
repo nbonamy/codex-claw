@@ -17,12 +17,17 @@ normal tests: that boundary belongs to the SDK repository.
 Every code change must add or update tests for the behavior it changes. There
 is no small-change exemption for code.
 
-Coverage must stay very high. Once coverage tooling exists, the minimum
-threshold is 85% for statements, branches, functions, and lines.
+All five workspaces (core, backend, vue, electron, web) gate on exactly 85%
+statement coverage. Statements are the only blocking coverage metric; continue
+reporting lines, branches, and functions to guide risk assessment. Electron has
+the same gate as every other workspace.
 
 Rules:
 
-- Do not lower coverage thresholds to land a change.
+- Do not lower the statement threshold or shrink coverage includes/exclusions
+  to land a change.
+- Coverage does not substitute for meaningful behavioral/regression tests or
+  verification at the owning runtime boundary.
 - Do not leave broad untested areas around IPC, protocol adapters,
   persistence, reducers, agent status, tool rendering, approvals, diffs,
   filesystem behavior, git behavior, or teams.
@@ -333,6 +338,11 @@ The unqualified typecheck, lint, and test commands cover every workspace.
 
 For protocol or persistence changes, run focused tests for the touched module
 and the full coverage gate.
+
+Before release, require both `npm run test:ai` (including script tests) and
+`npm run test:coverage` across all five workspaces. A failed test or a workspace
+below 85% statements blocks release. Run against the installed SDK package
+boundary; source aliases are not a substitute for package verification.
 
 ## Conversation Ownership Verification
 

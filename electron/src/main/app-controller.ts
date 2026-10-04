@@ -742,12 +742,7 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
-      this.backendClientEventUnsubscribe?.();
-      this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitBackendEvent(event));
-      this.backendClientConnectionUnsubscribe?.();
-      this.backendClientConnectionUnsubscribe = this.backendClient.onConnectionState?.((state, error) => {
-        if (state === 'disconnected') this.handleBackendDisconnect(error);
-      }) ?? null;
+      this.subscribeToBackendClient();
       await this.synchronizeBackendState();
       this.setConnectionState({ status: 'connected' });
       logMain('clawd', 'connected to backend', { version: health.version, pid: health.pid });
@@ -763,6 +758,14 @@ export class AppController {
     const result = await this.requireBackendClient().request<WorkProviderConnectResult>(backendMethods.workProviderConnect, { provider });
     await this.adoptBackendSnapshot(result.snapshot);
     return result;
+  }
+
+  private subscribeToBackendClient(): void {
+    if (!this.backendClient) return;
+    this.backendClientEventUnsubscribe ??= this.backendClient.onEvent((event) => this.emitBackendEvent(event));
+    this.backendClientConnectionUnsubscribe ??= this.backendClient.onConnectionState?.((state, error) => {
+      if (state === 'disconnected') this.handleBackendDisconnect(error);
+    }) ?? null;
   }
 
   private async listSshHosts(): Promise<SshHostCandidate[]> {
@@ -1851,6 +1854,7 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
+      this.subscribeToBackendClient();
       const snapshot = await this.synchronizeBackendState();
       this.reconnectAttempt = 0;
       this.setConnectionState({ status: 'connected' });
