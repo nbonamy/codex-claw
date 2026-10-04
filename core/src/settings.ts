@@ -96,15 +96,16 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
     });
   }
 
-  if (input.workProviders?.github) {
-    const githubSettings = normalizeWorkProviderSettings({
-      ...snapshot.workBacklog.providerSettings.github,
-      ...input.workProviders.github,
+  for (const provider of ['github', 'linear'] as const) {
+    if (!input.workProviders?.[provider]) continue;
+    const settings = normalizeWorkProviderSettings({
+      ...snapshot.workBacklog.providerSettings[provider],
+      ...input.workProviders[provider],
     });
-    if (githubSettings.oauthClientId) {
-      snapshot.workBacklog.providerSettings.github = githubSettings;
+    if (settings.oauthClientId || settings.oauthCallbackUri) {
+      snapshot.workBacklog.providerSettings[provider] = settings;
     } else {
-      delete snapshot.workBacklog.providerSettings.github;
+      delete snapshot.workBacklog.providerSettings[provider];
     }
   }
 
@@ -337,7 +338,8 @@ function normalizeWorkProviderSettings(value: unknown): WorkProviderSettings {
   }
 
   const oauthClientId = normalizeOptionalString(value.oauthClientId);
-  return oauthClientId ? { oauthClientId } : {};
+  const oauthCallbackUri = normalizeOptionalString(value.oauthCallbackUri);
+  return { ...(oauthClientId ? { oauthClientId } : {}), ...(oauthCallbackUri ? { oauthCallbackUri } : {}) };
 }
 
 function normalizeRecentRepoNames(value: unknown): string[] {

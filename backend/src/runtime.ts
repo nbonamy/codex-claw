@@ -17,7 +17,8 @@ import { AutomationRunner } from './automations/runner';
 import { RuntimeScheduler } from './scheduling/runtime-scheduler';
 import { ClawMcpService } from './mcp/service';
 import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
-import { runtimeGitHubOAuthClientId } from './runtime-config';
+import { runtimeGitHubOAuthClientId, runtimeLinearOAuthSettings } from './runtime-config';
+import { LinearWorkProviderDriver } from './work-integrations/linear-driver';
 import { ClawBackendServer } from './server';
 import { backendCodexHomeDir, backendProviderTokensFilePath, backupProviderSetup, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
@@ -74,7 +75,10 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   );
   const agentCreation = new AgentCreationService(snapshot);
   const workIntegrations = new WorkIntegrationManager({
-    drivers: [new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github))],
+    drivers: [
+      new GitHubWorkProviderDriver(() => runtimeGitHubOAuthClientId(snapshot.workBacklog.providerSettings.github)),
+      new LinearWorkProviderDriver(() => runtimeLinearOAuthSettings(snapshot.workBacklog.providerSettings.linear)),
+    ],
     getSnapshot: () => snapshot,
     saveSnapshot: () => saveBackendSnapshot(snapshot),
     tokenStore: new FileWorkIntegrationTokenStore(backendProviderTokensFilePath()),
@@ -281,6 +285,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     async stop() {
       scheduler.stop();
       await server.close();
+      workIntegrations.close();
       await mcpService.stop();
     },
   };

@@ -7,6 +7,19 @@ afterEach(() => {
 });
 
 describe('backend runtime config', () => {
+  it('resolves public Linear OAuth configuration from packaged defaults, environment, then settings', async () => {
+    vi.stubGlobal('__CODEX_CLAW_LINEAR_CLIENT_ID__', 'packaged-client');
+    vi.stubGlobal('__CODEX_CLAW_LINEAR_CALLBACK_URI__', 'http://127.0.0.1:45678/packaged');
+    vi.stubEnv('CODEX_CLAW_LINEAR_CLIENT_ID', undefined);
+    vi.stubEnv('CODEX_CLAW_LINEAR_CALLBACK_URI', undefined);
+    const { runtimeLinearOAuthSettings } = await import('../runtime-config');
+    expect(runtimeLinearOAuthSettings()).toEqual({ oauthClientId: 'packaged-client', oauthCallbackUri: 'http://127.0.0.1:45678/packaged' });
+    vi.stubEnv('CODEX_CLAW_LINEAR_CLIENT_ID', ' env-client ');
+    vi.stubEnv('CODEX_CLAW_LINEAR_CALLBACK_URI', ' http://127.0.0.1:45678/env ');
+    expect(runtimeLinearOAuthSettings()).toEqual({ oauthClientId: 'env-client', oauthCallbackUri: 'http://127.0.0.1:45678/env' });
+    expect(runtimeLinearOAuthSettings({ oauthClientId: 'settings-client', oauthCallbackUri: 'http://127.0.0.1:45678/settings' })).toEqual({ oauthClientId: 'settings-client', oauthCallbackUri: 'http://127.0.0.1:45678/settings' });
+  });
+
   it('uses the GitHub OAuth client ID from settings before environment or packaged defaults', async () => {
     const { runtimeGitHubOAuthClientId } = await import('../runtime-config');
 

@@ -969,6 +969,7 @@ function sanitizeGitHubWorkBacklogConfiguration(value: unknown): WorkBacklogStat
 function cloneWorkProviderSettings(value: WorkBacklogState['providerSettings']): WorkBacklogState['providerSettings'] {
   return {
     ...(value.github ? { github: { ...value.github } } : {}),
+    ...(value.linear ? { linear: { ...value.linear } } : {}),
   };
 }
 
@@ -978,8 +979,10 @@ function sanitizeWorkProviderSettings(value: unknown): WorkBacklogState['provide
   }
 
   const github = sanitizeWorkProviderSetting(value.github);
+  const linear = sanitizeWorkProviderSetting(value.linear);
   return {
     ...(github ? { github } : {}),
+    ...(linear ? { linear } : {}),
   };
 }
 
@@ -989,7 +992,8 @@ function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | nul
   }
 
   const oauthClientId = optionalTrimmedString(value.oauthClientId) ?? '';
-  return oauthClientId ? { oauthClientId } : null;
+  const oauthCallbackUri = optionalTrimmedString(value.oauthCallbackUri);
+  return oauthClientId || oauthCallbackUri ? { ...(oauthClientId ? { oauthClientId } : {}), ...(oauthCallbackUri ? { oauthCallbackUri } : {}) } : null;
 }
 
 function cloneAutomation(automation: Automation): Automation {
@@ -1182,7 +1186,7 @@ function optionalTrimmedString(value: unknown): string | null {
 }
 
 function isWorkProvider(value: unknown): value is WorkProviderKind {
-  return value === 'github';
+  return value === 'github' || value === 'linear';
 }
 
 function isWorkIntegrationStatus(value: unknown): value is WorkIntegrationStatus {

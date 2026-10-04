@@ -453,7 +453,7 @@ function isWorkBacklog(value: unknown): boolean {
 
 function isWorkIntegrationConnection(value: unknown): boolean {
   return isRecord(value) &&
-    value.provider === 'github' &&
+    includes(['github', 'linear'], value.provider) &&
     includes(['notConfigured', 'disconnected', 'connecting', 'connected', 'error'], value.status) &&
     optional(value, 'accountLabel', isString) &&
     optional(value, 'detail', isAppText) &&
@@ -472,11 +472,11 @@ function isGitHubProviderConfiguration(value: unknown): boolean {
 }
 
 function isProviderSettings(value: unknown): boolean {
-  return isRecord(value) && optional(value, 'github', isWorkProviderSettings);
+  return isRecord(value) && optional(value, 'github', isWorkProviderSettings) && optional(value, 'linear', isWorkProviderSettings);
 }
 
 function isWorkProviderSettings(value: unknown): boolean {
-  return isRecord(value) && optional(value, 'oauthClientId', isString);
+  return isRecord(value) && optional(value, 'oauthClientId', isString) && optional(value, 'oauthCallbackUri', isString);
 }
 
 function isWorkBacklogAssignment(value: unknown): boolean {

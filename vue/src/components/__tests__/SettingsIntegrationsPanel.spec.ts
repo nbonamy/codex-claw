@@ -3,6 +3,38 @@ import { describe, expect, it, vi } from 'vitest';
 import SettingsIntegrationsPanel from '../SettingsIntegrationsPanel.vue';
 
 describe('SettingsIntegrationsPanel', () => {
+  it('keeps Linear setup editable after a failed save and never starts authorization', async () => {
+    const updateSettings = vi.fn().mockRejectedValue(new Error('Settings could not be saved'));
+    const wrapper = mountPanel({ updateSettings });
+    await wrapper.get('#linear-client-id').setValue('client');
+    await wrapper.get('[aria-label="Connect Linear"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('Settings could not be saved');
+    expect(wrapper.emitted('connect')).toBeUndefined();
+    expect(wrapper.get('[aria-label="Connect Linear"]').attributes('disabled')).toBeUndefined();
+  });
+
+  it('saves Linear setup before connecting, opens authorization, cancels, and disconnects independently', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ connections: [{ provider: 'github', status: 'connected', accountLabel: 'GitHub user' }], updateSettings });
+    expect(wrapper.text()).toContain('Linear');
+    await wrapper.get('#linear-client-id').setValue(' linear-client ');
+    await wrapper.get('#linear-callback-uri').setValue('http://127.0.0.1:45678/oauth/linear/callback');
+    await wrapper.get('[aria-label="Connect Linear"]').trigger('click');
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith({ workProviders: { linear: { oauthClientId: 'linear-client', oauthCallbackUri: 'http://127.0.0.1:45678/oauth/linear/callback' } } });
+    expect(wrapper.emitted('connect')).toEqual([['linear']]);
+    await wrapper.setProps({ connections: [{ provider: 'linear', status: 'connecting' }], authorization: { provider: 'linear', flow: 'browser', verificationUri: 'https://linear.app/oauth/authorize', expiresAt: '2026-10-04T00:00:00Z' } });
+    await wrapper.get('[aria-label="Open Linear authorization"]').trigger('click');
+    expect(wrapper.emitted('open-authorization')).toEqual([['linear']]);
+    await wrapper.get('[aria-label="Cancel Linear authorization"]').trigger('click');
+    expect(wrapper.emitted('disconnect')).toEqual([['linear']]);
+    await wrapper.setProps({ connections: [{ provider: 'linear', status: 'connected', accountLabel: 'Alex · Example' }] });
+    expect(wrapper.text()).toContain('Alex · Example');
+    await wrapper.get('[aria-label="Disconnect Linear"]').trigger('click');
+    expect(wrapper.emitted('disconnect')).toEqual([['linear'], ['linear']]);
+  });
+
   it('renders a decorative banner below the title', () => {
     const wrapper = mountPanel({
       connections: [{ provider: 'github', status: 'disconnected' }],

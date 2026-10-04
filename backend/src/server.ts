@@ -3045,7 +3045,7 @@ function requireBacklogConfiguration(params: unknown): WorkBacklogConfigurationI
 function requireWorkProvider(params: unknown): WorkProviderKind {
   const record = requireRecord(params);
   const provider = requireString(record.provider, 'provider');
-  if (provider !== 'github') {
+  if (provider !== 'github' && provider !== 'linear') {
     throw new Error(`Unsupported work provider: ${provider}`);
   }
   return provider;

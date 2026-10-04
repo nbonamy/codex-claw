@@ -42,6 +42,7 @@ export function workProviderLabel(provider: WorkItem['provider']): string {
   if (provider === 'github') {
     return 'GitHub';
   }
+  if (provider === 'linear') return 'Linear';
   provider satisfies never;
   return 'work provider';
 }

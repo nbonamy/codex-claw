@@ -1,7 +1,7 @@
 import type { BackendConversationRef } from './conversation';
 import type { AppText } from './shared';
 
-export type WorkProviderKind = 'github';
+export type WorkProviderKind = 'github' | 'linear';
 
 export type WorkIntegrationStatus = 'notConfigured' | 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -15,6 +15,7 @@ export type WorkIntegrationConnection = {
 
 export type WorkProviderSettings = {
   oauthClientId?: string;
+  oauthCallbackUri?: string;
 };
 
 export type WorkBacklogAssignmentPolicy = 'complete' | 'review';
@@ -65,7 +66,8 @@ export type WorkBacklogState = {
 
 export type WorkProviderAuthorization = {
   provider: WorkProviderKind;
-  userCode: string;
+  flow?: 'browser';
+  userCode?: string;
   verificationUri: string;
   expiresAt: string;
 };

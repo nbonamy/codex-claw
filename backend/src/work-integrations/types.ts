@@ -30,6 +30,7 @@ export type WorkProviderDeviceTokenResult =
 export interface WorkProviderDriver {
   provider: WorkProviderKind;
   configured(): boolean;
+  cancelAuthorization?(): void;
   startAuthorization(): Promise<WorkProviderDeviceAuthorization>;
   pollAuthorization(deviceCode: string): Promise<WorkProviderDeviceTokenResult>;
   refreshToken?(token: WorkProviderToken): Promise<WorkProviderToken>;

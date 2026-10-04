@@ -2,6 +2,16 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    linearIntegration: {
+      name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',
+      cancelLabel: 'Cancel Linear authorization', openLabel: 'Open Linear authorization',
+      callbackPlaceholder: 'http://127.0.0.1:45678/oauth/linear/callback',
+      clientId: 'OAuth client ID', callback: 'Registered callback URL', cancel: 'Cancel',
+      setup: 'Connect your Linear account for backlog work. Configure a public OAuth client ID and callback URL.',
+      callbackHelp: 'Register this exact loopback URL in your Linear OAuth app. Open authorization on the same computer as Claw.',
+      authorize: 'Authorize in your browser', open: 'Open Linear',
+      returnToClaw: 'Approve access in Linear, then return here. Claw finishes connecting automatically.',
+    },
     handoff: {
       action: 'Hand off…', submit: 'Hand off', cancel: 'Cancel', hide: 'Hide',
       engine: 'Coding agent', model: 'Model', defaultModel: 'Provider default',
@@ -356,11 +366,12 @@ export const messages = {
       },
     },
     workProvider: {
+      linearAuthorizationExpired: 'Linear authorization expired. Open authorization on the same computer as Claw and try again.',
       authorizationCancelled: '{provider} authorization was cancelled.',
       authorizationExpired: '{provider} authorization expired. Reconnect to continue.',
       authorizationPending: '{provider} authorization is still pending.',
       authorizationUnavailable: '{provider} authorization is unavailable right now.',
-      authorizationWaiting: 'GitHub is still waiting for authorization. Try again in {seconds}s.',
+      authorizationWaiting: 'Waiting for authorization. Try again in {seconds}s.',
       enterCode: 'Enter code {code} in {provider}.',
       needsConnection: '{provider} needs to be connected.',
       oauthNotConfigured: '{provider} OAuth is not configured.',

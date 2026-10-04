@@ -110,6 +110,7 @@ vi.mock('../work-integrations/manager', () => ({
   WorkIntegrationManager: class {
     constructor(options: unknown) { mocks.workIntegrationOptions.push(options); }
     hydrateConnections = mocks.hydrateConnections;
+    close = vi.fn();
     githubConnected = mocks.githubConnected;
     getPullRequest = mocks.getPullRequest;
   },

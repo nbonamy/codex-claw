@@ -999,6 +999,35 @@ stores the rotating refresh token beside the access token and refreshes it
 before provider requests. Concurrent requests share one refresh operation
 because GitHub invalidates the old access and refresh tokens after rotation.
 
+Linear uses authorization-code OAuth with S256 PKCE and single-use random state.
+The public client ID and exact registered callback URL resolve from
+`workBacklog.providerSettings.linear` in Settings, then
+`CODEX_CLAW_LINEAR_CLIENT_ID` / `CODEX_CLAW_LINEAR_CALLBACK_URI`, then optional
+public defaults baked into the backend build using those same environment
+variables. No client secret or API key is used. Settings therefore also works
+in packaged desktop builds without a shell environment.
+
+Register an exact callback such as
+`http://127.0.0.1:45678/oauth/linear/callback` in the Linear OAuth app, then enter
+it and the public client ID in Settings → Integrations. Choose an unused port.
+`clawd` binds that loopback address only during authorization; a bind failure
+appears in Settings before opening Linear. The browser must run on the same
+computer as `clawd` (the desktop and localhost web hosts). A remote browser
+cannot use this loopback callback: connect on the owning computer. Claw does
+not deploy an OAuth broker or expose the callback on a network interface.
+Cancellation, replacement, timeout, completion, and runtime shutdown dispose
+the listener. An abandoned browser tab expires after ten minutes and can be
+cancelled immediately in Settings.
+
+The requested Linear scopes are `read,write`: read supports backlog browsing;
+write supports the approved agent issue create/update/comment workflows. No
+administrative, schedule, or app-agent scopes are requested. These scope and
+PKCE choices follow [Linear's OAuth protocol](https://linear.app/developers/oauth-2-0-authentication).
+Access and rotated refresh tokens stay in the existing backend token store;
+only account/connection metadata reaches snapshots. Refreshes are coalesced
+per provider. Failed refreshes require reconnection, and an in-flight callback
+or refresh cannot restore a disconnected account. PR credentials remain GitHub's.
+
 ## In-app Browser
 
 The in-app browser is a desktop preview surface hosted in the renderer's

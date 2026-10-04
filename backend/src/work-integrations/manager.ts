@@ -17,11 +17,18 @@ export class WorkIntegrationManager {
   private readonly drivers = new Map<WorkProviderKind, WorkProviderDriver>();
   private readonly pendingAuthorizations = new Map<WorkProviderKind, PendingAuthorization>();
   private readonly tokenRefreshes = new Map<WorkProviderKind, Promise<WorkProviderToken>>();
+  private readonly generations = new Map<WorkProviderKind, number>();
+  private readonly tokenWrites = new Map<WorkProviderKind, Promise<void>>();
+  private readonly polls = new Map<WorkProviderKind, Promise<AppSnapshot>>();
 
   constructor(private readonly options: WorkIntegrationManagerOptions) {
     for (const driver of options.drivers) {
       this.drivers.set(driver.provider, driver);
     }
+  }
+
+  close(): void {
+    for (const provider of this.drivers.keys()) this.invalidate(provider);
   }
 
   async hydrateConnections(): Promise<void> {
@@ -32,6 +39,7 @@ export class WorkIntegrationManager {
     ]);
 
     for (const provider of providers) {
+      const generation = this.generation(provider);
       const driver = this.driver(provider);
       const connection = this.snapshot().workBacklog.connections.find((candidate) => candidate.provider === provider);
       const storedToken = await this.options.tokenStore.get(provider);
@@ -41,14 +49,12 @@ export class WorkIntegrationManager {
           try {
             token = await this.refreshConnectedToken(provider, token);
           } catch {
-            changed = this.setConnection({
-              provider,
-              status: 'disconnected',
-              detail: { key: 'workProvider.authorizationExpired', params: { provider: providerLabel(provider) } },
-            }) || changed;
+            if (this.generation(provider) !== generation) continue;
+            await this.markReconnectRequired(provider, generation);
             continue;
           }
         }
+        if (this.generation(provider) !== generation) continue;
         changed = this.setConnection({
           provider,
           status: 'connected',
@@ -58,12 +64,14 @@ export class WorkIntegrationManager {
         continue;
       }
 
+      if (this.generation(provider) !== generation) continue;
+
       if (!driver.configured()) {
-        if (connection) {
+        if (connection || provider === 'linear') {
           changed = this.setConnection({
             provider,
             status: 'notConfigured',
-            detail: `${providerLabel(provider)} OAuth is not configured.`,
+            detail: this.configurationDetail(provider),
           }) || changed;
         }
         continue;
@@ -76,7 +84,7 @@ export class WorkIntegrationManager {
       if (connection.status !== 'connected') {
         changed = this.setConnection({
           ...connection,
-          status: connection.status === 'notConfigured' ? 'disconnected' : connection.status,
+          status: connection.status === 'notConfigured' || (connection.status === 'connecting' && !this.pendingAuthorizations.has(provider)) ? 'disconnected' : connection.status,
           detail: connection.status === 'notConfigured' ? undefined : connection.detail,
         }) || changed;
         continue;
@@ -132,6 +140,9 @@ export class WorkIntegrationManager {
 
   async connect(provider: WorkProviderKind): Promise<WorkProviderConnectResult> {
     const driver = this.driver(provider);
+    const generation = this.invalidate(provider);
+    await this.writeToken(provider, () => this.options.tokenStore.delete(provider));
+    if (this.generation(provider) !== generation) return { snapshot: this.snapshot() };
     if (!await this.options.tokenStore.canStoreTokens()) {
       this.setConnection({
         provider,
@@ -146,13 +157,22 @@ export class WorkIntegrationManager {
       this.setConnection({
         provider,
         status: 'notConfigured',
-        detail: { key: 'workProvider.oauthNotConfigured', params: { provider: providerLabel(provider) } },
+        detail: this.configurationDetail(provider),
       });
       await this.options.saveSnapshot();
       return { snapshot: this.snapshot() };
     }
 
-    const authorization = await driver.startAuthorization();
+    let authorization: WorkProviderDeviceAuthorization;
+    try {
+      authorization = await driver.startAuthorization();
+    } catch (error) {
+      if (this.generation(provider) !== generation) return { snapshot: this.snapshot() };
+      this.setConnection({ provider, status: 'error', detail: error instanceof Error ? error.message : 'Could not start authorization.' });
+      await this.options.saveSnapshot();
+      return { snapshot: this.snapshot() };
+    }
+    if (this.generation(provider) !== generation) return { snapshot: this.snapshot() };
     this.pendingAuthorizations.set(provider, {
       ...authorization,
       lastPollAt: null,
@@ -160,7 +180,9 @@ export class WorkIntegrationManager {
     this.setConnection({
       provider,
       status: 'connecting',
-      detail: { key: 'workProvider.enterCode', params: { code: authorization.userCode, provider: providerLabel(provider) } },
+      detail: authorization.flow === 'browser'
+        ? { key: 'workProvider.authorizationPending', params: { provider: providerLabel(provider) } }
+        : { key: 'workProvider.enterCode', params: { code: authorization.userCode ?? '', provider: providerLabel(provider) } },
     });
     await this.options.saveSnapshot();
 
@@ -171,6 +193,17 @@ export class WorkIntegrationManager {
   }
 
   async pollAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
+    const existing = this.polls.get(provider);
+    if (existing) return existing;
+    const operation = this.pollPendingAuthorization(provider).finally(() => {
+      if (this.polls.get(provider) === operation) this.polls.delete(provider);
+    });
+    this.polls.set(provider, operation);
+    return operation;
+  }
+
+  private async pollPendingAuthorization(provider: WorkProviderKind): Promise<AppSnapshot> {
+    const generation = this.generation(provider);
     const pending = await this.activePendingAuthorization(provider);
     if (!pending) {
       return this.snapshot();
@@ -190,6 +223,7 @@ export class WorkIntegrationManager {
 
     pending.lastPollAt = now;
     const result = await this.driver(provider).pollAuthorization(pending.deviceCode);
+    if (this.generation(provider) !== generation || this.pendingAuthorizations.get(provider) !== pending) return this.snapshot();
     if (result.status === 'pending') {
       if (result.intervalSeconds) {
         pending.intervalSeconds = result.intervalSeconds;
@@ -205,6 +239,7 @@ export class WorkIntegrationManager {
 
     if (result.status === 'error') {
       this.pendingAuthorizations.delete(provider);
+      this.driver(provider).cancelAuthorization?.();
       this.setConnection({
         provider,
         status: result.code === 'not_configured' ? 'notConfigured' : 'error',
@@ -219,12 +254,23 @@ export class WorkIntegrationManager {
       ...result.token,
       connectedAt: new Date().toISOString(),
     };
-    const accountLabel = await this.driver(provider).currentAccountLabel(token);
-    await this.options.tokenStore.set({
-      ...token,
-      accountLabel,
-    });
+    let accountLabel: string;
+    try {
+      accountLabel = await this.driver(provider).currentAccountLabel(token);
+      await this.writeToken(provider, async () => {
+        if (this.generation(provider) === generation) await this.options.tokenStore.set({ ...token, accountLabel });
+      });
+    } catch {
+      if (this.generation(provider) !== generation) return this.snapshot();
+      this.pendingAuthorizations.delete(provider);
+      this.driver(provider).cancelAuthorization?.();
+      this.setConnection({ provider, status: 'error', detail: workProviderAuthorizationError('unavailable', providerLabel(provider)) });
+      await this.options.saveSnapshot();
+      return this.snapshot();
+    }
+    if (this.generation(provider) !== generation) return this.snapshot();
     this.pendingAuthorizations.delete(provider);
+    this.driver(provider).cancelAuthorization?.();
     this.setConnection({
       provider,
       status: 'connected',
@@ -237,9 +283,10 @@ export class WorkIntegrationManager {
   }
 
   async disconnect(provider: WorkProviderKind): Promise<AppSnapshot> {
-    this.pendingAuthorizations.delete(provider);
-    await this.options.tokenStore.delete(provider);
-    delete this.snapshot().workBacklog.providerConfigurations[provider];
+    const generation = this.invalidate(provider);
+    await this.writeToken(provider, () => this.options.tokenStore.delete(provider));
+    if (this.generation(provider) !== generation) return this.snapshot();
+    if (provider === 'github') delete this.snapshot().workBacklog.providerConfigurations.github;
     this.setConnection({
       provider,
       status: this.driver(provider).configured() ? 'disconnected' : 'notConfigured',
@@ -301,16 +348,18 @@ export class WorkIntegrationManager {
     if (Date.parse(pending.expiresAt) > Date.now()) return pending;
 
     this.pendingAuthorizations.delete(provider);
+    this.driver(provider).cancelAuthorization?.();
     this.setConnection({
       provider,
       status: 'error',
-      detail: { key: 'workProvider.verificationExpired' },
+      detail: { key: provider === 'linear' ? 'workProvider.linearAuthorizationExpired' : 'workProvider.verificationExpired' },
     });
     await this.options.saveSnapshot();
     return null;
   }
 
   private async connectedToken(provider: WorkProviderKind, forceRefresh = false): Promise<WorkProviderToken> {
+    const generation = this.generation(provider);
     const token = await this.options.tokenStore.get(provider);
     if (!token) {
       this.setConnection({
@@ -327,7 +376,7 @@ export class WorkIntegrationManager {
     try {
       return await this.refreshConnectedToken(provider, token);
     } catch (error) {
-      await this.markReconnectRequired(provider);
+      if (this.generation(provider) === generation) await this.markReconnectRequired(provider, generation);
       throw error;
     }
   }
@@ -344,9 +393,14 @@ export class WorkIntegrationManager {
       throw new Error(`${providerLabel(provider)} needs to be reconnected.`);
     }
 
+    const generation = this.generation(provider);
     const refresh = driver.refreshToken(token)
       .then(async (refreshedToken) => {
-        await this.options.tokenStore.set(refreshedToken);
+        await this.writeToken(provider, async () => {
+          if (this.generation(provider) !== generation) throw new Error('Authorization was cancelled.');
+          await this.options.tokenStore.set(refreshedToken);
+        });
+        if (this.generation(provider) !== generation) throw new Error('Authorization was cancelled.');
         return refreshedToken;
       })
       .finally(() => {
@@ -358,13 +412,43 @@ export class WorkIntegrationManager {
     return refresh;
   }
 
-  private async markReconnectRequired(provider: WorkProviderKind): Promise<void> {
+  private async markReconnectRequired(provider: WorkProviderKind, generation = this.generation(provider)): Promise<void> {
+    await this.writeToken(provider, async () => {
+      if (this.generation(provider) === generation) await this.options.tokenStore.delete(provider);
+    });
+    if (this.generation(provider) !== generation) return;
     this.setConnection({
       provider,
       status: 'disconnected',
       detail: { key: 'workProvider.authorizationExpired', params: { provider: providerLabel(provider) } },
     });
     await this.options.saveSnapshot();
+  }
+
+  private generation(provider: WorkProviderKind): number {
+    return this.generations.get(provider) ?? 0;
+  }
+
+  private invalidate(provider: WorkProviderKind): number {
+    const generation = this.generation(provider) + 1;
+    this.generations.set(provider, generation);
+    this.pendingAuthorizations.delete(provider);
+    this.tokenRefreshes.delete(provider);
+    this.polls.delete(provider);
+    this.driver(provider).cancelAuthorization?.();
+    return generation;
+  }
+
+  private writeToken(provider: WorkProviderKind, write: () => Promise<void>): Promise<void> {
+    const operation = (this.tokenWrites.get(provider) ?? Promise.resolve()).then(write);
+    this.tokenWrites.set(provider, operation.catch(() => undefined));
+    return operation;
+  }
+
+  private configurationDetail(provider: WorkProviderKind): WorkIntegrationConnection['detail'] {
+    return provider === 'linear'
+      ? 'Set the Linear OAuth client ID and register the callback URL in Settings. Authorization must open on the same computer as Claw.'
+      : { key: 'workProvider.oauthNotConfigured', params: { provider: providerLabel(provider) } };
   }
 
   private driver(provider: WorkProviderKind): WorkProviderDriver {
@@ -419,14 +503,15 @@ function normalizedOptionalString(value: string | null | undefined): string | nu
 function publicAuthorization(authorization: WorkProviderDeviceAuthorization): WorkProviderAuthorization {
   return {
     provider: authorization.provider,
-    userCode: authorization.userCode,
+    ...(authorization.flow ? { flow: authorization.flow } : {}),
+    ...(authorization.userCode ? { userCode: authorization.userCode } : {}),
     verificationUri: authorization.verificationUri,
     expiresAt: authorization.expiresAt,
   };
 }
 
 function providerLabel(provider: WorkProviderKind): string {
-  return provider === 'github' ? 'GitHub' : provider;
+  return provider === 'github' ? 'GitHub' : 'Linear';
 }
 
 function workProviderAuthorizationError(

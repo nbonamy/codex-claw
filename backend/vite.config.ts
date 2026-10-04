@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => {
   return {
     define: {
       __CODEX_CLAW_GITHUB_CLIENT_ID__: JSON.stringify(env.CODEX_CLAW_GITHUB_CLIENT_ID ?? ''),
+      __CODEX_CLAW_LINEAR_CLIENT_ID__: JSON.stringify(env.CODEX_CLAW_LINEAR_CLIENT_ID ?? ''),
+      __CODEX_CLAW_LINEAR_CALLBACK_URI__: JSON.stringify(env.CODEX_CLAW_LINEAR_CALLBACK_URI ?? ''),
     },
     resolve: {
       alias: {

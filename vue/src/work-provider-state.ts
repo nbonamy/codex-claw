@@ -33,19 +33,23 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   const status = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
   const error = ref<string | null>(null);
   const authorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
+  let authorizationRevision = 0;
 
   async function connect(provider: WorkProviderKind): Promise<void> {
     if (!codexClawApi?.connectWorkProvider) return;
+    const revision = ++authorizationRevision;
     status.value = 'loading';
     error.value = null;
     try {
       const result = await codexClawApi.connectWorkProvider(provider);
+      if (revision !== authorizationRevision) return;
       options.adoptSnapshot(result.snapshot);
       authorization.value = result.authorization ?? null;
       if (result.authorization) scheduleAuthorizationPoll(provider);
       else clearAuthorizationPoll(provider);
       status.value = 'loaded';
     } catch (cause) {
+      if (revision !== authorizationRevision) return;
       status.value = 'error';
       error.value = errorMessage(cause);
       throw cause;
@@ -79,9 +83,12 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
 
   async function disconnect(provider: WorkProviderKind): Promise<void> {
     if (!codexClawApi?.disconnectWorkProvider) return;
-    options.adoptSnapshot(await codexClawApi.disconnectWorkProvider(provider));
+    const revision = ++authorizationRevision;
     clearAuthorizationPoll(provider);
-    authorization.value = null;
+    const snapshot = await codexClawApi.disconnectWorkProvider(provider);
+    if (revision !== authorizationRevision) return;
+    options.adoptSnapshot(snapshot);
+    if (authorization.value?.provider === provider) authorization.value = null;
     repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: [] };
     itemsByRepository.value = {};
     status.value = 'notLoaded';
@@ -89,6 +96,10 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   }
 
   async function loadRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]> {
+    if (provider !== 'github') {
+      status.value = 'loaded';
+      return [];
+    }
     if (isRemoteAutomationLocation(location)) {
       return await codexClawApi?.listWorkRepositories?.(provider, location) ?? [];
     }
@@ -191,6 +202,7 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   }
 
   async function loadConnectedProvider(provider: WorkProviderKind): Promise<void> {
+    if (provider !== 'github') return;
     if (!codexClawApi?.listWorkRepositories) return;
     try {
       const repositories = await codexClawApi.listWorkRepositories(provider);
@@ -219,14 +231,17 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
 
   async function pollConnection(provider: WorkProviderKind, pollOptions: { userInitiated?: boolean } = {}): Promise<void> {
     if (!codexClawApi?.pollWorkProviderAuthorization) return;
+    const revision = authorizationRevision;
     if (pollOptions.userInitiated) status.value = 'loading';
     error.value = null;
     try {
-      options.adoptSnapshot(await codexClawApi.pollWorkProviderAuthorization(provider));
+      const snapshot = await codexClawApi.pollWorkProviderAuthorization(provider);
+      if (revision !== authorizationRevision) return;
+      options.adoptSnapshot(snapshot);
       const current = connection(provider);
       if (current?.status === 'connected') {
         clearAuthorizationPoll(provider);
-        authorization.value = null;
+        if (authorization.value?.provider === provider) authorization.value = null;
         if (!isFirstRunOnboardingActive()) useConfetti().celebrate();
         await loadRepositories(provider);
         return;
@@ -237,10 +252,11 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
         return;
       }
       clearAuthorizationPoll(provider);
-      authorization.value = null;
+      if (authorization.value?.provider === provider) authorization.value = null;
       status.value = current?.status === 'error' ? 'error' : 'loaded';
       error.value = current?.status === 'error' ? localizedText(current.detail, translate) : null;
     } catch (cause) {
+      if (revision !== authorizationRevision) return;
       clearAuthorizationPoll(provider);
       status.value = 'error';
       error.value = errorMessage(cause);

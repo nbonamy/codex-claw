@@ -122,6 +122,8 @@ function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand
 function runtimeClawdEnv(deps: RuntimeClawdConfigDeps): NodeJS.ProcessEnv {
   const env = deps.env ?? process.env;
   const githubClientId = env.CODEX_CLAW_GITHUB_CLIENT_ID?.trim();
+  const linearClientId = env.CODEX_CLAW_LINEAR_CLIENT_ID?.trim();
+  const linearCallbackUri = env.CODEX_CLAW_LINEAR_CALLBACK_URI?.trim();
   const bundledCodexPath = runtimeBundledCodexPath(deps);
   const runtimePath = !deps.env || env.PATH ? discoveredRuntimePath(deps) : '';
   const home = env.HOME?.trim() || (deps.homedir ?? homedir)();
@@ -133,6 +135,8 @@ function runtimeClawdEnv(deps: RuntimeClawdConfigDeps): NodeJS.ProcessEnv {
     HOME: home,
     ...(runtimePath ? { PATH: runtimePath } : {}),
     ...(githubClientId ? { CODEX_CLAW_GITHUB_CLIENT_ID: githubClientId } : {}),
+    ...(linearClientId ? { CODEX_CLAW_LINEAR_CLIENT_ID: linearClientId } : {}),
+    ...(linearCallbackUri ? { CODEX_CLAW_LINEAR_CALLBACK_URI: linearCallbackUri } : {}),
   };
 }
 

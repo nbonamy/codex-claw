@@ -7,7 +7,7 @@ import { AppStateStore } from '../persistence/store';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import { defaultPluginSettings, defaultThemeSettings } from '@codex-claw/core/settings';
+import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
 
@@ -21,6 +21,19 @@ afterEach(async () => {
 });
 
 describe('state persistence', () => {
+  it('round trips Linear OAuth settings and public connection alongside legacy GitHub settings', async () => {
+    const persistence = new AppStateStore(await tempHome());
+    const snapshot = createEmptySnapshot();
+    snapshot.workBacklog.providerSettings.github = { oauthClientId: 'github-client' };
+    updateSettingsInSnapshot(snapshot, { workProviders: { linear: { oauthClientId: ' linear-client ', oauthCallbackUri: ' http://127.0.0.1:45678/oauth/linear/callback ' } } });
+    snapshot.workBacklog.connections.push({ provider: 'linear', status: 'connected', accountLabel: 'Alex' });
+    await persistence.save(snapshot);
+    const restored = await persistence.load();
+    expect(restored.workBacklog.providerSettings).toEqual({ github: { oauthClientId: 'github-client' }, linear: { oauthClientId: 'linear-client', oauthCallbackUri: 'http://127.0.0.1:45678/oauth/linear/callback' } });
+    expect(restored.workBacklog.connections).toContainEqual({ provider: 'linear', status: 'connected', accountLabel: 'Alex' });
+    expect(isAppSnapshot(restored)).toBe(true);
+  });
+
   it.each([true, false])('migrates legacy Codex sharing once (%s), preserving newer choices', enabled => {
     const legacy = { ...persistedStateFromSnapshot(createEmptySnapshot()), general: { shareCodexSkillsAndPlugins: enabled } };
     const restored = snapshotFromPersistedState(legacy);

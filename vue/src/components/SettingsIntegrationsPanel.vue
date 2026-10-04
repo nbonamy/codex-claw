@@ -76,6 +76,33 @@
       </div>
     </SettingsSection>
 
+    <SettingsSection>
+      <SettingsRow :title="$t('linearIntegration.name')" :description="linearDescription" :error="linearError">
+        <template #control>
+          <el-button v-if="linearConnection.status === 'connected'" size="small" :aria-label="$t('linearIntegration.disconnectLabel')" @click="emit('disconnect', 'linear')">{{ $t('surface.settingsIntegrationsPanel.disconnect') }}</el-button>
+          <el-button v-else-if="linearConnection.status === 'connecting'" size="small" :aria-label="$t('linearIntegration.cancelLabel')" @click="emit('disconnect', 'linear')">{{ $t('linearIntegration.cancel') }}</el-button>
+          <el-button v-else size="small" type="primary" :aria-label="$t('linearIntegration.connectLabel')" :loading="savingLinear || status === 'loading'" @click="connectLinear">{{ $t('surface.settingsIntegrationsPanel.connect') }}</el-button>
+        </template>
+      </SettingsRow>
+      <template v-if="linearConnection.status !== 'connected' && linearConnection.status !== 'connecting'">
+        <SettingsRow :title="$t('linearIntegration.clientId')">
+          <template #control>
+            <el-input id="linear-client-id" v-model="linearClientId" class="settings-integrations-panel__linear-input" :aria-label="$t('linearIntegration.clientId')" size="small" autocomplete="off" />
+          </template>
+        </SettingsRow>
+        <SettingsRow :title="$t('linearIntegration.callback')" :description="$t('linearIntegration.callbackHelp')">
+          <template #control>
+            <el-input id="linear-callback-uri" v-model="linearCallbackUri" class="settings-integrations-panel__linear-input" :aria-label="$t('linearIntegration.callback')" size="small" :placeholder="$t('linearIntegration.callbackPlaceholder')" />
+          </template>
+        </SettingsRow>
+      </template>
+      <SettingsRow v-if="authorization?.provider === 'linear' && linearConnection.status === 'connecting'" :title="$t('linearIntegration.authorize')" :description="$t('linearIntegration.returnToClaw')">
+        <template #control>
+          <el-button size="small" type="primary" :aria-label="$t('linearIntegration.openLabel')" @click="emit('open-authorization', 'linear')">{{ $t('linearIntegration.open') }}</el-button>
+        </template>
+      </SettingsRow>
+    </SettingsSection>
+
     <p
       v-if="configurationError || error"
       class="settings-integrations-panel__detail"
@@ -94,6 +121,8 @@ import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsSection from './SettingsSection.vue';
+import SettingsRow from './SettingsRow.vue';
+import { localizedText } from '../i18n/errors';
 
 const props = withDefaults(defineProps<{
   authorization?: WorkProviderAuthorization | null;
@@ -120,6 +149,37 @@ const emit = defineEmits<{
 const clientIdInput = ref('');
 const configurationError = ref<string | null>(null);
 const savingClientId = ref(false);
+const linearClientId = ref('');
+const linearCallbackUri = ref('');
+const savingLinear = ref(false);
+const linearConnection = computed<WorkIntegrationConnection>(() => props.connections.find(connection => connection.provider === 'linear') ?? { provider: 'linear', status: 'notConfigured' });
+const linearDescription = computed(() => {
+  if (linearConnection.value.status === 'connected') return [translate('surface.settingsIntegrationsPanel.connected'), linearConnection.value.accountLabel].filter(Boolean).join(' · ');
+  if (linearConnection.value.status === 'connecting') return translate('surface.settingsIntegrationsPanel.waitingForAuthorization');
+  return translate('linearIntegration.setup');
+});
+const linearError = computed(() => linearConnection.value.status === 'error' ? localizedText(linearConnection.value.detail, translate) : null);
+watch(() => props.providerSettings.linear, settings => {
+  linearClientId.value = settings?.oauthClientId ?? '';
+  linearCallbackUri.value = settings?.oauthCallbackUri ?? '';
+}, { immediate: true });
+
+async function connectLinear(): Promise<void> {
+  savingLinear.value = true;
+  configurationError.value = null;
+  try {
+    const oauthClientId = linearClientId.value.trim();
+    const oauthCallbackUri = linearCallbackUri.value.trim();
+    if (oauthClientId !== (props.providerSettings.linear?.oauthClientId ?? '') || oauthCallbackUri !== (props.providerSettings.linear?.oauthCallbackUri ?? '')) {
+      await props.updateSettings({ workProviders: { linear: { oauthClientId, oauthCallbackUri } } });
+    }
+    emit('connect', 'linear');
+  } catch (error) {
+    configurationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    savingLinear.value = false;
+  }
+}
 
 const githubConnection = computed<WorkIntegrationConnection>(() => (
   props.connections.find((connection) => connection.provider === 'github') ?? {
@@ -179,6 +239,11 @@ async function connectGithub(): Promise<void> {
 </script>
 
 <style scoped>
+.settings-integrations-panel__linear-input {
+  width: 300px;
+  max-width: 100%;
+}
+
 .settings-integrations-panel__integration {
   min-height: 64px;
   display: flex;

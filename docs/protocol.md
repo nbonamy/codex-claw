@@ -343,7 +343,7 @@ without adopting it as the local product snapshot.
 
 | Method | Params | Result | Notes |
 | --- | --- | --- | --- |
-| `workProvider/connect` | `{ provider }` | `WorkProviderConnectResult` | Starts provider connection such as GitHub device flow. |
+| `workProvider/connect` | `{ provider }` | `WorkProviderConnectResult` | Starts GitHub device flow or Linear browser PKCE. Browser authorization has `flow: 'browser'` and no `userCode`; both return a `verificationUri` and `expiresAt`. |
 | `workProvider/authorization/poll` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
 | `workProvider/connections/reload` | none | `AppSnapshot` | Rehydrates provider connection metadata from token storage after token files are mirrored, without restarting `clawd`. |
 | `workProvider/disconnect` | `{ provider }` | `AppSnapshot` | Removes provider connection and token. |

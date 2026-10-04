@@ -57,7 +57,7 @@ describe('runtime config', () => {
     });
   });
 
-  it('forwards the GitHub OAuth client ID when Electron starts clawd with one in its environment', async () => {
+  it('forwards public OAuth configuration when Electron starts clawd with it in its environment', async () => {
     const { runtimeClawdCommand } = await import('../runtime-config');
 
     expect(runtimeClawdCommand({
@@ -65,6 +65,8 @@ describe('runtime config', () => {
       env: {
         CODEX_CLAW_BACKEND_COMMAND: 'clawd',
         CODEX_CLAW_GITHUB_CLIENT_ID: ' github-client-id ',
+        CODEX_CLAW_LINEAR_CLIENT_ID: ' linear-client-id ',
+        CODEX_CLAW_LINEAR_CALLBACK_URI: ' http://127.0.0.1:45678/oauth/linear/callback ',
       },
     })).toStrictEqual({
       command: 'clawd',
@@ -73,6 +75,8 @@ describe('runtime config', () => {
         CODEX_CLAW_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
         CODEX_CLAW_HOME: path.join(homedir(), '.codex-claw'),
         CODEX_CLAW_GITHUB_CLIENT_ID: 'github-client-id',
+        CODEX_CLAW_LINEAR_CLIENT_ID: 'linear-client-id',
+        CODEX_CLAW_LINEAR_CALLBACK_URI: 'http://127.0.0.1:45678/oauth/linear/callback',
         HOME: homedir(),
       },
     });

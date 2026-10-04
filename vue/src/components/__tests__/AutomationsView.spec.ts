@@ -13,6 +13,7 @@ import type {
   RendererMessage,
   SourceRepository,
   WorkRepository,
+  WorkProviderKind,
 } from '@codex-claw/core/contracts';
 import AutomationsView from '../AutomationsView.vue';
 
@@ -532,7 +533,7 @@ function mountView(
     deleteAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
     listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-    loadWorkRepositories: (provider: 'github', location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+    loadWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
     automations: Automation[];
     readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
     remoteConnections: RemoteConnection[];

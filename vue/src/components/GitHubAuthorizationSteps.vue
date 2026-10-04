@@ -67,6 +67,7 @@ watch(() => props.authorization.userCode, () => {
 
 async function copyAuthorizationCode(): Promise<void> {
   try {
+    if (!props.authorization.userCode) return;
     await navigator.clipboard.writeText(props.authorization.userCode);
     copyIconConfirmed.value = true;
     codeCopied.value = true;
