@@ -197,13 +197,16 @@ function reportMessage(agent: Agent, outcome: DelegatedWorkOutcome, summary: str
     ? ['Handoff from the worker:', '', summary]
     : ['The worker could not prepare a handoff summary. Open its conversation for details.'];
 
-  return [
+  const report = [
     `${worker} completed a delegated Git milestone. Please give the user a concise update using this report; no reply to the worker is needed.`,
     '',
     ...action,
     '',
     ...handoff,
   ].join('\n');
+  return outcome.kind === 'merge'
+    ? `<context>\n${report.replace(/<\/context>/giu, '&lt;/context&gt;')}\n</context>\n\n${outcome.branch} merged`
+    : report;
 }
 
 function workerPullRequestMessage(outcome: Extract<DelegatedWorkOutcome, { kind: 'pullRequest' }>): string {

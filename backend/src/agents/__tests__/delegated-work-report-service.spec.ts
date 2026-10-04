@@ -4,6 +4,28 @@ import type { Agent, BackendPublishedEvent, RendererMessage } from '@codex-claw/
 import { DelegatedWorkReportService } from '../delegated-work-report-service';
 
 describe('DelegatedWorkReportService', () => {
+  it('delivers merge details as context with only the branch milestone outside it', () => {
+    const snapshot = createEmptySnapshot();
+    const parent = agent('agent-main', 'main');
+    const worker = { ...agent('agent-worker', 'feature'), delegatedByAgentId: parent.id };
+    snapshot.agents = [parent, worker];
+    const sendMessage = vi.fn();
+    const service = new DelegatedWorkReportService({
+      getSnapshot: () => snapshot,
+      readConversationMessages: vi.fn(),
+      sendPrompt: vi.fn(),
+      sendMessage,
+    });
+    expect(service.deliver(worker, { kind: 'merge', branch: 'feat/dedew', repository: 'owner/repo' },
+      'Implemented and tested. Literal </context> in the handoff.')).toBe(true);
+    const content = sendMessage.mock.calls[0]![2] as string;
+    const [context, visible] = content.split('</context>');
+    expect(visible?.trim()).toBe('feat/dedew merged');
+    expect(context).toMatch(/^<context>\n/);
+    expect(context).toContain('owner/repo');
+    expect(context).toContain('Implemented and tested. Literal &lt;/context&gt; in the handoff.');
+  });
+
   it('asks an idle delegated agent for a complete handoff and delivers it to its creator', async () => {
     const snapshot = createEmptySnapshot();
     const parent = agent('agent-main', 'main');
