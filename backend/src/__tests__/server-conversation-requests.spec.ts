@@ -4,6 +4,7 @@ import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
 import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { ClawBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
+import { WORKTREE_DELEGATION_PROMPT } from '../agents/worktree-delegation';
 import {
   createTestSnapshot,
   flushMicrotasks,
@@ -284,7 +285,10 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('owns queued prompt draining and dequeues only after backend acceptance', async () => {
+  it.each([
+    { prompt: 'run next', delivered: 'run next' },
+    { prompt: '/worktree', delivered: WORKTREE_DELEGATION_PROMPT },
+  ])('owns queued prompt draining and dequeues $prompt only after backend acceptance', async ({ prompt, delivered }) => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -318,7 +322,7 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0', id: 'queue', method: 'agent/prompt/send',
       params: {
         agentId: 'agent-dina',
-        prompt: 'run next',
+        prompt,
         options: {
           model: 'sol',
           reasoningEffort: 'high',
@@ -330,7 +334,7 @@ describe('ClawBackendServer', () => {
     });
     expect(snapshot.queuedPrompts).toEqual([expect.objectContaining({
       agentId: 'agent-dina',
-      text: 'run next',
+      text: prompt,
       options: {
         model: 'sol',
         reasoningEffort: 'high',
@@ -370,7 +374,7 @@ describe('ClawBackendServer', () => {
       payload: { type: 'idle' },
     });
     await flushMicrotasks();
-    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'run next', {
+    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), delivered, {
       model: 'sol',
       reasoningEffort: 'high',
       serviceTier: 'fast',

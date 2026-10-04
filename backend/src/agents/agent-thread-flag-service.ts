@@ -1,11 +1,6 @@
 import type { Agent } from '@codex-claw/core/contracts';
 import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
-
-export const WORKTREE_DELEGATION_PROMPT = [
-  'Delegate this implementation to a Codex Claw co-agent in a dedicated worktree.',
-  'Use the current conversation as context, choose an appropriate branch name, and provide a self-contained handoff prompt.',
-  'Use the create-agent tool with createWorktree set to true.',
-].join(' ');
+import { WORKTREE_DELEGATION_PROMPT } from './worktree-delegation';
 
 export class AgentThreadFlagService {
   private readonly inFlight = new Set<string>();

@@ -1,4 +1,5 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { expandWorktreeDelegationCommand } from './agents/worktree-delegation';
 import { handoffInProgress } from '@codex-claw/core/agent-handoff';
 import { isAgentRequestResponse } from '@codex-claw/core/agent-request';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
@@ -246,7 +247,8 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         await this.ensureConnected?.(agent.backend);
         const record = requireRecord(params);
-        const prompt = requireString(record.prompt, 'prompt');
+        const rawPrompt = requireString(record.prompt, 'prompt');
+        const prompt = expandWorktreeDelegationCommand(rawPrompt) ?? rawPrompt;
         const driver = this.requireDriver(agent.backend);
         return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
@@ -422,7 +424,8 @@ export class BackendDriverRpc {
         if (!driver.steerPrompt) {
           throw unsupportedBackendFeature(agent, 'prompt steering');
         }
-        const prompt = requireString(record.prompt, 'prompt');
+        const rawPrompt = requireString(record.prompt, 'prompt');
+        const prompt = expandWorktreeDelegationCommand(rawPrompt) ?? rawPrompt;
         const options = record.options as SendPromptOptions | undefined;
         return options
           ? driver.steerPrompt(agent, prompt, options)
@@ -559,6 +562,7 @@ export class BackendDriverRpc {
   }
 
   tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {
+    if (expandWorktreeDelegationCommand(prompt) !== null) return null;
     return this.requireDriver(agent.backend).tryHandlePromptCommand?.(agent, prompt) ?? null;
   }
 
