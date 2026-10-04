@@ -39,6 +39,18 @@ Native subagent availability follows the provider's tools and settings. For a su
 
 Give the new teammate a self-contained objective, scope, constraints, and validation requirement. Creation in a worktree creates the isolated workspace and starts the teammate with that prompt. See [Parallel agents](../workflows/parallel-agents) and [Worktrees](../workflows/worktrees).
 
+## Durable delegated tasks
+
+::: info Upcoming release
+Durable task tracking is implemented on main for the intended 0.26.0 release, not the published 0.25.2 app.
+:::
+
+An agent can create a teammate with a tracked task: an objective, a completion condition, and a saved result containing evidence and caveats. This is an optional delegation mode, not a separate Tasks panel or a property of every new agent.
+
+Ask the parent agent to check its delegated tasks or wait for their results. Saved assignments and outcomes remain available after a restart, even if automatic result delivery was interrupted. Waiting with a timeout does not cancel the worker. A submitted result becomes complete only after the worker's submitting turn succeeds; an idle agent alone is not proof of completion.
+
+Ask the parent or worker to cancel a tracked task when it should stop. Cancellation preserves the agent, conversation, worktree, and recorded results; it does not undo file changes. A completed task does not authorize merging, publication, or advancing a Mission stage. Review its evidence and diff before delivery.
+
 ## Workspace tools
 
 | Capability | What to ask |
@@ -47,7 +59,7 @@ Give the new teammate a self-contained objective, scope, constraints, and valida
 | Browser | “Open the local preview in your in-app browser and check the form.” |
 | Visualize | Open Visualize, then ask for a diagram or a targeted canvas edit. |
 | Computer Use | Enable it in Settings, then name the macOS app and task. |
-| Work item status | Ask the assigned agent to report whether its GitHub work is in progress, blocked, ready for review, or completed. |
+| Work item status | Ask the assigned agent to report whether its GitHub or Linear work is in progress, blocked, ready for review, or completed. This tracks work in Claw, separately from the source issue's status. |
 
 See [Workspace & diffs](../features/workspace), [Browser](../features/browser), [Visualize](../features/visualize), and [Computer Use](../features/computer-use) for the corresponding setup and interaction flows.
 
@@ -56,3 +68,5 @@ See [Workspace & diffs](../features/workspace), [Browser](../features/browser), 
 Tell the agent which teammate needs a decision or task and what outcome you expect. Review the resulting work through the receiving agent's conversation and artifacts.
 
 Claw collaboration messages go to other Claw agents. Sending an email, Slack message, or GitHub comment is a separate action through that service's integration; name that action explicitly when you want it.
+
+Connecting Linear also makes its hosted tools available to agents through Claw. Ask explicitly when you want the agent to comment on an issue or change its Linear status; connecting the integration or finishing a Claw assignment is not itself that request.

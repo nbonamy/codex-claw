@@ -9,6 +9,10 @@ description: Install Codex Claw, connect your coding agents, and take software w
 
 Codex Claw is a desktop workspace for agentic software engineering. Keep conversations, repositories, browser previews, plans, and diffs together as you move from an idea to delivery.
 
+::: info Release availability
+The published app is 0.25.2. This guide also covers changes implemented on main for the intended 0.26.0 release, including Linear, delegation commands, and additional Claude conversation controls. Those sections are marked as upcoming; they do not indicate that 0.26.0 has shipped.
+:::
+
 <div class="docs-grid">
   <a class="docs-card" href="./getting-started/quickstart.html"><strong>Quickstart →</strong><span>Install Claw and take your first task through to a reviewed diff.</span></a>
   <a class="docs-card" href="./providers/"><strong>Provider guides →</strong><span>Connect Codex or Claude Code and choose an engine for your agents.</span></a>
@@ -35,6 +39,8 @@ Use a [Mission](./workflows/missions) to move through Requirements, Tickets, Imp
 ## Choose your engine
 
 Claw provides the workspace around your coding agent. Your selected provider supplies model access, account authentication, and usage limits. See the [provider guides](./providers/) for setup.
+
+For issue-driven work, connect [GitHub or Linear](./providers/#connect-github-or-linear), [browse the backlog](./features/workspace#browse-and-start-backlog-work), and choose the code repository where the agent should work. Use [automations](./features/automations) for recurring intake.
 
 ::: tip Looking for developer documentation?
 This guide covers using Claw. Architecture, protocol, frontend, and testing notes live in the repository's `docs/` directory.

@@ -55,5 +55,9 @@ Type `/` in the composer to discover commands. These commands are available for 
 | `/compact` | Compact conversation context. |
 | `/review` | Open Claw's [Code Review](../workflows/code-review) workflow. |
 | `/visualize` | Open [Visualize](../features/visualize). |
+| `/delegate [task]` | Ask the current agent to hand off work to a new Claw teammate in a worktree. Upcoming release after 0.25.2. |
+| `/worktree [task]` | Alias for `/delegate`. Upcoming release after 0.25.2. |
 
-Codex also offers `/goal` for a thread goal. Other composer controls and turn actions depend on the selected provider; see [Conversations](../features/conversations).
+The upcoming release also adds **Review**, **Delegate**, and **Visualize** to the composer's **+** menu. See [Worktree delegation](../workflows/worktrees#delegate-implementation) for handoff and local-commit behavior.
+
+Codex offers `/goal` for a thread goal; Claude native goal support is new in the upcoming release after 0.25.2. Claude goals have no token-budget support. Other composer controls and turn actions depend on the selected provider; see [Conversations](../features/conversations).

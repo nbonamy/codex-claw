@@ -10,6 +10,8 @@ Each agent can use an in-app browser alongside its conversation for research and
 
 Select an agent, then open **Browser** from the workspace's **+** menu or press **⌘B** on macOS. Enter an HTTP or HTTPS URL in the address bar and press Enter. Back, forward, and reload controls work like a normal browser.
 
+In the upcoming release after 0.25.2, the address bar also accepts search text. Entering words such as `Vue accessibility guide` opens a Google search; recognizable addresses, including `localhost` with a port, navigate directly. This searches the web, not text within the current page.
+
 You can also ask the agent to open a page:
 
 ```text

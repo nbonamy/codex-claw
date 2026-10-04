@@ -53,6 +53,10 @@ Create an agent in the folder you want to work in and choose **Claude Code** if 
 
 Confirm that the engine responds and uses the intended working folder before assigning implementation work. Review any permission requests in the conversation. Available models, effort levels, and permission modes depend on Claude Code; Codex controls do not all apply to Claude sessions.
 
+## Conversation controls
+
+For steering, forks, and goals, see [Conversations](../features/conversations). These Claude capabilities are implemented on main for the intended 0.26.0 release and are not included in the published 0.25.2 app. Steering waits for a tool boundary or following turn; forks require an idle conversation and keep the same working folder; goals require native hooks and do not support token budgets. Edit, retry, and delete turn actions remain unavailable.
+
 ## Configure instructions, skills, and external tools
 
 For personal instructions, open **Settings → Personalization**, choose **Claude Code**, and check the displayed instruction-file path. The file belongs to the selected Claude home. With **Use existing setup**, your edits also affect Claude Code outside Claw. Project instructions continue to apply in the working folder.

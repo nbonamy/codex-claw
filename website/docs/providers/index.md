@@ -1,5 +1,5 @@
 ---
-description: Choose separate or shared provider setups, connect Codex and Claude Code, and manage each engine independently.
+description: Connect Codex and Claude Code for agent work, and GitHub or Linear for backlog work.
 ---
 
 # Provider guides
@@ -48,6 +48,29 @@ Uncheck **Reuse my existing skills** if you want to manage those resources separ
 ## Accounts and usage
 
 Authentication, model availability, and usage limits belong to the selected provider. Connecting an account to Claw does not create a new model subscription or transfer one provider's access to another. Claude subscription sign-in and Anthropic Console API billing are separate choices in its connection dialog.
+
+## Connect GitHub or Linear
+
+Coding engines and backlog integrations are separate choices. Codex or Claude Code runs the agent; GitHub or Linear supplies the work items.
+
+::: info Upcoming release
+Linear and the shared backlog provider/source selectors are implemented on main for the intended 0.26.0 release. They are not included in the published 0.25.2 app.
+:::
+
+Open **Settings → Integrations** and connect the service you want to use:
+
+| Integration | Connect | Backlog source |
+| --- | --- | --- |
+| GitHub | Select **Connect**, copy the displayed device code, open GitHub, and authorize Claw. Return when authorization finishes. | A GitHub repository, with issues and pull requests. |
+| Linear | Select **Connect**, complete sign-in and authorization in the browser, and return to Claw. Check for **Connected** and the expected account. | A Linear team or project, with issues. |
+
+Linear does not require pasting an API key or registering your own OAuth application in Settings. **Cancel** stops an in-progress authorization; use **Connect** to retry. If the build reports that Linear sign-in is not configured, use a build with Linear configuration rather than entering credentials in chat. **Disconnect** removes Claw's connection to that service without disconnecting the other integration or your coding engines.
+
+In backlog pickers, choose the provider first, then its **Repository** or **Team / project**. Browsing only offers connected providers; with one connected provider, the provider selector is hidden. Automation setup also lets you select a disconnected provider and directs you to connect it before saving.
+
+A Linear team or project identifies **where the issue lives**, not **where code runs**. Work started from a repository uses that repository. Without a repository context, choose a **Code repository** before starting. For unattended work, [automations](../features/automations) require a saved repository for every Linear source.
+
+Git branches, commits, pushes, and pull requests still belong to the code repository. Linear supplies backlog work; it does not replace GitHub's pull-request workflow. See [Browse and start backlog work](../features/workspace#browse-and-start-backlog-work) and [Missions](../workflows/missions) for the entry points.
 
 ## Choosing an engine
 
