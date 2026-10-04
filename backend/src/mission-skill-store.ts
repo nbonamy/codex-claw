@@ -65,7 +65,7 @@ disable-model-invocation: true
 
 # Implement a Mission ticket
 
-Complete only the assigned ticket in the assigned isolated worktree.
+Complete only the currently assigned ticket in the assigned isolated worktree. A later explicit assignment from Claw or the user supersedes the previous ticket assignment.
 
 1. Read the canonical ticket, accepted requirements, repository instructions, and relevant existing code before editing.
 2. Make the smallest coherent vertical change that satisfies every acceptance criterion. Keep changes inside the assigned repository worktree.
