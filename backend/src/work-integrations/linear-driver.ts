@@ -49,7 +49,13 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
         response.setHeader('Cache-Control', 'no-store');
         response.setHeader('Content-Type', 'text/plain; charset=utf-8');
         response.setHeader('Referrer-Policy', 'no-referrer');
-        const url = new URL(request.url ?? '/', callback.origin);
+        let url: URL;
+        try {
+          url = new URL(request.url ?? '/', callback.origin);
+        } catch {
+          response.writeHead(400).end('Invalid callback URL.');
+          return;
+        }
         if (request.method !== 'GET' || request.headers.host !== callback.host || url.pathname !== callback.pathname) {
           response.writeHead(404).end('Not found.');
           return;

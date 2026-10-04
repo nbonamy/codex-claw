@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createConnection } from 'node:net';
 import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -47,6 +48,29 @@ async function setup() {
 }
 
 describe('Linear OAuth through manager and HTTP callback', () => {
+  it('rejects malformed HTTP targets without consuming the pending authorization', async () => {
+    const { manager, callbackUri, realFetch, upstream, tokenStore } = await setup();
+    const authorization = new URL((await manager.connect('linear')).authorization!.verificationUri);
+    const callback = new URL(callbackUri);
+    const response = await new Promise<string>((resolve, reject) => {
+      const socket = createConnection({ host: callback.hostname, port: Number(callback.port) });
+      let data = '';
+      socket.setEncoding('utf8');
+      socket.setTimeout(1_000, () => socket.destroy(new Error('Callback did not reject the malformed target.')));
+      socket.on('error', reject);
+      socket.on('data', chunk => { data += chunk; });
+      socket.on('end', () => { socket.destroy(); resolve(data); });
+      socket.on('connect', () => socket.write(`GET http://[ HTTP/1.1\r\nHost: ${callback.host}\r\nConnection: close\r\n\r\n`));
+    });
+    expect(response).toMatch(/^HTTP\/1\.1 400 /);
+    expect(upstream).not.toHaveBeenCalled();
+    expect(manager.isConnected('linear')).toBe(false);
+    expect((await realFetch(`${callbackUri}?state=${authorization.searchParams.get('state')}&code=accepted`)).status).toBe(200);
+    await manager.pollAuthorization('linear');
+    expect(manager.isConnected('linear')).toBe(true);
+    expect(await tokenStore.get('linear')).toMatchObject({ accessToken: 'access-secret' });
+  });
+
   it('surfaces missing setup, rejects non-loopback callbacks, and permits retry after a callback port conflict', async () => {
     const { manager, snapshot, callbackUri, options } = await setup();
     const unconfigured = new WorkIntegrationManager({ ...options, drivers: [new LinearWorkProviderDriver(() => ({}))] });
