@@ -43,11 +43,12 @@ export class WorkIntegrationManager {
       const driver = this.driver(provider);
       const connection = this.snapshot().workBacklog.connections.find((candidate) => candidate.provider === provider);
       const storedToken = await this.options.tokenStore.get(provider);
+      if (this.generation(provider) !== generation) continue;
       if (storedToken) {
         let token = storedToken;
         if (tokenNeedsRefresh(token)) {
           try {
-            token = await this.refreshConnectedToken(provider, token);
+            token = await this.refreshConnectedToken(provider, token, generation);
           } catch {
             if (this.generation(provider) !== generation) continue;
             await this.markReconnectRequired(provider, generation);
@@ -359,6 +360,7 @@ export class WorkIntegrationManager {
   private async connectedToken(provider: WorkProviderKind, forceRefresh = false): Promise<WorkProviderToken> {
     const generation = this.generation(provider);
     const token = await this.options.tokenStore.get(provider);
+    if (this.generation(provider) !== generation) throw new Error('Authorization was cancelled.');
     if (!token) {
       this.setConnection({
         provider,
@@ -372,7 +374,7 @@ export class WorkIntegrationManager {
     if (!forceRefresh && !tokenNeedsRefresh(token)) return token;
 
     try {
-      return await this.refreshConnectedToken(provider, token);
+      return await this.refreshConnectedToken(provider, token, generation);
     } catch (error) {
       if (this.generation(provider) === generation) await this.markReconnectRequired(provider, generation);
       throw error;
@@ -382,7 +384,9 @@ export class WorkIntegrationManager {
   private async refreshConnectedToken(
     provider: WorkProviderKind,
     token: WorkProviderToken,
+    generation: number,
   ): Promise<WorkProviderToken> {
+    if (this.generation(provider) !== generation) throw new Error('Authorization was cancelled.');
     const existingRefresh = this.tokenRefreshes.get(provider);
     if (existingRefresh) return existingRefresh;
 
@@ -391,7 +395,6 @@ export class WorkIntegrationManager {
       throw new Error(`${providerLabel(provider)} needs to be reconnected.`);
     }
 
-    const generation = this.generation(provider);
     const refresh = driver.refreshToken(token)
       .then(async (refreshedToken) => {
         await this.writeToken(provider, async () => {

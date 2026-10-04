@@ -7,6 +7,45 @@ import { MemoryWorkIntegrationTokenStore } from '../memory-token-store';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from '../types';
 
 describe('WorkIntegrationManager', () => {
+  describe.each(['request', 'hydration'] as const)('obsolete token read during %s', operation => {
+    it.each(['disconnect', 'replacement authorization'] as const)('preserves %s without refreshing the old account', async transition => {
+      const snapshot = createInitialSnapshot();
+      const tokenStore = new MemoryWorkIntegrationTokenStore();
+      const oldToken: WorkProviderToken = {
+        provider: 'github', accessToken: 'old-access', tokenType: 'bearer',
+        refreshToken: 'old-refresh', expiresAt: '2000-01-01T00:00:00.000Z',
+        connectedAt: '2000-01-01T00:00:00.000Z',
+      };
+      await tokenStore.set(oldToken);
+      const driver = fakeDriver({ refreshedToken: { ...oldToken, accessToken: 'stale-refresh-result' } });
+      const manager = createManager({ driver, snapshot, tokenStore });
+      let finishRead!: (token: WorkProviderToken) => void;
+      vi.spyOn(tokenStore, 'get').mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve; }));
+      const pending = operation === 'request'
+        ? manager.authorizationHeader('github')
+        : manager.hydrateConnections();
+      const settled = operation === 'request'
+        ? expect(pending).rejects.toThrow('Authorization was cancelled.')
+        : pending;
+
+      if (transition === 'disconnect') {
+        await manager.disconnect('github');
+      } else {
+        await manager.connect('github');
+        await manager.pollAuthorization('github');
+      }
+      const currentToken = await tokenStore.get('github');
+      const currentConnections = structuredClone(snapshot.workBacklog.connections);
+      finishRead(oldToken);
+      await settled;
+
+      expect(driver.refreshToken).not.toHaveBeenCalled();
+      expect(await tokenStore.get('github')).toStrictEqual(currentToken);
+      expect(snapshot.workBacklog.connections).toStrictEqual(currentConnections);
+      expect(currentToken?.accessToken ?? null).toBe(transition === 'disconnect' ? null : 'gho_secret');
+    });
+  });
+
   it('marks unconfigured providers without opening an OAuth page', async () => {
     const snapshot = createInitialSnapshot();
     const openExternal = vi.fn();
