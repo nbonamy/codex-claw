@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { AgentThreadFlagService, WORKTREE_DELEGATION_PROMPT } from '../agent-thread-flag-service';
+import { AgentThreadFlagService } from '../agent-thread-flag-service';
+import { WORKTREE_DELEGATION_PROMPT } from '../worktree-delegation';
 
 describe('AgentThreadFlagService', () => {
   it('submits the fixed delegation prompt and clears the flag only after acceptance', async () => {
