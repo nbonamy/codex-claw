@@ -130,6 +130,7 @@ describe('Codex Claw MCP tool registration', () => {
       'branchName',
       'destinationPath',
       'prompt',
+      'instructions',
     ]);
   });
 

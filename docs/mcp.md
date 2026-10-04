@@ -3,8 +3,10 @@
 ## Durable task delegation
 
 `create-agent` accepts optional `task: { title, doneWhen }`. Task mode requires
-the actual assignment in `prompt` and a stable parent-scoped `requestId`; reuse
-that ID after timeout. Returned `taskId`, `agentId` and status describe accepted
+the visible assignment in `prompt` and a stable parent-scoped `requestId`; reuse
+that ID after timeout. Optional `instructions` supplies the full handoff in the
+same escaped `<context>` block as ordinary creation. Tasks retain the combined
+assignment for recovery. Returned `taskId`, `agentId` and status describe accepted
 startup or an existing task, not completed work. Calls without `task` keep their
 previous behavior. Provider/model/effort/worktree selection remains unchanged.
 
@@ -532,8 +534,13 @@ Input:
 - `model` and `reasoningEffort`: optional backend overrides. When omitted and
   the new agent uses the caller's backend, each value inherits from the caller;
   cross-backend creation uses that backend's defaults instead;
-- `prompt`: optional self-contained initial instructions. The tool stays
-  pending until the new agent accepts this prompt.
+- `prompt`: optional concise initial request shown to the user. The tool stays
+  pending until the new agent accepts this prompt;
+- `instructions`: optional full handoff, requiring a nonempty `prompt`. Claw
+  prepends these instructions inside `<context>` and leaves the visible request
+  outside it. Existing prompt-only calls are unchanged. This is presentation
+  separation, not secret storage or a separate system-instruction channel:
+  both parts remain in the provider transcript.
 
 `clawd` emits transient `agentCreation.progress` events around worktree
 creation, agent creation, and initial-prompt handoff. The renderer shows the

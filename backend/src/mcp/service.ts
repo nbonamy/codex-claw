@@ -453,10 +453,18 @@ export class ClawMcpService {
     input: McpCreateAgentInput & { teamId?: string },
     intendedId?: string,
   ): Promise<McpCreateAgentResponse> {
+    const prompt = input.prompt?.trim() ?? '';
+    const instructions = input.instructions?.trim();
+    if (instructions && !prompt) {
+      return { success: false, message: 'prompt is required when instructions are provided' };
+    }
+    const fullPrompt = instructions
+      ? `<context>\n${instructions.replace(/<\/context>/giu, '&lt;/context&gt;')}\n</context>\n\n${prompt}`
+      : prompt;
     if (input.task) {
       if (!this.tasks) throw new Error('Durable tasks are unavailable.');
       const task = await this.tasks.create(caller, {
-        requestId: input.requestId ?? '', task: input.task, prompt: input.prompt ?? '',
+        requestId: input.requestId ?? '', task: input.task, prompt: fullPrompt,
         backend: input.backend ?? caller.backend, specification: input,
         workspace: {
           repositoryPath: input.repoPath,
@@ -464,7 +472,7 @@ export class ClawMcpService {
           ...(input.destinationPath ? { destinationPath: input.destinationPath } : {}),
         },
       }, async task => {
-        const response = await this.createAgentFromMcp(caller, { ...input, task: undefined, prompt: undefined }, task.workerAgentId);
+        const response = await this.createAgentFromMcp(caller, { ...input, task: undefined, prompt: undefined, instructions: undefined }, task.workerAgentId);
         if (!response.success) throw new Error(response.message);
         await this.persistSnapshot?.();
         return this.snapshot.agents.find(agent => agent.id === task.workerAgentId)!;
@@ -480,7 +488,6 @@ export class ClawMcpService {
       return { success: false, message: 'branchName is required when createWorktree is true' };
     }
 
-    const prompt = input.prompt?.trim() ?? '';
     const progressId = `agent-creation-${randomUUID()}`;
     const progress = {
       id: progressId,
@@ -543,7 +550,7 @@ export class ClawMcpService {
           type: 'agentCreation.progress',
           payload: { ...progress, state: 'running', phase: 'startingPrompt' },
         });
-        await this.startAgentWithPrompt(createdAgent, prompt);
+        await this.startAgentWithPrompt(createdAgent, fullPrompt);
       }
 
       const createdAgentName = agentDisplayName(createdAgent);

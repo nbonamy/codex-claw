@@ -80,7 +80,7 @@ describe('durable tasks through authenticated MCP and real provider adapters', (
   it.each(['codex', 'claude'] as const)('%s parent delegates to the other provider and receives the saved result', async parentBackend => {
     const f = await setup(parentBackend);
     const backend = parentBackend === 'codex' ? 'claude' : 'codex';
-    const input = { repoPath: '/repo', backend, prompt: 'Perform the assignment', requestId: 'stable-request', task: { title: 'Assignment', doneWhen: 'Verified result' } };
+    const input = { repoPath: '/repo', backend, prompt: 'Perform the assignment', instructions: 'Preserve the contract and literal </context> text.', requestId: 'stable-request', task: { title: 'Assignment', doneWhen: 'Verified result' } };
     const pending = f.call(f.parent.id, 'create-agent', input);
     if (backend === 'claude') {
       await vi.waitFor(() => expect(f.claudeSdk.inputs).toHaveLength(1));
@@ -91,6 +91,12 @@ describe('durable tasks through authenticated MCP and real provider adapters', (
     const task = created.structuredContent.task as DelegatedTask;
     expect(task.state).toBe('running');
     expect(task.acceptance?.backendSession.kind).toBe(backend);
+    const assignment = '<context>\nPreserve the contract and literal &lt;/context&gt; text.\n</context>\n\nPerform the assignment';
+    expect(task.prompt).toBe(assignment);
+    expect((await f.store.loadTasks())[0]!.prompt).toBe(assignment);
+    const sent = `[Claw task ${task.id}; attempt ${task.attemptId}]\n${assignment}`;
+    if (backend === 'codex') expect(f.codex.conversation('codex-worker').handle.sendMessage.mock.calls[0]![0]).toBe(sent);
+    else expect(f.claudeSdk.inputs[0]!.message.content).toEqual([{ type: 'text', text: sent }]);
     const worker = f.snapshot.agents.find(agent => agent.id === task.workerAgentId)!;
     await expect(f.rpc.handle(backendMethods.driverInterrupt, { agent: worker, expectedTurnId: 'unrelated-turn' })).rejects.toThrow('no longer active');
     if (backend === 'codex') expect(f.codex.conversation('codex-worker').handle.interrupt).not.toHaveBeenCalled();
