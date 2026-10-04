@@ -231,6 +231,9 @@ describe('AppShell workspace and plans', () => {
 
     const workspace = wrapper.findAll('.app-shell__right-workspace').find((panel) => panel.isVisible());
     expect((workspace?.element as HTMLElement).style.flexBasis).toBe('300px');
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 100 }));
+    await nextTick();
+    expect((workspace?.element as HTMLElement).style.flexBasis).toBe('875px');
     window.dispatchEvent(new Event('pointerup'));
     await nextTick();
     expect(wrapper.find('.app-shell__right-workspace-resize-shield').exists()).toBe(false);

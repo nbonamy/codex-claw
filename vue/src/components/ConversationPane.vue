@@ -471,7 +471,7 @@ defineExpose({ focusComposer, openSavedDraftPicker, saveCurrentDraft });
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  min-width: 360px;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--color-shell-main);
