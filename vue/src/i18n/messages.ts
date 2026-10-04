@@ -714,7 +714,7 @@ export const messages = {
         editAnnotations: 'Edit annotations for {name} ({count})',
       },
       textAnnotations: {
-        addToChat: 'Add to chat',
+        annotate: 'Annotate',
         annotation: 'Annotation',
         commentLabel: 'Chat annotation comment',
         commentPlaceholder: 'What should change?',

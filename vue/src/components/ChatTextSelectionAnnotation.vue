@@ -7,7 +7,7 @@
     @pointerdown.prevent
     @click="startComment"
   >
-    {{ t('chat.textAnnotations.addToChat') }}
+    {{ t('chat.textAnnotations.annotate') }}
   </button>
   <AnnotationPopup
     v-if="commentingSelection"
