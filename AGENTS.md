@@ -123,9 +123,12 @@ configuration. Enforce static architecture rules with lint, type, AST, or
 dependency tooling instead. Coverage is evidence of exercised behavior, never
 a reason to invent a test.
 
-Coverage must stay very high. Once coverage tooling exists, the minimum
-threshold is 85% for statements, branches, functions, and lines. Do not lower
-coverage thresholds to land a change.
+Every workspace (core, backend, vue, electron, web) gates on exactly 85%
+statement coverage. Lines, branches, and functions remain reported diagnostics
+without blocking thresholds. Do not lower the statement threshold or shrink
+the measured surface to land a change. Coverage does not replace meaningful
+behavioral/regression tests or verification at the owning runtime boundary.
+Before release, require the full test suite and all-workspace statement coverage.
 
 Before editing code, read `docs/testing.md`. Before editing UI, also read
 `docs/frontend.md`.

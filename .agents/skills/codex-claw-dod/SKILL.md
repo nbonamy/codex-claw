@@ -30,6 +30,12 @@ Run every applicable row:
 | Imports, exports, dependencies, CSS, or shared config | Relevant lint command |
 | Cross-cutting | `npm run test:ai` and affected workspace typechecks |
 | Coverage-sensitive | Focused coverage; use `npm run test:coverage` only when repository-wide evidence is needed |
+| Release | `npm run test:ai` and `npm run test:coverage` across all five workspaces against installed SDK packages |
+
+The coverage gate is exactly 85% statements in every workspace, including
+Electron. Lines, branches, and functions remain reported diagnostics. Meaningful
+behavioral/regression tests and owning-boundary verification remain mandatory;
+a coverage percentage alone is not proof of correctness.
 
 Use package-local Vitest for focused tests:
 

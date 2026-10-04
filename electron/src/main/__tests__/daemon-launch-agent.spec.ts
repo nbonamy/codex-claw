@@ -4,6 +4,45 @@ import { describe, expect, it, vi } from 'vitest';
 import { getClawdDaemonStatus, getResolvedClawdVersion, installClawdDaemon, setClawdDaemonEnabled } from '../daemon-launch-agent';
 
 describe('daemon launch agent', () => {
+  it('buffers health responses and closes probes on malformed replies or timeout', async () => {
+    for (const response of ['healthy', 'malformed', 'timeout'] as const) {
+      const socket = fakeSocket();
+      const pending = getClawdDaemonStatus({
+        access: vi.fn().mockResolvedValue(undefined),
+        connectSocket: vi.fn(() => socket) as never,
+        env: { CODEX_CLAW_BACKEND_COMMAND: 'node' },
+        homedir: () => '/test/home', platform: 'darwin',
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      socket.emit('connect');
+      expect(socket.write).toHaveBeenCalledWith(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'backend/health/get' }) + '\n');
+      if (response === 'healthy') {
+        socket.emit('data', '{"jsonrpc":"2.0","id":1,');
+        expect(socket.destroy).not.toHaveBeenCalled();
+        socket.emit('data', '"result":{"version":"test","pid":42}}\n');
+        expect(await pending).toMatchObject({ running: true, version: 'test', pid: 42 });
+      } else {
+        if (response === 'malformed') socket.emit('data', 'invalid\n');
+        else socket.emit('timeout');
+        expect(await pending).toMatchObject({ running: false, detail: expect.any(String) });
+      }
+      socket.emit('timeout');
+      expect(socket.destroy).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('refuses unsupported installations and propagates meaningful uninstall failures', async () => {
+    const execFile = vi.fn();
+    const base = { env: {}, homedir: () => '/test/home', execFile };
+    await expect(installClawdDaemon({ ...base, platform: 'linux' })).rejects.toThrow('only supported on macOS');
+    await expect(installClawdDaemon({ ...base, platform: 'darwin' })).rejects.toThrow('No clawd runtime');
+    await expect(setClawdDaemonEnabled(false, {
+      ...base, platform: 'darwin',
+      unlink: vi.fn().mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' })),
+    })).rejects.toThrow('denied');
+  });
+
   it('reports unsupported status when no clawd runtime is available', async () => {
     await expect(getClawdDaemonStatus({
       access: vi.fn().mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' })),
