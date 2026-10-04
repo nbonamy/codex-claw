@@ -1,5 +1,6 @@
 import type { Automation, WorkItem } from './contracts';
 import { workItemAssignmentKey } from './work-assignments';
+import { workItemDisplayIdentifier } from './work-item-prompts';
 
 export const automationSelectionOutputSchema = {
   type: 'object',
@@ -17,7 +18,7 @@ export function automationSelectionPrompt(automation: Automation, candidates: Wo
   return [
     'Select the work items that match the automation criteria.',
     '',
-    'Repositories in scope:',
+    'Backlog sources and execution repositories in scope:',
     ...automation.repositories.map((repository) => (
       `- ${repository.repositoryId} (local clone: ${repository.sourceRepositoryPath})`
     )),
@@ -50,7 +51,7 @@ export function parseAutomationSelection(value: string, candidates: WorkItem[]):
 
 function formatCandidate(item: WorkItem): string {
   const details = [
-    `${item.kind === 'pullRequest' ? 'Pull request' : 'Issue'} #${item.number}: ${item.title}`,
+    `${item.kind === 'pullRequest' ? 'Pull request' : 'Issue'} ${workItemDisplayIdentifier(item)}: ${item.title}`,
     item.labels.length > 0 ? `labels: ${item.labels.map((label) => label.name).join(', ')}` : null,
     item.assignees && item.assignees.length > 0 ? `assignees: ${item.assignees.join(', ')}` : null,
     item.authorName ? `author: ${item.authorName}` : null,
@@ -59,7 +60,7 @@ function formatCandidate(item: WorkItem): string {
   const body = item.body?.trim();
   return [
     `- ID: ${workItemAssignmentKey(item)}`,
-    `  Repository: ${item.repositoryFullName}`,
+    `  ${item.provider === 'linear' ? 'Backlog source' : 'Repository'}: ${item.repositoryFullName}`,
     `  ${details.join(' · ')}`,
     `  URL: ${item.url}`,
     ...(body ? [`  Body: ${truncate(body)}`] : []),

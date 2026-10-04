@@ -3,6 +3,16 @@ import type { Automation, WorkItem } from '../contracts';
 import { automationSelectionPrompt, parseAutomationSelection } from '../automation-prompts';
 
 describe('automation prompts', () => {
+  it('gives the picker native Linear identifiers and a separate execution repository', () => {
+    const config = automation();
+    config.repositories = [{ provider: 'linear', repositoryId: 'linear:eng:project', sourceRepositoryPath: '/code' }];
+    const prompt = automationSelectionPrompt(config, [{ ...workItem(12), provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12', repositoryFullName: 'Engineering' }]);
+    expect(prompt).toContain('linear:eng:project');
+    expect(prompt).toContain('/code');
+    expect(prompt).toContain('ENG-12');
+    expect(prompt).toContain('ID: linear:linear:uuid');
+    expect(prompt).toContain('Backlog source: Engineering');
+  });
   it('includes every selected repository, the criteria, and eligible work item details', () => {
     const prompt = automationSelectionPrompt(automation(), [workItem(12), workItem(14, 'nbonamy/witsy')]);
 

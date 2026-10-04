@@ -32,14 +32,17 @@
           <AutomationEditor
             v-if="editorVisible"
             :key="editorKey"
-            :connection="locationGithubConnection"
+            :connections="locationWorkBacklog.connections"
             :automation="editingAutomation"
             :mode="editorMode"
-            :repositories="locationGithubRepositories"
+            :repositories="Object.values(locationWorkRepositoriesByProvider).flat()"
+            :loading="catalogLoading"
+            :error="catalogError"
             :source-repositories="locationSourceRepositories"
+            :current-repository-path="currentRepository?.remoteConnectionId === (selectedRemoteConnectionId ?? undefined) ? currentRepository?.path : undefined"
             :teams="locationTeams"
             @cancel="closeEditor"
-            @load-repositories="loadGitHubRepositories"
+            @load-repositories="loadProviderRepositories"
             @submit="saveAutomation"
           />
 
@@ -186,6 +189,7 @@ const props = withDefaults(
     runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
     sourceRepositories?: SourceRepository[];
+    currentRepository?: { path: string; remoteConnectionId?: string };
     teams: AppSnapshot['teams'];
     updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     workBacklog: AppSnapshot['workBacklog'];
@@ -223,8 +227,12 @@ const selectedLocationValue = ref('local');
 const remoteSnapshot = ref<AppSnapshot | null>(null);
 const remoteSourceRepositories = ref<SourceRepository[]>([]);
 const remoteWorkRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
+const localWorkRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
 const locationStatus = ref<LocationStatus>('idle');
 const locationError = ref<string | null>(null);
+const catalogError = ref<string | null>(null);
+const catalogLoading = ref(false);
+let catalogLoadId = 0;
 let locationLoadId = 0;
 const emptyLocationSnapshot = createEmptySnapshot();
 
@@ -244,13 +252,13 @@ provideBackendHost(() => selectedRemoteConnectionId.value
   ? { host: selectedRemoteConnectionId.value, connections: remoteSnapshot.value?.providerConnections ?? [] }
   : null);
 const locationAutomations = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.automations ?? []) : props.automations));
-const locationTeams = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.teams ?? []) : props.teams));
+const locationTeams = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.teams ?? []) : props.teams).filter(team => !team.remoteConnectionId));
 const locationWorkBacklog = computed(() =>
   isRemoteLocation.value ? (remoteSnapshot.value?.workBacklog ?? emptyLocationSnapshot.workBacklog) : props.workBacklog,
 );
 const locationSourceRepositories = computed(() => (isRemoteLocation.value ? remoteSourceRepositories.value : props.sourceRepositories));
 const locationWorkRepositoriesByProvider = computed(() =>
-  isRemoteLocation.value ? remoteWorkRepositoriesByProvider.value : props.workRepositoriesByProvider,
+  isRemoteLocation.value ? remoteWorkRepositoriesByProvider.value : { ...props.workRepositoriesByProvider, ...localWorkRepositoriesByProvider.value },
 );
 const editingAutomation = computed(() =>
   editingAutomationId.value ? (locationAutomations.value.find((automation) => automation.id === editingAutomationId.value) ?? null) : null,
@@ -320,6 +328,9 @@ watch(selectedLocationValue, () => {
   closeEditor();
   closeLog();
   remoteWorkRepositoriesByProvider.value = {};
+  catalogLoadId += 1;
+  catalogError.value = null;
+  catalogLoading.value = false;
   void loadSelectedLocation();
 });
 
@@ -467,13 +478,26 @@ async function confirmDeleteAutomationExecution(payload: { executionId: string; 
 }
 
 async function loadGitHubRepositories(): Promise<void> {
+  await loadProviderRepositories('github');
+}
+
+async function loadProviderRepositories(provider: WorkProviderKind): Promise<void> {
   const location = requestLocation();
-  const repositories = location ? await props.loadWorkRepositories('github', location) : await props.loadWorkRepositories('github');
-  if (location?.kind === 'remote' && selectedLocationValue.value === remoteLocationValue(location.remoteConnectionId) && repositories) {
-    remoteWorkRepositoriesByProvider.value = {
-      ...remoteWorkRepositoriesByProvider.value,
-      github: repositories,
-    };
+  const loadId = ++catalogLoadId;
+  catalogError.value = null;
+  catalogLoading.value = true;
+  try {
+    const repositories = location ? await props.loadWorkRepositories(provider, location) : await props.loadWorkRepositories(provider);
+    if (loadId !== catalogLoadId) return;
+    if (location?.kind === 'remote' && repositories) {
+      remoteWorkRepositoriesByProvider.value = { ...remoteWorkRepositoriesByProvider.value, [provider]: repositories };
+    } else if (repositories) {
+      localWorkRepositoriesByProvider.value = { ...localWorkRepositoriesByProvider.value, [provider]: repositories };
+    }
+  } catch (error) {
+    if (loadId === catalogLoadId) catalogError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (loadId === catalogLoadId) catalogLoading.value = false;
   }
 }
 

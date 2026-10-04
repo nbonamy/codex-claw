@@ -173,7 +173,8 @@
         :delete-automation-execution="deleteAutomationExecution"
         :delete-automation="deleteAutomation"
         :get-automation-snapshot="getAutomationSnapshot"
-        :load-work-repositories="loadWorkRepositories"
+        :load-work-repositories="listAutomationWorkRepositories"
+        :current-repository="currentAgent?.workspace?.kind === 'git' ? { path: currentAgent.workspace.primaryWorktreeRoot, remoteConnectionId: snapshot.teams.find(team => team.id === currentAgent?.teamId)?.remoteConnectionId } : undefined"
         :list-source-repositories="listSourceRepositories"
         :automations="snapshot.automations"
         :read-conversation-messages="readConversationMessages"
@@ -762,6 +763,7 @@ const props = withDefaults(defineProps<{
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
   getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
+  listAutomationWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[]>;
   createAutomation?: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
@@ -914,6 +916,7 @@ const props = withDefaults(defineProps<{
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
   getAutomationSnapshot: async () => createEmptySnapshot(),
+  listAutomationWorkRepositories: async () => [],
   createAutomation: async () => undefined,
   updateAutomation: async () => undefined,
   runAutomation: async () => undefined,

@@ -8,6 +8,7 @@ import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/sna
 import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { closeAgentInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
 import { ClawBackendServer } from '../server';
+import { AutomationRunner } from '../automations/runner';
 import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
@@ -22,6 +23,49 @@ afterEach(async () => {
 });
 
 describe('state persistence', () => {
+  it('creates, updates and runs a remote Linear automation, then reloads its configuration, assignment and execution identity', async () => {
+    const persistence = new AppStateStore(await tempHome());
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    const runner = new AutomationRunner({ getSnapshot: () => snapshot,
+      listWorkItems: { listItems: async () => [{ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12', repositoryId: 'linear:eng:project',
+        repositoryFullName: 'Engineering', number: 12, title: 'Login', url: 'https://linear.app/acme/issue/ENG-12', body: 'Steps', state: 'open', labels: [],
+        createdAt: '2026-10-04T12:00:00Z', updatedAt: '2026-10-04T12:00:00Z' }] },
+      selectWorkItems: async (_automation, items) => items,
+      createWorktree: async input => { expect(input.repoPath).toBe('/remote/code'); return { name: input.branchName, path: '/remote/code-worktree' }; },
+      sendPrompt: async () => {}, saveSnapshot: () => persistence.save(snapshot), notifySnapshotUpdated: () => {},
+    });
+    const remote = new ClawBackendServer({ version: 'test', snapshot, automationRunner: runner, saveSnapshot: value => persistence.save(value) });
+    const localSnapshot = createInitialSnapshot();
+    localSnapshot.remoteConnections.connections = [readyRemoteConnection()];
+    const server = new ClawBackendServer({ version: 'test', snapshot: localSnapshot, remoteClients: {
+      request: async (_connection: unknown, method: string, params: unknown) => {
+        const response = await remote.handleMessage({ jsonrpc: '2.0', id: 'forwarded', method, params });
+        if (!response || !('result' in response)) throw new Error('Remote request failed');
+        return response.result;
+      }, close: async () => {},
+    } as never });
+    const location = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
+    const input = { name: 'Engineering bugs', enabled: false, backend: 'claude', teamId: snapshot.teams[0]!.id,
+      repositories: [{ provider: 'linear', repositoryId: 'linear:eng:project', sourceRepositoryPath: '/remote/code' }],
+      selectionPrompt: 'Ready bugs', assignmentPrompt: 'Fix and verify', schedule: { intervalMinutes: 360 } };
+    try {
+      expect(await server.handleMessage({ jsonrpc: '2.0', id: 'create', method: 'automation/create', params: { input, location } })).not.toHaveProperty('error');
+      const id = snapshot.automations[0]!.id;
+      expect(await server.handleMessage({ jsonrpc: '2.0', id: 'update', method: 'automation/update', params: { input: { ...input, id, enabled: true }, location } })).not.toHaveProperty('error');
+      expect(await server.handleMessage({ jsonrpc: '2.0', id: 'run', method: 'automation/run', params: { automationId: id, location } })).not.toHaveProperty('error');
+      const saved = await persistence.load();
+      expect(isAppSnapshot(saved)).toBe(true);
+      expect(saved.automations).toEqual([expect.objectContaining({ ...input, id, enabled: true })]);
+      expect(saved.automations[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({ workItemId: 'linear:linear:uuid', workItemIdentifier: 'ENG-12', workItemUrl: 'https://linear.app/acme/issue/ENG-12' });
+      expect(saved.workBacklog.assignments['linear:linear:uuid']).toMatchObject({ item: { identifier: 'ENG-12', body: 'Steps' }, status: 'inProgress' });
+      expect(localSnapshot.automations).toEqual([]);
+      expect(localSnapshot.workBacklog.assignments).toEqual({});
+      const invalid = { ...input, repositories: [{ ...input.repositories[0], sourceRepositoryPath: '' }] };
+      expect(await server.handleMessage({ jsonrpc: '2.0', id: 'invalid', method: 'automation/create', params: { input: invalid, location } })).toHaveProperty('error');
+      expect(snapshot.automations).toHaveLength(1);
+    } finally { await server.close(); await remote.close(); }
+  });
   it('assigns, reassigns, persists and clears Linear work with its full reference and independent Claw status', async () => {
     const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();

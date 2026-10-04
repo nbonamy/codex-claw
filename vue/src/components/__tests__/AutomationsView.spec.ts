@@ -19,7 +19,7 @@ import AutomationsView from '../AutomationsView.vue';
 
 const AutomationEditorStub = defineComponent({
   name: 'AutomationEditor',
-  props: ['automation', 'connection', 'mode', 'repositories', 'sourceRepositories', 'teams'],
+  props: ['automation', 'connections', 'mode', 'repositories', 'sourceRepositories', 'teams'],
   emits: ['cancel', 'load-repositories', 'submit'],
   template: '<section class="automation-editor" />',
 });
@@ -30,16 +30,71 @@ afterEach(() => {
 });
 
 describe('AutomationsView', () => {
+  it('configures a Linear automation on the selected remote host through the real editor and reopens it', async () => {
+    const remote = createInitialSnapshot();
+    remote.providerConnections = [{ backend: 'claude', connected: true, installed: true, checking: false }];
+    remote.workBacklog.connections = [{ provider: 'linear', status: 'connected' }];
+    const target = { provider: 'linear' as const, repositoryId: 'linear:eng:login', sourceRepositoryPath: '/home/nicolas/src/codex-claw' };
+    const saved = automation({ name: 'Engineering / Login', backend: 'claude', repositories: [target] });
+    let failCatalog = true;
+    const loadWorkRepositories = vi.fn(async (provider: WorkProviderKind) => {
+      if (provider === 'linear' && failCatalog) throw new Error('Linear access failed');
+      return provider === 'linear' ? [repository({ provider, id: target.repositoryId, fullName: 'Engineering / Login' })] : [];
+    });
+    const createAutomation = vi.fn(async () => ({ ...remote, automations: [saved] }));
+    const wrapper = mountView({ realAutomationEditor: true, remoteConnections: [readyRemoteConnection()],
+      getAutomationSnapshot: async () => remote, listSourceRepositories: async () => [remoteSourceRepository()], loadWorkRepositories, createAutomation });
+    async function choose(label: string, option: string) {
+      await wrapper.get(`[aria-label="${label}"]`).trigger('click');
+      await flushPromises();
+      const entry = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(el => el.textContent === option);
+      expect(entry).toBeDefined(); entry!.click(); await flushPromises();
+    }
+    await choose('Automation location', 'devbox');
+    await wrapper.get('.automation-welcome__button').trigger('click');
+    await choose('Backlog provider', 'Linear');
+    expect(loadWorkRepositories).toHaveBeenCalledWith('linear', { kind: 'remote', remoteConnectionId: 'connection-devbox' });
+    expect(wrapper.text()).toContain('Linear access failed');
+    failCatalog = false;
+    await wrapper.findAll('button').find(button => button.text() === 'Retry')!.trigger('click'); await flushPromises();
+    expect(wrapper.text()).not.toContain('Linear access failed');
+    await choose('Team / project', 'Engineering / Login');
+    await choose('Code repository for Engineering / Login', 'codex-claw');
+    await wrapper.get('form').trigger('submit'); await flushPromises();
+    expect(createAutomation).toHaveBeenCalledWith(expect.objectContaining({ backend: 'claude', repositories: [target] }), { kind: 'remote', remoteConnectionId: 'connection-devbox' });
+    await wrapper.get('[aria-label="Engineering / Login actions"]').trigger('click'); await flushPromises();
+    bodyButton('Edit').click(); await flushPromises();
+    expect(wrapper.find('[aria-label="Code repository for Engineering / Login"]').exists()).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElSelect' }).some(select => select.props('modelValue') === target.sourceRepositoryPath)).toBe(true);
+  });
+
+  it('discards a late remote source failure after leaving that host', async () => {
+    const remote = createInitialSnapshot();
+    remote.workBacklog.connections = [{ provider: 'linear', status: 'connected' }];
+    let reject!: (error: Error) => void;
+    const loadWorkRepositories = vi.fn((provider: WorkProviderKind) => provider === 'linear' ? new Promise<WorkRepository[]>((_resolve, rejectPromise) => { reject = rejectPromise; }) : Promise.resolve([]));
+    const wrapper = mountView({ remoteConnections: [readyRemoteConnection()], getAutomationSnapshot: async () => remote, loadWorkRepositories });
+    wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox'); await flushPromises();
+    await wrapper.get('.automation-welcome__button').trigger('click');
+    wrapper.findComponent({ name: 'AutomationEditor' }).vm.$emit('load-repositories', 'linear'); await flushPromises();
+    wrapper.findComponent({ name: 'AutomationEditor' }).vm.$emit('cancel'); await flushPromises();
+    wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'local'); await flushPromises();
+    reject(new Error('Old remote error')); await flushPromises();
+    expect(wrapper.text()).not.toContain('Old remote error');
+  });
   it('shows the welcome state and opens the editor', async () => {
-    const wrapper = mountView({ realAutomationEditor: true });
+    const snapshot = createInitialSnapshot();
+    snapshot.teams.push({ ...snapshot.teams[0]!, id: 'team-remote', name: 'Remote-only team', remoteConnectionId: 'devbox' });
+    const wrapper = mountView({ realAutomationEditor: true, snapshot });
 
     expect(wrapper.text()).toContain('Automations');
     expect(wrapper.text()).not.toContain('Loops');
-    expect(wrapper.text()).toContain('Select matching GitHub work and delegate it on your schedule.');
 
     await wrapper.find('.automation-welcome__button').trigger('click');
 
     expect(wrapper.find('.automation-editor').exists()).toBe(true);
+    const teamSelect = wrapper.findAllComponents({ name: 'ElSelect' }).find(select => select.find('[aria-label="Automation target team"]').exists())!;
+    expect(teamSelect.findAllComponents({ name: 'ElOption' }).map(option => option.props('label'))).not.toContain('Remote-only team');
   });
 
   it('creates a automation from the editor submit payload', async () => {
@@ -556,6 +611,7 @@ function mountView(
   ];
 
   return mount(AutomationsView, {
+    attachTo: document.body,
     props: {
       agents: snapshot.agents,
       clearAutomationHistory: overrides.clearAutomationHistory ?? vi.fn().mockResolvedValue(undefined),

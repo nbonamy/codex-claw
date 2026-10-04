@@ -585,7 +585,7 @@ export const surfaceMessages = {
     "everyDay": "Every day",
     "selectionPrompt": "What should be picked up?",
     "selectionPromptPlaceholder": "For example: open bugs labeled ready that have clear acceptance criteria",
-    "selectionPromptHelp": "Codex evaluates open issues and pull requests not already assigned in Claw. Leave blank to pick up all of them.",
+    "selectionPromptHelp": "Your selected coding agent evaluates open work not already assigned in Claw. Leave blank to pick up all of it.",
     "assignmentPrompt": "What should each agent do?",
     "assignmentPromptPlaceholder": "For example: reproduce the problem, implement the fix, and run focused tests",
     "assignmentPromptHelp": "Each selected item gets a dedicated worktree and agent. Its repository and work item details are included automatically.",
@@ -617,8 +617,8 @@ export const surfaceMessages = {
   "automationWelcome": {
     "automationsWelcome": "Automations welcome",
     "noAutomationsYet": "No automations yet",
-    "automationsWatchForMatchingWork": "Select matching GitHub work and delegate it on your schedule.",
-    "describePickupCriteriaAndAgentInstructions": "Choose repositories, describe what to pick up, and tell each new agent what to do.",
+    "automationsWatchForMatchingWork": "Select matching GitHub or Linear work and delegate it on your schedule.",
+    "describePickupCriteriaAndAgentInstructions": "Choose backlog sources, describe what to pick up, and tell each new agent what to do.",
     "createAutomation": "Create Automation"
   },
   "automationsView": {

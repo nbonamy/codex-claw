@@ -219,7 +219,7 @@ function normalizeAutomationInput(
   if (
     repositories.length === 0 ||
     !teamId ||
-    !snapshot.teams.some((team) => team.id === teamId) ||
+    !snapshot.teams.some((team) => team.id === teamId && !team.remoteConnectionId) ||
     !Number.isFinite(intervalMinutes) ||
     intervalMinutes < 1
   ) {
@@ -258,11 +258,11 @@ function normalizeAutomationRepositories(repositories: AutomationRepositoryTarge
     const repositoryId = repository.repositoryId.trim();
     const sourceRepositoryPath = repository.sourceRepositoryPath.trim();
     const key = `${repository.provider}:${repositoryId}`;
-    if (repository.provider !== 'github' || !repositoryId || !sourceRepositoryPath || seen.has(key)) {
+    if ((repository.provider !== 'github' && repository.provider !== 'linear') || !repositoryId || !sourceRepositoryPath || seen.has(key)) {
       continue;
     }
     seen.add(key);
-    normalized.push({ provider: 'github', repositoryId, sourceRepositoryPath });
+    normalized.push({ provider: repository.provider, repositoryId, sourceRepositoryPath });
   }
   return normalized;
 }

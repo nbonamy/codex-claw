@@ -379,7 +379,7 @@ describe('AppShell navigation and teams', () => {
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
-    expect(wrapper.text()).toContain('Select matching GitHub work and delegate it on your schedule.');
+    expect(wrapper.find('.automation-welcome__button').exists()).toBe(true);
   });
 
   it('opens a automation execution conversation from the logs view', async () => {

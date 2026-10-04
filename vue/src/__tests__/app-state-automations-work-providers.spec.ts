@@ -11,6 +11,20 @@ import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onb
 import { workItem } from './app-state-test-harness';
 
 describe('useAppState', () => {
+  it('loads automation catalogs on the requested host without changing the interactive backlog and exposes retryable errors', async () => {
+    const listWorkRepositories = vi.fn().mockResolvedValue([]);
+    const configureWorkBacklog = vi.fn();
+    const listWorkItems = vi.fn();
+    stubElectronTestWindow({ codexClaw: { listWorkRepositories, configureWorkBacklog, listWorkItems } });
+    const state = useAppState();
+    const location = { kind: 'remote' as const, remoteConnectionId: 'devbox' };
+    await state.listAutomationWorkRepositories('linear', location);
+    expect(listWorkRepositories).toHaveBeenCalledWith('linear', location);
+    expect(configureWorkBacklog).not.toHaveBeenCalled();
+    expect(listWorkItems).not.toHaveBeenCalled();
+    listWorkRepositories.mockRejectedValueOnce(new Error('Linear disconnected'));
+    await expect(state.listAutomationWorkRepositories('linear')).rejects.toThrow('Linear disconnected');
+  });
   afterEach(() => {
     clearConfetti();
     clearFirstRunOnboardingStage();

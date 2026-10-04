@@ -142,7 +142,7 @@ export type WorkItem = {
 };
 
 export type AutomationRepositoryTarget = {
-  provider: 'github';
+  provider: WorkProviderKind;
   repositoryId: string;
   sourceRepositoryPath: string;
 };
@@ -157,6 +157,7 @@ export type AutomationExecutionCreatedAgent = {
   agentId: string;
   agentName: string;
   workItemId: string;
+  workItemIdentifier?: string;
   workItemTitle: string;
   workItemUrl: string;
   conversationRef?: BackendConversationRef;

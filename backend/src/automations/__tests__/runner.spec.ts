@@ -16,6 +16,81 @@ describe('AutomationRunner', () => {
     warnMainMock.mockReset();
   });
 
+  it('selects overlapping Linear sources once and retains native identity through execution and repeated runs', async () => {
+    const targets = ['linear:eng', 'linear:eng:project', 'linear:ops'].map(repositoryId => ({
+      provider: 'linear' as const, repositoryId, sourceRepositoryPath: repositoryId.endsWith(':project') ? '/other-code' : '/remote/code',
+    }));
+    const snapshot = snapshotWithAutomation({ repositories: targets, selectionPrompt: 'Ready bugs', backend: 'claude' });
+    const issue = (repositoryId: string): WorkItem => ({
+      ...workItem(12, repositoryId), provider: 'linear', id: repositoryId === 'linear:ops' ? 'linear:ops-uuid' : 'linear:eng-uuid',
+      identifier: repositoryId === 'linear:ops' ? 'OPS-12' : 'ENG-12', repositoryFullName: repositoryId === 'linear:ops' ? 'Operations' : 'Engineering',
+      url: `https://linear.app/acme/issue/${repositoryId === 'linear:ops' ? 'OPS-12' : 'ENG-12'}`, body: 'Reproduction steps',
+      linearSource: repositoryId === 'linear:ops' ? { teamId: 'ops', teamName: 'Operations' } : { teamId: 'eng', teamName: 'Engineering' },
+    });
+    const listItems = vi.fn(async (_provider, source) => [issue(source), { ...issue(source), id: 'closed', state: 'closed' as const }]);
+    const createWorktree = vi.fn(async ({ branchName }) => ({ name: branchName, path: `/remote/code-${branchName}` }));
+    const sendPrompt = vi.fn().mockResolvedValue(undefined);
+    const selectWorkItems = vi.fn(async (_automation, candidates) => candidates);
+    const runner = new AutomationRunner({ getSnapshot: () => snapshot, listWorkItems: { listItems }, createWorktree,
+      sendPrompt, selectWorkItems, saveSnapshot: async () => {}, notifySnapshotUpdated: () => {} });
+    await runner.runAll();
+    expect(selectWorkItems.mock.calls[0]?.[1].map((item: WorkItem) => item.identifier)).toEqual(['ENG-12', 'OPS-12']);
+    expect(createWorktree.mock.calls.map(([input]) => input)).toEqual([
+      { repoPath: '/remote/code', branchName: 'automation/eng-12', reuseExisting: true },
+      { repoPath: '/remote/code', branchName: 'automation/ops-12', reuseExisting: true },
+    ]);
+    expect(snapshot.workBacklog.assignments['linear:linear:eng-uuid']).toMatchObject({
+      provider: 'linear', status: 'inProgress', item: { identifier: 'ENG-12', body: 'Reproduction steps' },
+    });
+    expect(snapshot.agents.find(agent => agent.name === 'Linear ENG-12')).toMatchObject({ backend: 'claude', folder: '/remote/code-automation/eng-12' });
+    expect(snapshot.automations[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({
+      workItemId: 'linear:linear:eng-uuid', workItemIdentifier: 'ENG-12', workItemUrl: 'https://linear.app/acme/issue/ENG-12',
+    });
+    expect(sendPrompt.mock.calls[0]?.[1]).toContain('ENG-12');
+    expect(sendPrompt.mock.calls[0]?.[1]).toContain('https://linear.app/acme/issue/ENG-12');
+    await runner.runAutomation(snapshot.automations[0]!.id);
+    expect(createWorktree).toHaveBeenCalledTimes(2);
+    expect(sendPrompt).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['Linear source is inaccessible', 'Code repository missing'])(
+    'records a failed Linear run without assigning or dispatching when %s', async message => {
+      const snapshot = snapshotWithAutomation({ repositories: [{ provider: 'linear', repositoryId: 'linear:eng', sourceRepositoryPath: '/missing' }] });
+      const prepareFailure = message === 'Code repository missing';
+      const sendPrompt = vi.fn();
+      const initialAgents = snapshot.agents.length;
+      const runner = new AutomationRunner({ getSnapshot: () => snapshot,
+        listWorkItems: { listItems: prepareFailure ? async () => [{ ...workItem(12, 'linear:eng'), provider: 'linear' }] : async () => { throw new Error(message); } },
+        createWorktree: async () => { throw new Error(message); }, sendPrompt,
+        saveSnapshot: async () => {}, notifySnapshotUpdated: () => {},
+      });
+      await runner.runAll();
+      expect(snapshot.automations[0]?.executionLog).toEqual([expect.objectContaining({ status: 'failed', createdCount: 0, error: message })]);
+      expect(snapshot.agents).toHaveLength(initialAgents);
+      expect(snapshot.workBacklog.assignments).toEqual({});
+      expect(sendPrompt).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not duplicate Linear work when manual and scheduled runs overlap during preparation', async () => {
+    const snapshot = snapshotWithAutomation({ repositories: [{ provider: 'linear', repositoryId: 'linear:eng', sourceRepositoryPath: '/code' }] });
+    let finish!: (worktree: { name: string; path: string }) => void;
+    const createWorktree = vi.fn(() => new Promise<{ name: string; path: string }>(resolve => { finish = resolve; }));
+    const sendPrompt = vi.fn().mockRejectedValue(new Error('Agent could not start'));
+    const runner = new AutomationRunner({ getSnapshot: () => snapshot,
+      listWorkItems: { listItems: async () => [{ ...workItem(12, 'linear:eng'), provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12' }] },
+      createWorktree, sendPrompt, saveSnapshot: async () => {}, notifySnapshotUpdated: () => {},
+    });
+    const scheduled = runner.runAll();
+    await vi.waitFor(() => expect(createWorktree).toHaveBeenCalledOnce());
+    await runner.runAutomation(snapshot.automations[0]!.id);
+    finish({ name: 'automation/eng-12', path: '/code-worktree' });
+    await scheduled;
+    expect(createWorktree).toHaveBeenCalledOnce();
+    expect(sendPrompt).toHaveBeenCalledOnce();
+    expect(snapshot.automations[0]?.executionLog).toEqual([expect.objectContaining({ status: 'failed', createdCount: 1, error: 'Agent could not start' })]);
+  });
+
   it('checks every selected repository and creates isolated agents in the selected team', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
@@ -112,6 +187,17 @@ describe('AutomationRunner', () => {
     expect(createWorktree).not.toHaveBeenCalled();
     expect(sendPrompt).not.toHaveBeenCalled();
     expect(snapshot.automations[0]).toMatchObject({ backend: 'claude', lastError: 'Claude Code is not connected.' });
+  });
+
+  it('refuses to prepare local work if the automation team has moved to a remote host', async () => {
+    const snapshot = snapshotWithAutomation();
+    snapshot.teams[0]!.remoteConnectionId = 'devbox';
+    const createWorktree = vi.fn();
+    const runner = new AutomationRunner({ getSnapshot: () => snapshot, listWorkItems: { listItems: async () => [workItem(12)] },
+      createWorktree, sendPrompt: vi.fn(), saveSnapshot: async () => {}, notifySnapshotUpdated: () => {} });
+    await runner.runAll();
+    expect(createWorktree).not.toHaveBeenCalled();
+    expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({ status: 'failed', createdCount: 0 });
   });
 
   it('records a due check even when there is no new work', async () => {

@@ -1122,6 +1122,7 @@ function sanitizeAutomationExecutionCreatedAgent(value: unknown): AutomationExec
     agentId: value.agentId,
     agentName: typeof value.agentName === 'string' && value.agentName.trim() ? value.agentName : value.agentId,
     workItemId: value.workItemId,
+    ...(typeof value.workItemIdentifier === 'string' ? { workItemIdentifier: value.workItemIdentifier } : {}),
     workItemTitle: value.workItemTitle,
     workItemUrl: value.workItemUrl,
     ...(sanitizeBackendConversationRef(value.conversationRef) ?? legacyCodexConversationRef(value.conversationId)),
@@ -1171,13 +1172,13 @@ function isAutomationExecutionStatus(value: unknown): value is AutomationExecuti
 }
 
 function sanitizeAutomationRepository(value: unknown): AutomationRepositoryTarget | null {
-  if (!isRecord(value) || value.provider !== 'github') {
+  if (!isRecord(value) || !isWorkProvider(value.provider)) {
     return null;
   }
   const repositoryId = optionalTrimmedString(value.repositoryId);
   const sourceRepositoryPath = optionalTrimmedString(value.sourceRepositoryPath);
   return repositoryId && sourceRepositoryPath
-    ? { provider: 'github', repositoryId, sourceRepositoryPath }
+    ? { provider: value.provider, repositoryId, sourceRepositoryPath }
     : null;
 }
 

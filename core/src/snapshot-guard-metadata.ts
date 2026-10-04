@@ -291,7 +291,7 @@ function isAutomation(value: unknown): boolean {
 
 function isAutomationRepository(value: unknown): boolean {
   return isRecord(value) &&
-    value.provider === 'github' &&
+    includes(['github', 'linear'], value.provider) &&
     typeof value.repositoryId === 'string' &&
     typeof value.sourceRepositoryPath === 'string';
 }
@@ -317,6 +317,7 @@ function isAutomationCreatedAgent(value: unknown): boolean {
     typeof value.agentId === 'string' &&
     typeof value.agentName === 'string' &&
     typeof value.workItemId === 'string' &&
+    optional(value, 'workItemIdentifier', isString) &&
     typeof value.workItemTitle === 'string' &&
     typeof value.workItemUrl === 'string' &&
     optional(value, 'conversationRef', isBackendConversationRef);

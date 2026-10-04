@@ -6,6 +6,8 @@ import AutomationEditor from '../AutomationEditor.vue';
 export function mountEditor(
   overrides: Partial<{
     connection: WorkIntegrationConnection;
+    connections: WorkIntegrationConnection[];
+    currentRepositoryPath: string;
     automation: Automation;
     repositories: WorkRepository[];
     sourceRepositories: SourceRepository[];
@@ -13,14 +15,16 @@ export function mountEditor(
   }> = {},
 ) {
   return mount(AutomationEditor, {
+    attachTo: document.body,
     props: {
       mode: overrides.automation ? 'edit' : 'create',
-      connection: overrides.connection ?? {
+      connections: overrides.connections ?? [overrides.connection ?? {
         provider: 'github',
         status: 'connected',
         accountLabel: 'nbonamy',
-      },
+      }],
       automation: overrides.automation,
+      currentRepositoryPath: overrides.currentRepositoryPath,
       repositories: overrides.repositories ?? workRepositories(),
       sourceRepositories: overrides.sourceRepositories ?? sourceRepositories(),
       teams: overrides.teams ?? [

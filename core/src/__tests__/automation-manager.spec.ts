@@ -77,6 +77,7 @@ describe('automation manager', () => {
 
   it('rejects invalid repositories, teams, schedules, and missing updates', () => {
     const snapshot = createInitialSnapshot();
+    snapshot.teams.push({ ...snapshot.teams[0]!, id: 'team-remote', remoteConnectionId: 'devbox' });
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     expect(
       createAutomationInSnapshot(snapshot, {
@@ -96,6 +97,7 @@ describe('automation manager', () => {
         teamId: 'missing',
       }),
     ).toBeNull();
+    expect(createAutomationInSnapshot(snapshot, { ...automationInput(), teamId: 'team-remote' })).toBeNull();
     expect(
       createAutomationInSnapshot(snapshot, {
         ...automationInput(),

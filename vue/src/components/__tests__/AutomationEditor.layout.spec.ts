@@ -5,12 +5,12 @@ describe('AutomationEditor presentation', () => {
   it('asks the parent to load repositories', () => {
     const wrapper = mountEditor({ repositories: [] });
 
-    expect(wrapper.emitted('load-repositories')).toStrictEqual([[]]);
+    expect(wrapper.emitted('load-repositories')).toStrictEqual([['github']]);
   });
 
   it('uses one repository multi-select and two guided prompts', () => {
     const wrapper = mountEditor();
-    const repositories = wrapper.findAllComponents({ name: 'ElSelect' })[0]!;
+    const repositories = wrapper.findAllComponents({ name: 'ElSelect' })[1]!;
 
     expect(repositories.props('multiple')).toBe(true);
     expect(wrapper.findAll('textarea')).toHaveLength(2);

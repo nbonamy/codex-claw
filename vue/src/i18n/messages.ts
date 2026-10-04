@@ -2,6 +2,7 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    automationSources: { connect: 'Connect {provider} in Settings before saving an automation.', noSources: 'No accessible Linear teams or projects.', codeRepositoryFor: 'Code repository for {source}', refresh: 'Refresh' },
     backlogSource: { provider: 'Backlog provider', teamProject: 'Team / project', repository: 'Repository', codeRepository: 'Code repository', chooseCodeRepository: 'Choose a code repository', sources: 'Sources', retry: 'Retry', filterSources: 'Filter sources', openSource: 'Open {repository} in Linear' },
     linearIntegration: {
       name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',

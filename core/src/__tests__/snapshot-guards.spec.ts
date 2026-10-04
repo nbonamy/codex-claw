@@ -47,7 +47,7 @@ describe('snapshot guards', () => {
       { name: 'agent plan', mutate: (snapshot) => { snapshot.agents[0]!.plan!.steps[0]!.status = 'working' as never; } },
       { name: 'agent goal', mutate: (snapshot) => { snapshot.agents[0]!.goal!.tokenBudget = 'unlimited' as never; } },
       { name: 'agent registration', mutate: (snapshot) => { snapshot.agents[0]!.isRegistered = 'yes' as never; } },
-      { name: 'automation repository', mutate: (snapshot) => { snapshot.automations[0]!.repositories[0]!.provider = 'linear' as never; } },
+      { name: 'automation repository', mutate: (snapshot) => { snapshot.automations[0]!.repositories[0]!.provider = 'unknown' as never; } },
       { name: 'automation schedule', mutate: (snapshot) => { snapshot.automations[0]!.schedule.intervalMinutes = 'hourly' as never; } },
       { name: 'automation log', mutate: (snapshot) => { snapshot.automations[0]!.executionLog[0]!.status = 'pending' as never; } },
       { name: 'automation created agent', mutate: (snapshot) => { snapshot.automations[0]!.executionLog[0]!.createdAgents[0]!.conversationRef = { backend: 'codex', threadId: 42 as never }; } },

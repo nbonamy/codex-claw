@@ -1118,6 +1118,15 @@ depends on the agent still being present. Resetting an assignment clears Codex
 Claw's local assignment metadata and lifecycle state.
 Automations keep their generated agents and isolated worktrees after completion so
 the user can review or continue the work explicitly.
+Linear automations persist each team/project source ID with an explicit code
+repository path on the automation's host. Setup offers the current repository
+when available; unattended runs never infer a clone from a Linear name or ask
+for a repository. This mapping belongs only to that automation. Catalog reads
+do not change the interactive backlog selection. Overlapping sources are
+deduplicated by provider-qualified issue identity before selection; the first
+configured source supplies the execution repository. In-flight reservations
+also prevent concurrent runs from preparing the same issue twice. Native Linear
+identifiers are retained in selection prompts, assignments and execution logs.
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.
