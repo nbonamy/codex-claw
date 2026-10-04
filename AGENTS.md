@@ -86,6 +86,9 @@ changes; specify feature behavior in tests:
   lifecycle, generated types, and test fixtures.
 - `docs/claude.md`: Claude Code websocket/SDK protocol research, support
   strategy, and remaining Claude-driver questions.
+- [Claude capability audit](docs/research/claude-capabilities.md): read before adding
+  Claude steering, forks, goals, turn mutations, or context controls; distinguishes
+  SDK contracts, Claw integration gaps, and runtime evidence.
 - `docs/research/synara.md`: competitive analysis for Synara comparisons and
   provider-neutral workflow decisions; dated source evidence, not a roadmap.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration

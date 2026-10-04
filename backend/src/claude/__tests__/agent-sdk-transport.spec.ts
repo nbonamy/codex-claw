@@ -22,18 +22,87 @@ vi.mock('@codex-claw/core/runtime-discovery', () => ({
 }));
 
 describe('ClaudeAgentSdkTransport', () => {
-  it('waits for SDK iterator cleanup before reporting a handoff session closed', async () => {
+  it('does not let steering overtake an initial prompt while its attachment is being read', async () => {
+    const folder = await mkdtemp(path.join(os.tmpdir(), 'claude-steer-order-'));
+    const file = path.join(folder, 'notes.txt');
+    await writeFile(file, 'scratch notes');
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
+    try {
+      const turn = transport.startTurn({ cwd: folder, prompt: 'first', attachments: [{ type: 'file', path: file }] }, () => undefined);
+      await Promise.all([turn.steer?.('second', [{ type: 'file', path: file }]), turn.steer?.('third')]);
+      await vi.waitFor(() => expect(harness.inputs).toHaveLength(3));
+      expect(harness.inputs.map((input) => (input.message.content as Array<{ text?: string }>)[0]?.text)).toEqual(['first', 'second', 'third']);
+      await turn.interrupt();
+    } finally { await transport.close(); await rm(folder, { recursive: true, force: true }); }
+  });
+
+  it('cancels queued steering on stop and resumes through a fresh SDK query', async () => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
+    const turn = transport.startTurn({ cwd: '/tmp/project', sessionId: 'session', prompt: 'first' }, () => undefined);
+    await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+    await turn.steer?.('queued');
+    await turn.interrupt();
+    await turn.done;
+    expect(harness.runtimes[0]?.close).toHaveBeenCalledOnce();
+    const next = transport.startTurn({ cwd: '/tmp/project', sessionId: 'session', prompt: 'new' }, () => undefined);
+    await vi.waitFor(() => expect(harness.runtimes).toHaveLength(2));
+    expect(harness.options[1]?.resume).toBe('session');
+    harness.emit({ type: 'result', subtype: 'success', session_id: 'session', is_error: false }, 1);
+    await next.done;
+    await transport.close();
+  });
+
+  it('forks through the native SDK with the requested project and exact cutoff', async () => {
+    const forkSession = vi.fn().mockResolvedValue({ sessionId: 'child' });
+    const transport = new ClaudeAgentSdkTransport({ forkSession });
+    expect(await transport.forkSession('parent', '/tmp/project', 'native-uuid')).toBe('child');
+    expect(forkSession).toHaveBeenCalledExactlyOnceWith('parent', { dir: '/tmp/project', upToMessageId: 'native-uuid' });
+    await transport.close();
+  });
+
+  it('keeps listening across a result until queued steering is consumed and answered', async () => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
+    const messages: ClaudeSdkMessage[] = [];
+    const turn = transport.startTurn({ cwd: '/tmp/project', prompt: 'first' }, (message) => messages.push(message));
+    const finished = vi.fn();
+    void turn.done.then(finished);
+    try {
+      await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+      expect(await turn.steer?.('change direction')).toBe(true);
+      await vi.waitFor(() => expect(harness.inputs).toHaveLength(2));
+      expect(harness.options[0]?.extraArgs).toMatchObject({ 'replay-user-messages': null });
+      harness.emit({ type: 'result', subtype: 'success', session_id: 'session', is_error: false });
+      harness.emit({ type: 'user', uuid: harness.inputs[1]!.uuid, message: { role: 'user', content: 'change direction' } });
+      await vi.waitFor(() => expect(messages.some((message) => message.type === 'user')).toBe(true));
+      expect(finished).not.toHaveBeenCalled();
+      expect(messages.some((message) => message.type === 'result')).toBe(false);
+      harness.emit({ type: 'assistant', message: { content: 'changed' } });
+      harness.emit({ type: 'result', subtype: 'success', session_id: 'session', is_error: false });
+      await turn.done;
+      expect(messages.filter((message) => message.type === 'result')).toHaveLength(1);
+      expect(await turn.steer?.('too late')).toBe(false);
+    } finally { await transport.close(); }
+  });
+
+  it.each(['release', 'steered interruption'] as const)('waits for SDK iterator cleanup before reporting %s complete', async (operation) => {
     const harness = createQueryHarness();
     const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery, createSessionId: () => 'handoff-session' });
     const turn = transport.startTurn({ cwd: '/tmp/project', prompt: 'note' }, () => undefined);
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
-    harness.emit({ type: 'result', subtype: 'success', session_id: 'handoff-session', is_error: false });
-    await turn.done;
+    if (operation === 'release') {
+      harness.emit({ type: 'result', subtype: 'success', session_id: 'handoff-session', is_error: false });
+      await turn.done;
+    } else {
+      await turn.steer?.('queued update');
+    }
     let finish!: () => void;
     const returned = vi.fn(() => new Promise<IteratorResult<never, void>>(resolve => { finish = () => resolve({ done: true, value: undefined }); }));
     Object.assign(harness.runtimes[0]!, { return: returned });
     let closed = false;
-    const closing = transport.closeSession('handoff-session').then(() => { closed = true; });
+    const closing = (operation === 'release' ? transport.closeSession('handoff-session') : turn.interrupt()).then(() => { closed = true; });
     await Promise.resolve();
     expect(closed).toBe(false);
     expect(returned).toHaveBeenCalledOnce();

@@ -34,6 +34,27 @@ describe('Claude Agent SDK → Claw backend', () => {
   }
   afterEach(async () => { await Promise.all(servers.splice(0).map((server) => server.close())); });
 
+  it('keeps the agent working until a steered follow-up is consumed and answered', async () => {
+    const { sdk, send, server, snapshot, events } = setup();
+    const started = send('claude-a', 'first');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await started;
+    sdk.emit({ type: 'assistant', session_id: 'session-a', message: { content: 'Before' } });
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'steer', method: 'agent/prompt/steer', params: { agentId: 'claude-a', prompt: 'Change it' } })).resolves.not.toHaveProperty('error');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(2));
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: false });
+    sdk.emit({ type: 'user', uuid: sdk.inputs[1]!.uuid, isReplay: true, session_id: 'session-a', message: { content: 'Change it' } });
+    sdk.emit({ type: 'assistant', session_id: 'session-a', message: { content: 'After' } });
+    await vi.waitFor(() => expect(events.some((event) => event.type === 'claude.conversationEventReceived' && event.payload.event.type === 'message.delta' && event.payload.event.payload.delta === 'After')).toBe(true));
+    expect(snapshot.agents[0]!.status.type).toBe('working');
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: false });
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
+    const conversationEvents = events.filter((event) => event.type === 'claude.conversationEventReceived').map((event) => event.payload.event);
+    expect(conversationEvents.filter((event) => event.type === 'turn.completed')).toHaveLength(1);
+    expect(conversationEvents.filter((event) => event.type === 'message.userSubmitted')).toHaveLength(2);
+  });
+
   it('projects Claude quota windows separately from Codex and retains the other reported window', async () => {
     const { sdk, send, snapshot, events } = setup();
     const pending = send('claude-a', 'hello');
