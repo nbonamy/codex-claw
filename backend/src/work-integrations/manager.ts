@@ -448,7 +448,7 @@ export class WorkIntegrationManager {
 
   private configurationDetail(provider: WorkProviderKind): WorkIntegrationConnection['detail'] {
     return provider === 'linear'
-      ? 'Set the Linear OAuth client ID and register the callback URL in Settings. Authorization must open on the same computer as Claw.'
+      ? 'The Linear OAuth client ID is not configured for this build.'
       : { key: 'workProvider.oauthNotConfigured', params: { provider: providerLabel(provider) } };
   }
 

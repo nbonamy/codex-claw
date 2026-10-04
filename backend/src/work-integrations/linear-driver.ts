@@ -33,7 +33,7 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
     this.cancelAuthorization();
     const settings = this.settings();
     const clientId = settings.oauthClientId?.trim();
-    if (!clientId || !settings.oauthCallbackUri) throw new Error('Configure the Linear OAuth client ID and registered callback URL in Settings.');
+    if (!clientId || !settings.oauthCallbackUri) throw new Error('Linear OAuth is not configured for this build.');
     const callback = new URL(settings.oauthCallbackUri);
     if (callback.protocol !== 'http:' || callback.hostname !== '127.0.0.1' || !callback.port || callback.username || callback.password || callback.search || callback.hash) {
       throw new Error('Linear callback must be an http://127.0.0.1:PORT/path URL registered with Linear. Open authorization on the same computer as Claw.');

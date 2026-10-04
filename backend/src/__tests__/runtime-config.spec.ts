@@ -7,6 +7,15 @@ afterEach(() => {
 });
 
 describe('backend runtime config', () => {
+  it('uses the registered Linear callback with only an app client ID, including blank legacy settings', async () => {
+    vi.stubEnv('CODEX_CLAW_LINEAR_CLIENT_ID', ' app-client ');
+    vi.stubEnv('CODEX_CLAW_LINEAR_CALLBACK_URI', undefined);
+    const { runtimeLinearOAuthSettings } = await import('../runtime-config');
+    const expected = { oauthClientId: 'app-client', oauthCallbackUri: 'http://127.0.0.1:5173/api/auth/callback/linear' };
+    expect(runtimeLinearOAuthSettings()).toEqual(expected);
+    expect(runtimeLinearOAuthSettings({ oauthClientId: ' ', oauthCallbackUri: '' })).toEqual(expected);
+  });
+
   it('resolves public Linear OAuth configuration from packaged defaults, environment, then settings', async () => {
     vi.stubGlobal('__CODEX_CLAW_LINEAR_CLIENT_ID__', 'packaged-client');
     vi.stubGlobal('__CODEX_CLAW_LINEAR_CALLBACK_URI__', 'http://127.0.0.1:45678/packaged');

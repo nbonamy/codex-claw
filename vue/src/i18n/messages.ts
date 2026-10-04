@@ -7,10 +7,8 @@ export const messages = {
     linearIntegration: {
       name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',
       cancelLabel: 'Cancel Linear authorization', openLabel: 'Open Linear authorization',
-      callbackPlaceholder: 'http://127.0.0.1:45678/oauth/linear/callback',
-      clientId: 'OAuth client ID', callback: 'Registered callback URL', cancel: 'Cancel',
-      setup: 'Connect your Linear account for backlog work. Configure a public OAuth client ID and callback URL.',
-      callbackHelp: 'Register this exact loopback URL in your Linear OAuth app. Open authorization on the same computer as Claw.',
+      cancel: 'Cancel',
+      setup: 'Connect your Linear account for backlog work.',
       authorize: 'Authorize in your browser', open: 'Open Linear',
       returnToClaw: 'Approve access in Linear, then return here. Claw finishes connecting automatically.',
     },

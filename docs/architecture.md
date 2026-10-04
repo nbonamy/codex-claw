@@ -1068,16 +1068,17 @@ catalogs key requests by provider, source and host location and reject late
 responses after a context switch. GitHub continues to own branch/PR and clone
 operations. Browsing does not infer a code repository from Linear names.
 
-The public client ID and exact registered callback URL resolve from
-`workBacklog.providerSettings.linear` in Settings, then
-`CODEX_CLAW_LINEAR_CLIENT_ID` / `CODEX_CLAW_LINEAR_CALLBACK_URI`, then optional
-public defaults baked into the backend build using those same environment
-variables. No client secret or API key is used. Settings therefore also works
-in packaged desktop builds without a shell environment.
+Linear uses the app's public OAuth client ID from `CODEX_CLAW_LINEAR_CLIENT_ID`,
+which can also be baked into the backend build from the repository `.env`.
+The registered callback defaults to
+`http://127.0.0.1:5173/api/auth/callback/linear`; an optional
+`CODEX_CLAW_LINEAR_CALLBACK_URI` overrides it at runtime or build time.
+Nonempty legacy `workBacklog.providerSettings.linear` values remain compatible
+and take precedence; blank saved values fall through to app defaults.
+Settings exposes connection controls, with no client ID or callback fields.
+No client secret or API key is used.
 
-Register an exact callback such as
-`http://127.0.0.1:45678/oauth/linear/callback` in the Linear OAuth app, then enter
-it and the public client ID in Settings → Integrations. Choose an unused port.
+The app registration must include the exact callback, and its port must be free.
 `clawd` binds that loopback address only during authorization; a bind failure
 appears in Settings before opening Linear. The browser must run on the same
 computer as `clawd` (the desktop and localhost web hosts). A remote browser
