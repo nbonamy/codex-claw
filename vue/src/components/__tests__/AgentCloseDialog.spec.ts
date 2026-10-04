@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { ElCheckbox } from 'element-plus';
+import { ElSwitch } from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentCloseDialog from '../AgentCloseDialog.vue';
 
@@ -35,7 +35,8 @@ describe('AgentCloseDialog', () => {
     const wrapper = mountDialog();
     await wrapper.setProps({ workflow: { ...workflow, files: [{ path: 'README.fr.md', indexStatus: '?', worktreeStatus: '?' }] } });
     expect(wrapper.get('.claw-button--primary').attributes('disabled')).toBeDefined();
-    await wrapper.get('input[type="checkbox"]').setValue(true);
+    expect(wrapper.get('.agent-close-dialog__discard [role="switch"]').attributes('aria-checked')).toBe('false');
+    await wrapper.get('.agent-close-dialog__discard .el-switch').trigger('click');
     await wrapper.get('.claw-button--primary').trigger('click');
     expect(wrapper.emitted('delete-worktree')).toStrictEqual([[false, true]]);
     await wrapper.setProps({ visible: false });
@@ -71,7 +72,7 @@ function mountDialog() {
   return mount(AgentCloseDialog, {
     props: { visible: true, agent, workflow },
     global: {
-      components: { ElCheckbox },
+      components: { ElSwitch },
       stubs: {
         ElDialog: {
           props: ['modelValue'],

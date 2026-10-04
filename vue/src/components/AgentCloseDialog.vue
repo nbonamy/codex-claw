@@ -18,11 +18,10 @@
       <p> {{ $t('surface.agentCloseDialog.thisAgentIsUsingTheLinkedWorktree') }} <strong>{{ workflow?.branch }}</strong>.
       </p>
       <p> {{ $t('surface.agentCloseDialog.deletingTheWorktreeAlsoDeletesItsLocalBranchKeepingItLea') }} </p>
-      <div v-if="hasChanges" class="agent-close-dialog__discard">
-        <el-checkbox v-model="discardChanges" :disabled="busy">
-          {{ $t('surface.agentCloseDialog.discardChanges') }}
-        </el-checkbox>
-      </div>
+      <label v-if="hasChanges" class="agent-close-dialog__discard">
+        <el-switch v-model="discardChanges" size="small" :disabled="busy" :aria-label="$t('surface.agentCloseDialog.discardChanges')" />
+        <span>{{ $t('surface.agentCloseDialog.discardChanges') }}</span>
+      </label>
       <label v-if="workflow?.upstream" class="agent-close-dialog__remote">
         <el-switch v-model="deleteRemoteBranch" size="small" :disabled="busy" />
         <span>{{ $t('surface.agentCloseDialog.alsoDelete') }} {{ workflow.upstream }}</span>
@@ -100,7 +99,8 @@ function onVisibilityChanged(visible: boolean): void {
   color: var(--color-text);
 }
 
-.agent-close-dialog__remote {
+.agent-close-dialog__remote,
+.agent-close-dialog__discard {
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -112,13 +112,7 @@ function onVisibilityChanged(visible: boolean): void {
   color: var(--color-error) !important;
 }
 
-.agent-close-dialog__discard :deep(.el-checkbox) {
-  height: auto;
-  white-space: normal;
-}
-
-.agent-close-dialog__discard :deep(.el-checkbox__label) {
-  white-space: normal;
-  line-height: 1.4;
+.agent-close-dialog__discard :deep(.el-switch) {
+  flex-shrink: 0;
 }
 </style>
