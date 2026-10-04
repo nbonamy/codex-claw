@@ -2,6 +2,11 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    tasks: {
+      title: 'Tasks', assignment: 'Assignment', provisional: 'Saved result · awaiting successful turn completion',
+      evidence: 'Verification', artifacts: 'Artifacts', caveats: 'Caveats',
+      delivery: 'Parent delivery', cancel: 'Cancel task',
+    },
     handoff: {
       action: 'Hand off…', submit: 'Hand off', cancel: 'Cancel', hide: 'Hide',
       engine: 'Coding agent', model: 'Model', defaultModel: 'Provider default',

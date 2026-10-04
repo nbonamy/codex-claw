@@ -1,4 +1,5 @@
 import { readWorktreeHead } from './git-worktrees';
+import type { DurableTaskService } from './agents/durable-task-service';
 import { ProviderConnections } from './provider-connections';
 import { backendCodexHomeDir } from './state';
 import { isProviderConnection, type ProviderAuthentication } from '@codex-claw/core/contracts/provider-setup';
@@ -76,6 +77,7 @@ import { VisualizeService, directVisualizationPrompt, generateVisualizationSugge
 import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@codex-claw/core/visualize';
 
 export type ClawBackendServerOptions = {
+  tasks?: DurableTaskService;
   providerSetup?: import('./provider-setup').ProviderSetup;
   version: string;
   pid?: number;
@@ -130,6 +132,16 @@ type BackendHandle =
   };
 
 export class ClawBackendServer {
+  private readonly tasks?: DurableTaskService;
+
+  async sendTaskPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
+    await this.requireConnectedEngine(agent.backend);
+    if (!this.snapshot.agents.includes(agent)) throw new Error('Agent was removed before task prompt admission.');
+    if (this.tasks?.mayStartAutomatedPrompt(agent.id) === false || agent.planReview?.status === 'pending') throw new Error('Agent is stopped or waiting for a review decision.');
+    const receipt = await this.agentPrompts.sendWithReceipt(agent, prompt);
+    await this.persistSnapshotOnly();
+    return receipt;
+  }
   private readonly version: string;
   private readonly pid: number;
   private readonly snapshot: AppSnapshot;
@@ -177,6 +189,7 @@ export class ClawBackendServer {
   private readonly providerConnections?: ProviderConnections;
 
   constructor(options: ClawBackendServerOptions) {
+    this.tasks = options.tasks;
     this.providerSetup = options.providerSetup;
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
@@ -1163,6 +1176,9 @@ export class ClawBackendServer {
           if (remoteTarget) return this.routeAgentSnapshotRequest(message.id, remoteTarget.id, message.method, { agentId, input }, async () => { throw new Error('Remote handoff owner is unavailable.'); });
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async () => {
+          if (this.tasks?.list(agentId).some(task => !['completed', 'cancelled', 'failed'].includes(task.state))) {
+            throw new Error('Resolve or cancel durable tasks before handing off this agent.');
+          }
           await this.agentHandoffs.run(agentId, input);
           return this.persistAndEmitSnapshot();
         });
@@ -1787,6 +1803,7 @@ export class ClawBackendServer {
       case backendMethods.agentInterrupt: {
         const agentId = requireAgentId(message.params);
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentInterrupt, { agentId }, async (agent) => {
+          await this.tasks?.blockParent(agentId);
           try {
             const result = await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }) as BackendSendResult;
             agent.backendSession = result.backendSession;
@@ -1801,6 +1818,19 @@ export class ClawBackendServer {
             });
           }
           return this.snapshot;
+        });
+      }
+      case backendMethods.agentTasksList: {
+        const agentId = requireAgentId(message.params);
+        return this.routeAgentResultRequest(message.id, agentId, message.method, { agentId }, () => this.tasks?.list(agentId) ?? []);
+      }
+      case backendMethods.agentTaskCancel: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const taskId = requireString(params.taskId, 'taskId');
+        return this.routeAgentResultRequest(message.id, agentId, message.method, { agentId, taskId }, () => {
+          if (!this.tasks) throw new Error('Durable tasks are unavailable.');
+          return this.tasks.cancel(agentId, taskId);
         });
       }
       case backendMethods.agentTurnDelete: {

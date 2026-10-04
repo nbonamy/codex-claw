@@ -346,7 +346,10 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverInterrupt: {
         const { agent } = requireAgentParams(params);
-        return this.requireDriver(agent.backend).interrupt(agent);
+        const expectedTurnId = requireRecord(params).expectedTurnId;
+        return expectedTurnId === undefined
+          ? this.requireDriver(agent.backend).interrupt(agent)
+          : this.requireDriver(agent.backend).interrupt(agent, requireString(expectedTurnId, 'expectedTurnId'));
       }
       case backendMethods.driverAgentRequestRespond: {
         const record = requireRecord(params);

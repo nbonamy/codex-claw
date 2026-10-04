@@ -1008,7 +1008,7 @@ and future remote.
 ## State And Migration
 
 `clawd` owns the durable `AppSnapshot` and persists it as `roster.json`,
-`settings.json` and `visualizations/` under `~/.codex-claw` by default (see
+`settings.json`, `tasks.json` and `visualizations/` under `~/.codex-claw` by default (see
 `docs/architecture.md`, Persistence). It also stores work-integration tokens in
 `~/.codex-claw/provider-tokens.json`. Electron main
 owns only desktop-window state plus a
@@ -1027,6 +1027,12 @@ Active turns, pending approvals, and queued prompts live in the running
 `clawd` snapshot. Queue delivery removes an item only after backend acceptance;
 transport failures retain the FIFO head, record the failure, and retry with
 bounded exponential backoff without appending duplicate user messages.
+
+Durable task results use their own persisted outbox in `tasks.json`, not the
+ordinary volatile prompt queue. The task owner submits ready batches through
+normal prompt admission and saves provider receipts. Unconfirmed acceptance is
+reconciled through provider history or retained for inspection, never blindly
+replayed. See `architecture.md` for retention and restart guarantees.
 
 Local migration path:
 

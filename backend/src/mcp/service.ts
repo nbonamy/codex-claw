@@ -48,10 +48,13 @@ import { AgentCreationService } from '../agents/agent-creation-service';
 import type { ClawMcpToolModuleProvider } from './tool-modules';
 import { createQuickChatProjectToolModuleProvider } from './quick-chat-project-tools';
 import type { CreatedProject } from '../projects/project-creation-service';
+import type { DurableTaskService } from '../agents/durable-task-service';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
 export type ClawMcpServiceOptions = {
+  tasks?: DurableTaskService;
+  persistSnapshot?: () => Promise<void>;
   missionTools?: MissionToolPort;
   snapshot: AppSnapshot;
   now?: () => Date;
@@ -69,6 +72,8 @@ export type ClawMcpServiceOptions = {
 };
 
 export class ClawMcpService {
+  private readonly tasks?: DurableTaskService;
+  private readonly persistSnapshot?: () => Promise<void>;
   private readonly snapshot: AppSnapshot;
   private readonly coordinator: ClawMcpAgentCoordinator;
   private readonly server: ClawMcpHttpServer;
@@ -85,6 +90,8 @@ export class ClawMcpService {
   private readonly agentCreation: AgentCreationService;
 
   constructor(options: ClawMcpServiceOptions) {
+    this.tasks = options.tasks;
+    this.persistSnapshot = options.persistSnapshot;
     this.snapshot = options.snapshot;
     this.now = options.now ?? (() => new Date());
     this.computerUseEnabled = options.computerUseEnabled ?? (() => true);
@@ -444,7 +451,26 @@ export class ClawMcpService {
   private async createAgentFromMcp(
     caller: Agent,
     input: McpCreateAgentInput & { teamId?: string },
+    intendedId?: string,
   ): Promise<McpCreateAgentResponse> {
+    if (input.task) {
+      if (!this.tasks) throw new Error('Durable tasks are unavailable.');
+      const task = await this.tasks.create(caller, {
+        requestId: input.requestId ?? '', task: input.task, prompt: input.prompt ?? '',
+        backend: input.backend ?? caller.backend, specification: input,
+        workspace: {
+          repositoryPath: input.repoPath,
+          ...(input.createWorktree && input.branchName ? { branchName: input.branchName } : {}),
+          ...(input.destinationPath ? { destinationPath: input.destinationPath } : {}),
+        },
+      }, async task => {
+        const response = await this.createAgentFromMcp(caller, { ...input, task: undefined, prompt: undefined }, task.workerAgentId);
+        if (!response.success) throw new Error(response.message);
+        await this.persistSnapshot?.();
+        return this.snapshot.agents.find(agent => agent.id === task.workerAgentId)!;
+      });
+      return { success: true, taskId: task.id, task, agentId: task.workerAgentId, folder: task.folder, promptSubmitted: Boolean(task.acceptance), message: `Task ${task.id}: ${task.state}. Use wait-tasks to inspect the durable outcome.` };
+    }
     const repoPath = input.repoPath.trim();
     if (!repoPath) {
       return { success: false, message: 'repoPath is required' };
@@ -504,7 +530,7 @@ export class ClawMcpService {
         delegatedByAgentId: caller.id,
         teamId: input.teamId ?? caller.teamId,
       };
-      const createdAgent = this.agentCreation.create(createInput, { select: false });
+      const createdAgent = this.agentCreation.create(createInput, { select: false, ...(intendedId ? { id: intendedId } : {}) });
       if (this.resolveWorkspaceIdentity) {
         const workspace = await this.resolveWorkspaceIdentity(folder);
         updateAgentWorkspace(this.snapshot, createdAgent.id, workspace, workspace.updatedAt);
@@ -575,7 +601,7 @@ export class ClawMcpService {
     });
   }
 
-  private startAgentWithPrompt(agent: Agent, prompt: string): Promise<void> {
+  private startAgentWithPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
     return new Promise((resolve, reject) => {
       this.recordPromptInputMethod(agent.id, 'typed');
       sendAgentPrompt(
@@ -588,7 +614,7 @@ export class ClawMcpService {
         {
           onBackendSessionUpdated: () => this.emitSnapshotUpdated(agent.id),
           onPromptFailed: reject,
-          onPromptStarted: () => resolve(),
+          onPromptStarted: result => resolve(result),
         },
       );
       this.emitSnapshotUpdated(agent.id);

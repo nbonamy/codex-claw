@@ -828,6 +828,8 @@ export type CodexClawApi = {
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
   getAgentGitDiff(agentId: string, target?: AgentGitDiffTarget): Promise<import('./contracts/git').AgentGitDiff>;
   getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow>;
+  listAgentTasks(agentId: string): Promise<import('./delegated-task').DelegatedTask[]>;
+  cancelAgentTask(agentId: string, taskId: string): Promise<import('./delegated-task').DelegatedTask>;
   generateAgentGitMessage(agentId: string, input: AgentGitMessageGenerationInput): Promise<AgentGitMessageGenerationResult>;
   stageAgentGitFiles(agentId: string, input: AgentGitStageInput): Promise<AgentGitWorkflow>;
   commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow>;

@@ -1,5 +1,5 @@
 import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import type { Agent, AppSnapshot, SendPromptOptions } from '@codex-claw/core/contracts';
 import { createEntityId } from '@codex-claw/core/ids';
 import { handoffInProgress } from '@codex-claw/core/agent-handoff';
@@ -26,6 +26,10 @@ export class AgentPromptManager {
   }
 
   sendAndWaitForAcceptance(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<void> {
+    return this.sendWithReceipt(agent, prompt, options).then(() => undefined);
+  }
+
+  sendWithReceipt(agent: Agent, prompt: string, options?: SendPromptOptions): Promise<BackendSendResult> {
     if (!canStartPrompt(agent)) return Promise.reject(new Error('Agent is busy. Try the review decision again when idle.'));
     return new Promise((resolve, reject) => {
       this.start(agent, prompt, options, undefined, { resolve, reject });
@@ -92,7 +96,7 @@ export class AgentPromptManager {
     this.inFlightQueuedPrompts.clear();
   }
 
-  private start(agent: Agent, prompt: string, promptOptions?: SendPromptOptions, queuedPromptId?: string, acceptance?: { resolve: () => void; reject: (error: Error) => void }): AppSnapshot {
+  private start(agent: Agent, prompt: string, promptOptions?: SendPromptOptions, queuedPromptId?: string, acceptance?: { resolve: (receipt: BackendSendResult) => void; reject: (error: Error) => void }): AppSnapshot {
     const snapshot = this.options.getSnapshot();
     if (this.options.isEngineConnected?.(agent) === false) {
       acceptance?.reject(new Error('Engine is not connected. Reconnect in Settings.'));
@@ -121,9 +125,9 @@ export class AgentPromptManager {
             this.options.setNewConversationTitle(agent.id, wasNewSession);
             await this.options.persistSnapshot();
           },
-          onPromptStarted: () => {
+          onPromptStarted: result => {
             if (queuedPromptId) this.dequeue(agent.id, queuedPromptId);
-            acceptance?.resolve();
+            acceptance?.resolve(result);
           },
           onPromptFailed: (error) => {
             acceptance?.reject(error);

@@ -1,5 +1,31 @@
 # MCP Servers
 
+## Durable task delegation
+
+`create-agent` accepts optional `task: { title, doneWhen }`. Task mode requires
+the actual assignment in `prompt` and a stable parent-scoped `requestId`; reuse
+that ID after timeout. Returned `taskId`, `agentId` and status describe accepted
+startup or an existing task, not completed work. Calls without `task` keep their
+previous behavior. Provider/model/effort/worktree selection remains unchanged.
+
+Contextual `complete-task` takes `summary`, `evidence`, `artifacts` and
+`caveats`. It saves a provisional result and finalizes only after the exact
+submitting turn succeeds. Task instructions require this before `finish_turn`
+instead of a manual completion `send-message`. Notifications need no reply.
+
+`wait-tasks` lists owned/assigned tasks, optionally filters `taskIds`, and
+supports `mode: any|all` with `timeoutMs` from 0 to 30,000. Completion, failure,
+cancellation, interruption and needs-input end a relevant wait. Timeout leaves
+work running. `cancel-task` accepts one owned `taskId`, saves cancellation
+and interrupts only the recorded execution. Unrelated agents cannot read
+filtered task IDs, submit another worker's results or cancel assignments.
+
+All operations run on the executing daemon's MCP server. Remote clients inspect
+and cancel through agent-scoped RPC routed to that same owner. Tasks survive
+agent removal; undelivered results are never pruned. See `architecture.md` for
+recovery and retention limits.
+
+
 Codex Claw owns local MCP endpoints for agent-to-agent collaboration and for
 credentialed access to provider-hosted MCP servers. These are app surfaces,
 not Codex-specific protocols. Codex and Claude receive the same Claw-owned

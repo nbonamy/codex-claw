@@ -1,5 +1,21 @@
 # Backend Protocol
 
+## Durable task inspection
+
+`agent/tasks/list { agentId }` returns app-owned assignments, statuses,
+provisional/final results and delivery state for tasks owned by or assigned to
+that agent. `agent/task/cancel { agentId, taskId }` performs scoped cancellation
+through the same durable owner used by MCP. Both use normal agent-location
+routing, including remote daemons. Electron/preload and web adapters expose
+`listAgentTasks` and `cancelAgentTask`; the conversation's compact Tasks
+disclosure polls these contracts without interpreting provider frames.
+
+Provider interruption accepts optional `expectedTurnId`. Task cancellation
+supplies it, and both supported drivers reject a different active turn. This
+guards restart/late-cancellation races without interrupting unrelated worker
+execution.
+
+
 Status: current backend JSON-RPC protocol, 2026-06-17.
 
 This document catalogs the app-owned protocol between clients and `clawd`.

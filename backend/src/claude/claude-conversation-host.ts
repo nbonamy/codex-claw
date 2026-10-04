@@ -437,11 +437,12 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return result;
   }
 
-  async interrupt(agent: Agent): Promise<BackendSendResult> {
+  async interrupt(agent: Agent, expectedTurnId?: string): Promise<BackendSendResult> {
     const activeTurn = this.activeTurnsByAgentId.get(agent.id);
     if (!activeTurn) {
       throw new Error('No active Claude turn to interrupt.');
     }
+    if (expectedTurnId && activeTurn.turnId !== expectedTurnId) throw new Error('The requested Claude task turn is no longer active.');
 
     activeTurn.interrupted = true;
     await activeTurn.handle.interrupt();

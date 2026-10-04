@@ -1,5 +1,61 @@
 # Codex Claw Architecture
 
+## Durable delegated tasks
+
+`clawd` owns durable assignments through `DurableTaskService`. Tasks have an
+identity and lifetime separate from worker agents and provider conversations.
+Optional `create-agent.task` contracts use existing worktree creation, agent
+creation and prompt admission, including provider/model selection. A stable
+parent-scoped `requestId` is mandatory: repeats return the same task/worker,
+and conflicting reuse fails. Preparing state and intended worker ID are saved
+before provisioning. Recovery never provisions a worker again automatically.
+
+Tasks live in **`tasks.json`** under the owning daemon's backend home, through
+`AppStateStore` and its shared versioned envelope, validation and atomic writer.
+They are not roster entries or copies on agents. Missing `tasks.json` means an
+older installation with no tasks. Invalid or unsupported files fail startup
+instead of becoming an empty list. This additive file does not bump the schema
+version. Task writes are serialized separately from roster snapshots. Atomic
+replacement protects against partial files/process restart; the shared writer
+does not fsync and makes no power-loss durability guarantee.
+
+Assignment, execution identity, provider acceptance, provisional result and
+delivery outbox are saved together. Results contain bounded text and artifact
+references, never copied transcripts. V1 deliberately retains **all task records
+indefinitely**, including delivered results, failed/cancelled attempts and
+undelivered results. Agent/team deletion does not delete tasks. There is no
+automatic cleanup or retention timer; a later explicit archival/removal policy
+must preserve undelivered records. This is an intentional disk-growth tradeoff.
+
+`complete-task` infers the worker from authenticated MCP context and saves a
+result against its current turn, conversation and attempt. Only successful
+completion of that exact turn finalizes it. Idle/turn-ended without a result is
+interrupted work, not success. Provisional results cannot be overwritten by
+later turns. New work uses a new request/task ID. Completion does not approve
+Git operations or Mission progression.
+
+Result batches are persisted before parent prompt acceptance, use normal prompt
+admission, and wait while a parent is busy or awaiting input. Explicit
+interruption blocks automatic wakeup until the parent starts another turn.
+Missing parents retain discoverable results. Restart blocks automatic parent
+wakeup and marks unresolved execution interrupted. Acceptance markers in
+provider-owned user history can reconcile uncertain startup/delivery; missing
+or truncated history never proves non-execution and never triggers blind replay.
+A provisional result whose successful turn outcome was not observed before
+restart remains interrupted for inspection. This is **not exactly-once provider
+execution**.
+
+Cancellation is saved before interrupting the recorded provider turn and is
+retried conservatively after restart. Conversations/worktrees remain.
+Cross-provider handoff is blocked while assignments remain active; v1 does not
+transfer ownership to replacement identities. Retained results remain accessible
+through the worker after parent replacement/removal.
+Provider success covers foreground turns only. Codex readiness can inspect
+turns, queue and requests; the shared seam does not certify detached native
+processes/background tasks. Workers must finish that work before submitting;
+Claw does not claim background process quiescence.
+
+
 Status: updated for modular desktop/web hosts, 2026-08-07.
 
 Codex Claw is a modular team/agent app with native chat and artifact rendering.

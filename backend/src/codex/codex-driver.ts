@@ -212,8 +212,8 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async interrupt(agent: Agent): Promise<BackendSendResult> {
-    const result = await this.sessionManager.interruptTurn(agent);
+  async interrupt(agent: Agent, expectedTurnId?: string): Promise<BackendSendResult> {
+    const result = await this.sessionManager.interruptTurn(agent, expectedTurnId);
     return {
       backendSession: codexBackendSession(result.threadId),
       turnId: result.turnId,

@@ -23,8 +23,8 @@ describe('mission backend boundary', () => {
       expect(mission.teamId).toBe(snapshot.teams[0]!.id);
       expect(mission.execution!.repoPath).toBeUndefined();
       await vi.waitFor(() => expect(snapshot.missions![0]!.execution!.runs[0]!.status).toBe('running'));
+      await vi.waitFor(() => expect(snapshot.missions![0]!.execution!.runs[0]!.skills[0]?.name).toBe('mission-shape-requirements'));
       const run = snapshot.missions![0]!.execution!.runs[0]!;
-      expect(run.skills[0]?.name).toBe('mission-shape-requirements');
       await call('mission/execution/update', { id: mission.id, revision: snapshot.missions![0]!.revision, action: 'cancel', runId: run.id });
       const artifacts = { ...mission.artifacts, requirements: { problem: 'Billing', acceptance: 'Owner checkout' } };
       await call('mission/update', { id: mission.id, revision: snapshot.missions![0]!.revision, artifacts, stageAgentIds: {}, action: 'advance' });
