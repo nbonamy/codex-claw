@@ -8,6 +8,10 @@ A Mission turns a feature into a staged workflow with an approved brief, reposit
 
 Use a direct agent conversation for a focused fix or investigation. Use a Mission when you want explicit requirements and ticket approval before implementation, especially when the feature spans repositories. Mission workers are separate Claw agents; they are not simply native subagents of the conversation where you started.
 
+::: info Upcoming release
+Linear issue selection and **Update from main** in Ship are implemented on main for the intended 0.26.0 release. They are not included in the published 0.25.2 app.
+:::
+
 ## Prepare the team
 
 Connect the [providers](../providers/) the team will use. Add at least one repository-backed agent to the team before creating a Mission. For a feature spanning an API and a frontend, add an agent for each repository to that same team. Tickets can only target repositories represented in the Mission's team.
@@ -18,12 +22,14 @@ Check those repositories have Git history and can create worktrees. Have their s
 
 1. Select the team where the feature belongs.
 2. Click **New mission** in the sidebar. If the team already has Missions, use the **+** beside **Missions**.
-3. In the Mission conversation, describe the desired outcome, constraints, and how you will know it works. During Requirements, you can also use **Choose an issue…** to supply a GitHub issue when that integration is available.
+3. In the Mission conversation, describe the desired outcome, constraints, and how you will know it works. During Requirements, you can also use **Choose an issue…** to supply an issue from a connected GitHub or Linear integration. Choose the provider first, then its repository or **Team / project**, and select the issue.
 4. Work with the Mission lead until the Requirements artifact is specific enough to approve.
 
 For example:
 
 > Add CSV export to the reporting page. The API and web repositories are in this team. Only authorized users can export; preserve the current filters; escape spreadsheet formulas. Success means a browser download with the expected rows plus API authorization and escaping tests. Do not add scheduled exports.
+
+A selected issue supplies context for Requirements. A Linear team or project does not select an execution repository, and Mission tickets are not automatically exported as Linear issues. Review the code-repository assignment on each Mission ticket before approving implementation. GitHub still owns any pull requests created during Ship.
 
 ## Follow the stages
 
@@ -65,6 +71,8 @@ This review is part of the Mission. The separate conversation command [`/review`
 ## Ship each repository
 
 Ship shows a delivery card for each affected repository. Commit any remaining intended changes, then use its Git controls to create a pull request or merge. Check the branch, destination, title/message, and cleanup choices before confirming. Follow [Worktrees](./worktrees#review-and-merge) for merge prerequisites and cleanup behavior.
+
+When the destination has advanced, use **Update from main** in the delivery card's Git controls; the label follows the repository's base branch name. Claw merges the base into the Mission branch. Resolve any conflicts in the Mission worktree and rerun the relevant checks, then return to Ship and refresh the Git state before merging. Updating the branch does not itself deliver the Mission.
 
 The Mission completes when every affected repository has a recorded pull request or merge. A created pull request can still need review and merging. Mission completion does not mean the code was deployed.
 

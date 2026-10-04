@@ -89,6 +89,6 @@ Clear the setting to return to bundled Codex. Selecting a different executable d
 | Browser sign-in remains pending | Finish the flow in the browser or select **Cancel sign-in** and retry. |
 | A skill, plugin, or MCP server is missing | Check the selected home and whether resource reuse is enabled. Skills/plugin sharing does not copy all provider configuration. |
 | A custom runtime fails | Check **Codex executable**; clear it to retry with bundled Codex. |
-| The engine is connected but unavailable for new work | Turn on **Enable engine**. **Disconnect** disables it in Claw without removing the CLI sign-in. |
+| The engine is connected but unavailable for new work | Turn on **Enable engine**. **Disconnect** signs out of the selected Codex setup; connect again if you used it. |
 
 When reporting a problem, include the Claw version, displayed location, runtime choice, and the error message. See [Troubleshooting](../troubleshooting/) for the wider diagnostic checklist.

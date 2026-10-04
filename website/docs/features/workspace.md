@@ -24,6 +24,8 @@ Open **Files** to browse the agent's folder, expand directories, or search by pa
 
 When available, **Open In** opens the selected project file in a detected editor or application. The file preview is for inspection; ask the agent to change a file or open it in your editor when you want to edit it yourself.
 
+In the upcoming release after 0.25.2, clicking a file link in chat downloads the file when it is binary or too large to preview. Previewable text and images still open in the workspace. This fallback applies to chat file links; a missing or unreadable file still reports an error.
+
 Open **Changes** or press **⌘G** to inspect Git diffs. The agent header's diff selector lets you choose the scope:
 
 | Scope | What it shows |
@@ -37,6 +39,26 @@ Open **Changes** or press **⌘G** to inspect Git diffs. The agent header's diff
 The **Changes** pane's refresh action reloads the selected diff. Its **…** menu controls staged, unstaged, and untracked sections when available, word wrap, and expanding or collapsing files. Select a file in the diff to open its preview.
 
 Use the full repository diff before delivery so earlier or unrelated edits are accounted for.
+
+## Browse and start backlog work
+
+::: info Upcoming release
+Linear backlog support and the provider/source selectors described here are implemented on main for the intended 0.26.0 release, not the published 0.25.2 app.
+:::
+
+Connect [GitHub or Linear](../providers/#connect-github-or-linear) in Settings first. Open **Backlog** from the left rail to browse work across sources, or use the repository's **Backlog** pane or **Create from…** issue picker for work in that repository.
+
+Choose **GitHub** or **Linear** when both are connected, then a repository or Linear **Team / project**. A repository's GitHub backlog stays scoped to that repository. Selecting a Linear source changes the issues shown while keeping the code repository context. Linear issues display their identifier, such as `ENG-42`, and their native workflow status; pull-request choices apply only to GitHub.
+
+In a repository backlog, search by issue identifier or title and use the state, assignee, and label filters to narrow the list. Open an item to read its details before assigning work. For an issue:
+
+1. Choose **New agent** for a new agent and worktree, or **Existing agent** when offered. Check the displayed branch; an existing agent uses its current folder without creating a worktree.
+2. Choose the coding engine for a new agent.
+3. Select **Investigate**, **Fix**, or **Custom** to prepare your own prompt.
+
+From the global Backlog, select items and start work, choose the destination **Team** and coding engine, and choose a **Code repository** for Linear. Each selected item starts a separate agent in a worktree. Claw does not infer a local clone from the Linear team or project name.
+
+Assigned items link back to their agent. Claw's assignment and completion status tracks the agent's work; it does not by itself change an issue's status in Linear or GitHub, merge a pull request, or deploy code. Ask explicitly when you want an external issue updated.
 
 ## Commit and deliver
 

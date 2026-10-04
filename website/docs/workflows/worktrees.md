@@ -27,13 +27,27 @@ Claw displays provisioning progress. When it finishes, check the new agent's fol
 
 ## Delegate implementation
 
-You can let the current conversation shape a task first, then delegate it:
+::: info Upcoming release
+The `/delegate` and `/worktree` commands and composer **Delegate** action are implemented on main for the intended 0.26.0 release, not the published 0.25.2 app.
+:::
+
+Let the current conversation shape a task first, then submit `/delegate` to hand off the agreed work. `/worktree` is an alias. You can include a specific task:
+
+```text
+/delegate Implement the agreed CSV export flow and its tests. Keep commits local and report back for review.
+```
+
+Both Codex and Claude Code support these commands. The composer's **+** menu also offers **Delegate**. The current agent uses the conversation to prepare a self-contained handoff and creates a separate Claw teammate in a dedicated worktree. If the task or repository is unclear, it asks for clarification first. The original agent and conversation remain open.
+
+You can also request delegation in plain language:
 
 > Create a Claw teammate in a dedicated worktree on `feat/export-csv`. Implement the agreed export flow, add the relevant tests, and leave the changes ready for review.
 
 When Claw offers **Start implementation in a worktree?** above the composer, the checkmark sends a delegation request to the current agent. That agent prepares a handoff and creates the separate teammate. The dismiss button removes the proposal. Accepting this proposal starts implementation; it does not approve a later merge or push.
 
 Continue the implementation discussion with the new agent so its instructions, changes, and evidence stay together. This creates a Claw teammate, rather than a [native subagent](./parallel-agents#choose-the-kind-of-agent).
+
+The command's handoff asks the teammate to commit at coherent milestones and keep those commits local. Delegation does not authorize a push or merge; specify any stricter delivery constraint in the task.
 
 ## Verify the workspace
 
