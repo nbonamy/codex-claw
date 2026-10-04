@@ -121,7 +121,7 @@ export type AgentBackendDriver = {
   /** Removes the provider-side conversation for good; callers fall back to archiving when absent. */
   deleteAgentConversation?(agent: Agent): Promise<void>;
   reconcileConversations?(agents: Agent[]): Promise<void>;
-  interrupt(agent: Agent): Promise<BackendSendResult>;
+  interrupt(agent: Agent, expectedTurnId?: string): Promise<BackendSendResult>;
   respondToAgentRequest(response: AgentRequestResponse): Promise<void>;
   loadConversation?(agent: Agent): Promise<BackendSession | null>;
   loadOlderHistory?(agent: Agent): Promise<BackendHistoryLoadResult>;

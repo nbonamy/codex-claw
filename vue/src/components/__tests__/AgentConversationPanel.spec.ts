@@ -12,7 +12,45 @@ import AgentConversationPanel from '../AgentConversationPanel.vue';
 import { backendChoicesKey } from '../backend-selection';
 
 describe('AgentConversationPanel', () => {
-  it('queues the focused split Claude pane shortcut for its own agent and disables shelf steering', async () => {
+  it('routes composer commands from an unfocused split pane without submitting its draft', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[1]!;
+    agent.backend = 'claude'; agent.backendDefaults = { kind: 'claude' };
+    const view = shallowReactive<AgentConversationView>({
+      agent, codexSnapshot: null, claudeSnapshot: claudeConversationSnapshot([], { agentId: agent.id }),
+      composer: createAgentComposerState({ getSnapshot: () => snapshot }).configurationForAgent(agent.id),
+      composerState: { text: 'Unsent split draft', selectionStart: 5, selectionEnd: 5 },
+      attachments: [], capabilities: claudeBackendCapabilities, approvals: [], sending: false,
+      queuedPrompts: [], history: { failed: false, hydrating: false, hasOlder: false, loadingOlder: false },
+      answeredClientRequestIds: new Set(),
+    });
+    const actions: AgentConversationActions = {
+      planReview: vi.fn(), clearGoal: vi.fn(), threadFlag: vi.fn(), prepare: vi.fn(), loadOlder: vi.fn(),
+      send: vi.fn(), steer: vi.fn(), interrupt: vi.fn(), deleteTurn: vi.fn(), editTurn: vi.fn(), forkTurn: vi.fn(), retryTurn: vi.fn(),
+      continueInterruptedTurn: vi.fn(), resolveApproval: vi.fn(), clientResponse: vi.fn(),
+      selectModel: vi.fn(), selectReasoningEffort: vi.fn(), selectServiceTier: vi.fn(), setPlanMode: vi.fn(),
+      setApprovalPreset: vi.fn(), setPermissionMode: vi.fn(), updateComposerState: vi.fn(), updateAttachments: vi.fn(),
+      deleteQueuedPrompt: vi.fn(), updateQueuedPrompt: vi.fn(), steerQueuedPrompt: vi.fn(),
+    };
+    const selectModelMenuItem = vi.fn();
+    const wrapper = mount(AgentConversationPanel, { props: {
+      view, actions, agents: snapshot.agents, focused: false, mentionGroups: [], modelMenuItems: [], selectModelMenuItem,
+      savedPromptDrafts: [], savePromptDraft: vi.fn(), removePromptDraft: vi.fn(), openLink: vi.fn(), openImage: vi.fn(), openVisualization: vi.fn(),
+    }, global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } } });
+    for (const label of ['Review', 'Delegate', 'Visualize']) {
+      await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+      await wrapper.findAll('[role="menuitem"]').find(item => item.text() === label)!.trigger('click');
+    }
+    expect(wrapper.emitted('composer-command')).toStrictEqual([
+      [agent.id, 'review'], [agent.id, 'delegate'], [agent.id, 'visualize'],
+    ]);
+    expect(selectModelMenuItem).not.toHaveBeenCalled();
+    expect(actions.send).not.toHaveBeenCalled();
+    expect(actions.updateComposerState).not.toHaveBeenCalled();
+    expect(wrapper.get('.chat-rich-text-editor').text()).toBe('Unsent split draft');
+  });
+
+  it('steers the focused split Claude pane and its queued prompt to its own agent', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[1]!;
     agent.backend = 'claude';
@@ -43,11 +81,13 @@ describe('AgentConversationPanel', () => {
       view, actions, agents: snapshot.agents, focused: true, mentionGroups: [], modelMenuItems: [], selectModelMenuItem: vi.fn(),
       savedPromptDrafts: [], savePromptDraft: vi.fn(), removePromptDraft: vi.fn(), openLink: vi.fn(), openImage: vi.fn(), openVisualization: vi.fn(),
     }, global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } } });
-    expect(wrapper.get<HTMLButtonElement>('[aria-label="Steer queued prompt now"]').element.disabled).toBe(true);
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Steer queued prompt now"]').element.disabled).toBe(false);
     await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter', metaKey: true });
     await flushPromises();
-    expect(actions.send).toHaveBeenCalledExactlyOnceWith(agent.id, 'Split follow-up', undefined);
-    expect(actions.steer).not.toHaveBeenCalled();
+    expect(actions.steer).toHaveBeenCalledExactlyOnceWith(agent.id, 'Split follow-up', undefined);
+    expect(actions.send).not.toHaveBeenCalled();
+    await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
+    expect(actions.steerQueuedPrompt).toHaveBeenCalledWith(agent.id, 'queued-split', undefined);
   });
 
   it('routes an unfocused Claude pane’s composer approval to its own agent and restores its draft and attachment', async () => {

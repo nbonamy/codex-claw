@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   deleteSession as deleteClaudeSession,
+  forkSession as forkClaudeSession,
   query,
   type CanUseTool,
   type Options as ClaudeQueryOptions,
@@ -37,6 +38,7 @@ export type ClaudeAgentSdkTransportOptions = {
   createQuery?: ClaudeQueryFactory;
   createSessionId?: () => string;
   deleteSession?: typeof deleteClaudeSession;
+  forkSession?: typeof forkClaudeSession;
 };
 
 export type ClaudeQueryRuntime = AsyncIterable<SDKMessage> & Pick<Query,
@@ -54,6 +56,8 @@ type ActiveTransportTurn = {
   resolve: () => void;
   reject: (error: Error) => void;
   settled: boolean;
+  pendingInputs: Set<string>;
+  steered: boolean;
   onMessage: (message: ClaudeSdkMessage) => void;
   onPermissionRequest?: (request: ClaudePermissionRequest) => void;
   onPermissionCancelled?: (requestId: string) => void;
@@ -142,17 +146,39 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
       existingSession.activeTurn = activeTurn;
     }
 
-    void this.submitTurn(session, params).catch((error: unknown) => {
+    let submission = this.submitTurn(session, params);
+    void submission.catch((error: unknown) => {
+      if (session.activeTurn !== activeTurn) return;
       this.rejectTurn(session, normalizeError(error));
     });
 
     return {
       done: activeTurn.done,
+      steer: (prompt, attachments) => {
+        const queued = submission.then(async () => {
+          const message = await claudeUserMessage(prompt, attachments);
+          if (session.closed || session.activeTurn !== activeTurn || activeTurn.settled) return false;
+          message.uuid = randomUUID();
+          activeTurn.pendingInputs.add(message.uuid);
+          activeTurn.steered = true;
+          session.input.push(message);
+          return true;
+        });
+        submission = queued.then(() => undefined, () => undefined);
+        return queued;
+      },
       interrupt: async () => {
         if (session.activeTurn !== activeTurn || activeTurn.settled) {
           return;
         }
+        // interrupt() alone can leave queued user messages runnable in the SDK.
+        if (activeTurn.steered) {
+          this.resolveTurn(session);
+          await this.closeSession(session.sessionId);
+          return;
+        }
         await session.query.interrupt();
+        if (session.activeTurn !== activeTurn) return;
         this.resolveTurn(session);
         this.denyPendingPermissions(session, 'Claude turn was interrupted.');
       },
@@ -184,6 +210,16 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
   async deleteSession(sessionId: string, cwd: string): Promise<void> {
     await this.closeSession(sessionId);
     await this.deleteStoredSession(sessionId, { dir: cwd });
+  }
+
+  async forkSession(sessionId: string, cwd: string, upToMessageId?: string): Promise<string> {
+    const session = this.sessions.get(sessionId);
+    if (session?.activeTurn) throw new Error('Claude must be idle before forking.');
+    if (session && session.cwd !== expandHome(cwd)) throw new Error('Claude session workspace does not match the active agent folder.');
+    const fork = await (this.options.forkSession ?? forkClaudeSession)(sessionId, {
+      dir: cwd, ...(upToMessageId ? { upToMessageId } : {}),
+    });
+    return fork.sessionId;
   }
 
   async listModels(): Promise<ClaudeAvailableModel[] | null> {
@@ -360,10 +396,15 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         const message = sdkMessage as ClaudeSdkMessage;
         this.rekeySessionFromMessage(session, message);
         const activeTurn = session.activeTurn;
+        if (message.type === 'user' && typeof message.uuid === 'string') activeTurn?.pendingInputs.delete(message.uuid);
+        if (message.type === 'result' && activeTurn?.pendingInputs.size && !message.is_error && message.subtype === 'success') {
+          continue;
+        }
         activeTurn?.onMessage(message);
         if (message.type === 'result' && activeTurn) {
           this.resolveTurn(session);
           this.denyPendingPermissions(session, 'Claude turn finished before permission was answered.');
+          if (activeTurn.pendingInputs.size) this.closeSessionRecord(session, 'Claude failed before consuming queued input.');
         }
       }
 
@@ -519,6 +560,8 @@ function createActiveTurn(
     resolve,
     reject,
     settled: false,
+    pendingInputs: new Set(),
+    steered: false,
     onMessage,
     ...(onPermissionRequest ? { onPermissionRequest } : {}),
     ...(onPermissionCancelled ? { onPermissionCancelled } : {}),
@@ -546,6 +589,7 @@ function claudeQueryOptions(
     tools: { type: 'preset', preset: 'claude_code' },
     settingSources: ['user', 'project', 'local'],
     includePartialMessages: true,
+    extraArgs: { 'replay-user-messages': null },
     canUseTool,
     env,
     ...(params.model ? { model: params.model } : {}),

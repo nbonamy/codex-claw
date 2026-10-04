@@ -11,6 +11,7 @@ import { useImageAnnotation } from './use-image-annotation';
 import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useVisualizationAnnotations } from './use-visualization-annotations';
 import { claudePaneClientRequests } from './claude-pane-client-requests';
+import { conversationCommandMenuItems } from './conversation-command-menu';
 
 export type AgentConversationActions = {
   planReview: (agentId: string, resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => void | Promise<void>;
@@ -80,7 +81,7 @@ export function agentConversationState(view: () => AgentConversationView, extens
       get attachments() { return view().attachments; },
       get placeholder() { return translate('surface.appShell.askForFollowUpChanges'); },
       get approvalPreset() { return approvalPreset(); },
-      get leadingMenuItems() { return permissionMenuItems(view()); },
+      get leadingMenuItems() { return [...permissionMenuItems(view()), ...conversationCommandMenuItems()]; },
       get modelMenuItems() { return extensions.modelMenuItems?.(); },
       get planMode() { return view().composer.planMode; },
       get selectedModelId() { return view().composer.selectedModelId; },

@@ -9,6 +9,7 @@ import {
 import { computed, defineComponent, h, nextTick, provide, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, RendererMessage, SavedPromptDraft, ThreadPlan } from '@codex-claw/core/contracts';
+import { formatCollaborationMessageEnvelope } from '@codex-claw/core/collaboration-message-envelope';
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import type { VisualizationAnnotation } from '../use-visualization-annotations';
@@ -60,6 +61,14 @@ const executionPlan: ThreadPlan = {
 };
 
 describe('ConversationPane', () => {
+  it('allows the real conversation and composer to shrink within the workspace chat allocation', () => {
+    const wrapper = mountPane({ controller: controllerFor(messages), agent });
+    const pane = wrapper.get('.conversation-pane');
+    expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(true);
+    expect(Number.parseFloat(getComputedStyle(pane.element).minWidth)).toBe(0);
+    expect(getComputedStyle(pane.element).overflow).toBe('hidden');
+  });
+
   it('keeps an interrupted handoff and its saved note visible after restoring the agent', () => {
     const wrapper = mountPane({ controller: controllerFor([]), agent: { ...agent, handoff: {
       operationId: 'once', backend: 'codex', sourceAgentId: 'old', sourceTitle: 'Original',
@@ -561,7 +570,7 @@ describe('ConversationPane', () => {
     expect(wrapper.find('[aria-label="Fork"]').exists()).toBe(true);
   });
 
-  it('renders teammate envelopes as labeled messages containing only their content', () => {
+  it.each([false, true])('renders teammate envelopes with hidden context: %s', (withContext) => {
     const wrapper = mountPane({
       controller: controllerFor([{
         id: 'message-from-sdk',
@@ -571,7 +580,10 @@ describe('ConversationPane', () => {
         createdAt: '2026-08-02T00:00:00.000Z',
         parts: [{
           type: 'text',
-          text: [
+          text: withContext ? formatCollaborationMessageEnvelope([{
+            senderName: 'codex-app-sdk', senderId: 'agent-sdk', sentAt: '2026-08-02T00:00:00.000Z',
+            content: '<context>\nFull merge handoff and verification details.\n</context>\n\nfeat/dedew merged',
+          }]) : [
             'You received a message from codex-app-sdk (agent-sdk).',
             '',
             'Message:',
@@ -585,7 +597,8 @@ describe('ConversationPane', () => {
     });
 
     expect(wrapper.get('.conversation-pane__message-header').text()).toBe('Message from codex-app-sdk');
-    expect(wrapper.get('.chat-user-text').text()).toBe('The SDK hooks are ready.');
+    expect(wrapper.get('.chat-user-text').text()).toBe(withContext ? 'feat/dedew merged' : 'The SDK hooks are ready.');
+    expect(wrapper.text()).not.toContain('Full merge handoff');
     expect(wrapper.text()).not.toContain('You received a message from');
     expect(wrapper.text()).not.toContain('Update your status');
   });
@@ -642,6 +655,28 @@ describe('ConversationPane', () => {
     expect(wrapper.get('.chat-message__thinking').text()).toBe('Working');
     expect(wrapper.text()).not.toContain('codex_claw.set-status');
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+  });
+
+  it('renders task waiting and restored results without raw tool names or false completion', async () => {
+    const taskMessages: RendererMessage[] = [{
+      id: 'message-task-tool', agentId: agent.id, role: 'assistant', status: 'streaming',
+      createdAt: '2026-10-04T00:00:00.000Z',
+      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'codex_claw.wait-tasks',
+        status: 'running', metadata: { server: 'codex_claw', tool: 'wait-tasks' },
+        input: { taskIds: ['task-private-id'], timeoutMs: 30000 } }],
+    }];
+    const wrapper = mountPane({ controller: controllerFor(taskMessages), agent });
+    expect(wrapper.get('.chat-tool-call').text()).toContain('Waiting for delegated tasks');
+    expect(wrapper.find('.tabler-icon-square-check').exists()).toBe(true);
+
+    await wrapper.setProps({ controller: controllerFor([{
+      ...taskMessages[0]!, status: 'complete',
+      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'codex_claw.wait-tasks',
+        status: 'completed', metadata: { server: 'codex_claw', tool: 'wait-tasks' },
+        output: { timedOut: true, tasks: [{ id: 'task-private-id', state: 'running' }] } }],
+    }]) });
+    expect(wrapper.get('.chat-tool-call').text()).toContain('Checked delegated tasks');
+    expect(wrapper.get('.chat-tool-call').text()).not.toMatch(/codex_claw|task-private-id|Completed/);
   });
 
   it('renders review tool activity as finding actions instead of raw MCP names', () => {

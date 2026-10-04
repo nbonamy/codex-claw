@@ -15,6 +15,8 @@ const EXTENDED_REQUEST_TIMEOUT_MS = 10 * 60_000;
  * and EXTENDED only for operations designed to run for several minutes.
  */
 const requestTimeoutByMethod = {
+  [backendMethods.agentTasksList]: QUICK_REQUEST_TIMEOUT_MS,
+  [backendMethods.agentTaskCancel]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentHandoff]: EXTENDED_REQUEST_TIMEOUT_MS,
   [backendMethods.driverHandoffCheck]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.providerUsageGet]: IO_REQUEST_TIMEOUT_MS,
@@ -57,6 +59,7 @@ const requestTimeoutByMethod = {
   [backendMethods.agentDuplicate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentFork]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentFilePreview]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.agentFileChunkRead]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.agentFilesList]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.workspaceFolderValidate]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitDiffGet]: IO_REQUEST_TIMEOUT_MS,
@@ -143,6 +146,7 @@ const requestTimeoutByMethod = {
   [backendMethods.driverConversationsList]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.driverConversationsReconcile]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.workspaceFilePreview]: IO_REQUEST_TIMEOUT_MS,
+  [backendMethods.workspaceFileChunkRead]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.workspaceFilesList]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.driverTextGenerate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.driverCodeReviewRun]: LONG_RUNNING_REQUEST_TIMEOUT_MS,

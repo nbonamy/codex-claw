@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, updateMission, type MissionArtifacts } from '@codex-claw/core/missions';
+import { createMission, updateMission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
 import { MissionService } from '../mission-service';
 import { MissionExecutionService } from '../mission-execution-service';
+import { FileMissionArtifactStore } from '../mission-artifact-store';
 
 function setup() {
   const snapshot = createInitialSnapshot();
@@ -13,8 +17,8 @@ function setup() {
   const artifactContents = new Map<string, string>();
   const ports = { snapshot, missions: store, publish: vi.fn().mockResolvedValue(undefined), reportImplementationStartProgress: vi.fn(), validateRepository: vi.fn().mockResolvedValue(undefined),
     ensureMissionHome: vi.fn().mockResolvedValue('/claw/missions/mission'),
-    readArtifact: vi.fn(async (_missionId: string, stage: string) => artifactContents.get(stage) ?? ''),
-    writeArtifact: vi.fn(async (_missionId: string, stage: string, content: string) => { artifactContents.set(stage, content); return { size: content.length }; }),
+    readArtifact: vi.fn(async (_missionId: string, stage: MissionStage) => artifactContents.get(stage) ?? ''),
+    writeArtifact: vi.fn(async (_missionId: string, stage: MissionStage, content: string) => { artifactContents.set(stage, content); return { size: content.length }; }),
     createWorktree: vi.fn(async ({ repoPath, branchName }: { repoPath: string; branchName: string }) => ({ name: branchName, path: `${repoPath}-${branchName.replace('/', '-')}` })),
     getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
@@ -34,6 +38,90 @@ function setup() {
 }
 
 describe('mission execution', () => {
+  it('retains Mission tools and accepts a later result after an implementation turn ends without submitting', async () => {
+    const h = setup();
+    await h.configure();
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'implementation';
+      mission.artifacts.requirements = { problem: 'Linear OAuth', acceptance: 'Connect' };
+      mission.artifacts.tickets = [{ title: 'Connect Linear', repositoryPath: h.originalAgents[0]!.folder!, done: false }];
+    });
+    await h.command({ action: 'run' });
+    await h.service.waitForLaunches();
+    const workerId = h.current().execution!.runs.at(-1)!.workerId!;
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+    const { createClawMcpServer } = await import('../mcp/tools');
+    const { createMissionToolModuleProvider } = await import('../mcp/mission-tools');
+    const { createCollaborationToolModuleProvider } = await import('../mcp/collaboration-tools');
+    const coordinator = {
+      missionContext: (id: string) => h.service.contextForAgent(id),
+      listMissionArtifacts: (id: string) => h.service.listArtifacts(id),
+      submitMissionResult: (id: string, input: Parameters<typeof h.service.submit>[1]) => h.service.submit(id, input),
+    } as unknown as import('../mcp/agent-coordinator').ClawMcpAgentCoordinator;
+    const callTool = async (name: string, args: Record<string, unknown> = {}) => {
+      const server = createClawMcpServer({ agentId: workerId, url: new URL(`http://localhost/mcp?agentId=${workerId}`) }, [createCollaborationToolModuleProvider(coordinator), createMissionToolModuleProvider(coordinator)]);
+      const client = new Client({ name: 'mission-lifecycle-repro', version: '1' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      try {
+        await server.connect(serverTransport);
+        await client.connect(clientTransport);
+        return await client.callTool({ name, arguments: args });
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    };
+    await expect(callTool('list-mission-artifacts')).resolves.toMatchObject({ isError: false });
+    await h.service.agentFinished(workerId);
+    expect(h.current().execution!.runs.at(-1)!.status).toBe('failed');
+    await expect(callTool('list-mission-artifacts')).resolves.toMatchObject({ isError: false });
+    const artifacts = structuredClone(h.current().artifacts);
+    artifacts.tickets[0]!.done = true;
+    artifacts.implementation = { changes: 'OAuth implemented in a local commit.', tests: 'Callback tests pass.' };
+    await expect(callTool('submit-mission-result', { summary: 'Recovered after clarification', artifacts })).resolves.toMatchObject({
+      isError: false, structuredContent: { success: true, status: 'accepted' },
+    });
+    expect(h.current().artifacts.tickets[0]!.done).toBe(true);
+    expect(h.current().execution!.runs.at(-1)!.error).toBeUndefined();
+    await expect(callTool('list-mission-artifacts')).resolves.toMatchObject({ isError: false });
+    await expect(callTool('submit-mission-result', { summary: 'Duplicate', artifacts })).resolves.toMatchObject({ isError: true });
+    expect(h.current().artifacts.implementation).toStrictEqual(artifacts.implementation);
+  });
+
+  it('keeps historical and cancelled workers able to read artifacts without reviving their assignments', async () => {
+    const h = setup();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const run = h.current().execution!.runs.at(-1)!;
+    await h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Approved problem' });
+    await h.command({ action: 'cancel', runId: run.id });
+    await expect(h.service.readArtifact(run.workerId!, 'requirements')).resolves.toMatchObject({ content: '# Approved problem' });
+    await expect(h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Cancelled write' })).rejects.toThrow('active mission stage');
+    await h.store.change(h.current().id, mission => { mission.stage = 'implementation'; });
+    expect(h.service.contextForAgent(run.workerId!)).toMatchObject({ missionId: h.current().id });
+    expect(h.service.developerInstructionsForAgent(run.workerId!)).toBeUndefined();
+    expect(h.service.contextForAgent('unrelated-agent')).toBeUndefined();
+    await expect(h.service.readArtifact('unrelated-agent', 'requirements')).rejects.toThrow();
+  });
+
+  it('recovers failed Review writes but rejects a superseded worker result', async () => {
+    const h = setup();
+    const workerId = h.originalAgents[0]!.id;
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'review';
+      mission.execution!.runs = [{ id: 'failed-review', stage: 'review', memberId: workerId, workerId, status: 'failed', skills: [], feedback: '', startedAt: 'before', error: 'Interrupted' }];
+    });
+    await h.service.writeArtifact(workerId, { stage: 'review', content: '# Recovered review' });
+    await h.store.change(h.current().id, mission => {
+      mission.execution!.runs.push({ id: 'replacement-review', stage: 'review', memberId: h.originalAgents[1]!.id, workerId: h.originalAgents[1]!.id, status: 'running', skills: [], feedback: '', startedAt: 'now' });
+    });
+    await expect(h.service.readArtifact(workerId, 'review')).resolves.toMatchObject({ content: '# Recovered review' });
+    await expect(h.service.writeArtifact(workerId, { stage: 'review', content: '# Stale review' })).rejects.toThrow('active mission stage');
+    const artifacts = structuredClone(h.current().artifacts);
+    artifacts.review.summary = 'Stale result';
+    await expect(h.service.submit(workerId, { summary: 'Stale result', artifacts })).rejects.toThrow('active run');
+  });
+
   it('persists structured Review findings and remediates the selected set', async () => {
     const h = setup();
     const repositoryPath = h.originalAgents[0]!.folder!;
@@ -199,8 +287,14 @@ describe('mission execution', () => {
     ]);
   });
 
-  it('re-runs Review in the same Mission stage after remediation completes', async () => {
+  it('re-runs Review with real artifact storage and requires a fresh artifact after remediation', async ({ onTestFinished }) => {
     const h = setup();
+    const root = await mkdtemp(path.join(tmpdir(), 'claw-review-rerun-'));
+    onTestFinished(() => rm(root, { recursive: true, force: true }));
+    const artifacts = new FileMissionArtifactStore(async missionId => path.join(root, missionId));
+    h.ports.readArtifact.mockImplementation((id, stage) => artifacts.read(id, stage));
+    h.ports.writeArtifact.mockImplementation((id, stage, content) => artifacts.write(id, stage, content));
+    const previousArtifact = await artifacts.write(h.current().id, 'review', '# Previous review\nRemediation complete.');
     const workerId = h.originalAgents[0]!.id;
     await h.store.change(h.current().id, mission => {
       mission.stage = 'review';
@@ -215,7 +309,7 @@ describe('mission execution', () => {
       };
       mission.artifactFiles = {
         ...mission.artifactFiles,
-        review: { revision: 2, size: 42, updatedAt: 'before' },
+        review: { revision: 2, size: previousArtifact.size, updatedAt: 'before' },
       };
       mission.execution!.workspaces = [{ repositoryPath: '/repo', path: '/mission/repo', branch: 'mission/review' }];
       mission.execution!.runs = [{
@@ -228,10 +322,18 @@ describe('mission execution', () => {
 
     expect(h.current().stage).toBe('review');
     expect(h.current().artifacts.review).toStrictEqual({ summary: '', pullRequestUrl: '', findings: [] });
-    expect(h.ports.writeArtifact).toHaveBeenCalledWith(h.current().id, 'review', '');
-    expect(h.current().artifactFiles?.review).toMatchObject({ revision: 3, size: 0 });
+    await expect(h.service.readArtifactForMission(h.current().id, 'review')).rejects.toThrow('Mission artifact not found.');
     expect(h.current().execution!.runs[0]).toMatchObject({ status: 'accepted', finishedAt: expect.any(String) });
     expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'review', status: 'running', feedback: expect.stringContaining('Re-review') });
+    const rerun = h.current().execution!.runs[1]!;
+    const resultArtifacts = structuredClone(h.current().artifacts);
+    resultArtifacts.review.summary = 'No findings';
+    await expect(h.service.submit(rerun.workerId!, { summary: 'No findings', artifacts: resultArtifacts }))
+      .rejects.toThrow('Write the stage artifact');
+    await h.service.writeArtifact(rerun.workerId!, { stage: 'review', content: '# Fresh review\nNo findings.' });
+    await expect(h.service.readArtifactForMission(h.current().id, 'review')).resolves.toMatchObject({ content: '# Fresh review\nNo findings.' });
+    await expect(h.service.submit(rerun.workerId!, { summary: 'No findings', artifacts: resultArtifacts }))
+      .resolves.toMatchObject({ success: true, status: 'awaitingReview' });
   });
 
   it('tracks only an accepted remediation turn and rejects overlapping batches', async () => {
@@ -574,9 +676,12 @@ describe('mission execution', () => {
       artifacts: firstResult, summary: 'Foundation complete',
     })).resolves.toEqual({ success: true, status: 'accepted' });
     await h.service.waitForLaunches();
-    await h.service.agentFinished(implementationWorkerId!);
+    await h.service.agentFinished(implementationWorkerId!, 'foundation-turn');
     await h.service.waitForLaunches();
-    await h.service.agentFinished(implementationWorkerId!); // /compact completed before the queued ticket prompt starts.
+    // A repeated completion must not consume the compaction guard for the next ticket.
+    await h.service.agentFinished(implementationWorkerId!, 'foundation-turn');
+    await h.service.agentFinished(implementationWorkerId!, 'compaction-turn');
+    await h.service.agentFinished(implementationWorkerId!, 'compaction-turn');
 
     const implementationRuns = h.current().execution!.runs.filter(run => run.stage === 'implementation');
     expect(implementationRuns).toHaveLength(2);

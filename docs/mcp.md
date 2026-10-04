@@ -1,5 +1,33 @@
 # MCP Servers
 
+## Durable task delegation
+
+`create-agent` accepts optional `task: { title, doneWhen }`. Task mode requires
+the visible assignment in `prompt` and a stable parent-scoped `requestId`; reuse
+that ID after timeout. Optional `instructions` supplies the full handoff in the
+same escaped `<context>` block as ordinary creation. Tasks retain the combined
+assignment for recovery. Returned `taskId`, `agentId` and status describe accepted
+startup or an existing task, not completed work. Calls without `task` keep their
+previous behavior. Provider/model/effort/worktree selection remains unchanged.
+
+Contextual `complete-task` takes `summary`, `evidence`, `artifacts` and
+`caveats`. It saves a provisional result and finalizes only after the exact
+submitting turn succeeds. Task instructions require this before `finish_turn`
+instead of a manual completion `send-message`. Notifications need no reply.
+
+`wait-tasks` lists owned/assigned tasks, optionally filters `taskIds`, and
+supports `mode: any|all` with `timeoutMs` from 0 to 30,000. Completion, failure,
+cancellation, interruption and needs-input end a relevant wait. Timeout leaves
+work running. `cancel-task` accepts one owned `taskId`, saves cancellation
+and interrupts only the recorded execution. Unrelated agents cannot read
+filtered task IDs, submit another worker's results or cancel assignments.
+
+All operations run on the executing daemon's MCP server. Remote clients inspect
+and cancel through agent-scoped RPC routed to that same owner. Tasks survive
+agent removal; undelivered results are never pruned. See `architecture.md` for
+recovery and retention limits.
+
+
 Codex Claw owns local MCP endpoints for agent-to-agent collaboration and for
 credentialed access to provider-hosted MCP servers. These are app surfaces,
 not Codex-specific protocols. Codex and Claude receive the same Claw-owned
@@ -517,8 +545,13 @@ Input:
 - `model` and `reasoningEffort`: optional backend overrides. When omitted and
   the new agent uses the caller's backend, each value inherits from the caller;
   cross-backend creation uses that backend's defaults instead;
-- `prompt`: optional self-contained initial instructions. The tool stays
-  pending until the new agent accepts this prompt.
+- `prompt`: optional concise initial request shown to the user. The tool stays
+  pending until the new agent accepts this prompt;
+- `instructions`: optional full handoff, requiring a nonempty `prompt`. Claw
+  prepends these instructions inside `<context>` and leaves the visible request
+  outside it. Existing prompt-only calls are unchanged. This is presentation
+  separation, not secret storage or a separate system-instruction channel:
+  both parts remain in the provider transcript.
 
 `clawd` emits transient `agentCreation.progress` events around worktree
 creation, agent creation, and initial-prompt handoff. The renderer shows the
@@ -766,9 +799,11 @@ path validation remain mandatory boundaries.
 
 ### Mission tools
 
-Mission tools are registered only when the authenticated backend agent owns the
-current running Mission attempt. Ordinary agents do not receive them in their
-tool catalog, and backend ownership checks still reject cached or late calls.
+Mission tools remain registered for authenticated Mission workers across run
+failures, cancellations, acceptance, and stage transitions. Membership comes
+from the worker's recorded assignments, not its current turn or run status.
+Ordinary agents do not receive them. Tool availability permits inspection;
+backend ownership checks separately control mutations and reject stale calls.
 Mission workers do not receive generic thread-flag tools because the Mission
 workflow owns delegation and worktree transitions explicitly.
 
@@ -782,13 +817,13 @@ already represented by a Mission team member. The tool validates the path as a
 Git repository and persists it without exposing a setup form; implementation
 creates the isolated worktree later, when code work begins.
 
-`list-mission-artifacts` and `read-mission-artifact` let any active Mission
+`list-mission-artifacts` and `read-mission-artifact` let any assigned Mission
 worker discover and consume the canonical Markdown created by earlier stages.
 `write-mission-artifact` writes only the caller's assigned stage under the
 Claw-owned Mission home. Existing files use an expected revision so concurrent
 or stale agents cannot silently overwrite each other.
 
-`upsert-mission-ticket` is exposed only to the active Tickets-stage orchestrator.
+`upsert-mission-ticket` accepts writes only from the current Tickets-stage orchestrator.
 It assigns stable Mission ticket IDs, resolves blocking edges against those IDs,
 persists the structured draft, rewrites the canonical Tickets Markdown artifact,
 and publishes the snapshot after every change. Tracker issue numbers are optional
@@ -796,15 +831,20 @@ external references and never serve as the Mission ticket identity.
 
 `submit-mission-result` is an app-owned stage handoff. The active Mission and run
 are inferred from the authenticated worker; volatile Mission and run IDs are not
-model-authored inputs. Only the worker bound to the current running Mission
-attempt may report artifacts, and the canonical stage artifact must already
-exist. Requirements, Tickets, and Review reports become persisted proposals for
+model-authored inputs. Only the worker bound to the current, unsuperseded Mission
+attempt may report artifacts. Requirements, Tickets, and Review require the
+canonical stage artifact to exist and become persisted proposals for
 human review. Tickets may carry canonical tracker references and zero-based
 dependency indices; invalid/cyclic dependencies are rejected. A completed
 implementation report updates only its assigned ticket, appends verification
 evidence, and continues toward the explicit Review stage. Late reports from
-stopped or accepted attempts are rejected because they no longer have an active
-identity-bound context.
+cancelled or accepted attempts are rejected by mutation ownership checks.
+A failed attempt remains recoverable: its worker can read artifacts, continue
+its assigned work, and submit the result on a later turn without restarting the
+Mission. A successful submission clears the old error. A replacement attempt,
+a stage change, or Mission completion prevents the old attempt from writing.
+Historical workers keep read access without receiving obsolete stage execution
+instructions.
 
 ### Visualize canvas tools
 

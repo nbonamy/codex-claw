@@ -6,6 +6,9 @@ type ToolPhase = 'completed' | 'failed' | 'running';
 type AgentNameResolver = (identifier: string) => string | undefined;
 
 const TOOL_KEYS: Record<string, string> = {
+  'wait-tasks': 'waitTasks',
+  'complete-task': 'completeTask',
+  'cancel-task': 'cancelTask',
   'broadcast-message': 'broadcastMessage',
   'browser-click': 'browserClick',
   'browser-console-logs': 'browserConsoleLogs',

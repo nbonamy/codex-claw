@@ -317,7 +317,25 @@ describe('ClawBackendServer', () => {
     } finally { await server.close(); }
   });
 
-  it('deletes an explicitly confirmed linked worktree before removing its agent', async () => {
+  it.each([
+    { confirmed: true, deleteWorktree: true, discardChanges: 'true' },
+    { confirmed: false, deleteWorktree: true, discardChanges: true },
+    { confirmed: true, deleteWorktree: false, discardChanges: true },
+  ])('rejects invalid discard authorization without deleting the agent: %j', async (input) => {
+    const snapshot = createTestSnapshot();
+    snapshot.agents = [{ id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/repo-feature', backend: 'codex', status: { type: 'idle' }, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }];
+    snapshot.teams[0]!.agentIds = ['agent-dina'];
+    const agent = snapshot.agents[0]!;
+    const deleteLinkedWorktree = vi.fn();
+    const server = new ClawBackendServer({ version: 'test', snapshot, agentGitService: { deleteLinkedWorktree } as unknown as AgentGitService });
+    try {
+      await expect(server.handleMessage({ jsonrpc: '2.0', id: 'invalid-discard', method: backendMethods.agentDelete, params: { agentId: agent.id, input } })).rejects.toThrow();
+      expect(snapshot.agents).toContain(agent);
+      expect(deleteLinkedWorktree).not.toHaveBeenCalled();
+    } finally { await server.close(); }
+  });
+
+  it.each([false, true])('deletes a confirmed linked worktree, forwarding discardChanges=%s', async (discardChanges) => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
@@ -345,12 +363,12 @@ describe('ClawBackendServer', () => {
       method: backendMethods.agentDelete,
       params: {
         agentId: 'agent-dina',
-        input: { deleteWorktree: true, deleteRemoteBranch: true, confirmed: true },
+        input: { deleteWorktree: true, deleteRemoteBranch: true, confirmed: true, discardChanges },
       },
     })).resolves.toMatchObject({ result: { agents: [] } });
 
-    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-fix-gh-22', true, undefined);
-    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-fix-gh-22', true, undefined);
+    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-fix-gh-22', true, undefined, discardChanges);
+    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-fix-gh-22', true, undefined, discardChanges);
     await server.close();
   });
 
@@ -408,8 +426,8 @@ describe('ClawBackendServer', () => {
       },
     })).resolves.toMatchObject({ result: { agents: [] } });
 
-    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-feature', false, 'merged-head');
-    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-feature', false, 'merged-head');
+    expect(validateLinkedWorktreeDeletion).toHaveBeenCalledWith('/repo-feature', false, 'merged-head', false);
+    expect(deleteLinkedWorktree).toHaveBeenCalledWith('/repo-feature', false, 'merged-head', false);
     await server.close();
   });
 
@@ -496,6 +514,12 @@ describe('ClawBackendServer', () => {
           path: 'README.md',
           content: '# Read me\n',
         },
+      });
+      await expect(server.handleMessage({
+        jsonrpc: '2.0', id: 'download-file', method: 'agent/file/chunk/read',
+        params: { agentId: 'agent-dina', filePath: 'README.md', offset: 2 },
+      })).resolves.toMatchObject({
+        result: { path: 'README.md', size: 10, data: Buffer.from('Read me\n').toString('base64'), nextOffset: 10 },
       });
       await expect(server.handleMessage({
         jsonrpc: '2.0',

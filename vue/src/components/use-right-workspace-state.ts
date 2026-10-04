@@ -40,6 +40,11 @@ export type AgentRightWorkspaceState = {
   width: number;
 };
 
+export function constrainedRightWorkspaceWidth(preferredWidth: number, bodyWidth: number): number {
+  // Reserve the chat minimum and the divider before allocating sidebar space.
+  return Math.min(Math.max(preferredWidth, 240), Math.max(0, bodyWidth - 480 - 5));
+}
+
 export function useRightWorkspaceState(options: {
   currentAgentId: () => string | undefined;
   sharedVisibilityGroupId?: () => string | undefined;
@@ -165,8 +170,7 @@ export function useRightWorkspaceState(options: {
     resizing.value = true;
     const updateWidth = (moveEvent: PointerEvent) => {
       const bounds = body.getBoundingClientRect();
-      const availableWidth = Math.max(240, bounds.width - 240);
-      workspaceFor(agentId).width = Math.min(Math.max(bounds.right - moveEvent.clientX, 240), availableWidth);
+      workspaceFor(agentId).width = constrainedRightWorkspaceWidth(bounds.right - moveEvent.clientX, bounds.width);
     };
     const stop = () => {
       window.removeEventListener('pointermove', updateWidth);

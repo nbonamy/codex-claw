@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { getLocalClaudeAuthentication, logoutLocalClaude } from './authentication';
 import { getClaudeAccountUsage } from './account-usage';
 import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
@@ -17,7 +18,8 @@ import type {
   ConversationSummary,
   RendererMessage,
   RendererToolPart,
-  SendPromptOptions
+  SendPromptOptions,
+  ThreadGoal,
 } from '@codex-claw/core/contracts';
 import {
   createClaudeConversationReplica,
@@ -88,6 +90,7 @@ type ActiveClaudeTurn = {
   resolveStart: (result: BackendSendResult) => void;
   rejectStart: (error: Error) => void;
   startResolved: boolean;
+  error: Error | null;
 };
 
 type EventListener = (event: BackendEvent) => void;
@@ -124,6 +127,10 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     credits: null, individualLimit: null, planType: null, rateLimitReachedType: null,
   };
   private readonly activeTurnsByAgentId = new Map<string, ActiveClaudeTurn>();
+  private readonly forkingAgentIds = new Set<string>();
+  private readonly turnBoundariesByAgentId = new Map<string, Map<string, string>>();
+  private readonly goalsByAgentId = new Map<string, ThreadGoal>();
+  private readonly goalRefreshIds = new Map<string, symbol>();
   private readonly conversationReplicasByAgentId = new Map<string, ClaudeConversationReplica>();
   private readonly conversationRevisionsByAgentId = new Map<string, number>();
   private readonly pendingRequestOwners = new Map<string, ActiveClaudeTurn>();
@@ -259,11 +266,47 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {
-    return /^\/compact(?:\s+.*)?$/s.test(prompt) ? this.sendPrompt(agent, prompt) : null;
+    return /^\/(?:compact|goal)(?:\s+.*)?$/s.test(prompt) ? this.sendPrompt(agent, prompt) : null;
+  }
+
+  async setGoal(agent: Agent, objective: string): Promise<import('@codex-claw/core/backend-driver').BackendGoalResult> {
+    const condition = objective.trim();
+    if (!condition || condition === 'clear') throw new Error('Enter a goal condition.');
+    const now = Date.now() / 1000;
+    const started = await this.sendPrompt(agent, `/goal ${condition}`, { recordUserMessage: false });
+    if (started.backendSession.kind !== 'claude') throw new Error('Claude did not return a session.');
+    const goal: ThreadGoal = { threadId: started.backendSession.sessionId, objective: condition, status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: now, updatedAt: now };
+    this.goalsByAgentId.set(agent.id, goal);
+    return { backendSession: started.backendSession, goal };
+  }
+
+  async clearGoal(agent: Agent): Promise<import('@codex-claw/core/backend-driver').BackendGoalResult> {
+    if (this.activeTurnsByAgentId.has(agent.id)) await this.interrupt(agent);
+    const started = await this.sendPromptWithConfiguration(agent, '/goal clear', { recordUserMessage: false }, undefined, true);
+    this.goalRefreshIds.delete(agent.id);
+    this.goalsByAgentId.delete(agent.id);
+    return { backendSession: started.backendSession, cleared: true };
   }
 
   async sendPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {
     return this.sendPromptWithConfiguration(agent, prompt, options);
+  }
+
+  async steerPrompt(agent: Agent, prompt: string, options: SendPromptOptions = {}): Promise<BackendSendResult> {
+    const turn = this.activeTurnsByAgentId.get(agent.id);
+    if (!turn) return this.sendPrompt(agent, prompt, options);
+    if (!turn.sessionId) throw new Error('Claude has not initialized its session yet.');
+    if (!turn.handle.steer) throw new Error('This Claude transport does not support steering.');
+    if (!await turn.handle.steer(prompt, options.attachments)) return this.sendPrompt(agent, prompt, options);
+    if (options.recordUserMessage !== false) {
+      const createdAt = new Date().toISOString();
+      this.emitConversation({
+        type: 'message.userSubmitted', agentId: agent.id, backend: 'claude',
+        backendSessionId: turn.sessionId ?? undefined, turnId: turn.turnId, occurredAt: createdAt,
+        payload: { message: createUserMessage(agent.id, prompt, createdAt, `steer-${randomUUID()}`, turn.turnId, options.attachments) },
+      });
+    }
+    return { backendSession: claudeBackendSession(turn.sessionId, turn.model, turn.reasoningEffort), turnId: turn.turnId };
   }
 
   private async sendPromptWithConfiguration(
@@ -271,11 +314,15 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     prompt: string,
     options: SendPromptOptions,
     review?: ClaudeReviewTurnConfiguration,
+    waitForCompletion = false,
   ): Promise<BackendSendResult> {
+    if (this.forkingAgentIds.has(agent.id)) throw new Error('Claude conversation is being forked.');
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
     }
     const folder = claudeWorkingDirectory(agent);
+    const goalRefreshId = Symbol();
+    this.goalRefreshIds.set(agent.id, goalRefreshId);
     const turnId = this.nextTurnId();
     const existingSessionId = claudeSessionId(agent);
     const liveSessionId = this.liveSessionIdsByAgentId.get(agent.id);
@@ -338,6 +385,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         resolveStart: resolve,
         rejectStart: reject,
         startResolved: false,
+        error: null,
       };
       this.activeTurnsByAgentId.set(agent.id, activeTurn);
       if (existingSessionId) {
@@ -376,22 +424,30 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       }
       void handle.done
         .then(() => this.finishProcess(activeTurn as ActiveClaudeTurn))
-        .catch((error: unknown) => this.failProcess(activeTurn as ActiveClaudeTurn, error));
+        .catch((error: unknown) => this.failProcess(activeTurn as ActiveClaudeTurn, error))
+        .then(() => this.refreshGoal(agent, activeTurn as ActiveClaudeTurn, goalRefreshId));
     });
 
-    return started;
+    const result = await started;
+    const turn = activeTurn as ActiveClaudeTurn | null;
+    if (waitForCompletion && turn) {
+      await turn.handle.done;
+      if (turn.error) throw turn.error;
+    }
+    return result;
   }
 
-  async interrupt(agent: Agent): Promise<BackendSendResult> {
+  async interrupt(agent: Agent, expectedTurnId?: string): Promise<BackendSendResult> {
     const activeTurn = this.activeTurnsByAgentId.get(agent.id);
     if (!activeTurn) {
       throw new Error('No active Claude turn to interrupt.');
     }
+    if (expectedTurnId && activeTurn.turnId !== expectedTurnId) throw new Error('The requested Claude task turn is no longer active.');
 
     activeTurn.interrupted = true;
     await activeTurn.handle.interrupt();
     this.completeTurn(activeTurn);
-    this.activeTurnsByAgentId.delete(agent.id);
+    if (this.activeTurnsByAgentId.get(agent.id) === activeTurn) this.activeTurnsByAgentId.delete(agent.id);
 
     return {
       backendSession: claudeBackendSession(
@@ -428,6 +484,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   async releaseConversation(agentId: string): Promise<void> {
+    this.turnBoundariesByAgentId.delete(agentId);
+    this.goalRefreshIds.delete(agentId);
+    this.goalsByAgentId.delete(agentId);
     this.conversationReplicasByAgentId.delete(agentId);
     this.conversationRevisionsByAgentId.delete(agentId);
     const sessionId = this.liveSessionIdsByAgentId.get(agentId);
@@ -465,6 +524,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     );
 
     if (history.backendSession.kind === 'claude') {
+      this.publishGoal(agent.id, history.goal);
       this.queueHydratedContextUsageRefresh(agent, history.backendSession);
     }
 
@@ -498,11 +558,35 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       history?.messages ?? [],
     );
     if (resolvedBackendSession.kind === 'claude') {
+      this.turnBoundariesByAgentId.delete(agent.id);
+      this.goalRefreshIds.delete(agent.id);
+      this.publishGoal(agent.id, history?.goal ?? null);
       this.queueHydratedContextUsageRefresh({ ...agent, backendSession: resolvedBackendSession }, resolvedBackendSession);
     }
     return {
       backendSession: resolvedBackendSession,
     };
+  }
+
+  async forkConversation(agent: Agent, targetAgent: Agent, turnId?: string): Promise<import('@codex-claw/core/backend-driver').BackendConversationForkResult> {
+    const sessionId = claudeSessionId(agent);
+    if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
+    if (this.activeTurnsByAgentId.has(agent.id) || this.forkingAgentIds.has(agent.id)) throw new Error('Claude must be idle before forking.');
+    if (agent.folder !== targetAgent.folder) throw new Error('Claude fork folder must match the source folder.');
+    if (!this.transport.forkSession) throw new Error('Native Claude forks are unavailable.');
+    this.forkingAgentIds.add(agent.id);
+    try {
+      const history = turnId ? await this.loadHistory(agent) : null;
+      const liveBoundary = turnId ? this.turnBoundariesByAgentId.get(agent.id)?.get(turnId) : undefined;
+      const historicalTurnId = liveBoundary ? history?.nativeMessageTurnIds?.[liveBoundary] : turnId;
+      const boundary = historicalTurnId ? history?.turnBoundaries?.[historicalTurnId] : undefined;
+      if (turnId && !boundary) throw new Error('Native Claude message boundary is unavailable for this turn. Reload the conversation and retry.');
+      const childId = await this.transport.forkSession(sessionId, claudeWorkingDirectory(agent), boundary);
+      const backendSession = claudeBackendSession(childId,
+        agent.backendSession?.kind === 'claude' ? agent.backendSession.model : undefined,
+        agent.backendSession?.kind === 'claude' ? agent.backendSession.reasoningEffort as ClaudeTurnParams['effort'] : undefined);
+      return { backendSession };
+    } finally { this.forkingAgentIds.delete(agent.id); }
   }
 
   async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
@@ -540,6 +624,46 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return this.historyLoader(agent);
   }
 
+  private async refreshGoal(agent: Agent, turn: ActiveClaudeTurn, refreshId: symbol): Promise<void> {
+    if (!turn.sessionId || this.goalRefreshIds.get(agent.id) !== refreshId) return;
+    try {
+      let goal: ThreadGoal | null | undefined;
+      let verified = false;
+      // The CLI can emit result before its goal_status attachment reaches disk.
+      // Bound the retry and invalidate it when a newer turn or release wins.
+      for (const delay of [0, 100, 200, 400, 800]) {
+        if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+        if (this.goalRefreshIds.get(agent.id) !== refreshId) return;
+        const history = await this.loadHistory({ ...agent, backendSession: claudeBackendSession(turn.sessionId) });
+        if (this.goalRefreshIds.get(agent.id) !== refreshId) return;
+        const pending = this.goalsByAgentId.get(agent.id);
+        verified = history?.goal !== undefined;
+        goal = history?.goal !== undefined ? history.goal : pending;
+        if (goal && pending?.status === 'active' && goal.createdAt < pending.createdAt) { goal = pending; verified = false; }
+        if (goal?.status !== 'active' || turn.error || turn.interrupted) break;
+      }
+      if (goal?.status === 'active' && (turn.error || turn.interrupted || !verified)) {
+        goal = { ...goal, status: turn.interrupted ? 'paused' : 'blocked', updatedAt: Date.now() / 1000 };
+      }
+      this.publishGoal(agent.id, goal);
+    } catch {
+      // History is best effort; an unreadable transcript must not claim success.
+      const goal = this.goalsByAgentId.get(agent.id);
+      if (goal && this.goalRefreshIds.get(agent.id) === refreshId) this.publishGoal(agent.id, { ...goal, status: 'blocked' });
+    }
+  }
+
+  private publishGoal(agentId: string, goal: ThreadGoal | null | undefined): void {
+    if (goal === undefined) return;
+    if (goal === null) {
+      this.goalsByAgentId.delete(agentId);
+      this.emit({ agentId, type: 'conversation.goalCleared', payload: {} });
+    } else {
+      this.goalsByAgentId.set(agentId, goal);
+      this.emit({ agentId, type: 'conversation.goalUpdated', payload: { goal } });
+    }
+  }
+
   private claudeProjectsRoot(): string | undefined {
     return this.driverOptions.homeDir ? path.join(this.driverOptions.homeDir, '.claude', 'projects') : undefined;
   }
@@ -559,6 +683,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   async close(): Promise<void> {
+    this.goalRefreshIds.clear();
+    this.goalsByAgentId.clear();
+    this.turnBoundariesByAgentId.clear();
     const interrupts: Promise<void>[] = [];
     for (const activeTurn of this.activeTurnsByAgentId.values()) {
       activeTurn.interrupted = true;
@@ -608,6 +735,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         return;
       }
 
+      this.rememberTurnBoundary(activeTurn, message);
       this.emitAssistantMessage(activeTurn, message);
       return;
     }
@@ -618,6 +746,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     }
 
     if (message.type === 'user') {
+      this.rememberTurnBoundary(activeTurn, message);
       this.emitToolResults(activeTurn, message);
       return;
     }
@@ -634,6 +763,13 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       }
       this.activeTurnsByAgentId.delete(activeTurn.agentId);
     }
+  }
+
+  private rememberTurnBoundary(turn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
+    if (!('uuid' in message) || typeof message.uuid !== 'string') return;
+    let boundaries = this.turnBoundariesByAgentId.get(turn.agentId);
+    if (!boundaries) this.turnBoundariesByAgentId.set(turn.agentId, boundaries = new Map());
+    boundaries.set(turn.turnId, message.uuid);
   }
 
   private handleCompactionEvent(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
@@ -1239,6 +1375,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   private failTurn(activeTurn: ActiveClaudeTurn, error: Error): void {
+    activeTurn.error = error;
     this.emit({
       backend: this.backend,
       type: 'backend.statusChanged',
@@ -1272,7 +1409,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       backendSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'turn.completed',
-      payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : 'completed' } },
+      payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : activeTurn.error ? 'failed' : 'completed' } },
     });
     this.emit({
       agentId: activeTurn.agentId,

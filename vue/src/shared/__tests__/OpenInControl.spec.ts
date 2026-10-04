@@ -1,5 +1,6 @@
-import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { ElPopover } from 'element-plus';
+import { describe, expect, it, vi } from 'vitest';
 import OpenInControl from '../OpenInControl.vue';
 
 const catalog = {
@@ -32,18 +33,27 @@ describe('OpenInControl', () => {
     expect(wrapper.find('.open-in-control__menu-trigger').exists()).toBe(true);
   });
 
-  it('shows installed applications and opens the selected choice', async () => {
+  it('shows applications outside the containing pane and opens the selected choice', async () => {
     const wrapper = mount(OpenInControl, {
       props: { application: 'vscode', catalog },
       attachTo: document.body,
+      global: { components: { ElPopover }, stubs: { transition: false } },
     });
 
     await wrapper.get('[aria-label="Choose Open In application"]').trigger('click');
-    expect(wrapper.findAll('[role="menuitem"]').map((item) => item.text())).toStrictEqual(['VS Code', 'Finder', 'Xcode']);
-    await wrapper.findAll('[role="menuitem"]')[2]?.trigger('click');
+    await flushPromises();
+    const menu = document.querySelector('[role="menu"][aria-label="Open in application"]')!;
+    expect(menu).not.toBeNull();
+    expect(wrapper.element.contains(menu)).toBe(false);
+    const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    expect(items.map(item => item.textContent?.trim())).toStrictEqual(['VS Code', 'Finder', 'Xcode']);
+    items[2]!.focus();
+    await flushPromises();
+    items[2]!.click();
+    await flushPromises();
 
     expect(wrapper.emitted('open')).toStrictEqual([['xcode']]);
-    expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+    await vi.waitFor(() => expect(menu.closest('[role="tooltip"]')!.getAttribute('aria-hidden')).toBe('true'));
     wrapper.unmount();
   });
 });

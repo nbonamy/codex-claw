@@ -1,4 +1,6 @@
 export const backendMethods = {
+  agentTasksList: 'agent/tasks/list',
+  agentTaskCancel: 'agent/task/cancel',
   engineInstructionsRead: 'settings/instructions/read',
   engineInstructionsSave: 'settings/instructions/save',
   agentApprovalPresetUpdate: 'agent/approvalPreset/update',
@@ -34,6 +36,7 @@ export const backendMethods = {
   agentHandoff: 'agent/handoff/start',
   driverHandoffCheck: 'driver/handoff/check',
   agentFilePreview: 'agent/file/preview',
+  agentFileChunkRead: 'agent/file/chunk/read',
   agentFilesList: 'agent/files/list',
   workspaceFolderValidate: 'workspace/folder/validate',
   agentGitDiffGet: 'agent/git/diff/get',
@@ -128,6 +131,7 @@ export const backendMethods = {
   driverConversationsList: 'driver/conversations/list',
   driverConversationsReconcile: 'driver/conversations/reconcile',
   workspaceFilePreview: 'workspace/file/preview',
+  workspaceFileChunkRead: 'workspace/file/chunk/read',
   workspaceFilesList: 'workspace/files/list',
   driverTextGenerate: 'driver/text/generate',
   driverCodeReviewRun: 'driver/codeReview/run',

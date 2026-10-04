@@ -2,11 +2,33 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { listAgentFolderFiles, previewAgentFolderFile } from '../agent-files';
+import { listAgentFolderFiles, previewAgentFolderFile, readAgentFolderFileChunk } from '../agent-files';
 
 const tempFolders: string[] = [];
 
 describe('listAgentFolderFiles', () => {
+  it('downloads binary files beyond the preview limit in bounded, byte-exact chunks', async () => {
+    const folder = await createTempFolder();
+    const original = Buffer.alloc(2 * 1024 * 1024 + 7, 0x9a);
+    await writeFile(path.join(folder, 'film.mp4'), original);
+    expect((await previewAgentFolderFile(folder, 'film.mp4')).kind).toBe('tooLarge');
+    const parts: Buffer[] = [];
+    let offset = 0;
+    while (offset < original.length) {
+      const result = await readAgentFolderFileChunk(folder, 'film.mp4', offset);
+      const bytes = Buffer.from(result.data, 'base64');
+      expect(bytes.length).toBeLessThanOrEqual(512 * 1024);
+      expect(result.size).toBe(original.length);
+      expect(result.nextOffset).toBe(offset + bytes.length);
+      parts.push(bytes);
+      offset = result.nextOffset;
+    }
+    expect(Buffer.concat(parts).equals(original)).toBe(true);
+    await expect(readAgentFolderFileChunk(folder, 'film.mp4', -1)).rejects.toThrow('Invalid file offset');
+    await expect(readAgentFolderFileChunk(folder, 'film.mp4', original.length + 1)).rejects.toThrow('File changed');
+    await expect(readAgentFolderFileChunk(folder, '.', 0)).rejects.toThrow('not a file');
+  });
+
   afterEach(async () => {
     await Promise.all(tempFolders.map(async (folder) => {
       await rm(folder, { recursive: true, force: true });

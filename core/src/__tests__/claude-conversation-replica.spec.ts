@@ -3,6 +3,17 @@ import { createClaudeConversationReplica } from '../claude-conversation-replica'
 import type { ClaudeConversationEvent, ClaudeConversationSnapshot } from '../contracts';
 
 describe('Claude conversation replica', () => {
+  it('keeps a steering message between the answers received before and after it', () => {
+    const replica = createClaudeConversationReplica(emptySnapshot());
+    replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } } }));
+    replica.apply(event({ type: 'message.delta', turnId: 'turn-1', payload: { messageId: 'answer', delta: 'Before' } }));
+    replica.apply(event({ type: 'message.userSubmitted', turnId: 'turn-1', payload: { message: { id: 'steer-1', agentId: 'agent-1', role: 'user', kind: 'steer', status: 'complete', turnId: 'turn-1', createdAt: '2026-10-04T00:00:00Z', parts: [{ type: 'text', text: 'Change it' }] } } }));
+    replica.apply(event({ type: 'message.delta', turnId: 'turn-1', payload: { messageId: 'answer', delta: 'After' } }));
+    expect(replica.getSnapshot().messages.map((message) => message.parts)).toEqual([
+      [{ type: 'text', text: 'Before' }], [{ type: 'text', text: 'Change it' }], [{ type: 'text', text: 'After' }],
+    ]);
+  });
+
   it('owns one turn transcript from prompt submission through completion', () => {
     const replica = createClaudeConversationReplica(emptySnapshot());
 

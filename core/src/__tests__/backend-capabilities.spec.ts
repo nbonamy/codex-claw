@@ -24,11 +24,11 @@ describe('backend capabilities', () => {
     expect(claudeBackendCapabilities).toMatchObject({
       attachments: true,
       planMode: 'prompted',
-      goals: false,
+      goals: true,
       serviceTier: false,
-      steerPrompt: false,
+      steerPrompt: true,
       approvals: true,
-      conversationFork: false,
+      conversationFork: true,
       approvalPresets: [],
       permissionModes: [
         expect.objectContaining({ id: 'default', label: { key: 'permissions.claude.default.label' } }),

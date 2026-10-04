@@ -76,6 +76,7 @@ const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-mess
 const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding', 'delete-finding', 'report-mission-review-finding', 'update-mission-review-finding']);
 const VISUALIZE_TOOLS = new Set(['suggest-visualizations', 'add-visualization', 'get-visualization', 'list-visualizations', 'delete-visualization', 'replace-visualization', 'read-visualization-canvas', 'edit-visualization-canvas', 'view-visualization-canvas']);
 const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent']);
+const TASK_TOOLS = new Set(['wait-tasks', 'complete-task', 'cancel-task']);
 const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-project', 'create-worktree', 'list-repos', 'list-worktrees']);
 const HIDDEN_HOUSEKEEPING_TOOLS = new Set(['set-status', 'finish-turn']);
 
@@ -122,6 +123,7 @@ function clawToolIcon(tool: string): ToolIcon | undefined {
   if (REVIEW_TOOLS.has(tool)) return icons.review;
   if (VISUALIZE_TOOLS.has(tool)) return icons.visualize;
   if (AGENT_TOOLS.has(tool)) return icons.agents;
+  if (TASK_TOOLS.has(tool)) return icons.workItem;
   if (WORKSPACE_TOOLS.has(tool)) return icons.workspace;
   if (tool === 'display-markdown' || tool === 'list-mission-artifacts' || tool === 'read-mission-artifact') return icons.markdown;
   if (tool === 'set-mission-title') return icons.mission;

@@ -2,6 +2,7 @@ import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMission } from '@codex-claw/core/missions';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
+import type { AgentGitWorkflow } from '@codex-claw/core/contracts';
 import { conversationControllerActions, conversationControllerState, mountShell, workItem } from './app-shell-test-harness';
 
 const missionStorageKey = 'codexClaw.activeMissionId';
@@ -439,6 +440,11 @@ describe('AppShell missions', () => {
     const mergeAgentGitBranch = vi.fn();
     const createAgentGitPullRequest = vi.fn();
     const openAgentPath = vi.fn().mockResolvedValue(undefined);
+    const workflow: AgentGitWorkflow = {
+      repository: 'owner/billing', folder: worktreePath, isLinkedWorktree: true, baseBranch: 'main', branch: 'mission/add-billing',
+      detached: false, ahead: 1, behind: 0, files: [], stagedFiles: [], unstagedFiles: [], githubConnected: true,
+    };
+    const updateAgentGitBranchFromBase = vi.fn().mockResolvedValue({ workflow, baseBranch: 'main', branch: workflow.branch, conflicts: [] });
     const wrapper = mountShell({
       snapshot,
       mergeAgentGitBranch,
@@ -450,7 +456,9 @@ describe('AppShell missions', () => {
       },
     });
 
+    await wrapper.setProps({ getAgentGitWorkflow: vi.fn().mockResolvedValue(workflow), updateAgentGitBranchFromBase });
     await wrapper.findComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
 
     const board = wrapper.getComponent({ name: 'MissionShipBoard' });
     expect(board.props('mission')).toMatchObject({ id: mission.id, stage: 'ship' });
@@ -462,5 +470,8 @@ describe('AppShell missions', () => {
       'vscode',
       worktreePath,
     );
+    await board.findAll('button').find(button => button.text() === 'Update from main')!.trigger('click');
+    await flushPromises();
+    expect(updateAgentGitBranchFromBase).toHaveBeenCalledExactlyOnceWith(snapshot.agents[0]!.id, { confirmed: true });
   });
 });

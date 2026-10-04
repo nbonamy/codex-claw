@@ -79,7 +79,12 @@ function write(level: 'debug' | 'info' | 'warn' | 'error', area: string, message
 
 function safeJson(details: Record<string, unknown>): string {
   try {
-    return redactText(JSON.stringify(details)).slice(0, maxRendererMessageLength);
+    return JSON.stringify(details, (key, value: unknown) => {
+      if (/^(?:authorization|access[_-]?token|refresh[_-]?token|password|secret|prompt|content)$/i.test(key)) {
+        return '[redacted]';
+      }
+      return typeof value === 'string' ? redactText(value) : value;
+    }).slice(0, maxRendererMessageLength);
   } catch {
     return JSON.stringify({ detail: 'unserializable' });
   }

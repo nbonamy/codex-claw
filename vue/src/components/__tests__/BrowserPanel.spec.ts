@@ -77,6 +77,23 @@ function mountPanel(
 }
 
 describe('BrowserPanel', () => {
+  it.each([
+    ['claw', 'https://www.google.com/search?q=claw'],
+    ['  how do worktrees work?  ', 'https://www.google.com/search?q=how%20do%20worktrees%20work%3F'],
+    ['example.com/docs', 'example.com/docs'],
+    ['example.com:8080/docs', 'https://example.com:8080/docs'],
+    ['localhost:3000', 'http://localhost:3000'],
+    ['https://example.com/', 'https://example.com/'],
+    ['javascript:alert(1)', 'javascript:alert(1)'],
+  ])('submits address-bar input %s as a URL or search', async (input, expected) => {
+    const { wrapper, api } = mountPanel();
+    await flushPromises();
+    await wrapper.get('input[aria-label="Browser address"]').setValue(input);
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(api.browserNavigate).toHaveBeenCalledWith('agent-1', 'primary', expected);
+  });
+
   it('waits for the attached guest document before requesting its WebContents ID', async () => {
     const getWebContentsId = vi.fn(() => 42);
     Object.defineProperty(HTMLElement.prototype, 'getWebContentsId', { configurable: true, value: getWebContentsId });

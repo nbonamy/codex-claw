@@ -49,6 +49,7 @@ export const codexBackendCommands: BackendCommandSummary[] = [
       placeholder: 'Describe the goal',
     },
   },
+  ...worktreeDelegationCommands('codex'),
 ];
 
 export const claudeBackendCommands: BackendCommandSummary[] = [
@@ -88,7 +89,22 @@ export const claudeBackendCommands: BackendCommandSummary[] = [
     slashName: 'plan',
     submitOnSelect: true,
   },
+  ...worktreeDelegationCommands('claude'),
 ];
+
+function worktreeDelegationCommands(backend: AgentBackend): BackendCommandSummary[] {
+  return ['delegate', 'worktree'].map((name) => ({
+    id: `claw.${name}`,
+    backend,
+    name,
+    displayName: name === 'delegate' ? 'Delegate' : 'Worktree',
+    description: name === 'delegate'
+      ? 'Delegate this task to a new agent in a worktree.'
+      : 'Alias for /delegate: start a new agent in a worktree.',
+    slashName: name,
+    submitOnSelect: true,
+  }));
+}
 
 export function defaultBackendCommands(backend: AgentBackend): BackendCommandSummary[] {
   return backend === 'claude' ? claudeBackendCommands : codexBackendCommands;

@@ -809,6 +809,18 @@ describe('ClawMcpService', () => {
       message: 'branchName is required when createWorktree is true',
     });
 
+    const agentCount = snapshot.agents.length;
+    const missingPrompt = await callTool(url, 'agent-dina', 'create-agent', {
+      repoPath: '/tmp/new-agent',
+      prompt: '   ',
+      instructions: 'Detailed handoff without a visible request.',
+    });
+    expect(missingPrompt.result.structuredContent).toStrictEqual({
+      success: false,
+      message: 'prompt is required when instructions are provided',
+    });
+    expect(snapshot.agents).toHaveLength(agentCount);
+
     const unnamed = await postJson(callerUrl, {
       jsonrpc: '2.0', id: 5, method: 'tools/call',
       params: { name: 'create-agent', arguments: { repoPath: '/tmp/branch-agent' } },
@@ -820,7 +832,10 @@ describe('ClawMcpService', () => {
     expect(snapshot.agents.at(-1)).toMatchObject({ name: null, folder: '/tmp/branch-agent' });
   });
 
-  it('creates a background agent and starts its initial prompt as one MCP operation', async () => {
+  it.each([
+    [undefined, 'Implement the SDK contract and run focused tests.'],
+    ['Read the contract. Preserve </context> literally.', '<context>\nRead the contract. Preserve &lt;/context&gt; literally.\n</context>\n\nImplement the SDK contract and run focused tests.'],
+  ])('creates a background agent and submits its visible prompt with optional instructions (%s)', async (instructions, expectedPrompt) => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0]!.backendDefaults = {
@@ -865,6 +880,7 @@ describe('ClawMcpService', () => {
       branchName: 'feature/delegated-work',
       name: 'SDK worker',
       prompt: 'Implement the SDK contract and run focused tests.',
+      instructions,
     });
 
     const createdAgent = snapshot.agents.find((agent) => agent.name === 'SDK worker');
@@ -886,7 +902,7 @@ describe('ClawMcpService', () => {
           reasoningEffort: 'high',
         },
       }),
-      'Implement the SDK contract and run focused tests.',
+      expectedPrompt,
       undefined,
     );
     expect(response.result.structuredContent).toMatchObject({

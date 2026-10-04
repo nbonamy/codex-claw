@@ -1,6 +1,7 @@
-import { readFile, readdir, realpath, stat } from 'node:fs/promises';
+import { open, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { AgentFilePreviewResult, AgentFileSearchItem } from '@codex-claw/core/contracts';
+import type { AgentFileChunk } from '@codex-claw/core/contracts/workspace';
 
 const DEFAULT_AGENT_FILE_LIMIT = 1000;
 const DEFAULT_AGENT_FILE_DEPTH = 8;
@@ -120,6 +121,23 @@ export async function previewAgentFolderFile(
     kind: 'text',
     content: buffer.toString('utf8'),
   };
+}
+
+export async function readAgentFolderFileChunk(folder: string | undefined, filePath: string, offset: number): Promise<AgentFileChunk> {
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('Invalid file offset.');
+  const resolved = await resolveAgentFilePath(folder, filePath);
+  if (!(await stat(resolved.absolutePath)).isFile()) throw new Error('Path is not a file.');
+  const file = await open(resolved.absolutePath, 'r');
+  try {
+    const info = await file.stat();
+    if (!info.isFile()) throw new Error('Path is not a file.');
+    if (offset > info.size) throw new Error('File changed while downloading.');
+    const buffer = Buffer.alloc(Math.min(512 * 1024, info.size - offset));
+    const { bytesRead } = await file.read(buffer, 0, buffer.length, offset);
+    return { path: resolved.previewPath, size: info.size, data: buffer.subarray(0, bytesRead).toString('base64'), nextOffset: offset + bytesRead };
+  } finally {
+    await file.close();
+  }
 }
 
 async function resolveAgentFilePath(folder: string | undefined, filePath: string): Promise<{ absolutePath: string; previewPath: string }> {

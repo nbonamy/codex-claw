@@ -38,6 +38,7 @@ describe('GitWorkflowControl', () => {
     expect(merge.find('.git-workflow-control__trigger').exists()).toBe(false);
 
     await actions[0]!.trigger('click');
+    await flushPromises();
     expect(merge.find('[role="dialog"]').exists()).toBe(true);
     expect(merge.find('[role="radiogroup"]').exists()).toBe(true);
 
@@ -313,7 +314,7 @@ describe('GitWorkflowControl', () => {
       unstagedFiles: [],
     };
     const currentWorkflow = { ...staleWorkflow, baseUpdateRequired: false };
-    const getWorkflow = vi.fn(async () => staleWorkflow);
+    const getWorkflow = vi.fn(async () => staleWorkflow).mockResolvedValueOnce(currentWorkflow);
     const updateFromBase = vi.fn(async () => ({
       workflow: currentWorkflow,
       baseBranch: 'main',
@@ -328,21 +329,42 @@ describe('GitWorkflowControl', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await flushPromises();
 
-    expect(getWorkflow).toHaveBeenCalledTimes(1);
-    expect(wrapper.text()).toContain('Update from main required');
-    expect(wrapper.text()).toContain('This branch must include the latest changes from main before it can be merged.');
+    expect(getWorkflow).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain('Update required');
+    expect(wrapper.text()).toContain('main has new commits. Update this branch before merging.');
     expect(updateFromBase).not.toHaveBeenCalled();
     expect(mergeBranch).not.toHaveBeenCalled();
 
-    await submitButton(wrapper, 'Update branch').trigger('click');
+    await submitButton(wrapper, 'Update from main').trigger('click');
     await flushPromises();
     expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true });
     expect(wrapper.text()).toContain('Branch updated');
 
+    getWorkflow.mockResolvedValue(currentWorkflow);
     await vi.advanceTimersByTimeAsync(1500);
     expect(wrapper.text()).toContain('Merge branch');
     expect(wrapper.text()).toContain('Preserve every commit in a merge commit.');
     expect(mergeBranch).not.toHaveBeenCalled();
+  });
+
+  it('checks again at confirmation when the base advances while the merge dialog is open', async () => {
+    const currentWorkflow = { ...workflow, files: [], baseUpdateRequired: false };
+    const getWorkflow = vi.fn().mockResolvedValue(currentWorkflow);
+    const mergeBranch = vi.fn();
+    const updateFromBase = vi.fn();
+    const wrapper = mountControl({ presentation: 'delivery', getWorkflow, mergeBranch, updateFromBase });
+    await flushPromises();
+    await wrapper.findAll('button').find(button => button.text() === 'Merge')!.trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(true);
+
+    getWorkflow.mockResolvedValue({ ...currentWorkflow, baseUpdateRequired: true });
+    await submitButton(wrapper, 'Merge').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('Update required');
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
+    expect(mergeBranch).not.toHaveBeenCalled();
+    expect(updateFromBase).not.toHaveBeenCalled();
   });
 
   it('requires committing changes in the target worktree before showing merge options', async () => {
@@ -355,10 +377,25 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
 
     expect(wrapper.text()).toContain('Commit changes in main first');
     expect(wrapper.text()).toContain('The main worktree has uncommitted changes. Commit them before merging feature/demo.');
     expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
+    expect(mergeBranch).not.toHaveBeenCalled();
+  });
+
+  it('does not merge using cached workflow details when the preflight refresh fails', async () => {
+    const getWorkflow = vi.fn().mockResolvedValue(workflow);
+    const mergeBranch = vi.fn();
+    const notifyError = vi.spyOn(ElMessage, 'error').mockImplementation(() => ({ close: vi.fn() }));
+    const wrapper = mountControl({ presentation: 'delivery', getWorkflow, mergeBranch });
+    await flushPromises();
+    getWorkflow.mockRejectedValue(new Error('Cannot read repository status'));
+    await wrapper.findAll('button').find(button => button.text() === 'Merge')!.trigger('click');
+    await flushPromises();
+    expect(notifyError).toHaveBeenCalledWith('Cannot read repository status');
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
     expect(mergeBranch).not.toHaveBeenCalled();
   });
 
@@ -417,6 +454,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
 
     expect(wrapper.find('[role="radiogroup"]').exists()).toBe(true);
     const choices = wrapper.findAll('.git-workflow-control__merge-strategy label');
@@ -458,6 +496,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
 
     expect(wrapper.text()).not.toContain('Delete worktree after merging');
     expect(wrapper.text()).not.toContain('Delete branch after removing worktree');
@@ -472,7 +511,9 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     await submitButton(wrapper, 'Merge').trigger('click');
+    await flushPromises();
 
     expect(wrapper.text()).toContain('Merging feature/demo');
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
@@ -506,6 +547,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
     await submitButton(wrapper, 'Merge').trigger('click');
     await flushPromises();
@@ -527,6 +569,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
     await wrapper.findAllComponents({ name: 'ElSwitch' })[1]!.setValue(true);
     await submitButton(wrapper, 'Merge and push').trigger('click');
@@ -561,6 +604,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
     await submitButton(wrapper, 'Merge and push').trigger('click');
     await flushPromises();
@@ -591,6 +635,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     await submitButton(wrapper, 'Merge').trigger('click');
     await flushPromises();
 
@@ -647,6 +692,7 @@ describe('GitWorkflowControl', () => {
     expect(merge.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     expect(merge.get('.git-workflow-control__uncommitted-warning').text()).toBe(
       'Uncommitted changes will not be included in this merge.',
     );
@@ -687,6 +733,7 @@ describe('GitWorkflowControl', () => {
     expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
 
     expect(merge.text()).toContain('Report to main agent');
     expect(merge.text()).not.toContain('Ask this agent for a summary');
@@ -730,7 +777,9 @@ describe('GitWorkflowControl', () => {
     expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     await submitButton(merge, 'Merge').trigger('click');
+    await flushPromises();
     const mergeBackgroundButton = submitButton(merge, 'Run in background');
     expect(mergeBackgroundButton.isVisible()).toBe(true);
     await mergeBackgroundButton.trigger('click');
@@ -786,7 +835,9 @@ describe('GitWorkflowControl', () => {
     expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
+    await flushPromises();
     await submitButton(merge, 'Merge').trigger('click');
+    await flushPromises();
 
     expect(merge.text()).toContain('Building handoff report');
     expect(merge.text()).toContain('Waiting for the worker’s final summary.');

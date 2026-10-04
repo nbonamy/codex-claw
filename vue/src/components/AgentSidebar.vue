@@ -1077,8 +1077,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-trailing-column-width: 28px;
 }
 
-.agent-sidebar:hover .agent-sidebar__agent:has(.agent-sidebar__engine),
-.agent-sidebar:focus-within .agent-sidebar__agent:has(.agent-sidebar__engine) {
+.agent-sidebar:hover .agent-sidebar__agent:has(.agent-sidebar__engine) {
   --agent-sidebar-engine-track: 18px;
 }
 
@@ -1255,8 +1254,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   color: var(--color-text-muted);
 }
 
-.agent-sidebar:hover .agent-sidebar__engine,
-.agent-sidebar:focus-within .agent-sidebar__engine {
+.agent-sidebar:hover .agent-sidebar__engine {
   display: grid;
 }
 

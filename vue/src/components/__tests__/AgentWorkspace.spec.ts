@@ -129,6 +129,42 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
 }
 
 describe('AgentWorkspace', () => {
+  it('reserves chat space when the workspace shrinks and restores the preferred sidebar width when it grows', async () => {
+    let onResize: ResizeObserverCallback = () => {};
+    const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) { onResize = callback; }
+      observe() {}
+      disconnect = disconnect;
+    });
+    try {
+      const { wrapper, workspace } = mountWorkspace();
+      await wrapper.setProps({ rightWorkspaceVisible: true });
+      const body = wrapper.get('.app-shell__body').element;
+      const bounds = vi.spyOn(body, 'getBoundingClientRect');
+      const resize = async (width: number) => {
+        bounds.mockReturnValue({ width } as DOMRect);
+        onResize([{ target: body } as ResizeObserverEntry], {} as ResizeObserver);
+        await wrapper.vm.$nextTick();
+      };
+      const panel = wrapper.get('.app-shell__right-workspace').element as HTMLElement;
+
+      await resize(1200);
+      expect(panel.style.flexBasis).toBe('420px');
+      await resize(600);
+      expect(panel.style.flexBasis).toBe('115px');
+      await resize(400);
+      expect(panel.style.flexBasis).toBe('0px');
+      expect(workspace.width).toBe(420);
+      await resize(1200);
+      expect(panel.style.flexBasis).toBe('420px');
+      wrapper.unmount();
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('persists the selected Git diff target on the active agent', async () => {
     const { currentAgent, updateAgent, wrapper } = mountWorkspace();
 

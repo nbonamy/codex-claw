@@ -2,10 +2,40 @@ import { mkdir, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
+import { claudeTranscriptGoal, claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
 import type { Agent } from '@codex-claw/core/contracts';
 
+describe('native Claude goal history', () => {
+  it('distinguishes an active goal, native completion, explicit clear, and sidechain records', () => {
+    const row = (attachment: object, isSidechain = false) => JSON.stringify({ type: 'attachment', timestamp: '2026-10-04T12:00:00.000Z', isSidechain, attachment: { type: 'goal_status', condition: 'Ship it', ...attachment } });
+    const active = row({ met: false, sentinel: true });
+    expect(claudeTranscriptGoal(active, 'session')).toMatchObject({ objective: 'Ship it', status: 'active', threadId: 'session' });
+    const complete = active + '\n' + row({ met: true, iterations: 2, tokens: 55, durationMs: 1800 });
+    expect(claudeTranscriptGoal(complete, 'session')).toMatchObject({ status: 'complete', tokensUsed: 55, timeUsedSeconds: 1.8 });
+    expect(claudeTranscriptGoal(complete + '\n' + row({ met: false }, true), 'session')?.status).toBe('complete');
+    expect(claudeTranscriptGoal(active + '\n' + row({ met: true, sentinel: true }), 'session')).toBeNull();
+    expect(claudeTranscriptGoal('{"type":"assistant","message":{"content":"Goal complete!"}}', 'session')).toBeUndefined();
+  });
+});
+
 describe('claudeTranscriptToRendererMessages', () => {
+  it('excludes unfinished tool chains from fork cutoffs and includes trailing goal records', () => {
+    const rows = [
+      { type: 'user', uuid: 'user', message: { content: 'work' } },
+      { type: 'assistant', uuid: 'tool-call', message: { content: [{ type: 'tool_use', id: 'tool', name: 'Read', input: {} }] } },
+    ];
+    const unfinished: Record<string, string> = {};
+    claudeTranscriptToRendererMessages(rows.map((row) => JSON.stringify(row)).join('\n'), 'agent', 'session', unfinished);
+    expect(unfinished).toEqual({});
+    const finished: Record<string, string> = {};
+    const complete = [...rows,
+      { type: 'user', uuid: 'tool-result', message: { content: [{ type: 'tool_result', tool_use_id: 'tool', content: 'done' }] } },
+      { type: 'attachment', uuid: 'goal-met', attachment: { type: 'goal_status', condition: 'work', met: true } },
+    ];
+    claudeTranscriptToRendererMessages(complete.map((row) => JSON.stringify(row)).join('\n'), 'agent', 'session', finished);
+    expect(finished).toEqual({ 'claude-user': 'goal-met' });
+  });
+
   it('translates Claude JSONL transcript records into renderer messages', () => {
     const content = [
       JSON.stringify({ type: 'queue-operation', operation: 'enqueue', content: 'ignored' }),
@@ -224,9 +254,9 @@ describe('claudeTranscriptSettings', () => {
 });
 
 describe('loadClaudeTranscriptHistory', () => {
-  it.each(['/Users/nbonamy/src/id8', null])('loads a persisted Claude session with folder %s', async (folder) => {
+  it.each(['/Users/nbonamy/src/id8', '/workspace/project.with_underscore', null])('loads a persisted Claude session with folder %s', async (folder) => {
     const projectsRoot = path.join(tmpdir(), `codex-claw-claude-history-${Date.now()}-${folder ? 'project' : 'chat'}`);
-    const projectDirectory = path.join(projectsRoot, (folder ?? homedir()).replaceAll(path.sep, '-'));
+    const projectDirectory = path.join(projectsRoot, (folder ?? homedir()).replace(/[^a-zA-Z0-9]/g, '-'));
     await mkdir(projectDirectory, { recursive: true });
     await writeFile(path.join(projectDirectory, 'session-1.jsonl'), [
       JSON.stringify({
@@ -255,6 +285,8 @@ describe('loadClaudeTranscriptHistory', () => {
     };
 
     await expect(loadClaudeTranscriptHistory(agent, { projectsRoot })).resolves.toStrictEqual({
+      turnBoundaries: { 'claude-prompt-1': 'assistant-1' },
+      nativeMessageTurnIds: { 'user-1': 'claude-prompt-1', 'assistant-1': 'claude-prompt-1' },
       backendSession: {
         kind: 'claude',
         sessionId: 'session-1',

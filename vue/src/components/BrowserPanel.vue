@@ -318,7 +318,15 @@ async function openExternal(): Promise<void> {
 }
 
 async function navigate(): Promise<void> {
-  await runNavigation(() => requireBrowserApi().browserNavigate(props.agentId, props.browserId, address.value));
+  const input = address.value.trim();
+  const localAddress = /^(?:localhost|127(?:\.\d+){3}|\[::1\])(?::\d+)?(?:[/?#]|$)/i.test(input);
+  const explicitScheme = /^[a-z][a-z\d+.-]*:/i.test(input);
+  const looksLikeHost = /^(?:[^\s/:]+\.)+[^\s/:]+(?::\d+)?(?:[/?#]|$)/u.test(input);
+  const target = localAddress ? `http://${input}`
+    : !/\s/u.test(input) && looksLikeHost ? (explicitScheme ? `https://${input}` : input)
+    : !input || explicitScheme ? input
+      : `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+  await runNavigation(() => requireBrowserApi().browserNavigate(props.agentId, props.browserId, target));
 }
 
 async function goBack(): Promise<void> {

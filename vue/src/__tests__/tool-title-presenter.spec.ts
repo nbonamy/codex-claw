@@ -5,6 +5,15 @@ import { presentClawToolTitle } from '../tool-title-presenter';
 
 describe('Claw tool title presenter', () => {
   it.each([
+    ['codex_claw.wait-tasks', {}, 'running', 'Waiting for delegated tasks'],
+    ['codex_claw.wait-tasks', {}, 'completed', 'Checked delegated tasks'],
+    ['codex_claw.wait-tasks', {}, 'error', 'Could not check delegated tasks'],
+    ['codex_claw.complete-task', {}, 'running', 'Submitting task result'],
+    ['codex_claw.complete-task', {}, 'completed', 'Submitted task result'],
+    ['codex_claw.complete-task', {}, 'error', 'Could not submit task result'],
+    ['codex_claw.cancel-task', {}, 'running', 'Cancelling delegated task'],
+    ['codex_claw.cancel-task', {}, 'completed', 'Requested task cancellation'],
+    ['codex_claw.cancel-task', {}, 'error', 'Could not cancel delegated task'],
     ['codex_claw.suggest-visualizations', { suggestions: [] }, 'completed', 'Suggested diagrams'],
     ['codex_claw.add-visualization', { title: 'System map' }, 'completed', 'Created diagram'],
     ['codex_claw.read-visualization-canvas', {}, 'completed', 'Read canvas selection'],

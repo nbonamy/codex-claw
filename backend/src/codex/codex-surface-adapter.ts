@@ -415,10 +415,11 @@ export class CodexSurfaceAgentAdapter {
     return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
   }
 
-  async interruptTurn(agent: Agent) {
+  async interruptTurn(agent: Agent, expectedTurnId?: string) {
     const session = await this.ensureSession(agent);
     const turnId = session.handle.getSnapshot().activeTurnId;
     if (!turnId) throw new Error('No active Codex turn to interrupt.');
+    if (expectedTurnId && turnId !== expectedTurnId) throw new Error('The requested Codex task turn is no longer active.');
     await invokeCodexConversationBridgeOperation(
       this.surface, session.handle.id, 'interrupt', [],
     );

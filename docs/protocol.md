@@ -1,5 +1,21 @@
 # Backend Protocol
 
+## Durable task inspection
+
+`agent/tasks/list { agentId }` returns app-owned assignments, statuses,
+provisional/final results and delivery state for tasks owned by or assigned to
+that agent. `agent/task/cancel { agentId, taskId }` performs scoped cancellation
+through the same durable owner used by MCP. Both use normal agent-location
+routing, including remote daemons. Electron/preload and web adapters expose
+`listAgentTasks` and `cancelAgentTask`; the conversation's compact Tasks
+disclosure polls these contracts without interpreting provider frames.
+
+Provider interruption accepts optional `expectedTurnId`. Task cancellation
+supplies it, and both supported drivers reject a different active turn. This
+guards restart/late-cancellation races without interrupting unrelated worker
+execution.
+
+
 Status: current backend JSON-RPC protocol, 2026-06-17.
 
 This document catalogs the app-owned protocol between clients and `clawd`.
@@ -175,9 +191,10 @@ the explicit Review stage remains the user gate.
 | `agent/fork` | `{ agentId, turnId? }` | `AppSnapshot` | Forks an idle agent's backend conversation, optionally at a stable turn id, into a new selected agent directly below the source. |
 | `agent/team/move` | `{ input: MoveAgentToTeamInput }` | `AppSnapshot` | Moves a local agent between local teams. Cross-backend moves are rejected; create a new agent in the target remote team instead. |
 | `client/agentOrder/update` | `{ input: ReorderAgentsInput }` | `AppSnapshot` | Reorders within a team. |
-| `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Archives the attached provider conversation when supported, then removes the product agent and, when explicitly confirmed, its clean linked worktree, local branch, and optional tracked remote branch. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
+| `agent/delete` | `{ agentId, input? }` | `AppSnapshot` | Archives the attached provider conversation when supported, then removes the product agent and, when explicitly confirmed, its linked worktree, local branch, and optional tracked remote branch. Dirty worktrees require the additional `discardChanges: true` opt-in; omission preserves the clean-worktree requirement. Discard requires `deleteWorktree: true` and `confirmed: true`. `pullRequestCleanup` additionally requires a tracked merged or closed PR, an idle agent, and a worktree HEAD matching the recorded PR head. Closed-PR cleanup preserves the remote branch. |
 | `agent/files/list` | `{ agentId }` | `AgentFileSearchItem[]` | Lists files under the agent folder. |
 | `agent/file/preview` | `{ agentId, filePath }` | `AgentFilePreviewResult` | Reads a backend-host file. Relative inputs require and resolve from the agent folder; absolute paths also work for folderless sessions. Absolute paths and relative traversal may address files elsewhere on that host. The backend caps preview bytes and classifies text, image, binary, and oversized results. Clients must not read backend-host files directly. |
+| `agent/file/chunk/read` | `{ agentId, filePath, offset }` | `AgentFileChunk` | Reads up to 512 KiB of a regular file as base64, with total byte size and next byte offset. Uses the preview path policy and routes remote agents to their owning host. Clients assemble chunks for user-requested downloads of unsupported previews; the whole download is held in client memory. |
 | `agent/models/list` | `{ agentId }` | `BackendModelOption[]` | Provider-specific catalog adapted to app-owned shape. |
 | `agent/skills/list` | `{ agentId }` | `BackendSkillSummary[]` | Provider-specific skills adapted to app-owned shape. |
 | `agent/git/diff/get` | `{ agentId, target? }` | `AgentGitDiff` | Returns backend-owned diff data; failures propagate as request errors. Targets are branch, uncommitted, unstaged, staged, an exact commit, or a provider-supplied turn diff. Clients choose presentation; no panel event is emitted. |
@@ -385,6 +402,7 @@ implementation messages, not the preferred app protocol for clients.
 | --- | --- | --- | --- |
 | `workspace/files/list` | `{ folder }` | `AgentFileSearchItem[]` |
 | `workspace/file/preview` | `{ folder?, filePath }` | `AgentFilePreviewResult` |
+| `workspace/file/chunk/read` | `{ folder?, filePath, offset }` | `AgentFileChunk` |
 | `workspace/folder/validate` | `{ folder }` | `null` |
 | `driver/promptCommand/handle` | `{ agent, prompt }` | `BackendSendResult | null` |
 | `driver/codeReview/run` | `{ agent, prompt, cwd, reviewMcpServerUrl, reviewerSession? }` | `BackendCodeReviewResult` | Creates a fresh provider conversation when `reviewerSession` is absent; otherwise continues that opaque provider session. |

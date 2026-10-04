@@ -51,6 +51,18 @@ const electronMocks = vi.hoisted(() => {
     setWindowOpenHandler = vi.fn();
     canGoBack = vi.fn(() => false);
     canGoForward = vi.fn(() => false);
+    goBack = vi.fn();
+    goForward = vi.fn();
+    reload = vi.fn();
+    isLoading = vi.fn(() => false);
+    once = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
+      this.listeners.set(event, listener);
+    });
+    removeListener = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
+      if (this.listeners.get(event) === listener) this.listeners.delete(event);
+      return this;
+    });
+    emit(event: string, ...args: unknown[]) { this.listeners.get(event)?.(...args); }
     getZoomFactor = vi.fn(() => 1);
     setZoomFactor = vi.fn();
     capturePage = vi.fn(async (_rect?: { x: number; y: number; width: number; height: number }) => ({ isEmpty: (): boolean => false }));
@@ -102,6 +114,46 @@ beforeEach(() => {
 });
 
 describe('browser pane helpers', () => {
+  it('waits for a replacement page when a client redirect aborts loadURL', async () => {
+    const owner = { webContents: {} };
+    const guest = electronMocks.createGuest(owner, 60);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(owner as never, 'agent-one', 'primary', '', '', 60);
+    guest.isLoading.mockReturnValue(true);
+    guest.loadURL.mockRejectedValueOnce(Object.assign(new Error('ERR_ABORTED (-3)'), { code: 'ERR_ABORTED', errno: -3 }));
+    let settled = false;
+    const navigation = pane.navigate('agent-one', 'primary', 'https://www.google.com/search?q=dark%20mode')
+      .then(state => { settled = true; return state; });
+    const assertion = expect(navigation).resolves.toMatchObject({ url: 'https://www.google.com/search?q=dark%20mode&sei=redirect' });
+    await Promise.resolve();
+    guest.emit('did-fail-load', {}, -3, '', 'https://www.google.com/search?q=dark%20mode', true);
+    expect(settled).toBe(false);
+    guest.getURL.mockReturnValue('https://www.google.com/search?q=dark%20mode&sei=redirect');
+    guest.isLoading.mockReturnValue(false);
+    guest.emit('did-finish-load');
+    await assertion;
+  });
+
+  it('keeps genuine navigation failures visible, including after an aborted redirect', async () => {
+    const owner = { webContents: {} };
+    const guest = electronMocks.createGuest(owner, 61);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(owner as never, 'agent-one', 'primary', '', '', 61);
+    const failure = Object.assign(new Error('ERR_NAME_NOT_RESOLVED'), { code: 'ERR_NAME_NOT_RESOLVED', errno: -105 });
+    guest.loadURL.mockRejectedValueOnce(failure);
+    await expect(pane.navigate('agent-one', 'primary', 'https://example.com')).rejects.toBe(failure);
+    const abort = Object.assign(new Error('ERR_ABORTED'), { code: 'ERR_ABORTED', errno: -3 });
+    guest.loadURL.mockRejectedValueOnce(abort);
+    await expect(pane.navigate('agent-one', 'primary', 'https://example.com')).rejects.toBe(abort);
+    guest.isLoading.mockReturnValue(true);
+    guest.loadURL.mockRejectedValueOnce(abort);
+    const navigation = pane.navigate('agent-one', 'primary', 'https://example.com');
+    const assertion = expect(navigation).rejects.toThrow('ERR_NAME_NOT_RESOLVED');
+    await Promise.resolve();
+    guest.emit('did-fail-load', {}, -105, 'ERR_NAME_NOT_RESOLVED', 'https://example.com/redirect', true);
+    await assertion;
+  });
+
   it('normalizes a bare host into an https URL', () => {
     expect(normalizeBrowserUrl('example.com/docs')).toBe('https://example.com/docs');
     expect(normalizeBrowserUrl('http://localhost:3000')).toBe('http://localhost:3000/');
@@ -279,6 +331,98 @@ describe('browser pane helpers', () => {
 
     await expect(pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project', 23)).rejects.toThrow('not attached');
     await expect(pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project', 24)).rejects.toThrow('not attached');
+  });
+
+  it('waits for guest navigation and keeps a bounded chronological console history', async () => {
+    const window = { webContents: {} };
+    const guest = electronMocks.createGuest(window, 40);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(window as never, 'agent-one', 'primary', 'https://example.com', '', 40);
+    guest.canGoBack.mockReturnValue(true);
+    guest.isLoading.mockReturnValue(true);
+    let settled = false;
+    const back = pane.goBack('agent-one', 'primary').then(state => { settled = true; return state; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    guest.emit('did-finish-load');
+    expect(await back).toMatchObject({ url: 'https://example.com/', canGoBack: true });
+    expect(guest.goBack).toHaveBeenCalledOnce();
+    guest.isLoading.mockReturnValue(false);
+    await pane.goForward('agent-one', 'primary');
+    expect(guest.goForward).not.toHaveBeenCalled();
+    guest.canGoForward.mockReturnValue(true);
+    await pane.goForward('agent-one', 'primary');
+    expect(guest.goForward).toHaveBeenCalledOnce();
+    await pane.reload('agent-one', 'primary');
+    expect(guest.reload).toHaveBeenCalledOnce();
+    for (let index = 0; index < 105; index++) guest.emit('console-message', {}, 2, 'message-' + index);
+    const result = await pane.execute('agent-one', 'primary', 'console', { limit: 200 }) as { messages: { message: string }[] };
+    expect(result.messages).toHaveLength(100);
+    expect(result.messages[0]!.message).toBe('message-5');
+    expect(result.messages.at(-1)!.message).toBe('message-104');
+    await pane.closeAll();
+    await expect(pane.reload('agent-one', 'primary')).rejects.toThrow('not open');
+  });
+
+  it('executes browser commands against the guest DOM with input events and error propagation', async () => {
+    const window = { webContents: {} };
+    const guest = electronMocks.createGuest(window, 41);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(window as never, 'agent-one', 'primary', '', '', 41);
+    document.body.innerHTML = '<button id="save">Save</button><input id="name" value="old"><div id="label">Label</div>';
+    const button = document.querySelector<HTMLButtonElement>('#save')!;
+    const input = document.querySelector<HTMLInputElement>('#name')!;
+    const click = vi.fn();
+    const changed = vi.fn();
+    button.addEventListener('click', click);
+    input.addEventListener('input', changed);
+    guest.executeJavaScript.mockImplementation(async (script: string) => globalThis.eval(script));
+    try {
+      expect(await pane.execute('agent-one', 'primary', 'dom', { selector: '#save' })).toMatchObject({
+        selector: '#save', element: { tag: 'button', text: 'Save' },
+      });
+      await pane.execute('agent-one', 'primary', 'click', { selector: '#save' });
+      expect(click).toHaveBeenCalledOnce();
+      await pane.execute('agent-one', 'primary', 'type', { selector: '#name', text: 'new' });
+      await pane.execute('agent-one', 'primary', 'type', { selector: '#name', text: ' value', clear: false });
+      expect(input.value).toBe('new value');
+      expect(changed).toHaveBeenCalledTimes(2);
+      await expect(pane.execute('agent-one', 'primary', 'type', { selector: '#label', text: 'oops' })).rejects.toThrow('not editable');
+      await expect(pane.execute('agent-one', 'primary', 'click', { selector: '#missing' })).rejects.toThrow('No element');
+      await expect(pane.execute('agent-one', 'primary', 'unknown', {})).rejects.toThrow('Unsupported');
+    } finally {
+      await pane.closeAll();
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('repositions and dismisses a packaged annotation overlay when its guest is replaced', async () => {
+    vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', '');
+    vi.stubGlobal('MAIN_WINDOW_VITE_NAME', 'main_window');
+    const window = { webContents: {}, getContentBounds: () => ({ x: 10, y: 20, width: 800, height: 600 }) };
+    const guest = electronMocks.createGuest(window, 42);
+    const onAnnotation = vi.fn();
+    const pane = new BrowserPane({ onAnnotation });
+    await pane.open(window as never, 'agent-one', 'primary', '', '', 42);
+    guest.executeJavaScript.mockResolvedValueOnce({ kind: 'area', rect: { x: 1, y: 2, width: 30, height: 40 } });
+    await pane.setAnnotationMode('agent-one', 'primary', true);
+    await vi.waitFor(() => expect(electronMocks.BrowserWindowMock.instances).toHaveLength(1));
+    const overlay = electronMocks.BrowserWindowMock.instances[0]!;
+    expect(overlay.loadFile).toHaveBeenCalledWith(expect.stringContaining('/renderer/main_window/index.html'), expect.objectContaining({
+      query: expect.objectContaining({ surface: 'annotation-overlay' }),
+    }));
+    pane.setBounds('agent-one', 'primary', { x: 30, y: 40, width: 500, height: 400 });
+    expect(overlay.setBounds).toHaveBeenLastCalledWith({ x: 40, y: 60, width: 500, height: 400 });
+    pane.setVisible('agent-one', 'primary', false);
+    expect(overlay.hide).toHaveBeenCalledOnce();
+    pane.setVisible('agent-one', 'primary', true);
+    expect(overlay.show).toHaveBeenCalledTimes(2);
+    electronMocks.createGuest(window, 43);
+    await pane.open(window as never, 'agent-one', 'primary', '', '', 43);
+    expect(overlay.close).toHaveBeenCalledOnce();
+    expect(guest.close).toHaveBeenCalledOnce();
+    expect(onAnnotation).not.toHaveBeenCalled();
+    await pane.closeAll();
   });
 
   it('uses collision-safe keys for future multiple browser tabs', () => {

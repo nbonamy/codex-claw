@@ -1,4 +1,5 @@
 import { readWorktreeHead } from './git-worktrees';
+import type { DurableTaskService } from './agents/durable-task-service';
 import { ProviderConnections } from './provider-connections';
 import { backendCodexHomeDir } from './state';
 import { isProviderConnection, type ProviderAuthentication } from '@codex-claw/core/contracts/provider-setup';
@@ -76,6 +77,7 @@ import { VisualizeService, directVisualizationPrompt, generateVisualizationSugge
 import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@codex-claw/core/visualize';
 
 export type ClawBackendServerOptions = {
+  tasks?: DurableTaskService;
   providerSetup?: import('./provider-setup').ProviderSetup;
   version: string;
   pid?: number;
@@ -130,6 +132,16 @@ type BackendHandle =
   };
 
 export class ClawBackendServer {
+  private readonly tasks?: DurableTaskService;
+
+  async sendTaskPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
+    await this.requireConnectedEngine(agent.backend);
+    if (!this.snapshot.agents.includes(agent)) throw new Error('Agent was removed before task prompt admission.');
+    if (this.tasks?.mayStartAutomatedPrompt(agent.id) === false || agent.planReview?.status === 'pending') throw new Error('Agent is stopped or waiting for a review decision.');
+    const receipt = await this.agentPrompts.sendWithReceipt(agent, prompt);
+    await this.persistSnapshotOnly();
+    return receipt;
+  }
   private readonly version: string;
   private readonly pid: number;
   private readonly snapshot: AppSnapshot;
@@ -177,6 +189,7 @@ export class ClawBackendServer {
   private readonly providerConnections?: ProviderConnections;
 
   constructor(options: ClawBackendServerOptions) {
+    this.tasks = options.tasks;
     this.providerSetup = options.providerSetup;
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
@@ -190,7 +203,8 @@ export class ClawBackendServer {
           const reconnected = connections.filter(connection => connection.connected && connection.installed && connection.enabled !== false && !connection.checking
             && !this.snapshot.providerConnections?.some(previous => previous.backend === connection.backend && previous.connected && previous.installed && previous.enabled !== false));
           this.snapshot.providerConnections = connections;
-          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          // Publish the client projection without replacing live agents/review contexts.
+          this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
           for (const agent of this.snapshot.agents) {
             if (reconnected.some(connection => connection.backend === agent.backend)) this.agentPrompts?.drain(agent.id);
           }
@@ -1163,6 +1177,9 @@ export class ClawBackendServer {
           if (remoteTarget) return this.routeAgentSnapshotRequest(message.id, remoteTarget.id, message.method, { agentId, input }, async () => { throw new Error('Remote handoff owner is unavailable.'); });
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async () => {
+          if (this.tasks?.list(agentId).some(task => !['completed', 'cancelled', 'failed'].includes(task.state))) {
+            throw new Error('Resolve or cancel durable tasks before handing off this agent.');
+          }
           await this.agentHandoffs.run(agentId, input);
           return this.persistAndEmitSnapshot();
         });
@@ -1218,6 +1235,7 @@ export class ClawBackendServer {
               folder,
               input.deleteRemoteBranch === true,
               finishedPullRequest?.headSha,
+              input.discardChanges === true,
             );
           }
           if (existingAgent.backendSession) {
@@ -1232,6 +1250,7 @@ export class ClawBackendServer {
               requireAgentFolder(existingAgent),
               input.deleteRemoteBranch === true,
               finishedPullRequest?.headSha,
+              input.discardChanges === true,
             );
           }
           this.codeReviews?.closeForAgentRemoval(existingAgent);
@@ -1249,15 +1268,20 @@ export class ClawBackendServer {
           folder: requireAgentFolder(agent),
         }));
       }
+      case backendMethods.agentFileChunkRead:
       case backendMethods.agentFilePreview: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
-        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentFilePreview, {
+        const chunk = message.method === backendMethods.agentFileChunkRead;
+        const offset = chunk ? { offset: params.offset } : {};
+        return this.routeAgentResultRequest(message.id, agentId, message.method, {
           agentId,
           filePath: requireString(params.filePath, 'filePath'),
-        }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.workspaceFilePreview, {
+          ...offset,
+        }, (agent) => this.handleAgentDriverRequest(agent, chunk ? backendMethods.workspaceFileChunkRead : backendMethods.workspaceFilePreview, {
           folder: agentFolder(agent),
           filePath: requireString(params.filePath, 'filePath'),
+          ...offset,
         }));
       }
       case backendMethods.agentVisualizeStart: {
@@ -1787,6 +1811,7 @@ export class ClawBackendServer {
       case backendMethods.agentInterrupt: {
         const agentId = requireAgentId(message.params);
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentInterrupt, { agentId }, async (agent) => {
+          await this.tasks?.blockParent(agentId);
           try {
             const result = await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }) as BackendSendResult;
             agent.backendSession = result.backendSession;
@@ -1801,6 +1826,19 @@ export class ClawBackendServer {
             });
           }
           return this.snapshot;
+        });
+      }
+      case backendMethods.agentTasksList: {
+        const agentId = requireAgentId(message.params);
+        return this.routeAgentResultRequest(message.id, agentId, message.method, { agentId }, () => this.tasks?.list(agentId) ?? []);
+      }
+      case backendMethods.agentTaskCancel: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        const taskId = requireString(params.taskId, 'taskId');
+        return this.routeAgentResultRequest(message.id, agentId, message.method, { agentId, taskId }, () => {
+          if (!this.tasks) throw new Error('Durable tasks are unavailable.');
+          return this.tasks.cancel(agentId, taskId);
         });
       }
       case backendMethods.agentTurnDelete: {
@@ -2057,7 +2095,7 @@ export class ClawBackendServer {
           if (!Array.isArray(providers) || !providers.every(isProviderConnection)) throw new Error('Remote engine connections are unavailable. Update the remote runtime.');
           const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
           if (connection) connection.providerConnections = providers;
-          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
           return createClawRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
@@ -2084,7 +2122,7 @@ export class ClawBackendServer {
           if (!Array.isArray(providers) || !providers.every(isProviderConnection)) throw new Error('Remote engine connections are unavailable. Update the remote runtime.');
           const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
           if (connection) connection.providerConnections = providers;
-          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
           return createClawRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
@@ -2749,6 +2787,7 @@ export class ClawBackendServer {
       clientState: this.clientStateFromSnapshot(snapshot),
     };
     this.onEvent?.(event);
+    this.onBackendEventApplied?.(event);
   }
 
   private backendDriverForAgent(agent: Agent): AgentBackendDriver {
@@ -2893,7 +2932,7 @@ export class ClawBackendServer {
     this.delegatedWorkReports.handleEvent(fullEvent);
     for (const listener of this.handoffListeners) listener(fullEvent);
     if (fullEvent.agentId && providerConversationEventView(fullEvent).type === 'turn.completed') {
-      void this.missionExecution.agentFinished(fullEvent.agentId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
+      void this.missionExecution.agentFinished(fullEvent.agentId, providerConversationEventView(fullEvent).turnId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
     }
     this.agentRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
@@ -3247,7 +3286,7 @@ function requireAgentId(params: unknown): string {
 
 function requireAgentCloseRequest(params: unknown): {
   agentId: string;
-  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: true };
+  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; discardChanges?: boolean; pullRequestCleanup?: boolean; confirmed: true };
 } {
   const record = requireRecord(params);
   const agentId = requireString(record.agentId, 'agentId');
@@ -3261,6 +3300,12 @@ function requireAgentCloseRequest(params: unknown): {
   if (input.pullRequestCleanup !== undefined && typeof input.pullRequestCleanup !== 'boolean') {
     throw new Error('pullRequestCleanup must be a boolean.');
   }
+  if (input.discardChanges !== undefined && typeof input.discardChanges !== 'boolean') {
+    throw new Error('discardChanges must be a boolean.');
+  }
+  if (input.discardChanges === true && input.deleteWorktree !== true) {
+    throw new Error('Changes can only be discarded when deleting the worktree.');
+  }
   if (input.deleteRemoteBranch === true && input.deleteWorktree !== true) {
     throw new Error('Delete the worktree before deleting its remote branch.');
   }
@@ -3273,6 +3318,7 @@ function requireAgentCloseRequest(params: unknown): {
       deleteWorktree: input.deleteWorktree,
       ...(input.deleteRemoteBranch === undefined ? {} : { deleteRemoteBranch: input.deleteRemoteBranch }),
       ...(input.pullRequestCleanup === undefined ? {} : { pullRequestCleanup: input.pullRequestCleanup }),
+      ...(input.discardChanges === undefined ? {} : { discardChanges: input.discardChanges }),
       confirmed: true,
     },
   };

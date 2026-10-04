@@ -1,11 +1,12 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { expandWorktreeDelegationCommand } from './agents/worktree-delegation';
 import { handoffInProgress } from '@codex-claw/core/agent-handoff';
 import { isAgentRequestResponse } from '@codex-claw/core/agent-request';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, BackendSession, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
 import { stat } from 'node:fs/promises';
-import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
+import { listAgentFolderFiles, previewAgentFolderFile, readAgentFolderFileChunk } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
@@ -193,6 +194,14 @@ export class BackendDriverRpc {
           requireString(record.filePath, 'filePath'),
         );
       }
+      case backendMethods.workspaceFileChunkRead: {
+        const record = requireRecord(params);
+        return readAgentFolderFileChunk(
+          record.folder === undefined ? undefined : requireString(record.folder, 'folder'),
+          requireString(record.filePath, 'filePath'),
+          typeof record.offset === 'number' ? record.offset : NaN,
+        );
+      }
       case backendMethods.workspaceFolderValidate: {
         const record = requireRecord(params);
         const folderStat = await stat(requireString(record.folder, 'folder').trim());
@@ -246,7 +255,8 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         await this.ensureConnected?.(agent.backend);
         const record = requireRecord(params);
-        const prompt = requireString(record.prompt, 'prompt');
+        const rawPrompt = requireString(record.prompt, 'prompt');
+        const prompt = expandWorktreeDelegationCommand(rawPrompt) ?? rawPrompt;
         const driver = this.requireDriver(agent.backend);
         return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
@@ -344,7 +354,10 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverInterrupt: {
         const { agent } = requireAgentParams(params);
-        return this.requireDriver(agent.backend).interrupt(agent);
+        const expectedTurnId = requireRecord(params).expectedTurnId;
+        return expectedTurnId === undefined
+          ? this.requireDriver(agent.backend).interrupt(agent)
+          : this.requireDriver(agent.backend).interrupt(agent, requireString(expectedTurnId, 'expectedTurnId'));
       }
       case backendMethods.driverAgentRequestRespond: {
         const record = requireRecord(params);
@@ -422,7 +435,8 @@ export class BackendDriverRpc {
         if (!driver.steerPrompt) {
           throw unsupportedBackendFeature(agent, 'prompt steering');
         }
-        const prompt = requireString(record.prompt, 'prompt');
+        const rawPrompt = requireString(record.prompt, 'prompt');
+        const prompt = expandWorktreeDelegationCommand(rawPrompt) ?? rawPrompt;
         const options = record.options as SendPromptOptions | undefined;
         return options
           ? driver.steerPrompt(agent, prompt, options)
@@ -559,6 +573,7 @@ export class BackendDriverRpc {
   }
 
   tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {
+    if (expandWorktreeDelegationCommand(prompt) !== null) return null;
     return this.requireDriver(agent.backend).tryHandlePromptCommand?.(agent, prompt) ?? null;
   }
 

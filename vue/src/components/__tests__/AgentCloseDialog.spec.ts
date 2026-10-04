@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils';
+import { ElSwitch } from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentCloseDialog from '../AgentCloseDialog.vue';
 
@@ -30,6 +31,21 @@ const workflow = {
 };
 
 describe('AgentCloseDialog', () => {
+  it('requires an explicit discard choice before deleting a dirty worktree and resets it on reopening', async () => {
+    const wrapper = mountDialog();
+    await wrapper.setProps({ workflow: { ...workflow, files: [{ path: 'README.fr.md', indexStatus: '?', worktreeStatus: '?' }] } });
+    expect(wrapper.get('.claw-button--primary').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('.agent-close-dialog__discard [role="switch"]').attributes('aria-checked')).toBe('false');
+    await wrapper.get('.agent-close-dialog__discard .el-switch').trigger('click');
+    await wrapper.get('.claw-button--primary').trigger('click');
+    expect(wrapper.emitted('delete-worktree')).toStrictEqual([[false, true]]);
+    await wrapper.setProps({ visible: false });
+    await wrapper.setProps({ visible: true });
+    expect(wrapper.get('.claw-button--primary').attributes('disabled')).toBeDefined();
+    await wrapper.get('.claw-button--secondary').trigger('click');
+    expect(wrapper.emitted('keep-worktree')).toStrictEqual([[]]);
+  });
+
   it('offers keeping or deleting the linked worktree and keeps remote deletion opt-in', async () => {
     const wrapper = mountDialog();
 
@@ -40,7 +56,7 @@ describe('AgentCloseDialog', () => {
     await wrapper.get('.agent-close-dialog__remote .el-switch').trigger('click');
     await wrapper.get('.claw-button--primary').trigger('click');
 
-    expect(wrapper.emitted('delete-worktree')).toStrictEqual([[true]]);
+    expect(wrapper.emitted('delete-worktree')).toStrictEqual([[true, false]]);
   });
 
   it('can close the agent while preserving the worktree', async () => {
@@ -56,6 +72,7 @@ function mountDialog() {
   return mount(AgentCloseDialog, {
     props: { visible: true, agent, workflow },
     global: {
+      components: { ElSwitch },
       stubs: {
         ElDialog: {
           props: ['modelValue'],

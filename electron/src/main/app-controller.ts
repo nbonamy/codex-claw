@@ -256,10 +256,14 @@ export class AppController {
     ipc.handle(ipcChannels.listAgentFiles, async (_event, agentId: string) => {
       return this.listAgentFiles(agentId);
     });
+    ipc.handle(ipcChannels.listAgentTasks, (_event, agentId) => this.requireBackendClient().request(backendMethods.agentTasksList, { agentId }));
+    ipc.handle(ipcChannels.cancelAgentTask, (_event, agentId, taskId) => this.requireBackendClient().request(backendMethods.agentTaskCancel, { agentId, taskId }));
 
     ipc.handle(ipcChannels.previewAgentFile, async (_event, agentId: string, filePath: string) => {
       return this.previewAgentFile(agentId, filePath);
     });
+    ipc.handle(ipcChannels.readAgentFileChunk, (_event, agentId, filePath, offset) =>
+      this.requireBackendClient().request(backendMethods.agentFileChunkRead, { agentId, filePath, offset }));
 
     registerAgentGitIpcHandlers(ipc, () => this.requireBackendClient());
 
@@ -742,12 +746,7 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
-      this.backendClientEventUnsubscribe?.();
-      this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitBackendEvent(event));
-      this.backendClientConnectionUnsubscribe?.();
-      this.backendClientConnectionUnsubscribe = this.backendClient.onConnectionState?.((state, error) => {
-        if (state === 'disconnected') this.handleBackendDisconnect(error);
-      }) ?? null;
+      this.subscribeToBackendClient();
       await this.synchronizeBackendState();
       this.setConnectionState({ status: 'connected' });
       logMain('clawd', 'connected to backend', { version: health.version, pid: health.pid });
@@ -763,6 +762,14 @@ export class AppController {
     const result = await this.requireBackendClient().request<WorkProviderConnectResult>(backendMethods.workProviderConnect, { provider });
     await this.adoptBackendSnapshot(result.snapshot);
     return result;
+  }
+
+  private subscribeToBackendClient(): void {
+    if (!this.backendClient) return;
+    this.backendClientEventUnsubscribe ??= this.backendClient.onEvent((event) => this.emitBackendEvent(event));
+    this.backendClientConnectionUnsubscribe ??= this.backendClient.onConnectionState?.((state, error) => {
+      if (state === 'disconnected') this.handleBackendDisconnect(error);
+    }) ?? null;
   }
 
   private async listSshHosts(): Promise<SshHostCandidate[]> {
@@ -1851,6 +1858,7 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
+      this.subscribeToBackendClient();
       const snapshot = await this.synchronizeBackendState();
       this.reconnectAttempt = 0;
       this.setConnectionState({ status: 'connected' });

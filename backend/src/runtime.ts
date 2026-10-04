@@ -32,6 +32,11 @@ import { WorktreeManager } from './worktrees/worktree-manager';
 import { AgentCreationService } from './agents/agent-creation-service';
 import { VisualizeService } from './visualize-service';
 import { createVisualizeToolModuleProvider } from './mcp/visualize-tools';
+import { DurableTaskService } from './agents/durable-task-service';
+import { createTaskToolModuleProvider } from './mcp/task-tools';
+import { loadBackendTasks, saveBackendTasks } from './state';
+import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
+import type { RendererMessage } from '@codex-claw/core/contracts';
 
 type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
@@ -54,6 +59,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   const computerUseAvailable = options.features?.computerUse !== false;
   const embeddedBrowserAvailable = options.features?.embeddedBrowser !== false;
   const snapshot = await loadBackendSnapshot();
+  const savedTasks = await loadBackendTasks();
   await ensureBackendCodexHome();
   const providerSetup = new ProviderSetup(snapshot, () => saveBackendSnapshot(snapshot), async backend => {
     await driverRpc.replaceDriver(backend, () => createBackendDriver(backend, { ...driverOptions, generalSettings: snapshot.general }));
@@ -86,13 +92,27 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   await workIntegrations.hydrateConnections();
   const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
   let server!: ClawBackendServer;
+  const tasks: DurableTaskService = new DurableTaskService({
+    tasks: savedTasks,
+    save: saveBackendTasks,
+    agent: id => snapshot.agents.find(agent => agent.id === id),
+    send: (agent, prompt) => server.sendTaskPrompt(agent, prompt),
+    interrupt: (agent, expectedTurnId) => driverRpc.handle(backendMethods.driverInterrupt, { agent, expectedTurnId }),
+    readHistory: agent => {
+      const ref = conversationRefFromAgent(agent);
+      return ref ? driverRpc.handle(backendMethods.driverConversationMessagesGet, { ref, agentId: agent.id }) as Promise<RendererMessage[]> : Promise.resolve([]);
+    },
+    onError: error => warnMain('tasks', 'transition failed', { message: String(error) }),
+  });
   const visualizeService = new VisualizeService({
     snapshot,
     generatedImagesRoot: path.join(backendCodexHomeDir(), 'generated_images'),
     persist: () => saveBackendSnapshot(snapshot),
     publish: () => server?.emitEvent({ type: 'snapshot.updated', payload: snapshot }),
   });
-  const mcpService = new ClawMcpService({
+  const mcpService: ClawMcpService = new ClawMcpService({
+    tasks,
+    persistSnapshot: () => saveBackendSnapshot(snapshot),
     missionTools: {
       contextForAgent: agentId => server.missionContext(agentId),
       submitResult: (agentId, input) => server.submitMissionResult(agentId, input),
@@ -123,7 +143,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     worktreeManager,
     agentCreation,
     createProject: (agentId, name, prompt, backend) => server.createProjectFromQuickChat(agentId, name, prompt, backend),
-    toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService)],
+    toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService), createTaskToolModuleProvider(tasks)],
   });
   const mcpServerUrl = await mcpService.start();
   const driverOptions: BackendDriverRegistryOptions = {
@@ -133,6 +153,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     pluginSettings,
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
     additionalDeveloperInstructions: (agent) => [
+      tasks.instructions(agent.id),
       server?.missionDeveloperInstructions(agent.id),
       visualizeService.developerInstructions(),
     ].filter(Boolean).join('\n\n') || undefined,
@@ -228,6 +249,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     run: () => pullRequestMonitor.check(),
   });
   server = new ClawBackendServer({
+    tasks,
     providerSetup,
     version: options.version,
     snapshot,
@@ -236,7 +258,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     visualizeService,
     driverRpc,
     onEvent: options.emitEvent,
-    onBackendEventApplied: (event) => mcpService.handleBackendEvent(event),
+    onBackendEventApplied: (event) => { mcpService.handleBackendEvent(event); tasks.handleEvent(event); },
     saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
     ensureMissionHome: ensureBackendMissionHome,
     deleteMissionHome: deleteBackendMissionHome,
@@ -275,6 +297,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   });
   mcpService.setDriverRpc(driverRpc);
   mcpService.setEventSink((event) => server.emitEvent(event));
+  await tasks.recover();
   scheduler.start();
   void server.initialize().catch((error) => warnMain('startup', 'backend initialization failed', {
     message: error instanceof Error ? error.message : String(error),
@@ -283,6 +306,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   return {
     server,
     async stop() {
+      tasks.close();
       scheduler.stop();
       await server.close();
       workIntegrations.close();

@@ -35,6 +35,7 @@ export class MissionExecutionService {
   private readonly remediationDispatches = new Set<string>();
   private readonly remediationTurns = new Map<string, { missionId: string; findingIds: string[]; frozenFindingIds: string[] }>();
   private readonly nonResultTurns = new Set<string>();
+  private readonly completedTurns = new Map<string, Set<string>>();
   private readonly agentTools: MissionAgentTools;
   private readonly workspaces: MissionWorkspaceService;
   constructor(private readonly ports: MissionExecutionPorts) {
@@ -248,10 +249,7 @@ export class MissionExecutionService {
         previousRun.status = 'accepted';
         previousRun.finishedAt = new Date().toISOString();
         current.artifacts.review = { summary: '', pullRequestUrl: '', findings: [] };
-        const stored = await this.ports.writeArtifact(current.id, 'review', '');
-        const updatedAt = new Date().toISOString();
-        const revision = (current.artifactFiles?.review?.revision ?? 0) + 1;
-        (current.artifactFiles ??= {}).review = { revision, size: stored.size, updatedAt };
+        if (current.artifactFiles) delete current.artifactFiles.review;
         runId = this.enqueueRun(current, { feedback: 'Re-review the remediated Mission workspaces and report the current findings.' });
       });
       void this.startLaunch(input.id, runId);
@@ -419,7 +417,7 @@ export class MissionExecutionService {
     await this.ports.missions.changeAsync(context.missionId, async mission => {
       const workflow = missionWorkflow(mission.workflow.type);
       const run = mission.execution?.runs.find(run => run.id === context.runId);
-      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
+      if (!run || !this.agentTools.ownsWritableRun(mission, run.id, agentId)) throw new Error('This agent does not own an active run for this mission stage.');
       if (run.stage !== 'implementation' && !mission.artifactFiles?.[run.stage]) throw new Error('Write the stage artifact before submitting it for review.');
       const proposal = structuredClone(mission.artifacts);
       if (run.stage === 'implementation') {
@@ -444,6 +442,7 @@ export class MissionExecutionService {
       }
       if (!isMissionArtifacts(proposal)) throw new Error('Mission evidence is too large. Submit a concise report with references.');
       run.proposal = proposal; run.summary = input.summary.trim(); run.status = 'awaitingReview'; run.finishedAt = new Date().toISOString();
+      delete run.error;
       if (run.stage === 'implementation') {
         this.acceptImplementationResult(mission, run);
         await this.persistImplementationArtifact(mission);
@@ -468,7 +467,15 @@ export class MissionExecutionService {
   setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> { return this.agentTools.setTitle(agentId, title); }
   attachRepository(agentId: string, repoPath: string): Promise<{ success: true; repoPath: string }> { return this.agentTools.attachRepository(agentId, repoPath); }
 
-  async agentFinished(agentId: string): Promise<void> {
+  async agentFinished(agentId: string, turnId?: string): Promise<void> {
+    if (turnId) {
+      const completed = this.completedTurns.get(agentId) ?? new Set<string>();
+      if (completed.has(turnId)) return;
+      completed.add(turnId);
+      // Keep recent completions across ticket handoffs without retaining the whole conversation.
+      if (completed.size > 64) completed.delete(completed.values().next().value!);
+      this.completedTurns.set(agentId, completed);
+    }
     const remediationTurn = this.remediationTurns.get(agentId);
     if (remediationTurn) {
       this.remediationTurns.delete(agentId);
@@ -495,6 +502,9 @@ export class MissionExecutionService {
       return;
     }
     if (this.nonResultTurns.delete(agentId)) return;
+    // A completed maintenance/compaction turn is not the end of the assignment
+    // when the prompt manager still has work to deliver, including after resume.
+    if (this.ports.snapshot.queuedPrompts?.some(prompt => prompt.agentId === agentId)) return;
     const mission = this.ports.snapshot.missions?.find(mission => mission.execution?.runs.some(run => run.workerId === agentId && run.status === 'running' && ['implementation', 'review'].includes(run.stage)));
     if (!mission) return;
     await this.ports.missions.change(mission.id, current => {
