@@ -47,6 +47,36 @@ afterEach(() => {
 });
 
 describe('AppShell workspace and plans', () => {
+  it('downloads an unsupported chat file without opening a workspace tab', async () => {
+    const readAgentFileChunk = vi.fn().mockResolvedValue({ path: 'film.mp4', size: 2, data: 'AAE=', nextOffset: 2 });
+    setElectronTestClient({ readAgentFileChunk });
+    vi.stubGlobal('URL', class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:film');
+      static revokeObjectURL = vi.fn();
+    });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      expect(this.download).toBe('film.mp4');
+    });
+    try {
+      const wrapper = mountShell({
+        realConversationPane: true,
+        previewAgentFile: vi.fn().mockResolvedValue({ path: 'film.mp4', kind: 'binary', size: 2 }),
+        codexConversationSnapshot: codexConversationSnapshot([
+          codexTextMessage('video', 'assistant', '[Film](film.mp4)'),
+        ]),
+      });
+      await wrapper.get('a[href="film.mp4"]').trigger('click');
+      await flushPromises();
+      expect(readAgentFileChunk).toHaveBeenCalledWith('agent-dina', 'film.mp4', 0);
+      expect(download).toHaveBeenCalledOnce();
+      expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
+      expect(wrapper.get('[aria-label="Right workspace"]').isVisible()).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('drops chat file links into additive sidebar tabs, including when the sidebar is closed', async () => {
     const previewAgentFile = vi.fn().mockImplementation(async (_agentId: string, path: string) => ({
       kind: 'text', path, content: `# Content of ${path}`, size: 40,
@@ -696,7 +726,7 @@ describe('AppShell workspace and plans', () => {
     await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
 
     expect(previewAgentFile).toHaveBeenCalledWith('agent-dina', 'docs/architecture.md');
-    expect(wrapper.text()).toContain('Loading markdown...');
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).not.toContain('architecture.md');
 
     resolveReadAgentFile({
       path: 'docs/architecture.md',
@@ -954,7 +984,7 @@ describe('AppShell workspace and plans', () => {
   it('ignores stale markdown reads after the file tab closes', async () => {
     const snapshot = createInitialSnapshot();
     let resolveReadAgentFile: (result: { content: string; path: string }) => void = () => undefined;
-    const previewAgentFile = vi.fn().mockReturnValue(new Promise((resolve) => {
+    const previewAgentFile = vi.fn().mockResolvedValueOnce({ path: 'docs/architecture.md', kind: 'text', content: '# Original' }).mockReturnValue(new Promise((resolve) => {
       resolveReadAgentFile = resolve;
     }));
     const wrapper = mount(AppShell, {
@@ -973,6 +1003,8 @@ describe('AppShell workspace and plans', () => {
       },
     });
 
+    await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
+    await flushPromises();
     await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
     await wrapper.get('[aria-label="Close architecture.md tab"]').trigger('click');
 

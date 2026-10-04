@@ -6,7 +6,7 @@ import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex
 import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
 import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, BackendSession, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
 import { stat } from 'node:fs/promises';
-import { listAgentFolderFiles, previewAgentFolderFile } from './agent-files';
+import { listAgentFolderFiles, previewAgentFolderFile, readAgentFolderFileChunk } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
@@ -192,6 +192,14 @@ export class BackendDriverRpc {
         return previewAgentFolderFile(
           record.folder === undefined ? undefined : requireString(record.folder, 'folder'),
           requireString(record.filePath, 'filePath'),
+        );
+      }
+      case backendMethods.workspaceFileChunkRead: {
+        const record = requireRecord(params);
+        return readAgentFolderFileChunk(
+          record.folder === undefined ? undefined : requireString(record.folder, 'folder'),
+          requireString(record.filePath, 'filePath'),
+          typeof record.offset === 'number' ? record.offset : NaN,
         );
       }
       case backendMethods.workspaceFolderValidate: {

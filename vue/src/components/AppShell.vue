@@ -654,6 +654,7 @@ import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useVisualizationAnnotations } from './use-visualization-annotations';
 import { useCockpitBacklog } from './use-cockpit-backlog';
 import { useWorkspacePreviews } from './use-workspace-previews';
+import { downloadAgentFile } from '../download-agent-file';
 import { useWorkItemRouting } from './use-work-item-routing';
 import { useAppShellCommands } from './use-app-shell-commands';
 
@@ -1695,6 +1696,8 @@ watch(
   { immediate: true, flush: 'sync' },
 );
 const workspacePreviews = useWorkspacePreviews({
+  downloadAgentFile,
+  reportError: message => { ElMessage.error(message); },
   closeTab: closeRightWorkspaceTab,
   currentAgent: () => currentAgent.value,
   getSnapshot: () => props.snapshot,

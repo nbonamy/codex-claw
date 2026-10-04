@@ -46,6 +46,7 @@ export const ipcChannels = {
   listBackendSkills: 'backend:skills:list',
   listAgentFiles: 'agent:files:list',
   previewAgentFile: 'agent:file:preview',
+  readAgentFileChunk: 'agent:file:chunk:read',
   getAgentGitDiff: 'agent:git-diff:get',
   getAgentGitWorkflow: 'agent:git-workflow:get',
   generateAgentGitMessage: 'agent:git-workflow:message:generate',

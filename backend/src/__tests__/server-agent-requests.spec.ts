@@ -498,6 +498,12 @@ describe('ClawBackendServer', () => {
         },
       });
       await expect(server.handleMessage({
+        jsonrpc: '2.0', id: 'download-file', method: 'agent/file/chunk/read',
+        params: { agentId: 'agent-dina', filePath: 'README.md', offset: 2 },
+      })).resolves.toMatchObject({
+        result: { path: 'README.md', size: 10, data: Buffer.from('Read me\n').toString('base64'), nextOffset: 10 },
+      });
+      await expect(server.handleMessage({
         jsonrpc: '2.0',
         id: 'missing-agent',
         method: 'agent/file/preview',
