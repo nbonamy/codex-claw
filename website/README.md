@@ -98,7 +98,7 @@ node videos/render-mission-film.mjs review-film
 
 ## Worktree delegation product film
 
-`videos/delegation-film.html` is a separate, illustrative 46-second film: a feature conversation leads to Claw's “Start implementation in a worktree?” proposal, visible worktree provisioning, follow-up work with the delegated agent, and a merge with worktree cleanup that closes the agent. Preview it at <http://127.0.0.1:4174/videos/delegation-film.html> and export its ignored MP4 and poster with:
+`videos/delegation-film.html` is a separate, illustrative 46-second film: a feature conversation leads to typing and submitting `/delegate` in the current agent's composer, handoff preparation, visible worktree provisioning, follow-up work with the delegated agent, and a merge with worktree cleanup that closes the delegated agent. The original agent and conversation remain available. Preview it at <http://127.0.0.1:4174/videos/delegation-film.html> and export its ignored MP4 and poster with:
 
 ```bash
 node videos/render-mission-film.mjs delegation-film
