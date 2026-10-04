@@ -6,6 +6,63 @@ import type { AppSnapshot } from '@codex-claw/core/contracts';
 import { AgentGitService } from '../git/agent-git-service';
 
 describe('mission backend boundary', () => {
+  it('keeps a resumed Mission running through compaction while its work prompt is queued', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    const worker = snapshot.agents[0]!;
+    worker.backendSession = { kind: 'codex', threadId: 'mission-thread' };
+    worker.status = { type: 'working' };
+    const mission = createMission(snapshot, {
+      outcome: 'Linear tools', workflowType: 'shapeAndShipFeature', teamId: worker.teamId!, orchestratorMemberId: worker.id,
+    });
+    mission.stage = 'implementation';
+    mission.artifacts.tickets = [{ title: 'Linear tools', repositoryPath: worker.folder!, done: false }];
+    mission.execution!.runs = [{
+      id: 'active-run', stage: 'implementation', memberId: worker.id, workerId: worker.id,
+      repositoryPath: worker.folder!, ticketIndex: 0, status: 'running', skills: [], feedback: '', startedAt: new Date().toISOString(),
+    }];
+    const sendPrompt = vi.fn().mockResolvedValue({ backendSession: worker.backendSession, turnId: 'work-turn' });
+    const driver: AgentBackendDriver = {
+      backend: 'codex', getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }), getCapabilities: () => codexBackendCapabilities,
+      sendPrompt, interrupt: async () => ({ backendSession: worker.backendSession! }),
+      respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
+    };
+    let disk: unknown;
+    const server = new ClawBackendServer({
+      version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); },
+    });
+    const completed = (turnId: string) => server.emitEvent({
+      agentId: worker.id, backend: 'codex', threadId: 'mission-thread', type: 'codex.conversationEventReceived',
+      payload: { revision: 1, event: {
+        seq: 1, occurredAt: new Date().toISOString(), origin: 'notification', conversationId: 'mission-thread', turnId,
+        type: 'turn.completed', payload: { status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null },
+      } },
+    });
+    const currentRun = () => snapshot.missions![0]!.execution!.runs[0]!;
+    try {
+      // Enqueue through the real prompt manager, as launch does while /compact is active.
+      await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'agent/prompt/send', params: {
+        agentId: worker.id, prompt: 'Begin the assigned ticket now.',
+      } });
+      expect(snapshot.queuedPrompts).toHaveLength(1);
+      completed('compact-turn');
+      server.emitEvent({ agentId: worker.id, type: 'agent.statusChanged', payload: { type: 'idle' } });
+      await vi.waitFor(() => expect(sendPrompt).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(snapshot.queuedPrompts).toHaveLength(0));
+      expect(currentRun().status).toBe('running');
+      expect(snapshotFromPersistedState(disk).missions![0]!.execution!.runs[0]!.status).toBe('running');
+      // A replay after dequeue must not fail the work that just started.
+      completed('compact-turn');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(currentRun().status).toBe('running');
+      // A genuine work completion without a result still fails the assignment.
+      completed('work-turn');
+      server.emitEvent({ agentId: worker.id, type: 'agent.statusChanged', payload: { type: 'idle' } });
+      await vi.waitFor(() => expect(currentRun().status).toBe('failed'));
+    } finally { await server.close(); }
+  });
+
   it('creates, broadcasts, updates and reloads a team-scoped mission without a repository', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];

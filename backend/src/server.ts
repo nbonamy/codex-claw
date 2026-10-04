@@ -2898,7 +2898,7 @@ export class ClawBackendServer {
     this.delegatedWorkReports.handleEvent(fullEvent);
     for (const listener of this.handoffListeners) listener(fullEvent);
     if (fullEvent.agentId && providerConversationEventView(fullEvent).type === 'turn.completed') {
-      void this.missionExecution.agentFinished(fullEvent.agentId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
+      void this.missionExecution.agentFinished(fullEvent.agentId, providerConversationEventView(fullEvent).turnId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
     }
     this.agentRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
