@@ -1,3 +1,4 @@
+import { isWorkProviderKind } from '@codex-claw/core/work-providers';
 import { readWorktreeHead } from './git-worktrees';
 import type { DurableTaskService } from './agents/durable-task-service';
 import { ProviderConnections } from './provider-connections';
@@ -2348,15 +2349,15 @@ export class ClawBackendServer {
       }
       case backendMethods.workProviderDisconnect:
         return createClawRpcResult(message.id, await this.requireWorkIntegrations().disconnect(requireWorkProvider(message.params)));
-      case backendMethods.workProviderRepositoriesList: {
+      case backendMethods.workProviderSourcesList: {
         return this.respondInLocation(
           message.id,
           this.automationLocationFromParams(message.params),
-          backendMethods.workProviderRepositoriesList,
+          backendMethods.workProviderSourcesList,
           {
             provider: requireWorkProvider(message.params),
           },
-          () => this.requireWorkIntegrations().listRepositories(requireWorkProvider(message.params)),
+          () => this.requireWorkIntegrations().listSources(requireWorkProvider(message.params)),
         );
       }
       case backendMethods.workProviderBacklogConfigure: {
@@ -2379,12 +2380,12 @@ export class ClawBackendServer {
           backendMethods.workProviderItemsList,
           {
             provider: requireWorkProvider(params),
-            repositoryId: requireString(params.repositoryId, 'repositoryId'),
+            sourceId: requireString(params.sourceId, 'sourceId'),
             ...(query ? { query } : {}),
           },
           () => query
-            ? this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId'), query)
-            : this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.repositoryId, 'repositoryId')),
+            ? this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.sourceId, 'sourceId'), query)
+            : this.requireWorkIntegrations().listItems(requireWorkProvider(params), requireString(params.sourceId, 'sourceId')),
         );
       }
       case backendMethods.workProviderGlobalItemsList: {
@@ -3090,7 +3091,7 @@ function requireBacklogConfiguration(params: unknown): WorkBacklogConfigurationI
 function requireWorkProvider(params: unknown): WorkProviderKind {
   const record = requireRecord(params);
   const provider = requireString(record.provider, 'provider');
-  if (provider !== 'github' && provider !== 'linear') {
+  if (!isWorkProviderKind(provider)) {
     throw new Error(`Unsupported work provider: ${provider}`);
   }
   return provider;
@@ -3118,13 +3119,13 @@ function globalWorkItemQuery(value: unknown): import('@codex-claw/core/contracts
   const query = requireRecord(value);
   const base = workItemQuery(query) ?? {};
   const assignment = query.assignment;
-  const page = query.page;
+  const cursor = query.cursor;
   const pageSize = query.pageSize;
   if (assignment !== undefined && assignment !== 'all' && assignment !== 'viewer') {
     throw new Error('Invalid global work item assignment filter.');
   }
-  if (page !== undefined && (typeof page !== 'number' || !Number.isInteger(page) || page < 1)) {
-    throw new Error('Invalid global work item page.');
+  if (cursor !== undefined && (typeof cursor !== 'string' || !cursor || cursor.length > 4096)) {
+    throw new Error('Invalid global work item cursor.');
   }
   if (pageSize !== undefined && (typeof pageSize !== 'number' || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)) {
     throw new Error('Invalid global work item page size.');
@@ -3132,7 +3133,7 @@ function globalWorkItemQuery(value: unknown): import('@codex-claw/core/contracts
   return {
     ...base,
     ...(assignment ? { assignment } : {}),
-    ...(typeof page === 'number' ? { page } : {}),
+    ...(typeof cursor === 'string' ? { cursor } : {}),
     ...(typeof pageSize === 'number' ? { pageSize } : {}),
   };
 }

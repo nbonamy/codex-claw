@@ -2,8 +2,14 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
-    automationSources: { connect: 'Connect {provider} in Settings before saving an automation.', noSources: 'No accessible Linear teams or projects.', codeRepositoryFor: 'Code repository for {source}', refresh: 'Refresh' },
-    backlogSource: { provider: 'Backlog provider', teamProject: 'Team / project', repository: 'Repository', codeRepository: 'Code repository', chooseCodeRepository: 'Choose a code repository', sources: 'Sources', retry: 'Retry', filterSources: 'Filter sources', openSource: 'Open {repository} in Linear' },
+    workAuthorization: {
+      copyCode: 'Copy {provider} device code {code}', step2: 'Step 2: Open {provider}',
+      pasteCode: '{provider} will ask for the code. Paste it there, authorize Codex Claw, then come back here.',
+      open: 'Open {provider}', finish: 'Codex Claw will finish the connection automatically once {provider} approves it.',
+      waiting: 'Waiting for {provider} authorization',
+    },
+    automationSources: { connect: 'Connect {provider} in Settings before saving an automation.', noSources: 'No accessible backlog sources.', codeRepositoryFor: 'Code repository for {source}', refresh: 'Refresh' },
+    backlogSource: { provider: 'Backlog provider', teamProject: 'Team / project', repository: 'Repository', codeRepository: 'Code repository', chooseCodeRepository: 'Choose a code repository', sources: 'Sources', retry: 'Retry', filterSources: 'Filter sources', openSource: 'Open {repository}', selectItem: 'Select {identifier}', assignedItem: 'Assigned {identifier}', viewAgent: 'View agent for {identifier}', viewItem: 'View {identifier}', viewProvider: 'View {identifier} in {provider}' },
     linearIntegration: {
       name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',
       cancelLabel: 'Cancel Linear authorization',
@@ -573,7 +579,7 @@ export const messages = {
       clearAssignmentPrompt: 'Do you want to close the assigned agent {name}?',
       keepAgent: 'Keep agent',
       closeAgent: 'Close agent',
-      startWork: 'Start work on #{number}',
+      startWork: 'Start work on {identifier}',
       useCurrentAgent: 'Use current agent',
       useCurrentAgentDetail: 'Continue this conversation',
       duplicateAgent: 'Duplicate agent',
@@ -601,10 +607,10 @@ export const messages = {
       review: 'Review',
       starting: 'Starting work…',
       started: 'Work started',
-      launchingFrom: 'Launching from #{number}',
-      buildIsolatedHome: 'Building an isolated home for #{number}…',
-      prepareExistingSession: 'Preparing session for #{number}…',
-      workReady: 'Work on #{number} is ready',
+      launchingFrom: 'Launching from {identifier}',
+      buildIsolatedHome: 'Building an isolated home for {identifier}…',
+      prepareExistingSession: 'Preparing session for {identifier}…',
+      workReady: 'Work on {identifier} is ready',
       createIsolatedWorktree: 'Creating isolated worktree',
       prepareWorkBranch: 'Preparing work branch',
       startAgentSession: 'Starting agent session',

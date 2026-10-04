@@ -1,10 +1,11 @@
+import { isWorkProviderKind } from './work-providers';
 import type {
   AppSnapshot,
   CreateAutomationInput,
   Automation,
   BackendConversationRef,
   AutomationExecutionLogEntry,
-  AutomationRepositoryTarget,
+  AutomationWorkSourceTarget,
   UpdateAutomationInput,
 } from './contracts';
 import { createEntityId, type IdGenerator } from './ids';
@@ -251,27 +252,27 @@ function cloneAutomationExecutionEntry(entry: AutomationExecutionLogEntry): Auto
   };
 }
 
-function normalizeAutomationRepositories(repositories: AutomationRepositoryTarget[]): AutomationRepositoryTarget[] {
+function normalizeAutomationRepositories(repositories: AutomationWorkSourceTarget[]): AutomationWorkSourceTarget[] {
   const seen = new Set<string>();
-  const normalized: AutomationRepositoryTarget[] = [];
+  const normalized: AutomationWorkSourceTarget[] = [];
   for (const repository of repositories) {
-    const repositoryId = repository.repositoryId.trim();
-    const sourceRepositoryPath = repository.sourceRepositoryPath.trim();
-    const key = `${repository.provider}:${repositoryId}`;
-    if ((repository.provider !== 'github' && repository.provider !== 'linear') || !repositoryId || !sourceRepositoryPath || seen.has(key)) {
+    const sourceId = repository.sourceId.trim();
+    const executionRepositoryPath = repository.executionRepositoryPath.trim();
+    const key = `${repository.provider}:${sourceId}`;
+    if (!isWorkProviderKind(repository.provider) || !sourceId || !executionRepositoryPath || seen.has(key)) {
       continue;
     }
     seen.add(key);
-    normalized.push({ provider: repository.provider, repositoryId, sourceRepositoryPath });
+    normalized.push({ provider: repository.provider, sourceId, executionRepositoryPath });
   }
   return normalized;
 }
 
-function defaultAutomationName(repositories: AutomationRepositoryTarget[]): string {
+function defaultAutomationName(repositories: AutomationWorkSourceTarget[]): string {
   if (repositories.length === 1) {
-    return repositories[0]!.repositoryId;
+    return repositories[0]!.sourceId;
   }
-  return `${repositories[0]!.repositoryId} +${repositories.length - 1}`;
+  return `${repositories[0]!.sourceId} +${repositories.length - 1}`;
 }
 
 function uniqueAutomationId(snapshot: AppSnapshot, name: string, createdAt: string, createId: IdGenerator): string {

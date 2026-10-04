@@ -12,7 +12,7 @@ import type {
   RemoteConnection,
   RendererMessage,
   SourceRepository,
-  WorkRepository,
+  WorkSource,
   WorkProviderKind,
 } from '@codex-claw/core/contracts';
 import AutomationsView from '../AutomationsView.vue';
@@ -34,12 +34,12 @@ describe('AutomationsView', () => {
     const remote = createInitialSnapshot();
     remote.providerConnections = [{ backend: 'claude', connected: true, installed: true, checking: false }];
     remote.workBacklog.connections = [{ provider: 'linear', status: 'connected' }];
-    const target = { provider: 'linear' as const, repositoryId: 'linear:eng:login', sourceRepositoryPath: '/home/nicolas/src/codex-claw' };
+    const target = { provider: 'linear' as const, sourceId: 'linear:eng:login', executionRepositoryPath: '/home/nicolas/src/codex-claw' };
     const saved = automation({ name: 'Engineering / Login', backend: 'claude', repositories: [target] });
     let failCatalog = true;
     const loadWorkRepositories = vi.fn(async (provider: WorkProviderKind) => {
       if (provider === 'linear' && failCatalog) throw new Error('Linear access failed');
-      return provider === 'linear' ? [repository({ provider, id: target.repositoryId, fullName: 'Engineering / Login' })] : [];
+      return provider === 'linear' ? [repository({ provider, id: target.sourceId, fullName: 'Engineering / Login' })] : [];
     });
     const createAutomation = vi.fn(async () => ({ ...remote, automations: [saved] }));
     const wrapper = mountView({ realAutomationEditor: true, remoteConnections: [readyRemoteConnection()],
@@ -65,19 +65,16 @@ describe('AutomationsView', () => {
     await wrapper.get('[aria-label="Engineering / Login actions"]').trigger('click'); await flushPromises();
     bodyButton('Edit').click(); await flushPromises();
     expect(wrapper.find('[aria-label="Code repository for Engineering / Login"]').exists()).toBe(true);
-    expect(wrapper.findAllComponents({ name: 'ElSelect' }).some(select => select.props('modelValue') === target.sourceRepositoryPath)).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElSelect' }).some(select => select.props('modelValue') === target.executionRepositoryPath)).toBe(true);
   });
 
   it('discards a late remote source failure after leaving that host', async () => {
     const remote = createInitialSnapshot();
     remote.workBacklog.connections = [{ provider: 'linear', status: 'connected' }];
     let reject!: (error: Error) => void;
-    const loadWorkRepositories = vi.fn((provider: WorkProviderKind) => provider === 'linear' ? new Promise<WorkRepository[]>((_resolve, rejectPromise) => { reject = rejectPromise; }) : Promise.resolve([]));
+    const loadWorkRepositories = vi.fn((provider: WorkProviderKind) => provider === 'linear' ? new Promise<WorkSource[]>((_resolve, rejectPromise) => { reject = rejectPromise; }) : Promise.resolve([]));
     const wrapper = mountView({ remoteConnections: [readyRemoteConnection()], getAutomationSnapshot: async () => remote, loadWorkRepositories });
     wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'remote:connection-devbox'); await flushPromises();
-    await wrapper.get('.automation-welcome__button').trigger('click');
-    wrapper.findComponent({ name: 'AutomationEditor' }).vm.$emit('load-repositories', 'linear'); await flushPromises();
-    wrapper.findComponent({ name: 'AutomationEditor' }).vm.$emit('cancel'); await flushPromises();
     wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'local'); await flushPromises();
     reject(new Error('Old remote error')); await flushPromises();
     expect(wrapper.text()).not.toContain('Old remote error');
@@ -106,8 +103,8 @@ describe('AutomationsView', () => {
       repositories: [
         {
           provider: 'github',
-          repositoryId: 'nbonamy/codex-claw',
-          sourceRepositoryPath: '/src/codex-claw',
+          sourceId: 'nbonamy/codex-claw',
+          executionRepositoryPath: '/src/codex-claw',
         },
       ],
       teamId: 'team-codex-claw',
@@ -119,8 +116,8 @@ describe('AutomationsView', () => {
       repositories: [
         {
           provider: 'github',
-          repositoryId: 'nbonamy/codex-claw',
-          sourceRepositoryPath: '/src/codex-claw',
+          sourceId: 'nbonamy/codex-claw',
+          executionRepositoryPath: '/src/codex-claw',
         },
       ],
       teamId: 'team-codex-claw',
@@ -208,8 +205,8 @@ describe('AutomationsView', () => {
       repositories: [
         {
           provider: 'github',
-          repositoryId: 'nbonamy/remote',
-          sourceRepositoryPath: '/home/nicolas/src/codex-claw',
+          sourceId: 'nbonamy/remote',
+          executionRepositoryPath: '/home/nicolas/src/codex-claw',
         },
       ],
       teamId: 'team-remote',
@@ -219,7 +216,7 @@ describe('AutomationsView', () => {
 
     expect(createAutomation).toHaveBeenCalledWith(
       expect.objectContaining({
-        repositories: [expect.objectContaining({ repositoryId: 'nbonamy/remote' })],
+        repositories: [expect.objectContaining({ sourceId: 'nbonamy/remote' })],
       }),
       location,
     );
@@ -273,8 +270,8 @@ describe('AutomationsView', () => {
       repositories: [
         {
           provider: 'github',
-          repositoryId: 'nbonamy/codex-claw',
-          sourceRepositoryPath: '/tmp/fresh-agent',
+          sourceId: 'nbonamy/codex-claw',
+          executionRepositoryPath: '/tmp/fresh-agent',
         },
       ],
       teamId: 'team-codex-claw',
@@ -285,7 +282,7 @@ describe('AutomationsView', () => {
     expect(updateAutomation).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'automation-bugs',
-        repositories: [expect.objectContaining({ sourceRepositoryPath: '/tmp/fresh-agent' })],
+        repositories: [expect.objectContaining({ executionRepositoryPath: '/tmp/fresh-agent' })],
       }),
     );
     expect(wrapper.findComponent({ name: 'AutomationEditor' }).exists()).toBe(false);
@@ -588,7 +585,7 @@ function mountView(
     deleteAutomation: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
     listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-    loadWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+    loadWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkSource[] | void>;
     automations: Automation[];
     readConversationMessages: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
     remoteConnections: RemoteConnection[];
@@ -598,7 +595,7 @@ function mountView(
       input: Parameters<NonNullable<InstanceType<typeof AutomationsView>['$props']['updateAutomation']>>[0],
       location?: AutomationLocation,
     ) => Promise<AppSnapshot | void>;
-    workRepositoriesByProvider: Partial<Record<'github', WorkRepository[]>>;
+    workRepositoriesByProvider: Partial<Record<'github', WorkSource[]>>;
     realAutomationEditor: boolean;
   }> = {},
 ) {
@@ -663,8 +660,8 @@ function automation(overrides: Partial<Automation> = {}): Automation {
     repositories: [
       {
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       },
     ],
     teamId: 'team-codex-claw',
@@ -676,7 +673,7 @@ function automation(overrides: Partial<Automation> = {}): Automation {
   };
 }
 
-function repository(overrides: Partial<WorkRepository> = {}): WorkRepository {
+function repository(overrides: Partial<WorkSource> = {}): WorkSource {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw',

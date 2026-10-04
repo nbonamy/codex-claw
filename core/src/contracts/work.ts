@@ -1,7 +1,8 @@
 import type { BackendConversationRef } from './conversation';
 import type { AppText } from './shared';
 
-export type WorkProviderKind = 'github' | 'linear';
+import type { WorkProviderKind } from '../work-providers';
+export type { WorkProviderKind } from '../work-providers';
 
 export type WorkIntegrationStatus = 'notConfigured' | 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -37,28 +38,25 @@ export type WorkBacklogAssignment = {
   automationExecutionId?: string;
 };
 
-export type WorkItemReference = Pick<WorkItem, 'provider' | 'id' | 'repositoryId' | 'repositoryFullName' | 'number' | 'title' | 'url' | 'identifier' | 'body' | 'linearSource'>;
+export type WorkItemReference = Pick<WorkItem, 'provider' | 'id' | 'sourceId' | 'sourceName' | 'number' | 'title' | 'url' | 'identifier' | 'body'>;
 
-export type GitHubWorkBacklogConfiguration = {
-  repositoryId?: string;
+export type WorkSourceConfiguration = {
+  sourceId?: string;
   assigneeLogin?: string;
   tagName?: string;
 };
 
-export type GitHubWorkBacklogConfigurationInput = {
-  repositoryId?: string | null;
+export type WorkSourceConfigurationInput = {
+  sourceId?: string | null;
   assigneeLogin?: string | null;
   tagName?: string | null;
 };
 
-export type WorkBacklogProviderConfigurations = {
-  github?: GitHubWorkBacklogConfiguration;
-  linear?: GitHubWorkBacklogConfiguration;
-};
+export type WorkBacklogProviderConfigurations = Partial<Record<WorkProviderKind, WorkSourceConfiguration>>;
 
 export type WorkBacklogConfigurationInput = {
   provider: WorkProviderKind;
-  configuration: GitHubWorkBacklogConfigurationInput;
+  configuration: WorkSourceConfigurationInput;
 };
 
 export type WorkBacklogState = {
@@ -76,19 +74,17 @@ export type WorkProviderAuthorization = {
   expiresAt: string;
 };
 
-/** Legacy catalog DTO. For Linear this is a backlog scope, never a Git repository. */
-export type WorkRepository = {
+/** An opaque provider-owned backlog scope, independent of an execution repository. */
+export type WorkSource = {
   provider: WorkProviderKind;
   id: string;
-  owner: string;
+  owner?: string;
   name: string;
   fullName: string;
   url: string;
-  isPrivate: boolean;
+  isPrivate?: boolean;
   updatedAt?: string;
   workItemsUpdatedAt?: string;
-  /** Backlog scope only; never a code repository or clone target. */
-  linearSource?: { teamId: string; teamName: string; projectId?: string; projectName?: string };
 };
 
 export type WorkItemLabel = {
@@ -107,15 +103,16 @@ export type WorkItemQuery = {
 
 export type GlobalWorkItemQuery = WorkItemQuery & {
   assignment?: 'all' | 'viewer';
-  page?: number;
+  cursor?: string;
   pageSize?: number;
 };
 
 export type WorkItemPage = {
   items: WorkItem[];
-  page: number;
-  pageSize: number;
-  totalItems: number;
+  /** Absent when the provider has no further results. Opaque to callers. */
+  nextCursor?: string;
+  /** Only supplied when the provider can report a reliable total cheaply. */
+  totalItems?: number;
 };
 
 export type WorkItem = {
@@ -123,13 +120,13 @@ export type WorkItem = {
   id: string;
   kind?: WorkItemKind;
   branchName?: string;
-  repositoryId: string;
-  repositoryFullName: string;
-  number: number;
+  sourceId: string;
+  sourceName: string;
+  /** Optional native numeric reference, used only by code-host operations. */
+  number?: number;
   identifier?: string;
   nativeState?: string;
   assignedToViewer?: boolean;
-  linearSource?: WorkRepository['linearSource'];
   title: string;
   url: string;
   state: WorkItemState;
@@ -141,10 +138,10 @@ export type WorkItem = {
   updatedAt: string;
 };
 
-export type AutomationRepositoryTarget = {
+export type AutomationWorkSourceTarget = {
   provider: WorkProviderKind;
-  repositoryId: string;
-  sourceRepositoryPath: string;
+  sourceId: string;
+  executionRepositoryPath: string;
 };
 
 export type AutomationSchedule = {
@@ -180,7 +177,7 @@ export type Automation = {
   id: string;
   name: string;
   enabled: boolean;
-  repositories: AutomationRepositoryTarget[];
+  repositories: AutomationWorkSourceTarget[];
   teamId: string;
   selectionPrompt?: string;
   assignmentPrompt?: string;
@@ -206,7 +203,7 @@ export type CreateAutomationInput = {
   backend?: import('../contracts').AgentBackend;
   name?: string;
   enabled?: boolean;
-  repositories: AutomationRepositoryTarget[];
+  repositories: AutomationWorkSourceTarget[];
   teamId: string;
   selectionPrompt?: string;
   assignmentPrompt?: string;

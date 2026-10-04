@@ -18,14 +18,14 @@ describe('AutomationRunner', () => {
 
   it('selects overlapping Linear sources once and retains native identity through execution and repeated runs', async () => {
     const targets = ['linear:eng', 'linear:eng:project', 'linear:ops'].map(repositoryId => ({
-      provider: 'linear' as const, repositoryId, sourceRepositoryPath: repositoryId.endsWith(':project') ? '/other-code' : '/remote/code',
+      provider: 'linear' as const, sourceId: repositoryId, executionRepositoryPath: repositoryId.endsWith(':project') ? '/other-code' : '/remote/code',
     }));
     const snapshot = snapshotWithAutomation({ repositories: targets, selectionPrompt: 'Ready bugs', backend: 'claude' });
     const issue = (repositoryId: string): WorkItem => ({
       ...workItem(12, repositoryId), provider: 'linear', id: repositoryId === 'linear:ops' ? 'linear:ops-uuid' : 'linear:eng-uuid',
-      identifier: repositoryId === 'linear:ops' ? 'OPS-12' : 'ENG-12', repositoryFullName: repositoryId === 'linear:ops' ? 'Operations' : 'Engineering',
+      identifier: repositoryId === 'linear:ops' ? 'OPS-12' : 'ENG-12', sourceName: repositoryId === 'linear:ops' ? 'Operations' : 'Engineering',
       url: `https://linear.app/acme/issue/${repositoryId === 'linear:ops' ? 'OPS-12' : 'ENG-12'}`, body: 'Reproduction steps',
-      linearSource: repositoryId === 'linear:ops' ? { teamId: 'ops', teamName: 'Operations' } : { teamId: 'eng', teamName: 'Engineering' },
+
     });
     const listItems = vi.fn(async (_provider, source) => [issue(source), { ...issue(source), id: 'closed', state: 'closed' as const }]);
     const createWorktree = vi.fn(async ({ branchName }) => ({ name: branchName, path: `/remote/code-${branchName}` }));
@@ -55,7 +55,7 @@ describe('AutomationRunner', () => {
 
   it.each(['Linear source is inaccessible', 'Code repository missing'])(
     'records a failed Linear run without assigning or dispatching when %s', async message => {
-      const snapshot = snapshotWithAutomation({ repositories: [{ provider: 'linear', repositoryId: 'linear:eng', sourceRepositoryPath: '/missing' }] });
+      const snapshot = snapshotWithAutomation({ repositories: [{ provider: 'linear', sourceId: 'linear:eng', executionRepositoryPath: '/missing' }] });
       const prepareFailure = message === 'Code repository missing';
       const sendPrompt = vi.fn();
       const initialAgents = snapshot.agents.length;
@@ -73,7 +73,7 @@ describe('AutomationRunner', () => {
   );
 
   it('does not duplicate Linear work when manual and scheduled runs overlap during preparation', async () => {
-    const snapshot = snapshotWithAutomation({ repositories: [{ provider: 'linear', repositoryId: 'linear:eng', sourceRepositoryPath: '/code' }] });
+    const snapshot = snapshotWithAutomation({ repositories: [{ provider: 'linear', sourceId: 'linear:eng', executionRepositoryPath: '/code' }] });
     let finish!: (worktree: { name: string; path: string }) => void;
     const createWorktree = vi.fn(() => new Promise<{ name: string; path: string }>(resolve => { finish = resolve; }));
     const sendPrompt = vi.fn().mockRejectedValue(new Error('Agent could not start'));
@@ -109,7 +109,7 @@ describe('AutomationRunner', () => {
     );
     const items = [workItem(12), workItem(13, 'nbonamy/witsy')];
     const listItems = vi.fn((_provider: string, repositoryId: string) =>
-      Promise.resolve(items.filter((item) => item.repositoryId === repositoryId)),
+      Promise.resolve(items.filter((item) => item.sourceId === repositoryId)),
     );
     const createWorktree = vi.fn(({ repoPath, branchName }: { repoPath: string; branchName: string }) =>
       Promise.resolve({
@@ -344,16 +344,16 @@ function automationFixture(): Automation {
   return snapshotWithAutomation().automations[0]!;
 }
 
-function repository(repositoryId: string, sourceRepositoryPath: string) {
-  return { provider: 'github' as const, repositoryId, sourceRepositoryPath };
+function repository(repositoryId: string, executionRepositoryPath: string) {
+  return { provider: 'github' as const, sourceId: repositoryId, executionRepositoryPath };
 }
 
 function workItem(number: number, repositoryId = 'nbonamy/codex-claw'): WorkItem {
   return {
     provider: 'github',
     id: `${repositoryId}#${number}`,
-    repositoryId,
-    repositoryFullName: repositoryId,
+    sourceId: repositoryId,
+    sourceName: repositoryId,
     number,
     title: `Issue ${number}`,
     url: `https://github.com/${repositoryId}/issues/${number}`,

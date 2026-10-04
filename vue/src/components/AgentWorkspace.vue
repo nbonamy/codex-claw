@@ -71,16 +71,9 @@
       :open-in-catalog="openInApplications"
       :subagent-tree="subagentTreeFor(agent.id)"
       :load-subagent-messages="(conversationId) => loadSubagentMessages(agent.id, conversationId)"
-      :backlog-items="rightWorkspaceFor(agent.id).backlogItems"
       :backlog-location="snapshot.teams.find(team => team.id === agent.teamId)?.remoteConnectionId ? { kind: 'remote', remoteConnectionId: snapshot.teams.find(team => team.id === agent.teamId)!.remoteConnectionId! } : undefined"
-      :backlog-status="rightWorkspaceFor(agent.id).backlogStatus"
-      :backlog-error="rightWorkspaceFor(agent.id).backlogError"
       :github-repository="snapshot.agentGitStatuses[agent.id]?.githubRepository ?? null"
-      :github-connection="
-        snapshot.workBacklog.connections.find((connection) => connection.provider === 'github') ?? null
-      "
       :work-assignments="snapshot.workBacklog.assignments"
-      :prefill-repository-work="(item) => prefillRepositoryWork(agent.id, item)"
       :clear-repository-work-assignment="(item) => $emit('remove-work-item-assignment', item)"
       :close-repository-work-agent="(agentId) => $emit('close-agent', agentId)"
       :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
@@ -105,7 +98,6 @@
       @resize-files-pane="rightWorkspaceFor(agent.id).filesPaneWidth = $event"
       @open-link="openConversationLink"
       @refresh-git-diff="openAgentGitDiffPreview(agent.id, $event)"
-      @refresh-backlog="loadRepositoryBacklog(agent.id)"
       @clarify-finding="emit('clarifyCodeReviewFinding', { agentId: agent.id, ...$event })"
       @select-tab="selectRightWorkspaceTab(agent.id, $event)"
       @send-prompt="forwardPrompt"
@@ -155,8 +147,6 @@ import type {
   RendererSendPromptOptions,
   ThreadPlan,
   WorkItem,
-  WorkItemQuery,
-  WorkProviderKind,
 } from '@codex-claw/core/contracts';
 import { PRIMARY_BROWSER_ID, type AppCommand } from '@codex-claw/core/contracts';
 import type {
@@ -234,12 +224,6 @@ const props = defineProps<{
   isLoading: boolean;
   isModalDialogVisible: boolean;
   isRightWorkspaceVisible: (agentId: string) => boolean;
-  loadWorkItems: (
-    provider: WorkProviderKind,
-    repositoryId: string,
-    location?: AutomationLocation,
-    query?: WorkItemQuery,
-  ) => Promise<WorkItem[] | void>;
   hasVisibleMessages: boolean;
   hasRunningPlanTool: boolean;
   latestConversationTurnId: string | null;
@@ -255,7 +239,6 @@ const props = defineProps<{
   openFilePreviewForAgent: (agentId: string, filePath: string) => Promise<void>;
   openInApplications: OpenInApplicationCatalog;
   openRightWorkspaceTab: (tab: RightWorkspaceTab, agentId?: string) => void;
-  prefillWorkItemForAgent: (agentId: string, item: WorkItem) => void;
   pushAgentGitBranch: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
   rightWorkspaceFor: (agentId: string) => AgentRightWorkspaceState;
   rightWorkspaces: Record<string, AgentRightWorkspaceState>;
@@ -635,10 +618,6 @@ const linkDrag = useWorkspaceLinkDrag({
   },
 });
 
-function prefillWorkItemForAgent(agentId: string, item: WorkItem): void {
-  props.prefillWorkItemForAgent(agentId, item);
-}
-
 function isPlanPreviewUpdatingFor(agentId: string): boolean {
   const panel = rightWorkspaceFor(agentId).planPanel;
   if (!panel || panel.purpose !== 'plan') return false;
@@ -727,40 +706,8 @@ function openRightWorkspaceTabFromMenu(agentId: string, tab: RightWorkspaceTab):
   openRightWorkspaceTab(tab, agentId);
 }
 
-async function openRepositoryBacklog(agentId: string): Promise<void> {
+function openRepositoryBacklog(agentId: string): void {
   openRightWorkspaceTab('backlog', agentId);
-  const workspace = rightWorkspaceFor(agentId);
-  if (workspace.backlogStatus === 'notLoaded' || workspace.backlogStatus === 'error') {
-    await loadRepositoryBacklog(agentId);
-  }
-}
-
-async function loadRepositoryBacklog(agentId: string): Promise<void> {
-  const workspace = rightWorkspaceFor(agentId);
-  const repositoryId = props.snapshot.agentGitStatuses[agentId]?.githubRepository?.trim();
-  if (!repositoryId) {
-    workspace.backlogStatus = 'error';
-    workspace.backlogError = translate('dynamic.misc.repositoryNotConnected');
-    return;
-  }
-
-  workspace.backlogStatus = 'loading';
-  workspace.backlogError = null;
-  try {
-    workspace.backlogItems =
-      (await props.loadWorkItems('github', repositoryId, undefined, {
-        kind: 'all',
-        state: 'all',
-      })) ?? [];
-    workspace.backlogStatus = 'loaded';
-  } catch (error) {
-    workspace.backlogStatus = 'error';
-    workspace.backlogError = error instanceof Error ? error.message : String(error);
-  }
-}
-
-function prefillRepositoryWork(agentId: string, item: WorkItem): void {
-  prefillWorkItemForAgent(agentId, item);
 }
 
 function isLocalAgent(agent: Agent): boolean {

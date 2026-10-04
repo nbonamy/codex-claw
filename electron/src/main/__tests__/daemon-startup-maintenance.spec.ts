@@ -149,8 +149,8 @@ function activeAutomationSnapshot() {
     enabled: true,
     repositories: [{
       provider: 'github',
-      repositoryId: 'nabocorp/codex-claw',
-      sourceRepositoryPath: '/Users/nicolas/src/codex-claw',
+      sourceId: 'nabocorp/codex-claw',
+      executionRepositoryPath: '/Users/nicolas/src/codex-claw',
     }],
     teamId: 'team-codex-claw',
     schedule: { intervalMinutes: 60 },

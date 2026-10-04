@@ -5,18 +5,18 @@ import type { Agent, WorkItem } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
 import RepositoryBacklogPanel from '../RepositoryBacklogPanel.vue';
 import { createClientApiMock } from '../../test/client-api-mock';
-import { configureClawClient } from '../../platform-api';
+import { codexClawApi, configureClawClient } from '../../platform-api';
 import { backlogConnectionsKey } from '../backlog-providers';
 
 describe('RepositoryBacklogPanel', () => {
   it('shows native Linear details, filters by the viewer and resets details when the source changes', async () => {
     const { api } = createClientApiMock();
     configureClawClient({ platform: 'desktop', api });
-    api.listWorkRepositories.mockResolvedValue(['a', 'b'].map(id => ({ provider: 'linear', id: `linear:${id}`, owner: id, name: id, fullName: id, url: 'https://linear.app', isPrivate: true })));
-    const item = workItem({ provider: 'linear', id: 'linear:issue', repositoryId: 'linear:a', identifier: 'ENG-12', nativeState: 'Started', body: 'Repair login', assignedToViewer: true, assignees: ['Alex'] });
+    api.listWorkSources.mockResolvedValue(['a', 'b'].map(id => ({ provider: 'linear', id: `linear:${id}`, owner: id, name: id, fullName: id, url: 'https://linear.app', isPrivate: true })));
+    const item = workItem({ provider: 'linear', id: 'linear:issue', sourceId: 'linear:a', identifier: 'ENG-12', nativeState: 'Started', body: 'Repair login', assignedToViewer: true, assignees: ['Alex'] });
     api.listWorkItems.mockResolvedValue([item]);
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ startWorkAction });
+    const wrapper = await mountPanel({ startWorkAction });
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
     await flushPromises();
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:a');
@@ -25,13 +25,13 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Started');
     expect(wrapper.findAll('[role="radio"]')).toHaveLength(1);
     await wrapper.get('.repository-backlog__item-actions').trigger('click');
-    expect(wrapper.get('.linear-issue-detail').text()).toContain('Repair login');
+    expect(wrapper.get('.work-item-detail').text()).toContain('Repair login');
     await wrapper.get('.work-item-assignment-picker .claw-button--primary').trigger('click');
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ item, target: 'duplicate', action: 'fix', workspace: { kind: 'worktree', branchName: 'fix/eng-12' } }));
     const guard = startWorkAction.mock.calls[0]![0].isCurrent;
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:b');
     await flushPromises();
-    expect(wrapper.find('.linear-issue-detail').exists()).toBe(false);
+    expect(wrapper.find('.work-item-detail').exists()).toBe(false);
     expect(guard()).toBe(false);
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:a');
     await flushPromises();
@@ -42,11 +42,13 @@ describe('RepositoryBacklogPanel', () => {
     configureClawClient();
   });
   beforeEach(() => {
+    const { api } = createClientApiMock();
+    configureClawClient({ platform: 'desktop', api });
     window.localStorage.clear();
   });
 
   it('separates issues and pull requests and filters the visible list', async () => {
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       items: [
         workItem(),
         workItem({ id: 'nbonamy/codex-claw#21', kind: 'pullRequest', number: 21, title: 'Ship backlog workspace' }),
@@ -66,7 +68,7 @@ describe('RepositoryBacklogPanel', () => {
   });
 
   it('opens issue and pull request titles in the system browser without adding another row action', async () => {
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       items: [
         workItem(),
         workItem({
@@ -94,8 +96,8 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.findAll('[aria-label^="Work item actions"]')).toHaveLength(1);
   });
 
-  it('darkens pale label text while preserving the source color for its tint', () => {
-    const wrapper = mountPanel({
+  it('darkens pale label text while preserving the source color for its tint', async () => {
+    const wrapper = await mountPanel({
       items: [workItem({ labels: [{ name: 'enhancement', color: 'a2eeef' }] })],
     });
 
@@ -104,8 +106,8 @@ describe('RepositoryBacklogPanel', () => {
     expect(label.attributes('style')).toContain('--repository-label-text-color: #547c7c');
   });
 
-  it('groups assigned work by lifecycle status', () => {
-    const wrapper = mountPanel({
+  it('groups assigned work by lifecycle status', async () => {
+    const wrapper = await mountPanel({
       assignments: {
         'github:nbonamy/codex-claw#12': {
           provider: 'github',
@@ -122,9 +124,9 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Fix backlog assignment');
   });
 
-  it('replaces default item metadata with a wrapping multi-line agent comment', () => {
+  it('replaces default item metadata with a wrapping multi-line agent comment', async () => {
     const note = 'Investigation complete: the reconnect race happens after restart.\nThe backend response arrives after the client closes.';
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       assignments: {
         'github:nbonamy/codex-claw#12': {
           provider: 'github',
@@ -150,7 +152,7 @@ describe('RepositoryBacklogPanel', () => {
     const clearAssignmentAction = vi.fn();
     const showAgentAction = vi.fn();
     const otherAgent = { ...agent, id: 'agent-jesse', name: 'Jesse' };
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       assignments: {
         'github:nbonamy/codex-claw#12': {
           provider: 'github',
@@ -187,7 +189,7 @@ describe('RepositoryBacklogPanel', () => {
   it('opens an assigned item owner from the row without intercepting its GitHub link or actions menu', async () => {
     const showAgentAction = vi.fn();
     const otherAgent = { ...agent, id: 'agent-jesse', name: 'Jesse' };
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       assignments: {
         'github:nbonamy/codex-claw#12': {
           provider: 'github',
@@ -217,7 +219,7 @@ describe('RepositoryBacklogPanel', () => {
 
   it('keeps the assigned-agent action visible but disabled for the current agent', async () => {
     const showAgentAction = vi.fn();
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       assignments: {
         'github:nbonamy/codex-claw#12': {
           provider: 'github',
@@ -249,7 +251,7 @@ describe('RepositoryBacklogPanel', () => {
     const clearAssignmentAction = vi.fn();
     const closeAgentAction = vi.fn();
     const otherAgent = { ...agent, id: 'agent-jesse', name: 'Jesse' };
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       agents: [agent, otherAgent],
       assignments: {
         'github:nbonamy/codex-claw#12': {
@@ -285,7 +287,7 @@ describe('RepositoryBacklogPanel', () => {
   });
 
   it('keeps search collapsed until requested and clears it when closed', async () => {
-    const wrapper = mountPanel();
+    const wrapper = await mountPanel();
 
     expect(wrapper.find('[aria-label="Search repository work"]').exists()).toBe(true);
     expect(wrapper.find('input[aria-label="Search repository work"]').exists()).toBe(false);
@@ -302,7 +304,7 @@ describe('RepositoryBacklogPanel', () => {
   });
 
   it('saves filter defaults for only the current repository', async () => {
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       items: [
         workItem(),
         workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Completed backlog work', state: 'closed' }),
@@ -317,14 +319,14 @@ describe('RepositoryBacklogPanel', () => {
     await nextTick();
     await wrapper.get('.repository-backlog__filter-menu footer button').trigger('click');
 
-    expect(window.localStorage.getItem('repositoryBacklogFilters:nbonamy/codex-claw')).toBe(JSON.stringify({
+    expect(window.localStorage.getItem('repositoryBacklogFilters:github:undefined:nbonamy/codex-claw')).toBe(JSON.stringify({
       state: 'closed',
       assignee: 'all',
       label: '',
     }));
 
     wrapper.unmount();
-    const restored = mountPanel({
+    const restored = await mountPanel({
       items: [
         workItem(),
         workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Completed backlog work', state: 'closed' }),
@@ -333,25 +335,25 @@ describe('RepositoryBacklogPanel', () => {
     expect(restored.text()).not.toContain('Fix backlog assignment');
     expect(restored.text()).toContain('Completed backlog work');
 
-    const otherRepository = mountPanel({ repositoryId: 'nbonamy/another-repository' });
+    const otherRepository = await mountPanel({ repositoryId: 'nbonamy/another-repository' });
     expect(otherRepository.text()).toContain('Fix backlog assignment');
   });
 
-  it('ignores invalid or unavailable saved filter defaults', () => {
-    window.localStorage.setItem('repositoryBacklogFilters:nbonamy/codex-claw', JSON.stringify({
+  it('ignores invalid or unavailable saved filter defaults', async () => {
+    window.localStorage.setItem('repositoryBacklogFilters:github:undefined:nbonamy/codex-claw', JSON.stringify({
       state: 'invalid',
-      assignee: 'me',
+      assignee: 'invalid',
       label: 'not-in-this-repository',
     }));
 
-    const wrapper = mountPanel({ connection: null });
+    const wrapper = await mountPanel();
 
     expect(wrapper.text()).toContain('Fix backlog assignment');
   });
 
   it('offers contextual issue actions and fixes an issue in an isolated worktree', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ startWorkAction });
+    const wrapper = await mountPanel({ startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     expect(wrapper.text()).toContain('Start work on #12');
@@ -366,6 +368,7 @@ describe('RepositoryBacklogPanel', () => {
 
     expect(startWorkAction).toHaveBeenCalledWith({
       action: 'fix',
+      isCurrent: expect.any(Function),
       backend: 'codex',
       item: expect.objectContaining({ id: 'nbonamy/codex-claw#12' }),
       target: 'duplicate',
@@ -375,29 +378,26 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Work started');
   });
 
-  it('keeps experimental issue creation out of the backlog toolbar', () => {
-    const wrapper = mountPanel();
+  it('keeps experimental issue creation out of the backlog toolbar', async () => {
+    const wrapper = await mountPanel();
 
     expect(wrapper.find('[aria-label="Create issue"]').exists()).toBe(false);
     expect(wrapper.find('.repository-issue-composer').exists()).toBe(false);
   });
 
   it('prefills custom issue work without dispatching it', async () => {
-    const prefillAction = vi.fn();
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ prefillAction, startWorkAction });
+    const wrapper = await mountPanel({ startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     await wrapper.get('.repository-backlog__start-work .claw-button--tertiary').trigger('click');
 
-    expect(prefillAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/codex-claw#12' }));
-    expect(startWorkAction).not.toHaveBeenCalled();
-    expect(wrapper.text()).not.toContain('Start work on #12');
+    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'custom', item: expect.objectContaining({ id: 'nbonamy/codex-claw#12' }), isCurrent: expect.any(Function) }));
   });
 
   it('dispatches issue investigation without using the fix prompt', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ startWorkAction });
+    const wrapper = await mountPanel({ startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     await wrapper.get('.repository-backlog__start-work .claw-button--secondary').trigger('click');
@@ -407,7 +407,7 @@ describe('RepositoryBacklogPanel', () => {
 
   it('can dispatch work in the current session without creating a worktree', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ branch: 'feature/current-work', startWorkAction });
+    const wrapper = await mountPanel({ branch: 'feature/current-work', startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     expect(wrapper.text()).toContain('New agent');
@@ -425,7 +425,7 @@ describe('RepositoryBacklogPanel', () => {
 
   it('forces duplicated agents into a worktree and suggests a review branch for pull requests', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       items: [workItem({ branchName: 'feature/backlog-workspace', kind: 'pullRequest', number: 21, title: 'Ship backlog workspace' })],
       startWorkAction,
     });
@@ -447,7 +447,7 @@ describe('RepositoryBacklogPanel', () => {
 
   it('can check out the pull request branch in the current agent workspace', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       items: [workItem({ branchName: 'feature/current-pr', kind: 'pullRequest', number: 22, title: 'Update current workspace' })],
       startWorkAction,
     });
@@ -467,7 +467,7 @@ describe('RepositoryBacklogPanel', () => {
 
   it('allows pull request work to resolve missing branch metadata at dispatch time', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({
+    const wrapper = await mountPanel({
       items: [workItem({ kind: 'pullRequest', number: 23, title: 'Resolve remote branch' })],
       startWorkAction,
     });
@@ -482,7 +482,7 @@ describe('RepositoryBacklogPanel', () => {
   });
 
   it('keeps start work open on pointer exit and dismisses it on outside close or inactive workspace', async () => {
-    const wrapper = mountPanel();
+    const wrapper = await mountPanel();
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     expect(wrapper.text()).toContain('Start work on #12');
@@ -502,23 +502,24 @@ describe('RepositoryBacklogPanel', () => {
   });
 });
 
-function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPanel>['$props']> = {}) {
+async function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPanel>['$props']> & { items?: WorkItem[] } = {}) {
+  const { items = [workItem()], ...componentOverrides } = overrides;
   const props = {
     agent,
     agents: [agent],
     assignments: {},
     branch: 'main',
-    connection: { provider: 'github', status: 'connected', accountLabel: 'nbonamy' },
-    error: null,
-    items: [workItem()],
     repositoryId: 'nbonamy/codex-claw',
-    prefillAction: vi.fn(),
-    status: 'loaded',
     startWorkAction: vi.fn().mockResolvedValue(undefined),
     visible: true,
-    ...overrides,
+    ...componentOverrides,
   } as InstanceType<typeof RepositoryBacklogPanel>['$props'];
-  return mount(RepositoryBacklogPanel, {
+  const api = codexClawApi!;
+  const load = vi.mocked(api.listWorkItems).getMockImplementation();
+  vi.mocked(api.listWorkItems).mockImplementation(async (provider, id, location, query) => provider === 'github' ? [...items] : await load!(provider, id, location, query));
+  const sources = vi.mocked(api.listWorkSources).getMockImplementation();
+  vi.mocked(api.listWorkSources).mockImplementation(async (provider, location) => provider === 'github' ? [{ provider, id: props.repositoryId, name: props.repositoryId, fullName: props.repositoryId, url: 'https://github.com/' + props.repositoryId }] : await sources!(provider, location));
+  const wrapper = mount(RepositoryBacklogPanel, {
     props,
     global: {
       provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected' }] },
@@ -533,6 +534,8 @@ function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPane
       },
     },
   });
+  await flushPromises();
+  return wrapper;
 }
 
 const agent: Agent = {
@@ -552,8 +555,8 @@ function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
     provider: 'github',
     id: 'nbonamy/codex-claw#12',
     kind: 'issue',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number: 12,
     title: 'Fix backlog assignment',
     url: 'https://github.com/nbonamy/codex-claw/issues/12',

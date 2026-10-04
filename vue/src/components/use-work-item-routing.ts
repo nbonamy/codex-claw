@@ -1,3 +1,4 @@
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type {
   Agent,
@@ -79,7 +80,7 @@ export function useWorkItemRouting(options: {
   async function startRepositoryWork(agentId: string, input: RepositoryWorkStartInput): Promise<void> {
     const sourceAgent = findAgent(agentId);
     if (!sourceAgent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-    if (input.item.provider === 'linear') await validateAgentRepository(sourceAgent);
+    await validateAgentRepository(sourceAgent);
 
     const item = await resolvePullRequestBranch(input.item);
     ensureCurrent(input.isCurrent);
@@ -93,12 +94,12 @@ export function useWorkItemRouting(options: {
     const targetAgent = input.target === 'duplicate'
       ? input.backend && input.backend !== sourceAgent.backend
         ? await options.actions.createAgent({
-            name: `${sourceAgentName} ${item.provider === 'linear' ? workItemDisplayIdentifier(item) : `gh-${item.number}`}`, folder: sourceAgent.folder ?? '',
+            name: `${sourceAgentName} ${workItemDisplayIdentifier(item)}`, folder: sourceAgent.folder ?? '',
             backend: input.backend, teamId: sourceAgent.teamId,
           })
         : await options.actions.duplicateAgent(sourceAgent.id, {
           select: false,
-          name: `${sourceAgentName} ${item.provider === 'linear' ? workItemDisplayIdentifier(item) : `gh-${item.number}`}`,
+          name: `${sourceAgentName} ${workItemDisplayIdentifier(item)}`,
         })
       : sourceAgent;
     if (!targetAgent) throw new Error(translate('surface.appShell.theDuplicateAgentCouldNotBeCreated'));
@@ -188,9 +189,9 @@ export function useWorkItemRouting(options: {
     const item = await resolvePullRequestBranch(listedItem);
     ensureCurrent(creationOptions.isCurrent);
     const repositoryName = workItemRepositoryName(item);
-    const repository = creationOptions.repository ?? (item.provider === 'github'
+    const repository = creationOptions.repository ?? (workProviderDefinition(item.provider).repositoryBacked
       ? options.model.sourceRepositories().find((candidate) => candidate.name === repositoryName) : undefined);
-    if (!repository) throw new Error(`${item.repositoryFullName} is not available in the source folder.`);
+    if (!repository) throw new Error(`${item.sourceName} is not available in the source folder.`);
     if (!await confirmAssignedOverride(item, 'a new agent')) throw new Error(translate('surface.appShell.assignmentCancelled'));
     ensureCurrent(creationOptions.isCurrent);
 
@@ -208,7 +209,7 @@ export function useWorkItemRouting(options: {
       sourceRepositoryName: repository.name,
       teamId: team.id,
     });
-    if (!agent) throw new Error(`Could not create an agent for ${item.repositoryFullName} ${workItemDisplayIdentifier(item)}.`);
+    if (!agent) throw new Error(`Could not create an agent for ${item.sourceName} ${workItemDisplayIdentifier(item)}.`);
     return { agent, item };
   }
 
@@ -220,7 +221,7 @@ export function useWorkItemRouting(options: {
   ): Promise<void> {
     const agent = findAgent(agentId);
     if (!agent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-    if (listedItem.provider === 'linear') await validateAgentRepository(agent);
+    await validateAgentRepository(agent);
     const item = await resolvePullRequestBranch(listedItem);
     ensureCurrent(isCurrent);
     if (!await confirmAssignedOverride(item, agentDisplayName(agent), agent.id)) {
@@ -249,7 +250,7 @@ export function useWorkItemRouting(options: {
 
   async function resolvePullRequestBranch(item: WorkItem): Promise<WorkItem> {
     if (item.kind !== 'pullRequest' || item.branchName?.trim()) return item;
-    const refreshedItems = await options.actions.loadItems(item.provider, item.repositoryId, {
+    const refreshedItems = await options.actions.loadItems(item.provider, item.sourceId, {
       kind: 'pullRequest',
       state: 'all',
     });
@@ -313,8 +314,8 @@ export function useWorkItemRouting(options: {
 }
 
 function workItemRepositoryName(item: WorkItem): string {
-  if (item.provider === 'linear') return '';
-  return item.repositoryFullName.split('/').filter(Boolean).at(-1) ?? item.repositoryFullName;
+  if (!workProviderDefinition(item.provider).repositoryBacked) return '';
+  return item.sourceName.split('/').filter(Boolean).at(-1) ?? item.sourceName;
 }
 
 function workItemTeamName(item: WorkItem): string {
@@ -326,7 +327,7 @@ function ensureCurrent(isCurrent?: () => boolean): void {
 }
 
 function workProviderTitle(provider: WorkItem['provider']): string {
-  return provider === 'github' ? translate('surface.appShell.gitHub') : provider;
+  return workProviderDefinition(provider).label;
 }
 
 function remoteConnection(team: Team): { remoteConnectionId?: string } {

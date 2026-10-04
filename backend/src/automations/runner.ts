@@ -3,7 +3,7 @@ import type {
   AppSnapshot,
   Automation,
   AutomationExecutionLogEntry,
-  AutomationRepositoryTarget,
+  AutomationWorkSourceTarget,
   CreateSourceWorktreeInput,
   SourceWorktree,
   WorkItem,
@@ -18,7 +18,7 @@ import { workItemAssignmentPrompt, workItemBranchName, workItemDisplayIdentifier
 import { logMain, warnMain } from '../log';
 
 type WorkItemLister = {
-  listItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
+  listItems(provider: WorkProviderKind, sourceId: string): Promise<WorkItem[]>;
 };
 
 type AutomationPromptContext = {
@@ -179,16 +179,16 @@ export class AutomationRunner {
     createdAt: string,
     createdAssignments: CreatedAutomationAssignment[],
   ): Promise<void> {
-    const candidates: Array<{ item: WorkItem; repository: AutomationRepositoryTarget }> = [];
+    const candidates: Array<{ item: WorkItem; repository: AutomationWorkSourceTarget }> = [];
     const seen = new Set<string>();
     for (const repository of automation.repositories) {
-      if (!repository.sourceRepositoryPath.trim()) throw new Error(`Choose a code repository for ${repository.repositoryId}.`);
-      const items = await this.options.listWorkItems.listItems(repository.provider, repository.repositoryId);
+      if (!repository.executionRepositoryPath.trim()) throw new Error(`Choose a code repository for ${repository.sourceId}.`);
+      const items = await this.options.listWorkItems.listItems(repository.provider, repository.sourceId);
       const matchingItems = matchingAutomationItems(items, repository);
       logMain('automation-runner', 'listed work items', {
         automationId: automation.id,
         executionId,
-        repositoryId: repository.repositoryId,
+        sourceId: repository.sourceId,
         itemCount: items.length,
         matchingCount: matchingItems.length,
       });
@@ -249,7 +249,7 @@ export class AutomationRunner {
 
   private async createAgentForAutomation(
     automation: Automation,
-    repository: AutomationRepositoryTarget,
+    repository: AutomationWorkSourceTarget,
     item: WorkItem,
     createdAt: string,
   ): Promise<Agent | null> {
@@ -259,7 +259,7 @@ export class AutomationRunner {
     }
 
     const worktree = await this.options.createWorktree({
-      repoPath: repository.sourceRepositoryPath,
+      repoPath: repository.executionRepositoryPath,
       branchName: automationBranchName(item),
       reuseExisting: true,
     });
@@ -302,9 +302,9 @@ export class AutomationRunner {
   }
 }
 
-export function matchingAutomationItems(items: WorkItem[], repository: AutomationRepositoryTarget): WorkItem[] {
+export function matchingAutomationItems(items: WorkItem[], repository: AutomationWorkSourceTarget): WorkItem[] {
   return items.filter((item) => {
-    return item.provider === repository.provider && item.repositoryId === repository.repositoryId && item.state === 'open';
+    return item.provider === repository.provider && item.sourceId === repository.sourceId && item.state === 'open';
   });
 }
 
@@ -320,8 +320,7 @@ function dedicatedTeamName(item: WorkItem): string {
 }
 
 function automationBranchName(item: WorkItem): string {
-  if (item.provider === 'linear') return workItemBranchName(item).replace(/^fix\//, 'automation/');
-  return `automation/${item.provider}-${item.number}`;
+  return workItemBranchName(item, 'automation');
 }
 
 function createAutomationExecutionEntry(

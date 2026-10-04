@@ -210,7 +210,7 @@ describe('AppController', () => {
       workBacklog: {
         ...snapshot.workBacklog,
         providerConfigurations: {
-          github: { repositoryId: 'nbonamy/codex-claw' },
+          github: { sourceId: 'nbonamy/codex-claw' },
         },
       },
     };
@@ -239,7 +239,7 @@ describe('AppController', () => {
     await expect(connectWorkProvider(controller, 'github')).resolves.toMatchObject({
       authorization: { provider: 'github', userCode: 'ABCD-1234' },
     });
-    await expect(configureWorkBacklog(controller, { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } })).resolves.toStrictEqual(configuredSnapshot);
+    await expect(configureWorkBacklog(controller, { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } })).resolves.toStrictEqual(configuredSnapshot);
     await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw')).resolves.toStrictEqual([{
       provider: 'github',
       id: 'github:nbonamy/codex-claw#12',
@@ -252,7 +252,7 @@ describe('AppController', () => {
       title: 'Assigned bug',
       url: 'https://github.com/nbonamy/codex-claw/issues/13',
     }]);
-    await expect(listGlobalWorkItems(controller, 'github', { assignment: 'all', page: 1, pageSize: 50 })).resolves.toMatchObject({
+    await expect(listGlobalWorkItems(controller, 'github', { assignment: 'all', pageSize: 50 })).resolves.toMatchObject({
       items: [{ id: 'github:nbonamy/codex-claw#14' }],
       page: 1,
       totalItems: 14,
@@ -260,25 +260,25 @@ describe('AppController', () => {
     await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' })).resolves.toHaveLength(1);
     await expect(configureWorkBacklog(
       controller,
-      { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
+      { provider: 'github', configuration: { sourceId: 'nbonamy/remote' } },
       { kind: 'remote', remoteConnectionId: 'connection-devbox' },
     )).resolves.toStrictEqual(configuredSnapshot);
 
     expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
-    expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } });
-    expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', repositoryId: 'nbonamy/codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } } });
+    expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', sourceId: 'nbonamy/codex-claw' });
     expect(request).toHaveBeenNthCalledWith(4, 'workProvider/assignedItems/list', { provider: 'github' });
     expect(request).toHaveBeenNthCalledWith(5, 'workProvider/globalItems/list', {
       provider: 'github',
-      query: { assignment: 'all', page: 1, pageSize: 50 },
+      query: { assignment: 'all', pageSize: 50 },
     });
     expect(request).toHaveBeenNthCalledWith(6, 'workProvider/items/list', {
       provider: 'github',
-      repositoryId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
       query: { kind: 'all', state: 'all' },
     });
     expect(request).toHaveBeenNthCalledWith(7, 'workProvider/backlog/configure', {
-      input: { provider: 'github', configuration: { repositoryId: 'nbonamy/remote' } },
+      input: { provider: 'github', configuration: { sourceId: 'nbonamy/remote' } },
       location: { kind: 'remote', remoteConnectionId: 'connection-devbox' },
     });
   });
@@ -563,7 +563,7 @@ describe('AppController', () => {
     const createInput: CreateAutomationInput = {
       name: 'GitHub bugs',
       enabled: true,
-      repositories: [{ provider: 'github', repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/repo' }],
+      repositories: [{ provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/repo' }],
       teamId: 'team-codex-claw',
       schedule: { intervalMinutes: 60 },
     };
@@ -602,7 +602,7 @@ describe('AppController', () => {
     const createInput: CreateAutomationInput = {
       name: 'Remote bugs',
       enabled: true,
-      repositories: [{ provider: 'github', repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/repo' }],
+      repositories: [{ provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/repo' }],
       teamId: 'team-remote',
       schedule: { intervalMinutes: 60 },
     };
@@ -626,7 +626,7 @@ function automationFixture(teamId = 'team-codex-claw'): Automation {
     id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
-    repositories: [{ provider: 'github', repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/repo' }],
+    repositories: [{ provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/repo' }],
     teamId,
     schedule: { intervalMinutes: 60 },
     executionLog: [],
@@ -960,8 +960,8 @@ function createWorkItem(): WorkItem {
   return {
     provider: 'github',
     id: 'github:nbonamy/codex-claw#12',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number: 12,
     title: 'Fix bug',
     url: 'https://github.com/nbonamy/codex-claw/issues/12',

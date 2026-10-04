@@ -510,10 +510,10 @@ describe('AppShell workspace and plans', () => {
       updatedAt: '2026-08-12T00:00:00.000Z',
     };
     const item = workItem();
+    snapshot.agents[0]!.workspace = { kind: 'git', folder: '/workspace/codex-claw', repositoryName: 'codex-claw', repositoryRoot: '/workspace/codex-claw', primaryWorktreeRoot: '/workspace/codex-claw', branch: 'main', isLinkedWorktree: false, updatedAt: 'now' };
     const unresolvedPullRequest = workItem({ kind: 'pullRequest', number: 44, id: 'nbonamy/codex-claw#44' });
     const resolvedPullRequest = { ...unresolvedPullRequest, branchName: 'feature/resolved-pr-44' };
     const loadWorkItems = vi.fn()
-      .mockResolvedValueOnce([item])
       .mockResolvedValueOnce([resolvedPullRequest]);
     const duplicateAgentAction = vi.fn().mockImplementation(async (_agentId: string, options?: { name?: string }) => ({
       ...snapshot.agents[0]!,
@@ -540,10 +540,9 @@ describe('AppShell workspace and plans', () => {
     wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'backlog');
     await flushPromises();
 
-    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, { kind: 'all', state: 'all' });
+    expect(loadWorkItems).not.toHaveBeenCalled();
     expect(wrapper.get('[role="tab"]').text()).toBe('Backlog');
     const backlog = wrapper.getComponent({ name: 'RepositoryBacklogPanel' });
-    expect(backlog.props('items')).toStrictEqual([item]);
 
     await backlog.props('startWorkAction')({
       action: 'fix',
@@ -563,7 +562,7 @@ describe('AppShell workspace and plans', () => {
       prompt: workItemAssignmentPrompt(item, { action: 'fix' }),
     });
 
-    backlog.props('prefillAction')(item);
+    await backlog.props('startWorkAction')({ action: 'custom', item, target: 'current', workspace: { kind: 'current' } });
     await nextTick();
     expect(wrapper.emitted('update:composerState')).toContainEqual([{
       agentId: 'agent-dina',
@@ -602,7 +601,7 @@ describe('AppShell workspace and plans', () => {
     });
 
     expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', {
-      name: 'codex-claw gh-42',
+      name: 'codex-claw #42',
       select: false,
     });
     expect(createAgentGitBranch).toHaveBeenCalledWith('agent-reviewer', {
@@ -627,7 +626,7 @@ describe('AppShell workspace and plans', () => {
     });
 
     expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', {
-      name: 'codex-claw gh-24',
+      name: 'codex-claw #24',
       select: false,
     });
 

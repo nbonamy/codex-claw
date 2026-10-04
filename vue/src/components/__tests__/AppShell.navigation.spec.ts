@@ -7,7 +7,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, WorkSource } from '@codex-claw/core/contracts';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 
 import {
@@ -390,8 +390,8 @@ describe('AppShell navigation and teams', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       }],
       teamId: 'team-codex-claw',
       schedule: { intervalMinutes: 60 },
@@ -453,7 +453,7 @@ describe('AppShell navigation and teams', () => {
       accountLabel: 'nbonamy',
     }];
     snapshot.workBacklog.providerConfigurations.github = {
-      repositoryId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
     };
     const item = workItem();
     const wrapper = mountShell({
@@ -494,7 +494,7 @@ describe('AppShell navigation and teams', () => {
       status: 'connected',
       accountLabel: 'nbonamy',
     }];
-    const repositories: WorkRepository[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
+    const repositories: WorkSource[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
       provider: 'github',
       id: `nbonamy/${name}`,
       owner: 'nbonamy',
@@ -514,16 +514,16 @@ describe('AppShell navigation and teams', () => {
     expect(loadWorkRepositories).toHaveBeenCalledWith('github');
     expect(loadWorkItems).not.toHaveBeenCalled();
     expect(loadGlobalWorkItems).toHaveBeenCalledWith('github', undefined, {
-      assignment: 'viewer', state: 'open', page: 1, pageSize: 25,
+      assignment: 'viewer', state: 'open', pageSize: 25,
     });
-    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('selectedAssigneeLogin')).toBe('nbonamy');
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('selectedAssigneeLogin')).toBeNull();
   });
 
   it('automatically loads one global page after the user remembers that scope', async () => {
     window.localStorage.setItem('cockpitGlobalScope:github', 'all');
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
-    const repositories: WorkRepository[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
+    const repositories: WorkSource[] = ['codex-claw', 'multi-llm-ts'].map((name) => ({
       provider: 'github', id: `nbonamy/${name}`, owner: 'nbonamy', name,
       fullName: `nbonamy/${name}`, url: `https://github.com/nbonamy/${name}`, isPrivate: true,
     }));
@@ -538,7 +538,7 @@ describe('AppShell navigation and teams', () => {
     expect(confirm).not.toHaveBeenCalled();
     expect(loadGlobalWorkItems).toHaveBeenCalledTimes(1);
     expect(loadGlobalWorkItems).toHaveBeenCalledWith('github', undefined, {
-      assignment: 'all', state: 'open', page: 1, pageSize: 25,
+      assignment: 'all', state: 'open', pageSize: 25,
     });
     expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props('globalScope')).toBe('all');
     expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ page: 1, pageSize: 25, totalItems: 12 });
@@ -547,7 +547,7 @@ describe('AppShell navigation and teams', () => {
   it('remembers the explicit load-everything confirmation', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
-    const repository: WorkRepository = {
+    const repository: WorkSource = {
       provider: 'github', id: 'nbonamy/codex-claw', owner: 'nbonamy', name: 'codex-claw',
       fullName: 'nbonamy/codex-claw', url: 'https://github.com/nbonamy/codex-claw', isPrivate: true,
     };
@@ -566,7 +566,7 @@ describe('AppShell navigation and teams', () => {
 
     expect(window.localStorage.getItem('cockpitGlobalScope:github')).toBe('all');
     expect(loadGlobalWorkItems).toHaveBeenLastCalledWith('github', undefined, {
-      assignment: 'all', state: 'open', page: 1, pageSize: 25,
+      assignment: 'all', state: 'open', pageSize: 25,
     });
   });
 
@@ -574,11 +574,11 @@ describe('AppShell navigation and teams', () => {
     window.localStorage.setItem('cockpitGlobalScope:github', 'all');
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
-    const first = workItem({ id: 'nbonamy/one#1', repositoryId: 'nbonamy/one', repositoryFullName: 'nbonamy/one', number: 1 });
-    const second = workItem({ id: 'nbonamy/two#2', repositoryId: 'nbonamy/two', repositoryFullName: 'nbonamy/two', number: 2 });
+    const first = workItem({ id: 'nbonamy/one#1', sourceId: 'nbonamy/one', sourceName: 'nbonamy/one', number: 1 });
+    const second = workItem({ id: 'nbonamy/two#2', sourceId: 'nbonamy/two', sourceName: 'nbonamy/two', number: 2 });
     const loadGlobalWorkItems = vi.fn()
-      .mockResolvedValueOnce({ items: [first], page: 1, pageSize: 25, totalItems: 26 })
-      .mockResolvedValueOnce({ items: [second], page: 2, pageSize: 25, totalItems: 26 });
+      .mockResolvedValueOnce({ items: [first], nextCursor: 'opaque-next' })
+      .mockResolvedValueOnce({ items: [second] });
     const wrapper = mountShell({
       snapshot,
       loadGlobalWorkItems,
@@ -590,13 +590,13 @@ describe('AppShell navigation and teams', () => {
     await flushPromises();
 
     expect(loadGlobalWorkItems).toHaveBeenNthCalledWith(2, 'github', undefined, {
-      assignment: 'all', state: 'open', page: 2, pageSize: 25,
+      assignment: 'all', state: 'open', cursor: 'opaque-next', pageSize: 25,
     });
-    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [second], page: 2, totalItems: 26 });
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [second], page: 2, hasNextPage: false });
 
     wrapper.findComponent({ name: 'BacklogView' }).vm.$emit('change-work-items-page', 1);
     await flushPromises();
     expect(loadGlobalWorkItems).toHaveBeenCalledTimes(2);
-    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [first], page: 1, totalItems: 26 });
+    expect(wrapper.findComponent({ name: 'CockpitWorkInbox' }).props()).toMatchObject({ items: [first], page: 1, hasNextPage: true });
   });
 });

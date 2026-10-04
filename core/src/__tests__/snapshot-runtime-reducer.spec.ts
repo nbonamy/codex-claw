@@ -398,8 +398,8 @@ describe('snapshot runtime reducer', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       }],
       teamId: 'team-codex-claw',
       schedule: { intervalMinutes: 60 },

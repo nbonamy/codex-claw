@@ -1374,8 +1374,8 @@ function createAutomationSnapshot(input: {
     updatedAt: '2026-06-15T01:00:00.000Z',
     repositories: [{
       provider: 'github',
-      repositoryId: 'nbonamy/codex-claw',
-      sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
+      executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
     }],
     teamId: targetTeamId,
     schedule: { intervalMinutes: 60 },

@@ -34,7 +34,7 @@ describe('AppShell missions', () => {
     await wrapper.get('.conversation-pane [role="menuitem"]').trigger('click');
     await flushPromises();
     const picker = wrapper.findAllComponents({ name: 'RepositorySessionSourceDialog' }).find(component => component.props('purpose') === 'missionIssue')!;
-    const issue = workItem({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-42', repositoryId: 'linear:team', repositoryFullName: 'Engineering', body: 'Reproduction steps', url: 'https://linear.app/acme/issue/ENG-42' });
+    const issue = workItem({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-42', sourceId: 'linear:team', sourceName: 'Engineering', body: 'Reproduction steps', url: 'https://linear.app/acme/issue/ENG-42' });
     picker.vm.$emit('select-work-item', issue);
     await flushPromises();
     expect(sendPromptAction).toHaveBeenCalledWith(expect.stringContaining('Linear issue ENG-42'), undefined);
@@ -125,7 +125,7 @@ describe('AppShell missions', () => {
       { provider: 'github' as const, id: 'first', owner: 'nbonamy', name: 'first', fullName: 'nbonamy/first', url: 'https://github.com/nbonamy/first', isPrivate: false },
       { provider: 'github' as const, id: 'second', owner: 'nbonamy', name: 'second', fullName: 'nbonamy/second', url: 'https://github.com/nbonamy/second', isPrivate: false },
     ];
-    const issue = workItem({ repositoryId: 'second', repositoryFullName: 'nbonamy/second', number: 42, title: 'Fix login flow', body: 'Users cannot sign in after logout.' });
+    const issue = workItem({ sourceId: 'second', sourceName: 'nbonamy/second', number: 42, title: 'Fix login flow', body: 'Users cannot sign in after logout.' });
     const loadWorkRepositories = vi.fn().mockResolvedValue(repositories);
     const loadWorkItems = vi.fn().mockResolvedValue([issue]);
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
@@ -140,20 +140,11 @@ describe('AppShell missions', () => {
     const picker = wrapper.findAllComponents({ name: 'RepositorySessionSourceDialog' })
       .find(candidate => candidate.props('purpose') === 'missionIssue')!;
     expect(picker.props('visible')).toBe(true);
-    expect(picker.props('repositories')).toStrictEqual([repositories[1]]);
-    expect(loadWorkRepositories).toHaveBeenCalledWith('github', undefined);
-    expect(picker.props('selectedRepositoryId')).toBe('second');
-    expect(loadWorkItems).toHaveBeenCalledExactlyOnceWith('github', 'second', undefined, { kind: 'issue', state: 'open' });
-    expect(picker.props('workItems')).toStrictEqual([issue]);
-
-    picker.vm.$emit('select-repository', 'first');
-    await flushPromises();
-    expect(loadWorkItems).toHaveBeenCalledTimes(1);
-    expect(picker.props('workItems')).toStrictEqual([issue]);
-
-    picker.vm.$emit('select-work-item', { ...issue, repositoryId: 'first' });
-    await flushPromises();
-    expect(sendPromptAction).not.toHaveBeenCalled();
+    const acceptsSource = picker.props('sourceFilter')!;
+    expect(repositories.filter(acceptsSource)).toEqual([repositories[1]]);
+    expect(acceptsSource({ provider: 'linear', id: 'team', name: 'Team', fullName: 'Team', url: 'https://linear.app/team' })).toBe(true);
+    expect(loadWorkRepositories).not.toHaveBeenCalled();
+    expect(loadWorkItems).not.toHaveBeenCalled();
     picker.vm.$emit('select-work-item', issue);
     await flushPromises();
     expect(picker.props('visible')).toBe(false);
@@ -185,7 +176,7 @@ describe('AppShell missions', () => {
     representGitHubRepository(snapshot.agents[0]!, 'nbonamy/repo');
     const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     prepareMissionLead(mission, snapshot.agents[0]!.id);
-    const issue = workItem({ repositoryId: 'repo', repositoryFullName: 'nbonamy/repo', number: 9 });
+    const issue = workItem({ sourceId: 'repo', sourceName: 'nbonamy/repo', number: 9 });
     const wrapper = mountShell({
       snapshot,
       loadWorkRepositories: vi.fn().mockResolvedValue([{ provider: 'github', id: 'repo', owner: 'nbonamy', name: 'repo', fullName: 'nbonamy/repo', url: 'https://github.com/nbonamy/repo', isPrivate: false }]),
@@ -198,13 +189,12 @@ describe('AppShell missions', () => {
     await flushPromises();
     const picker = wrapper.findAllComponents({ name: 'RepositorySessionSourceDialog' })
       .find(candidate => candidate.props('purpose') === 'missionIssue')!;
-    expect(picker.props('selectedRepositoryId')).toBe('repo');
+    expect(picker.props('sourceFilter')!({ provider: 'github', id: 'repo', name: 'repo', fullName: 'nbonamy/repo', url: 'https://github.com/nbonamy/repo' })).toBe(true);
     picker.vm.$emit('select-work-item', issue);
     await flushPromises();
 
     expect(picker.props('visible')).toBe(true);
     expect(picker.props('error')).toBe('Mission could not start');
-    expect(picker.props('workItems')).toStrictEqual([issue]);
   });
 
   it('creates and selects a team-scoped placeholder mission without asking for a title or repository', async () => {

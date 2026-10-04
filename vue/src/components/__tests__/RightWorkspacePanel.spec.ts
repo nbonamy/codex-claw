@@ -275,7 +275,6 @@ describe('RightWorkspacePanel', () => {
   });
 
   it('renders an existing repository backlog without offering it in the add-tab menu', async () => {
-    const prefillRepositoryWork = vi.fn();
     const startRepositoryWork = vi.fn().mockResolvedValue(undefined);
     const launcher = mountPanel([], null);
     await launcher.setProps({ githubRepository: 'nbonamy/codex-claw' });
@@ -285,9 +284,6 @@ describe('RightWorkspacePanel', () => {
     const wrapper = mountPanel(['backlog'], 'backlog');
     await wrapper.setProps({
       githubRepository: 'nbonamy/codex-claw',
-      backlogStatus: 'loaded',
-      backlogItems: [],
-      prefillRepositoryWork,
       startRepositoryWork,
     });
 
@@ -295,8 +291,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.get('[role="tab"]').findComponent({ name: 'BacklogIcon' }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'RepositoryBacklogPanel' }).props()).toMatchObject({
       repositoryId: 'nbonamy/codex-claw',
-      status: 'loaded',
-      prefillAction: prefillRepositoryWork,
+      startWorkAction: startRepositoryWork,
     });
 
     await wrapper.get('[aria-label="Open right workspace tab"]').trigger('click');

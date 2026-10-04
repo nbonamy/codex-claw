@@ -175,7 +175,7 @@ describe('GitHubWorkProviderDriver', () => {
       connectedAt: '2026-06-09T12:00:00.000Z',
     };
 
-    await expect(driver.listRepositories(token)).resolves.toStrictEqual([{
+    await expect(driver.listSources(token)).resolves.toStrictEqual([{
       provider: 'github',
       id: 'nbonamy/codex-claw',
       owner: 'nbonamy',
@@ -193,8 +193,9 @@ describe('GitHubWorkProviderDriver', () => {
       provider: 'github',
       id: 'nbonamy/codex-claw#12',
       kind: 'issue',
-      repositoryId: 'nbonamy/codex-claw',
-      repositoryFullName: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
+      sourceName: 'nbonamy/codex-claw',
+      assignedToViewer: false,
       number: 12,
       title: 'Fix cockpit drag target',
       url: 'https://github.com/nbonamy/codex-claw/issues/12',
@@ -210,8 +211,9 @@ describe('GitHubWorkProviderDriver', () => {
       id: 'nbonamy/codex-claw#13',
       kind: 'pullRequest',
       branchName: 'feature/backlog-workspace',
-      repositoryId: 'nbonamy/codex-claw',
-      repositoryFullName: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
+      sourceName: 'nbonamy/codex-claw',
+      assignedToViewer: false,
       number: 13,
       title: 'This is a pull request',
       url: 'https://github.com/nbonamy/codex-claw/pull/13',
@@ -261,7 +263,7 @@ describe('GitHubWorkProviderDriver', () => {
     const driver = new GitHubWorkProviderDriver('client-id');
     const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
 
-    await expect(driver.listRepositories(token)).resolves.toStrictEqual([{
+    await expect(driver.listSources(token)).resolves.toStrictEqual([{
       provider: 'github',
       id: 'nbonamy/codex-claw',
       owner: 'nbonamy',
@@ -290,7 +292,7 @@ describe('GitHubWorkProviderDriver', () => {
     const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
 
     await expect(driver.listAssignedItems(token)).resolves.toEqual([
-      expect.objectContaining({ repositoryId: 'nbonamy/codex-claw', number: 24, assignees: ['nbonamy'] }),
+      expect.objectContaining({ sourceId: 'nbonamy/codex-claw', number: 24, assignees: ['nbonamy'] }),
     ]);
     expect(fetch).toHaveBeenCalledWith(
       'https://api.github.com/issues?filter=assigned&state=open&per_page=100',
@@ -298,7 +300,7 @@ describe('GitHubWorkProviderDriver', () => {
     );
   });
 
-  it('pages the global backlog across repositories and reports the exact total', async () => {
+  it('returns a continuation without fetching the final page to manufacture a total', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(jsonResponse([{
       number: 24,
@@ -312,7 +314,6 @@ describe('GitHubWorkProviderDriver', () => {
       }], {
       link: '<https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=3>; rel="next", <https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=8>; rel="last"',
       }))
-      .mockResolvedValueOnce(jsonResponse([{ number: 351 }, { number: 352 }, { number: 353 }]))
       .mockResolvedValueOnce(jsonResponse([]));
     vi.stubGlobal('fetch', fetch);
     const driver = new GitHubWorkProviderDriver('client-id');
@@ -321,27 +322,20 @@ describe('GitHubWorkProviderDriver', () => {
     await expect(driver.listGlobalItems(token, {
       assignment: 'all',
       state: 'open',
-      page: 2,
+      cursor: '2',
       pageSize: 50,
     })).resolves.toStrictEqual({
-      items: [expect.objectContaining({ repositoryId: 'nbonamy/codex-claw', number: 24 })],
-      page: 2,
-      pageSize: 50,
-      totalItems: 353,
+      items: [expect.objectContaining({ sourceId: 'nbonamy/codex-claw', number: 24 })],
+      nextCursor: '3',
     });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenNthCalledWith(1,
       'https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=2',
       expect.any(Object),
     );
-    expect(fetch).toHaveBeenNthCalledWith(2,
-      'https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=50&page=8',
-      expect.any(Object),
-    );
-
-    await expect(driver.listGlobalItems(token, { assignment: 'all', state: 'open', page: 3, pageSize: 50 }))
-      .resolves.toMatchObject({ page: 3, pageSize: 50, totalItems: 353 });
-    expect(fetch).toHaveBeenCalledTimes(3);
+    await expect(driver.listGlobalItems(token, { assignment: 'all', state: 'open', cursor: '3', pageSize: 50 }))
+      .resolves.toEqual({ items: [] });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('rejects malformed global backlog pages before calling GitHub', async () => {
@@ -350,7 +344,7 @@ describe('GitHubWorkProviderDriver', () => {
     const driver = new GitHubWorkProviderDriver('client-id');
     const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
 
-    await expect(driver.listGlobalItems(token, { page: 0 })).rejects.toThrow('Invalid work item page');
+    await expect(driver.listGlobalItems(token, { cursor: 'invalid' })).rejects.toThrow('Invalid work item page');
     expect(fetch).not.toHaveBeenCalled();
   });
 

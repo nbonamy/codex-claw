@@ -1,10 +1,11 @@
+import { isWorkProviderKind, workProviderKinds } from '@codex-claw/core/work-providers';
 import { isAgentHandoff } from '@codex-claw/core/agent-handoff';
 import { isMission } from '@codex-claw/core/missions';
 import { isThreadFlags } from '@codex-claw/core/thread-flags';
 import { backendCodexHomeDir } from './state';
 import { isPlanReview } from '@codex-claw/core/plan-review';
 import { sanitizeClientPreferences } from '@codex-claw/core/client-preferences';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationRepositoryTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationWorkSourceTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
 import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
@@ -933,10 +934,7 @@ function sanitizeWorkIntegrationConnection(value: unknown): WorkIntegrationConne
 }
 
 function cloneWorkBacklogProviderConfigurations(value: WorkBacklogState['providerConfigurations']): WorkBacklogState['providerConfigurations'] {
-  return {
-    ...(value.github ? { github: { ...value.github } } : {}),
-    ...(value.linear ? { linear: { ...value.linear } } : {}),
-  };
+  return Object.fromEntries(Object.entries(value).map(([provider, configuration]) => [provider, { ...configuration }]));
 }
 
 function sanitizeWorkBacklogProviderConfigurations(value: unknown): WorkBacklogState['providerConfigurations'] {
@@ -944,38 +942,33 @@ function sanitizeWorkBacklogProviderConfigurations(value: unknown): WorkBacklogS
     return {};
   }
 
-  const github = sanitizeGitHubWorkBacklogConfiguration(value.github);
-  const linear = sanitizeGitHubWorkBacklogConfiguration(value.linear);
-  return {
-    ...(github ? { github } : {}),
-    ...(linear ? { linear } : {}),
-  };
+  return Object.fromEntries(workProviderKinds.flatMap(provider => {
+    const configuration = sanitizeWorkSourceConfiguration(value[provider]);
+    return configuration ? [[provider, configuration]] : [];
+  }));
 }
 
-function sanitizeGitHubWorkBacklogConfiguration(value: unknown): WorkBacklogState['providerConfigurations']['github'] | null {
+function sanitizeWorkSourceConfiguration(value: unknown): WorkBacklogState['providerConfigurations']['github'] | null {
   if (!isRecord(value)) {
     return null;
   }
 
-  const repositoryId = optionalTrimmedString(value.repositoryId);
-  if (!repositoryId) {
+  const sourceId = optionalTrimmedString(value.sourceId);
+  if (!sourceId) {
     return null;
   }
   const assigneeLogin = optionalTrimmedString(value.assigneeLogin);
   const tagName = optionalTrimmedString(value.tagName);
 
   return {
-    repositoryId,
+    sourceId,
     ...(assigneeLogin ? { assigneeLogin } : {}),
     ...(tagName ? { tagName } : {}),
   };
 }
 
 function cloneWorkProviderSettings(value: WorkBacklogState['providerSettings']): WorkBacklogState['providerSettings'] {
-  return {
-    ...(value.github ? { github: { ...value.github } } : {}),
-    ...(value.linear ? { linear: { ...value.linear } } : {}),
-  };
+  return Object.fromEntries(Object.entries(value).map(([provider, settings]) => [provider, { ...settings }]));
 }
 
 function sanitizeWorkProviderSettings(value: unknown): WorkBacklogState['providerSettings'] {
@@ -983,12 +976,10 @@ function sanitizeWorkProviderSettings(value: unknown): WorkBacklogState['provide
     return {};
   }
 
-  const github = sanitizeWorkProviderSetting(value.github);
-  const linear = sanitizeWorkProviderSetting(value.linear);
-  return {
-    ...(github ? { github } : {}),
-    ...(linear ? { linear } : {}),
-  };
+  return Object.fromEntries(workProviderKinds.flatMap(provider => {
+    const settings = sanitizeWorkProviderSetting(value[provider]);
+    return settings ? [[provider, settings]] : [];
+  }));
 }
 
 function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | null {
@@ -1032,7 +1023,7 @@ function sanitizeAutomation(value: unknown): Automation | null {
   }
 
   const repositories = Array.isArray(value.repositories)
-    ? value.repositories.map(sanitizeAutomationRepository).filter((repository): repository is AutomationRepositoryTarget => Boolean(repository))
+    ? value.repositories.map(sanitizeAutomationRepository).filter((repository): repository is AutomationWorkSourceTarget => Boolean(repository))
     : [];
   const teamId = optionalTrimmedString(value.teamId);
   const rawIntervalMinutes = isRecord(value.schedule) ? value.schedule.intervalMinutes : null;
@@ -1171,14 +1162,14 @@ function isAutomationExecutionStatus(value: unknown): value is AutomationExecuti
   return value === 'working' || value === 'completed' || value === 'failed';
 }
 
-function sanitizeAutomationRepository(value: unknown): AutomationRepositoryTarget | null {
+function sanitizeAutomationRepository(value: unknown): AutomationWorkSourceTarget | null {
   if (!isRecord(value) || !isWorkProvider(value.provider)) {
     return null;
   }
-  const repositoryId = optionalTrimmedString(value.repositoryId);
-  const sourceRepositoryPath = optionalTrimmedString(value.sourceRepositoryPath);
-  return repositoryId && sourceRepositoryPath
-    ? { provider: value.provider, repositoryId, sourceRepositoryPath }
+  const sourceId = optionalTrimmedString(value.sourceId);
+  const executionRepositoryPath = optionalTrimmedString(value.executionRepositoryPath);
+  return sourceId && executionRepositoryPath
+    ? { provider: value.provider, sourceId, executionRepositoryPath }
     : null;
 }
 
@@ -1192,7 +1183,7 @@ function optionalTrimmedString(value: unknown): string | null {
 }
 
 function isWorkProvider(value: unknown): value is WorkProviderKind {
-  return value === 'github' || value === 'linear';
+  return isWorkProviderKind(value);
 }
 
 function isWorkIntegrationStatus(value: unknown): value is WorkIntegrationStatus {

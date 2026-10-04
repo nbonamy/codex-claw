@@ -12,7 +12,7 @@
 
       <template v-if="authorization">
         <h1 class="onboarding-landing-title github-onboarding__title">{{ t('auth.githubAuthorizationTitle') }}</h1>
-        <GitHubAuthorizationSteps
+        <WorkAuthorizationSteps
           class="github-onboarding__steps"
           :authorization="authorization"
           @open="emit('openAuthorization')"
@@ -56,7 +56,7 @@
 import type { WorkProviderAuthorization } from '@codex-claw/core/contracts';
 import { useI18n } from 'vue-i18n';
 import { GitHubIcon } from '../shared/icons/app-icons';
-import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
+import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';
 import OnboardingLandingFrame from './OnboardingLandingFrame.vue';
 
 withDefaults(defineProps<{

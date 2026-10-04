@@ -364,10 +364,17 @@ without adopting it as the local product snapshot.
 | `workProvider/authorization/poll` | `{ provider }` | `AppSnapshot` | Polls/completes pending provider auth. |
 | `workProvider/connections/reload` | none | `AppSnapshot` | Rehydrates provider connection metadata from token storage after token files are mirrored, without restarting `clawd`. |
 | `workProvider/disconnect` | `{ provider }` | `AppSnapshot` | Removes provider connection and token. |
-| `workProvider/repositories/list` | `{ provider, location? }` | `WorkRepository[]` | Lists GitHub repositories or Linear team/project backlog scopes from local `clawd` or the selected remote location. Linear scopes carry `linearSource` IDs and are not code repositories. |
+| `workProvider/sources/list` | `{ provider, location? }` | `WorkSource[]` | Lists opaque provider-owned backlog scopes from local `clawd` or the selected remote location. A source can be a repository, team, project, or board; it does not identify an execution repository. |
 | `workProvider/backlog/configure` | `{ input: WorkBacklogConfigurationInput, location? }` | `AppSnapshot` | Saves backlog configuration in local `clawd` or the selected remote automation location. Remote snapshots are returned but not adopted as local product state. |
-| `workProvider/items/list` | `{ provider, repositoryId, location?, query? }` | `WorkItem[]` | Lists provider work items from local `clawd` or the selected remote location. For Linear, the legacy `repositoryId` is a stable team/project scope; items retain their UUID identity, native `identifier`, `nativeState`, and `linearSource`. |
-| `workProvider/globalItems/list` | `{ provider, location?, query? }` | `WorkItemPage` | Lists one numbered page plus its exact total across visible repositories; Cockpit uses it instead of repository fan-out. |
+| `workProvider/items/list` | `{ provider, sourceId, location?, query? }` | `WorkItem[]` | Lists source items normalized by the adapter. Queries select kind and state; native source IDs stay inside adapters. |
+| `workProvider/globalItems/list` | `{ provider, location?, query? }` | `WorkItemPage` | Returns `{ items, nextCursor?, totalItems? }`. Queries accept opaque `cursor`, `pageSize`, assignment, kind and state filters. Missing `nextCursor` ends paging; an exact total is optional. |
+
+Items share `provider`, opaque `id`, `sourceId`, `sourceName`, `title`,
+`body`, `url`, labels, assignees, timestamps, normalized `state`, and optional
+native `identifier`/`nativeState`. Numeric `number` is optional. Provider
+configuration uses `sourceId`; automation targets pair that ID with an
+`executionRepositoryPath`. These contracts replace the previous repository
+and numbered-page contracts directly; there is no compatibility translation.
 
 ## Client To `clawd`: Automations
 

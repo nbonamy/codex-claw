@@ -1,9 +1,9 @@
 <template>
   <section class="repository-backlog" :aria-label="$t('surface.repositoryBacklogPanel.repositoryBacklog')">
-    <BacklogSourceSelector size="small" :provider="linear.provider.value" :providers="linear.providers.value" :sources="linear.sources.value" :source-id="linear.sourceId.value" :show-source="linear.provider.value === 'linear'" @select-provider="linear.selectProvider" @select-source="linear.selectSource" />
+    <BacklogSourceSelector size="small" :provider="backlog.provider.value" :providers="backlog.providers.value" :sources="backlog.sources.value" :source-id="backlog.sourceId.value" :show-source="!workProviderDefinition(backlog.provider.value).repositoryBacked" @select-provider="backlog.selectProvider" @select-source="backlog.selectSource" />
     <header class="repository-backlog__repository">
       <div>
-        <GitHubIcon v-if="linear.provider.value === 'github'" aria-hidden="true" />
+        <GitHubIcon v-if="backlog.provider.value === 'github'" aria-hidden="true" />
         <strong>{{ repositoryName }}</strong>
       </div>
       <span v-if="branch" class="repository-backlog__branch-pill">
@@ -14,7 +14,7 @@
         type="button"
         :aria-label="t('repositoryBacklog.refresh')"
         :disabled="status === 'loading'"
-        @click="linear.provider.value === 'linear' ? linear.refresh() : emit('refresh')"
+        @click="backlog.refresh()"
       >
         <IconRefresh :class="{ 'repository-backlog__spin': status === 'loading' }" aria-hidden="true" />
       </button>
@@ -33,7 +33,7 @@
           {{ t('repositoryBacklog.issues') }}
         </button>
         <button
-          v-if="linear.provider.value === 'github'"
+          v-if="workProviderDefinition(backlog.provider.value).pullRequests"
           type="button"
           role="radio"
           :aria-checked="kindFilter === 'pullRequest'"
@@ -96,7 +96,7 @@
                 <span>{{ t('repositoryBacklog.assignee') }}</span>
                 <el-select v-model="assigneeFilter" size="small" :aria-label="$t('surface.repositoryBacklogPanel.workItemAssignee')">
                   <el-option :label="t('repositoryBacklog.anyone')" value="all" />
-                  <el-option :label="t('repositoryBacklog.assignedToMe')" value="me" :disabled="linear.provider.value === 'github' && !accountLabel" />
+                  <el-option :label="t('repositoryBacklog.assignedToMe')" value="me" />
                   <el-option :label="t('repositoryBacklog.unassigned')" value="unassigned" />
                 </el-select>
               </label>
@@ -149,7 +149,7 @@
     <div v-else-if="error" class="repository-backlog__state repository-backlog__state--error">
       <IconAlertCircle aria-hidden="true" />
       <span>{{ error }}</span>
-      <button type="button" @click="linear.provider.value === 'linear' ? linear.refresh() : emit('refresh')">{{ t('repositoryBacklog.retry') }}</button>
+      <button type="button" @click="backlog.refresh()">{{ t('repositoryBacklog.retry') }}</button>
     </div>
 
     <div v-else-if="filteredItems.length === 0" class="repository-backlog__state">
@@ -207,7 +207,7 @@
         class="repository-backlog__start-work"
         :class="{ 'repository-backlog__start-work--menu': selectedAssignment }"
       >
-        <LinearIssueDetail v-if="selectedItem.provider === 'linear'" :item="selectedItem" />
+        <WorkItemDetail :item="selectedItem" />
         <template v-if="selectedAssignment">
           <AppMenu
             class="app-menu--embedded repository-backlog__assignment-menu"
@@ -218,7 +218,7 @@
         </template>
         <template v-else-if="operationState === 'idle' || operationState === 'error'">
           <header>
-            <strong>{{ selectedItem.identifier ?? t('repositoryBacklog.startWork', { number: selectedItem.number }) }}</strong>
+            <strong>{{ t('repositoryBacklog.startWork', { identifier: workItemDisplayIdentifier(selectedItem) }) }}</strong>
             <button type="button" :aria-label="$t('surface.repositoryBacklogPanel.close')" @click="closeStartWork"><IconX aria-hidden="true" /></button>
           </header>
 
@@ -273,7 +273,8 @@
 </template>
 
 <script setup lang="ts">
-import { workItemBranchName } from '@codex-claw/core/work-item-prompts';
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workItemBranchName, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
 import { computed, h, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -291,7 +292,7 @@ import {
   IconX,
 } from '@tabler/icons-vue';
 import { GitHubIcon } from '../shared/icons/app-icons';
-import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -300,8 +301,8 @@ import type { RepositoryWorkStartInput } from './right-workspace';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 import BacklogSourceSelector from './BacklogSourceSelector.vue';
-import LinearIssueDetail from './LinearIssueDetail.vue';
-import { useLinearBacklog } from './use-linear-backlog';
+import WorkItemDetail from './WorkItemDetail.vue';
+import { useWorkSourceBacklog } from './use-work-source-backlog';
 
 defineOptions({ name: 'RepositoryBacklogPanel' });
 
@@ -311,28 +312,18 @@ const props = defineProps<{
   agents: readonly Agent[];
   assignments: Record<string, WorkBacklogAssignment>;
   branch?: string;
-  connection?: WorkIntegrationConnection | null;
-  error?: string | null;
-  items: WorkItem[];
   repositoryId: string;
-  prefillAction: (item: WorkItem) => void;
   clearAssignmentAction?: (item: WorkItem) => void;
   closeAgentAction?: (agentId: string) => void;
   showAgentAction?: (agentId: string) => void;
-  status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   startWorkAction: (input: RepositoryWorkStartInput) => Promise<void>;
   visible: boolean;
 }>();
 
-const emit = defineEmits<{
-  refresh: [];
-}>();
 
 const { t } = useI18n();
-const linear = useLinearBacklog(() => props.location);
-const items = computed(() => linear.provider.value === 'linear' ? linear.items.value : props.items);
-const status = computed(() => linear.provider.value === 'linear' ? linear.status.value : props.status);
-const error = computed(() => linear.provider.value === 'linear' ? linear.error.value : props.error);
+const backlog = useWorkSourceBacklog({ location: () => props.location, preferredSourceId: () => props.repositoryId, enabled: () => props.visible });
+const { items, status, error } = backlog;
 const kindFilter = ref<'issue' | 'pullRequest'>('issue');
 const stateFilter = ref<'open' | 'closed' | 'all'>('open');
 const assigneeFilter = ref<'all' | 'me' | 'unassigned'>('all');
@@ -359,8 +350,7 @@ const currentSessionOptions = computed<WorkItemAssignmentSession[]>(() => [{
 }]);
 const operationWorkspaceLabel = computed(() => branchName.value || props.branch || t('repositoryBacklog.currentWorkspace'));
 
-const accountLabel = computed(() => props.connection?.accountLabel?.trim() ?? '');
-const repositoryName = computed(() => linear.provider.value === 'linear' ? linear.sources.value.find(source => source.id === linear.sourceId.value)?.fullName ?? 'Linear' : props.repositoryId.split('/').at(-1) ?? props.repositoryId);
+const repositoryName = computed(() => backlog.sources.value.find(source => source.id === backlog.sourceId.value)?.fullName ?? backlog.sourceId.value ?? '');
 const labelOptions = computed(() => [...new Set(items.value.flatMap((item) => item.labels.map((label) => label.name)))].sort());
 const activeFilterCount = computed(() => Number(stateFilter.value !== 'open') + Number(assigneeFilter.value !== 'all') + Number(Boolean(labelFilter.value)));
 const kindItems = computed(() => items.value.filter((item) => (item.kind ?? 'issue') === kindFilter.value));
@@ -370,7 +360,7 @@ const filteredItems = computed(() => {
     .filter((item) => (item.kind ?? 'issue') === kindFilter.value)
     .filter((item) => stateFilter.value === 'all' || item.state === stateFilter.value)
     .filter((item) => assigneeFilter.value === 'all'
-      || (assigneeFilter.value === 'me' && (item.provider === 'linear' ? item.assignedToViewer : Boolean(accountLabel.value) && item.assignees?.includes(accountLabel.value)))
+      || (assigneeFilter.value === 'me' && item.assignedToViewer)
       || (assigneeFilter.value === 'unassigned' && (item.assignees?.length ?? 0) === 0))
     .filter((item) => !labelFilter.value || item.labels.some((label) => label.name === labelFilter.value))
     .filter((item) => !query || `${item.identifier ?? item.number} ${item.title} ${item.authorName ?? ''}`.toLocaleLowerCase().includes(query))
@@ -425,7 +415,7 @@ watch(() => props.repositoryId, () => {
   loadFilterDefaults();
 }, { immediate: true });
 
-watch([linear.provider, linear.sourceId, () => JSON.stringify(props.location)], () => {
+watch([backlog.provider, backlog.sourceId, () => JSON.stringify(props.location)], () => {
   pendingClearAssignment.value = null;
   closeStartWork();
   closeSearch();
@@ -459,7 +449,7 @@ const RepositoryItemRow = (rowProps: { item: WorkItem; assignment: WorkBacklogAs
         target: '_blank',
         rel: 'noopener noreferrer',
         onClick: (event: MouseEvent) => event.stopPropagation(),
-      }, [h('span', item.identifier ?? `#${item.number}`), h('strong', item.title)]),
+      }, [h('span', workItemDisplayIdentifier(item)), h('strong', item.title)]),
       assignmentNote
         ? h('p', { class: 'repository-backlog__assignment-note' }, assignmentNote)
         : h('div', { class: 'repository-backlog__item-meta' }, [
@@ -534,7 +524,7 @@ function readFilterDefaults(): {
     const value = JSON.parse(stored) as Record<string, unknown>;
     return {
       state: value.state === 'closed' || value.state === 'all' ? value.state : 'open',
-      assignee: value.assignee === 'unassigned' || (value.assignee === 'me' && (linear.provider.value === 'linear' || accountLabel.value)) ? value.assignee : 'all',
+      assignee: value.assignee === 'unassigned' || value.assignee === 'me' ? value.assignee : 'all',
       label: typeof value.label === 'string' && value.label.length <= 100 && (labelOptions.value.length === 0 || labelOptions.value.includes(value.label)) ? value.label : '',
     };
   } catch {
@@ -543,7 +533,7 @@ function readFilterDefaults(): {
 }
 
 function filterDefaultsKey(): string {
-  return linear.provider.value === 'github' ? `repositoryBacklogFilters:${props.repositoryId}` : `repositoryBacklogFilters:linear:${JSON.stringify(props.location)}:${linear.sourceId.value}`;
+  return `repositoryBacklogFilters:${backlog.provider.value}:${JSON.stringify(props.location)}:${backlog.sourceId.value}`;
 }
 
 function openItem(item: WorkItem, element?: HTMLElement): void {
@@ -626,25 +616,23 @@ function setStartWorkVisible(visible: boolean): void {
 function prefillCustomPrompt(selection: Omit<WorkItemAssignmentSelection, 'action'>): void {
   const item = selectedItem.value;
   if (!item) return;
-  if (item.provider === 'linear') { void startWork({ ...selection, action: 'custom' }); return; }
-  props.prefillAction(item);
-  closeStartWork();
+  void startWork({ ...selection, action: 'custom' });
 }
 
 async function startWork(selection: Omit<WorkItemAssignmentSelection, 'action'> & { action: RepositoryWorkStartInput['action'] }): Promise<void> {
   const item = selectedItem.value;
   if (!item || selection.item.id !== item.id || operationState.value === 'running') return;
-  const source = linear.sourceId.value;
-  const provider = linear.provider.value;
+  const source = backlog.sourceId.value;
+  const provider = backlog.provider.value;
   const revision = selectionRevision;
-  const isCurrent = () => revision === selectionRevision && props.visible && selectedItem.value?.id === item.id && linear.sourceId.value === source && linear.provider.value === provider;
+  const isCurrent = () => revision === selectionRevision && props.visible && selectedItem.value?.id === item.id && backlog.sourceId.value === source && backlog.provider.value === provider;
   operationState.value = 'running';
   operationError.value = null;
   try {
     const input: RepositoryWorkStartInput = selection.destination === 'new'
       ? { action: selection.action, item, target: 'duplicate', backend: selection.backend, workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
       : { action: selection.action, item, target: 'current', workspace: { kind: 'current' } };
-    await props.startWorkAction({ ...input, ...(item.provider === 'linear' ? { isCurrent } : {}) });
+    await props.startWorkAction({ ...input, isCurrent });
     if (!isCurrent()) return;
     operationState.value = 'success';
     globalThis.setTimeout(() => { if (isCurrent()) closeStartWork(); }, 1_200);

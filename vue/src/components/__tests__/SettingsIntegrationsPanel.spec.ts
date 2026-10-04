@@ -89,7 +89,7 @@ describe('SettingsIntegrationsPanel', () => {
     expect(wrapper.text()).toContain('Codex Claw will finish the connection automatically once GitHub approves it.');
     expect(wrapper.find('[aria-label="Waiting for GitHub authorization"]').exists()).toBe(true);
 
-    wrapper.getComponent({ name: 'GitHubAuthorizationSteps' }).vm.$emit('open');
+    wrapper.getComponent({ name: 'WorkAuthorizationSteps' }).vm.$emit('open');
     expect(wrapper.emitted('open-authorization')).toStrictEqual([['github']]);
     expect(wrapper.emitted('complete')).toBeUndefined();
   });

@@ -21,8 +21,8 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-06-13T00:00:00.000Z',
       repositories: [{
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       }],
       teamId: 'team-test',
       schedule: { intervalMinutes: 60 },
@@ -92,8 +92,8 @@ describe('ClawBackendServer', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/home/nicolas/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/home/nicolas/src/codex-claw',
       }],
       teamId: 'team-remote',
       schedule: { intervalMinutes: 60 },
@@ -134,7 +134,7 @@ describe('ClawBackendServer', () => {
     });
     const location = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
     const createInput = {
-      repositories: [{ provider: 'github' as const, repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/home/nicolas/src/codex-claw' }],
+      repositories: [{ provider: 'github' as const, sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/home/nicolas/src/codex-claw' }],
       teamId: 'team-remote',
       schedule: { intervalMinutes: 60 },
     };
@@ -156,7 +156,7 @@ describe('ClawBackendServer', () => {
       id: 'remote-backlog-configure',
       method: 'workProvider/backlog/configure',
       params: {
-        input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } },
+        input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } },
         location,
       },
     })).resolves.toMatchObject({ result: remoteSnapshot });
@@ -216,7 +216,7 @@ describe('ClawBackendServer', () => {
       3,
       snapshot.remoteConnections.connections[0],
       'workProvider/backlog/configure',
-      { ...{ input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } }, _clientId: 'remote-controller' },
+      { ...{ input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } } }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
@@ -287,8 +287,8 @@ describe('ClawBackendServer', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       }],
       teamId: 'team-test',
       schedule: { intervalMinutes: 60 },

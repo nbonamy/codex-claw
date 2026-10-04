@@ -9,7 +9,7 @@ import type {
   WorkItemQuery,
   WorkProviderAuthorization,
   WorkProviderKind,
-  WorkRepository,
+  WorkSource,
 } from '@codex-claw/core/contracts';
 import { localizedText } from './i18n/errors';
 import { translate } from './i18n';
@@ -27,7 +27,7 @@ const authorizationPollMs = 5_000;
 /** Owns provider authorization, polling, repository catalogs, and backlog state. */
 export function createWorkProviderState(options: WorkProviderStateOptions) {
   const authorization = ref<WorkProviderAuthorization | null>(null);
-  const repositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
+  const repositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkSource[]>>>({});
   const itemsByRepository = ref<Record<string, WorkItem[]>>({});
   const assignedItemsByProvider = ref<Partial<Record<WorkProviderKind, WorkItem[]>>>({});
   const status = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
@@ -103,11 +103,11 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     error.value = null;
   }
 
-  async function loadRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]> {
+  async function loadRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]> {
     if (isRemoteAutomationLocation(location)) {
-      return await codexClawApi?.listWorkRepositories?.(provider, location) ?? [];
+      return await codexClawApi?.listWorkSources?.(provider, location) ?? [];
     }
-    if (!codexClawApi?.listWorkRepositories || connection(provider)?.status !== 'connected') {
+    if (!codexClawApi?.listWorkSources || connection(provider)?.status !== 'connected') {
       repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: [] };
       status.value = 'notLoaded';
       return [];
@@ -118,16 +118,16 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     const revision = (catalogRevisions.get(provider) ?? 0) + 1;
     catalogRevisions.set(provider, revision);
     try {
-      const repositories = await codexClawApi.listWorkRepositories(provider);
+      const repositories = await codexClawApi.listWorkSources(provider);
       if (catalogRevisions.get(provider) !== revision) return [];
       repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: repositories };
       status.value = 'loaded';
-      const configuredId = options.getSnapshot().workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
+      const configuredId = options.getSnapshot().workBacklog.providerConfigurations[provider]?.sourceId ?? null;
       const selectedId = configuredId ?? repositories[0]?.id ?? null;
       if (selectedId && !configuredId) {
         await configure({
           provider,
-          configuration: { repositoryId: selectedId, assigneeLogin: null, tagName: null },
+          configuration: { sourceId: selectedId, assigneeLogin: null, tagName: null },
         });
       }
       if (selectedId) await loadItems(provider, selectedId);
@@ -186,7 +186,7 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     query?: GlobalWorkItemQuery,
   ): Promise<WorkItemPage> {
     if (!codexClawApi?.listGlobalWorkItems) {
-      return { items: [], page: 1, pageSize: query?.pageSize ?? 50, totalItems: 0 };
+      return { items: [] };
     }
     return codexClawApi.listGlobalWorkItems(provider, location, query);
   }

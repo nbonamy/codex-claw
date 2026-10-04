@@ -1,5 +1,6 @@
 import type { WorkBacklogAssignmentPolicy, WorkItem } from './contracts';
 import { workItemAssignmentKey } from './work-assignments';
+import { workProviderDefinition } from './work-providers';
 
 export type WorkItemAssignmentAction = 'addressFeedback' | 'fix' | 'investigate' | 'review';
 
@@ -23,7 +24,7 @@ export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPrompt
       : 'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
     'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
     '',
-    `${item.provider === 'linear' ? 'Backlog source' : 'Repository'}: ${item.repositoryFullName}`,
+    `Backlog source: ${item.sourceName}`,
     `${item.kind === 'pullRequest' ? 'Pull request' : 'Issue'}: ${workItemDisplayIdentifier(item)} ${item.title}`,
     `URL: ${item.url}`,
     item.labels.length > 0 ? `Labels: ${item.labels.map((label) => label.name).join(', ')}` : null,
@@ -36,26 +37,23 @@ export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPrompt
 export function workItemComposerPrompt(item: WorkItem): string {
   const kind = item.kind === 'pullRequest' ? 'pull request' : 'issue';
   return `Regarding ${workProviderLabel(item.provider)} ${kind} ${workItemDisplayIdentifier(item)} — ${item.title}:\n\n`
-    + (item.provider === 'linear' ? `Work item ID: ${workItemAssignmentKey(item)}\nBacklog source: ${item.repositoryFullName}\nURL: ${item.url}\n\n${truncateWorkItemBody(item.body?.trim() ?? '')}\n\n` : '');
+    + `Work item ID: ${workItemAssignmentKey(item)}\nBacklog source: ${item.sourceName}\nURL: ${item.url}\n\n${truncateWorkItemBody(item.body?.trim() ?? '')}\n\n`;
 }
 
-export function workItemDisplayIdentifier(item: Pick<WorkItem, 'provider' | 'identifier' | 'number'>): string {
-  return item.provider === 'linear' ? item.identifier ?? `#${item.number}` : `#${item.number}`;
+export function workItemDisplayIdentifier(item: Pick<WorkItem, 'id' | 'identifier' | 'number'>): string {
+  return item.identifier ?? (item.number !== undefined ? `#${item.number}` : item.id);
 }
 
-export function workItemBranchName(item: WorkItem): string {
-  if (item.kind === 'pullRequest') return item.branchName?.trim() || `review/gh-${item.number}`;
-  const reference = item.provider === 'linear' ? item.identifier ?? item.id : `gh-${item.number}`;
-  return `fix/${reference.toLowerCase().replace(/[^a-z0-9-]+/g, '-')}`;
+export function workItemBranchName(item: WorkItem, purpose?: 'automation'): string {
+  if (!purpose && item.kind === 'pullRequest' && item.branchName?.trim()) return item.branchName.trim();
+  const definition = workProviderDefinition(item.provider);
+  const prefix = purpose ? definition.automationBranchPrefix : definition.branchPrefix;
+  const reference = prefix ? `${prefix}-${item.number ?? item.identifier ?? item.id}` : item.identifier ?? item.id;
+  return `${purpose ?? (item.kind === 'pullRequest' ? 'review' : 'fix')}/${reference.toLowerCase().replace(/[^a-z0-9-]+/g, '-')}`;
 }
 
 export function workProviderLabel(provider: WorkItem['provider']): string {
-  if (provider === 'github') {
-    return 'GitHub';
-  }
-  if (provider === 'linear') return 'Linear';
-  provider satisfies never;
-  return 'work provider';
+  return workProviderDefinition(provider)?.label ?? 'work provider';
 }
 
 function workItemActionInstruction(item: WorkItem, action?: WorkItemAssignmentAction): string {

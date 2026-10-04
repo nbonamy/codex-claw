@@ -4,15 +4,16 @@ import type {
   WorkBacklogConfigurationInput,
   WorkItem,
   WorkItemPage,
-  WorkRepository,
+  WorkSource,
   WorkProviderKind,
 } from '@codex-claw/core/contracts';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useBacklogProviders } from './backlog-providers';
+import { isWorkProviderKind, workProviderDefinition } from '@codex-claw/core/work-providers';
 
 type CockpitBacklogConfiguration = {
   assigneeLogin: string | null;
-  repositoryId: string | null;
+  sourceId: string | null;
   tagName: string | null;
 };
 type GlobalScope = 'assignedToMe' | 'all';
@@ -20,10 +21,11 @@ type GlobalFeed = {
   error: string | null;
   page: number;
   pages: Record<number, WorkItem[]>;
+  cursors: Record<number, string>;
   pageSize: number;
   pendingPage: number | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  totalItems: number;
+  totalItems?: number;
 };
 
 const globalPageSize = 25;
@@ -35,9 +37,9 @@ export function useCockpitBacklog(options: {
   getWorkBacklogError: () => string | null;
   getWorkBacklogStatus: () => 'notLoaded' | 'loading' | 'loaded' | 'error';
   getWorkItemsByRepository: () => Record<string, WorkItem[]>;
-  getWorkRepositories: (provider: WorkProviderKind) => WorkRepository[];
+  getWorkRepositories: (provider: WorkProviderKind) => WorkSource[];
   loadGlobalWorkItems: (query: GlobalWorkItemQuery, provider: WorkProviderKind) => Promise<WorkItemPage>;
-  loadWorkItems: (repositoryId: string, provider: WorkProviderKind) => Promise<void>;
+  loadWorkItems: (sourceId: string, provider: WorkProviderKind) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
 }) {
   const { provider, providers } = useBacklogProviders(() => options.getSnapshot().workBacklog.connections, rememberedProvider());
@@ -53,7 +55,7 @@ export function useCockpitBacklog(options: {
   const savedConfiguration = computed<CockpitBacklogConfiguration>(() => {
     const configuration = options.getSnapshot().workBacklog.providerConfigurations[provider.value] ?? {};
     return normalize({
-      repositoryId: configuration.repositoryId ?? null,
+      sourceId: configuration.sourceId ?? null,
       assigneeLogin: configuration.assigneeLogin ?? null,
       tagName: configuration.tagName ?? null,
     });
@@ -64,7 +66,7 @@ export function useCockpitBacklog(options: {
     const connection = snapshot.workBacklog.connections.find((candidate) => candidate.provider === provider.value);
     if (!connection || connection.status !== 'connected') return null;
     const configuration = effectiveConfiguration.value;
-    const selectedRepositoryId = configuration.repositoryId;
+    const selectedRepositoryId = configuration.sourceId;
     const feed = globalScope.value ? feeds[globalScope.value] : null;
     const items = selectedRepositoryId
       ? options.getWorkItemsByRepository()[`${provider.value}:${selectedRepositoryId}`] ?? []
@@ -75,17 +77,16 @@ export function useCockpitBacklog(options: {
       globalScope: globalScope.value,
       page: feed?.page ?? 1,
       pageSize: feed?.pageSize ?? items.length,
+      hasNextPage: Boolean(feed?.cursors[feed.page + 1]),
       pageLoading: feed?.pendingPage !== null,
       repositories: options.getWorkRepositories(provider.value),
-      selectedAssigneeLogin: globalScope.value === 'assignedToMe' && provider.value === 'github'
-        ? connection.accountLabel ?? configuration.assigneeLogin
-        : configuration.assigneeLogin,
+      selectedAssigneeLogin: configuration.assigneeLogin,
       selectedRepositoryId,
       selectedTagName: configuration.tagName,
       items,
       status: selectedRepositoryId ? options.getWorkBacklogStatus() : feed?.status ?? options.getWorkBacklogStatus(),
       error: selectedRepositoryId ? options.getWorkBacklogError() : feed?.error ?? options.getWorkBacklogError(),
-      totalItems: feed?.totalItems ?? items.length,
+      totalItems: feed ? feed.totalItems : items.length,
     };
   });
 
@@ -106,25 +107,25 @@ export function useCockpitBacklog(options: {
     }
     if (revision !== contextRevision) return;
     const firstSource = options.getWorkRepositories(provider.value)[0];
-    if (provider.value === 'linear' && firstSource) {
+    if (workProviderDefinition(provider.value).initialView === 'source' && firstSource) {
       await selectRepository(firstSource.id);
       return;
     }
-    pendingConfiguration.value = { repositoryId: null, assigneeLogin: null, tagName: null };
+    pendingConfiguration.value = { sourceId: null, assigneeLogin: null, tagName: null };
     const scope = rememberedGlobalScope(provider.value) === 'all' ? 'all' : 'assignedToMe';
     globalScope.value = scope;
     await ensureGlobalItems(scope);
   }
 
-  async function selectRepository(repositoryId: string | null): Promise<void> {
+  async function selectRepository(sourceId: string | null): Promise<void> {
     const selectedProvider = provider.value;
     const revision = ++contextRevision;
     feeds.all = emptyFeed();
     feeds.assignedToMe = emptyFeed();
-    globalScope.value = repositoryId ? null : 'assignedToMe';
-    await configure({ repositoryId, assigneeLogin: null, tagName: null });
+    globalScope.value = sourceId ? null : 'assignedToMe';
+    await configure({ sourceId, assigneeLogin: null, tagName: null });
     if (revision !== contextRevision) return;
-    if (repositoryId) await options.loadWorkItems(repositoryId, selectedProvider);
+    if (sourceId) await options.loadWorkItems(sourceId, selectedProvider);
     else await ensureGlobalItems('assignedToMe');
   }
 
@@ -134,7 +135,7 @@ export function useCockpitBacklog(options: {
       await ensureGlobalItems('all');
     }
     await configure({
-      repositoryId: workBacklog.value?.selectedRepositoryId ?? null,
+      sourceId: workBacklog.value?.selectedRepositoryId ?? null,
       assigneeLogin,
       tagName: workBacklog.value?.selectedTagName ?? null,
     });
@@ -142,15 +143,15 @@ export function useCockpitBacklog(options: {
 
   async function selectTag(tagName: string | null): Promise<void> {
     await configure({
-      repositoryId: workBacklog.value?.selectedRepositoryId ?? null,
+      sourceId: workBacklog.value?.selectedRepositoryId ?? null,
       assigneeLogin: workBacklog.value?.selectedAssigneeLogin ?? null,
       tagName,
     });
   }
 
-  async function refresh(repositoryId: string | null): Promise<void> {
+  async function refresh(sourceId: string | null): Promise<void> {
     if (options.getWorkRepositories(provider.value).length === 0) await options.loadWorkRepositories(provider.value);
-    if (repositoryId) await options.loadWorkItems(repositoryId, provider.value);
+    if (sourceId) await options.loadWorkItems(sourceId, provider.value);
     else if (globalScope.value) await loadGlobalItems(globalScope.value, 1, true);
   }
 
@@ -158,7 +159,7 @@ export function useCockpitBacklog(options: {
     const revision = contextRevision;
     if (scope === 'all' && !await options.confirmLoadAll()) return;
     if (revision !== contextRevision) return;
-    await configure({ repositoryId: null, assigneeLogin: null, tagName: null });
+    await configure({ sourceId: null, assigneeLogin: null, tagName: null });
     if (revision !== contextRevision) return;
     globalScope.value = scope;
     if (scope === 'all') rememberGlobalScope(provider.value);
@@ -169,8 +170,7 @@ export function useCockpitBacklog(options: {
     const scope = globalScope.value;
     if (!scope) return;
     const feed = feeds[scope];
-    const totalPages = Math.max(1, Math.ceil(feed.totalItems / feed.pageSize));
-    if (!Number.isInteger(page) || page < 1 || page > totalPages || page === feed.page) return;
+    if (!Number.isInteger(page) || page < 1 || page === feed.page || (page > 1 && !feed.cursors[page])) return;
     await loadGlobalItems(scope, page);
   }
 
@@ -200,6 +200,11 @@ export function useCockpitBacklog(options: {
       return;
     }
     feed.pendingPage = page;
+    if (force) {
+      feed.pages = {};
+      feed.cursors = {};
+      feed.totalItems = undefined;
+    }
     if (Object.keys(feed.pages).length === 0) feed.status = 'loading';
     feed.error = null;
     const revision = contextRevision;
@@ -207,13 +212,14 @@ export function useCockpitBacklog(options: {
       const result = await options.loadGlobalWorkItems({
         assignment: scope === 'assignedToMe' ? 'viewer' : 'all',
         state: 'open',
-        page,
+        ...(page > 1 ? { cursor: feed.cursors[page] } : {}),
         pageSize: globalPageSize,
       }, provider.value);
       if (revision !== contextRevision) return;
-      feed.pages[result.page] = result.items;
-      feed.page = result.page;
-      feed.pageSize = result.pageSize;
+      feed.pages[page] = result.items;
+      feed.page = page;
+      if (result.nextCursor) feed.cursors[page + 1] = result.nextCursor;
+      else delete feed.cursors[page + 1];
       feed.totalItems = result.totalItems;
       feed.status = 'loaded';
     } catch (error) {
@@ -257,23 +263,23 @@ function emptyFeed(): GlobalFeed {
     error: null,
     page: 1,
     pages: {},
+    cursors: {},
     pageSize: globalPageSize,
     pendingPage: null,
     status: 'notLoaded',
-    totalItems: 0,
   };
 }
 
 function normalize(configuration: CockpitBacklogConfiguration): CockpitBacklogConfiguration {
   return {
-    repositoryId: normalizedOptionalString(configuration.repositoryId),
+    sourceId: normalizedOptionalString(configuration.sourceId),
     assigneeLogin: normalizedOptionalString(configuration.assigneeLogin),
     tagName: normalizedOptionalString(configuration.tagName),
   };
 }
 
 function sameConfiguration(left: CockpitBacklogConfiguration, right: CockpitBacklogConfiguration): boolean {
-  return left.repositoryId === right.repositoryId &&
+  return left.sourceId === right.sourceId &&
     left.assigneeLogin === right.assigneeLogin &&
     left.tagName === right.tagName;
 }
@@ -283,7 +289,10 @@ function normalizedOptionalString(value: string | null | undefined): string | nu
 }
 
 function rememberedProvider(): WorkProviderKind {
-  try { return window.localStorage.getItem('cockpitBacklogProvider') === 'linear' ? 'linear' : 'github'; } catch { return 'github'; }
+  try {
+    const saved = window.localStorage.getItem('cockpitBacklogProvider');
+    return isWorkProviderKind(saved) ? saved : 'github';
+  } catch { return 'github'; }
 }
 
 function rememberedGlobalScope(provider: WorkProviderKind): 'all' | null {

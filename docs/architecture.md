@@ -1152,8 +1152,8 @@ state is local and provider-neutral: newly assigned items are `inProgress`, and
 agents update them to `blocked`, `readyForReview`, or `completed` through the
 `update-work-item` Claw MCP tool using the exact work item id from that prompt.
 Blocked updates include a user-facing note explaining what help is needed.
-Linear assignments retain a sanitized issue reference (native identifier, URL,
-body and stable team/project source) through persistence and remote snapshots.
+Every provider's assignments retain a sanitized issue reference (native identifier,
+URL, body and opaque source identity) through persistence and remote snapshots.
 The backlog source is separate from the execution repository: repository entry
 points use their current repository, while global batch starts require a code
 repository chosen on the selected Claw team's host. This choice is transient;
@@ -1184,6 +1184,30 @@ deduplicated by provider-qualified issue identity before selection; the first
 configured source supplies the execution repository. In-flight reservations
 also prevent concurrent runs from preparing the same issue twice. Native Linear
 identifiers are retained in selection prompts, assignments and execution logs.
+The work-provider boundary has three parts:
+
+- `core/src/contracts/work.ts` defines the shared `WorkSource` and `WorkItem`
+  model. Source IDs and item IDs are opaque; a numeric issue number is optional.
+  Native workflow states and display identifiers supplement common fields.
+- `core/src/work-providers.ts` registers labels, source terminology,
+  repository/PR capabilities, branch conventions and optional hosted MCP
+  endpoints. Validation, Settings, prompts, automation setup and MCP wiring
+  consume this registry.
+- Backend `WorkProviderDriver` adapters own authentication, native API
+  requests and normalization. Shared browsing owns source selection, caching,
+  host isolation and stale-response protection. Global feeds use opaque cursors
+  and optional totals; Linear does not traverse the entire issue connection
+  for each visible page.
+
+Adding a source requires a registry definition, an adapter and runtime
+construction/configuration. It does not require new branches in assignment,
+Mission selection, Settings connection controls or automation workflows.
+Provider-specific logos are optional presentation metadata. Contract tests use
+a third provider with nonnumeric IDs to exercise the shared protocol and UI.
+GitHub code-host operations remain separate from a backlog item's execution
+repository choice. Automation targets explicitly store `sourceId` and
+`executionRepositoryPath`.
+
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.

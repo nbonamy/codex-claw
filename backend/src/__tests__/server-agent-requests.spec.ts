@@ -663,8 +663,8 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-06-13T00:00:00.000Z',
       repositories: [{
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       }],
       teamId: 'team-test',
       schedule: { intervalMinutes: 60 },

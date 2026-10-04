@@ -1,6 +1,7 @@
-import type { AgentGitPullRequest, AppSnapshot, GlobalWorkItemQuery, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, AppSnapshot, GlobalWorkItemQuery, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderConnectResult, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
 import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import type { WorkProviderDeviceAuthorization, WorkProviderDriver } from './types';
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
 
 type WorkIntegrationManagerOptions = {
   drivers: WorkProviderDriver[];
@@ -68,13 +69,11 @@ export class WorkIntegrationManager {
       if (this.generation(provider) !== generation) continue;
 
       if (!driver.configured()) {
-        if (connection || provider === 'linear') {
-          changed = this.setConnection({
-            provider,
-            status: 'notConfigured',
-            detail: this.configurationDetail(provider),
-          }) || changed;
-        }
+        changed = this.setConnection({
+          provider,
+          status: 'notConfigured',
+          detail: this.configurationDetail(provider),
+        }) || changed;
         continue;
       }
 
@@ -296,19 +295,19 @@ export class WorkIntegrationManager {
     return this.snapshot();
   }
 
-  async listRepositories(provider: WorkProviderKind): Promise<WorkRepository[]> {
+  async listSources(provider: WorkProviderKind): Promise<WorkSource[]> {
     const token = await this.connectedToken(provider);
-    return this.driver(provider).listRepositories(token);
+    return this.driver(provider).listSources(token);
   }
 
   async configureBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
     {
-      const repositoryId = normalizedOptionalString(input.configuration.repositoryId);
-      if (repositoryId) {
+      const sourceId = normalizedOptionalString(input.configuration.sourceId);
+      if (sourceId) {
         const assigneeLogin = normalizedOptionalString(input.configuration.assigneeLogin);
         const tagName = normalizedOptionalString(input.configuration.tagName);
         this.snapshot().workBacklog.providerConfigurations[input.provider] = {
-          repositoryId,
+          sourceId,
           ...(assigneeLogin ? { assigneeLogin } : {}),
           ...(tagName ? { tagName } : {}),
         };
@@ -351,7 +350,7 @@ export class WorkIntegrationManager {
     this.setConnection({
       provider,
       status: 'error',
-      detail: { key: provider === 'linear' ? 'workProvider.linearAuthorizationExpired' : 'workProvider.verificationExpired' },
+      detail: { key: 'workProvider.verificationExpired' },
     });
     await this.options.saveSnapshot();
     return null;
@@ -447,9 +446,7 @@ export class WorkIntegrationManager {
   }
 
   private configurationDetail(provider: WorkProviderKind): WorkIntegrationConnection['detail'] {
-    return provider === 'linear'
-      ? 'The Linear OAuth client ID is not configured for this build.'
-      : { key: 'workProvider.oauthNotConfigured', params: { provider: providerLabel(provider) } };
+    return workProviderDefinition(provider).configurationDetail;
   }
 
   private driver(provider: WorkProviderKind): WorkProviderDriver {
@@ -512,7 +509,7 @@ function publicAuthorization(authorization: WorkProviderDeviceAuthorization): Wo
 }
 
 function providerLabel(provider: WorkProviderKind): string {
-  return provider === 'github' ? 'GitHub' : 'Linear';
+  return workProviderDefinition(provider).label;
 }
 
 function workProviderAuthorizationError(

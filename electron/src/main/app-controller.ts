@@ -18,7 +18,7 @@ import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance
 import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
 import { decodeAppSnapshot, isClientState, type DecodedAppSnapshot } from '@codex-claw/core/snapshot-guards';
 import { applyMainEventToSnapshot, replaceAppSnapshot } from '@codex-claw/core/snapshot';
-import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type ClawdDaemonStatus, type ClaudeAuthentication, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationListInput, type ConversationResumeTarget, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkRepository } from '@codex-claw/core/contracts';
+import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type ClawdDaemonStatus, type ClaudeAuthentication, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationListInput, type ConversationResumeTarget, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkSource } from '@codex-claw/core/contracts';
 import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks, type DebugCodeReviewScenario } from './app-menu';
@@ -221,8 +221,8 @@ export class AppController {
       return this.disconnectWorkProvider(provider);
     });
 
-    ipc.handle(ipcChannels.listWorkRepositories, async (_event, provider: WorkProviderKind, location?: AutomationLocation) => {
-      return this.listWorkRepositories(provider, location);
+    ipc.handle(ipcChannels.listWorkSources, async (_event, provider: WorkProviderKind, location?: AutomationLocation) => {
+      return this.listWorkSources(provider, location);
     });
 
     ipc.handle(ipcChannels.configureWorkBacklog, async (_event, input: WorkBacklogConfigurationInput, location?: AutomationLocation) => {
@@ -829,8 +829,8 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.workProviderDisconnect, { provider }));
   }
 
-  private async listWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]> {
-    return this.requireBackendClient().request(backendMethods.workProviderRepositoriesList, {
+  private async listWorkSources(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]> {
+    return this.requireBackendClient().request(backendMethods.workProviderSourcesList, {
       provider,
       ...(location ? { location } : {}),
     });
@@ -844,10 +844,10 @@ export class AppController {
     return location?.kind === 'remote' ? snapshot : this.adoptBackendSnapshot(snapshot);
   }
 
-  private async listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
+  private async listWorkItems(provider: WorkProviderKind, sourceId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
     return this.requireBackendClient().request(backendMethods.workProviderItemsList, {
       provider,
-      repositoryId,
+      sourceId,
       ...(location ? { location } : {}),
       ...(query ? { query } : {}),
     });

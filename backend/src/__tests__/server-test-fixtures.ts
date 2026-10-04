@@ -140,8 +140,8 @@ export function createWorkItem(): WorkItem {
   return {
     provider: 'github',
     id: 'github:nbonamy/codex-claw#12',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number: 12,
     title: 'Fix bug',
     url: 'https://github.com/nbonamy/codex-claw/issues/12',

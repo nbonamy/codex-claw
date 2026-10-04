@@ -10,7 +10,7 @@ import { defineComponent, nextTick } from 'vue';
 import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConnectionState, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, OpenInApplication, OpenInApplicationCatalog, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConnectionState, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, OpenInApplication, OpenInApplicationCatalog, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
 import type { CreateMissionInput, DeleteMissionInput, Mission } from '@codex-claw/core/missions';
 import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
 
@@ -158,7 +158,7 @@ export function mountShell(overrides: Partial<{
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
   getAgentGitDiff: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
-  loadWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+  loadWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkSource[] | void>;
   loadAssignedWorkItems: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
   loadGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => Promise<import('@codex-claw/core/contracts').WorkItemPage>;
   loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
@@ -171,7 +171,7 @@ export function mountShell(overrides: Partial<{
   assignWorkItemAction: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   getAutomationSnapshot: (location?: AutomationLocation) => Promise<AppSnapshot>;
   quit: () => Promise<void>;
-  workRepositoriesByProvider: Partial<Record<WorkProviderKind, WorkRepository[]>>;
+  workRepositoriesByProvider: Partial<Record<WorkProviderKind, WorkSource[]>>;
   workItemsByRepository: Record<string, WorkItem[]>;
   realConversationPane: boolean;
   realAgentSidebar: boolean;
@@ -340,8 +340,8 @@ export function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw#12',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number: 12,
     title: 'Fix cockpit drag target',
     url: 'https://github.com/nbonamy/codex-claw/issues/12',

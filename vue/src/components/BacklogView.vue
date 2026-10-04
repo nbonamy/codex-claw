@@ -4,7 +4,7 @@
       <nav>
         <BacklogSourceSelector class="cockpit-view__provider" size="small" full-width :provider="workProvider ?? 'github'" :providers="workProviders ?? []" :show-source="false" @select-provider="emit('select-work-provider', $event)" />
         <div class="cockpit-view__navigation-section">
-          <strong>{{ $t(workProvider === 'linear' ? 'backlogSource.sources' : 'surface.cockpitView.repositories') }}</strong>
+          <strong>{{ $t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.sources' : 'surface.cockpitView.repositories') }}</strong>
           <el-dropdown
             placement="bottom-end"
             trigger="click"
@@ -31,8 +31,8 @@
           <input
             v-model="repositoryFilter"
             type="search"
-            :placeholder="$t(workProvider === 'linear' ? 'backlogSource.filterSources' : 'surface.cockpitView.filterRepositories')"
-            :aria-label="$t(workProvider === 'linear' ? 'backlogSource.filterSources' : 'surface.cockpitView.filterRepositories')"
+            :placeholder="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.filterSources' : 'surface.cockpitView.filterRepositories')"
+            :aria-label="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.filterSources' : 'surface.cockpitView.filterRepositories')"
           />
         </label>
         <div v-if="workBacklog" class="cockpit-view__repositories">
@@ -55,8 +55,8 @@
               :href="repository.url"
               target="_blank"
               rel="noreferrer"
-              :aria-label="$t(workProvider === 'linear' ? 'backlogSource.openSource' : 'dynamic.cockpit.openRepository', { repository: repository.name })"
-              :title="$t(workProvider === 'linear' ? 'backlogSource.openSource' : 'dynamic.cockpit.openRepository', { repository: repository.name })"
+              :aria-label="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.openSource' : 'dynamic.cockpit.openRepository', { repository: repository.name })"
+              :title="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.openSource' : 'dynamic.cockpit.openRepository', { repository: repository.name })"
               @click.stop
             >
               <ExternalLinkIcon aria-hidden="true" />
@@ -100,6 +100,7 @@
         :page="workBacklog.page"
         :page-loading="workBacklog.pageLoading"
         :page-size="workBacklog.pageSize"
+        :has-next-page="workBacklog.hasNextPage"
         :repositories="workBacklog.repositories"
         :repository-icons="repositoryIcons"
         :search-query="searchQuery"
@@ -130,10 +131,11 @@
 </template>
 
 <script setup lang="ts">
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import { IconChevronDown, IconFolder, IconSearch } from '@tabler/icons-vue';
-import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkSource } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { ExternalLinkIcon } from '../shared/icons/app-icons';
 import CockpitWorkInbox from './CockpitWorkInbox.vue';
@@ -148,12 +150,13 @@ type CockpitWorkBacklog = {
   page?: number;
   pageLoading?: boolean;
   pageSize?: number;
-  repositories: WorkRepository[];
+  repositories: WorkSource[];
   selectedAssigneeLogin?: string | null;
   selectedRepositoryId: string | null;
   selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   totalItems?: number;
+  hasNextPage?: boolean;
 };
 
 type WorkItemAssignmentIntent = { item: WorkItem; teamId?: string };
@@ -253,7 +256,7 @@ function selectSummaryMetric(metric: SummaryMetric): void {
   activeSummaryFilter.value = metric.filter;
 }
 
-function repositoryActivityAt(repository: WorkRepository): string {
+function repositoryActivityAt(repository: WorkSource): string {
   return repository.workItemsUpdatedAt ?? '';
 }
 

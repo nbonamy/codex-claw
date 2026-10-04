@@ -63,7 +63,7 @@ describe('snapshot guards', () => {
       { name: 'subagent operation', mutate: (snapshot) => { snapshot.subagentTrees.root!.operations.operation!.lifecycle = 'pending' as never; } },
       { name: 'subagent activity', mutate: (snapshot) => { snapshot.subagentTrees.root!.activities.activity!.kind = 'waiting' as never; } },
       { name: 'work backlog connection', mutate: (snapshot) => { snapshot.workBacklog.connections[0]!.status = 'ready' as never; } },
-      { name: 'work backlog provider configuration', mutate: (snapshot) => { snapshot.workBacklog.providerConfigurations.github!.repositoryId = 42 as never; } },
+      { name: 'work backlog provider configuration', mutate: (snapshot) => { snapshot.workBacklog.providerConfigurations.github!.sourceId = 42 as never; } },
       { name: 'work backlog provider settings', mutate: (snapshot) => { snapshot.workBacklog.providerSettings.github!.oauthClientId = 42 as never; } },
       { name: 'work backlog assignment', mutate: (snapshot) => { snapshot.workBacklog.assignments.item!.status = 'working' as never; } },
       { name: 'remote connection', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.status = 'connected' as never; } },
@@ -244,8 +244,8 @@ function completeSnapshot(): AppSnapshot {
     enabled: true,
     repositories: [{
       provider: 'github',
-      repositoryId: 'openai/codex-claw',
-      sourceRepositoryPath: '/repo',
+      sourceId: 'openai/codex-claw',
+      executionRepositoryPath: '/repo',
     }],
     teamId: snapshot.teams[0]!.id,
     selectionPrompt: 'Choose work',
@@ -448,7 +448,7 @@ function completeSnapshot(): AppSnapshot {
       connectedAt: '2026-09-04T00:00:00.000Z',
     }],
     providerConfigurations: {
-      github: { repositoryId: 'openai/codex-claw', assigneeLogin: 'octocat', tagName: 'codex' },
+      github: { sourceId: 'openai/codex-claw', assigneeLogin: 'octocat', tagName: 'codex' },
     },
     providerSettings: {
       github: { oauthClientId: 'client-id' },

@@ -18,14 +18,14 @@ describe('Linear issue to repository session', () => {
     const team = snapshot.teams[0]!;
     team.remoteConnectionId = 'remote-code';
     const createdAgent = { ...snapshot.agents[0]!, id: 'new-agent' };
-    const issue: WorkItem = { provider: 'linear', id: 'linear:issue', identifier: 'ENG-12', number: 12, repositoryId: 'linear:team',
-      repositoryFullName: 'Engineering', title: 'Fix login', body: 'Steps to reproduce', url: 'https://linear.app/acme/issue/ENG-12',
+    const issue: WorkItem = { provider: 'linear', id: 'linear:issue', identifier: 'ENG-12', number: 12, sourceId: 'linear:team',
+      sourceName: 'Engineering', title: 'Fix login', body: 'Steps to reproduce', url: 'https://linear.app/acme/issue/ENG-12',
       state: 'open', labels: [], createdAt: '', updatedAt: '' };
     const { api } = createClientApiMock();
     configureClawClient({ platform: 'desktop', api });
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected' }];
     api.getAutomationSnapshot.mockResolvedValue(snapshot);
-    api.listWorkRepositories.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', url: 'https://linear.app', isPrivate: true }]);
+    api.listWorkSources.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', url: 'https://linear.app', isPrivate: true }]);
     api.listWorkItems.mockResolvedValue([issue]);
     const createWorktree = vi.fn().mockResolvedValue({ name: 'fix/eng-12', path: '/remote/code-eng-12' });
     const createAgent = vi.fn().mockResolvedValue(createdAgent);

@@ -1,3 +1,4 @@
+import { workProviderKinds } from './work-providers';
 import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type ModelFavorite, type SavedPromptDraft, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
 import { repositoryIconKeyForRemote } from './git-remote';
 import { isApprovalPreset } from './approval-presets';
@@ -96,7 +97,7 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
     });
   }
 
-  for (const provider of ['github', 'linear'] as const) {
+  for (const provider of workProviderKinds) {
     if (!input.workProviders?.[provider]) continue;
     const settings = normalizeWorkProviderSettings({
       ...snapshot.workBacklog.providerSettings[provider],

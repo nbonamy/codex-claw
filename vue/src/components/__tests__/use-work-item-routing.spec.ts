@@ -34,7 +34,7 @@ describe('useWorkItemRouting', () => {
     expect(harness.assign).not.toHaveBeenCalled();
   });
   it('starts Linear work in the explicit repository on the selected host and preserves full issue identity', async () => {
-    const listedItem = item({ provider: 'linear', id: 'linear:eng-uuid', identifier: 'ENG-12', repositoryFullName: 'Engineering', repositoryId: 'linear:team' });
+    const listedItem = item({ provider: 'linear', id: 'linear:eng-uuid', identifier: 'ENG-12', sourceName: 'Engineering', sourceId: 'linear:team' });
     const harness = createHarness({ item: listedItem, remoteConnectionId: 'remote-dev' });
     await harness.routing.startMany({ action: 'fix', items: [listedItem], teamId: harness.teamId, repository: { name: 'codex-claw', path: '/workspace/codex-claw', worktrees: [] } });
     expect(harness.createWorktree).toHaveBeenCalledWith({ repoPath: '/workspace/codex-claw', branchName: 'fix/eng-12', remoteConnectionId: 'remote-dev' });
@@ -66,7 +66,7 @@ describe('useWorkItemRouting', () => {
 
     const result = await harness.routing.createIsolatedAgent(listedItem, harness.teamId);
 
-    expect(harness.loadItems).toHaveBeenCalledWith('github', listedItem.repositoryId, {
+    expect(harness.loadItems).toHaveBeenCalledWith('github', listedItem.sourceId, {
       kind: 'pullRequest',
       state: 'all',
     });
@@ -133,6 +133,7 @@ function createHarness(input: {
   const snapshot = createInitialSnapshot();
   const team = snapshot.teams[0]!;
   const agent = snapshot.agents[0]!;
+  agent.workspace = { kind: 'git', folder: '/workspace/codex-claw', repositoryName: 'codex-claw', repositoryRoot: '/workspace/codex-claw', primaryWorktreeRoot: '/workspace/codex-claw', branch: 'main', isLinkedWorktree: false, updatedAt: 'now' };
   const listedItem = input.item ?? item();
   if (input.remoteConnectionId) team.remoteConnectionId = input.remoteConnectionId;
   if (input.assignedToCurrentAgent) {
@@ -224,8 +225,8 @@ function item(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw#12',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number: 12,
     title: 'Fix cockpit drag target',
     url: 'https://github.com/nbonamy/codex-claw/issues/12',

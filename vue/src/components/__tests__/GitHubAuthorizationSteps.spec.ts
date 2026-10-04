@@ -1,8 +1,8 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import GitHubAuthorizationSteps from '../GitHubAuthorizationSteps.vue';
+import WorkAuthorizationSteps from '../WorkAuthorizationSteps.vue';
 
-describe('GitHubAuthorizationSteps', () => {
+describe('WorkAuthorizationSteps', () => {
   it('copies the device code and opens GitHub through its host', async () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -10,7 +10,7 @@ describe('GitHubAuthorizationSteps', () => {
       configurable: true,
       value: { writeText },
     });
-    const wrapper = mount(GitHubAuthorizationSteps, {
+    const wrapper = mount(WorkAuthorizationSteps, {
       props: {
         authorization: {
           provider: 'github',

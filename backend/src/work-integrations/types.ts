@@ -1,4 +1,4 @@
-import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
 import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 
 export type WorkProviderDeviceAuthorization = WorkProviderAuthorization & {
@@ -35,7 +35,7 @@ export interface WorkProviderDriver {
   pollAuthorization(deviceCode: string): Promise<WorkProviderDeviceTokenResult>;
   refreshToken?(token: WorkProviderToken): Promise<WorkProviderToken>;
   currentAccountLabel(token: WorkProviderToken): Promise<string>;
-  listRepositories(token: WorkProviderToken): Promise<WorkRepository[]>;
+  listSources(token: WorkProviderToken): Promise<WorkSource[]>;
   listGlobalItems(token: WorkProviderToken, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
   listItems(token: WorkProviderToken, repositoryId: string, query?: WorkItemQuery): Promise<WorkItem[]>;
   listAssignedItems?(token: WorkProviderToken): Promise<WorkItem[]>;

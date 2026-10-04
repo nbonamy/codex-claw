@@ -20,7 +20,7 @@ export function automationSelectionPrompt(automation: Automation, candidates: Wo
     '',
     'Backlog sources and execution repositories in scope:',
     ...automation.repositories.map((repository) => (
-      `- ${repository.repositoryId} (local clone: ${repository.sourceRepositoryPath})`
+      `- ${repository.sourceId} (local clone: ${repository.executionRepositoryPath})`
     )),
     '',
     'Selection criteria:',
@@ -60,7 +60,7 @@ function formatCandidate(item: WorkItem): string {
   const body = item.body?.trim();
   return [
     `- ID: ${workItemAssignmentKey(item)}`,
-    `  ${item.provider === 'linear' ? 'Backlog source' : 'Repository'}: ${item.repositoryFullName}`,
+    `  Backlog source: ${item.sourceName}`,
     `  ${details.join(' · ')}`,
     `  URL: ${item.url}`,
     ...(body ? [`  Body: ${truncate(body)}`] : []),

@@ -24,7 +24,7 @@
         <button type="button" :aria-label="t('common.back')" :disabled="preparationVisible" @click="selectedWorkItem = null">
           <ArrowLeftIcon aria-hidden="true" />
         </button>
-        <strong>{{ selectedWorkItem.identifier ?? t('repositoryBacklog.startWork', { number: selectedWorkItem.number }) }}</strong>
+        <strong>{{ t('repositoryBacklog.startWork', { identifier: workItemDisplayIdentifier(selectedWorkItem) }) }}</strong>
       </div>
     </template>
 
@@ -36,29 +36,29 @@
     </div>
 
     <BacklogSourceSelector
-      v-if="!selectedWorkItem && (purpose === 'missionIssue' || tab === 'issues') && linear.providers.value.length"
+      v-if="!selectedWorkItem && (purpose === 'missionIssue' || tab === 'issues') && backlog.providers.value.length"
       class="repository-session-source-dialog__sources"
       size="small"
-      :provider="linear.provider.value"
-      :providers="linear.providers.value"
-      :sources="linear.provider.value === 'linear' ? linear.sources.value : repositories"
-      :source-id="linear.provider.value === 'linear' ? linear.sourceId.value : selectedRepositoryId"
-      :show-source="purpose === 'missionIssue' || linear.provider.value === 'linear'"
-      @select-provider="linear.selectProvider"
+      :provider="backlog.provider.value"
+      :providers="backlog.providers.value"
+      :sources="backlog.sources.value"
+      :source-id="backlog.sourceId.value"
+      :show-source="purpose === 'missionIssue' || !workProviderDefinition(backlog.provider.value).repositoryBacked"
+      @select-provider="backlog.selectProvider"
       @select-source="selectSource"
     />
 
     <section class="repository-session-source-dialog__results" aria-live="polite">
-      <p v-if="purpose === 'missionIssue' && linear.provider.value === 'github' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
+      <p v-if="purpose === 'missionIssue' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
       <template v-if="selectedWorkItem">
-        <p v-if="selectedWorkItem.provider === 'linear'">{{ t('backlogSource.codeRepository') }}: {{ repositoryName }}</p>
-        <LinearIssueDetail v-if="selectedWorkItem.provider === 'linear'" :item="selectedWorkItem" />
+        <p v-if="!workProviderDefinition(selectedWorkItem.provider).repositoryBacked">{{ t('backlogSource.codeRepository') }}: {{ repositoryName }}</p>
+        <WorkItemDetail :item="selectedWorkItem" />
         <StagedOperationProgress
           v-if="preparationVisible && assignmentState !== 'error'"
           :state="assignmentState === 'success' ? 'success' : 'running'"
-          :eyebrow="t('repositoryBacklog.launchingFrom', { number: selectedWorkItem.number })"
+          :eyebrow="t('repositoryBacklog.launchingFrom', { identifier: workItemDisplayIdentifier(selectedWorkItem) })"
           :title="preparationTitle"
-          :complete-title="t('repositoryBacklog.workReady', { number: selectedWorkItem.number })"
+          :complete-title="t('repositoryBacklog.workReady', { identifier: workItemDisplayIdentifier(selectedWorkItem) })"
           :steps="preparationSteps"
           @complete="emit('preparation-complete')"
         />
@@ -75,10 +75,10 @@
         />
       </template>
       <p v-else-if="effectiveLoading" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.loading') }}</p>
-      <p v-else-if="tab === 'issues' && linear.provider.value === 'linear' && linear.error.value" role="alert">{{ linear.error.value }} <button type="button" @click="linear.refresh">{{ t('backlogSource.retry') }}</button></p>
-      <p v-else-if="purpose === 'session' && (tab !== 'issues' || linear.provider.value === 'github') && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error">{{ error }}</p>
-      <p v-else-if="purpose === 'missionIssue' && linear.provider.value === 'github' && repositories.length === 0" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.noRepositories') }}</p>
-      <p v-else-if="purpose === 'missionIssue' && linear.provider.value === 'github' && !selectedRepositoryId" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.chooseRepositoryToSeeIssues') }}</p>
+      <p v-else-if="tab === 'issues' && backlog.error.value" role="alert">{{ backlog.error.value }} <button type="button" @click="backlog.refresh">{{ t('backlogSource.retry') }}</button></p>
+      <p v-else-if="purpose === 'session' && tab !== 'issues' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error">{{ error }}</p>
+      <p v-else-if="purpose === 'missionIssue' && backlog.sources.value.length === 0" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.noRepositories') }}</p>
+      <p v-else-if="purpose === 'missionIssue' && !backlog.sourceId.value" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.chooseRepositoryToSeeIssues') }}</p>
       <template v-else-if="tab === 'branches' && purpose === 'session'">
         <h3>{{ t('repositories.sessionSource.recentBranches') }}</h3>
         <button v-for="branch in filteredBranches" :key="branch.name" class="repository-session-source-dialog__result" type="button" @click="emit('select-branch', branch)">
@@ -105,7 +105,7 @@
           <GitPullRequestIcon v-if="item.kind === 'pullRequest'" class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <IssueIcon v-else class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <span class="repository-session-source-dialog__result-copy">
-            <small>{{ item.identifier ?? `#${item.number}` }}</small>
+            <small>{{ workItemDisplayIdentifier(item) }}</small>
             <strong>{{ item.title }}</strong>
           </span>
           <ArrowRightIcon class="repository-session-source-dialog__arrow" aria-hidden="true" />
@@ -120,7 +120,8 @@
 </template>
 
 <script setup lang="ts">
-import { workItemBranchName } from '@codex-claw/core/work-item-prompts';
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workItemBranchName, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -129,10 +130,10 @@ import {
   IconGitPullRequest as GitPullRequestIcon,
   IconSearch as SearchIcon,
 } from '@tabler/icons-vue';
-import type { SourceBranch, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { SourceBranch, WorkItem, WorkSource } from '@codex-claw/core/contracts';
 import BacklogSourceSelector from './BacklogSourceSelector.vue';
-import LinearIssueDetail from './LinearIssueDetail.vue';
-import { useLinearBacklog } from './use-linear-backlog';
+import WorkItemDetail from './WorkItemDetail.vue';
+import { useWorkSourceBacklog } from './use-work-source-backlog';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import BackendSelector from './BackendSelector.vue';
@@ -154,7 +155,8 @@ const props = withDefaults(defineProps<{
   loading?: boolean;
   repositoryName: string;
   purpose?: 'session' | 'missionIssue';
-  repositories?: WorkRepository[];
+  repositories?: WorkSource[];
+  sourceFilter?: (source: WorkSource) => boolean;
   selectedRepositoryId?: string | null;
   sessions?: WorkItemAssignmentSession[];
   visible: boolean;
@@ -183,14 +185,18 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const linear = useLinearBacklog(() => props.location);
-const effectiveLoading = computed(() => linear.provider.value === 'linear' && tab.value === 'issues' ? linear.status.value === 'loading' : props.loading);
+const backlog = useWorkSourceBacklog({
+  location: () => props.location,
+  preferredSourceId: () => props.selectedRepositoryId ?? props.workItems[0]?.sourceId ?? null,
+  acceptsSource: source => props.sourceFilter?.(source) ?? true,
+  enabled: () => props.visible,
+});
+const effectiveLoading = computed(() => tab.value === 'issues' ? backlog.status.value === 'loading' : props.loading);
 function selectSource(id: string | null): void {
   selectedWorkItem.value = null;
   query.value = '';
   resetPreparation();
-  if (linear.provider.value === 'linear') void linear.selectSource(id);
-  else if (id) emit('select-repository', id);
+  void backlog.selectSource(id);
 }
 
 const searchInput = ref<HTMLInputElement | null>(null);
@@ -200,7 +206,7 @@ let selectionRevision = 0;
 watch([selectedWorkItem, () => props.visible, () => JSON.stringify(props.location)], () => { ++selectionRevision; }, { flush: 'sync' });
 const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
 const preparationVisible = ref(false);
-watch([linear.provider, () => linear.providers.value.length > 0], () => {
+watch([backlog.provider, () => backlog.providers.value.length > 0], () => {
   selectedWorkItem.value = null;
   query.value = '';
   resetPreparation();
@@ -216,7 +222,7 @@ const searchPlaceholder = computed(() => tab.value === 'branches'
   : t('repositories.sessionSource.searchWork'));
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase());
 const filteredBranches = computed(() => props.branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalizedQuery.value)));
-const filteredWorkItems = computed(() => (linear.provider.value === 'linear' && tab.value === 'issues' ? linear.items.value : props.workItems).filter((item) => {
+const filteredWorkItems = computed(() => (tab.value === 'issues' ? backlog.items.value : props.workItems).filter((item) => {
   if (props.purpose === 'missionIssue' && item.kind === 'pullRequest') return false;
   if (tab.value === 'pullRequests' && item.kind !== 'pullRequest') return false;
   if (tab.value === 'issues' && item.kind === 'pullRequest') return false;
@@ -248,17 +254,17 @@ const preparationSteps = computed(() => {
   ];
 });
 const preparationTitle = computed(() => {
-  const number = selectedWorkItem.value?.number ?? '';
+  const identifier = selectedWorkItem.value ? workItemDisplayIdentifier(selectedWorkItem.value) : '';
   return t(
     preparationSelection.value?.destination === 'existing'
       ? 'repositoryBacklog.prepareExistingSession'
       : 'repositoryBacklog.buildIsolatedHome',
-    { number },
+    { identifier },
   );
 });
 
 watch(() => props.visible, async (visible) => {
-  if (!visible) { void linear.selectProvider('github'); return; }
+  if (!visible) return;
   query.value = '';
   tab.value = props.purpose === 'missionIssue' ? 'issues' : 'branches';
   selectedWorkItem.value = null;
@@ -297,19 +303,19 @@ function startWorkItem(selection: WorkItemAssignmentSelection): void {
   if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
   preparationSelection.value = selection;
   preparationVisible.value = true;
-  emit('start-work-item', { ...selection, ...(selection.item.provider === 'linear' ? { isCurrent: selectionGuard(selection.item) } : {}) });
+  emit('start-work-item', { ...selection, isCurrent: selectionGuard(selection.item) });
 }
 
 function selectionGuard(item: WorkItem): () => boolean {
-  const provider = linear.provider.value;
-  const source = linear.sourceId.value;
+  const provider = backlog.provider.value;
+  const source = backlog.sourceId.value;
   const revision = selectionRevision;
-  return () => revision === selectionRevision && props.visible && selectedWorkItem.value?.id === item.id && linear.provider.value === provider && linear.sourceId.value === source;
+  return () => revision === selectionRevision && props.visible && selectedWorkItem.value?.id === item.id && backlog.provider.value === provider && backlog.sourceId.value === source;
 }
 
 function customWorkItem(selection: Omit<WorkItemAssignmentSelection, 'action'>): void {
   if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
-  emit('custom-work-item', { ...selection, ...(selection.item.provider === 'linear' ? { isCurrent: selectionGuard(selection.item) } : {}) });
+  emit('custom-work-item', { ...selection, isCurrent: selectionGuard(selection.item) });
 }
 
 function resetPreparation(clearSelection = true): void {

@@ -32,8 +32,8 @@ describe('AutomationEditor submission', () => {
     await wrapper.get('form').trigger('submit');
     const input = wrapper.emitted('submit')![0]![0];
     expect(input).toMatchObject({ repositories: [
-      { provider: 'linear', repositoryId: 'linear:eng', sourceRepositoryPath: '/Users/nbonamy/src/witsy' },
-      { provider: 'linear', repositoryId: 'linear:eng:login', sourceRepositoryPath: '/Users/nbonamy/src/codex-claw' },
+      { provider: 'linear', sourceId: 'linear:eng', executionRepositoryPath: '/Users/nbonamy/src/witsy' },
+      { provider: 'linear', sourceId: 'linear:eng:login', executionRepositoryPath: '/Users/nbonamy/src/codex-claw' },
     ], selectionPrompt: 'Ready bugs', assignmentPrompt: 'Fix and verify' });
     wrapper.unmount();
     const reopened = mountEditor({ connections, repositories: sources, automation: automation(input as Parameters<typeof automation>[0]) });
@@ -65,13 +65,13 @@ describe('AutomationEditor submission', () => {
           repositories: [
             {
               provider: 'github',
-              repositoryId: 'nbonamy/codex-claw',
-              sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+              sourceId: 'nbonamy/codex-claw',
+              executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
             },
             {
               provider: 'github',
-              repositoryId: 'nbonamy/witsy',
-              sourceRepositoryPath: '/Users/nbonamy/src/witsy',
+              sourceId: 'nbonamy/witsy',
+              executionRepositoryPath: '/Users/nbonamy/src/witsy',
             },
           ],
           teamId: 'team-codex-claw',
@@ -95,8 +95,8 @@ describe('AutomationEditor submission', () => {
       repositories: [
         {
           provider: 'github',
-          repositoryId: 'nbonamy/codex-claw',
-          sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+          sourceId: 'nbonamy/codex-claw',
+          executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
         },
       ],
       teamId: 'team-codex-claw',

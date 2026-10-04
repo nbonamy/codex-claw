@@ -225,7 +225,7 @@ const requestTimeoutByMethod = {
   [backendMethods.workProviderGlobalItemsList]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.workProviderAssignedItemsList]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.workProviderItemsList]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
-  [backendMethods.workProviderRepositoriesList]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.workProviderSourcesList]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
 } satisfies Record<BackendMethod, number>;
 
 export function backendRequestTimeoutMs(method: string): number {

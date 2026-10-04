@@ -16,7 +16,7 @@
     </header>
 
     <div class="automation-editor__body">
-      <BacklogSourceSelector :provider="provider" :providers="['github', 'linear']" :show-source="false" @select-provider="selectProvider" />
+      <BacklogSourceSelector :provider="provider" :providers="workProviderKinds" :show-source="false" @select-provider="selectProvider" />
       <div v-if="!providerConnected" class="automation-editor__notice">
         {{ $t('automationSources.connect', { provider: providerLabel }) }}
       </div>
@@ -36,18 +36,18 @@
           collapse-tags-tooltip
           :max-collapse-tags="3"
           :placeholder="sourceLabel"
-          :aria-label="provider === 'linear' ? sourceLabel : $t('surface.automationEditor.automationRepositories')"
+          :aria-label="!workProviderDefinition(provider).repositoryBacked ? sourceLabel : $t('surface.automationEditor.automationRepositories')"
           :loading="loading"
           :disabled="!providerConnected || loading || repositoryOptions.length === 0"
         >
           <el-option v-for="repository in repositoryOptions" :key="repository.value" :label="repository.label" :value="repository.value" />
         </el-select>
         <p v-if="providerConnected && !loading && repositoryOptions.length === 0" class="automation-editor__help">
-          {{ $t(provider === 'linear' ? 'automationSources.noSources' : 'surface.automationEditor.noConfiguredGitHubRepositories') }}
+          {{ $t(!workProviderDefinition(provider).repositoryBacked ? 'automationSources.noSources' : 'surface.automationEditor.noConfiguredGitHubRepositories') }}
         </p>
       </section>
 
-      <section v-for="source in selectedLinearSources" :key="source.value" class="automation-editor__section">
+      <section v-for="source in selectedWorkSources" :key="source.value" class="automation-editor__section">
         <label :for="`automation-code-${source.value}`">{{ $t('automationSources.codeRepositoryFor', { source: source.label }) }}</label>
         <el-select :id="`automation-code-${source.value}`" v-model="executionPaths[source.value]" filterable
           :aria-label="$t('automationSources.codeRepositoryFor', { source: source.label })" :placeholder="$t('backlogSource.chooseCodeRepository')">
@@ -123,14 +123,15 @@
 </template>
 
 <script setup lang="ts">
+import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
 import type {
   Automation,
-  AutomationRepositoryTarget,
+  AutomationWorkSourceTarget,
   CreateAutomationInput,
   SourceRepository,
   Team,
   WorkIntegrationConnection,
-  WorkRepository,
+  WorkSource,
   WorkProviderKind,
 } from '@codex-claw/core/contracts';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
@@ -149,7 +150,7 @@ const props = withDefaults(
     error?: string | null;
     automation?: Automation | null;
     mode: 'create' | 'edit';
-    repositories: WorkRepository[];
+    repositories: WorkSource[];
     sourceRepositories?: SourceRepository[];
     currentRepositoryPath?: string;
     teams: Team[];
@@ -192,11 +193,11 @@ const form = reactive({
 const selectionPromptBusy = ref(false);
 const engineChoices = useBackendChoices(() => form.teamId);
 const assignmentPromptBusy = ref(false);
-const provider = ref<WorkProviderKind>(props.automation?.repositories[0]?.provider ?? 'github');
+const provider = ref<WorkProviderKind>(props.automation?.repositories[0]?.provider ?? props.connections.find(connection => connection.status === 'connected')?.provider ?? workProviderKinds[0]!);
 const providerLabel = computed(() => workProviderLabel(provider.value));
-const sourceLabel = computed(() => translate(provider.value === 'linear' ? 'backlogSource.teamProject' : 'surface.automationEditor.repositories'));
+const sourceLabel = computed(() => translate(workProviderDefinition(provider.value).sourceLabel.key));
 const executionPaths = reactive<Record<string, string>>(Object.fromEntries(
-  (props.automation?.repositories ?? []).map(target => [repositoryValue(target), target.sourceRepositoryPath]),
+  (props.automation?.repositories ?? []).map(target => [repositoryValue(target), target.executionRepositoryPath]),
 ));
 
 const providerConnected = computed(() => props.connections.find(connection => connection.provider === provider.value)?.status === 'connected');
@@ -206,42 +207,42 @@ const repositoryOptions = computed(() => {
   );
   const options = props.repositories.flatMap((repository) => {
     if (repository.provider !== provider.value) return [];
-    if (repository.provider === 'linear') {
-      const target: AutomationRepositoryTarget = { provider: 'linear', repositoryId: repository.id, sourceRepositoryPath: executionPaths[repositoryValue({ provider: 'linear', repositoryId: repository.id })] ?? '' };
+    if (!workProviderDefinition(repository.provider).repositoryBacked) {
+      const target: AutomationWorkSourceTarget = { provider: repository.provider, sourceId: repository.id, executionRepositoryPath: executionPaths[repositoryValue({ provider: repository.provider, sourceId: repository.id })] ?? '' };
       return [{ value: repositoryValue(target), label: repository.fullName, target }];
     }
     const identity = canonicalGitRemoteIdentity(repository.url);
     const sourceRepository = identity ? sourceRepositoryByIdentity.get(identity) : undefined;
-    if (!sourceRepository || repository.provider !== 'github') return [];
-    const target: AutomationRepositoryTarget = {
-      provider: 'github',
-      repositoryId: repository.id,
-      sourceRepositoryPath: sourceRepository.path,
+    if (!sourceRepository || !workProviderDefinition(repository.provider).repositoryBacked) return [];
+    const target: AutomationWorkSourceTarget = {
+      provider: repository.provider,
+      sourceId: repository.id,
+      executionRepositoryPath: sourceRepository.path,
     };
     return [{ value: repositoryValue(target), label: repository.fullName, target }];
   });
 
   for (const repository of props.automation?.repositories ?? []) {
-    if (repository.provider !== provider.value || repository.provider === 'linear') continue;
+    if (repository.provider !== provider.value || !workProviderDefinition(repository.provider).repositoryBacked) continue;
     const value = repositoryValue(repository);
     if (!options.some((option) => option.value === value)) {
       options.push({
         value,
-        label: repository.repositoryId,
+        label: repository.sourceId,
         target: repository,
       });
     }
   }
   return options.sort((left, right) => left.label.localeCompare(right.label));
 });
-const selectedLinearSources = computed(() => provider.value === 'linear'
+const selectedWorkSources = computed(() => !workProviderDefinition(provider.value).repositoryBacked
   ? repositoryOptions.value.filter(option => form.repositoryIds.includes(option.value)) : []);
 const canSubmit = computed(
   () =>
     providerConnected.value && !props.loading && !props.error &&
     form.repositoryIds.length > 0 &&
     form.repositoryIds.every(value => repositoryOptions.value.some(option => option.value === value
-      && (provider.value !== 'linear' || props.sourceRepositories.some(repository => repository.path === option.target.sourceRepositoryPath)))) &&
+      && (workProviderDefinition(provider.value).repositoryBacked || props.sourceRepositories.some(repository => repository.path === option.target.executionRepositoryPath)))) &&
     Boolean(form.teamId) &&
     Boolean(form.backend && (engineChoices.value.includes(form.backend) || form.backend === props.automation?.backend || (props.automation && !props.automation.backend && form.backend === 'codex'))) &&
     Number.isFinite(form.intervalMinutes) &&
@@ -255,7 +256,7 @@ watch([provider, providerConnected], (_, previous) => {
 }, { immediate: true });
 
 watch(() => form.repositoryIds, values => {
-  if (provider.value !== 'linear' || !props.sourceRepositories.some(repository => repository.path === props.currentRepositoryPath)) return;
+  if (workProviderDefinition(provider.value).repositoryBacked || !props.sourceRepositories.some(repository => repository.path === props.currentRepositoryPath)) return;
   for (const value of values) executionPaths[value] ??= props.currentRepositoryPath;
 }, { deep: true });
 
@@ -277,7 +278,7 @@ function submit(): void {
   if (!canSubmit.value) return;
   const selectedValues = new Set(form.repositoryIds);
   emit('submit', {
-    ...(props.automation?.name ? { name: props.automation.name } : provider.value === 'linear' ? { name: selectedLinearSources.value.map(source => source.label).join(', ') } : {}),
+    ...(props.automation?.name ? { name: props.automation.name } : !workProviderDefinition(provider.value).repositoryBacked ? { name: selectedWorkSources.value.map(source => source.label).join(', ') } : {}),
     enabled: form.enabled,
     backend: form.backend,
     repositories: repositoryOptions.value.filter((option) => selectedValues.has(option.value)).map((option) => option.target),
@@ -288,8 +289,8 @@ function submit(): void {
   });
 }
 
-function repositoryValue(repository: Pick<AutomationRepositoryTarget, 'provider' | 'repositoryId'>): string {
-  return `${repository.provider}:${repository.repositoryId}`;
+function repositoryValue(repository: Pick<AutomationWorkSourceTarget, 'provider' | 'sourceId'>): string {
+  return `${repository.provider}:${repository.sourceId}`;
 }
 </script>
 

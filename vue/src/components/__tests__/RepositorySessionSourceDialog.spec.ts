@@ -4,12 +4,12 @@ import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { ElDialog } from 'element-plus';
 import { backendChoicesKey } from '../backend-selection';
 import { flushPromises, mount } from '@vue/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import '../../styles/base.css';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
 import { createClientApiMock } from '../../test/client-api-mock';
-import { configureClawClient } from '../../platform-api';
+import { codexClawApi, configureClawClient } from '../../platform-api';
 
 const branches: SourceBranch[] = [
   { name: 'main', isDefault: true, worktreePath: '/repos/project' },
@@ -19,8 +19,8 @@ const branches: SourceBranch[] = [
 const issue: WorkItem = {
   provider: 'github',
   id: 'github:nbonamy/codex-claw#24',
-  repositoryId: 'nbonamy/codex-claw',
-  repositoryFullName: 'nbonamy/codex-claw',
+  sourceId: 'nbonamy/codex-claw',
+  sourceName: 'nbonamy/codex-claw',
   number: 24,
   title: 'Repository-first sessions',
   url: 'https://github.com/nbonamy/codex-claw/issues/24',
@@ -33,11 +33,17 @@ const issue: WorkItem = {
 };
 
 describe('RepositorySessionSourceDialog', () => {
+  beforeEach(() => {
+    const { api } = createClientApiMock();
+    api.listWorkSources.mockResolvedValue([{ provider: 'github', id: issue.sourceId, name: 'codex-claw', fullName: issue.sourceName, url: 'https://github.com/nbonamy/codex-claw' }]);
+    api.listWorkItems.mockResolvedValue([issue]);
+    configureClawClient({ platform: 'desktop', api });
+  });
   it('selects a Linear issue in the Mission picker with its provider and source intact', async () => {
     const { api } = createClientApiMock();
     configureClawClient({ platform: 'desktop', api });
-    api.listWorkRepositories.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', isPrivate: true, url: 'https://linear.app' }]);
-    const selected: WorkItem = { ...issue, provider: 'linear', id: 'linear:uuid', identifier: 'ENG-24', repositoryId: 'linear:team', linearSource: { teamId: 'team', teamName: 'Engineering' } };
+    api.listWorkSources.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', isPrivate: true, url: 'https://linear.app' }]);
+    const selected: WorkItem = { ...issue, provider: 'linear', id: 'linear:uuid', identifier: 'ENG-24', sourceId: 'linear:team' };
     api.listWorkItems.mockResolvedValue([selected]);
     const wrapper = mount(RepositorySessionSourceDialog, {
       props: { visible: true, repositoryName: '', purpose: 'missionIssue' },
@@ -56,9 +62,9 @@ describe('RepositorySessionSourceDialog', () => {
     const { api } = createClientApiMock();
     configureClawClient({ platform: 'desktop', api });
     const source = (id: string) => ({ provider: 'linear' as const, id: `linear:${id}`, owner: id, name: id, fullName: id, url: 'https://linear.app', isPrivate: true });
-    api.listWorkRepositories.mockResolvedValue([source('eng'), source('ops')]);
+    api.listWorkSources.mockResolvedValue([source('eng'), source('ops')]);
     let resolveOld!: (items: WorkItem[]) => void;
-    const item = { ...issue, provider: 'linear' as const, id: 'linear:uuid', identifier: 'OPS-24', repositoryId: 'linear:ops', body: 'Issue details', nativeState: 'In progress' };
+    const item = { ...issue, provider: 'linear' as const, id: 'linear:uuid', identifier: 'OPS-24', sourceId: 'linear:ops', body: 'Issue details', nativeState: 'In progress' };
     api.listWorkItems.mockImplementation(async (_provider, id) => id === 'linear:eng' ? new Promise(resolve => { resolveOld = resolve; }) : [item]);
     const location = { kind: 'remote' as const, remoteConnectionId: 'remote-one' };
     const remoteSnapshot = createInitialSnapshot();
@@ -70,16 +76,16 @@ describe('RepositorySessionSourceDialog', () => {
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
     await flushPromises();
     expect(wrapper.get<HTMLSelectElement>('[aria-label="Team / project"] select').element.value).toBe('linear:eng');
-    expect(api.listWorkItems).toHaveBeenCalledWith('linear', 'linear:eng', location, { kind: 'issue', state: 'all' });
+    expect(api.listWorkItems).toHaveBeenCalledWith('linear', 'linear:eng', location, { kind: 'all', state: 'all' });
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:ops');
     await flushPromises();
-    resolveOld([{ ...item, identifier: 'ENG-24', repositoryId: 'linear:eng' }]);
+    resolveOld([{ ...item, identifier: 'ENG-24', sourceId: 'linear:eng' }]);
     await flushPromises();
     expect(wrapper.text()).toContain('OPS-24');
     expect(wrapper.text()).not.toContain('ENG-24');
-    expect(api.listWorkItems).toHaveBeenLastCalledWith('linear', 'linear:ops', location, { kind: 'issue', state: 'all' });
+    expect(api.listWorkItems).toHaveBeenLastCalledWith('linear', 'linear:ops', location, { kind: 'all', state: 'all' });
     await wrapper.get('.repository-session-source-dialog__result').trigger('click');
-    expect(wrapper.get('.linear-issue-detail').text()).toContain('Issue details');
+    expect(wrapper.get('.work-item-detail').text()).toContain('Issue details');
     expect(wrapper.get('input[aria-label="Branch"]').element).toHaveProperty('value', 'fix/ops-24');
     await wrapper.get('.work-item-assignment-picker .claw-button--tertiary').trigger('click');
     const selection = wrapper.emitted('custom-work-item')![0]![0] as { item: WorkItem; isCurrent: () => boolean };
@@ -92,7 +98,7 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.emitted('select-branch')).toEqual([[branches[0]]]);
     await wrapper.findAll('[role="tab"]')[2].trigger('click');
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('github');
-    api.listWorkRepositories.mockRejectedValueOnce(new Error('Linear unavailable'));
+    api.listWorkSources.mockRejectedValueOnce(new Error('Linear unavailable'));
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain('Linear unavailable');
@@ -128,6 +134,7 @@ describe('RepositorySessionSourceDialog', () => {
 
   it('keeps branch metadata compact and gives branch states distinct semantics', async () => {
     const wrapper = mount(RepositorySessionSourceDialog, {
+      global: { provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }] } },
       props: {
         visible: true,
         repositoryName: 'codex-claw',
@@ -152,6 +159,7 @@ describe('RepositorySessionSourceDialog', () => {
 
   it('uses Element Plus tabs to switch the searchable source type', async () => {
     const wrapper = mount(RepositorySessionSourceDialog, {
+      global: { provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }] } },
       props: {
         visible: true,
         repositoryName: 'codex-claw',
@@ -171,6 +179,7 @@ describe('RepositorySessionSourceDialog', () => {
   });
 
   it('reuses the source dialog as a cross-repository issue picker without branch or PR actions', async () => {
+    vi.mocked(codexClawApi!.listWorkSources).mockResolvedValue(['first', 'second'].map(id => ({ provider: 'github', id, name: id, fullName: id, url: 'https://github.com/' + id })));
     const pullRequest: WorkItem = { ...issue, id: 'github:nbonamy/codex-claw#25', number: 25, kind: 'pullRequest', title: 'Update UI' };
     const wrapper = mount(RepositorySessionSourceDialog, {
       props: {
@@ -196,7 +205,8 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.findAll('.repository-session-source-dialog__result')).toHaveLength(1);
     expect(wrapper.text()).not.toContain('Update UI');
     await wrapper.get('[aria-label="Repository"] select').setValue('second');
-    expect(wrapper.emitted('select-repository')).toStrictEqual([['second']]);
+    await flushPromises();
+    expect(wrapper.emitted('select-repository')).toBeUndefined();
     await wrapper.get('[aria-label="Search issues"]').setValue('not found');
     expect(wrapper.find('.repository-session-source-dialog__result').exists()).toBe(false);
     await wrapper.get('[aria-label="Search issues"]').setValue('Repository-first');
@@ -207,6 +217,7 @@ describe('RepositorySessionSourceDialog', () => {
 
   it('opens the shared assignment picker for repository work items', async () => {
     const wrapper = mount(RepositorySessionSourceDialog, {
+      global: { provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }] } },
       props: {
         visible: true,
         repositoryName: 'codex-claw',
@@ -230,12 +241,13 @@ describe('RepositorySessionSourceDialog', () => {
 
     await wrapper.get('.claw-button--primary').trigger('click');
     expect(wrapper.emitted('start-work-item')).toStrictEqual([[
-      { action: 'fix', destination: 'new', item: issue, backend: 'codex' },
+      { action: 'fix', destination: 'new', item: issue, backend: 'codex', isCurrent: expect.any(Function) },
     ]]);
   });
 
   it('paces isolated-session preparation before completing', async () => {
     const wrapper = mount(RepositorySessionSourceDialog, {
+      global: { provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }] } },
       props: {
         visible: true,
         repositoryName: 'codex-claw',

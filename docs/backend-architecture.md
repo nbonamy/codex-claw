@@ -580,7 +580,7 @@ names that describe backend ownership:
 - `git/status`, `git/diff`
 - `workProvider/connect`, `workProvider/authorization/poll`,
   `workProvider/connections/reload`, `workProvider/disconnect`,
-  `workProvider/repositories/list`, `workProvider/backlog/configure`,
+  `workProvider/sources/list`, `workProvider/backlog/configure`,
   `workProvider/items/list`
 - `settings/update`
 - `settings/codexResourceSharing/get`

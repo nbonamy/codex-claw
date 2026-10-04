@@ -11,7 +11,7 @@ describe('AutomationEditor behavior', () => {
     await wrapper.get('[aria-label="Team / project"]').trigger('click'); await flushPromises();
     [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(el => el.textContent === 'Engineering')!.click(); await flushPromises();
     await wrapper.get('form').trigger('submit');
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ repositories: [{ provider: 'linear', repositoryId: 'linear:eng', sourceRepositoryPath: sourceRepositories()[0]!.path }] });
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ repositories: [{ provider: 'linear', sourceId: 'linear:eng', executionRepositoryPath: sourceRepositories()[0]!.path }] });
     await wrapper.setProps({ sourceRepositories: [] });
     await wrapper.get('form').trigger('submit');
     expect(wrapper.emitted('submit')).toHaveLength(1);

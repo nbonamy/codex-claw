@@ -4,7 +4,7 @@ import { workItemAssignmentPrompt, workItemBranchName, workItemComposerPrompt, w
 
 describe('work item prompts', () => {
   it('keeps Linear identity, source and body in assigned and editable prompts', () => {
-    const item = workItem({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-42', repositoryId: 'linear:team', repositoryFullName: 'Engineering', url: 'https://linear.app/acme/issue/ENG-42', body: 'Steps to reproduce' });
+    const item = workItem({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-42', sourceId: 'linear:team', sourceName: 'Engineering', url: 'https://linear.app/acme/issue/ENG-42', body: 'Steps to reproduce' });
     const prompt = workItemAssignmentPrompt(item, { action: 'fix' });
     expect(prompt).toContain('Issue: ENG-42');
     expect(prompt).toContain('Backlog source: Engineering');
@@ -70,8 +70,8 @@ describe('work item prompts', () => {
   });
 
   it('creates an editable composer prompt without dispatch instructions', () => {
-    expect(workItemComposerPrompt(workItem())).toBe('Regarding GitHub issue #42 — Keep queued messages visible:\n\n');
-    expect(workItemComposerPrompt(workItem({ kind: 'pullRequest' }))).toBe('Regarding GitHub pull request #42 — Keep queued messages visible:\n\n');
+    expect(workItemComposerPrompt(workItem())).toContain('Regarding GitHub issue #42 — Keep queued messages visible:\n\n');
+    expect(workItemComposerPrompt(workItem({ kind: 'pullRequest' }))).toContain('Regarding GitHub pull request #42 — Keep queued messages visible:\n\n');
   });
 });
 
@@ -79,8 +79,8 @@ function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw#42',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number: 42,
     title: 'Keep queued messages visible',
     url: 'https://github.com/nbonamy/codex-claw/issues/42',

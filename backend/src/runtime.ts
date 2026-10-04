@@ -172,7 +172,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     saveSnapshot: () => saveBackendSnapshot(snapshot),
     selectWorkItems: async (automation, candidates) => {
       const backend = await server.requireConnectedEngine(automation.backend ?? 'codex');
-      const folder = automation.repositories[0]?.sourceRepositoryPath ?? '';
+      const folder = automation.repositories[0]?.executionRepositoryPath ?? '';
       const pickerAgent = snapshot.agents.find((agent) => agent.teamId === automation.teamId && agent.backend === backend)
         ?? createAgentFromInput({ name: null, folder, backend, teamId: automation.teamId });
       const driver = requireBackendDriver(backendDrivers, pickerAgent);

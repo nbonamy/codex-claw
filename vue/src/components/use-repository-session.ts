@@ -11,7 +11,7 @@ import type {
   SourceRepository,
   SourceWorktree,
   WorkItem,
-  WorkRepository,
+  WorkSource,
 } from '@codex-claw/core/contracts';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { computed, ref } from 'vue';
@@ -30,10 +30,10 @@ export function useRepositorySession(options: {
   ) => Promise<{ agent: Agent; item: WorkItem }>;
   createSourceWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   getSnapshot: () => AppSnapshot;
-  getWorkRepositories: () => WorkRepository[];
+  getWorkRepositories: () => WorkSource[];
   listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
   loadWorkItems: (repositoryId: string, location?: AutomationLocation) => Promise<WorkItem[]>;
-  loadWorkRepositories: (location?: AutomationLocation) => Promise<WorkRepository[]>;
+  loadWorkRepositories: (location?: AutomationLocation) => Promise<WorkSource[]>;
   notifyError: (message: string) => void;
   prefillWorkItemForAgent: (agentId: string, item: WorkItem) => void;
   startWorkItemInExistingSession: (
@@ -216,7 +216,7 @@ export function useRepositorySession(options: {
           selection.item,
           teamId,
           { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
-            ...(selection.item.provider === 'linear' ? { repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent } : {}) },
+            repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
         );
         if (!isCurrent()) return;
         await options.assignWorkItem({
@@ -252,7 +252,7 @@ export function useRepositorySession(options: {
           selection.item,
           teamId,
           { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
-            ...(selection.item.provider === 'linear' ? { repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent } : {}) },
+            repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
         );
         if (!isCurrent()) return;
         options.prefillWorkItemForAgent(agent.id, item);

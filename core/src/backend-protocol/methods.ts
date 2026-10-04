@@ -208,7 +208,7 @@ export const backendMethods = {
   workProviderGlobalItemsList: 'workProvider/globalItems/list',
   workProviderAssignedItemsList: 'workProvider/assignedItems/list',
   workProviderItemsList: 'workProvider/items/list',
-  workProviderRepositoriesList: 'workProvider/repositories/list',
+  workProviderSourcesList: 'workProvider/sources/list',
 } as const;
 
 export type BackendMethod = (typeof backendMethods)[keyof typeof backendMethods];

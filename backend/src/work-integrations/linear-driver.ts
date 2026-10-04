@@ -175,7 +175,7 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
     return viewer.organization?.name ? `${viewer.name} · ${viewer.organization.name}` : viewer.name;
   }
 
-  listRepositories = linearSources;
+  listSources = linearSources;
   listGlobalItems = linearGlobalItems;
   listItems = linearItems;
   listAssignedItems = linearAssignedItems;

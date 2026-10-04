@@ -196,25 +196,19 @@
     />
 
     <RepositoryBacklogPanel
-      v-if="tabs.includes('backlog') && prefillRepositoryWork && startRepositoryWork"
+      v-if="tabs.includes('backlog') && startRepositoryWork"
       v-show="activeTab === 'backlog'"
       :agent="agent"
       :agents="agents ?? []"
       :location="backlogLocation"
       :assignments="workAssignments"
       :branch="gitStatus?.branch"
-      :connection="githubConnection"
-      :error="backlogError"
-      :items="backlogItems"
       :repository-id="githubRepository ?? ''"
-      :prefill-action="prefillRepositoryWork"
       :clear-assignment-action="clearRepositoryWorkAssignment"
       :close-agent-action="closeRepositoryWorkAgent"
       :show-agent-action="showRepositoryWorkAgent"
-      :status="backlogStatus"
       :start-work-action="startRepositoryWork"
       :visible="visible && activeTab === 'backlog'"
-      @refresh="emit('refreshBacklog')"
     />
 
     <BrowserPanel
@@ -364,7 +358,7 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
-import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
 import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppContextMenu from '../shared/menu/AppContextMenu.vue';
@@ -437,14 +431,9 @@ const props = withDefaults(defineProps<{
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
   loadSubagentMessages?: (conversationId: string) => Promise<RendererMessage[]>;
-  backlogItems?: WorkItem[];
   backlogLocation?: import('@codex-claw/core/contracts').AutomationLocation;
-  backlogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  backlogError?: string | null;
   githubRepository?: string | null;
-  githubConnection?: WorkIntegrationConnection | null;
   workAssignments?: Record<string, WorkBacklogAssignment>;
-  prefillRepositoryWork?: (item: WorkItem) => void;
   clearRepositoryWorkAssignment?: (item: WorkItem) => void;
   closeRepositoryWorkAgent?: (agentId: string) => void;
   showRepositoryWorkAgent?: (agentId: string) => void;
@@ -461,11 +450,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   browserPanels: () => ({}),
   filesPaneWidth: 280,
-  backlogItems: () => [],
-  backlogStatus: 'notLoaded',
-  backlogError: null,
   githubRepository: null,
-  githubConnection: null,
   workAssignments: () => ({}),
   startCodeReview: async () => { throw new Error('Code review is not available.'); },
   decideCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
@@ -488,7 +473,6 @@ const emit = defineEmits<{
   openIn: [payload: { application: OpenInApplication; filePath: string }];
   openLink: [link: CodexConversationLink];
   refreshGitDiff: [target?: import('@codex-claw/core/contracts').AgentGitDiffTarget];
-  refreshBacklog: [];
   clarifyFinding: [payload: {
     sessionId: string;
     roundId: string;
@@ -797,7 +781,7 @@ function sourceFilePanel(tab: RightWorkspaceFileTab): SidePanelSourceState | nul
 
 function openTabFromMenu(tab: string): void {
   addMenuOpen.value = false;
-  if ((tab === 'backlog' && props.githubRepository) || tab === 'codeReview' || tab === 'visualize' || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
+  if (tab === 'backlog' || tab === 'codeReview' || tab === 'visualize' || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
     emit('openTab', tab);
   }
 }

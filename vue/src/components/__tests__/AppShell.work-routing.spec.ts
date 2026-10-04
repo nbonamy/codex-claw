@@ -7,7 +7,7 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, CreateAgentInput, SourceRepository, Team, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, CreateAgentInput, SourceRepository, Team, WorkItem, WorkSource } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setElectronTestClient } from '../../test/client';
@@ -83,7 +83,7 @@ describe('AppShell work routing', () => {
       path: '/Users/nbonamy/src/codex-claw',
       worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
     };
-    const githubRepository: WorkRepository = {
+    const githubRepository: WorkSource = {
       provider: 'github',
       id: 'nbonamy/codex-claw',
       owner: 'nbonamy',
@@ -94,8 +94,8 @@ describe('AppShell work routing', () => {
     };
     const issue = workItem({
       id: 'github:nbonamy/codex-claw#24',
-      repositoryId: githubRepository.id,
-      repositoryFullName: githubRepository.fullName,
+      sourceId: githubRepository.id,
+      sourceName: githubRepository.fullName,
       number: 24,
       title: 'Repository-first sessions',
     });
@@ -342,7 +342,7 @@ describe('AppShell work routing', () => {
   it('clones a GitHub repository before opening its contextual session picker', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
-    const githubRepository: WorkRepository = {
+    const githubRepository: WorkSource = {
       provider: 'github',
       id: 'nbonamy/new-project',
       owner: 'nbonamy',
@@ -388,7 +388,7 @@ describe('AppShell work routing', () => {
   it('discovers and clones GitHub repositories in the active remote team location', async () => {
     const snapshot = remoteEmptyTeamSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
-    const githubRepository: WorkRepository = {
+    const githubRepository: WorkSource = {
       provider: 'github',
       id: 'nbonamy/new-project',
       owner: 'nbonamy',
@@ -443,7 +443,7 @@ describe('AppShell work routing', () => {
   it('opens an existing checkout only when its remote matches the selected GitHub repository', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected', accountLabel: 'nbonamy' }];
-    const githubRepository: WorkRepository = {
+    const githubRepository: WorkSource = {
       provider: 'github',
       id: 'nbonamy/existing-project',
       owner: 'nbonamy',
@@ -515,7 +515,7 @@ describe('AppShell work routing', () => {
     expect(configureWorkBacklog).toHaveBeenNthCalledWith(1, {
       provider: 'github',
       configuration: {
-        repositoryId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
         assigneeLogin: null,
         tagName: null,
       },
@@ -523,7 +523,7 @@ describe('AppShell work routing', () => {
     expect(configureWorkBacklog).toHaveBeenNthCalledWith(2, {
       provider: 'github',
       configuration: {
-        repositoryId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
         assigneeLogin: 'nbonamy',
         tagName: null,
       },
@@ -531,7 +531,7 @@ describe('AppShell work routing', () => {
     expect(configureWorkBacklog).toHaveBeenNthCalledWith(3, {
       provider: 'github',
       configuration: {
-        repositoryId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
         assigneeLogin: 'nbonamy',
         tagName: 'bug',
       },

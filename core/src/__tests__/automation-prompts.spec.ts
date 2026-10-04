@@ -5,8 +5,8 @@ import { automationSelectionPrompt, parseAutomationSelection } from '../automati
 describe('automation prompts', () => {
   it('gives the picker native Linear identifiers and a separate execution repository', () => {
     const config = automation();
-    config.repositories = [{ provider: 'linear', repositoryId: 'linear:eng:project', sourceRepositoryPath: '/code' }];
-    const prompt = automationSelectionPrompt(config, [{ ...workItem(12), provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12', repositoryFullName: 'Engineering' }]);
+    config.repositories = [{ provider: 'linear', sourceId: 'linear:eng:project', executionRepositoryPath: '/code' }];
+    const prompt = automationSelectionPrompt(config, [{ ...workItem(12), provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12', sourceName: 'Engineering' }]);
     expect(prompt).toContain('linear:eng:project');
     expect(prompt).toContain('/code');
     expect(prompt).toContain('ENG-12');
@@ -47,8 +47,8 @@ function automation(): Automation {
     name: 'Ready bugs',
     enabled: true,
     repositories: [
-      { provider: 'github', repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/src/codex-claw' },
-      { provider: 'github', repositoryId: 'nbonamy/witsy', sourceRepositoryPath: '/src/witsy' },
+      { provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/src/codex-claw' },
+      { provider: 'github', sourceId: 'nbonamy/witsy', executionRepositoryPath: '/src/witsy' },
     ],
     teamId: 'team-codex-claw',
     selectionPrompt: 'Only bugs labeled ready',
@@ -64,8 +64,8 @@ function workItem(number: number, repositoryId = 'nbonamy/codex-claw'): WorkItem
   return {
     provider: 'github',
     id: `${repositoryId}#${number}`,
-    repositoryId,
-    repositoryFullName: repositoryId,
+    sourceId: repositoryId,
+    sourceName: repositoryId,
     number,
     title: `Issue ${number}`,
     url: `https://github.com/${repositoryId}/issues/${number}`,

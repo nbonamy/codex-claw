@@ -1,4 +1,4 @@
-import type { GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkRepository } from '@codex-claw/core/contracts';
+import type { GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkSource } from '@codex-claw/core/contracts';
 import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 
 type RecordValue = Record<string, unknown>;
@@ -38,23 +38,23 @@ async function collect(load: (after: string | null) => Promise<unknown>): Promis
   }
 }
 
-export async function linearSources(token: WorkProviderToken): Promise<WorkRepository[]> {
+export async function linearSources(token: WorkProviderToken): Promise<WorkSource[]> {
   const teams = await collect(async after => (await request(token, `query($after: String) { teams(first: 100, after: $after) { nodes { id name key organization { urlKey } } ${pageFields} } }`, { after })).teams);
-  const sources: WorkRepository[] = [];
+  const sources: WorkSource[] = [];
   for (const team of teams) {
     const teamId = string(team.id);
     const teamName = string(team.name);
-    const source: WorkRepository = {
+    const source: WorkSource = {
       provider: 'linear', id: `linear:${teamId}`, name: teamName, fullName: teamName,
       owner: string(team.key), url: `https://linear.app/${encodeURIComponent(string(record(team.organization).urlKey))}/team/${encodeURIComponent(String(team.key))}/all`, isPrivate: true,
-      linearSource: { teamId, teamName },
+
     };
     sources.push(source);
     const projects = await collect(async after => record((await request(token, `query($teamId: String!, $after: String) { team(id: $teamId) { projects(first: 100, after: $after) { nodes { id name url } ${pageFields} } } }`, { teamId, after })).team).projects);
     for (const project of projects) {
       const projectId = string(project.id);
       const projectName = string(project.name);
-      sources.push({ ...source, id: `${source.id}:${projectId}`, name: `${teamName} / ${projectName}`, fullName: `${teamName} / ${projectName}`, url: string(project.url), linearSource: { teamId, teamName, projectId, projectName } });
+      sources.push({ ...source, id: `${source.id}:${projectId}`, name: `${teamName} / ${projectName}`, fullName: `${teamName} / ${projectName}`, url: string(project.url) });
     }
   }
   return sources;
@@ -64,8 +64,8 @@ const issueFields = `id identifier number title description url createdAt update
   state { name type } team { id name } project { id name }
   creator { name } assignee { id name } labels(first: 50) { nodes { name color } ${pageFields} }`;
 
-async function issues(token: WorkProviderToken, sourceId: string | undefined, query: WorkItemQuery, assigned = false): Promise<WorkItem[]> {
-  if (query.kind === 'pullRequest') return [];
+async function issues(token: WorkProviderToken, sourceId: string | undefined, query: GlobalWorkItemQuery, assigned = false, paged = false): Promise<WorkItemPage> {
+  if (query.kind === 'pullRequest') return { items: [] };
   const viewerId = string(record((await request(token, '{ viewer { id } }')).viewer).id);
   const filter: RecordValue = {};
   if (sourceId) {
@@ -78,12 +78,23 @@ async function issues(token: WorkProviderToken, sourceId: string | undefined, qu
   }
   if (assigned) filter.assignee = { id: { eq: viewerId } };
   if (query.state !== 'all') filter.state = { type: { [query.state === 'closed' ? 'in' : 'nin']: ['completed', 'canceled'] } };
-  const values = await collect(async after => (await request(token, `query($after: String, $filter: IssueFilter) { issues(first: 50, after: $after, filter: $filter, orderBy: updatedAt) { nodes { ${issueFields} } ${pageFields} } }`, { after, filter })).issues);
-  return Promise.all(values.map(async (value): Promise<WorkItem> => {
+  const load = async (after: string | null) => (await request(token, `query($after: String, $filter: IssueFilter, $first: Int!) { issues(first: $first, after: $after, filter: $filter, orderBy: updatedAt) { nodes { ${issueFields} } ${pageFields} } }`, { after, filter, first: Math.max(1, Math.min(100, Math.trunc(query.pageSize ?? 50))) })).issues;
+  let nextCursor: string | undefined;
+  let values: RecordValue[];
+  if (paged) {
+    const page = record(await load(query.cursor ?? null));
+    if (!Array.isArray(page.nodes)) throw new Error('Linear returned malformed results.');
+    values = page.nodes.map(record);
+    const info = record(page.pageInfo);
+    if (info.hasNextPage === true) {
+      nextCursor = string(info.endCursor);
+      if (nextCursor === query.cursor) throw new Error('Linear returned a repeated pagination cursor. Retry the request.');
+    } else if (info.hasNextPage !== false) throw new Error('Linear returned malformed pagination.');
+  } else values = await collect(load);
+  const items = await Promise.all(values.map(async (value): Promise<WorkItem> => {
     const id = string(value.id);
     const team = record(value.team);
     const state = record(value.state);
-    const project = value.project ? record(value.project) : null;
     const assignee = value.assignee ? record(value.assignee) : null;
     const initialLabels = record(value.labels);
     const labels = await collect(async after => after === null ? initialLabels : record((await request(token, `query($id: String!, $after: String) { issue(id: $id) { labels(first: 100, after: $after) { nodes { name color } ${pageFields} } } }`, { id, after })).issue).labels);
@@ -92,8 +103,8 @@ async function issues(token: WorkProviderToken, sourceId: string | undefined, qu
     if (!['triage', 'backlog', 'unstarted', 'started', 'completed', 'canceled'].includes(nativeType)) throw new Error('Linear returned an unknown workflow state.');
     return {
       provider: 'linear', id: `linear:${id}`, kind: 'issue', identifier: string(value.identifier), number: Number(value.number),
-      repositoryId: sourceId ?? `linear:${string(team.id)}`, repositoryFullName: string(team.name),
-      linearSource: { teamId: string(team.id), teamName: string(team.name), ...(project ? { projectId: string(project.id), projectName: string(project.name) } : {}) },
+      sourceId: sourceId ?? `linear:${string(team.id)}`, sourceName: string(team.name),
+
       title: string(value.title), body: value.description == null || value.description === '' ? '' : string(value.description), url: string(value.url),
       state: nativeType === 'completed' || nativeType === 'canceled' ? 'closed' : 'open', nativeState: string(state.name),
       ...(value.creator ? { authorName: string(record(value.creator).name) } : {}),
@@ -102,19 +113,15 @@ async function issues(token: WorkProviderToken, sourceId: string | undefined, qu
       createdAt: string(value.createdAt), updatedAt: string(value.updatedAt),
     };
   }));
+  return { items, ...(nextCursor ? { nextCursor } : {}) };
 }
 
-export function linearItems(token: WorkProviderToken, sourceId: string, query: WorkItemQuery = {}): Promise<WorkItem[]> {
-  return issues(token, sourceId, query);
+export async function linearItems(token: WorkProviderToken, sourceId: string, query: WorkItemQuery = {}): Promise<WorkItem[]> {
+  return (await issues(token, sourceId, query)).items;
 }
 export async function linearGlobalItems(token: WorkProviderToken, query: GlobalWorkItemQuery = {}): Promise<WorkItemPage> {
-  // Existing clients use numbered pages and exact totals. Traverse the filtered
-  // connection completely before slicing; never invent a count or truncate it.
-  const items = await issues(token, undefined, query, query.assignment === 'viewer');
-  const page = Math.max(1, Math.floor(query.page ?? 1));
-  const pageSize = Math.max(1, Math.min(100, Math.floor(query.pageSize ?? 25)));
-  return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, totalItems: items.length };
+  return issues(token, undefined, query, query.assignment === 'viewer', true);
 }
-export function linearAssignedItems(token: WorkProviderToken): Promise<WorkItem[]> {
-  return issues(token, undefined, {}, true);
+export async function linearAssignedItems(token: WorkProviderToken): Promise<WorkItem[]> {
+  return (await issues(token, undefined, {}, true)).items;
 }

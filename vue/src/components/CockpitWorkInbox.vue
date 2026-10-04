@@ -107,13 +107,13 @@
               class="cockpit-inbox__selection"
               :model-value="selectedItemIds.has(row.item.id)"
               :disabled="Boolean(row.assignment)"
-              :aria-label="row.assignment ? $t('dynamic.cockpit.assigned', { number: row.item.number }) : $t('dynamic.cockpit.select', { number: row.item.number })"
+              :aria-label="row.assignment ? $t('backlogSource.assignedItem', { identifier: workItemDisplayIdentifier(row.item) }) : $t('backlogSource.selectItem', { identifier: workItemDisplayIdentifier(row.item) })"
               @click.stop
               @change="toggleSelection(row)"
             />
             <span class="cockpit-inbox__repository">{{ repositoryName(row.item) }}</span>
             <span class="cockpit-inbox__number">
-              {{ row.item.kind === 'pullRequest' ? $t('surface.cockpitWorkInbox.pR') : '' }} {{ row.item.identifier ?? `#${row.item.number}` }}
+              {{ row.item.kind === 'pullRequest' ? $t('surface.cockpitWorkInbox.pR') : '' }} {{ workItemDisplayIdentifier(row.item) }}
             </span>
             <strong class="cockpit-inbox__title">{{ row.item.title }}</strong>
 
@@ -142,22 +142,21 @@
             <span class="cockpit-inbox__elapsed">{{ elapsed(row.activityAt) }}</span>
 
             <div class="cockpit-inbox__row-actions">
-              <el-tooltip :content="row.assignment ? $t('surface.cockpitWorkInbox.viewAgent') : $t('surface.cockpitWorkInbox.assignWork')" placement="top" :show-after="300">
+              <el-tooltip :content="row.assignment ? $t('surface.cockpitWorkInbox.viewAgent') : $t('backlogSource.viewItem', { identifier: workItemDisplayIdentifier(row.item) })" placement="top" :show-after="300">
                 <button
                   class="cockpit-inbox__row-action"
                   type="button"
-                  :aria-label="row.assignment ? $t('dynamic.cockpit.viewAgent', { number: row.item.number }) : $t('dynamic.cockpit.assign', { number: row.item.number })"
-                  @click.stop="selectRow(row)"
+                  :aria-label="row.assignment ? $t('backlogSource.viewAgent', { identifier: workItemDisplayIdentifier(row.item) }) : $t('backlogSource.viewItem', { identifier: workItemDisplayIdentifier(row.item) })"
+                  @click.stop="viewRow(row)"
                 >
-                  <EyeIcon v-if="row.assignment || row.item.provider === 'linear'" aria-hidden="true" />
-                  <PlusCircleIcon v-else aria-hidden="true" />
+                  <EyeIcon aria-hidden="true" />
                 </button>
               </el-tooltip>
-              <el-tooltip :content="$t('dynamic.cockpit.viewProvider', { number: row.item.number, provider: providerLabel })" placement="top" :show-after="300">
+              <el-tooltip :content="$t('backlogSource.viewProvider', { identifier: workItemDisplayIdentifier(row.item), provider: providerLabel })" placement="top" :show-after="300">
                 <button
                   class="cockpit-inbox__external-action"
                   type="button"
-                  :aria-label="$t('dynamic.cockpit.viewProvider', { number: row.item.number, provider: providerLabel })"
+                  :aria-label="$t('backlogSource.viewProvider', { identifier: workItemDisplayIdentifier(row.item), provider: providerLabel })"
                   @click.stop="openSource(row.item)"
                 >
                   <ExternalLinkIcon aria-hidden="true" />
@@ -170,11 +169,11 @@
     </div>
 
     <footer
-      v-if="!selectedRepositoryId && globalScope && items.length > 0"
+      v-if="!selectedRepositoryId && globalScope && (items.length > 0 || hasNextPage || page > 1)"
       class="cockpit-inbox__pagination"
       :aria-label="$t('surface.cockpitWorkInbox.workItemPagination')"
     >
-      <span>{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }} {{ $t('surface.cockpitWorkInbox.total') }}</span>
+      <span v-if="totalItems !== undefined">{{ totalItems }} {{ totalItems === 1 ? 'item' : 'items' }} {{ $t('surface.cockpitWorkInbox.total') }}</span>
       <span v-if="error" class="cockpit-inbox__pagination-error" role="alert">{{ error }}</span>
       <div class="cockpit-inbox__page-controls">
         <button
@@ -186,11 +185,11 @@
         >
           <IconChevronLeft aria-hidden="true" />
         </button>
-        <span>{{ $t('surface.cockpitWorkInbox.page') }} {{ page }} {{ $t('surface.cockpitWorkInbox.of') }} {{ totalPages }}</span>
+        <span>{{ $t('surface.cockpitWorkInbox.page') }} {{ page }}</span>
         <button
           class="cockpit-inbox__icon-button"
           type="button"
-          :disabled="pageLoading || page >= totalPages"
+          :disabled="pageLoading || !hasNextPage"
           :aria-label="$t('surface.cockpitWorkInbox.nextPage')"
           @click="emit('change-page', page + 1)"
         >
@@ -200,7 +199,7 @@
     </footer>
 
     <el-dialog :model-value="Boolean(detailItem)" class="claw-dialog" @update:model-value="detailItem = null">
-      <LinearIssueDetail v-if="detailItem" :item="detailItem" />
+      <WorkItemDetail v-if="detailItem" :item="detailItem" />
     </el-dialog>
     <el-dialog
       class="claw-dialog cockpit-inbox__start-dialog"
@@ -224,7 +223,7 @@
           </el-select>
         </label>
         <p v-if="startWorkError" class="cockpit-inbox__start-error" role="alert">{{ startWorkError }}</p>
-        <label v-if="connection.provider === 'linear'">
+        <label v-if="!workProviderDefinition(connection.provider).repositoryBacked">
           {{ $t('backlogSource.codeRepository') }}
           <el-select v-model="selectedCodeRepositoryPath" :loading="codeRepositoriesLoading" :disabled="startingWork" :aria-label="$t('backlogSource.codeRepository')" :placeholder="$t('backlogSource.chooseCodeRepository')">
             <el-option v-for="repository in codeRepositories" :key="repository.path" :label="repository.name" :value="repository.path" />
@@ -245,15 +244,17 @@
 </template>
 
 <script setup lang="ts">
+import { workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
 import { translate } from '../i18n';
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
-import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkSource } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
-import LinearIssueDetail from './LinearIssueDetail.vue';
+import WorkItemDetail from './WorkItemDetail.vue';
 import AgentAvatar from './AgentAvatar.vue';
 import BackendSelector from './BackendSelector.vue';
 
@@ -273,7 +274,7 @@ const props = withDefaults(defineProps<{
   page?: number;
   pageLoading?: boolean;
   pageSize?: number;
-  repositories: WorkRepository[];
+  repositories: WorkSource[];
   repositoryIcons?: Record<string, string>;
   searchQuery?: string;
   selectedAssigneeLogin?: string | null;
@@ -283,10 +284,11 @@ const props = withDefaults(defineProps<{
   statusFilter?: SummaryFilter | null;
   teams: Team[];
   totalItems?: number;
+  hasNextPage?: boolean;
   defaultTeamId?: string | null;
   listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceRepository[]>;
   startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@codex-claw/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
-}>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, repositoryIcons: () => ({}), searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null, totalItems: 0 });
+}>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, repositoryIcons: () => ({}), searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null });
 
 const emit = defineEmits<{
   refresh: [repositoryId: string | null];
@@ -318,7 +320,7 @@ watch([startWorkDialogOpen, selectedTeamId], async () => {
   const revision = ++contextRevision;
   codeRepositories.value = [];
   selectedCodeRepositoryPath.value = '';
-  if (!startWorkDialogOpen.value || props.connection.provider !== 'linear') return;
+  if (!startWorkDialogOpen.value || workProviderDefinition(props.connection.provider).repositoryBacked) return;
   codeRepositoriesLoading.value = true;
   try {
     const team = props.teams.find(team => team.id === selectedTeamId.value);
@@ -335,7 +337,7 @@ watch(() => props.activeView, (view) => { localActiveView.value = view; });
 watch(() => props.searchQuery, (query) => { effectiveSearchQuery.value = query; });
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
 const sortedRepositories = computed(() => [...props.repositories].sort((a, b) => a.fullName.localeCompare(b.fullName)));
-const providerLabel = computed(() => props.connection.provider === 'github' ? translate('surface.cockpitWorkInbox.gitHub') : 'Linear');
+const providerLabel = computed(() => workProviderDefinition(props.connection.provider).label);
 const repositoryIcons = computed(() => props.repositoryIcons);
 const tagOptions = computed(() => [...new Set(props.items.flatMap((item) => item.labels.map((label) => label.name)))].sort());
 const assigneeOptions = computed(() => [...new Set(props.items.flatMap((item) => item.assignees ?? []))].sort());
@@ -347,10 +349,10 @@ const allRows = computed<InboxRow[]>(() => props.items.filter((item) => item.sta
 const filteredRows = computed(() => {
   const query = effectiveSearchQuery.value.trim().toLocaleLowerCase();
   return allRows.value.filter((row) => {
-    if (props.selectedRepositoryId && row.item.repositoryId !== props.selectedRepositoryId) return false;
+    if (props.selectedRepositoryId && row.item.sourceId !== props.selectedRepositoryId) return false;
     if (props.selectedTagName && !row.item.labels.some((label) => label.name === props.selectedTagName)) return false;
     if (props.selectedAssigneeLogin && !(row.item.assignees ?? []).includes(props.selectedAssigneeLogin)) return false;
-    if (query && !`${row.item.repositoryFullName} ${row.item.identifier ?? row.item.number} ${row.item.title}`.toLocaleLowerCase().includes(query)) return false;
+    if (query && !`${row.item.sourceName} ${row.item.identifier ?? row.item.number} ${row.item.title}`.toLocaleLowerCase().includes(query)) return false;
     return true;
   });
 });
@@ -372,13 +374,12 @@ const totalAssignmentCount = computed(() => props.globalScope
 const totalFocusCount = computed(() => props.globalScope
   ? scopedActiveAssignments.value.filter((assignment) => assignment.status === 'blocked' || assignment.status === 'readyForReview').length
   : filteredRows.value.filter((row) => isActiveAssignment(row.assignment) && (row.priority === 'attention' || row.priority === 'review')).length);
-const effectiveTotalItems = computed(() => props.globalScope ? props.totalItems : filteredRows.value.length);
+const effectiveTotalItems = computed(() => props.globalScope ? props.totalItems ?? filteredRows.value.length : filteredRows.value.length);
 const totalBacklogCount = computed(() => props.globalScope
   ? Math.max(0, effectiveTotalItems.value - scopedActiveAssignments.value.length)
   : filteredRows.value.filter((row) => !row.assignment).length);
 const viewContextKey = computed(() => `${props.connection.provider}:${props.selectedRepositoryId ?? `global:${props.globalScope ?? 'unselected'}`}`);
 watch(viewContextKey, () => { ++contextRevision; detailItem.value = null; startWorkDialogOpen.value = false; selectedItemIds.value = new Set(); }, { flush: 'sync' });
-const totalPages = computed(() => Math.max(1, Math.ceil(props.totalItems / props.pageSize)));
 const priorityOrder: Priority[] = ['attention', 'review', 'progress', 'ready'];
 const groupedRows = computed(() => priorityOrder.map((priority) => ({
   id: priority,
@@ -477,7 +478,7 @@ function priorityLabel(priority: Priority): string {
 }
 
 function repositoryName(item: WorkItem): string {
-  return item.repositoryFullName.split('/').at(-1) ?? item.repositoryFullName;
+  return item.sourceName.split('/').at(-1) ?? item.sourceName;
 }
 
 function elapsed(value: string): string {
@@ -527,7 +528,7 @@ async function startSelectedWork(action: 'investigate' | 'fix'): Promise<void> {
   const items = [...selectedItems.value];
   if (!selectedTeamId.value || !selectedBackend.value || items.length === 0) return;
   const repository = codeRepositories.value.find(repository => repository.path === selectedCodeRepositoryPath.value);
-  if (props.connection.provider === 'linear' && !repository) {
+  if (!workProviderDefinition(props.connection.provider).repositoryBacked && !repository) {
     startWorkError.value = translate('backlogSource.chooseCodeRepository');
     return;
   }
@@ -563,8 +564,11 @@ function updateSearchQuery(value: unknown): void {
 }
 function selectRow(row: InboxRow): void {
   if (row.agent) emit('select-assigned-agent', row.agent.id);
-  else if (row.item.provider === 'linear') detailItem.value = row.item;
   else toggleSelection(row);
+}
+function viewRow(row: InboxRow): void {
+  if (row.agent) emit('select-assigned-agent', row.agent.id);
+  else detailItem.value = row.item;
 }
 function openSource(item: WorkItem): void { window.open(item.url, '_blank', 'noreferrer'); }
 function normalized(value: unknown): string | null { return typeof value === 'string' && value ? value : null; }

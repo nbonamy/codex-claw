@@ -183,8 +183,8 @@ function automationInput(): CreateAutomationInput {
   };
 }
 
-function repository(repositoryId: string, sourceRepositoryPath: string) {
-  return { provider: 'github' as const, repositoryId, sourceRepositoryPath };
+function repository(repositoryId: string, executionRepositoryPath: string) {
+  return { provider: 'github' as const, sourceId: repositoryId, executionRepositoryPath };
 }
 
 function execution(
