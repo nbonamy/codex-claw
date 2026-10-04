@@ -9,7 +9,7 @@ A Mission turns a feature into a staged workflow with an approved brief, reposit
 Use a direct agent conversation for a focused fix or investigation. Use a Mission when you want explicit requirements and ticket approval before implementation, especially when the feature spans repositories. Mission workers are separate Claw agents; they are not simply native subagents of the conversation where you started.
 
 ::: info Upcoming release
-Linear issue selection, the review recovery improvements, and **Update from main** in Ship are implemented on main for the intended 0.26.0 release. They are not included in the published 0.25.2 app.
+Linear issue selection and **Update from main** in Ship are implemented on main for the intended 0.26.0 release. They are not included in the published 0.25.2 app.
 :::
 
 ## Prepare the team
@@ -65,8 +65,6 @@ The Mission Review stage assesses the implemented feature against the approved r
 2. Select the findings to fix, then choose **Fix N selected**. The affected repository workers apply and verify the fixes in the Mission worktrees. Unselected findings are skipped during this remediation batch.
 3. Read the recorded fix evidence. Once remediation finishes, use **Re-run review** if you want another assessment.
 4. When the result is acceptable, choose **Approve and continue** to reach Ship.
-
-Re-running review clears the previous review artifact while the new assessment runs. Wait for the fresh summary and findings before approving. If a review run fails, resolve the reported blocker and use **Continue mission** when offered to restart the stage; a stale summary is not evidence that the retry completed.
 
 This review is part of the Mission. The separate conversation command [`/review`](./code-review) has its own reviewer and rounds and does not approve a Mission stage.
 

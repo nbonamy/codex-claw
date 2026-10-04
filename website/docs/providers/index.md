@@ -76,9 +76,9 @@ Git branches, commits, pushes, and pull requests still belong to the code reposi
 
 When multiple engines are available, choose an engine when starting new work. With only one available engine, Claw can use it without showing a picker. Models, reasoning controls, and permission choices depend on that engine.
 
-An existing conversation stays with its provider. Connecting another engine does not convert it.
+An existing conversation stays with its provider. Connecting another engine does not convert it. To continue work with another engine, use [Hand off…](../features/conversations#hand-work-to-another-engine), which creates a replacement agent in the same workspace using a written handoff.
 
-**Disconnect** and **Enable engine** control whether Claw uses an engine; disconnecting preserves its CLI sign-in and chats. Claw prevents turning off the last active engine. Connect or enable another one first.
+**Enable engine** controls whether Claw uses an engine without signing out. **Disconnect** signs out of the account in the selected provider home; saved conversations remain. With **Use existing setup**, that sign-out also affects the shared terminal setup. Claw prevents turning off the last active engine with the enable toggle; connect or enable another one first.
 
 ## Change the conversation location later
 

@@ -77,6 +77,21 @@ Right-click an agent for session actions:
 
 For provider setup and capability differences, see [Codex](../providers/codex) and [Claude Code](../providers/claude-code).
 
+## Hand work to another engine
+
+Use **Hand off…** to continue a workspace task with a new agent, including switching between Codex and Claude Code. You can also choose the same engine with a different model.
+
+1. Wait until the agent is idle, then right-click it in the sidebar or Cockpit and choose **Hand off…**. The native **Agent** menu offers the same action.
+2. Choose the destination **Coding agent** and **Model**, or keep **Provider default**.
+3. Optionally add **Additional handoff instructions** describing what the current agent should emphasize in its note.
+4. Choose **Hand off**. The current agent writes the note, and Claw replaces it with a new agent that starts work from that note.
+
+The replacement keeps the same folder, branch, and uncommitted changes and uses the destination engine's default permissions. The source conversation remains available through **Source conversation** in the handoff dialog, alongside the **Saved handoff note**. This transfers a written summary rather than converting one provider's conversation history into another's.
+
+Finish queued prompts, pending requests, active goals, reviews, and running delegated work before handing off. Quick Chats and Mission workers cannot use this action. **Hide** closes the progress dialog while the handoff continues. If it fails or is interrupted, inspect the saved note and available conversations before trying again.
+
+For parallel work that keeps the original agent open and creates an isolated checkout, use [worktree delegation](../workflows/worktrees#delegate-implementation).
+
 ## Set a goal
 
 Use `/goal` to define an outcome the agent should keep working toward. Keep the condition concrete and inspect the resulting evidence before accepting it as done.

@@ -78,6 +78,6 @@ Claw supplies the `codex_claw` collaboration tools to Claude agents itself. Desp
 | A skill is missing | Check whether **Reuse my existing skills** is enabled and whether the skill belongs to Claude Code's existing home or the current project. |
 | A plugin or MCP server works outside Claw only | Check which home or project owns its configuration. Sharing skills does not copy those settings. |
 | Changing setup reports private skills already exist | Leave skill sharing disabled to preserve the separate home's skills. Claw does not overwrite them to enable reuse. |
-| The engine is connected but absent when starting work | Check **Enable engine**. **Disconnect** keeps authentication but turns the engine off in Claw. |
+| The engine is connected but absent when starting work | Check **Enable engine**. **Disconnect** signs out of the selected Claude setup; connect again if you used it. |
 
 When reporting a problem, include the Claw version, location shown in Settings, account type, error text, and whether the failure occurs during installation, sign-in, conversation creation, or sending a prompt. Continue with [Troubleshooting](../troubleshooting/).

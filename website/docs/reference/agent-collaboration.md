@@ -45,9 +45,9 @@ Give the new teammate a self-contained objective, scope, constraints, and valida
 Durable task tracking is implemented on main for the intended 0.26.0 release, not the published 0.25.2 app.
 :::
 
-An agent can create a teammate with a tracked task: an objective, a completion condition, and a saved result containing evidence and caveats. This is an optional delegation mode, not a separate Tasks panel or a property of every new agent.
+An agent can create a teammate with a tracked task: an objective, a completion condition, and a saved result containing evidence and caveats. This is an optional delegation mode; follow the work in the agents' conversations.
 
-Ask the parent agent to check its delegated tasks or wait for their results. Saved assignments and outcomes remain available after a restart, even if automatic result delivery was interrupted. Waiting with a timeout does not cancel the worker. A submitted result becomes complete only after the worker's submitting turn succeeds; an idle agent alone is not proof of completion.
+Ask the parent agent to check its delegated tasks or wait for their results. Saved assignments and outcomes remain available after a restart, even if automatic result delivery was interrupted. Waiting with a timeout does not cancel the worker. Review the saved evidence rather than treating an idle agent as proof of completion.
 
 Ask the parent or worker to cancel a tracked task when it should stop. Cancellation preserves the agent, conversation, worktree, and recorded results; it does not undo file changes. A completed task does not authorize merging, publication, or advancing a Mission stage. Review its evidence and diff before delivery.
 
