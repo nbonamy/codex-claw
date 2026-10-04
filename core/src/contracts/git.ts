@@ -127,7 +127,7 @@ export type AgentGitPushInput = { confirmed: boolean; target?: 'current' | 'merg
 
 export type AgentGitBranchInput = { name: string; createWorktree?: boolean; pullRequestNumber?: number; confirmed: boolean };
 
-export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: boolean };
+export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: boolean; discardChanges?: boolean; pullRequestCleanup?: boolean; confirmed: boolean };
 
 export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
 

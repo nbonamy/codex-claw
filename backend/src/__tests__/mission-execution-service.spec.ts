@@ -658,9 +658,12 @@ describe('mission execution', () => {
       artifacts: firstResult, summary: 'Foundation complete',
     })).resolves.toEqual({ success: true, status: 'accepted' });
     await h.service.waitForLaunches();
-    await h.service.agentFinished(implementationWorkerId!);
+    await h.service.agentFinished(implementationWorkerId!, 'foundation-turn');
     await h.service.waitForLaunches();
-    await h.service.agentFinished(implementationWorkerId!); // /compact completed before the queued ticket prompt starts.
+    // A repeated completion must not consume the compaction guard for the next ticket.
+    await h.service.agentFinished(implementationWorkerId!, 'foundation-turn');
+    await h.service.agentFinished(implementationWorkerId!, 'compaction-turn');
+    await h.service.agentFinished(implementationWorkerId!, 'compaction-turn');
 
     const implementationRuns = h.current().execution!.runs.filter(run => run.stage === 'implementation');
     expect(implementationRuns).toHaveLength(2);

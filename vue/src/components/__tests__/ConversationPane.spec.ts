@@ -9,6 +9,7 @@ import {
 import { computed, defineComponent, h, nextTick, provide, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, RendererMessage, SavedPromptDraft, ThreadPlan } from '@codex-claw/core/contracts';
+import { formatCollaborationMessageEnvelope } from '@codex-claw/core/collaboration-message-envelope';
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import type { VisualizationAnnotation } from '../use-visualization-annotations';
@@ -569,7 +570,7 @@ describe('ConversationPane', () => {
     expect(wrapper.find('[aria-label="Fork"]').exists()).toBe(true);
   });
 
-  it('renders teammate envelopes as labeled messages containing only their content', () => {
+  it.each([false, true])('renders teammate envelopes with hidden context: %s', (withContext) => {
     const wrapper = mountPane({
       controller: controllerFor([{
         id: 'message-from-sdk',
@@ -579,7 +580,10 @@ describe('ConversationPane', () => {
         createdAt: '2026-08-02T00:00:00.000Z',
         parts: [{
           type: 'text',
-          text: [
+          text: withContext ? formatCollaborationMessageEnvelope([{
+            senderName: 'codex-app-sdk', senderId: 'agent-sdk', sentAt: '2026-08-02T00:00:00.000Z',
+            content: '<context>\nFull merge handoff and verification details.\n</context>\n\nfeat/dedew merged',
+          }]) : [
             'You received a message from codex-app-sdk (agent-sdk).',
             '',
             'Message:',
@@ -593,7 +597,8 @@ describe('ConversationPane', () => {
     });
 
     expect(wrapper.get('.conversation-pane__message-header').text()).toBe('Message from codex-app-sdk');
-    expect(wrapper.get('.chat-user-text').text()).toBe('The SDK hooks are ready.');
+    expect(wrapper.get('.chat-user-text').text()).toBe(withContext ? 'feat/dedew merged' : 'The SDK hooks are ready.');
+    expect(wrapper.text()).not.toContain('Full merge handoff');
     expect(wrapper.text()).not.toContain('You received a message from');
     expect(wrapper.text()).not.toContain('Update your status');
   });

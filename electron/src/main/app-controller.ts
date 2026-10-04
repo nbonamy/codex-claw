@@ -262,6 +262,8 @@ export class AppController {
     ipc.handle(ipcChannels.previewAgentFile, async (_event, agentId: string, filePath: string) => {
       return this.previewAgentFile(agentId, filePath);
     });
+    ipc.handle(ipcChannels.readAgentFileChunk, (_event, agentId, filePath, offset) =>
+      this.requireBackendClient().request(backendMethods.agentFileChunkRead, { agentId, filePath, offset }));
 
     registerAgentGitIpcHandlers(ipc, () => this.requireBackendClient());
 

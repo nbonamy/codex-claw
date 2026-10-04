@@ -1234,6 +1234,7 @@ export class ClawBackendServer {
               folder,
               input.deleteRemoteBranch === true,
               finishedPullRequest?.headSha,
+              input.discardChanges === true,
             );
           }
           if (existingAgent.backendSession) {
@@ -1248,6 +1249,7 @@ export class ClawBackendServer {
               requireAgentFolder(existingAgent),
               input.deleteRemoteBranch === true,
               finishedPullRequest?.headSha,
+              input.discardChanges === true,
             );
           }
           this.codeReviews?.closeForAgentRemoval(existingAgent);
@@ -1265,15 +1267,20 @@ export class ClawBackendServer {
           folder: requireAgentFolder(agent),
         }));
       }
+      case backendMethods.agentFileChunkRead:
       case backendMethods.agentFilePreview: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
-        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentFilePreview, {
+        const chunk = message.method === backendMethods.agentFileChunkRead;
+        const offset = chunk ? { offset: params.offset } : {};
+        return this.routeAgentResultRequest(message.id, agentId, message.method, {
           agentId,
           filePath: requireString(params.filePath, 'filePath'),
-        }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.workspaceFilePreview, {
+          ...offset,
+        }, (agent) => this.handleAgentDriverRequest(agent, chunk ? backendMethods.workspaceFileChunkRead : backendMethods.workspaceFilePreview, {
           folder: agentFolder(agent),
           filePath: requireString(params.filePath, 'filePath'),
+          ...offset,
         }));
       }
       case backendMethods.agentVisualizeStart: {
@@ -2923,7 +2930,7 @@ export class ClawBackendServer {
     this.delegatedWorkReports.handleEvent(fullEvent);
     for (const listener of this.handoffListeners) listener(fullEvent);
     if (fullEvent.agentId && providerConversationEventView(fullEvent).type === 'turn.completed') {
-      void this.missionExecution.agentFinished(fullEvent.agentId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
+      void this.missionExecution.agentFinished(fullEvent.agentId, providerConversationEventView(fullEvent).turnId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
     }
     this.agentRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);
@@ -3271,7 +3278,7 @@ function requireAgentId(params: unknown): string {
 
 function requireAgentCloseRequest(params: unknown): {
   agentId: string;
-  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: true };
+  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; discardChanges?: boolean; pullRequestCleanup?: boolean; confirmed: true };
 } {
   const record = requireRecord(params);
   const agentId = requireString(record.agentId, 'agentId');
@@ -3285,6 +3292,12 @@ function requireAgentCloseRequest(params: unknown): {
   if (input.pullRequestCleanup !== undefined && typeof input.pullRequestCleanup !== 'boolean') {
     throw new Error('pullRequestCleanup must be a boolean.');
   }
+  if (input.discardChanges !== undefined && typeof input.discardChanges !== 'boolean') {
+    throw new Error('discardChanges must be a boolean.');
+  }
+  if (input.discardChanges === true && input.deleteWorktree !== true) {
+    throw new Error('Changes can only be discarded when deleting the worktree.');
+  }
   if (input.deleteRemoteBranch === true && input.deleteWorktree !== true) {
     throw new Error('Delete the worktree before deleting its remote branch.');
   }
@@ -3297,6 +3310,7 @@ function requireAgentCloseRequest(params: unknown): {
       deleteWorktree: input.deleteWorktree,
       ...(input.deleteRemoteBranch === undefined ? {} : { deleteRemoteBranch: input.deleteRemoteBranch }),
       ...(input.pullRequestCleanup === undefined ? {} : { pullRequestCleanup: input.pullRequestCleanup }),
+      ...(input.discardChanges === undefined ? {} : { discardChanges: input.discardChanges }),
       confirmed: true,
     },
   };

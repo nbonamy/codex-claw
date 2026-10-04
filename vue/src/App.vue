@@ -193,7 +193,7 @@
     :error="agentCloseError"
     @close="cancelAgentClose"
     @keep-worktree="confirmAgentClose(false)"
-    @delete-worktree="confirmAgentClose(true, $event)"
+    @delete-worktree="(deleteRemoteBranch, discardChanges) => confirmAgentClose(true, deleteRemoteBranch, discardChanges)"
   />
   <SessionCompressionDialog
     :visible="pendingSessionCompression !== null"
@@ -546,7 +546,7 @@ function cancelAgentClose(): void {
   agentCloseError.value = null;
 }
 
-async function confirmAgentClose(deleteWorktree: boolean, deleteRemoteBranch = false): Promise<void> {
+async function confirmAgentClose(deleteWorktree: boolean, deleteRemoteBranch = false, discardChanges = false): Promise<void> {
   const pending = pendingAgentClose.value;
   if (!pending || agentCloseBusy.value) return;
   agentCloseBusy.value = true;
@@ -555,6 +555,7 @@ async function confirmAgentClose(deleteWorktree: boolean, deleteRemoteBranch = f
     await closeAgentAction(pending.agent.id, deleteWorktree ? {
       deleteWorktree: true,
       deleteRemoteBranch,
+      discardChanges,
       confirmed: true,
     } : undefined);
     pendingAgentClose.value = null;

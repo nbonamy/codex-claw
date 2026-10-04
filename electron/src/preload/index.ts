@@ -49,6 +49,7 @@ const api: CodexClawApi = {
   listBackendSkills: (agentId: string) => ipc.invoke(ipcChannels.listBackendSkills, agentId),
   listAgentFiles: (agentId: string) => ipc.invoke(ipcChannels.listAgentFiles, agentId),
   previewAgentFile: (agentId: string, filePath: string) => ipc.invoke(ipcChannels.previewAgentFile, agentId, filePath),
+  readAgentFileChunk: (agentId, filePath, offset) => ipc.invoke(ipcChannels.readAgentFileChunk, agentId, filePath, offset),
   getAgentGitDiff: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => ipc.invoke(ipcChannels.getAgentGitDiff, agentId, target),
   getAgentGitWorkflow: (agentId: string) => ipc.invoke(ipcChannels.getAgentGitWorkflow, agentId),
   listAgentTasks: (agentId: string) => ipc.invoke(ipcChannels.listAgentTasks, agentId),

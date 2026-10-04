@@ -10,13 +10,13 @@ const SCENES = [
     detail: "Shape a feature in conversation before changing the repository.",
   },
   {
-    name: "proposal",
+    name: "command",
     start: 13,
     end: 18,
     chapter: "02 / 06",
     title: "Give the build its own space.",
     detail:
-      "Claw offers a dedicated worktree when the plan is ready to implement.",
+      "Submit /delegate here. Claw prepares the handoff and starts a worktree agent.",
   },
   {
     name: "provision",
@@ -124,18 +124,18 @@ function contentFor(scene, variant) {
         status: "Planning",
         label: "DELEGATE / DISCUSS",
       };
-    case "proposal":
+    case "command":
       return {
-        center: `${userMessage("Let’s do it. Keep recent sessions near the top, too.")}${agentMessage("I’ll build the switcher in a dedicated worktree so main stays clean. You can keep refining it with the implementation agent.")}${variant !== "accepted" ? `<div class="delegate-flag-label">NEXT ACTION · delegate_to_worktree</div><div class="delegate-proposal"><span class="delegate-proposal__icon">⑂</span><strong>Start implementation in a worktree?</strong><span id="delegate-accept" class="delegate-proposal__accept">✓</span><span class="delegate-proposal__dismiss">×</span></div>` : `<div class="delegate-tool"><b>✓</b> Delegation accepted · creating a worktree agent</div>`}`,
+        center: `${userMessage("That covers Quick Chats, recents, and keyboard navigation.")}${agentMessage("We have a clear feature shape. Ready to give the implementation its own worktree?")}${variant === "submitted" ? `${userMessage("/delegate")}${agentMessage("I’m preparing the handoff for a new agent in its own worktree. This conversation will stay open.")}` : ""}`,
         role: "Codex · main",
         name: "Feature discussion",
         path: "codex-claw / main",
-        status: "Delegating",
-        label: "DELEGATE / APPROVE",
+        status: variant === "submitted" ? "Preparing handoff" : "Planning",
+        label: "DELEGATE / COMMAND",
       };
     case "provision":
       return {
-        center: `${userMessage("Let’s do it. Keep recent sessions near the top, too.")}${agentMessage("I’m handing the feature brief to a new agent in feat/agent-switcher.")}${`<div class="delegate-tool"><b>●</b> Creating agent with a dedicated worktree</div>`}`,
+        center: `${userMessage("/delegate")}${agentMessage("I’m handing the feature brief to a new agent in feat/agent-switcher.")}${`<div class="delegate-tool"><b>●</b> Creating agent with a dedicated worktree</div>`}`,
         role: "Codex · main",
         name: "Feature discussion",
         path: "codex-claw / main",
@@ -187,7 +187,7 @@ function variantFor(scene, local) {
         : local < 8
           ? "iterating"
           : "prepared";
-  if (scene.name === "proposal") return local < 3.9 ? "offered" : "accepted";
+  if (scene.name === "command") return local < 3.65 ? "typing" : "submitted";
   if (scene.name === "provision")
     return `step${Math.min(4, Math.floor(local / 1.35))}`;
   if (scene.name === "work")
@@ -237,7 +237,10 @@ export function createFilm(document, browserWindow = document.defaultView) {
 
   function updatePointer(scene, local) {
     const schedule = {
-      proposal: [[1.8, 3.6, "#delegate-accept"]],
+      command: [
+        [0.15, 0.75, "#composer-text"],
+        [2.6, 3.55, "#composer-send"],
+      ],
       merge: [
         [0.2, 1.15, "#merge-menu-action"],
         [1.55, 2.4, "#cleanup-switch"],
@@ -360,7 +363,16 @@ export function createFilm(document, browserWindow = document.defaultView) {
           round.style.transform = `translateY(${-260 * distance}px) scale(${1 - 0.07 * Math.abs(distance)})`;
         });
     }
-    if (scene.name === "chat" && local < 3) {
+    composer.classList.toggle("is-command", scene.name === "command");
+    if (scene.name === "command" && local >= 0.75 && local < 3.65) {
+      const prompt = "/delegate";
+      $("#composer-text").textContent =
+        prompt.slice(
+          0,
+          Math.floor(clamp((local - 1) / 1.25, 0, 1) * prompt.length),
+        ) + "▍";
+      composer.classList.add("is-typing");
+    } else if (scene.name === "chat" && local < 3) {
       const prompt = "Could we add a faster way to jump between active agents?";
       $("#composer-text").textContent =
         prompt.slice(
@@ -382,6 +394,7 @@ export function createFilm(document, browserWindow = document.defaultView) {
       composer.classList.remove("is-typing");
     }
     const delegatedRow = $("#delegated-session");
+    delegatedRow.classList.toggle("is-removing", scene.name === "complete");
     if (scene.name === "work") {
       const arrival = ease(local / 1.0);
       delegatedRow.style.opacity = String(arrival);
@@ -391,14 +404,12 @@ export function createFilm(document, browserWindow = document.defaultView) {
       delegatedRow.style.removeProperty("padding-bottom");
     } else if (scene.name === "complete") {
       const leave = ease((local - 0.65) / 1.55);
-      delegatedRow.classList.add("is-removing");
       delegatedRow.style.opacity = String(1 - leave);
       delegatedRow.style.transform = `translateY(${-leave * 6}px)`;
       delegatedRow.style.maxHeight = `${Math.round((1 - leave) * 42)}px`;
       delegatedRow.style.paddingTop = `${Math.round((1 - leave) * 9)}px`;
       delegatedRow.style.paddingBottom = `${Math.round((1 - leave) * 9)}px`;
     } else {
-      delegatedRow.classList.remove("is-removing");
       delegatedRow.style.opacity = scene.name === "merge" ? "1" : "0";
       delegatedRow.style.transform = "none";
       delegatedRow.style.removeProperty("max-height");
