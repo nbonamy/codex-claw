@@ -9,6 +9,32 @@ import type { Agent, AgentBackend } from '@codex-claw/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
+  it('does not reveal engine icons solely because a selected Mission row retains focus', async () => {
+    const { createMission } = await import('@codex-claw/core/missions');
+    const { createInitialSnapshot } = await import('@codex-claw/core/snapshot-construction');
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, {
+      outcome: 'Add team billing', workflowType: 'shapeAndShipFeature',
+      teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id,
+    });
+    const wrapper = mount(AgentSidebar, {
+      attachTo: document.body,
+      props: { agents, missions: [mission], activeMissionId: mission.id, activeAgentId: null, teamName: 'Team' },
+      global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } },
+    });
+    const missionRow = wrapper.get<HTMLButtonElement>('[data-group-kind="missions"] .agent-sidebar__agent');
+    missionRow.element.focus();
+
+    expect(missionRow.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.element.matches(':hover')).toBe(false);
+    expect(document.activeElement).toBe(missionRow.element);
+    const engine = wrapper.get('.agent-sidebar__engine');
+    expect(getComputedStyle(engine.element).display).toBe('none');
+    const agentRow = engine.element.closest('.agent-sidebar__agent')!;
+    expect(getComputedStyle(agentRow).getPropertyValue('--agent-sidebar-engine-track')).toBe('');
+    wrapper.unmount();
+  });
+
   it('identifies each engine before status without taking space while hidden, including quick chats and input requests', async () => {
     const claude: Agent = { ...agents[1]!, backend: 'claude', backendDefaults: { kind: 'claude' }, sessionKind: 'quickChat', status: { type: 'awaitingInput' } };
     const enabled = ref<AgentBackend[]>(['codex', 'claude']);
