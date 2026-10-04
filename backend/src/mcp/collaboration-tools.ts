@@ -170,9 +170,10 @@ function registerCollaborationTools(
       createWorktree: z.boolean().optional().describe('If true, create a new worktree from repoPath before creating the agent.'),
       branchName: z.string().optional().describe('Branch name for the new worktree. Required when createWorktree is true.'),
       destinationPath: z.string().optional().describe('Optional destination path for the new worktree.'),
-      prompt: z.string().optional().describe('Optional initial instructions. When provided, Claw starts the new agent immediately and waits until the handoff is accepted.'),
+      prompt: z.string().optional().describe('Optional initial request shown to the user. Keep it concise and put detailed handoff instructions in instructions. Starts the agent and waits until the handoff is accepted.'),
+      instructions: z.string().optional().describe('Optional full handoff: context, decisions, constraints, and acceptance criteria. Requires prompt. Claw wraps this in <context> for the agent, hidden from the displayed request; do not include secrets.'),
     },
-  }, ({ name, backend, model, reasoningEffort, repoPath, createWorktree, branchName, destinationPath, prompt }) => loggedToolResult('create-agent', {
+  }, ({ name, backend, model, reasoningEffort, repoPath, createWorktree, branchName, destinationPath, prompt, instructions }) => loggedToolResult('create-agent', {
     agentId: callerAgentId,
     repoPath,
     createWorktree: createWorktree === true,
@@ -186,6 +187,7 @@ function registerCollaborationTools(
     branchName,
     destinationPath,
     prompt,
+    instructions,
   })));
 
   server.registerTool('display-markdown', {

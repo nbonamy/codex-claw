@@ -506,8 +506,13 @@ Input:
 - `model` and `reasoningEffort`: optional backend overrides. When omitted and
   the new agent uses the caller's backend, each value inherits from the caller;
   cross-backend creation uses that backend's defaults instead;
-- `prompt`: optional self-contained initial instructions. The tool stays
-  pending until the new agent accepts this prompt.
+- `prompt`: optional concise initial request shown to the user. The tool stays
+  pending until the new agent accepts this prompt;
+- `instructions`: optional full handoff, requiring a nonempty `prompt`. Claw
+  prepends these instructions inside `<context>` and leaves the visible request
+  outside it. Existing prompt-only calls are unchanged. This is presentation
+  separation, not secret storage or a separate system-instruction channel:
+  both parts remain in the provider transcript.
 
 `clawd` emits transient `agentCreation.progress` events around worktree
 creation, agent creation, and initial-prompt handoff. The renderer shows the

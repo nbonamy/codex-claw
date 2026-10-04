@@ -124,6 +124,7 @@ export type McpCreateAgentInput = {
   model?: string;
   name?: string;
   prompt?: string;
+  instructions?: string;
   reasoningEffort?: string;
   repoPath: string;
 };
@@ -494,6 +495,7 @@ export class ClawMcpAgentCoordinator {
     return this.onCreateAgent(agent, {
       name: input.name?.trim(),
       prompt: input.prompt?.trim() || undefined,
+      instructions: input.instructions?.trim() || undefined,
       backend: input.backend ?? agent.backend,
       model: input.model?.trim() || undefined,
       reasoningEffort: input.reasoningEffort?.trim() || undefined,

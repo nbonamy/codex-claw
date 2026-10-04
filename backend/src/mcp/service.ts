@@ -455,6 +455,10 @@ export class ClawMcpService {
     }
 
     const prompt = input.prompt?.trim() ?? '';
+    const instructions = input.instructions?.trim();
+    if (instructions && !prompt) {
+      return { success: false, message: 'prompt is required when instructions are provided' };
+    }
     const progressId = `agent-creation-${randomUUID()}`;
     const progress = {
       id: progressId,
@@ -517,7 +521,10 @@ export class ClawMcpService {
           type: 'agentCreation.progress',
           payload: { ...progress, state: 'running', phase: 'startingPrompt' },
         });
-        await this.startAgentWithPrompt(createdAgent, prompt);
+        const fullPrompt = instructions
+          ? `<context>\n${instructions.replace(/<\/context>/giu, '&lt;/context&gt;')}\n</context>\n\n${prompt}`
+          : prompt;
+        await this.startAgentWithPrompt(createdAgent, fullPrompt);
       }
 
       const createdAgentName = agentDisplayName(createdAgent);
