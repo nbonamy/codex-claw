@@ -1,14 +1,89 @@
 import { describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { AgentBackendDriver, BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
 import type { Agent } from '@codex-claw/core/contracts';
 import { BackendDriverRpc } from '../driver-rpc';
 import { ClawBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
-import type { ReviewToolHandlers } from '../review/review-tool-registry';
+import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
 
 describe('ClawBackendServer code review workflow', () => {
+  it.each(['reviewing', 'fixing'] as const)('resumes a persisted %s session after startup connection detection without replacing the open context', async status => {
+    const snapshot = createTestSnapshot();
+    snapshot.sourceFolder = { path: '/repo', initialized: true, recentRepoNames: [] };
+    const reviewer: Agent = {
+      id: 'reviewer', teamId: 'team-test', name: 'Review', folder: '/repo', backend: 'claude',
+      status: { type: 'idle' }, createdAt: 'now', updatedAt: 'now',
+      backendSession: { kind: 'claude', sessionId: 'saved-review-thread', transport: 'stdio' },
+      codeReview: {
+        id: 'saved-review', targetAgentId: 'reviewer', reviewerAgentId: 'reviewer',
+        scope: { type: 'uncommitted' }, threadMode: 'current', status,
+        activeRoundId: 'saved-round', createdAt: 'now', updatedAt: 'now',
+        rounds: [{
+          id: 'saved-round', number: 1, status: status === 'fixing' ? 'submitted' : 'reviewing', startedAt: 'now',
+          reviewerSession: { kind: 'claude', sessionId: 'saved-review-thread', transport: 'stdio' },
+          findings: [{
+            id: 'saved-finding', roundId: 'saved-round', priority: 'p1', title: 'Check ownership',
+            body: 'Authorize before writing.', decision: { state: 'selected', decidedAt: 'now' },
+            remediation: { state: 'fixing', startedAt: 'now' }, discussion: [],
+            createdAt: 'now', updatedAt: 'now',
+          }],
+        }],
+      },
+    };
+    snapshot.agents.push(reviewer);
+    snapshot.teams[0]!.agentIds.push(reviewer.id);
+    const registry = new ReviewToolRegistry();
+    const runCodeReview = vi.fn(async (_agent, input) => {
+      const contextId = new URL(input.reviewMcpServerUrl).searchParams.get('reviewContextId');
+      const context = registry.resolve(reviewer.id, contextId);
+      if (!context) throw new Error('Missing saved review context.');
+      if (status === 'fixing') {
+        await context.updateFinding({ findingId: 'saved-finding', status: 'fixed', evidence: 'Ownership verified.' });
+      } else {
+        await context.reportFinding({ priority: 'p1', title: 'Check ownership', body: 'Authorize before writing.' });
+      }
+      return { text: '', reviewerSession: input.reviewerSession };
+    });
+    const driver: AgentBackendDriver = {
+      backend: 'claude', getRuntimeStatus: () => ({ backend: 'claude', status: 'running' }),
+      getCapabilities: () => claudeBackendCapabilities,
+      authenticate: async () => ({ kind: 'claude', connected: true, state: { loggedIn: true } }),
+      runCodeReview, sendPrompt: vi.fn(), interrupt: vi.fn(), respondToAgentRequest: vi.fn(),
+      onEvent: () => () => undefined, close: vi.fn(),
+    };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
+    const server = new ClawBackendServer({
+      version: 'test', snapshot, saveSnapshot,
+      driverRpc: new BackendDriverRpc(new Map([['claude', driver]])),
+      providerSetup: { isChanging: () => false, list: () => [{ backend: 'claude', installed: true }] } as never,
+      codeReviewTools: {
+        createReviewToolContext: (agentId, sessionId, handlers) => {
+          const context = registry.create(agentId, sessionId, handlers);
+          return { id: context.id, url: `http://review.test/mcp?reviewContextId=${context.id}` };
+        },
+        closeReviewToolContext: id => registry.close(id),
+      },
+    });
+    try {
+      await server.initialize();
+      await vi.waitFor(() => expect(snapshot.agents[0]?.codeReview?.status).not.toBe(status));
+      expect(snapshot.agents[0]?.codeReview?.rounds[0]?.error).toBeUndefined();
+      expect(snapshot.agents[0]?.codeReview).toMatchObject({
+        id: 'saved-review', status: status === 'fixing' ? 'readyToFinish' : 'ready', rounds: [{
+          id: 'saved-round', status: status === 'fixing' ? 'completed' : 'ready',
+          reviewerSession: { kind: 'claude', sessionId: 'saved-review-thread' },
+          findings: [status === 'fixing'
+            ? { id: 'saved-finding', remediation: { state: 'fixed', evidence: 'Ownership verified.' } }
+            : { title: 'Check ownership', remediation: { state: 'notStarted' } }],
+        }],
+      });
+      expect(runCodeReview).toHaveBeenCalledTimes(1);
+      expect(saveSnapshot).toHaveBeenCalled();
+    } finally { await server.close(); }
+  });
+
   it('rejects malformed finding decisions at the backend protocol boundary', async () => {
     const server = new ClawBackendServer({
       version: 'test', snapshot: createTestSnapshot(),
