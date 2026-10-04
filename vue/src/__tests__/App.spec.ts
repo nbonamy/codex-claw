@@ -232,12 +232,13 @@ describe('App', () => {
     const dialog = wrapper.findComponent(AgentCloseDialog);
     expect(dialog.props('visible')).toBe(true);
 
-    dialog.vm.$emit('delete-worktree', true);
+    dialog.vm.$emit('delete-worktree', true, true);
     await flushPromises();
 
     expect(closeAgent).toHaveBeenCalledWith(snapshot.agents[0]!.id, {
       deleteWorktree: true,
       deleteRemoteBranch: true,
+      discardChanges: true,
       confirmed: true,
     });
   });

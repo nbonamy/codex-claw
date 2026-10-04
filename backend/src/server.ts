@@ -1218,6 +1218,7 @@ export class ClawBackendServer {
               folder,
               input.deleteRemoteBranch === true,
               finishedPullRequest?.headSha,
+              input.discardChanges === true,
             );
           }
           if (existingAgent.backendSession) {
@@ -1232,6 +1233,7 @@ export class ClawBackendServer {
               requireAgentFolder(existingAgent),
               input.deleteRemoteBranch === true,
               finishedPullRequest?.headSha,
+              input.discardChanges === true,
             );
           }
           this.codeReviews?.closeForAgentRemoval(existingAgent);
@@ -3246,7 +3248,7 @@ function requireAgentId(params: unknown): string {
 
 function requireAgentCloseRequest(params: unknown): {
   agentId: string;
-  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; pullRequestCleanup?: boolean; confirmed: true };
+  input?: { deleteWorktree: boolean; deleteRemoteBranch?: boolean; discardChanges?: boolean; pullRequestCleanup?: boolean; confirmed: true };
 } {
   const record = requireRecord(params);
   const agentId = requireString(record.agentId, 'agentId');
@@ -3260,6 +3262,12 @@ function requireAgentCloseRequest(params: unknown): {
   if (input.pullRequestCleanup !== undefined && typeof input.pullRequestCleanup !== 'boolean') {
     throw new Error('pullRequestCleanup must be a boolean.');
   }
+  if (input.discardChanges !== undefined && typeof input.discardChanges !== 'boolean') {
+    throw new Error('discardChanges must be a boolean.');
+  }
+  if (input.discardChanges === true && input.deleteWorktree !== true) {
+    throw new Error('Changes can only be discarded when deleting the worktree.');
+  }
   if (input.deleteRemoteBranch === true && input.deleteWorktree !== true) {
     throw new Error('Delete the worktree before deleting its remote branch.');
   }
@@ -3272,6 +3280,7 @@ function requireAgentCloseRequest(params: unknown): {
       deleteWorktree: input.deleteWorktree,
       ...(input.deleteRemoteBranch === undefined ? {} : { deleteRemoteBranch: input.deleteRemoteBranch }),
       ...(input.pullRequestCleanup === undefined ? {} : { pullRequestCleanup: input.pullRequestCleanup }),
+      ...(input.discardChanges === undefined ? {} : { discardChanges: input.discardChanges }),
       confirmed: true,
     },
   };

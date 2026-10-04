@@ -18,6 +18,11 @@
       <p> {{ $t('surface.agentCloseDialog.thisAgentIsUsingTheLinkedWorktree') }} <strong>{{ workflow?.branch }}</strong>.
       </p>
       <p> {{ $t('surface.agentCloseDialog.deletingTheWorktreeAlsoDeletesItsLocalBranchKeepingItLea') }} </p>
+      <div v-if="hasChanges" class="agent-close-dialog__discard">
+        <el-checkbox v-model="discardChanges" :disabled="busy">
+          {{ $t('surface.agentCloseDialog.discardChanges') }}
+        </el-checkbox>
+      </div>
       <label v-if="workflow?.upstream" class="agent-close-dialog__remote">
         <el-switch v-model="deleteRemoteBranch" size="small" :disabled="busy" />
         <span>{{ $t('surface.agentCloseDialog.alsoDelete') }} {{ workflow.upstream }}</span>
@@ -29,14 +34,14 @@
       <div class="claw-dialog__footer">
         <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')"> {{ $t('surface.agentCloseDialog.cancel') }} </button>
         <button class="claw-button claw-button--secondary" type="button" :disabled="busy" @click="emit('keep-worktree')"> {{ $t('surface.agentCloseDialog.keepWorktree') }} </button>
-        <button class="claw-button claw-button--primary" type="button" :aria-busy="busy" :disabled="busy" @click="deleteWorktree"> {{ $t('surface.agentCloseDialog.deleteWorktree') }} </button>
+        <button class="claw-button claw-button--primary" type="button" :aria-busy="busy" :disabled="busy || (hasChanges && !discardChanges)" @click="deleteWorktree"> {{ $t('surface.agentCloseDialog.deleteWorktree') }} </button>
       </div>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Agent, AgentGitWorkflow } from '@codex-claw/core/contracts';
 
 const props = withDefaults(defineProps<{
@@ -54,18 +59,24 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  'delete-worktree': [deleteRemoteBranch: boolean];
+  'delete-worktree': [deleteRemoteBranch: boolean, discardChanges: boolean];
   'keep-worktree': [];
 }>();
 
 const deleteRemoteBranch = ref(false);
+const discardChanges = ref(false);
+const hasChanges = computed(() => (props.workflow?.files.length ?? 0) > 0);
 
 watch(() => props.visible, (visible) => {
-  if (visible) deleteRemoteBranch.value = false;
+  if (visible) {
+    deleteRemoteBranch.value = false;
+    discardChanges.value = false;
+  }
 });
 
 function deleteWorktree(): void {
-  emit('delete-worktree', deleteRemoteBranch.value);
+  if (props.busy || (hasChanges.value && !discardChanges.value)) return;
+  emit('delete-worktree', deleteRemoteBranch.value, hasChanges.value && discardChanges.value);
 }
 
 function onVisibilityChanged(visible: boolean): void {
@@ -99,5 +110,15 @@ function onVisibilityChanged(visible: boolean): void {
 
 .agent-close-dialog__error {
   color: var(--color-error) !important;
+}
+
+.agent-close-dialog__discard :deep(.el-checkbox) {
+  height: auto;
+  white-space: normal;
+}
+
+.agent-close-dialog__discard :deep(.el-checkbox__label) {
+  white-space: normal;
+  line-height: 1.4;
 }
 </style>
