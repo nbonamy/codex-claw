@@ -1,6 +1,6 @@
 import type { WorkProviderKind } from '@codex-claw/core/contracts';
 
-export type HostedMcpServerId = 'github';
+export type HostedMcpServerId = 'github' | 'linear';
 
 export type HostedMcpCredentialProvider = {
   isConnected(provider: WorkProviderKind): boolean;
@@ -25,6 +25,10 @@ const hostedMcpServers: readonly HostedMcpServerDefinition[] = [{
   id: 'github',
   provider: 'github',
   url: 'https://api.githubcopilot.com/mcp/',
+}, {
+  id: 'linear',
+  provider: 'linear',
+  url: 'https://mcp.linear.app/mcp',
 }];
 
 const forwardedRequestHeaders = [

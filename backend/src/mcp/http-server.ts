@@ -225,6 +225,8 @@ export class ClawMcpHttpServer {
       return;
     }
 
+    // Apply the same known-agent boundary as the collaboration endpoint.
+    this.coordinator.connectAgent(agentId);
     const body = request.method === 'POST' ? await readBody(request) : undefined;
     const startedAt = Date.now();
     logMain('mcp-http', 'hosted request', { serverId, agentId, method: request.method });

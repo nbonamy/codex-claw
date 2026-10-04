@@ -306,7 +306,7 @@ describe('ClawMcpService', () => {
     ));
     const hostedMcpGateway = new HostedMcpGateway({
       credentials: {
-        isConnected: () => true,
+        isConnected: provider => provider === 'github',
         authorizationHeader: vi.fn().mockResolvedValue('bearer ghu_secret'),
       },
       fetch: fetchUpstream,

@@ -20,6 +20,7 @@ describe('codex-config', () => {
       'features.apply_patch_streaming_events=true',
       'features.memories=true',
       'plugins."github@openai-curated-remote".enabled=false',
+      'plugins."linear@openai-curated-remote".enabled=false',
       'plugins."unified-computer-use@openai-bundled".enabled=false',
     ]);
   });
