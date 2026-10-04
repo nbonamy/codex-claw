@@ -447,7 +447,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     activeTurn.interrupted = true;
     await activeTurn.handle.interrupt();
     this.completeTurn(activeTurn);
-    this.activeTurnsByAgentId.delete(agent.id);
+    if (this.activeTurnsByAgentId.get(agent.id) === activeTurn) this.activeTurnsByAgentId.delete(agent.id);
 
     return {
       backendSession: claudeBackendSession(
@@ -1409,7 +1409,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       backendSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'turn.completed',
-      payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : 'completed' } },
+      payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : activeTurn.error ? 'failed' : 'completed' } },
     });
     this.emit({
       agentId: activeTurn.agentId,

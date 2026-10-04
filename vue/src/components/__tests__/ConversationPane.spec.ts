@@ -652,6 +652,28 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
   });
 
+  it('renders task waiting and restored results without raw tool names or false completion', async () => {
+    const taskMessages: RendererMessage[] = [{
+      id: 'message-task-tool', agentId: agent.id, role: 'assistant', status: 'streaming',
+      createdAt: '2026-10-04T00:00:00.000Z',
+      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'codex_claw.wait-tasks',
+        status: 'running', metadata: { server: 'codex_claw', tool: 'wait-tasks' },
+        input: { taskIds: ['task-private-id'], timeoutMs: 30000 } }],
+    }];
+    const wrapper = mountPane({ controller: controllerFor(taskMessages), agent });
+    expect(wrapper.get('.chat-tool-call').text()).toContain('Waiting for delegated tasks');
+    expect(wrapper.find('.tabler-icon-square-check').exists()).toBe(true);
+
+    await wrapper.setProps({ controller: controllerFor([{
+      ...taskMessages[0]!, status: 'complete',
+      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'codex_claw.wait-tasks',
+        status: 'completed', metadata: { server: 'codex_claw', tool: 'wait-tasks' },
+        output: { timedOut: true, tasks: [{ id: 'task-private-id', state: 'running' }] } }],
+    }]) });
+    expect(wrapper.get('.chat-tool-call').text()).toContain('Checked delegated tasks');
+    expect(wrapper.get('.chat-tool-call').text()).not.toMatch(/codex_claw|task-private-id|Completed/);
+  });
+
   it('renders review tool activity as finding actions instead of raw MCP names', () => {
     const wrapper = mountPane({
       controller: controllerFor([{

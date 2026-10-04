@@ -70,6 +70,52 @@ async function setup(parentBackend: 'codex' | 'claude') {
 }
 
 describe('durable tasks through authenticated MCP and real provider adapters', () => {
+  it.each(['error result', 'unexpected iterator end', 'explicit interruption'] as const)('retains the provisional Claude result without delivering success after %s', async outcome => {
+    const f = await setup('codex');
+    const creating = f.call(f.parent.id, 'create-agent', { repoPath: '/repo', backend: 'claude', prompt: 'Write bonjour', requestId: 'claude-outcome', task: { title: 'French readme', doneWhen: 'Verified' } });
+    await vi.waitFor(() => expect(f.claudeSdk.inputs).toHaveLength(1));
+    f.claudeSdk.emit({ type: 'system', subtype: 'init', session_id: 'claude-worker' });
+    const task = (await creating).structuredContent.task as DelegatedTask;
+    expect((await f.call(task.workerAgentId, 'complete-task', { summary: 'Created README.fr.md', evidence: ['Exact bytes verified'], artifacts: ['README.fr.md'], caveats: [] })).isError).toBe(false);
+    const submission = (await f.store.loadTasks())[0]!.submission;
+    expect(submission).toBeDefined();
+    const waiting = f.tasks.wait(f.parent.id, { taskIds: [task.id], mode: 'all', timeoutMs: 1000 });
+    if (outcome === 'error result') f.claudeSdk.emit({ type: 'result', subtype: 'error_during_execution', session_id: 'claude-worker', is_error: true, errors: ['Execution failed'] });
+    else if (outcome === 'unexpected iterator end') f.claudeSdk.runtimes[0]!.close();
+    else {
+      const worker = f.snapshot.agents.find(agent => agent.id === task.workerAgentId)!;
+      await f.rpc.handle(backendMethods.driverInterrupt, { agent: worker, expectedTurnId: task.acceptance!.turnId });
+    }
+    const result = await waiting;
+    expect(result.timedOut).toBe(false);
+    expect(result.tasks[0]).toMatchObject({ state: outcome === 'explicit interruption' ? 'interrupted' : 'failed', attemptId: task.attemptId, submission });
+    expect((await f.store.loadTasks())[0]).toMatchObject({ state: result.tasks[0]!.state, submission });
+    expect(f.tasks.list(f.parent.id)[0]!.delivery).toBeUndefined();
+    expect(f.codex.conversation('codex-parent').handle.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each(['completed', 'interrupted'] as const)('keeps wait-tasks pending after idle until the submitting turn is authoritatively %s', async outcome => {
+    const f = await setup('codex');
+    const created = await f.call(f.parent.id, 'create-agent', { repoPath: '/repo', backend: 'codex', prompt: 'Write bonjour', requestId: 'outcome-order', task: { title: 'French readme', doneWhen: 'Verified' } });
+    const task = created.structuredContent.task as DelegatedTask;
+    await f.call(task.workerAgentId, 'complete-task', { summary: 'Created README.fr.md', evidence: ['Exact bytes verified'], artifacts: ['README.fr.md'], caveats: [] });
+    const submission = f.tasks.list(f.parent.id)[0]!.submission;
+    const worker = f.codex.conversation('codex-worker');
+    const waiting = f.tasks.wait(f.parent.id, { taskIds: [task.id], mode: 'all', timeoutMs: 30 });
+    worker.setSnapshot({ activeTurnId: null, busy: false });
+    worker.emit({ ...f.metadata, type: 'conversation.activityChanged', payload: { threadStatus: { type: 'idle' }, busy: false, error: null } });
+    const pending = await waiting;
+    expect(pending.timedOut).toBe(true);
+    expect(pending.tasks[0]).toMatchObject({ state: 'running', attemptId: task.attemptId, submission });
+    const terminal = f.tasks.wait(f.parent.id, { taskIds: [task.id], mode: 'all', timeoutMs: 1000 });
+    worker.emit({ ...f.metadata, type: 'turn.completed', payload: { status: outcome, error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null } });
+    const settled = await terminal;
+    expect(settled.timedOut).toBe(false);
+    expect(settled.tasks[0]).toMatchObject({ state: outcome, attemptId: task.attemptId, submission });
+    if (outcome === 'completed') await vi.waitFor(() => expect(f.tasks.list(f.parent.id)[0]!.delivery?.state).toBe('accepted'));
+    else expect(f.tasks.list(f.parent.id)[0]!.delivery).toBeUndefined();
+  });
+
   it('rejects task prompt admission after the target agent is removed', async () => {
     const f = await setup('codex');
     f.snapshot.agents.splice(f.snapshot.agents.indexOf(f.parent), 1);

@@ -38,6 +38,13 @@ and recovery behavior. Product policy must not be added to the SDK to make a
 Codex Claw call compile; generic Codex conversation behavior must not be added
 to Claw to avoid fixing the SDK.
 
+SDK readiness is distinct from terminal outcome. A native thread-idle update
+releases readiness and queued prompts but does not fabricate `turn.completed`.
+Durable task results remain provisional until the submitting turn's authoritative
+terminal event arrives. A missing outcome can therefore time out in `wait-tasks`
+without implying interruption or cancellation. A late terminal event belongs to
+its original turn and must not clear a newer active turn.
+
 Electron main responsibilities:
 
 - spawn/connect to `clawd`;

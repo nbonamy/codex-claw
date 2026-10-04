@@ -168,7 +168,7 @@ Claw extends the SDK presentation surface in:
 
 - `vue/src/tool-presentation.ts`: recognized tools and icons;
 - `vue/src/tool-title-presenter.ts`: phase-aware titles and targets;
-- `vue/src/i18n/surface-messages.ts`: localized running, completed, and failed
+- `vue/src/i18n/messages.ts`: localized running, completed, and failed
   strings.
 
 For a visible tool row, add the tool to `TOOL_KEYS`, assign its semantic icon
