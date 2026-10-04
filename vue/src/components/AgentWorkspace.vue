@@ -44,7 +44,7 @@
       :key="agent.id"
       v-show="!emptySplitPane && isRightWorkspaceVisible(agent.id)"
       class="app-shell__right-workspace"
-      :style="{ flexBasis: `${rightWorkspaceFor(agent.id).width}px` }"
+      :style="{ flexBasis: `${workspaceWidthFor(agent.id)}px` }"
       :active-tab="rightWorkspaceFor(agent.id).activeTab"
       :agent="agent"
       :agents="snapshot.agents"
@@ -180,7 +180,7 @@ import ConversationPane from './ConversationPane.vue';
 import RightWorkspacePanel from './RightWorkspacePanel.vue';
 import WorkspaceLinkDropTarget from './WorkspaceLinkDropTarget.vue';
 import { useWorkspaceLinkDrag } from './use-workspace-link-drag';
-import type { AgentRightWorkspaceState } from './use-right-workspace-state';
+import { constrainedRightWorkspaceWidth, type AgentRightWorkspaceState } from './use-right-workspace-state';
 import type { PlanReviewComment, SidePanelGitDiffState } from './side-panel';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
 import type { VisualizationAnnotation, VisualizationAnnotationInput } from './use-visualization-annotations';
@@ -347,6 +347,28 @@ const {
 } = toRefs(props);
 
 const workspaceBody = ref<HTMLElement | null>(null);
+const workspaceBodyWidth = ref<number | null>(null);
+watch(workspaceBody, (body, _previous, onCleanup) => {
+  workspaceBodyWidth.value = null;
+  if (!body) return;
+  const measure = () => {
+    const width = body.getBoundingClientRect().width;
+    if (width > 0) workspaceBodyWidth.value = width;
+  };
+  measure();
+  if (typeof ResizeObserver === 'undefined') return;
+  const observer = new ResizeObserver(measure);
+  observer.observe(body);
+  onCleanup(() => observer.disconnect());
+}, { flush: 'post' });
+
+function workspaceWidthFor(agentId: string): number {
+  const preferredWidth = props.rightWorkspaceFor(agentId).width;
+  return workspaceBodyWidth.value === null
+    ? preferredWidth
+    : constrainedRightWorkspaceWidth(preferredWidth, workspaceBodyWidth.value);
+}
+
 const conversationPane = ref<{ focusComposer(): void; openSavedDraftPicker(): void; saveCurrentDraft(): Promise<void> } | null>(null);
 const rightWorkspaces = props.rightWorkspaces;
 const executionPlanStates = reactive<Record<string, { open: boolean; turnId: string }>>({});

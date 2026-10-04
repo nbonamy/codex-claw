@@ -60,6 +60,14 @@ const executionPlan: ThreadPlan = {
 };
 
 describe('ConversationPane', () => {
+  it('allows the real conversation and composer to shrink within the workspace chat allocation', () => {
+    const wrapper = mountPane({ controller: controllerFor(messages), agent });
+    const pane = wrapper.get('.conversation-pane');
+    expect(wrapper.find('.chat-rich-text-editor').exists()).toBe(true);
+    expect(Number.parseFloat(getComputedStyle(pane.element).minWidth)).toBe(0);
+    expect(getComputedStyle(pane.element).overflow).toBe('hidden');
+  });
+
   it('keeps an interrupted handoff and its saved note visible after restoring the agent', () => {
     const wrapper = mountPane({ controller: controllerFor([]), agent: { ...agent, handoff: {
       operationId: 'once', backend: 'codex', sourceAgentId: 'old', sourceTitle: 'Original',
