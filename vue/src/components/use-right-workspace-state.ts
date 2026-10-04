@@ -42,7 +42,7 @@ export type AgentRightWorkspaceState = {
 
 export function constrainedRightWorkspaceWidth(preferredWidth: number, bodyWidth: number): number {
   // Reserve the chat minimum and the divider before allocating sidebar space.
-  return Math.min(Math.max(preferredWidth, 240), Math.max(0, bodyWidth - 320 - 5));
+  return Math.min(Math.max(preferredWidth, 240), Math.max(0, bodyWidth - 480 - 5));
 }
 
 export function useRightWorkspaceState(options: {

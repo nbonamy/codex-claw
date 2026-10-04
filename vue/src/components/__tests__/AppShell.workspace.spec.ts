@@ -263,7 +263,7 @@ describe('AppShell workspace and plans', () => {
     expect((workspace?.element as HTMLElement).style.flexBasis).toBe('300px');
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 100 }));
     await nextTick();
-    expect((workspace?.element as HTMLElement).style.flexBasis).toBe('875px');
+    expect((workspace?.element as HTMLElement).style.flexBasis).toBe('715px');
     window.dispatchEvent(new Event('pointerup'));
     await nextTick();
     expect(wrapper.find('.app-shell__right-workspace-resize-shield').exists()).toBe(false);
