@@ -1095,6 +1095,14 @@ state is local and provider-neutral: newly assigned items are `inProgress`, and
 agents update them to `blocked`, `readyForReview`, or `completed` through the
 `update-work-item` Claw MCP tool using the exact work item id from that prompt.
 Blocked updates include a user-facing note explaining what help is needed.
+Linear assignments retain a sanitized issue reference (native identifier, URL,
+body and stable team/project source) through persistence and remote snapshots.
+The backlog source is separate from the execution repository: repository entry
+points use their current repository, while global batch starts require a code
+repository chosen on the selected Claw team's host. This choice is transient;
+there is no saved Linear source-to-repository mapping. Linear branch defaults
+use the full issue identifier, and Claw status updates do not change Linear's
+workflow state.
 Automation-created assignments also store automation origin metadata so one
 execution can be completed after all of its work items finish. Assigning the same
 work item to another agent overwrites that key and resets it to `inProgress`.

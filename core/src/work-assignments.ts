@@ -1,7 +1,7 @@
-import type { Agent, WorkBacklogAssignment, WorkItem, WorkProviderKind } from './contracts';
+import type { Agent, WorkBacklogAssignment, WorkItem, WorkItemReference, WorkProviderKind } from './contracts';
 
 type WorkItemIdentity = Pick<WorkItem, 'provider' | 'id'> | Pick<WorkBacklogAssignment, 'provider' | 'itemId'>;
-export type WorkItemAssignmentSource = Pick<WorkItem, 'provider' | 'id' | 'repositoryId' | 'repositoryFullName' | 'number' | 'title' | 'url'>;
+export type WorkItemAssignmentSource = WorkItemReference;
 
 export type WorkBacklogAssignmentMetadata = Partial<Pick<WorkBacklogAssignment, 'automationExecutionId' | 'automationId' | 'policy'>>;
 
@@ -18,6 +18,7 @@ export function workBacklogAssignmentFromWorkItem(
     assignedAt,
     policy: metadata.policy ?? 'review',
     status: 'inProgress',
+    ...(item.provider === 'linear' ? { item: sanitizeWorkItemAssignmentSource(item)! } : {}),
     ...(metadata.automationId ? { automationId: metadata.automationId } : {}),
     ...(metadata.automationExecutionId ? { automationExecutionId: metadata.automationExecutionId } : {}),
   };
@@ -47,6 +48,16 @@ export function sanitizeWorkItemAssignmentSource(value: unknown): WorkItemAssign
     number,
     title: value.title,
     url: value.url,
+    ...(typeof value.identifier === 'string' ? { identifier: value.identifier } : {}),
+    ...(typeof value.body === 'string' ? { body: value.body } : {}),
+    ...(isRecord(value.linearSource) && typeof value.linearSource.teamId === 'string' && typeof value.linearSource.teamName === 'string' ? {
+      linearSource: {
+        teamId: value.linearSource.teamId,
+        teamName: value.linearSource.teamName,
+        ...(typeof value.linearSource.projectId === 'string' ? { projectId: value.linearSource.projectId } : {}),
+        ...(typeof value.linearSource.projectName === 'string' ? { projectName: value.linearSource.projectName } : {}),
+      },
+    } : {}),
   };
 }
 
@@ -84,7 +95,7 @@ function workItemIdentityId(item: WorkItemIdentity): string {
 }
 
 function isWorkProvider(value: unknown): value is WorkProviderKind {
-  return value === 'github';
+  return value === 'github' || value === 'linear';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

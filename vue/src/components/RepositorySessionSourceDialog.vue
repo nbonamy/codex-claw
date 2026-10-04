@@ -39,9 +39,10 @@
     <section class="repository-session-source-dialog__results" aria-live="polite">
       <p v-if="purpose === 'missionIssue' && linear.provider.value === 'github' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
       <template v-if="selectedWorkItem">
+        <p v-if="selectedWorkItem.provider === 'linear'">{{ t('backlogSource.codeRepository') }}: {{ repositoryName }}</p>
         <LinearIssueDetail v-if="selectedWorkItem.provider === 'linear'" :item="selectedWorkItem" />
         <StagedOperationProgress
-          v-else-if="preparationVisible && assignmentState !== 'error'"
+          v-if="preparationVisible && assignmentState !== 'error'"
           :state="assignmentState === 'success' ? 'success' : 'running'"
           :eyebrow="t('repositoryBacklog.launchingFrom', { number: selectedWorkItem.number })"
           :title="preparationTitle"
@@ -57,7 +58,7 @@
           :existing-worktree-path="assignmentExistingWorktreePath"
           :sessions="sessions"
           :error="assignmentError"
-          @custom="emit('custom-work-item', $event)"
+          @custom="customWorkItem"
           @submit="startWorkItem"
         />
       </template>
@@ -107,6 +108,7 @@
 </template>
 
 <script setup lang="ts">
+import { workItemBranchName } from '@codex-claw/core/work-item-prompts';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -188,6 +190,8 @@ function selectSource(id: string | null): void {
 const searchInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const selectedWorkItem = ref<WorkItem | null>(null);
+let selectionRevision = 0;
+watch([selectedWorkItem, () => props.visible, () => JSON.stringify(props.location)], () => { ++selectionRevision; }, { flush: 'sync' });
 const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
 const preparationVisible = ref(false);
 const tab = ref<SourceTab>(props.purpose === 'missionIssue' ? 'issues' : 'branches');
@@ -211,8 +215,7 @@ const filteredWorkItems = computed(() => (linear.provider.value === 'linear' && 
 const assignmentBranchName = computed(() => {
   const item = selectedWorkItem.value;
   if (!item) return '';
-  if (item.kind === 'pullRequest') return item.branchName?.trim() || `review/gh-${item.number}`;
-  return `fix/gh-${item.number}`;
+  return workItemBranchName(item);
 });
 const assignmentExistingWorktreePath = computed(() => (
   props.branches.find((branch) => branch.name === assignmentBranchName.value)?.worktreePath ?? ''
@@ -276,13 +279,26 @@ function onVisibilityChanged(visible: boolean): void {
 function selectWorkItem(item: WorkItem): void {
   if (!filteredWorkItems.value.some(candidate => candidate.id === item.id)) return;
   if (props.purpose === 'missionIssue') emit('select-work-item', item);
-  if (props.purpose === 'session' || item.provider === 'linear') selectedWorkItem.value = item;
+  if (props.purpose === 'session') selectedWorkItem.value = item;
 }
 
 function startWorkItem(selection: WorkItemAssignmentSelection): void {
+  if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
   preparationSelection.value = selection;
   preparationVisible.value = true;
-  emit('start-work-item', selection);
+  emit('start-work-item', { ...selection, ...(selection.item.provider === 'linear' ? { isCurrent: selectionGuard(selection.item) } : {}) });
+}
+
+function selectionGuard(item: WorkItem): () => boolean {
+  const provider = linear.provider.value;
+  const source = linear.sourceId.value;
+  const revision = selectionRevision;
+  return () => revision === selectionRevision && props.visible && selectedWorkItem.value?.id === item.id && linear.provider.value === provider && linear.sourceId.value === source;
+}
+
+function customWorkItem(selection: Omit<WorkItemAssignmentSelection, 'action'>): void {
+  if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
+  emit('custom-work-item', { ...selection, ...(selection.item.provider === 'linear' ? { isCurrent: selectionGuard(selection.item) } : {}) });
 }
 
 function resetPreparation(clearSelection = true): void {
@@ -468,6 +484,7 @@ function resetPreparation(clearSelection = true): void {
 .repository-session-source-dialog--assignment
   .repository-session-source-dialog__results {
   min-height: 0;
+  max-height: min(70vh, 720px);
   padding: var(--space-3) var(--space-8) var(--space-8);
 }
 

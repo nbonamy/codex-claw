@@ -23,6 +23,7 @@ export type WorkBacklogAssignmentPolicy = 'complete' | 'review';
 export type WorkBacklogAssignmentStatus = 'blocked' | 'completed' | 'inProgress' | 'readyForReview';
 
 export type WorkBacklogAssignment = {
+  item?: WorkItemReference;
   provider: WorkProviderKind;
   itemId: string;
   agentId: string;
@@ -35,6 +36,8 @@ export type WorkBacklogAssignment = {
   automationId?: string;
   automationExecutionId?: string;
 };
+
+export type WorkItemReference = Pick<WorkItem, 'provider' | 'id' | 'repositoryId' | 'repositoryFullName' | 'number' | 'title' | 'url' | 'identifier' | 'body' | 'linearSource'>;
 
 export type GitHubWorkBacklogConfiguration = {
   repositoryId?: string;

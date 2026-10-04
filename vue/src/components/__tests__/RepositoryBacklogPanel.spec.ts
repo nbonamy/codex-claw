@@ -14,7 +14,8 @@ describe('RepositoryBacklogPanel', () => {
     api.listWorkRepositories.mockResolvedValue(['a', 'b'].map(id => ({ provider: 'linear', id: `linear:${id}`, owner: id, name: id, fullName: id, url: 'https://linear.app', isPrivate: true })));
     const item = workItem({ provider: 'linear', id: 'linear:issue', repositoryId: 'linear:a', identifier: 'ENG-12', nativeState: 'Started', body: 'Repair login', assignedToViewer: true, assignees: ['Alex'] });
     api.listWorkItems.mockResolvedValue([item]);
-    const wrapper = mountPanel();
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ startWorkAction });
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
     await flushPromises();
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:a');
@@ -24,10 +25,17 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.findAll('[role="radio"]')).toHaveLength(1);
     await wrapper.get('.repository-backlog__item-actions').trigger('click');
     expect(wrapper.get('.linear-issue-detail').text()).toContain('Repair login');
-    expect(wrapper.findComponent({ name: 'WorkItemAssignmentPicker' }).exists()).toBe(false);
+    await wrapper.get('.work-item-assignment-picker .claw-button--primary').trigger('click');
+    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ item, target: 'duplicate', action: 'fix', workspace: { kind: 'worktree', branchName: 'fix/eng-12' } }));
+    const guard = startWorkAction.mock.calls[0]![0].isCurrent;
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:b');
     await flushPromises();
     expect(wrapper.find('.linear-issue-detail').exists()).toBe(false);
+    expect(guard()).toBe(false);
+    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:a');
+    await flushPromises();
+    await wrapper.get('.repository-backlog__item-actions').trigger('click');
+    expect(guard()).toBe(false);
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('github');
     expect(wrapper.findAll('[role="radio"]')).toHaveLength(2);
     configureClawClient();

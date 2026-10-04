@@ -263,6 +263,7 @@ export type {
   WorkIntegrationStatus,
   WorkItem,
   WorkItemKind,
+  WorkItemReference,
   WorkItemLabel,
   WorkItemPage,
   WorkItemQuery,

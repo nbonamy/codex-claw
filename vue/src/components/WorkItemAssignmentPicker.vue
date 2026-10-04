@@ -114,6 +114,7 @@ export type WorkItemAssignmentSession = {
 };
 
 export type WorkItemAssignmentSelection = {
+  isCurrent?: () => boolean;
   backend?: import('@codex-claw/core/contracts').AgentBackend;
   action: WorkItemAssignmentAction;
   agentId?: string;

@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkItem } from '../contracts';
-import { workItemAssignmentPrompt, workItemComposerPrompt, workProviderLabel } from '../work-item-prompts';
+import { workItemAssignmentPrompt, workItemBranchName, workItemComposerPrompt, workProviderLabel } from '../work-item-prompts';
 
 describe('work item prompts', () => {
+  it('keeps Linear identity, source and body in assigned and editable prompts', () => {
+    const item = workItem({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-42', repositoryId: 'linear:team', repositoryFullName: 'Engineering', url: 'https://linear.app/acme/issue/ENG-42', body: 'Steps to reproduce' });
+    const prompt = workItemAssignmentPrompt(item, { action: 'fix' });
+    expect(prompt).toContain('Issue: ENG-42');
+    expect(prompt).toContain('Backlog source: Engineering');
+    expect(prompt).toContain('Work item ID: linear:linear:uuid');
+    expect(prompt).not.toContain('Repository: Engineering');
+    expect(workItemComposerPrompt(item)).toContain(item.url);
+    expect(workItemComposerPrompt(item)).toContain('ENG-42');
+    expect(workItemComposerPrompt(item)).toContain('Steps to reproduce');
+    expect(workItemBranchName(item)).toBe('fix/eng-42');
+    expect(workItemBranchName({ ...item, identifier: 'OPS-42' })).toBe('fix/ops-42');
+  });
   it('includes routing identifiers and available issue context', () => {
     const prompt = workItemAssignmentPrompt(workItem({
       labels: [{ name: 'bug', color: 'red' }],

@@ -72,8 +72,13 @@ describe('RepositorySessionSourceDialog', () => {
     expect(api.listWorkItems).toHaveBeenLastCalledWith('linear', 'linear:ops', location, { kind: 'issue', state: 'all' });
     await wrapper.get('.repository-session-source-dialog__result').trigger('click');
     expect(wrapper.get('.linear-issue-detail').text()).toContain('Issue details');
-    expect(wrapper.findComponent({ name: 'WorkItemAssignmentPicker' }).exists()).toBe(false);
+    expect(wrapper.get('input[aria-label="Branch"]').element).toHaveProperty('value', 'fix/ops-24');
+    await wrapper.get('.work-item-assignment-picker .claw-button--tertiary').trigger('click');
+    const selection = wrapper.emitted('custom-work-item')![0]![0] as { item: WorkItem; isCurrent: () => boolean };
+    expect(selection.item).toEqual(item);
+    expect(selection.isCurrent()).toBe(true);
     await wrapper.get('[aria-label="Back"]').trigger('click');
+    expect(selection.isCurrent()).toBe(false);
     await wrapper.findAll('[role="tab"]')[0].trigger('click');
     await wrapper.get('.repository-session-source-dialog__result').trigger('click');
     expect(wrapper.emitted('select-branch')).toEqual([[branches[0]]]);

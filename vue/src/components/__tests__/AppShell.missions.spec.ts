@@ -22,6 +22,29 @@ function representGitHubRepository(agent: ReturnType<typeof createInitialSnapsho
 }
 
 describe('AppShell missions', () => {
+  it('forwards Linear context without a GitHub repository and rejects selection after the requirements stage', async () => {
+    const snapshot = createInitialSnapshot();
+    const mission = createMission(snapshot, { outcome: 'New mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
+    prepareMissionLead(mission, snapshot.agents[0]!.id);
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountShell({ snapshot, loadWorkRepositories: vi.fn().mockResolvedValue([]), sendPromptAction });
+    wrapper.getComponent({ name: 'AppShellNavigation' }).vm.$emit('select-mission', mission.id);
+    await flushPromises();
+    await wrapper.get('.conversation-pane [role="menuitem"]').trigger('click');
+    await flushPromises();
+    const picker = wrapper.findAllComponents({ name: 'RepositorySessionSourceDialog' }).find(component => component.props('purpose') === 'missionIssue')!;
+    const issue = workItem({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-42', repositoryId: 'linear:team', repositoryFullName: 'Engineering', body: 'Reproduction steps', url: 'https://linear.app/acme/issue/ENG-42' });
+    picker.vm.$emit('select-work-item', issue);
+    await flushPromises();
+    expect(sendPromptAction).toHaveBeenCalledWith(expect.stringContaining('Linear issue ENG-42'), undefined);
+    expect(sendPromptAction.mock.calls[0]![0]).toContain(issue.url);
+    expect(sendPromptAction.mock.calls[0]![0]).toContain(issue.body);
+    mission.stage = 'tickets';
+    await wrapper.setProps({ snapshot: { ...snapshot } });
+    picker.vm.$emit('select-work-item', issue);
+    await flushPromises();
+    expect(sendPromptAction).toHaveBeenCalledOnce();
+  });
   afterEach(() => window.localStorage.removeItem(missionStorageKey));
 
   it('restores the Mission workspace after reopening the app on a selected Mission', async () => {

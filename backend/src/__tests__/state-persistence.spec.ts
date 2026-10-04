@@ -6,7 +6,8 @@ import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state
 import { AppStateStore } from '../persistence/store';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import { closeAgentInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
+import { ClawBackendServer } from '../server';
 import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot } from '@codex-claw/core/settings';
 import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
 import type { RemoteConnection } from '@codex-claw/core/contracts';
@@ -21,6 +22,31 @@ afterEach(async () => {
 });
 
 describe('state persistence', () => {
+  it('assigns, reassigns, persists and clears Linear work with its full reference and independent Claw status', async () => {
+    const persistence = new AppStateStore(await tempHome());
+    const snapshot = createInitialSnapshot();
+    const item = { provider: 'linear', id: 'linear:uuid', repositoryId: 'linear:team', repositoryFullName: 'Engineering', number: 12,
+      identifier: 'ENG-12', title: 'Repair login', body: 'Reproduction steps', url: 'https://linear.app/acme/issue/ENG-12',
+      linearSource: { teamId: 'team', teamName: 'Engineering', projectId: 'project', projectName: 'Login' } };
+    const server = new ClawBackendServer({ version: 'test', snapshot, saveSnapshot: value => persistence.save(value) });
+    try {
+      for (const agent of snapshot.agents.slice(0, 2)) {
+        const response = await server.handleMessage({ jsonrpc: '2.0', id: 'assign', method: 'agent/workItem/assign', params: { agentId: agent.id, item } });
+        expect(response).not.toHaveProperty('error');
+        expect(snapshot.workBacklog.assignments['linear:linear:uuid']).toMatchObject({ agentId: agent.id, item, status: 'inProgress' });
+      }
+      const owner = snapshot.agents[1]!;
+      for (const status of ['blocked', 'inProgress', 'readyForReview', 'completed'] as const) {
+        updateWorkItemAssignmentInSnapshot(snapshot, owner.id, 'linear:linear:uuid', status, '2026-10-04T12:00:00Z', 'Context retained');
+        await persistence.save(snapshot);
+        const restored = await persistence.load();
+        expect(isAppSnapshot(restored)).toBe(true);
+        expect(restored.workBacklog.assignments).toMatchObject({ 'linear:linear:uuid': { provider: 'linear', status, item, agentId: owner.id } });
+      }
+      await server.handleMessage({ jsonrpc: '2.0', id: 'clear', method: 'agent/workItem/assignment/delete', params: { item } });
+      expect((await persistence.load()).workBacklog.assignments).toEqual({});
+    } finally { await server.close(); }
+  });
   it('round trips Linear OAuth settings and public connection alongside legacy GitHub settings', async () => {
     const persistence = new AppStateStore(await tempHome());
     const snapshot = createEmptySnapshot();

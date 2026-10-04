@@ -3,6 +3,13 @@ import type { Agent, WorkItem } from '../contracts';
 import { assignedAgentsByWorkItemKey, findAssignedAgentForWorkItem, isSameWorkItem, sanitizeWorkItemAssignmentSource, workBacklogAssignmentFromWorkItem, workItemAssignmentKey } from '../work-assignments';
 
 describe('work assignments', () => {
+  it('retains a Linear issue reference in its assignment without colliding with equal issue numbers', () => {
+    const item = { ...workItem(12), provider: 'linear' as const, id: 'linear:eng-uuid', identifier: 'ENG-12', repositoryId: 'linear:team', repositoryFullName: 'Engineering', body: 'Reproduction', linearSource: { teamId: 'team', teamName: 'Engineering' } };
+    const source = sanitizeWorkItemAssignmentSource(item);
+    expect(source).toMatchObject({ identifier: 'ENG-12', body: 'Reproduction', linearSource: item.linearSource });
+    expect(workBacklogAssignmentFromWorkItem(source!, 'agent-dina', 'now')).toMatchObject({ item: source });
+    expect(isSameWorkItem(item, { ...item, id: 'linear:ops-uuid' })).toBe(false);
+  });
   it('uses provider-aware keys and finds the assigned agent', () => {
     const item = workItem(12);
     const assignment = workBacklogAssignmentFromWorkItem(item, 'agent-dina', '2026-06-09T13:00:00.000Z');

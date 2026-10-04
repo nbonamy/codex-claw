@@ -58,7 +58,7 @@
           </div>
         </el-popover>
 
-        <el-button v-if="connection.provider === 'github'" class="cockpit-inbox__start-work" type="primary" :icon="PlayerPlayIcon" :disabled="selectedItems.length === 0" @click="openStartWorkDialog"> {{ $t('surface.cockpitWorkInbox.startWork') }} </el-button>
+        <el-button class="cockpit-inbox__start-work" type="primary" :icon="PlayerPlayIcon" :disabled="selectedItems.length === 0" @click="openStartWorkDialog"> {{ $t('surface.cockpitWorkInbox.startWork') }} </el-button>
         <button class="cockpit-inbox__refresh" type="button" :disabled="status === 'loading'" :aria-label="$t('surface.cockpitWorkInbox.refreshWorkItems')" @click="emit('refresh', selectedRepositoryId)">
           <RefreshIcon aria-hidden="true" />
         </button>
@@ -106,7 +106,7 @@
             <el-checkbox
               class="cockpit-inbox__selection"
               :model-value="selectedItemIds.has(row.item.id)"
-              :disabled="Boolean(row.assignment) || row.item.provider === 'linear'"
+              :disabled="Boolean(row.assignment)"
               :aria-label="row.assignment ? $t('dynamic.cockpit.assigned', { number: row.item.number }) : $t('dynamic.cockpit.select', { number: row.item.number })"
               @click.stop
               @change="toggleSelection(row)"
@@ -219,11 +219,17 @@
 
       <div class="cockpit-inbox__start-body">
         <p> {{ $t('surface.cockpitWorkInbox.launch') }} <strong>{{ selectedItems.length }} {{ selectedItems.length === 1 ? 'agent' : 'agents' }}</strong>{{ $t('surface.cockpitWorkInbox.eachAgentWillWorkInADedicatedWorktree') }} </p>
-        <label> {{ $t('surface.cockpitWorkInbox.team') }} <el-select v-model="selectedTeamId" :aria-label="$t('surface.cockpitWorkInbox.teamForNewAgents')">
+        <label> {{ $t('surface.cockpitWorkInbox.team') }} <el-select v-model="selectedTeamId" :disabled="startingWork" :aria-label="$t('surface.cockpitWorkInbox.teamForNewAgents')">
             <el-option v-for="team in teams" :key="team.id" :label="team.name" :value="team.id" />
           </el-select>
         </label>
         <p v-if="startWorkError" class="cockpit-inbox__start-error" role="alert">{{ startWorkError }}</p>
+        <label v-if="connection.provider === 'linear'">
+          {{ $t('backlogSource.codeRepository') }}
+          <el-select v-model="selectedCodeRepositoryPath" :loading="codeRepositoriesLoading" :disabled="startingWork" :aria-label="$t('backlogSource.codeRepository')" :placeholder="$t('backlogSource.chooseCodeRepository')">
+            <el-option v-for="repository in codeRepositories" :key="repository.path" :label="repository.name" :value="repository.path" />
+          </el-select>
+        </label>
       </div>
 
       <template #footer>
@@ -240,7 +246,7 @@
 
 <script setup lang="ts">
 import { translate } from '../i18n';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
 import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
@@ -278,7 +284,8 @@ const props = withDefaults(defineProps<{
   teams: Team[];
   totalItems?: number;
   defaultTeamId?: string | null;
-  startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend'] }) => Promise<void>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceRepository[]>;
+  startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@codex-claw/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
 }>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, repositoryIcons: () => ({}), searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null, totalItems: 0 });
 
 const emit = defineEmits<{
@@ -302,6 +309,25 @@ const startingWork = ref(false);
 const startWorkError = ref<string | null>(null);
 const selectedTeamId = ref('');
 const selectedBackend = ref<Agent['backend']>();
+const codeRepositories = ref<import('@codex-claw/core/contracts').SourceRepository[]>([]);
+const selectedCodeRepositoryPath = ref('');
+const codeRepositoriesLoading = ref(false);
+let contextRevision = 0;
+onScopeDispose(() => { ++contextRevision; });
+watch([startWorkDialogOpen, selectedTeamId], async () => {
+  const revision = ++contextRevision;
+  codeRepositories.value = [];
+  selectedCodeRepositoryPath.value = '';
+  if (!startWorkDialogOpen.value || props.connection.provider !== 'linear') return;
+  codeRepositoriesLoading.value = true;
+  try {
+    const team = props.teams.find(team => team.id === selectedTeamId.value);
+    const repositories = await props.listSourceRepositories?.(team?.remoteConnectionId) ?? [];
+    if (revision === contextRevision) codeRepositories.value = repositories;
+  } catch (error) {
+    if (revision === contextRevision) startWorkError.value = error instanceof Error ? error.message : String(error);
+  } finally { if (revision === contextRevision) codeRepositoriesLoading.value = false; }
+});
 const localActiveView = ref<InboxView>(props.activeView);
 const activeView = computed(() => localActiveView.value);
 const effectiveSearchQuery = ref(props.searchQuery);
@@ -351,7 +377,7 @@ const totalBacklogCount = computed(() => props.globalScope
   ? Math.max(0, effectiveTotalItems.value - scopedActiveAssignments.value.length)
   : filteredRows.value.filter((row) => !row.assignment).length);
 const viewContextKey = computed(() => `${props.connection.provider}:${props.selectedRepositoryId ?? `global:${props.globalScope ?? 'unselected'}`}`);
-watch(viewContextKey, () => { detailItem.value = null; startWorkDialogOpen.value = false; selectedItemIds.value = new Set(); });
+watch(viewContextKey, () => { ++contextRevision; detailItem.value = null; startWorkDialogOpen.value = false; selectedItemIds.value = new Set(); }, { flush: 'sync' });
 const totalPages = computed(() => Math.max(1, Math.ceil(props.totalItems / props.pageSize)));
 const priorityOrder: Priority[] = ['attention', 'review', 'progress', 'ready'];
 const groupedRows = computed(() => priorityOrder.map((priority) => ({
@@ -479,7 +505,6 @@ function defaultTeamId(): string {
 }
 
 function toggleSelection(row: InboxRow): void {
-  if (row.item.provider === 'linear') { detailItem.value = row.item; return; }
   if (row.assignment) return;
   const next = new Set(selectedItemIds.value);
   if (next.has(row.item.id)) next.delete(row.item.id);
@@ -501,13 +526,22 @@ function closeStartWorkDialog(visible = false): void {
 async function startSelectedWork(action: 'investigate' | 'fix'): Promise<void> {
   const items = [...selectedItems.value];
   if (!selectedTeamId.value || !selectedBackend.value || items.length === 0) return;
+  const repository = codeRepositories.value.find(repository => repository.path === selectedCodeRepositoryPath.value);
+  if (props.connection.provider === 'linear' && !repository) {
+    startWorkError.value = translate('backlogSource.chooseCodeRepository');
+    return;
+  }
+  const revision = contextRevision;
   startingWork.value = true;
   startWorkError.value = null;
   try {
-    await props.startWorkAction({ action, items, teamId: selectedTeamId.value, backend: selectedBackend.value });
+    await props.startWorkAction({ action, items, teamId: selectedTeamId.value, backend: selectedBackend.value,
+      ...(repository ? { repository, isCurrent: () => revision === contextRevision } : {}) });
+    if (revision !== contextRevision) return;
     selectedItemIds.value = new Set();
     startWorkDialogOpen.value = false;
   } catch (error) {
+    if (revision !== contextRevision) return;
     startWorkError.value = error instanceof Error ? error.message : String(error);
   } finally {
     startingWork.value = false;
@@ -527,7 +561,11 @@ function updateSearchQuery(value: unknown): void {
   effectiveSearchQuery.value = query;
   emit('update-search-query', query);
 }
-function selectRow(row: InboxRow): void { row.agent ? emit('select-assigned-agent', row.agent.id) : toggleSelection(row); }
+function selectRow(row: InboxRow): void {
+  if (row.agent) emit('select-assigned-agent', row.agent.id);
+  else if (row.item.provider === 'linear') detailItem.value = row.item;
+  else toggleSelection(row);
+}
 function openSource(item: WorkItem): void { window.open(item.url, '_blank', 'noreferrer'); }
 function normalized(value: unknown): string | null { return typeof value === 'string' && value ? value : null; }
 function selectRepository(value: unknown): void { emit('select-repository', normalized(value)); }

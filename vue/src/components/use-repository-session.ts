@@ -26,7 +26,7 @@ export function useRepositorySession(options: {
   createIsolatedWorkItemAgent: (
     item: WorkItem,
     teamId: string,
-    options?: { reuseExisting?: boolean; backend?: AgentBackend },
+    options?: { reuseExisting?: boolean; backend?: AgentBackend; repository?: SourceRepository; isCurrent?: () => boolean },
   ) => Promise<{ agent: Agent; item: WorkItem }>;
   createSourceWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   getSnapshot: () => AppSnapshot;
@@ -40,6 +40,7 @@ export function useRepositorySession(options: {
     agentId: string,
     item: WorkItem,
     action: WorkItemAssignmentSelection['action'],
+    isCurrent?: () => boolean,
   ) => Promise<void>;
   suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
 }) {
@@ -199,28 +200,34 @@ export function useRepositorySession(options: {
   async function startWork(selection: WorkItemAssignmentSelection): Promise<void> {
     const current = source.value;
     if (!current) return;
+    const requestId = sourceRequestId;
+    const isCurrent = () => requestId === sourceRequestId && (!selection.isCurrent || selection.isCurrent());
+    if (!isCurrent()) return;
     const { teamId } = context(current);
     assignmentState.value = 'running';
     assignmentError.value = null;
     try {
       if (selection.destination === 'existing') {
         if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-        await options.startWorkItemInExistingSession(selection.agentId, selection.item, selection.action);
+        await options.startWorkItemInExistingSession(selection.agentId, selection.item, selection.action, isCurrent);
       } else {
         if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          { backend: backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}) },
+          { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
+            ...(selection.item.provider === 'linear' ? { repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent } : {}) },
         );
+        if (!isCurrent()) return;
         await options.assignWorkItem({
           agentId: agent.id,
           item,
           prompt: workItemAssignmentPrompt(item, { action: selection.action }),
         });
       }
-      assignmentState.value = 'success';
+      if (isCurrent()) assignmentState.value = 'success';
     } catch (caught) {
+      if (!isCurrent()) return;
       assignmentState.value = 'error';
       assignmentError.value = caught instanceof Error ? caught.message : String(caught);
     }
@@ -229,6 +236,9 @@ export function useRepositorySession(options: {
   async function customizeWork(selection: Omit<WorkItemAssignmentSelection, 'action'>): Promise<void> {
     const current = source.value;
     if (!current) return;
+    const requestId = sourceRequestId;
+    const isCurrent = () => requestId === sourceRequestId && (!selection.isCurrent || selection.isCurrent());
+    if (!isCurrent()) return;
     const { teamId } = context(current);
     assignmentState.value = 'running';
     assignmentError.value = null;
@@ -241,12 +251,15 @@ export function useRepositorySession(options: {
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          { backend: backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}) },
+          { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
+            ...(selection.item.provider === 'linear' ? { repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent } : {}) },
         );
+        if (!isCurrent()) return;
         options.prefillWorkItemForAgent(agent.id, item);
       }
       close();
     } catch (caught) {
+      if (!isCurrent()) return;
       assignmentState.value = 'error';
       assignmentError.value = caught instanceof Error ? caught.message : String(caught);
     }

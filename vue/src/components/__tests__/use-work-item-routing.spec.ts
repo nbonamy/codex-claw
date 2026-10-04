@@ -5,6 +5,43 @@ import { describe, expect, it, vi } from 'vitest';
 import { useWorkItemRouting } from '../use-work-item-routing';
 
 describe('useWorkItemRouting', () => {
+  it('does not start an agent after preparation fails, reassignment is cancelled, or selection changes', async () => {
+    const listedItem = item({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12' });
+    const repository = { name: 'claw', path: '/code/claw', worktrees: [] };
+    const cancelled = createHarness({ item: listedItem, assignedToCurrentAgent: true, confirmReassignment: false });
+    await expect(cancelled.routing.createIsolatedAgent(listedItem, cancelled.teamId, { repository })).rejects.toThrow();
+    expect(cancelled.createWorktree).not.toHaveBeenCalled();
+    const failed = createHarness();
+    failed.createWorktree.mockRejectedValueOnce(new Error('Repository unavailable'));
+    await expect(failed.routing.createIsolatedAgent(listedItem, failed.teamId, { repository })).rejects.toThrow('Repository unavailable');
+    expect(failed.createAgent).not.toHaveBeenCalled();
+    let current = true;
+    failed.createWorktree.mockImplementationOnce(async () => { current = false; return { name: 'work', path: '/code/work' }; });
+    await expect(failed.routing.createIsolatedAgent(listedItem, failed.teamId, { repository, isCurrent: () => current })).rejects.toThrow('selection changed');
+    expect(failed.createAgent).not.toHaveBeenCalled();
+    expect(failed.assign).not.toHaveBeenCalled();
+  });
+  it('stops branch preparation if the Linear selection changes while duplicating an agent', async () => {
+    const harness = createHarness();
+    harness.agent.workspace = { kind: 'git', folder: '/code', repositoryName: 'code', repositoryRoot: '/code', primaryWorktreeRoot: '/code', branch: 'main', isLinkedWorktree: false, updatedAt: '' };
+    let current = true;
+    harness.duplicateAgent.mockImplementationOnce(async () => { current = false; return harness.createdAgent; });
+    await expect(harness.routing.startRepositoryWork(harness.agent.id, {
+      item: item({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12' }), action: 'fix', target: 'duplicate',
+      workspace: { kind: 'worktree', branchName: 'fix/eng-12' }, isCurrent: () => current,
+    })).rejects.toThrow('selection changed');
+    expect(harness.createBranch).not.toHaveBeenCalled();
+    expect(harness.assign).not.toHaveBeenCalled();
+  });
+  it('starts Linear work in the explicit repository on the selected host and preserves full issue identity', async () => {
+    const listedItem = item({ provider: 'linear', id: 'linear:eng-uuid', identifier: 'ENG-12', repositoryFullName: 'Engineering', repositoryId: 'linear:team' });
+    const harness = createHarness({ item: listedItem, remoteConnectionId: 'remote-dev' });
+    await harness.routing.startMany({ action: 'fix', items: [listedItem], teamId: harness.teamId, repository: { name: 'codex-claw', path: '/workspace/codex-claw', worktrees: [] } });
+    expect(harness.createWorktree).toHaveBeenCalledWith({ repoPath: '/workspace/codex-claw', branchName: 'fix/eng-12', remoteConnectionId: 'remote-dev' });
+    expect(harness.assign).toHaveBeenCalledWith({ agentId: harness.createdAgent.id, item: listedItem, prompt: expect.stringContaining('Issue: ENG-12') });
+    await expect(harness.routing.createIsolatedAgent(listedItem, harness.teamId)).rejects.toThrow();
+    expect(harness.createAgent).toHaveBeenCalledOnce();
+  });
   it('moves an existing session onto the issue branch before assigning prompted work', async () => {
     const harness = createHarness();
 
@@ -142,6 +179,7 @@ function createHarness(input: {
       createAgent,
       createBranch,
       createWorktree,
+      listBranches: vi.fn().mockResolvedValue([]),
       duplicateAgent,
       loadItems,
     },
@@ -171,6 +209,7 @@ function createHarness(input: {
     createdAgent,
     createWorktree,
     focusComposer,
+    duplicateAgent,
     item: listedItem,
     loadItems,
     openNewAgent,

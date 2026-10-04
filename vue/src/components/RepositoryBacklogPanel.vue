@@ -216,9 +216,9 @@
             @select="selectAssignmentMenuItem"
           />
         </template>
-        <template v-else-if="selectedItem.provider === 'github' && (operationState === 'idle' || operationState === 'error')">
+        <template v-else-if="operationState === 'idle' || operationState === 'error'">
           <header>
-            <strong>{{ t('repositoryBacklog.startWork', { number: selectedItem.number }) }}</strong>
+            <strong>{{ selectedItem.identifier ?? t('repositoryBacklog.startWork', { number: selectedItem.number }) }}</strong>
             <button type="button" :aria-label="$t('surface.repositoryBacklogPanel.close')" @click="closeStartWork"><IconX aria-hidden="true" /></button>
           </header>
 
@@ -232,7 +232,7 @@
           />
         </template>
 
-        <div v-else-if="selectedItem.provider === 'github'" class="repository-backlog__operation-state" :data-state="operationState">
+        <div v-else class="repository-backlog__operation-state" :data-state="operationState">
           <span v-if="operationState === 'running'" class="repository-backlog__operation-spinner" aria-hidden="true" />
           <IconCircleCheck v-else aria-hidden="true" />
           <strong>{{ operationState === 'running' ? t('repositoryBacklog.starting') : t('repositoryBacklog.started') }}</strong>
@@ -273,6 +273,7 @@
 </template>
 
 <script setup lang="ts">
+import { workItemBranchName } from '@codex-claw/core/work-item-prompts';
 import { computed, h, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -342,6 +343,8 @@ const searchInput = ref<HTMLInputElement | null>(null);
 const filtersVisible = ref(false);
 const defaultsSaved = ref(false);
 const selectedItem = ref<WorkItem | null>(null);
+let selectionRevision = 0;
+watch([selectedItem, () => props.visible, () => JSON.stringify(props.location)], () => { ++selectionRevision; }, { flush: 'sync' });
 const openItemId = ref<string | null>(null);
 const startWorkVisible = ref(false);
 const branchName = ref('');
@@ -423,6 +426,7 @@ watch(() => props.repositoryId, () => {
 }, { immediate: true });
 
 watch([linear.provider, linear.sourceId, () => JSON.stringify(props.location)], () => {
+  pendingClearAssignment.value = null;
   closeStartWork();
   closeSearch();
   clearFilters();
@@ -619,34 +623,40 @@ function setStartWorkVisible(visible: boolean): void {
   closeStartWork();
 }
 
-function prefillCustomPrompt(): void {
+function prefillCustomPrompt(selection: Omit<WorkItemAssignmentSelection, 'action'>): void {
   const item = selectedItem.value;
   if (!item) return;
+  if (item.provider === 'linear') { void startWork({ ...selection, action: 'custom' }); return; }
   props.prefillAction(item);
   closeStartWork();
 }
 
-async function startWork(selection: WorkItemAssignmentSelection): Promise<void> {
+async function startWork(selection: Omit<WorkItemAssignmentSelection, 'action'> & { action: RepositoryWorkStartInput['action'] }): Promise<void> {
   const item = selectedItem.value;
-  if (!item || operationState.value === 'running') return;
+  if (!item || selection.item.id !== item.id || operationState.value === 'running') return;
+  const source = linear.sourceId.value;
+  const provider = linear.provider.value;
+  const revision = selectionRevision;
+  const isCurrent = () => revision === selectionRevision && props.visible && selectedItem.value?.id === item.id && linear.sourceId.value === source && linear.provider.value === provider;
   operationState.value = 'running';
   operationError.value = null;
   try {
     const input: RepositoryWorkStartInput = selection.destination === 'new'
       ? { action: selection.action, item, target: 'duplicate', backend: selection.backend, workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
       : { action: selection.action, item, target: 'current', workspace: { kind: 'current' } };
-    await props.startWorkAction(input);
+    await props.startWorkAction({ ...input, ...(item.provider === 'linear' ? { isCurrent } : {}) });
+    if (!isCurrent()) return;
     operationState.value = 'success';
-    globalThis.setTimeout(closeStartWork, 1_200);
+    globalThis.setTimeout(() => { if (isCurrent()) closeStartWork(); }, 1_200);
   } catch (error) {
+    if (!isCurrent()) return;
     operationState.value = 'error';
     operationError.value = error instanceof Error ? error.message : String(error);
   }
 }
 
 function suggestedBranch(item: WorkItem): string {
-  const prefix = item.kind === 'pullRequest' ? 'review' : 'fix';
-  return `${prefix}/gh-${item.number}`;
+  return workItemBranchName(item);
 }
 
 function relativeTime(value: string): string {

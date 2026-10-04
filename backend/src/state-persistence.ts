@@ -9,7 +9,7 @@ import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { sanitizeWorkItemAssignmentSource, workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
 import { appText } from '@codex-claw/core/app-text';
 import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
@@ -851,10 +851,12 @@ function sanitizeWorkBacklogAssignment(value: unknown): WorkBacklogAssignment | 
 
   const automationId = optionalTrimmedString(value.automationId) ?? optionalTrimmedString(value.loopId);
   const automationExecutionId = optionalTrimmedString(value.automationExecutionId) ?? optionalTrimmedString(value.loopExecutionId);
+  const item = sanitizeWorkItemAssignmentSource(value.item);
 
   return {
     provider: value.provider,
     itemId: value.itemId,
+    ...(item && item.provider === value.provider && item.id === value.itemId ? { item } : {}),
     agentId: value.agentId,
     assignedAt: value.assignedAt,
     policy: value.policy === 'complete' || value.policy === 'review'

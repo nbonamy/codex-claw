@@ -213,6 +213,7 @@
         :default-team-id="snapshot.activeTeamId"
         :repository-icons="snapshot.general.repositoryIcons"
         :start-work-items-action="startCockpitWorkItems"
+        :list-source-repositories="listSourceRepositories"
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
         @assign-work-item-to-new-agent="openNewAgentForWorkItem"
@@ -1137,11 +1138,14 @@ function closeMissionIssuePicker(): void {
 async function chooseMissionIssue(item: WorkItem): Promise<void> {
   const mission = selectedMission.value;
   if (!mission || mission.stage !== 'requirements' || missionIssueLoading.value
-    || item.kind === 'pullRequest' || item.repositoryId !== missionIssueRepositoryId.value) return;
+    || !missionIssuePickerVisible.value || item.kind === 'pullRequest'
+    || (item.provider === 'github' && item.repositoryId !== missionIssueRepositoryId.value)) return;
   missionIssueLoading.value = true;
   missionIssueError.value = null;
   try {
-    const issueContext = t('missions.issueMissionPrompt', {
+    const issueContext = item.provider === 'linear'
+      ? `Shape this Mission from Linear issue ${item.identifier ?? item.id}: ${item.title}\nBacklog source: ${item.repositoryFullName}\nWork item ID: linear:${item.id}\n${item.url}`
+      : t('missions.issueMissionPrompt', {
       repository: item.repositoryFullName,
       number: item.number,
       title: item.title,
@@ -1347,6 +1351,7 @@ const workItemRouting = useWorkItemRouting({
     createAgent: (input) => props.createAgent(input),
     createBranch: (agentId, input) => props.createAgentGitBranch(agentId, input),
     createWorktree: (input) => props.createSourceWorktree(input),
+    listBranches: (repoPath, remoteConnectionId) => props.listSourceBranches(repoPath, remoteConnectionId),
     duplicateAgent: (agentId, options) => props.duplicateAgentAction(agentId, options),
     loadItems: (provider, repositoryId, query) => props.loadWorkItems(provider, repositoryId, undefined, query),
   },

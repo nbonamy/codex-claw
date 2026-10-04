@@ -109,6 +109,7 @@
         :teams="teams"
         :default-team-id="defaultTeamId"
         :start-work-action="startWorkItemsAction"
+        :list-source-repositories="listSourceRepositories"
         :status="workBacklog.status"
         :status-filter="activeSummaryFilter"
         :total-items="workBacklog.totalItems"
@@ -167,7 +168,8 @@ const props = defineProps<{
   repositoryIcons?: Record<string, string>;
   teams: Team[];
   defaultTeamId?: string | null;
-  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend'] }) => Promise<void>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceRepository[]>;
+  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@codex-claw/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
   workBacklog?: CockpitWorkBacklog | null;
 }>();
 

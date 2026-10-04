@@ -1,4 +1,5 @@
 import { isMission } from './missions';
+import { sanitizeWorkItemAssignmentSource } from './work-assignments';
 import { isAgentHandoff } from './agent-handoff';
 import { isProviderConnection } from './contracts/provider-setup';
 import { isThreadFlags } from './thread-flags';
@@ -481,7 +482,8 @@ function isWorkProviderSettings(value: unknown): boolean {
 
 function isWorkBacklogAssignment(value: unknown): boolean {
   return isRecord(value) &&
-    value.provider === 'github' &&
+    includes(['github', 'linear'], value.provider) &&
+    optional(value, 'item', item => Boolean(sanitizeWorkItemAssignmentSource(item))) &&
     typeof value.itemId === 'string' &&
     typeof value.agentId === 'string' &&
     typeof value.assignedAt === 'string' &&

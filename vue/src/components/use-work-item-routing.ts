@@ -16,6 +16,8 @@ import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments'
 import {
   workItemAssignmentPrompt,
   workItemComposerPrompt,
+  workItemBranchName,
+  workItemDisplayIdentifier,
   type WorkItemAssignmentAction,
 } from '@codex-claw/core/work-item-prompts';
 import { computed, ref } from 'vue';
@@ -41,6 +43,7 @@ type WorkItemRoutingActions = {
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createBranch: (agentId: string, input: AgentGitBranchInput) => Promise<unknown>;
   createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
+  listBranches: (repoPath: string, remoteConnectionId?: string) => Promise<unknown>;
   duplicateAgent: (agentId: string, options: DuplicateAgentOptions) => Promise<Agent | null>;
   loadItems: (
     provider: WorkItem['provider'],
@@ -70,34 +73,36 @@ export function useWorkItemRouting(options: {
   const newAgentWorktreeBranchName = computed(() => {
     const item = pendingNewAgentItem.value;
     if (!item) return '';
-    return item.kind === 'pullRequest'
-      ? item.branchName?.trim() || `review/gh-${item.number}`
-      : `fix/gh-${item.number}`;
+    return workItemBranchName(item);
   });
 
   async function startRepositoryWork(agentId: string, input: RepositoryWorkStartInput): Promise<void> {
     const sourceAgent = findAgent(agentId);
     if (!sourceAgent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
+    if (input.item.provider === 'linear') await validateAgentRepository(sourceAgent);
 
     const item = await resolvePullRequestBranch(input.item);
+    ensureCurrent(input.isCurrent);
     const sourceAgentName = agentDisplayName(sourceAgent);
     const targetLabel = input.target === 'duplicate' ? `a duplicate of ${sourceAgentName}` : sourceAgentName;
     if (!await confirmAssignedOverride(item, targetLabel, input.target === 'current' ? sourceAgent.id : undefined)) {
       throw new Error(translate('surface.appShell.assignmentCancelled'));
     }
+    ensureCurrent(input.isCurrent);
 
     const targetAgent = input.target === 'duplicate'
       ? input.backend && input.backend !== sourceAgent.backend
         ? await options.actions.createAgent({
-            name: `${sourceAgentName} gh-${item.number}`, folder: sourceAgent.folder ?? '',
+            name: `${sourceAgentName} ${item.provider === 'linear' ? workItemDisplayIdentifier(item) : `gh-${item.number}`}`, folder: sourceAgent.folder ?? '',
             backend: input.backend, teamId: sourceAgent.teamId,
           })
         : await options.actions.duplicateAgent(sourceAgent.id, {
           select: false,
-          name: `${sourceAgentName} gh-${item.number}`,
+          name: `${sourceAgentName} ${item.provider === 'linear' ? workItemDisplayIdentifier(item) : `gh-${item.number}`}`,
         })
       : sourceAgent;
     if (!targetAgent) throw new Error(translate('surface.appShell.theDuplicateAgentCouldNotBeCreated'));
+    ensureCurrent(input.isCurrent);
     if (input.target === 'duplicate' && input.workspace.kind !== 'worktree') {
       throw new Error(translate('surface.appShell.aDuplicatedAgentRequiresANewWorktree'));
     }
@@ -116,7 +121,9 @@ export function useWorkItemRouting(options: {
         confirmed: true,
       });
     }
-    await assignWithPrompt(targetAgent.id, item, input.action);
+    ensureCurrent(input.isCurrent);
+    if (input.action === 'custom') prefill(targetAgent.id, item);
+    else await assignWithPrompt(targetAgent.id, item, input.action);
   }
 
   function prefill(agentId: string, item: WorkItem): void {
@@ -154,9 +161,18 @@ export function useWorkItemRouting(options: {
     items: WorkItem[];
     teamId: string;
     backend?: Agent['backend'];
+    repository?: SourceRepository;
+    isCurrent?: () => boolean;
   }): Promise<void> {
+    const keys = new Set<string>();
+    for (const item of input.items) {
+      const key = `${item.provider}:${item.id}`;
+      if (keys.has(key)) throw new Error('The same issue was selected more than once.');
+      keys.add(key);
+    }
     await Promise.all(input.items.map(async (listedItem) => {
-      const { agent, item } = await createIsolatedAgent(listedItem, input.teamId, { backend: input.backend });
+      const { agent, item } = await createIsolatedAgent(listedItem, input.teamId, { backend: input.backend, repository: input.repository, isCurrent: input.isCurrent });
+      ensureCurrent(input.isCurrent);
       await assignWithPrompt(agent.id, item, input.action);
     }));
   }
@@ -164,15 +180,19 @@ export function useWorkItemRouting(options: {
   async function createIsolatedAgent(
     listedItem: WorkItem,
     teamId: string,
-    creationOptions: { reuseExisting?: boolean; backend?: Agent['backend'] } = {},
+    creationOptions: { reuseExisting?: boolean; backend?: Agent['backend']; repository?: SourceRepository; isCurrent?: () => boolean } = {},
   ): Promise<{ agent: Agent; item: WorkItem }> {
     const team = options.model.snapshot().teams.find((candidate) => candidate.id === teamId);
     if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
 
     const item = await resolvePullRequestBranch(listedItem);
+    ensureCurrent(creationOptions.isCurrent);
     const repositoryName = workItemRepositoryName(item);
-    const repository = options.model.sourceRepositories().find((candidate) => candidate.name === repositoryName);
+    const repository = creationOptions.repository ?? (item.provider === 'github'
+      ? options.model.sourceRepositories().find((candidate) => candidate.name === repositoryName) : undefined);
     if (!repository) throw new Error(`${item.repositoryFullName} is not available in the source folder.`);
+    if (!await confirmAssignedOverride(item, 'a new agent')) throw new Error(translate('surface.appShell.assignmentCancelled'));
+    ensureCurrent(creationOptions.isCurrent);
 
     const worktree = await options.actions.createWorktree({
       repoPath: repository.path,
@@ -180,6 +200,7 @@ export function useWorkItemRouting(options: {
       ...(creationOptions.reuseExisting ? { reuseExisting: true } : {}),
       ...remoteConnection(team),
     });
+    ensureCurrent(creationOptions.isCurrent);
     const agent = await options.actions.createAgent({
       name: null,
       folder: worktree.path,
@@ -187,7 +208,7 @@ export function useWorkItemRouting(options: {
       sourceRepositoryName: repository.name,
       teamId: team.id,
     });
-    if (!agent) throw new Error(`Could not create an agent for ${item.repositoryFullName} #${item.number}.`);
+    if (!agent) throw new Error(`Could not create an agent for ${item.repositoryFullName} ${workItemDisplayIdentifier(item)}.`);
     return { agent, item };
   }
 
@@ -195,13 +216,17 @@ export function useWorkItemRouting(options: {
     agentId: string,
     listedItem: WorkItem,
     action: WorkItemAssignmentAction,
+    isCurrent?: () => boolean,
   ): Promise<void> {
     const agent = findAgent(agentId);
     if (!agent) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
+    if (listedItem.provider === 'linear') await validateAgentRepository(agent);
     const item = await resolvePullRequestBranch(listedItem);
+    ensureCurrent(isCurrent);
     if (!await confirmAssignedOverride(item, agentDisplayName(agent), agent.id)) {
       throw new Error(translate('surface.appShell.assignmentCancelled'));
     }
+    ensureCurrent(isCurrent);
 
     const branchName = workItemBranchName(item);
     if (agent.workspace?.kind !== 'git' || agent.workspace.branch !== branchName) {
@@ -212,6 +237,7 @@ export function useWorkItemRouting(options: {
         confirmed: true,
       });
     }
+    ensureCurrent(isCurrent);
     await assignWithPrompt(agent.id, item, action);
   }
 
@@ -227,7 +253,9 @@ export function useWorkItemRouting(options: {
       kind: 'pullRequest',
       state: 'all',
     });
-    return refreshedItems?.find((candidate) => candidate.id === item.id) ?? item;
+    const resolved = refreshedItems?.find((candidate) => candidate.id === item.id) ?? item;
+    if (!resolved.branchName?.trim()) throw new Error(translate('surface.appShell.gitHubDidNotReturnThePullRequestBranch'));
+    return resolved;
   }
 
   async function confirmAssignedOverride(
@@ -242,12 +270,18 @@ export function useWorkItemRouting(options: {
     );
     if (!assignedAgent || assignedAgent.id === targetAgentId) return true;
     return options.ui.confirmReassignment(
-      `${workProviderTitle(item.provider)} #${item.number} is already assigned to ${assignedAgent.name}. We don't know if ${assignedAgent.name} is still working on it. Assign it to ${targetLabel} anyway?`,
+      `${workProviderTitle(item.provider)} ${workItemDisplayIdentifier(item)} is already assigned to ${assignedAgent.name}. We don't know if ${assignedAgent.name} is still working on it. Assign it to ${targetLabel} anyway?`,
     );
   }
 
   function findAgent(agentId: string): Agent | null {
     return options.model.snapshot().agents.find((candidate) => candidate.id === agentId) ?? null;
+  }
+
+  async function validateAgentRepository(agent: Agent): Promise<void> {
+    if (agent.workspace?.kind !== 'git') throw new Error('The selected code repository is unavailable.');
+    const team = options.model.snapshot().teams.find(team => team.id === agent.teamId);
+    await options.actions.listBranches(agent.workspace.primaryWorktreeRoot, team?.remoteConnectionId);
   }
 
   async function assignWithPrompt(
@@ -278,18 +312,17 @@ export function useWorkItemRouting(options: {
   };
 }
 
-function workItemBranchName(item: WorkItem): string {
-  const branchName = item.kind === 'pullRequest' ? item.branchName?.trim() : `fix/gh-${item.number}`;
-  if (!branchName) throw new Error(`GitHub did not return the branch for ${item.repositoryFullName} #${item.number}.`);
-  return branchName;
-}
-
 function workItemRepositoryName(item: WorkItem): string {
+  if (item.provider === 'linear') return '';
   return item.repositoryFullName.split('/').filter(Boolean).at(-1) ?? item.repositoryFullName;
 }
 
 function workItemTeamName(item: WorkItem): string {
-  return `${workProviderTitle(item.provider)} #${item.number}`;
+  return `${workProviderTitle(item.provider)} ${workItemDisplayIdentifier(item)}`;
+}
+
+function ensureCurrent(isCurrent?: () => boolean): void {
+  if (isCurrent && !isCurrent()) throw new Error('The backlog selection changed. Select the issue again.');
 }
 
 function workProviderTitle(provider: WorkItem['provider']): string {

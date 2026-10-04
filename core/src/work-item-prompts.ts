@@ -23,8 +23,8 @@ export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPrompt
       : 'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
     'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
     '',
-    `Repository: ${item.repositoryFullName}`,
-    `${item.kind === 'pullRequest' ? 'Pull request' : 'Issue'}: #${item.number} ${item.title}`,
+    `${item.provider === 'linear' ? 'Backlog source' : 'Repository'}: ${item.repositoryFullName}`,
+    `${item.kind === 'pullRequest' ? 'Pull request' : 'Issue'}: ${workItemDisplayIdentifier(item)} ${item.title}`,
     `URL: ${item.url}`,
     item.labels.length > 0 ? `Labels: ${item.labels.map((label) => label.name).join(', ')}` : null,
     item.authorName ? `Author: ${item.authorName}` : null,
@@ -35,7 +35,18 @@ export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPrompt
 
 export function workItemComposerPrompt(item: WorkItem): string {
   const kind = item.kind === 'pullRequest' ? 'pull request' : 'issue';
-  return `Regarding ${workProviderLabel(item.provider)} ${kind} #${item.number} — ${item.title}:\n\n`;
+  return `Regarding ${workProviderLabel(item.provider)} ${kind} ${workItemDisplayIdentifier(item)} — ${item.title}:\n\n`
+    + (item.provider === 'linear' ? `Work item ID: ${workItemAssignmentKey(item)}\nBacklog source: ${item.repositoryFullName}\nURL: ${item.url}\n\n${truncateWorkItemBody(item.body?.trim() ?? '')}\n\n` : '');
+}
+
+export function workItemDisplayIdentifier(item: Pick<WorkItem, 'provider' | 'identifier' | 'number'>): string {
+  return item.provider === 'linear' ? item.identifier ?? `#${item.number}` : `#${item.number}`;
+}
+
+export function workItemBranchName(item: WorkItem): string {
+  if (item.kind === 'pullRequest') return item.branchName?.trim() || `review/gh-${item.number}`;
+  const reference = item.provider === 'linear' ? item.identifier ?? item.id : `gh-${item.number}`;
+  return `fix/${reference.toLowerCase().replace(/[^a-z0-9-]+/g, '-')}`;
 }
 
 export function workProviderLabel(provider: WorkItem['provider']): string {
