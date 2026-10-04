@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { BackendConversationRef, CodexClawApi, RendererMessage, WorkRepository } from '@codex-claw/core/contracts';
+import type { BackendConversationRef, CodexClawApi, RendererMessage, WorkSource } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow, stubLegacyElectronTestWindow } from '../test/client';
@@ -11,6 +11,20 @@ import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onb
 import { workItem } from './app-state-test-harness';
 
 describe('useAppState', () => {
+  it('loads automation catalogs on the requested host without changing the interactive backlog and exposes retryable errors', async () => {
+    const listWorkSources = vi.fn().mockResolvedValue([]);
+    const configureWorkBacklog = vi.fn();
+    const listWorkItems = vi.fn();
+    stubElectronTestWindow({ codexClaw: { listWorkSources, configureWorkBacklog, listWorkItems } });
+    const state = useAppState();
+    const location = { kind: 'remote' as const, remoteConnectionId: 'devbox' };
+    await state.listAutomationWorkRepositories('linear', location);
+    expect(listWorkSources).toHaveBeenCalledWith('linear', location);
+    expect(configureWorkBacklog).not.toHaveBeenCalled();
+    expect(listWorkItems).not.toHaveBeenCalled();
+    listWorkSources.mockRejectedValueOnce(new Error('Linear disconnected'));
+    await expect(state.listAutomationWorkRepositories('linear')).rejects.toThrow('Linear disconnected');
+  });
   afterEach(() => {
     clearConfetti();
     clearFirstRunOnboardingStage();
@@ -35,7 +49,7 @@ describe('useAppState', () => {
     const selectedSnapshot = createInitialSnapshot();
     selectedSnapshot.workBacklog.connections = connectedSnapshot.workBacklog.connections;
     selectedSnapshot.workBacklog.providerConfigurations.github = {
-      repositoryId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
     };
     const repository = workRepository();
     const item = workItem();
@@ -50,14 +64,14 @@ describe('useAppState', () => {
     });
     const openExternal = vi.spyOn(window, 'open').mockReturnValue(null);
     const pollWorkProviderAuthorization = vi.fn().mockResolvedValue(connectedSnapshot);
-    const listWorkRepositories = vi.fn().mockResolvedValue([repository]);
+    const listWorkSources = vi.fn().mockResolvedValue([repository]);
     const configureWorkBacklog = vi.fn().mockResolvedValue(selectedSnapshot);
     const listWorkItems = vi.fn().mockResolvedValue([item]);
     stubElectronTestWindow({
       codexClaw: {
         connectWorkProvider,
         pollWorkProviderAuthorization,
-        listWorkRepositories,
+        listWorkSources,
         configureWorkBacklog,
         listWorkItems,
       } satisfies Partial<CodexClawApi>,
@@ -69,6 +83,7 @@ describe('useAppState', () => {
     await state.connectWorkProvider('github');
     expect(state.snapshot.value).toStrictEqual(connectingSnapshot);
     expect(state.workProviderAuthorization.value?.userCode).toBe('ABCD-1234');
+    expect(openExternal).not.toHaveBeenCalled();
 
     await state.openWorkProviderAuthorization('github');
     expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device', '_blank', 'noopener,noreferrer');
@@ -79,11 +94,11 @@ describe('useAppState', () => {
 
     expect(pollWorkProviderAuthorization).toHaveBeenCalledWith('github');
     expect(useConfetti().bursts.value).toHaveLength(1);
-    expect(listWorkRepositories).toHaveBeenCalledWith('github');
+    expect(listWorkSources).toHaveBeenCalledWith('github');
     expect(configureWorkBacklog).toHaveBeenCalledWith({
       provider: 'github',
       configuration: {
-        repositoryId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
         assigneeLogin: null,
         tagName: null,
       },
@@ -104,7 +119,7 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         pollWorkProviderAuthorization: vi.fn().mockResolvedValue(connectedSnapshot),
-        listWorkRepositories: vi.fn().mockResolvedValue([]),
+        listWorkSources: vi.fn().mockResolvedValue([]),
       } satisfies Partial<CodexClawApi>,
     });
     setFirstRunOnboardingStage('github');
@@ -259,7 +274,7 @@ describe('useAppState', () => {
     await state.configureWorkBacklog({
       provider: 'github',
       configuration: {
-        repositoryId: null,
+        sourceId: null,
         tagName: null,
       },
     });
@@ -277,13 +292,13 @@ describe('useAppState', () => {
     }];
     const connectWorkProvider = vi.fn().mockRejectedValue('connect failed');
     const pollWorkProviderAuthorization = vi.fn().mockRejectedValue('finish failed');
-    const listWorkRepositories = vi.fn().mockRejectedValue('repos failed');
+    const listWorkSources = vi.fn().mockRejectedValue('repos failed');
     const listWorkItems = vi.fn().mockRejectedValue('items failed');
     stubElectronTestWindow({
       codexClaw: {
         connectWorkProvider,
         pollWorkProviderAuthorization,
-        listWorkRepositories,
+        listWorkSources,
         listWorkItems,
       } satisfies Partial<CodexClawApi>,
     });
@@ -315,7 +330,7 @@ describe('useAppState', () => {
     stubElectronTestWindow({
       codexClaw: {
         connectWorkProvider: vi.fn().mockRejectedValue(new Error('connect object failed')),
-        listWorkRepositories: vi.fn().mockRejectedValue(new Error('repo object failed')),
+        listWorkSources: vi.fn().mockRejectedValue(new Error('repo object failed')),
         listWorkItems: vi.fn().mockRejectedValue(new Error('item object failed')),
       } satisfies Partial<CodexClawApi>,
     });
@@ -340,11 +355,11 @@ describe('useAppState', () => {
       detail: 'GitHub authorization is still pending.',
     }];
     const pollWorkProviderAuthorization = vi.fn().mockResolvedValue(connectingSnapshot);
-    const listWorkRepositories = vi.fn();
+    const listWorkSources = vi.fn();
     stubElectronTestWindow({
       codexClaw: {
         pollWorkProviderAuthorization,
-        listWorkRepositories,
+        listWorkSources,
       } satisfies Partial<CodexClawApi>,
     });
     const state = useAppState();
@@ -353,7 +368,7 @@ describe('useAppState', () => {
 
     expect(state.snapshot.value.workBacklog.connections[0]?.status).toBe('connecting');
     expect(state.workBacklogStatus.value).toBe('loaded');
-    expect(listWorkRepositories).not.toHaveBeenCalled();
+    expect(listWorkSources).not.toHaveBeenCalled();
   });
 
   it('disconnects work providers and handles null repository selection', async () => {
@@ -364,7 +379,7 @@ describe('useAppState', () => {
       accountLabel: 'nbonamy',
     }];
     connectedSnapshot.workBacklog.providerConfigurations.github = {
-      repositoryId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
       tagName: 'bug',
     };
     const disconnectedSnapshot = createInitialSnapshot();
@@ -396,7 +411,7 @@ describe('useAppState', () => {
     await state.configureWorkBacklog({
       provider: 'github',
       configuration: {
-        repositoryId: null,
+        sourceId: null,
         tagName: null,
       },
     });
@@ -405,7 +420,7 @@ describe('useAppState', () => {
     expect(configureWorkBacklog).toHaveBeenCalledWith({
       provider: 'github',
       configuration: {
-        repositoryId: null,
+        sourceId: null,
         tagName: null,
       },
     });
@@ -422,7 +437,7 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.teams[0]!.id = 'team-remote';
     remoteSnapshot.workBacklog.providerConfigurations.github = {
-      repositoryId: 'nbonamy/remote',
+      sourceId: 'nbonamy/remote',
     };
     const configureWorkBacklog = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
@@ -437,7 +452,7 @@ describe('useAppState', () => {
     await state.configureWorkBacklog({
       provider: 'github',
       configuration: {
-        repositoryId: 'nbonamy/remote',
+        sourceId: 'nbonamy/remote',
         tagName: null,
       },
     }, location);
@@ -445,7 +460,7 @@ describe('useAppState', () => {
     expect(configureWorkBacklog).toHaveBeenCalledWith({
       provider: 'github',
       configuration: {
-        repositoryId: 'nbonamy/remote',
+        sourceId: 'nbonamy/remote',
         tagName: null,
       },
     }, location);
@@ -461,16 +476,16 @@ describe('useAppState', () => {
       accountLabel: 'nbonamy',
     }];
     snapshot.workBacklog.providerConfigurations.github = {
-      repositoryId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
     };
-    const listWorkRepositories = vi.fn()
+    const listWorkSources = vi.fn()
       .mockResolvedValueOnce([workRepository()])
       .mockResolvedValueOnce([]);
     const listWorkItems = vi.fn().mockResolvedValue([workItem()]);
     const configureWorkBacklog = vi.fn();
     stubElectronTestWindow({
       codexClaw: {
-        listWorkRepositories,
+        listWorkSources,
         listWorkItems,
         configureWorkBacklog,
       } satisfies Partial<CodexClawApi>,
@@ -493,8 +508,8 @@ describe('useAppState', () => {
       name: 'GitHub bugs',
       repositories: [{
         provider: 'github' as const,
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       }],
       teamId: 'team-codex-claw',
       schedule: { intervalMinutes: 60 },
@@ -624,7 +639,7 @@ describe('useAppState', () => {
   });
 });
 
-function workRepository(): WorkRepository {
+function workRepository(): WorkSource {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw',

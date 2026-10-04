@@ -87,8 +87,8 @@ describe('AgentConversationService', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        repositoryId: 'openai/codex-claw',
-        sourceRepositoryPath: '/repo',
+        sourceId: 'openai/codex-claw',
+        executionRepositoryPath: '/repo',
       }],
       teamId: 'team-1',
       schedule: { intervalMinutes: 60 },

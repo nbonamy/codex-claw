@@ -4,13 +4,14 @@ import { HostedMcpGateway, hostedMcpServerUrl } from '../hosted-mcp-gateway';
 describe('HostedMcpGateway', () => {
   it('publishes connected provider servers under the Claw loopback origin', () => {
     const credentials = {
-      isConnected: vi.fn((provider: string) => provider === 'github'),
+      isConnected: vi.fn(() => true),
       authorizationHeader: vi.fn(),
     };
     const gateway = new HostedMcpGateway({ credentials });
 
     expect(gateway.enabledServerUrls('http://127.0.0.1:4321/mcp')).toStrictEqual({
       github: 'http://127.0.0.1:4321/mcp/providers/github',
+      linear: 'http://127.0.0.1:4321/mcp/providers/linear',
     });
     expect(gateway.hasServer('github')).toBe(true);
     expect(gateway.hasServer('unknown')).toBe(false);
@@ -71,7 +72,7 @@ describe('HostedMcpGateway', () => {
     expect(headers.get('host')).toBeNull();
   });
 
-  it('force-refreshes once when the hosted server rejects a token', async () => {
+  it.each(['github', 'linear'] as const)('force-refreshes %s once when the hosted server rejects a token', async (provider) => {
     const fetchUpstream = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(new Response('unauthorized', { status: 401 }))
       .mockResolvedValueOnce(new Response('ok', { status: 200 }));
@@ -83,15 +84,15 @@ describe('HostedMcpGateway', () => {
     };
     const gateway = new HostedMcpGateway({ credentials, fetch: fetchUpstream });
 
-    const response = await gateway.forward('github', {
+    const response = await gateway.forward(provider, {
       method: 'POST',
       headers: new Headers({ 'content-type': 'application/json' }),
       body: Buffer.from('{}'),
     });
 
     expect(response.status).toBe(200);
-    expect(credentials.authorizationHeader).toHaveBeenNthCalledWith(1, 'github', undefined);
-    expect(credentials.authorizationHeader).toHaveBeenNthCalledWith(2, 'github', { forceRefresh: true });
+    expect(credentials.authorizationHeader).toHaveBeenNthCalledWith(1, provider, undefined);
+    expect(credentials.authorizationHeader).toHaveBeenNthCalledWith(2, provider, { forceRefresh: true });
     expect(new Headers(fetchUpstream.mock.calls[1]?.[1]?.headers).get('authorization')).toBe('bearer ghu_rotated');
   });
 });

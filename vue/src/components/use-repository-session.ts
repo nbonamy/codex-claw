@@ -11,7 +11,7 @@ import type {
   SourceRepository,
   SourceWorktree,
   WorkItem,
-  WorkRepository,
+  WorkSource,
 } from '@codex-claw/core/contracts';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { computed, ref } from 'vue';
@@ -26,20 +26,21 @@ export function useRepositorySession(options: {
   createIsolatedWorkItemAgent: (
     item: WorkItem,
     teamId: string,
-    options?: { reuseExisting?: boolean; backend?: AgentBackend },
+    options?: { reuseExisting?: boolean; backend?: AgentBackend; repository?: SourceRepository; isCurrent?: () => boolean },
   ) => Promise<{ agent: Agent; item: WorkItem }>;
   createSourceWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   getSnapshot: () => AppSnapshot;
-  getWorkRepositories: () => WorkRepository[];
+  getWorkRepositories: () => WorkSource[];
   listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
   loadWorkItems: (repositoryId: string, location?: AutomationLocation) => Promise<WorkItem[]>;
-  loadWorkRepositories: (location?: AutomationLocation) => Promise<WorkRepository[]>;
+  loadWorkRepositories: (location?: AutomationLocation) => Promise<WorkSource[]>;
   notifyError: (message: string) => void;
   prefillWorkItemForAgent: (agentId: string, item: WorkItem) => void;
   startWorkItemInExistingSession: (
     agentId: string,
     item: WorkItem,
     action: WorkItemAssignmentSelection['action'],
+    isCurrent?: () => boolean,
   ) => Promise<void>;
   suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => Promise<string>;
 }) {
@@ -48,6 +49,7 @@ export function useRepositorySession(options: {
   const visible = ref(false);
   const branches = ref<SourceBranch[]>([]);
   const workItems = ref<WorkItem[]>([]);
+  const workSourceId = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const assignmentState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -85,6 +87,7 @@ export function useRepositorySession(options: {
     visible.value = true;
     branches.value = [];
     workItems.value = [];
+    workSourceId.value = null;
     error.value = null;
     assignmentState.value = 'idle';
     assignmentError.value = null;
@@ -97,14 +100,19 @@ export function useRepositorySession(options: {
       try {
         const repositories = await options.loadWorkRepositories(location);
         if (requestId !== sourceRequestId) return;
-        const workRepository = (repositories.length > 0 ? repositories : options.getWorkRepositories())
-          .find((repository) => (
+        const matchingRepositories = (repositories.length > 0 ? repositories : options.getWorkRepositories())
+          .filter((repository) => (
             repository.name === nextSource.repositoryName ||
             repository.fullName.endsWith(`/${nextSource.repositoryName}`)
           ));
-        if (workRepository) workItems.value = await options.loadWorkItems(workRepository.id, location);
+        const workRepository = matchingRepositories.length === 1 ? matchingRepositories[0] : undefined;
+        if (workRepository) {
+          workSourceId.value = workRepository.id;
+          const loadedItems = await options.loadWorkItems(workRepository.id, location);
+          if (requestId === sourceRequestId) workItems.value = loadedItems;
+        }
       } catch {
-        workItems.value = [];
+        if (requestId === sourceRequestId) workItems.value = [];
       }
     } catch (caught) {
       if (requestId !== sourceRequestId) return;
@@ -118,6 +126,7 @@ export function useRepositorySession(options: {
     sourceRequestId += 1;
     visible.value = false;
     source.value = null;
+    workSourceId.value = null;
     loading.value = false;
     error.value = null;
     assignmentState.value = 'idle';
@@ -199,28 +208,34 @@ export function useRepositorySession(options: {
   async function startWork(selection: WorkItemAssignmentSelection): Promise<void> {
     const current = source.value;
     if (!current) return;
+    const requestId = sourceRequestId;
+    const isCurrent = () => requestId === sourceRequestId && (!selection.isCurrent || selection.isCurrent());
+    if (!isCurrent()) return;
     const { teamId } = context(current);
     assignmentState.value = 'running';
     assignmentError.value = null;
     try {
       if (selection.destination === 'existing') {
         if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-        await options.startWorkItemInExistingSession(selection.agentId, selection.item, selection.action);
+        await options.startWorkItemInExistingSession(selection.agentId, selection.item, selection.action, isCurrent);
       } else {
         if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          { backend: backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}) },
+          { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
+            repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
         );
+        if (!isCurrent()) return;
         await options.assignWorkItem({
           agentId: agent.id,
           item,
           prompt: workItemAssignmentPrompt(item, { action: selection.action }),
         });
       }
-      assignmentState.value = 'success';
+      if (isCurrent()) assignmentState.value = 'success';
     } catch (caught) {
+      if (!isCurrent()) return;
       assignmentState.value = 'error';
       assignmentError.value = caught instanceof Error ? caught.message : String(caught);
     }
@@ -229,6 +244,9 @@ export function useRepositorySession(options: {
   async function customizeWork(selection: Omit<WorkItemAssignmentSelection, 'action'>): Promise<void> {
     const current = source.value;
     if (!current) return;
+    const requestId = sourceRequestId;
+    const isCurrent = () => requestId === sourceRequestId && (!selection.isCurrent || selection.isCurrent());
+    if (!isCurrent()) return;
     const { teamId } = context(current);
     assignmentState.value = 'running';
     assignmentError.value = null;
@@ -241,12 +259,15 @@ export function useRepositorySession(options: {
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          { backend: backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}) },
+          { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
+            repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
         );
+        if (!isCurrent()) return;
         options.prefillWorkItemForAgent(agent.id, item);
       }
       close();
     } catch (caught) {
+      if (!isCurrent()) return;
       assignmentState.value = 'error';
       assignmentError.value = caught instanceof Error ? caught.message : String(caught);
     }
@@ -303,6 +324,7 @@ export function useRepositorySession(options: {
     suggestWorktreePath,
     visible,
     workItems,
+    workSourceId,
     worktreeBranches,
     worktreeBranchesLoading,
     worktreeRepository,

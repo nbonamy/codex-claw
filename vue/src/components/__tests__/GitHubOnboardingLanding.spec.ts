@@ -41,9 +41,9 @@ describe('GitHubOnboardingLanding', () => {
       },
     });
 
-    wrapper.getComponent({ name: 'GitHubAuthorizationSteps' });
+    wrapper.getComponent({ name: 'WorkAuthorizationSteps' });
     expect(wrapper.text()).toContain('ABCD-1234');
-    await wrapper.getComponent({ name: 'GitHubAuthorizationSteps' }).vm.$emit('open');
+    await wrapper.getComponent({ name: 'WorkAuthorizationSteps' }).vm.$emit('open');
     expect(wrapper.emitted('openAuthorization')).toStrictEqual([[]]);
   });
 });

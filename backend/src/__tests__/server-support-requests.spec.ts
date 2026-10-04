@@ -101,7 +101,7 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'global-items',
       method: 'workProvider/globalItems/list',
-      params: { provider: 'github', query: { assignment: 'viewer', page: 1, pageSize: 50 } },
+      params: { provider: 'github', query: { assignment: 'viewer', pageSize: 50 } },
     })).resolves.toMatchObject({
       result: { items: [{ id: 'github:nbonamy/codex-claw#14' }], page: 1, pageSize: 50, totalItems: 14 },
     });
@@ -109,7 +109,7 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'configure',
       method: 'workProvider/backlog/configure',
-      params: { input: { provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } } },
+      params: { input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } } },
     })).resolves.toMatchObject({ result: snapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -123,7 +123,7 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'items',
       method: 'workProvider/items/list',
-      params: { provider: 'github', repositoryId: 'nbonamy/codex-claw' },
+      params: { provider: 'github', sourceId: 'nbonamy/codex-claw' },
     })).resolves.toMatchObject({
       result: [{ id: 'github:nbonamy/codex-claw#12' }],
     });
@@ -133,7 +133,7 @@ describe('ClawBackendServer', () => {
       method: 'workProvider/items/list',
       params: {
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
         query: { kind: 'all', state: 'all' },
       },
     })).resolves.toMatchObject({
@@ -141,9 +141,9 @@ describe('ClawBackendServer', () => {
     });
 
     expect(workIntegrations.connect).toHaveBeenCalledWith('github');
-    expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { repositoryId: 'nbonamy/codex-claw' } });
+    expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } });
     expect(workIntegrations.listAssignedItems).toHaveBeenCalledWith('github');
-    expect(workIntegrations.listGlobalItems).toHaveBeenCalledWith('github', { assignment: 'viewer', page: 1, pageSize: 50 });
+    expect(workIntegrations.listGlobalItems).toHaveBeenCalledWith('github', { assignment: 'viewer', pageSize: 50 });
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
     expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' });
   });

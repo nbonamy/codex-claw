@@ -160,8 +160,8 @@ function workItem(): WorkItem {
   return {
     provider: 'github',
     id: 'nbonamy/codex-claw#12',
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number: 12,
     title: 'Fix cockpit drag target',
     url: 'https://github.com/nbonamy/codex-claw/issues/12',

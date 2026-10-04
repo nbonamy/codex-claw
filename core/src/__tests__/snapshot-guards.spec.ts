@@ -47,7 +47,7 @@ describe('snapshot guards', () => {
       { name: 'agent plan', mutate: (snapshot) => { snapshot.agents[0]!.plan!.steps[0]!.status = 'working' as never; } },
       { name: 'agent goal', mutate: (snapshot) => { snapshot.agents[0]!.goal!.tokenBudget = 'unlimited' as never; } },
       { name: 'agent registration', mutate: (snapshot) => { snapshot.agents[0]!.isRegistered = 'yes' as never; } },
-      { name: 'automation repository', mutate: (snapshot) => { snapshot.automations[0]!.repositories[0]!.provider = 'linear' as never; } },
+      { name: 'automation repository', mutate: (snapshot) => { snapshot.automations[0]!.repositories[0]!.provider = 'unknown' as never; } },
       { name: 'automation schedule', mutate: (snapshot) => { snapshot.automations[0]!.schedule.intervalMinutes = 'hourly' as never; } },
       { name: 'automation log', mutate: (snapshot) => { snapshot.automations[0]!.executionLog[0]!.status = 'pending' as never; } },
       { name: 'automation created agent', mutate: (snapshot) => { snapshot.automations[0]!.executionLog[0]!.createdAgents[0]!.conversationRef = { backend: 'codex', threadId: 42 as never }; } },
@@ -63,7 +63,7 @@ describe('snapshot guards', () => {
       { name: 'subagent operation', mutate: (snapshot) => { snapshot.subagentTrees.root!.operations.operation!.lifecycle = 'pending' as never; } },
       { name: 'subagent activity', mutate: (snapshot) => { snapshot.subagentTrees.root!.activities.activity!.kind = 'waiting' as never; } },
       { name: 'work backlog connection', mutate: (snapshot) => { snapshot.workBacklog.connections[0]!.status = 'ready' as never; } },
-      { name: 'work backlog provider configuration', mutate: (snapshot) => { snapshot.workBacklog.providerConfigurations.github!.repositoryId = 42 as never; } },
+      { name: 'work backlog provider configuration', mutate: (snapshot) => { snapshot.workBacklog.providerConfigurations.github!.sourceId = 42 as never; } },
       { name: 'work backlog provider settings', mutate: (snapshot) => { snapshot.workBacklog.providerSettings.github!.oauthClientId = 42 as never; } },
       { name: 'work backlog assignment', mutate: (snapshot) => { snapshot.workBacklog.assignments.item!.status = 'working' as never; } },
       { name: 'remote connection', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.status = 'connected' as never; } },
@@ -244,8 +244,8 @@ function completeSnapshot(): AppSnapshot {
     enabled: true,
     repositories: [{
       provider: 'github',
-      repositoryId: 'openai/codex-claw',
-      sourceRepositoryPath: '/repo',
+      sourceId: 'openai/codex-claw',
+      executionRepositoryPath: '/repo',
     }],
     teamId: snapshot.teams[0]!.id,
     selectionPrompt: 'Choose work',
@@ -448,7 +448,7 @@ function completeSnapshot(): AppSnapshot {
       connectedAt: '2026-09-04T00:00:00.000Z',
     }],
     providerConfigurations: {
-      github: { repositoryId: 'openai/codex-claw', assigneeLogin: 'octocat', tagName: 'codex' },
+      github: { sourceId: 'openai/codex-claw', assigneeLogin: 'octocat', tagName: 'codex' },
     },
     providerSettings: {
       github: { oauthClientId: 'client-id' },

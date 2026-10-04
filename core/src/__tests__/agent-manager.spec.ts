@@ -203,6 +203,7 @@ describe('agent-manager', () => {
     expect(snapshot.workBacklog.assignments[workItemAssignmentKey(firstItem)]).toStrictEqual({
       provider: 'github',
       itemId: 'nbonamy/codex-claw#12',
+      item: expect.objectContaining({ id: 'nbonamy/codex-claw#12', sourceId: 'nbonamy/codex-claw' }),
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
       policy: 'review',
@@ -220,6 +221,7 @@ describe('agent-manager', () => {
     expect(snapshot.workBacklog.assignments[workItemAssignmentKey(firstItem)]).toStrictEqual({
       provider: 'github',
       itemId: 'nbonamy/codex-claw#12',
+      item: expect.objectContaining({ id: 'nbonamy/codex-claw#12', sourceId: 'nbonamy/codex-claw' }),
       agentId: 'agent-jesse',
       assignedAt: '2026-06-09T13:10:00.000Z',
       policy: 'review',
@@ -237,6 +239,7 @@ describe('agent-manager', () => {
     expect(completeWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemAssignmentKey(item), '2026-06-09T13:15:00.000Z')).toStrictEqual({
       provider: 'github',
       itemId: 'nbonamy/codex-claw#12',
+      item: expect.objectContaining({ id: 'nbonamy/codex-claw#12', sourceId: 'nbonamy/codex-claw' }),
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
       policy: 'review',
@@ -284,6 +287,7 @@ describe('agent-manager', () => {
       'github:nbonamy/codex-claw#13': {
         provider: 'github',
         itemId: 'nbonamy/codex-claw#13',
+        item: expect.objectContaining({ id: 'nbonamy/codex-claw#13', sourceId: 'nbonamy/codex-claw' }),
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:05:00.000Z',
         policy: 'review',
@@ -568,8 +572,8 @@ function workItem(number: number, title: string): WorkItem {
   return {
     provider: 'github',
     id: `nbonamy/codex-claw#${number}`,
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number,
     title,
     url: `https://github.com/nbonamy/codex-claw/issues/${number}`,

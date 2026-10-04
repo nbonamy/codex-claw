@@ -121,18 +121,27 @@ Codex or Claude
   -> provider-hosted MCP server
 ```
 
-The first catalog entry is GitHub. Connecting the existing GitHub integration
-currently also installs its hosted MCP server. A newly started or resumed agent
-then receives a local server named `github`, preserving GitHub's native tool
-names under the backend's normal MCP namespace. Disconnecting GitHub disables
-the catalog entry for future session configuration; an already-running session
-keeps its local URL but calls fail until GitHub is reconnected.
+The catalog includes GitHub (`https://api.githubcopilot.com/mcp/`) and
+Linear (`https://mcp.linear.app/mcp`). Connecting either integration also enables
+its hosted MCP server. A newly started or resumed agent receives a local server
+named `github` or `linear`, preserving the upstream tool names and schemas under
+the backend's normal MCP namespace. Disconnecting an integration disables its
+entry for future session configuration; an already-running session keeps its
+local URL but calls fail until that integration is reconnected. Each request
+requires a known Claw agent identity, as on the collaboration endpoint.
+
+Linear reuses the integration's OAuth `read,write` grant for issue reads,
+creation, updates and comments. There is no additional login or API-key setting
+for MCP. The official [Linear MCP endpoint](https://linear.app/docs/mcp) accepts
+the existing OAuth bearer credential; its catalog remains upstream-owned.
+GitHub code and pull-request tools continue using the separate GitHub endpoint.
 
 Claw also launches its Codex app-server with
-`plugins."github@openai-curated-remote".enabled=false`. This process-local
-override prevents the globally installed GitHub plugin from contributing a
-second GitHub tool surface inside Claw. It does not edit the shared Codex config
-or disable the plugin in ChatGPT and other Codex clients.
+`plugins."github@openai-curated-remote".enabled=false` and
+`plugins."linear@openai-curated-remote".enabled=false`. These process-local
+overrides prevent globally installed provider plugins from contributing duplicate
+tool surfaces inside Claw. They do not edit the shared Codex config or disable
+plugins in ChatGPT and other Codex clients.
 
 For each Codex thread, Claw disables the ChatGPT GitHub connector only when the
 same thread receives Claw's authenticated `github` MCP proxy. If Claw has no
@@ -143,10 +152,11 @@ user's shared Codex or ChatGPT configuration.
 
 `WorkIntegrationManager` is the runtime credential authority. The gateway asks it
 for an authorization header on every upstream request, so the ordinary expiry
-check and concurrent refresh de-duplication apply to both Claw's GitHub product
-features and GitHub MCP calls. If GitHub MCP rejects a credential with `401`,
+check and concurrent refresh de-duplication apply to both Claw's product
+features and MCP calls for the same provider. If the upstream rejects a credential with `401`,
 the gateway asks the manager to rotate it and retries that request exactly once.
-Refresh failure marks the shared GitHub connection as requiring reconnection.
+Refresh failure marks only that provider's shared connection as requiring
+reconnection. Caller Authorization is replaced, never used as a fallback.
 
 Do not configure a provider's remote URL or bearer token directly in Codex,
 Claude, or user-global MCP settings. That would expose a rotating secret to the
@@ -172,11 +182,12 @@ overrides, then passes the Claw MCP server through each agent's
 }
 ```
 
-When GitHub is connected, the same extension also adds:
+When both integrations are connected, the same extension also adds:
 
 ```json
 {
-  "mcp_servers.github.url": "http://127.0.0.1:<port>/mcp/providers/github?agentId=<agent-id>"
+  "mcp_servers.github.url": "http://127.0.0.1:<port>/mcp/providers/github?agentId=<agent-id>",
+  "mcp_servers.linear.url": "http://127.0.0.1:<port>/mcp/providers/linear?agentId=<agent-id>"
 }
 ```
 

@@ -3,6 +3,18 @@ import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
 import { invokeClawWebOperation } from '../server/operations';
 
 describe('Claw web operations', () => {
+  it('preserves opaque source IDs, filters and cursors at the web boundary', async () => {
+    const request = vi.fn().mockResolvedValue({ items: [], nextCursor: 'native:next' });
+    const location = { kind: 'remote', remoteConnectionId: 'remote-owner' };
+    await invokeClawWebOperation({ request }, 'listWorkSources', ['mock-work', location]);
+    await invokeClawWebOperation({ request }, 'listWorkItems', ['mock-work', 'board:opaque', location, { kind: 'issue', state: 'all' }]);
+    await invokeClawWebOperation({ request }, 'listGlobalWorkItems', ['mock-work', location, { cursor: 'native:current', pageSize: 10 }]);
+    expect(request.mock.calls).toEqual([
+      [backendMethods.workProviderSourcesList, { provider: 'mock-work', location }],
+      [backendMethods.workProviderItemsList, { provider: 'mock-work', sourceId: 'board:opaque', location, query: { kind: 'issue', state: 'all' } }],
+      [backendMethods.workProviderGlobalItemsList, { provider: 'mock-work', location, query: { cursor: 'native:current', pageSize: 10 } }],
+    ]);
+  });
   it('separates settings policy and client preferences, including single-part and empty updates', async () => {
     const request = vi.fn().mockResolvedValue({ snapshot: { teams: [] }, marker: 'updated' });
     const backend = { request };

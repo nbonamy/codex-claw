@@ -173,7 +173,8 @@
         :delete-automation-execution="deleteAutomationExecution"
         :delete-automation="deleteAutomation"
         :get-automation-snapshot="getAutomationSnapshot"
-        :load-work-repositories="loadWorkRepositories"
+        :load-work-repositories="listAutomationWorkRepositories"
+        :current-repository="currentAgent?.workspace?.kind === 'git' ? { path: currentAgent.workspace.primaryWorktreeRoot, remoteConnectionId: snapshot.teams.find(team => team.id === currentAgent?.teamId)?.remoteConnectionId } : undefined"
         :list-source-repositories="listSourceRepositories"
         :automations="snapshot.automations"
         :read-conversation-messages="readConversationMessages"
@@ -213,6 +214,7 @@
         :default-team-id="snapshot.activeTeamId"
         :repository-icons="snapshot.general.repositoryIcons"
         :start-work-items-action="startCockpitWorkItems"
+        :list-source-repositories="listSourceRepositories"
         :teams="snapshot.teams"
         :work-backlog="cockpitWorkBacklog"
         @assign-work-item-to-new-agent="openNewAgentForWorkItem"
@@ -223,6 +225,9 @@
         @select-work-tag="selectWorkTagForCockpit"
         @select-work-assignee="selectWorkAssigneeForCockpit"
         @select-work-repository="selectWorkRepositoryForCockpit"
+        :work-provider="cockpitBacklogState.provider.value"
+        :work-providers="cockpitBacklogState.providers.value"
+        @select-work-provider="cockpitBacklogState.selectProvider"
         @select-agent="selectAgentFromCockpit"
       />
       <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :implementation-start-progress="missionImplementationStartProgress" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @chat-about-review-finding="prepareMissionReviewDiscussion" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
@@ -297,7 +302,6 @@
         :has-visible-messages="conversationMessages.length > 0"
         :has-running-plan-tool="conversationHasRunningPlanTool"
         :latest-conversation-turn-id="conversationLatestTurnId"
-        :load-work-items="props.loadWorkItems"
         :merge-agent-git-branch="props.mergeAgentGitBranch"
         :update-agent-git-branch-from-base="props.updateAgentGitBranchFromBase"
         :update-agent="props.updateAgent"
@@ -310,7 +314,6 @@
         :open-file-preview-for-agent="openFilePreviewForAgent"
         :open-in-applications="openInApplications"
         :open-right-workspace-tab="openRightWorkspaceTab"
-        :prefill-work-item-for-agent="prefillWorkItemForAgent"
         :push-agent-git-branch="props.pushAgentGitBranch"
         :right-workspace-for="rightWorkspaceFor"
         :right-workspaces="rightWorkspaces"
@@ -376,9 +379,11 @@
     <RepositorySessionSourceDialog
       v-model:backend="repositorySession.backend.value"
       :visible="repositorySessionSourceVisible"
+      :location="resolveRepositorySessionContext(snapshot, repositorySessionSource).location"
       :repository-name="repositorySessionSource?.repositoryName ?? ''"
       :branches="repositorySessionSourceBranches"
       :work-items="repositorySessionSourceWorkItems"
+      :selected-repository-id="repositorySession.workSourceId.value"
       :loading="repositorySessionSourceLoading"
       :error="repositorySessionSourceError"
       :sessions="repositorySessionAssignmentSessions"
@@ -393,14 +398,12 @@
     <RepositorySessionSourceDialog
       :visible="missionIssuePickerVisible"
       purpose="missionIssue"
+      :location="missionIssueLocation()"
+      :source-filter="acceptMissionSource"
       repository-name=""
-      :repositories="missionIssueRepositories"
-      :selected-repository-id="missionIssueRepositoryId"
-      :work-items="missionIssueItems"
       :loading="missionIssueLoading"
       :error="missionIssueError"
       @close="closeMissionIssuePicker"
-      @select-repository="selectMissionIssueRepository"
       @select-work-item="chooseMissionIssue"
     />
     <NewSourceWorktreeDialog
@@ -563,11 +566,14 @@
 import { translate } from '../i18n';
 import { localizedErrorMessage, localizedText } from '../i18n/errors';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workProviderLabel, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
+import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentBackend, AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
 import { defaultTeamColor } from '@codex-claw/core/team-colors';
@@ -656,6 +662,7 @@ import { useImageAnnotation } from './use-image-annotation';
 import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useVisualizationAnnotations } from './use-visualization-annotations';
 import { useCockpitBacklog } from './use-cockpit-backlog';
+import { provideBacklogConnections } from './backlog-providers';
 import { useWorkspacePreviews } from './use-workspace-previews';
 import { downloadAgentFile } from '../download-agent-file';
 import { useWorkItemRouting } from './use-work-item-routing';
@@ -698,7 +705,7 @@ const props = withDefaults(defineProps<{
   sidePanelRequest?: SidePanelRequest | null;
   fileActivity?: AgentFileActivity | null;
   workProviderAuthorization?: WorkProviderAuthorization | null;
-  workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkRepository[]>>;
+  workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkSource[]>>;
   workItemsByRepository?: Record<string, WorkItem[]>;
   assignedWorkItemsByProvider?: Partial<Record<WorkProviderKind, WorkItem[]>>;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
@@ -761,6 +768,7 @@ const props = withDefaults(defineProps<{
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
   getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
+  listAutomationWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkSource[]>;
   createAutomation?: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
@@ -776,7 +784,7 @@ const props = withDefaults(defineProps<{
   pollWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
   disconnectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   configureWorkBacklog?: (input: WorkBacklogConfigurationInput) => Promise<void>;
-  loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkRepository[] | void>;
+  loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkSource[] | void>;
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
   loadGlobalWorkItems?: (provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery) => Promise<WorkItemPage>;
   loadAssignedWorkItems?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
@@ -913,6 +921,7 @@ const props = withDefaults(defineProps<{
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
   getAutomationSnapshot: async () => createEmptySnapshot(),
+  listAutomationWorkRepositories: async () => [],
   createAutomation: async () => undefined,
   updateAutomation: async () => undefined,
   runAutomation: async () => undefined,
@@ -930,7 +939,7 @@ const props = withDefaults(defineProps<{
   configureWorkBacklog: async () => undefined,
   loadWorkRepositories: async () => undefined,
   loadWorkItems: async () => undefined,
-  loadGlobalWorkItems: async (_provider, _location, query) => ({ items: [], page: query?.page ?? 1, pageSize: query?.pageSize ?? 50, totalItems: 0 }),
+  loadGlobalWorkItems: async () => ({ items: [] }),
   loadAssignedWorkItems: async () => undefined,
   duplicateAgentAction: async () => null,
   assignWorkItemAction: async () => undefined,
@@ -997,6 +1006,7 @@ type PendingMissionReviewDiscussion = {
 
 type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 provideBackendChoices(() => props.snapshot, openSettings);
+provideBacklogConnections(() => props.snapshot.workBacklog.connections);
 const backendSwitch = provideBackendSwitch((id, backend) => props.updateAgent({ id, backend }));
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
@@ -1042,12 +1052,8 @@ const missionDeleteError = ref('');
 const selectedMissionId = ref<string | null>(null);
 const selectedMission = computed(() => props.snapshot.missions?.find(m => m.id === selectedMissionId.value) ?? null);
 const missionIssuePickerVisible = ref(false);
-const missionIssueRepositories = ref<WorkRepository[]>([]);
-const missionIssueRepositoryId = ref<string | null>(null);
-const missionIssueItems = ref<WorkItem[]>([]);
 const missionIssueLoading = ref(false);
 const missionIssueError = ref<string | null>(null);
-let missionIssueRequestId = 0;
 const missionSourceMenuItems = computed(() => [{ id: 'issue', type: 'action' as const, label: t('missions.chooseIssue'), icon: BacklogIcon }]);
 
 function missionIssueLocation(): AutomationLocation | undefined {
@@ -1084,69 +1090,31 @@ function missionIssueRepositoryIdentities(mission: Mission): Set<string> {
   return identities;
 }
 
-async function openMissionIssuePicker(): Promise<void> {
+function acceptMissionSource(source: WorkSource): boolean {
+  if (!workProviderDefinition(source.provider).repositoryBacked) return true;
   const mission = selectedMission.value;
-  if (!mission) return;
-  const requestId = ++missionIssueRequestId;
-  missionIssuePickerVisible.value = true;
-  missionIssueRepositoryId.value = null;
-  missionIssueItems.value = [];
-  missionIssueRepositories.value = [];
-  missionIssueError.value = null;
-  missionIssueLoading.value = true;
-  try {
-    const repositories = await props.loadWorkRepositories('github', missionIssueLocation()) ?? [];
-    if (requestId === missionIssueRequestId) {
-      const represented = missionIssueRepositoryIdentities(mission);
-      const availableRepositories = repositories.filter(repository => {
-        const identity = canonicalGitRemoteIdentity(repository.url);
-        return identity && represented.has(identity.toLocaleLowerCase());
-      });
-      missionIssueRepositories.value = availableRepositories;
-      if (availableRepositories[0]) await selectMissionIssueRepository(availableRepositories[0].id);
-    }
-  } catch (caught) {
-    if (requestId === missionIssueRequestId) missionIssueError.value = localizedErrorMessage(caught, t);
-  } finally {
-    if (requestId === missionIssueRequestId) missionIssueLoading.value = false;
-  }
+  const identity = canonicalGitRemoteIdentity(source.url);
+  return Boolean(mission && identity && missionIssueRepositoryIdentities(mission).has(identity.toLocaleLowerCase()));
 }
 
-async function selectMissionIssueRepository(repositoryId: string): Promise<void> {
-  if (!missionIssueRepositories.value.some(repository => repository.id === repositoryId)) return;
-  const requestId = ++missionIssueRequestId;
-  missionIssueRepositoryId.value = repositoryId;
-  missionIssueItems.value = [];
+function openMissionIssuePicker(): void {
+  if (!selectedMission.value) return;
   missionIssueError.value = null;
-  missionIssueLoading.value = true;
-  try {
-    const items = await props.loadWorkItems('github', repositoryId, missionIssueLocation(), { kind: 'issue', state: 'open' }) ?? [];
-    if (requestId === missionIssueRequestId) missionIssueItems.value = items;
-  } catch (caught) {
-    if (requestId === missionIssueRequestId) missionIssueError.value = localizedErrorMessage(caught, t);
-  } finally {
-    if (requestId === missionIssueRequestId) missionIssueLoading.value = false;
-  }
+  missionIssuePickerVisible.value = true;
 }
 
 function closeMissionIssuePicker(): void {
-  ++missionIssueRequestId;
   missionIssuePickerVisible.value = false;
 }
 
 async function chooseMissionIssue(item: WorkItem): Promise<void> {
   const mission = selectedMission.value;
   if (!mission || mission.stage !== 'requirements' || missionIssueLoading.value
-    || item.kind === 'pullRequest' || item.repositoryId !== missionIssueRepositoryId.value) return;
+    || !missionIssuePickerVisible.value || item.kind === 'pullRequest') return;
   missionIssueLoading.value = true;
   missionIssueError.value = null;
   try {
-    const issueContext = t('missions.issueMissionPrompt', {
-      repository: item.repositoryFullName,
-      number: item.number,
-      title: item.title,
-      url: item.url,
-    });
+    const issueContext = `Shape this Mission from ${workProviderLabel(item.provider)} issue ${workItemDisplayIdentifier(item)}: ${item.title}\nBacklog source: ${item.sourceName}\nWork item ID: ${workItemAssignmentKey(item)}\n${item.url}`;
     const issueBody = item.body?.trim().slice(0, 16_000);
     await forwardPrompt(issueBody ? `${issueContext}\n\n${issueBody}` : issueContext);
     closeMissionIssuePicker();
@@ -1347,6 +1315,7 @@ const workItemRouting = useWorkItemRouting({
     createAgent: (input) => props.createAgent(input),
     createBranch: (agentId, input) => props.createAgentGitBranch(agentId, input),
     createWorktree: (input) => props.createSourceWorktree(input),
+    listBranches: (repoPath, remoteConnectionId) => props.listSourceBranches(repoPath, remoteConnectionId),
     duplicateAgent: (agentId, options) => props.duplicateAgentAction(agentId, options),
     loadItems: (provider, repositoryId, query) => props.loadWorkItems(provider, repositoryId, undefined, query),
   },
@@ -1791,13 +1760,13 @@ const cockpitBacklogState = useCockpitBacklog({
   getWorkBacklogError: () => props.workBacklogError,
   getWorkBacklogStatus: () => props.workBacklogStatus,
   getWorkItemsByRepository: () => props.workItemsByRepository,
-  getWorkRepositories: () => props.workRepositoriesByProvider.github ?? [],
-  loadGlobalWorkItems: (query) => props.loadGlobalWorkItems('github', undefined, query),
-  loadWorkItems: async (repositoryId) => {
-    await props.loadWorkItems('github', repositoryId);
+  getWorkRepositories: (provider) => props.workRepositoriesByProvider[provider] ?? [],
+  loadGlobalWorkItems: (query, provider) => props.loadGlobalWorkItems(provider, undefined, query),
+  loadWorkItems: async (repositoryId, provider) => {
+    await props.loadWorkItems(provider, repositoryId);
   },
-  loadWorkRepositories: async () => {
-    await props.loadWorkRepositories('github');
+  loadWorkRepositories: async (provider) => {
+    await props.loadWorkRepositories(provider);
   },
 });
 const {

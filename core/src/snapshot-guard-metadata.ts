@@ -1,4 +1,6 @@
+import { isWorkProviderKind } from './work-providers';
 import { isMission } from './missions';
+import { sanitizeWorkItemAssignmentSource } from './work-assignments';
 import { isAgentHandoff } from './agent-handoff';
 import { isProviderConnection } from './contracts/provider-setup';
 import { isThreadFlags } from './thread-flags';
@@ -290,9 +292,9 @@ function isAutomation(value: unknown): boolean {
 
 function isAutomationRepository(value: unknown): boolean {
   return isRecord(value) &&
-    value.provider === 'github' &&
-    typeof value.repositoryId === 'string' &&
-    typeof value.sourceRepositoryPath === 'string';
+    isWorkProviderKind(value.provider) &&
+    typeof value.sourceId === 'string' &&
+    typeof value.executionRepositoryPath === 'string';
 }
 
 function isAutomationSchedule(value: unknown): boolean {
@@ -316,6 +318,7 @@ function isAutomationCreatedAgent(value: unknown): boolean {
     typeof value.agentId === 'string' &&
     typeof value.agentName === 'string' &&
     typeof value.workItemId === 'string' &&
+    optional(value, 'workItemIdentifier', isString) &&
     typeof value.workItemTitle === 'string' &&
     typeof value.workItemUrl === 'string' &&
     optional(value, 'conversationRef', isBackendConversationRef);
@@ -453,7 +456,7 @@ function isWorkBacklog(value: unknown): boolean {
 
 function isWorkIntegrationConnection(value: unknown): boolean {
   return isRecord(value) &&
-    value.provider === 'github' &&
+    isWorkProviderKind(value.provider) &&
     includes(['notConfigured', 'disconnected', 'connecting', 'connected', 'error'], value.status) &&
     optional(value, 'accountLabel', isString) &&
     optional(value, 'detail', isAppText) &&
@@ -461,27 +464,28 @@ function isWorkIntegrationConnection(value: unknown): boolean {
 }
 
 function isProviderConfigurations(value: unknown): boolean {
-  return isRecord(value) && optional(value, 'github', isGitHubProviderConfiguration);
+  return isRecord(value) && Object.entries(value).every(([provider, configuration]) => isWorkProviderKind(provider) && isWorkSourceConfiguration(configuration));
 }
 
-function isGitHubProviderConfiguration(value: unknown): boolean {
+function isWorkSourceConfiguration(value: unknown): boolean {
   return isRecord(value) &&
-    optional(value, 'repositoryId', isString) &&
+    optional(value, 'sourceId', isString) &&
     optional(value, 'assigneeLogin', isString) &&
     optional(value, 'tagName', isString);
 }
 
 function isProviderSettings(value: unknown): boolean {
-  return isRecord(value) && optional(value, 'github', isWorkProviderSettings);
+  return isRecord(value) && Object.entries(value).every(([provider, settings]) => isWorkProviderKind(provider) && isWorkProviderSettings(settings));
 }
 
 function isWorkProviderSettings(value: unknown): boolean {
-  return isRecord(value) && optional(value, 'oauthClientId', isString);
+  return isRecord(value) && optional(value, 'oauthClientId', isString) && optional(value, 'oauthCallbackUri', isString);
 }
 
 function isWorkBacklogAssignment(value: unknown): boolean {
   return isRecord(value) &&
-    value.provider === 'github' &&
+    isWorkProviderKind(value.provider) &&
+    optional(value, 'item', item => Boolean(sanitizeWorkItemAssignmentSource(item))) &&
     typeof value.itemId === 'string' &&
     typeof value.agentId === 'string' &&
     typeof value.assignedAt === 'string' &&

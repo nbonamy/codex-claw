@@ -146,7 +146,7 @@ const executionRows = computed<AppDataListRow[]>(() => entries.value.map((entry)
   startedAt: entry.startedAt,
   status: entry.status,
   statusLabel: statusLabel(entry.status),
-  ticket: entry.createdAgents[0]?.workItemId ?? '',
+  ticket: entry.createdAgents[0]?.workItemIdentifier ?? entry.createdAgents[0]?.workItemId ?? '',
   time: formatDate(entry.startedAt),
   triggerUrl: entry.createdAgents[0]?.workItemUrl ?? '',
 })));

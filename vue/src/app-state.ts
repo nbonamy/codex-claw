@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { PlanReviewResolution } from '@codex-claw/core/plan-review';
 import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import type { AgentCreationProgress } from '@codex-claw/core/contracts';
+import type { AgentCreationProgress, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
 import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
 import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
 import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
@@ -1050,6 +1050,11 @@ export function useAppState() {
     return codexClawApi.getAutomationSnapshot(location);
   }
 
+  async function listAutomationWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]> {
+    if (!codexClawApi?.listWorkSources) throw new Error('Backlog sources are unavailable.');
+    return codexClawApi.listWorkSources(provider, location);
+  }
+
   async function createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (!codexClawApi?.createAutomation) {
       return;
@@ -1739,6 +1744,7 @@ export function useAppState() {
     openWorkProviderAuthorization,
     configureWorkBacklog,
     getAutomationSnapshot,
+    listAutomationWorkRepositories,
     createAutomation,
     updateAutomation,
     runAutomation,
@@ -1832,9 +1838,13 @@ function cloneWorkItemForIpc(item: WorkItem): WorkItem {
     provider: item.provider,
     id: item.id,
     ...(item.kind ? { kind: item.kind } : {}),
-    repositoryId: item.repositoryId,
-    repositoryFullName: item.repositoryFullName,
+    sourceId: item.sourceId,
+    sourceName: item.sourceName,
     number: item.number,
+    identifier: item.identifier,
+    nativeState: item.nativeState,
+    assignedToViewer: item.assignedToViewer,
+    branchName: item.branchName,
     title: item.title,
     url: item.url,
     state: item.state,

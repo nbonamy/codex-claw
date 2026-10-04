@@ -1,14 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { mountEditor, sourceRepositories, workRepositories } from './automation-editor-test-harness';
+import { flushPromises } from '@vue/test-utils';
 
 describe('AutomationEditor behavior', () => {
+  it('uses the supplied current code repository for Linear and refuses a repository that disappears', async () => {
+    const wrapper = mountEditor({ connections: [{ provider: 'linear', status: 'connected' }], currentRepositoryPath: sourceRepositories()[0]!.path,
+      repositories: [{ ...workRepositories()[0]!, provider: 'linear', id: 'linear:eng', fullName: 'Engineering' }] });
+    await wrapper.get('[aria-label="Backlog provider"]').trigger('click'); await flushPromises();
+    [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(el => el.textContent === 'Linear')!.click(); await flushPromises();
+    await wrapper.get('[aria-label="Team / project"]').trigger('click'); await flushPromises();
+    [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(el => el.textContent === 'Engineering')!.click(); await flushPromises();
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ repositories: [{ provider: 'linear', sourceId: 'linear:eng', executionRepositoryPath: sourceRepositories()[0]!.path }] });
+    await wrapper.setProps({ sourceRepositories: [] });
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')).toHaveLength(1);
+  });
   it('offers only GitHub repositories that have a configured local clone', () => {
     const wrapper = mountEditor({
       repositories: workRepositories(),
       sourceRepositories: sourceRepositories().slice(0, 1),
     });
 
-    const repositoryOptions = wrapper.findAllComponents({ name: 'ElSelect' })[0]!.findAllComponents({ name: 'ElOption' });
+    const repositoryOptions = wrapper.findAllComponents({ name: 'ElSelect' })[1]!.findAllComponents({ name: 'ElOption' });
     expect(repositoryOptions.map((option) => option.props('label'))).toStrictEqual(['nbonamy/codex-claw']);
   });
 
@@ -25,7 +39,7 @@ describe('AutomationEditor behavior', () => {
       connection: { provider: 'github', status: 'disconnected' },
     });
 
-    expect(wrapper.findAllComponents({ name: 'ElSelect' })[0]!.props('disabled')).toBe(true);
+    expect(wrapper.findAllComponents({ name: 'ElSelect' })[1]!.props('disabled')).toBe(true);
     expect(wrapper.text()).toContain('Connect GitHub in Settings');
   });
 });

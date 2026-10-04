@@ -1,4 +1,4 @@
-import { PRIMARY_BROWSER_ID, type WorkItem } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID } from '@codex-claw/core/contracts';
 import type { CodexConversationVisualization } from '@codex-app-sdk/vue';
 import { computed, onScopeDispose, reactive, ref, watch } from 'vue';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';
@@ -19,9 +19,6 @@ import {
 
 export type AgentRightWorkspaceState = {
   activeTab: RightWorkspaceTab | null;
-  backlogError: string | null;
-  backlogItems: WorkItem[];
-  backlogStatus: 'notLoaded' | 'loading' | 'loaded' | 'error';
   browserId: string;
   browserInitialUrl: string;
   browserOpenRequestId: number;
@@ -72,9 +69,6 @@ export function useRightWorkspaceState(options: {
     if (existing) return existing;
     const created: AgentRightWorkspaceState = {
       activeTab: null,
-      backlogError: null,
-      backlogItems: [],
-      backlogStatus: 'notLoaded',
       browserId: PRIMARY_BROWSER_ID,
       browserInitialUrl: '',
       browserOpenRequestId: 0,

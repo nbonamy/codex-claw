@@ -1,7 +1,8 @@
 import type { BackendConversationRef } from './conversation';
 import type { AppText } from './shared';
 
-export type WorkProviderKind = 'github';
+import type { WorkProviderKind } from '../work-providers';
+export type { WorkProviderKind } from '../work-providers';
 
 export type WorkIntegrationStatus = 'notConfigured' | 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -15,6 +16,7 @@ export type WorkIntegrationConnection = {
 
 export type WorkProviderSettings = {
   oauthClientId?: string;
+  oauthCallbackUri?: string;
 };
 
 export type WorkBacklogAssignmentPolicy = 'complete' | 'review';
@@ -22,6 +24,7 @@ export type WorkBacklogAssignmentPolicy = 'complete' | 'review';
 export type WorkBacklogAssignmentStatus = 'blocked' | 'completed' | 'inProgress' | 'readyForReview';
 
 export type WorkBacklogAssignment = {
+  item?: WorkItemReference;
   provider: WorkProviderKind;
   itemId: string;
   agentId: string;
@@ -35,25 +38,25 @@ export type WorkBacklogAssignment = {
   automationExecutionId?: string;
 };
 
-export type GitHubWorkBacklogConfiguration = {
-  repositoryId?: string;
+export type WorkItemReference = Pick<WorkItem, 'provider' | 'id' | 'sourceId' | 'sourceName' | 'number' | 'title' | 'url' | 'identifier' | 'body'>;
+
+export type WorkSourceConfiguration = {
+  sourceId?: string;
   assigneeLogin?: string;
   tagName?: string;
 };
 
-export type GitHubWorkBacklogConfigurationInput = {
-  repositoryId?: string | null;
+export type WorkSourceConfigurationInput = {
+  sourceId?: string | null;
   assigneeLogin?: string | null;
   tagName?: string | null;
 };
 
-export type WorkBacklogProviderConfigurations = {
-  github?: GitHubWorkBacklogConfiguration;
-};
+export type WorkBacklogProviderConfigurations = Partial<Record<WorkProviderKind, WorkSourceConfiguration>>;
 
 export type WorkBacklogConfigurationInput = {
-  provider: 'github';
-  configuration: GitHubWorkBacklogConfigurationInput;
+  provider: WorkProviderKind;
+  configuration: WorkSourceConfigurationInput;
 };
 
 export type WorkBacklogState = {
@@ -65,19 +68,21 @@ export type WorkBacklogState = {
 
 export type WorkProviderAuthorization = {
   provider: WorkProviderKind;
-  userCode: string;
+  flow?: 'browser';
+  userCode?: string;
   verificationUri: string;
   expiresAt: string;
 };
 
-export type WorkRepository = {
+/** An opaque provider-owned backlog scope, independent of an execution repository. */
+export type WorkSource = {
   provider: WorkProviderKind;
   id: string;
-  owner: string;
+  owner?: string;
   name: string;
   fullName: string;
   url: string;
-  isPrivate: boolean;
+  isPrivate?: boolean;
   updatedAt?: string;
   workItemsUpdatedAt?: string;
 };
@@ -98,15 +103,16 @@ export type WorkItemQuery = {
 
 export type GlobalWorkItemQuery = WorkItemQuery & {
   assignment?: 'all' | 'viewer';
-  page?: number;
+  cursor?: string;
   pageSize?: number;
 };
 
 export type WorkItemPage = {
   items: WorkItem[];
-  page: number;
-  pageSize: number;
-  totalItems: number;
+  /** Absent when the provider has no further results. Opaque to callers. */
+  nextCursor?: string;
+  /** Only supplied when the provider can report a reliable total cheaply. */
+  totalItems?: number;
 };
 
 export type WorkItem = {
@@ -114,9 +120,13 @@ export type WorkItem = {
   id: string;
   kind?: WorkItemKind;
   branchName?: string;
-  repositoryId: string;
-  repositoryFullName: string;
-  number: number;
+  sourceId: string;
+  sourceName: string;
+  /** Optional native numeric reference, used only by code-host operations. */
+  number?: number;
+  identifier?: string;
+  nativeState?: string;
+  assignedToViewer?: boolean;
   title: string;
   url: string;
   state: WorkItemState;
@@ -128,10 +138,10 @@ export type WorkItem = {
   updatedAt: string;
 };
 
-export type AutomationRepositoryTarget = {
-  provider: 'github';
-  repositoryId: string;
-  sourceRepositoryPath: string;
+export type AutomationWorkSourceTarget = {
+  provider: WorkProviderKind;
+  sourceId: string;
+  executionRepositoryPath: string;
 };
 
 export type AutomationSchedule = {
@@ -144,6 +154,7 @@ export type AutomationExecutionCreatedAgent = {
   agentId: string;
   agentName: string;
   workItemId: string;
+  workItemIdentifier?: string;
   workItemTitle: string;
   workItemUrl: string;
   conversationRef?: BackendConversationRef;
@@ -166,7 +177,7 @@ export type Automation = {
   id: string;
   name: string;
   enabled: boolean;
-  repositories: AutomationRepositoryTarget[];
+  repositories: AutomationWorkSourceTarget[];
   teamId: string;
   selectionPrompt?: string;
   assignmentPrompt?: string;
@@ -192,7 +203,7 @@ export type CreateAutomationInput = {
   backend?: import('../contracts').AgentBackend;
   name?: string;
   enabled?: boolean;
-  repositories: AutomationRepositoryTarget[];
+  repositories: AutomationWorkSourceTarget[];
   teamId: string;
   selectionPrompt?: string;
   assignmentPrompt?: string;

@@ -8,8 +8,8 @@ import WorkItemAssignmentPicker from '../WorkItemAssignmentPicker.vue';
 const issue: WorkItem = {
   provider: 'github',
   id: 'github:nbonamy/codex-claw#24',
-  repositoryId: 'nbonamy/codex-claw',
-  repositoryFullName: 'nbonamy/codex-claw',
+  sourceId: 'nbonamy/codex-claw',
+  sourceName: 'nbonamy/codex-claw',
   number: 24,
   title: 'Repository-first sessions',
   url: 'https://github.com/nbonamy/codex-claw/issues/24',

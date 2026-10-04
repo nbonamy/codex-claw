@@ -1,6 +1,7 @@
 import type { WorkProviderKind } from '@codex-claw/core/contracts';
+import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
 
-export type HostedMcpServerId = 'github';
+export type HostedMcpServerId = WorkProviderKind;
 
 export type HostedMcpCredentialProvider = {
   isConnected(provider: WorkProviderKind): boolean;
@@ -21,11 +22,10 @@ type HostedMcpServerDefinition = {
   url: string;
 };
 
-const hostedMcpServers: readonly HostedMcpServerDefinition[] = [{
-  id: 'github',
-  provider: 'github',
-  url: 'https://api.githubcopilot.com/mcp/',
-}];
+const hostedMcpServers: readonly HostedMcpServerDefinition[] = workProviderKinds.flatMap(provider => {
+  const hosted = workProviderDefinition(provider).hostedMcp;
+  return hosted ? [{ id: provider, provider, url: hosted.url }] : [];
+});
 
 const forwardedRequestHeaders = [
   'accept',

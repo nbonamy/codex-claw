@@ -38,7 +38,7 @@ export const ipcChannels = {
   connectWorkProvider: 'work-provider:connect',
   pollWorkProviderAuthorization: 'work-provider:connection-complete',
   disconnectWorkProvider: 'work-provider:disconnect',
-  listWorkRepositories: 'work-provider:repositories:list',
+  listWorkSources: 'work-provider:sources:list',
   configureWorkBacklog: 'work-provider:backlog:configure',
   listGlobalWorkItems: 'work-provider:global-items:list',
   listAssignedWorkItems: 'work-provider:assigned-items:list',

@@ -19,23 +19,12 @@
           autocomplete="off"
           spellcheck="false"
         >
-        <el-select
-          v-if="purpose === 'missionIssue'"
-          class="repository-session-source-dialog__repository-select"
-          :model-value="selectedRepositoryId"
-          :placeholder="t('repositories.sessionSource.chooseRepository')"
-          :aria-label="t('repositories.sessionSource.chooseRepository')"
-          filterable
-          @update:model-value="emit('select-repository', $event)"
-        >
-          <el-option v-for="repository in repositories" :key="repository.id" :label="repository.fullName" :value="repository.id" />
-        </el-select>
       </div>
       <div v-else class="repository-session-source-dialog__assignment-header">
         <button type="button" :aria-label="t('common.back')" :disabled="preparationVisible" @click="selectedWorkItem = null">
           <ArrowLeftIcon aria-hidden="true" />
         </button>
-        <strong>{{ t('repositoryBacklog.startWork', { number: selectedWorkItem.number }) }}</strong>
+        <strong>{{ t('repositoryBacklog.startWork', { identifier: workItemDisplayIdentifier(selectedWorkItem) }) }}</strong>
       </div>
     </template>
 
@@ -46,15 +35,30 @@
       <span class="repository-session-source-dialog__repository"><RepositoryIcon aria-hidden="true" />{{ repositoryName }}</span>
     </div>
 
+    <BacklogSourceSelector
+      v-if="!selectedWorkItem && (purpose === 'missionIssue' || tab === 'issues') && backlog.providers.value.length"
+      class="repository-session-source-dialog__sources"
+      size="small"
+      :provider="backlog.provider.value"
+      :providers="backlog.providers.value"
+      :sources="backlog.sources.value"
+      :source-id="backlog.sourceId.value"
+      :show-source="purpose === 'missionIssue' || !workProviderDefinition(backlog.provider.value).repositoryBacked"
+      @select-provider="backlog.selectProvider"
+      @select-source="selectSource"
+    />
+
     <section class="repository-session-source-dialog__results" aria-live="polite">
       <p v-if="purpose === 'missionIssue' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
       <template v-if="selectedWorkItem">
+        <p v-if="!workProviderDefinition(selectedWorkItem.provider).repositoryBacked">{{ t('backlogSource.codeRepository') }}: {{ repositoryName }}</p>
+        <WorkItemDetail :item="selectedWorkItem" />
         <StagedOperationProgress
           v-if="preparationVisible && assignmentState !== 'error'"
           :state="assignmentState === 'success' ? 'success' : 'running'"
-          :eyebrow="t('repositoryBacklog.launchingFrom', { number: selectedWorkItem.number })"
+          :eyebrow="t('repositoryBacklog.launchingFrom', { identifier: workItemDisplayIdentifier(selectedWorkItem) })"
           :title="preparationTitle"
-          :complete-title="t('repositoryBacklog.workReady', { number: selectedWorkItem.number })"
+          :complete-title="t('repositoryBacklog.workReady', { identifier: workItemDisplayIdentifier(selectedWorkItem) })"
           :steps="preparationSteps"
           @complete="emit('preparation-complete')"
         />
@@ -66,14 +70,15 @@
           :existing-worktree-path="assignmentExistingWorktreePath"
           :sessions="sessions"
           :error="assignmentError"
-          @custom="emit('custom-work-item', $event)"
+          @custom="customWorkItem"
           @submit="startWorkItem"
         />
       </template>
-      <p v-else-if="loading" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.loading') }}</p>
-      <p v-else-if="purpose === 'session' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error">{{ error }}</p>
-      <p v-else-if="purpose === 'missionIssue' && repositories.length === 0" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.noRepositories') }}</p>
-      <p v-else-if="purpose === 'missionIssue' && !selectedRepositoryId" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.chooseRepositoryToSeeIssues') }}</p>
+      <p v-else-if="effectiveLoading" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.loading') }}</p>
+      <p v-else-if="tab === 'issues' && backlog.error.value" role="alert">{{ backlog.error.value }} <button type="button" @click="backlog.refresh">{{ t('backlogSource.retry') }}</button></p>
+      <p v-else-if="purpose === 'session' && tab !== 'issues' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error">{{ error }}</p>
+      <p v-else-if="purpose === 'missionIssue' && backlog.sources.value.length === 0" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.noRepositories') }}</p>
+      <p v-else-if="purpose === 'missionIssue' && !backlog.sourceId.value" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.chooseRepositoryToSeeIssues') }}</p>
       <template v-else-if="tab === 'branches' && purpose === 'session'">
         <h3>{{ t('repositories.sessionSource.recentBranches') }}</h3>
         <button v-for="branch in filteredBranches" :key="branch.name" class="repository-session-source-dialog__result" type="button" @click="emit('select-branch', branch)">
@@ -100,7 +105,7 @@
           <GitPullRequestIcon v-if="item.kind === 'pullRequest'" class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <IssueIcon v-else class="repository-session-source-dialog__result-icon" aria-hidden="true" />
           <span class="repository-session-source-dialog__result-copy">
-            <small>#{{ item.number }}</small>
+            <small>{{ workItemDisplayIdentifier(item) }}</small>
             <strong>{{ item.title }}</strong>
           </span>
           <ArrowRightIcon class="repository-session-source-dialog__arrow" aria-hidden="true" />
@@ -115,6 +120,8 @@
 </template>
 
 <script setup lang="ts">
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workItemBranchName, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -123,7 +130,10 @@ import {
   IconGitPullRequest as GitPullRequestIcon,
   IconSearch as SearchIcon,
 } from '@tabler/icons-vue';
-import type { SourceBranch, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { SourceBranch, WorkItem, WorkSource } from '@codex-claw/core/contracts';
+import BacklogSourceSelector from './BacklogSourceSelector.vue';
+import WorkItemDetail from './WorkItemDetail.vue';
+import { useWorkSourceBacklog } from './use-work-source-backlog';
 import { ArrowRightIcon, GitBranchIcon, GitForkIcon as RepositoryIcon } from '../shared/icons/app-icons';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import BackendSelector from './BackendSelector.vue';
@@ -137,6 +147,7 @@ import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './W
 type SourceTab = 'branches' | 'pullRequests' | 'issues';
 
 const props = withDefaults(defineProps<{
+  location?: import('@codex-claw/core/contracts').AutomationLocation;
   branches?: SourceBranch[];
   assignmentError?: string | null;
   assignmentState?: 'idle' | 'running' | 'success' | 'error';
@@ -144,7 +155,8 @@ const props = withDefaults(defineProps<{
   loading?: boolean;
   repositoryName: string;
   purpose?: 'session' | 'missionIssue';
-  repositories?: WorkRepository[];
+  repositories?: WorkSource[];
+  sourceFilter?: (source: WorkSource) => boolean;
   selectedRepositoryId?: string | null;
   sessions?: WorkItemAssignmentSession[];
   visible: boolean;
@@ -173,13 +185,35 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const backlog = useWorkSourceBacklog({
+  location: () => props.location,
+  query: { kind: 'issue', state: 'open' },
+  preferredSourceId: () => props.selectedRepositoryId,
+  restrictToRepository: () => props.purpose === 'session',
+  acceptsSource: source => props.sourceFilter?.(source) ?? true,
+  enabled: () => props.visible,
+});
+const effectiveLoading = computed(() => tab.value === 'issues' ? backlog.status.value === 'loading' : props.loading);
+function selectSource(id: string | null): void {
+  selectedWorkItem.value = null;
+  query.value = '';
+  resetPreparation();
+  void backlog.selectSource(id);
+}
 
 const searchInput = ref<HTMLInputElement | null>(null);
 const query = ref('');
 const selectedWorkItem = ref<WorkItem | null>(null);
+let selectionRevision = 0;
+watch([selectedWorkItem, () => props.visible, () => JSON.stringify(props.location)], () => { ++selectionRevision; }, { flush: 'sync' });
 const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
 const preparationVisible = ref(false);
-const tab = ref<SourceTab>('branches');
+watch([backlog.provider, () => backlog.providers.value.length > 0], () => {
+  selectedWorkItem.value = null;
+  query.value = '';
+  resetPreparation();
+});
+const tab = ref<SourceTab>(props.purpose === 'missionIssue' ? 'issues' : 'branches');
 const tabs = computed<ReadonlyArray<{ id: SourceTab; label: string }>>(() => [
   { id: 'branches', label: t('repositories.sessionSource.branches') },
   { id: 'pullRequests', label: t('repositories.sessionSource.pullRequests') },
@@ -190,18 +224,17 @@ const searchPlaceholder = computed(() => tab.value === 'branches'
   : t('repositories.sessionSource.searchWork'));
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase());
 const filteredBranches = computed(() => props.branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalizedQuery.value)));
-const filteredWorkItems = computed(() => props.workItems.filter((item) => {
+const filteredWorkItems = computed(() => (tab.value === 'issues' ? backlog.items.value : props.workItems).filter((item) => {
   if (props.purpose === 'missionIssue' && item.kind === 'pullRequest') return false;
   if (tab.value === 'pullRequests' && item.kind !== 'pullRequest') return false;
   if (tab.value === 'issues' && item.kind === 'pullRequest') return false;
-  const haystack = `${item.number} ${item.title} ${item.authorName ?? ''} ${item.url}`.toLocaleLowerCase();
+  const haystack = `${item.identifier ?? item.number} ${item.title} ${item.authorName ?? ''} ${item.url}`.toLocaleLowerCase();
   return haystack.includes(normalizedQuery.value);
 }));
 const assignmentBranchName = computed(() => {
   const item = selectedWorkItem.value;
   if (!item) return '';
-  if (item.kind === 'pullRequest') return item.branchName?.trim() || `review/gh-${item.number}`;
-  return `fix/gh-${item.number}`;
+  return workItemBranchName(item);
 });
 const assignmentExistingWorktreePath = computed(() => (
   props.branches.find((branch) => branch.name === assignmentBranchName.value)?.worktreePath ?? ''
@@ -223,12 +256,12 @@ const preparationSteps = computed(() => {
   ];
 });
 const preparationTitle = computed(() => {
-  const number = selectedWorkItem.value?.number ?? '';
+  const identifier = selectedWorkItem.value ? workItemDisplayIdentifier(selectedWorkItem.value) : '';
   return t(
     preparationSelection.value?.destination === 'existing'
       ? 'repositoryBacklog.prepareExistingSession'
       : 'repositoryBacklog.buildIsolatedHome',
-    { number },
+    { identifier },
   );
 });
 
@@ -252,19 +285,39 @@ watch(() => props.assignmentState, (state) => {
   }
 });
 
+watch(() => `${JSON.stringify(props.location)}:${props.selectedRepositoryId}:${props.repositoryName}`, () => {
+  selectedWorkItem.value = null;
+  query.value = '';
+  resetPreparation();
+});
+
 function onVisibilityChanged(visible: boolean): void {
   if (!visible) emit('close');
 }
 
 function selectWorkItem(item: WorkItem): void {
+  if (!filteredWorkItems.value.some(candidate => candidate.id === item.id)) return;
   if (props.purpose === 'missionIssue') emit('select-work-item', item);
-  else selectedWorkItem.value = item;
+  if (props.purpose === 'session') selectedWorkItem.value = item;
 }
 
 function startWorkItem(selection: WorkItemAssignmentSelection): void {
+  if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
   preparationSelection.value = selection;
   preparationVisible.value = true;
-  emit('start-work-item', selection);
+  emit('start-work-item', { ...selection, isCurrent: selectionGuard(selection.item) });
+}
+
+function selectionGuard(item: WorkItem): () => boolean {
+  const provider = backlog.provider.value;
+  const source = backlog.sourceId.value;
+  const revision = selectionRevision;
+  return () => revision === selectionRevision && props.visible && selectedWorkItem.value?.id === item.id && backlog.provider.value === provider && backlog.sourceId.value === source;
+}
+
+function customWorkItem(selection: Omit<WorkItemAssignmentSelection, 'action'>): void {
+  if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
+  emit('custom-work-item', { ...selection, isCurrent: selectionGuard(selection.item) });
 }
 
 function resetPreparation(clearSelection = true): void {
@@ -313,23 +366,14 @@ function resetPreparation(clearSelection = true): void {
   font: inherit;
 }
 
-.repository-session-source-dialog--issue-picker .repository-session-source-dialog__search-row {
-  grid-template-columns: var(--icon-md) minmax(0, 1fr) minmax(160px, 220px);
-}
-
-/* The compact dialog otherwise puts the selector beneath Element Plus's 48px close button. */
-:global(.repository-session-source-dialog--issue-picker.claw-dialog--compact .el-dialog__header) {
+/* Keep the search clear of the close button in every picker mode. */
+:global(.repository-session-source-dialog.claw-dialog--compact .el-dialog__header) {
   padding-right: 48px;
 }
 
-.repository-session-source-dialog__repository-select { min-width: 0; }
-
-@media (max-width: 680px) {
-  .repository-session-source-dialog--issue-picker .repository-session-source-dialog__search-row {
-    grid-template-columns: var(--icon-md) minmax(0, 1fr);
-  }
-
-  .repository-session-source-dialog__repository-select { grid-column: 1 / -1; }
+.repository-session-source-dialog__sources {
+  padding: var(--space-6) var(--space-8);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .repository-session-source-dialog__assignment-header {
@@ -450,6 +494,7 @@ function resetPreparation(clearSelection = true): void {
 .repository-session-source-dialog--assignment
   .repository-session-source-dialog__results {
   min-height: 0;
+  max-height: min(70vh, 720px);
   padding: var(--space-3) var(--space-8) var(--space-8);
 }
 

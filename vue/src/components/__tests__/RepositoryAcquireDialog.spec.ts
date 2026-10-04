@@ -2,10 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { computed, ref } from 'vue';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it } from 'vitest';
-import type { WorkRepository } from '@codex-claw/core/contracts';
+import type { WorkSource } from '@codex-claw/core/contracts';
 import RepositoryAcquireDialog from '../RepositoryAcquireDialog.vue';
 
-const repositories: WorkRepository[] = [
+const repositories: WorkSource[] = [
   {
     provider: 'github',
     id: 'nbonamy/codex-claw',
@@ -113,7 +113,7 @@ describe('RepositoryAcquireDialog', () => {
     });
     expect(wrapper.text()).toContain('Authorize Codex Claw');
     expect(wrapper.text()).toContain('ABCD-1234');
-    wrapper.getComponent({ name: 'GitHubAuthorizationSteps' }).vm.$emit('open');
+    wrapper.getComponent({ name: 'WorkAuthorizationSteps' }).vm.$emit('open');
     expect(wrapper.emitted('open-authorization')).toStrictEqual([[]]);
 
     await wrapper.setProps({

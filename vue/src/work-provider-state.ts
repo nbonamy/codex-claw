@@ -9,7 +9,7 @@ import type {
   WorkItemQuery,
   WorkProviderAuthorization,
   WorkProviderKind,
-  WorkRepository,
+  WorkSource,
 } from '@codex-claw/core/contracts';
 import { localizedText } from './i18n/errors';
 import { translate } from './i18n';
@@ -27,25 +27,35 @@ const authorizationPollMs = 5_000;
 /** Owns provider authorization, polling, repository catalogs, and backlog state. */
 export function createWorkProviderState(options: WorkProviderStateOptions) {
   const authorization = ref<WorkProviderAuthorization | null>(null);
-  const repositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkRepository[]>>>({});
+  const repositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkSource[]>>>({});
   const itemsByRepository = ref<Record<string, WorkItem[]>>({});
   const assignedItemsByProvider = ref<Partial<Record<WorkProviderKind, WorkItem[]>>>({});
   const status = ref<'notLoaded' | 'loading' | 'loaded' | 'error'>('notLoaded');
   const error = ref<string | null>(null);
   const authorizationPollTimers = new Map<WorkProviderKind, ReturnType<typeof globalThis.setTimeout>>();
+  let authorizationRevision = 0;
+  const catalogRevisions = new Map<WorkProviderKind, number>();
+  const itemRevisions = new Map<string, number>();
 
   async function connect(provider: WorkProviderKind): Promise<void> {
     if (!codexClawApi?.connectWorkProvider) return;
+    const revision = ++authorizationRevision;
     status.value = 'loading';
     error.value = null;
     try {
       const result = await codexClawApi.connectWorkProvider(provider);
+      if (revision !== authorizationRevision) return;
       options.adoptSnapshot(result.snapshot);
       authorization.value = result.authorization ?? null;
       if (result.authorization) scheduleAuthorizationPoll(provider);
       else clearAuthorizationPoll(provider);
+      if (result.authorization?.flow === 'browser') {
+        await clawPlatformActions.openExternal?.(result.authorization.verificationUri);
+        if (revision !== authorizationRevision) return;
+      }
       status.value = 'loaded';
     } catch (cause) {
+      if (revision !== authorizationRevision) return;
       status.value = 'error';
       error.value = errorMessage(cause);
       throw cause;
@@ -79,20 +89,25 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
 
   async function disconnect(provider: WorkProviderKind): Promise<void> {
     if (!codexClawApi?.disconnectWorkProvider) return;
-    options.adoptSnapshot(await codexClawApi.disconnectWorkProvider(provider));
+    const revision = ++authorizationRevision;
+    catalogRevisions.set(provider, (catalogRevisions.get(provider) ?? 0) + 1);
+    for (const [key, value] of itemRevisions) if (key.startsWith(`${provider}:`)) itemRevisions.set(key, value + 1);
     clearAuthorizationPoll(provider);
-    authorization.value = null;
+    const snapshot = await codexClawApi.disconnectWorkProvider(provider);
+    if (revision !== authorizationRevision) return;
+    options.adoptSnapshot(snapshot);
+    if (authorization.value?.provider === provider) authorization.value = null;
     repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: [] };
     itemsByRepository.value = {};
     status.value = 'notLoaded';
     error.value = null;
   }
 
-  async function loadRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]> {
+  async function loadRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]> {
     if (isRemoteAutomationLocation(location)) {
-      return await codexClawApi?.listWorkRepositories?.(provider, location) ?? [];
+      return await codexClawApi?.listWorkSources?.(provider, location) ?? [];
     }
-    if (!codexClawApi?.listWorkRepositories || connection(provider)?.status !== 'connected') {
+    if (!codexClawApi?.listWorkSources || connection(provider)?.status !== 'connected') {
       repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: [] };
       status.value = 'notLoaded';
       return [];
@@ -100,21 +115,25 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
 
     status.value = 'loading';
     error.value = null;
+    const revision = (catalogRevisions.get(provider) ?? 0) + 1;
+    catalogRevisions.set(provider, revision);
     try {
-      const repositories = await codexClawApi.listWorkRepositories(provider);
+      const repositories = await codexClawApi.listWorkSources(provider);
+      if (catalogRevisions.get(provider) !== revision) return [];
       repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: repositories };
       status.value = 'loaded';
-      const configuredId = options.getSnapshot().workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
+      const configuredId = options.getSnapshot().workBacklog.providerConfigurations[provider]?.sourceId ?? null;
       const selectedId = configuredId ?? repositories[0]?.id ?? null;
       if (selectedId && !configuredId) {
         await configure({
           provider,
-          configuration: { repositoryId: selectedId, assigneeLogin: null, tagName: null },
+          configuration: { sourceId: selectedId, assigneeLogin: null, tagName: null },
         });
       }
       if (selectedId) await loadItems(provider, selectedId);
       return repositories;
     } catch (cause) {
+      if (catalogRevisions.get(provider) !== revision) return [];
       repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: [] };
       status.value = 'error';
       error.value = errorMessage(cause);
@@ -142,14 +161,19 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     }
     if (query) return codexClawApi.listWorkItems(provider, repositoryId, undefined, query);
 
+    const key = workItemsKey(provider, repositoryId);
+    const revision = (itemRevisions.get(key) ?? 0) + 1;
+    itemRevisions.set(key, revision);
     status.value = 'loading';
     error.value = null;
     try {
       const items = await codexClawApi.listWorkItems(provider, repositoryId);
+      if (itemRevisions.get(key) !== revision) return undefined;
       itemsByRepository.value = { ...itemsByRepository.value, [workItemsKey(provider, repositoryId)]: items };
       status.value = 'loaded';
       return items;
     } catch (cause) {
+      if (itemRevisions.get(key) !== revision) return undefined;
       status.value = 'error';
       error.value = errorMessage(cause);
       return undefined;
@@ -162,7 +186,7 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     query?: GlobalWorkItemQuery,
   ): Promise<WorkItemPage> {
     if (!codexClawApi?.listGlobalWorkItems) {
-      return { items: [], page: 1, pageSize: query?.pageSize ?? 50, totalItems: 0 };
+      return { items: [] };
     }
     return codexClawApi.listGlobalWorkItems(provider, location, query);
   }
@@ -187,46 +211,22 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     const providers = options.getSnapshot().workBacklog.connections
       .filter((candidate) => candidate.status === 'connected')
       .map((candidate) => candidate.provider);
-    await Promise.all(providers.map(loadConnectedProvider));
-  }
-
-  async function loadConnectedProvider(provider: WorkProviderKind): Promise<void> {
-    if (!codexClawApi?.listWorkRepositories) return;
-    try {
-      const repositories = await codexClawApi.listWorkRepositories(provider);
-      repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: repositories };
-      const configuredId = options.getSnapshot().workBacklog.providerConfigurations[provider]?.repositoryId ?? null;
-      const selectedId = configuredId ?? repositories[0]?.id ?? null;
-      if (selectedId && !configuredId && codexClawApi.configureWorkBacklog) {
-        options.adoptSnapshot(await codexClawApi.configureWorkBacklog({
-          provider,
-          configuration: { repositoryId: selectedId, assigneeLogin: null, tagName: null },
-        }));
-      }
-      if (selectedId) await loadItemsForRepository(provider, selectedId);
-      status.value = 'loaded';
-    } catch (cause) {
-      status.value = 'error';
-      error.value = errorMessage(cause);
-    }
-  }
-
-  async function loadItemsForRepository(provider: WorkProviderKind, repositoryId: string): Promise<void> {
-    if (!codexClawApi?.listWorkItems) return;
-    const items = await codexClawApi.listWorkItems(provider, repositoryId);
-    itemsByRepository.value = { ...itemsByRepository.value, [workItemsKey(provider, repositoryId)]: items };
+    await Promise.all(providers.map(provider => loadRepositories(provider)));
   }
 
   async function pollConnection(provider: WorkProviderKind, pollOptions: { userInitiated?: boolean } = {}): Promise<void> {
     if (!codexClawApi?.pollWorkProviderAuthorization) return;
+    const revision = authorizationRevision;
     if (pollOptions.userInitiated) status.value = 'loading';
     error.value = null;
     try {
-      options.adoptSnapshot(await codexClawApi.pollWorkProviderAuthorization(provider));
+      const snapshot = await codexClawApi.pollWorkProviderAuthorization(provider);
+      if (revision !== authorizationRevision) return;
+      options.adoptSnapshot(snapshot);
       const current = connection(provider);
       if (current?.status === 'connected') {
         clearAuthorizationPoll(provider);
-        authorization.value = null;
+        if (authorization.value?.provider === provider) authorization.value = null;
         if (!isFirstRunOnboardingActive()) useConfetti().celebrate();
         await loadRepositories(provider);
         return;
@@ -237,10 +237,11 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
         return;
       }
       clearAuthorizationPoll(provider);
-      authorization.value = null;
+      if (authorization.value?.provider === provider) authorization.value = null;
       status.value = current?.status === 'error' ? 'error' : 'loaded';
       error.value = current?.status === 'error' ? localizedText(current.detail, translate) : null;
     } catch (cause) {
+      if (revision !== authorizationRevision) return;
       clearAuthorizationPoll(provider);
       status.value = 'error';
       error.value = errorMessage(cause);

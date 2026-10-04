@@ -1,5 +1,6 @@
 import type { Agent, AppPluginSettings } from '@codex-claw/core/contracts';
 import { defaultPluginSettings } from '@codex-claw/core/settings';
+import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
 import type { CodexThreadStartExtension } from '@codex-app-sdk/backend';
 import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from './agent-prompts';
 
@@ -9,7 +10,10 @@ export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettin
   return [
     configOverride('features.apply_patch_streaming_events', true),
     configOverride('features.memories', true),
-    configOverride('plugins."github@openai-curated-remote".enabled', false),
+    ...workProviderKinds.flatMap(provider => {
+      const plugin = workProviderDefinition(provider).hostedMcp?.plugin;
+      return plugin ? [configOverride(`plugins."${plugin}".enabled`, false)] : [];
+    }),
     configOverride('plugins."unified-computer-use@openai-bundled".enabled', false),
     ...(pluginSettings.chromeEnabled
       ? [configOverride('mcp_servers.node_repl.enabled', true)]

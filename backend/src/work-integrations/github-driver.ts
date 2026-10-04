@@ -1,4 +1,4 @@
-import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemLabel, WorkItemPage, WorkItemQuery, WorkRepository } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemLabel, WorkItemPage, WorkItemQuery, WorkSource } from '@codex-claw/core/contracts';
 import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import { runtimeGitHubOAuthClientId } from '../runtime-config';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
@@ -10,7 +10,6 @@ const DEFAULT_SCOPE = 'repo read:user';
 
 export class GitHubWorkProviderDriver implements WorkProviderDriver {
   readonly provider = 'github' as const;
-  private readonly globalItemTotals = new Map<string, number>();
 
   constructor(private readonly clientIdProvider: string | (() => string | null | undefined) = runtimeGitHubOAuthClientId) {}
 
@@ -170,7 +169,7 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
     return user.login;
   }
 
-  async listRepositories(token: WorkProviderToken): Promise<WorkRepository[]> {
+  async listSources(token: WorkProviderToken): Promise<WorkSource[]> {
     const [repositoryResponse, activityResponse] = await Promise.all([
       githubApiRequest(token, '/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=100'),
       githubApiRequest(token, '/issues?filter=all&state=open&sort=updated&direction=desc&per_page=100', {
@@ -181,7 +180,7 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
       throw new Error('GitHub returned an invalid repositories response.');
     }
 
-    const repositories = repositoryResponse.map(githubRepository).filter((repository): repository is WorkRepository => Boolean(repository));
+    const repositories = repositoryResponse.map(githubRepository).filter((repository): repository is WorkSource => Boolean(repository));
     const activityByRepository = Array.isArray(activityResponse)
       ? githubRepositoryWorkItemActivity(activityResponse)
       : new Map<string, string>();
@@ -192,7 +191,7 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
   }
 
   async listGlobalItems(token: WorkProviderToken, query: GlobalWorkItemQuery = {}): Promise<WorkItemPage> {
-    const page = query.page ?? 1;
+    const page = query.cursor === undefined ? 1 : Number(query.cursor);
     if (!Number.isSafeInteger(page) || page < 1) throw new Error('Invalid work item page.');
     const pageSize = Math.max(1, Math.min(100, Math.trunc(query.pageSize ?? 50)));
     const assignment = query.assignment === 'viewer' ? 'assigned' : 'all';
@@ -209,13 +208,10 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
       .map(githubAssignedIssue)
       .filter((item): item is WorkItem => item !== null)
       .filter((item) => query.kind === undefined || query.kind === 'all' || item.kind === query.kind);
-    const totalKey = `${assignment}:${state}:${pageSize}`;
-    let totalItems = this.globalItemTotals.get(totalKey);
-    if (page === 1 || totalItems === undefined) {
-      totalItems = await githubPageTotal(token, response, page, pageSize);
-      this.globalItemTotals.set(totalKey, totalItems);
-    }
-    return { items, page, pageSize, totalItems };
+    return {
+      items: items.map(item => ({ ...item, assignedToViewer: Boolean(token.accountLabel && item.assignees?.includes(token.accountLabel)) })),
+      ...(linkedPageUrl(response.linkHeader, 'next') ? { nextCursor: String(page + 1) } : {}),
+    };
   }
 
   async listItems(token: WorkProviderToken, repositoryId: string, query: WorkItemQuery = {}): Promise<WorkItem[]> {
@@ -240,7 +236,7 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
         .map((pullRequest) => githubPullRequestItem(pullRequest, repositoryId, repository.fullName))
         .filter((item): item is WorkItem => Boolean(item)));
     }
-    return items;
+    return items.map(item => ({ ...item, assignedToViewer: Boolean(token.accountLabel && item.assignees?.includes(token.accountLabel)) }));
   }
 
   async listAssignedItems(token: WorkProviderToken): Promise<WorkItem[]> {
@@ -368,25 +364,6 @@ async function githubApiResponse(token: WorkProviderToken, path: string, init: R
   return response;
 }
 
-async function githubPageTotal(
-  token: WorkProviderToken,
-  response: { linkHeader: string | null; value: unknown },
-  page: number,
-  pageSize: number,
-): Promise<number> {
-  const currentCount = Array.isArray(response.value) ? response.value.length : 0;
-  const lastUrl = linkedPageUrl(response.linkHeader, 'last');
-  if (!lastUrl) return ((page - 1) * pageSize) + currentCount;
-  const lastPage = Number(new URL(lastUrl).searchParams.get('page'));
-  if (!Number.isSafeInteger(lastPage) || lastPage < page) return ((page - 1) * pageSize) + currentCount;
-  if (lastPage === page) return ((page - 1) * pageSize) + currentCount;
-
-  const url = new URL(lastUrl);
-  const lastResponse = await githubApiPageRequest(token, `${url.pathname}${url.search}`);
-  if (!Array.isArray(lastResponse.value)) throw new Error('GitHub returned an invalid final issues page.');
-  return ((lastPage - 1) * pageSize) + lastResponse.value.length;
-}
-
 function linkedPageUrl(linkHeader: string | null, relation: 'last' | 'next'): string | null {
   if (!linkHeader) return null;
   for (const part of linkHeader.split(',')) {
@@ -450,7 +427,7 @@ function githubPullRequest(value: unknown): AgentGitPullRequest | null {
   };
 }
 
-function githubRepository(value: unknown): WorkRepository | null {
+function githubRepository(value: unknown): WorkSource | null {
   if (!isRecord(value) || typeof value.full_name !== 'string' || typeof value.html_url !== 'string') {
     return null;
   }
@@ -472,7 +449,7 @@ function githubRepository(value: unknown): WorkRepository | null {
   };
 }
 
-function githubIssue(value: unknown, repositoryId: string, repositoryFullName: string): WorkItem | null {
+function githubIssue(value: unknown, repositoryId: string, sourceName: string): WorkItem | null {
   const issueNumber = isRecord(value) && Number.isInteger(value.number) ? value.number : null;
   if (!isRecord(value) ||
     typeof issueNumber !== 'number' ||
@@ -488,8 +465,8 @@ function githubIssue(value: unknown, repositoryId: string, repositoryFullName: s
     provider: 'github',
     id: `${repositoryId}#${issueNumber}`,
     kind: isRecord(value.pull_request) ? 'pullRequest' : 'issue',
-    repositoryId,
-    repositoryFullName,
+    sourceId: repositoryId,
+    sourceName,
     number: issueNumber,
     title: value.title,
     url: value.html_url,
@@ -503,8 +480,8 @@ function githubIssue(value: unknown, repositoryId: string, repositoryFullName: s
   };
 }
 
-function githubPullRequestItem(value: unknown, repositoryId: string, repositoryFullName: string): WorkItem | null {
-  const item = githubIssue(isRecord(value) ? { ...value, pull_request: {} } : value, repositoryId, repositoryFullName);
+function githubPullRequestItem(value: unknown, repositoryId: string, sourceName: string): WorkItem | null {
+  const item = githubIssue(isRecord(value) ? { ...value, pull_request: {} } : value, repositoryId, sourceName);
   if (!item || !isRecord(value) || !isRecord(value.head) || typeof value.head.ref !== 'string' || !value.head.ref.trim()) {
     return null;
   }

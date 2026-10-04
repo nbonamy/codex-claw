@@ -3,6 +3,20 @@ import type { Agent, WorkItem } from '../contracts';
 import { assignedAgentsByWorkItemKey, findAssignedAgentForWorkItem, isSameWorkItem, sanitizeWorkItemAssignmentSource, workBacklogAssignmentFromWorkItem, workItemAssignmentKey } from '../work-assignments';
 
 describe('work assignments', () => {
+  it('persists a provider-neutral item without a numeric issue or repository identity', () => {
+    const item = { provider: 'linear' as const, id: 'opaque-task-id', sourceId: 'opaque-source-id', sourceName: 'Product', identifier: 'TASK-blue', title: 'Shared task', body: 'Details', url: 'https://example.test/task' };
+    const reference = sanitizeWorkItemAssignmentSource(item);
+    expect(reference).toEqual(item);
+    expect(workBacklogAssignmentFromWorkItem(reference!, 'agent-dina', 'now')).toMatchObject({ item });
+    expect(sanitizeWorkItemAssignmentSource({ ...item, provider: 'github' })).toEqual({ ...item, provider: 'github' });
+  });
+  it('retains a Linear issue reference in its assignment without colliding with equal issue numbers', () => {
+    const item = { ...workItem(12), provider: 'linear' as const, id: 'linear:eng-uuid', identifier: 'ENG-12', sourceId: 'linear:team', sourceName: 'Engineering', body: 'Reproduction' };
+    const source = sanitizeWorkItemAssignmentSource(item);
+    expect(source).toMatchObject({ identifier: 'ENG-12', body: 'Reproduction', sourceId: item.sourceId });
+    expect(workBacklogAssignmentFromWorkItem(source!, 'agent-dina', 'now')).toMatchObject({ item: source });
+    expect(isSameWorkItem(item, { ...item, id: 'linear:ops-uuid' })).toBe(false);
+  });
   it('uses provider-aware keys and finds the assigned agent', () => {
     const item = workItem(12);
     const assignment = workBacklogAssignmentFromWorkItem(item, 'agent-dina', '2026-06-09T13:00:00.000Z');
@@ -37,8 +51,8 @@ describe('work assignments', () => {
     expect(sanitizeWorkItemAssignmentSource(workItem(12))).toStrictEqual({
       provider: 'github',
       id: 'nbonamy/codex-claw#12',
-      repositoryId: 'nbonamy/codex-claw',
-      repositoryFullName: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
+      sourceName: 'nbonamy/codex-claw',
       number: 12,
       title: 'Fix cockpit drag target',
       url: 'https://github.com/nbonamy/codex-claw/issues/12',
@@ -58,8 +72,8 @@ function workItem(number: number): WorkItem {
   return {
     provider: 'github',
     id: `nbonamy/codex-claw#${number}`,
-    repositoryId: 'nbonamy/codex-claw',
-    repositoryFullName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/codex-claw',
+    sourceName: 'nbonamy/codex-claw',
     number,
     title: 'Fix cockpit drag target',
     url: `https://github.com/nbonamy/codex-claw/issues/${number}`,

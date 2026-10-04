@@ -1,4 +1,4 @@
-import type { Automation, SourceRepository, Team, WorkIntegrationConnection, WorkRepository } from '@codex-claw/core/contracts';
+import type { Automation, SourceRepository, Team, WorkIntegrationConnection, WorkSource } from '@codex-claw/core/contracts';
 import { mount } from '@vue/test-utils';
 import { ElButton, ElOption, ElSelect, ElSwitch } from 'element-plus';
 import AutomationEditor from '../AutomationEditor.vue';
@@ -6,21 +6,25 @@ import AutomationEditor from '../AutomationEditor.vue';
 export function mountEditor(
   overrides: Partial<{
     connection: WorkIntegrationConnection;
+    connections: WorkIntegrationConnection[];
+    currentRepositoryPath: string;
     automation: Automation;
-    repositories: WorkRepository[];
+    repositories: WorkSource[];
     sourceRepositories: SourceRepository[];
     teams: Team[];
   }> = {},
 ) {
   return mount(AutomationEditor, {
+    attachTo: document.body,
     props: {
       mode: overrides.automation ? 'edit' : 'create',
-      connection: overrides.connection ?? {
+      connections: overrides.connections ?? [overrides.connection ?? {
         provider: 'github',
         status: 'connected',
         accountLabel: 'nbonamy',
-      },
+      }],
       automation: overrides.automation,
+      currentRepositoryPath: overrides.currentRepositoryPath,
       repositories: overrides.repositories ?? workRepositories(),
       sourceRepositories: overrides.sourceRepositories ?? sourceRepositories(),
       teams: overrides.teams ?? [
@@ -47,8 +51,8 @@ export function automation(overrides: Partial<Automation> = {}): Automation {
     repositories: [
       {
         provider: 'github',
-        repositoryId: 'nbonamy/codex-claw',
-        sourceRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/codex-claw',
+        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
       },
     ],
     teamId: 'team-codex-claw',
@@ -62,7 +66,7 @@ export function automation(overrides: Partial<Automation> = {}): Automation {
   };
 }
 
-export function workRepositories(): WorkRepository[] {
+export function workRepositories(): WorkSource[] {
   return [
     {
       provider: 'github',

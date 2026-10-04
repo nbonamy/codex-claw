@@ -3,7 +3,42 @@ import { describe, expect, it, vi } from 'vitest';
 import SettingsIntegrationsPanel from '../SettingsIntegrationsPanel.vue';
 
 describe('SettingsIntegrationsPanel', () => {
-  it('renders a decorative banner below the title', () => {
+  it('connects Linear using app configuration without showing or saving OAuth fields', async () => {
+    const updateSettings = vi.fn();
+    const wrapper = mountPanel({ updateSettings });
+    expect(wrapper.find('input').exists()).toBe(false);
+    await wrapper.get('[aria-label="Connect Linear"]').trigger('click');
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(wrapper.emitted('connect')).toEqual([['linear']]);
+  });
+
+  it('keeps Linear authorization in one row and allows canceling and connecting again', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ connections: [{ provider: 'github', status: 'connected', accountLabel: 'GitHub user' }], updateSettings });
+    expect(wrapper.text()).toContain('Linear');
+    await wrapper.get('[aria-label="Connect Linear"]').trigger('click');
+    await flushPromises();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(wrapper.emitted('connect')).toEqual([['linear']]);
+    await wrapper.setProps({ connections: [{ provider: 'linear', status: 'connecting' }], authorization: { provider: 'linear', flow: 'browser', verificationUri: 'https://linear.app/oauth/authorize', expiresAt: '2026-10-04T00:00:00Z' } });
+    expect(wrapper.findAll('article')).toHaveLength(2);
+    expect(wrapper.text()).toContain('Waiting for authorization');
+    expect(wrapper.find('[aria-label="Open Linear authorization"]').exists()).toBe(false);
+    await wrapper.get('[aria-label="Cancel Linear authorization"]').trigger('click');
+    expect(wrapper.emitted('disconnect')).toEqual([['linear']]);
+    await wrapper.setProps({ connections: [{ provider: 'linear', status: 'disconnected' }], authorization: null });
+    await wrapper.get('[aria-label="Connect Linear"]').trigger('click');
+    expect(wrapper.emitted('connect')).toEqual([['linear'], ['linear']]);
+    await wrapper.setProps({ connections: [{ provider: 'linear', status: 'connected', accountLabel: 'Alex · Example' }] });
+    const linearRow = wrapper.findAll('article').find(row => row.text().includes('Linear'))!;
+    expect(linearRow.text()).toContain('Signed in as Alex · Example');
+    expect(linearRow.get('.settings-integrations-panel__actions').text()).toBe('ConnectedDisconnect');
+    await wrapper.get('[aria-label="Disconnect Linear"]').trigger('click');
+    expect(wrapper.emitted('disconnect')).toEqual([['linear'], ['linear']]);
+  });
+
+  it('renders a decorative banner and matching provider logos', () => {
     const wrapper = mountPanel({
       connections: [{ provider: 'github', status: 'disconnected' }],
     });
@@ -16,6 +51,9 @@ describe('SettingsIntegrationsPanel', () => {
     expect(banner.text()).toBe('');
     expect(wrapper.find('svg.github-icon').exists()).toBe(true);
     expect(wrapper.find('img.github-icon').exists()).toBe(false);
+    const linearLogo = wrapper.get('svg.linear-icon');
+    expect(linearLogo.attributes('width')).toBe(wrapper.get('svg.github-icon').attributes('width'));
+    expect(linearLogo.element.closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
   it('emits connect for disconnected GitHub', async () => {
@@ -51,7 +89,7 @@ describe('SettingsIntegrationsPanel', () => {
     expect(wrapper.text()).toContain('Codex Claw will finish the connection automatically once GitHub approves it.');
     expect(wrapper.find('[aria-label="Waiting for GitHub authorization"]').exists()).toBe(true);
 
-    wrapper.getComponent({ name: 'GitHubAuthorizationSteps' }).vm.$emit('open');
+    wrapper.getComponent({ name: 'WorkAuthorizationSteps' }).vm.$emit('open');
     expect(wrapper.emitted('open-authorization')).toStrictEqual([['github']]);
     expect(wrapper.emitted('complete')).toBeUndefined();
   });

@@ -3,7 +3,7 @@ import type {
   AppSnapshot,
   Automation,
   AutomationExecutionLogEntry,
-  AutomationRepositoryTarget,
+  AutomationWorkSourceTarget,
   CreateSourceWorktreeInput,
   SourceWorktree,
   WorkItem,
@@ -14,11 +14,11 @@ import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { recordAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
 import { createEntityId, type IdGenerator } from '@codex-claw/core/ids';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt, workProviderLabel } from '@codex-claw/core/work-item-prompts';
+import { workItemAssignmentPrompt, workItemBranchName, workItemDisplayIdentifier, workProviderLabel } from '@codex-claw/core/work-item-prompts';
 import { logMain, warnMain } from '../log';
 
 type WorkItemLister = {
-  listItems(provider: WorkProviderKind, repositoryId: string): Promise<WorkItem[]>;
+  listItems(provider: WorkProviderKind, sourceId: string): Promise<WorkItem[]>;
 };
 
 type AutomationPromptContext = {
@@ -46,6 +46,7 @@ type CreatedAutomationAssignment = {
 };
 
 export class AutomationRunner {
+  private readonly pendingAssignments = new Set<string>();
   constructor(private readonly options: AutomationRunnerOptions) {}
 
   async runAll(): Promise<void> {
@@ -178,14 +179,16 @@ export class AutomationRunner {
     createdAt: string,
     createdAssignments: CreatedAutomationAssignment[],
   ): Promise<void> {
-    const candidates: Array<{ item: WorkItem; repository: AutomationRepositoryTarget }> = [];
+    const candidates: Array<{ item: WorkItem; repository: AutomationWorkSourceTarget }> = [];
+    const seen = new Set<string>();
     for (const repository of automation.repositories) {
-      const items = await this.options.listWorkItems.listItems(repository.provider, repository.repositoryId);
+      if (!repository.executionRepositoryPath.trim()) throw new Error(`Choose a code repository for ${repository.sourceId}.`);
+      const items = await this.options.listWorkItems.listItems(repository.provider, repository.sourceId);
       const matchingItems = matchingAutomationItems(items, repository);
       logMain('automation-runner', 'listed work items', {
         automationId: automation.id,
         executionId,
-        repositoryId: repository.repositoryId,
+        sourceId: repository.sourceId,
         itemCount: items.length,
         matchingCount: matchingItems.length,
       });
@@ -193,7 +196,7 @@ export class AutomationRunner {
       for (const item of matchingItems) {
         const assignmentKey = workItemAssignmentKey(item);
         const existingAssignment = this.snapshot().workBacklog.assignments[assignmentKey];
-        if (existingAssignment) {
+        if (existingAssignment || seen.has(assignmentKey) || this.pendingAssignments.has(assignmentKey)) {
           logMain('automation-runner', 'skipped already assigned item', {
             automationId: automation.id,
             executionId,
@@ -201,6 +204,7 @@ export class AutomationRunner {
           });
           continue;
         }
+        seen.add(assignmentKey);
         candidates.push({ item, repository });
       }
     }
@@ -212,22 +216,27 @@ export class AutomationRunner {
     const selectedIds = new Set(selectedItems.map(workItemAssignmentKey));
     for (const { item, repository } of candidates) {
       const assignmentKey = workItemAssignmentKey(item);
-      if (!selectedIds.has(assignmentKey)) continue;
+      if (!selectedIds.has(assignmentKey) || this.snapshot().workBacklog.assignments[assignmentKey] || this.pendingAssignments.has(assignmentKey)) continue;
+      this.pendingAssignments.add(assignmentKey);
+      try {
+        const agent = await this.createAgentForAutomation(automation, repository, item, createdAt);
+        if (!agent) continue;
 
-      const agent = await this.createAgentForAutomation(automation, repository, item, createdAt);
-
-      assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt, {
-        automationExecutionId: executionId,
-        automationId: automation.id,
-        policy: 'complete',
-      });
-      createdAssignments.push({ agent, item });
-      logMain('automation-runner', 'created assignment', {
-        automationId: automation.id,
-        executionId,
-        agentId: agent.id,
-        workItemId: assignmentKey,
-      });
+        assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt, {
+          automationExecutionId: executionId,
+          automationId: automation.id,
+          policy: 'complete',
+        });
+        createdAssignments.push({ agent, item });
+        logMain('automation-runner', 'created assignment', {
+          automationId: automation.id,
+          executionId,
+          agentId: agent.id,
+          workItemId: assignmentKey,
+        });
+      } finally {
+        this.pendingAssignments.delete(assignmentKey);
+      }
     }
   }
 
@@ -240,20 +249,21 @@ export class AutomationRunner {
 
   private async createAgentForAutomation(
     automation: Automation,
-    repository: AutomationRepositoryTarget,
+    repository: AutomationWorkSourceTarget,
     item: WorkItem,
     createdAt: string,
-  ): Promise<Agent> {
+  ): Promise<Agent | null> {
     const team = this.snapshot().teams.find((candidate) => candidate.id === automation.teamId);
-    if (!team) {
+    if (!team || team.remoteConnectionId) {
       throw new Error(`Team is no longer available for automation "${automation.name}".`);
     }
 
     const worktree = await this.options.createWorktree({
-      repoPath: repository.sourceRepositoryPath,
+      repoPath: repository.executionRepositoryPath,
       branchName: automationBranchName(item),
       reuseExisting: true,
     });
+    if (this.snapshot().workBacklog.assignments[workItemAssignmentKey(item)]) return null;
     const previousAgentIds = new Set(this.snapshot().agents.map((agent) => agent.id));
     createAgentInSnapshot(
       this.snapshot(),
@@ -292,9 +302,9 @@ export class AutomationRunner {
   }
 }
 
-export function matchingAutomationItems(items: WorkItem[], repository: AutomationRepositoryTarget): WorkItem[] {
+export function matchingAutomationItems(items: WorkItem[], repository: AutomationWorkSourceTarget): WorkItem[] {
   return items.filter((item) => {
-    return item.provider === repository.provider && item.repositoryId === repository.repositoryId && item.state === 'open';
+    return item.provider === repository.provider && item.sourceId === repository.sourceId && item.state === 'open';
   });
 }
 
@@ -306,11 +316,11 @@ export function automationIsDue(automation: Automation, now: Date): boolean {
 }
 
 function dedicatedTeamName(item: WorkItem): string {
-  return `${workProviderLabel(item.provider)} #${item.number}`;
+  return `${workProviderLabel(item.provider)} ${workItemDisplayIdentifier(item)}`;
 }
 
 function automationBranchName(item: WorkItem): string {
-  return `automation/${item.provider}-${item.number}`;
+  return workItemBranchName(item, 'automation');
 }
 
 function createAutomationExecutionEntry(
@@ -332,6 +342,7 @@ function createAutomationExecutionEntry(
       agentId: agent.id,
       agentName: agentDisplayName(agent),
       workItemId: workItemAssignmentKey(item),
+      ...(item.identifier ? { workItemIdentifier: item.identifier } : {}),
       workItemTitle: item.title,
       workItemUrl: item.url,
     })),

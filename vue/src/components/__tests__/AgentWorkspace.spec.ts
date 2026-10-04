@@ -11,9 +11,6 @@ import type { RightWorkspaceTab } from '../right-workspace';
 function createWorkspaceState(): AgentRightWorkspaceState {
   return {
     activeTab: null,
-    backlogError: null,
-    backlogItems: [],
-    backlogStatus: 'notLoaded',
     browserId: 'primary',
     browserInitialUrl: '',
     browserOpenRequestId: 0,

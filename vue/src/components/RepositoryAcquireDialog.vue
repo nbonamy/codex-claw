@@ -101,7 +101,7 @@
           <p>{{ t(authorization ? 'repositories.githubOnboarding.authorizeDetail' : 'repositories.githubOnboarding.detail') }}</p>
         </div>
 
-        <GitHubAuthorizationSteps
+        <WorkAuthorizationSteps
           v-if="authorization"
           :authorization="authorization"
           @open="emit('open-authorization')"
@@ -130,10 +130,10 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
-import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkRepository } from '@codex-claw/core/contracts';
+import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkSource } from '@codex-claw/core/contracts';
 import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
 import { GitHubIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
-import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
+import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
@@ -150,7 +150,7 @@ const props = withDefaults(defineProps<{
   loading?: boolean;
   localRepositoryIdentities?: string[];
   mode: 'github' | 'url';
-  repositories?: WorkRepository[];
+  repositories?: WorkSource[];
   visible: boolean;
 }>(), {
   busy: false,
@@ -167,7 +167,7 @@ const emit = defineEmits<{
   'clone-url': [url: string];
   connect: [];
   'open-authorization': [];
-  'select-repository': [repository: WorkRepository];
+  'select-repository': [repository: WorkSource];
 }>();
 
 const { t } = useI18n();
@@ -202,12 +202,12 @@ function submitUrl(): void {
   if (canSubmitUrl.value && !props.busy && backend.value && backendChoices.value.includes(backend.value)) emit('clone-url', url.value.trim());
 }
 
-function isRepositoryLocal(repository: WorkRepository): boolean {
+function isRepositoryLocal(repository: WorkSource): boolean {
   const identity = canonicalGitRemoteIdentity(repository.url);
   return Boolean(identity && localRepositoryIdentities.value.has(identity));
 }
 
-function repositoryKindLabel(repository: WorkRepository): string {
+function repositoryKindLabel(repository: WorkSource): string {
   if (isRepositoryLocal(repository)) return t('repositories.acquire.onMachine');
   return repository.isPrivate
     ? t('repositories.acquire.privateRepository')

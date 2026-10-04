@@ -2,8 +2,9 @@
   <section class="cockpit-view" :aria-label="$t('surface.cockpitView.backlog')">
     <aside class="cockpit-view__navigation" :aria-label="$t('surface.cockpitView.backlogNavigation')">
       <nav>
+        <BacklogSourceSelector class="cockpit-view__provider" size="small" full-width :provider="workProvider ?? 'github'" :providers="workProviders ?? []" :show-source="false" @select-provider="emit('select-work-provider', $event)" />
         <div class="cockpit-view__navigation-section">
-          <strong>{{ $t('surface.cockpitView.repositories') }}</strong>
+          <strong>{{ $t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.sources' : 'surface.cockpitView.repositories') }}</strong>
           <el-dropdown
             placement="bottom-end"
             trigger="click"
@@ -30,8 +31,8 @@
           <input
             v-model="repositoryFilter"
             type="search"
-            :placeholder="$t('surface.cockpitView.filterRepositories')"
-            :aria-label="$t('surface.cockpitView.filterRepositories')"
+            :placeholder="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.filterSources' : 'surface.cockpitView.filterRepositories')"
+            :aria-label="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.filterSources' : 'surface.cockpitView.filterRepositories')"
           />
         </label>
         <div v-if="workBacklog" class="cockpit-view__repositories">
@@ -54,8 +55,8 @@
               :href="repository.url"
               target="_blank"
               rel="noreferrer"
-              :aria-label="$t('dynamic.cockpit.openRepository', { repository: repository.name })"
-              :title="$t('dynamic.cockpit.openRepository', { repository: repository.name })"
+              :aria-label="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.openSource' : 'dynamic.cockpit.openRepository', { repository: repository.name })"
+              :title="$t(!workProviderDefinition(workProvider ?? 'github').repositoryBacked ? 'backlogSource.openSource' : 'dynamic.cockpit.openRepository', { repository: repository.name })"
               @click.stop
             >
               <ExternalLinkIcon aria-hidden="true" />
@@ -88,6 +89,7 @@
 
       <CockpitWorkInbox
         v-if="workBacklog"
+        :key="`${workProvider}:${workBacklog.selectedRepositoryId}`"
         :agents="agents"
         :active-view="activeWorkView"
         :assignments="workBacklog.assignments"
@@ -98,6 +100,7 @@
         :page="workBacklog.page"
         :page-loading="workBacklog.pageLoading"
         :page-size="workBacklog.pageSize"
+        :has-next-page="workBacklog.hasNextPage"
         :repositories="workBacklog.repositories"
         :repository-icons="repositoryIcons"
         :search-query="searchQuery"
@@ -107,6 +110,7 @@
         :teams="teams"
         :default-team-id="defaultTeamId"
         :start-work-action="startWorkItemsAction"
+        :list-source-repositories="listSourceRepositories"
         :status="workBacklog.status"
         :status-filter="activeSummaryFilter"
         :total-items="workBacklog.totalItems"
@@ -127,13 +131,15 @@
 </template>
 
 <script setup lang="ts">
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
 import { translate } from '../i18n';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IconChevronDown, IconFolder, IconSearch } from '@tabler/icons-vue';
-import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkSource } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { ExternalLinkIcon } from '../shared/icons/app-icons';
 import CockpitWorkInbox from './CockpitWorkInbox.vue';
+import BacklogSourceSelector from './BacklogSourceSelector.vue';
 
 type CockpitWorkBacklog = {
   assignments: Record<string, WorkBacklogAssignment>;
@@ -144,12 +150,13 @@ type CockpitWorkBacklog = {
   page?: number;
   pageLoading?: boolean;
   pageSize?: number;
-  repositories: WorkRepository[];
+  repositories: WorkSource[];
   selectedAssigneeLogin?: string | null;
   selectedRepositoryId: string | null;
   selectedTagName?: string | null;
   status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   totalItems?: number;
+  hasNextPage?: boolean;
 };
 
 type WorkItemAssignmentIntent = { item: WorkItem; teamId?: string };
@@ -159,11 +166,14 @@ type SummaryFilter = 'inProgress' | 'blocked' | 'readyForReview';
 type SummaryMetric = { count: number; filter: SummaryFilter; id: 'working' | 'blocked' | 'review'; label: string; view: InboxView };
 
 const props = defineProps<{
+  workProvider?: import('@codex-claw/core/contracts').WorkProviderKind;
+  workProviders?: import('@codex-claw/core/contracts').WorkProviderKind[];
   agents: Agent[];
   repositoryIcons?: Record<string, string>;
   teams: Team[];
   defaultTeamId?: string | null;
-  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend'] }) => Promise<void>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceRepository[]>;
+  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@codex-claw/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
   workBacklog?: CockpitWorkBacklog | null;
 }>();
 
@@ -172,6 +182,7 @@ const repositoryIcons = computed(() => props.repositoryIcons ?? {});
 const startWorkItemsAction = props.startWorkItemsAction;
 
 const emit = defineEmits<{
+  'select-work-provider': [provider: import('@codex-claw/core/contracts').WorkProviderKind];
   'assign-work-item-to-new-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'refresh-work-items': [repositoryId: string | null];
@@ -188,6 +199,11 @@ const searchQuery = ref('');
 const repositoryFilter = ref('');
 const activeWorkView = ref<InboxView>('focus');
 const activeSummaryFilter = ref<SummaryFilter | null>(null);
+watch(() => `${props.workProvider}:${props.workBacklog?.selectedRepositoryId}`, () => {
+  searchQuery.value = '';
+  repositoryFilter.value = '';
+  activeSummaryFilter.value = null;
+});
 const repositorySortMode = ref<RepositorySortMode>('recent');
 const repositorySortLabel = computed(() => repositorySortMode.value === 'recent' ? translate('surface.cockpitView.recent') : 'A–Z');
 const repositorySortDescription = computed(() => repositorySortMode.value === 'recent' ? 'recent activity' : 'name');
@@ -240,7 +256,7 @@ function selectSummaryMetric(metric: SummaryMetric): void {
   activeSummaryFilter.value = metric.filter;
 }
 
-function repositoryActivityAt(repository: WorkRepository): string {
+function repositoryActivityAt(repository: WorkSource): string {
   return repository.workItemsUpdatedAt ?? '';
 }
 
@@ -270,6 +286,10 @@ function selectWorkView(view: InboxView): void {
   padding: var(--space-24) var(--space-12) var(--space-16);
   border-right: 1px solid var(--color-border);
   background: var(--color-shell-sidebar);
+}
+
+.cockpit-view__provider {
+  margin: 0 var(--space-6);
 }
 
 .cockpit-view__repository-filter {

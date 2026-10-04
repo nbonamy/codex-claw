@@ -5,7 +5,7 @@ import type {
   SourceRepository,
   Team,
   WorkIntegrationConnection,
-  WorkRepository,
+  WorkSource,
 } from '@codex-claw/core/contracts';
 import { computed, ref, watch } from 'vue';
 
@@ -14,7 +14,7 @@ type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
 export type RepositoryAcquisitionOptions = {
   activeTeam: () => Team | null;
   activeTeamId: () => string | undefined;
-  catalog: () => WorkRepository[] | undefined;
+  catalog: () => WorkSource[] | undefined;
   catalogError: () => string | null;
   catalogStatus: () => CatalogStatus;
   chooseLocalFolder: () => Promise<string | null>;
@@ -24,7 +24,7 @@ export type RepositoryAcquisitionOptions = {
   githubConnection: () => WorkIntegrationConnection;
   listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-  loadGitHubRepositories: () => Promise<WorkRepository[] | void>;
+  loadGitHubRepositories: () => Promise<WorkSource[] | void>;
   openFolder: (folder: string, teamId?: string) => Promise<void>;
   openGitHubAuthorization: () => Promise<void>;
   openRepository: (repository: SourceRepository, teamId?: string) => Promise<void>;
@@ -35,7 +35,7 @@ export type RepositoryAcquisitionOptions = {
 export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) {
   const visible = ref(false);
   const mode = ref<'github' | 'url'>('github');
-  const repositories = ref<WorkRepository[]>([]);
+  const repositories = ref<WorkSource[]>([]);
   const sourceRepositories = ref<SourceRepository[]>([]);
   const loading = ref(false);
   const busy = ref(false);
@@ -102,7 +102,7 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
     }
   }
 
-  async function select(repository: WorkRepository): Promise<void> {
+  async function select(repository: WorkSource): Promise<void> {
     const identity = canonicalGitRemoteIdentity(repository.url);
     const local = identity
       ? sourceRepositories.value.find((candidate) => candidate.remoteIdentity === identity)

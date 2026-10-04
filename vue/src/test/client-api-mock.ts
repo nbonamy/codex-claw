@@ -60,7 +60,7 @@ export function createClientApiMock(
     connectWorkProvider: unscripted('connectWorkProvider'),
     pollWorkProviderAuthorization: unscripted('pollWorkProviderAuthorization'),
     disconnectWorkProvider: unscripted('disconnectWorkProvider'),
-    listWorkRepositories: unscripted('listWorkRepositories'),
+    listWorkSources: unscripted('listWorkSources'),
     configureWorkBacklog: unscripted('configureWorkBacklog'),
     listGlobalWorkItems: unscripted('listGlobalWorkItems'),
     listAssignedWorkItems: unscripted('listAssignedWorkItems'),
@@ -215,10 +215,10 @@ export function createClientApiMock(
   // Harmless reads have explicit values; writes and consequential operations must be scripted.
   api.listSshHosts.mockResolvedValue([]);
   api.listPairedDevices.mockResolvedValue([]);
-  api.listWorkRepositories.mockResolvedValue([]);
+  api.listWorkSources.mockResolvedValue([]);
   api.listWorkItems.mockResolvedValue([]);
   api.listAssignedWorkItems.mockResolvedValue([]);
-  api.listGlobalWorkItems.mockResolvedValue({ items: [], page: 1, pageSize: 25, totalItems: 0 });
+  api.listGlobalWorkItems.mockResolvedValue({ items: [], totalItems: 0 });
   api.listBackendModels.mockResolvedValue([]);
   api.listBackendPlugins.mockResolvedValue([]);
   api.listBackendSkills.mockResolvedValue([]);

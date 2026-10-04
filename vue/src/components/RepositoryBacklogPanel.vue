@@ -1,8 +1,9 @@
 <template>
   <section class="repository-backlog" :aria-label="$t('surface.repositoryBacklogPanel.repositoryBacklog')">
+    <BacklogSourceSelector size="small" :provider="backlog.provider.value" :providers="backlog.providers.value" :sources="backlog.sources.value" :source-id="backlog.sourceId.value" :show-source="!workProviderDefinition(backlog.provider.value).repositoryBacked" @select-provider="backlog.selectProvider" @select-source="backlog.selectSource" />
     <header class="repository-backlog__repository">
       <div>
-        <GitHubIcon aria-hidden="true" />
+        <GitHubIcon v-if="backlog.provider.value === 'github'" aria-hidden="true" />
         <strong>{{ repositoryName }}</strong>
       </div>
       <span v-if="branch" class="repository-backlog__branch-pill">
@@ -13,7 +14,7 @@
         type="button"
         :aria-label="t('repositoryBacklog.refresh')"
         :disabled="status === 'loading'"
-        @click="emit('refresh')"
+        @click="backlog.refresh()"
       >
         <IconRefresh :class="{ 'repository-backlog__spin': status === 'loading' }" aria-hidden="true" />
       </button>
@@ -32,6 +33,7 @@
           {{ t('repositoryBacklog.issues') }}
         </button>
         <button
+          v-if="workProviderDefinition(backlog.provider.value).pullRequests"
           type="button"
           role="radio"
           :aria-checked="kindFilter === 'pullRequest'"
@@ -94,7 +96,7 @@
                 <span>{{ t('repositoryBacklog.assignee') }}</span>
                 <el-select v-model="assigneeFilter" size="small" :aria-label="$t('surface.repositoryBacklogPanel.workItemAssignee')">
                   <el-option :label="t('repositoryBacklog.anyone')" value="all" />
-                  <el-option :label="t('repositoryBacklog.assignedToMe')" value="me" :disabled="!accountLabel" />
+                  <el-option :label="t('repositoryBacklog.assignedToMe')" value="me" />
                   <el-option :label="t('repositoryBacklog.unassigned')" value="unassigned" />
                 </el-select>
               </label>
@@ -147,7 +149,7 @@
     <div v-else-if="error" class="repository-backlog__state repository-backlog__state--error">
       <IconAlertCircle aria-hidden="true" />
       <span>{{ error }}</span>
-      <button type="button" @click="emit('refresh')">{{ t('repositoryBacklog.retry') }}</button>
+      <button type="button" @click="backlog.refresh()">{{ t('repositoryBacklog.retry') }}</button>
     </div>
 
     <div v-else-if="filteredItems.length === 0" class="repository-backlog__state">
@@ -205,6 +207,7 @@
         class="repository-backlog__start-work"
         :class="{ 'repository-backlog__start-work--menu': selectedAssignment }"
       >
+        <WorkItemDetail :item="selectedItem" />
         <template v-if="selectedAssignment">
           <AppMenu
             class="app-menu--embedded repository-backlog__assignment-menu"
@@ -215,7 +218,7 @@
         </template>
         <template v-else-if="operationState === 'idle' || operationState === 'error'">
           <header>
-            <strong>{{ t('repositoryBacklog.startWork', { number: selectedItem.number }) }}</strong>
+            <strong>{{ t('repositoryBacklog.startWork', { identifier: workItemDisplayIdentifier(selectedItem) }) }}</strong>
             <button type="button" :aria-label="$t('surface.repositoryBacklogPanel.close')" @click="closeStartWork"><IconX aria-hidden="true" /></button>
           </header>
 
@@ -270,6 +273,8 @@
 </template>
 
 <script setup lang="ts">
+import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workItemBranchName, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
 import { computed, h, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -287,7 +292,7 @@ import {
   IconX,
 } from '@tabler/icons-vue';
 import { GitHubIcon } from '../shared/icons/app-icons';
-import type { Agent, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -295,32 +300,36 @@ import type { AppMenuItem } from '../shared/menu/app-menu';
 import type { RepositoryWorkStartInput } from './right-workspace';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
+import BacklogSourceSelector from './BacklogSourceSelector.vue';
+import WorkItemDetail from './WorkItemDetail.vue';
+import { useWorkSourceBacklog } from './use-work-source-backlog';
 
 defineOptions({ name: 'RepositoryBacklogPanel' });
 
 const props = defineProps<{
+  location?: import('@codex-claw/core/contracts').AutomationLocation;
   agent: Agent;
   agents: readonly Agent[];
   assignments: Record<string, WorkBacklogAssignment>;
   branch?: string;
-  connection?: WorkIntegrationConnection | null;
-  error?: string | null;
-  items: WorkItem[];
   repositoryId: string;
-  prefillAction: (item: WorkItem) => void;
   clearAssignmentAction?: (item: WorkItem) => void;
   closeAgentAction?: (agentId: string) => void;
   showAgentAction?: (agentId: string) => void;
-  status: 'notLoaded' | 'loading' | 'loaded' | 'error';
   startWorkAction: (input: RepositoryWorkStartInput) => Promise<void>;
   visible: boolean;
 }>();
 
-const emit = defineEmits<{
-  refresh: [];
-}>();
 
 const { t } = useI18n();
+const backlog = useWorkSourceBacklog({
+  location: () => props.location,
+  query: { kind: 'all', state: 'all' },
+  preferredSourceId: () => props.repositoryId,
+  restrictToRepository: () => true,
+  enabled: () => props.visible,
+});
+const { items, status, error } = backlog;
 const kindFilter = ref<'issue' | 'pullRequest'>('issue');
 const stateFilter = ref<'open' | 'closed' | 'all'>('open');
 const assigneeFilter = ref<'all' | 'me' | 'unassigned'>('all');
@@ -331,6 +340,8 @@ const searchInput = ref<HTMLInputElement | null>(null);
 const filtersVisible = ref(false);
 const defaultsSaved = ref(false);
 const selectedItem = ref<WorkItem | null>(null);
+let selectionRevision = 0;
+watch([selectedItem, () => props.visible, () => JSON.stringify(props.location)], () => { ++selectionRevision; }, { flush: 'sync' });
 const openItemId = ref<string | null>(null);
 const startWorkVisible = ref(false);
 const branchName = ref('');
@@ -345,21 +356,20 @@ const currentSessionOptions = computed<WorkItemAssignmentSession[]>(() => [{
 }]);
 const operationWorkspaceLabel = computed(() => branchName.value || props.branch || t('repositoryBacklog.currentWorkspace'));
 
-const accountLabel = computed(() => props.connection?.accountLabel?.trim() ?? '');
-const repositoryName = computed(() => props.repositoryId.split('/').at(-1) ?? props.repositoryId);
-const labelOptions = computed(() => [...new Set(props.items.flatMap((item) => item.labels.map((label) => label.name)))].sort());
+const repositoryName = computed(() => backlog.sources.value.find(source => source.id === backlog.sourceId.value)?.fullName ?? backlog.sourceId.value ?? '');
+const labelOptions = computed(() => [...new Set(items.value.flatMap((item) => item.labels.map((label) => label.name)))].sort());
 const activeFilterCount = computed(() => Number(stateFilter.value !== 'open') + Number(assigneeFilter.value !== 'all') + Number(Boolean(labelFilter.value)));
-const kindItems = computed(() => props.items.filter((item) => (item.kind ?? 'issue') === kindFilter.value));
+const kindItems = computed(() => items.value.filter((item) => (item.kind ?? 'issue') === kindFilter.value));
 const filteredItems = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase();
-  return props.items
+  return items.value
     .filter((item) => (item.kind ?? 'issue') === kindFilter.value)
     .filter((item) => stateFilter.value === 'all' || item.state === stateFilter.value)
     .filter((item) => assigneeFilter.value === 'all'
-      || (assigneeFilter.value === 'me' && Boolean(accountLabel.value) && item.assignees?.includes(accountLabel.value))
+      || (assigneeFilter.value === 'me' && item.assignedToViewer)
       || (assigneeFilter.value === 'unassigned' && (item.assignees?.length ?? 0) === 0))
     .filter((item) => !labelFilter.value || item.labels.some((label) => label.name === labelFilter.value))
-    .filter((item) => !query || `${item.number} ${item.title} ${item.authorName ?? ''}`.toLocaleLowerCase().includes(query))
+    .filter((item) => !query || `${item.identifier ?? item.number} ${item.title} ${item.authorName ?? ''}`.toLocaleLowerCase().includes(query))
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 });
 const assignmentGroups = computed(() => ([
@@ -407,8 +417,18 @@ watch(labelOptions, (labels) => {
 });
 
 watch(() => props.repositoryId, () => {
+  closeStartWork();
   loadFilterDefaults();
 }, { immediate: true });
+
+watch([backlog.provider, backlog.sourceId, () => JSON.stringify(props.location)], () => {
+  pendingClearAssignment.value = null;
+  closeStartWork();
+  closeSearch();
+  clearFilters();
+  kindFilter.value = 'issue';
+  loadFilterDefaults();
+});
 
 watch([stateFilter, assigneeFilter, labelFilter], () => {
   defaultsSaved.value = false;
@@ -435,12 +455,12 @@ const RepositoryItemRow = (rowProps: { item: WorkItem; assignment: WorkBacklogAs
         target: '_blank',
         rel: 'noopener noreferrer',
         onClick: (event: MouseEvent) => event.stopPropagation(),
-      }, [h('span', `#${item.number}`), h('strong', item.title)]),
+      }, [h('span', workItemDisplayIdentifier(item)), h('strong', item.title)]),
       assignmentNote
         ? h('p', { class: 'repository-backlog__assignment-note' }, assignmentNote)
         : h('div', { class: 'repository-backlog__item-meta' }, [
           h('span', { class: `repository-backlog__state-dot repository-backlog__state-dot--${item.state}` }),
-          h('span', item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed')),
+          h('span', item.nativeState ?? (item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed'))),
           label ? h('span', { class: 'repository-backlog__label', style: labelStyle(label.color) }, label.name) : null,
         ]),
     ]),
@@ -510,7 +530,7 @@ function readFilterDefaults(): {
     const value = JSON.parse(stored) as Record<string, unknown>;
     return {
       state: value.state === 'closed' || value.state === 'all' ? value.state : 'open',
-      assignee: value.assignee === 'unassigned' || (value.assignee === 'me' && accountLabel.value) ? value.assignee : 'all',
+      assignee: value.assignee === 'unassigned' || value.assignee === 'me' ? value.assignee : 'all',
       label: typeof value.label === 'string' && value.label.length <= 100 && (labelOptions.value.length === 0 || labelOptions.value.includes(value.label)) ? value.label : '',
     };
   } catch {
@@ -519,10 +539,11 @@ function readFilterDefaults(): {
 }
 
 function filterDefaultsKey(): string {
-  return `repositoryBacklogFilters:${props.repositoryId}`;
+  return `repositoryBacklogFilters:${backlog.provider.value}:${JSON.stringify(props.location)}:${backlog.sourceId.value}`;
 }
 
 function openItem(item: WorkItem, element?: HTMLElement): void {
+  if (!items.value.some(candidate => candidate.id === item.id)) return;
   const reference = element ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
   if (reference) virtualReference.value = reference;
   selectedItem.value = item;
@@ -598,34 +619,38 @@ function setStartWorkVisible(visible: boolean): void {
   closeStartWork();
 }
 
-function prefillCustomPrompt(): void {
+function prefillCustomPrompt(selection: Omit<WorkItemAssignmentSelection, 'action'>): void {
   const item = selectedItem.value;
   if (!item) return;
-  props.prefillAction(item);
-  closeStartWork();
+  void startWork({ ...selection, action: 'custom' });
 }
 
-async function startWork(selection: WorkItemAssignmentSelection): Promise<void> {
+async function startWork(selection: Omit<WorkItemAssignmentSelection, 'action'> & { action: RepositoryWorkStartInput['action'] }): Promise<void> {
   const item = selectedItem.value;
-  if (!item || operationState.value === 'running') return;
+  if (!item || selection.item.id !== item.id || operationState.value === 'running') return;
+  const source = backlog.sourceId.value;
+  const provider = backlog.provider.value;
+  const revision = selectionRevision;
+  const isCurrent = () => revision === selectionRevision && props.visible && selectedItem.value?.id === item.id && backlog.sourceId.value === source && backlog.provider.value === provider;
   operationState.value = 'running';
   operationError.value = null;
   try {
     const input: RepositoryWorkStartInput = selection.destination === 'new'
       ? { action: selection.action, item, target: 'duplicate', backend: selection.backend, workspace: { kind: 'worktree', branchName: branchName.value.trim() } }
       : { action: selection.action, item, target: 'current', workspace: { kind: 'current' } };
-    await props.startWorkAction(input);
+    await props.startWorkAction({ ...input, isCurrent });
+    if (!isCurrent()) return;
     operationState.value = 'success';
-    globalThis.setTimeout(closeStartWork, 1_200);
+    globalThis.setTimeout(() => { if (isCurrent()) closeStartWork(); }, 1_200);
   } catch (error) {
+    if (!isCurrent()) return;
     operationState.value = 'error';
     operationError.value = error instanceof Error ? error.message : String(error);
   }
 }
 
 function suggestedBranch(item: WorkItem): string {
-  const prefix = item.kind === 'pullRequest' ? 'review' : 'fix';
-  return `${prefix}/gh-${item.number}`;
+  return workItemBranchName(item);
 }
 
 function relativeTime(value: string): string {

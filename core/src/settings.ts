@@ -1,3 +1,4 @@
+import { workProviderKinds } from './work-providers';
 import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type ModelFavorite, type SavedPromptDraft, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
 import { repositoryIconKeyForRemote } from './git-remote';
 import { isApprovalPreset } from './approval-presets';
@@ -96,15 +97,16 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
     });
   }
 
-  if (input.workProviders?.github) {
-    const githubSettings = normalizeWorkProviderSettings({
-      ...snapshot.workBacklog.providerSettings.github,
-      ...input.workProviders.github,
+  for (const provider of workProviderKinds) {
+    if (!input.workProviders?.[provider]) continue;
+    const settings = normalizeWorkProviderSettings({
+      ...snapshot.workBacklog.providerSettings[provider],
+      ...input.workProviders[provider],
     });
-    if (githubSettings.oauthClientId) {
-      snapshot.workBacklog.providerSettings.github = githubSettings;
+    if (settings.oauthClientId || settings.oauthCallbackUri) {
+      snapshot.workBacklog.providerSettings[provider] = settings;
     } else {
-      delete snapshot.workBacklog.providerSettings.github;
+      delete snapshot.workBacklog.providerSettings[provider];
     }
   }
 
@@ -337,7 +339,8 @@ function normalizeWorkProviderSettings(value: unknown): WorkProviderSettings {
   }
 
   const oauthClientId = normalizeOptionalString(value.oauthClientId);
-  return oauthClientId ? { oauthClientId } : {};
+  const oauthCallbackUri = normalizeOptionalString(value.oauthCallbackUri);
+  return { ...(oauthClientId ? { oauthClientId } : {}), ...(oauthCallbackUri ? { oauthCallbackUri } : {}) };
 }
 
 function normalizeRecentRepoNames(value: unknown): string[] {

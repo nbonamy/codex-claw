@@ -84,7 +84,7 @@ import type {
   WorkProviderAuthorization,
   WorkProviderKind,
   WorkProviderSettings,
-  WorkRepository
+  WorkSource
 } from './contracts/work';
 import type { MainToRendererEvent } from './contracts/events';
 
@@ -246,11 +246,11 @@ export type {
   AutomationExecutionLogEntry,
   AutomationExecutionStatus,
   AutomationLocation,
-  AutomationRepositoryTarget,
+  AutomationWorkSourceTarget,
   AutomationSchedule,
   CreateAutomationInput,
-  GitHubWorkBacklogConfiguration,
-  GitHubWorkBacklogConfigurationInput,
+  WorkSourceConfiguration,
+  WorkSourceConfigurationInput,
   GlobalWorkItemQuery,
   UpdateAutomationInput,
   WorkBacklogAssignment,
@@ -263,6 +263,7 @@ export type {
   WorkIntegrationStatus,
   WorkItem,
   WorkItemKind,
+  WorkItemReference,
   WorkItemLabel,
   WorkItemPage,
   WorkItemQuery,
@@ -270,7 +271,7 @@ export type {
   WorkProviderAuthorization,
   WorkProviderKind,
   WorkProviderSettings,
-  WorkRepository,
+  WorkSource,
 } from './contracts/work';
 
 export type AgentStatus =
@@ -816,7 +817,7 @@ export type CodexClawApi = {
   connectWorkProvider(provider: WorkProviderKind): Promise<WorkProviderConnectResult>;
   pollWorkProviderAuthorization(provider: WorkProviderKind): Promise<AppSnapshot>;
   disconnectWorkProvider(provider: WorkProviderKind): Promise<AppSnapshot>;
-  listWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkRepository[]>;
+  listWorkSources(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]>;
   configureWorkBacklog(input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<AppSnapshot>;
   listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
   listAssignedWorkItems?(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]>;

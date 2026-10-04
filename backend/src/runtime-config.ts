@@ -1,3 +1,16 @@
+import type { WorkProviderSettings } from '@codex-claw/core/contracts';
+
+const PACKAGED_LINEAR_CLIENT_ID = typeof __CODEX_CLAW_LINEAR_CLIENT_ID__ === 'string' ? __CODEX_CLAW_LINEAR_CLIENT_ID__ : '';
+const PACKAGED_LINEAR_CALLBACK_URI = typeof __CODEX_CLAW_LINEAR_CALLBACK_URI__ === 'string' ? __CODEX_CLAW_LINEAR_CALLBACK_URI__ : '';
+const DEFAULT_LINEAR_CALLBACK_URI = 'http://127.0.0.1:5173/api/auth/callback/linear';
+
+export function runtimeLinearOAuthSettings(settings?: WorkProviderSettings): WorkProviderSettings {
+  return {
+    oauthClientId: settings?.oauthClientId?.trim() || process.env.CODEX_CLAW_LINEAR_CLIENT_ID?.trim() || PACKAGED_LINEAR_CLIENT_ID.trim(),
+    oauthCallbackUri: settings?.oauthCallbackUri?.trim() || process.env.CODEX_CLAW_LINEAR_CALLBACK_URI?.trim() || PACKAGED_LINEAR_CALLBACK_URI.trim() || DEFAULT_LINEAR_CALLBACK_URI,
+  };
+}
+
 const PACKAGED_GITHUB_CLIENT_ID =
   typeof __CODEX_CLAW_GITHUB_CLIENT_ID__ === 'string'
     ? __CODEX_CLAW_GITHUB_CLIENT_ID__

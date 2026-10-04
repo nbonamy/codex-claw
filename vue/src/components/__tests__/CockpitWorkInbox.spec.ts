@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { computed } from 'vue';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,28 @@ import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import CockpitWorkInbox from '../CockpitWorkInbox.vue';
 
 describe('CockpitWorkInbox', () => {
+  it('requires an explicit code repository for Linear batches and invalidates a submitted selection on source change', async () => {
+    const selected = { ...item(12, 'Repair login', 'linear:team'), provider: 'linear' as const, id: 'linear:uuid', identifier: 'ENG-12' };
+    const startWorkAction = vi.fn().mockResolvedValue(undefined);
+    const repository = { name: 'code', path: '/remote/code', worktrees: [] };
+    const listSourceRepositories = vi.fn().mockResolvedValue([repository]);
+    const wrapper = mountInbox([selected], {}, {}, startWorkAction);
+    await wrapper.setProps({ connection: { provider: 'linear', status: 'connected' }, listSourceRepositories,
+      teams: [{ id: 'team-one', name: 'Remote', agentIds: [], remoteConnectionId: 'remote-one' }] });
+    await wrapper.get('.cockpit-inbox__selection input').setValue(true);
+    await wrapper.get('.cockpit-inbox__start-work').trigger('click');
+    await flushPromises();
+    expect(listSourceRepositories).toHaveBeenCalledWith('remote-one');
+    const fix = wrapper.findAll('.claw-dialog__footer button').find(button => button.text() === 'Fix')!;
+    await fix.trigger('click');
+    expect(startWorkAction).not.toHaveBeenCalled();
+    await wrapper.get('[aria-label="Code repository"] select').setValue(repository.path);
+    await fix.trigger('click');
+    const input = startWorkAction.mock.calls[0]![0];
+    expect(input).toMatchObject({ items: [selected], repository, teamId: 'team-one', action: 'fix' });
+    await wrapper.setProps({ selectedRepositoryId: 'linear:other' });
+    expect(input.isCurrent()).toBe(false);
+  });
   it('defaults to Focus and preserves the view order while prioritizing attention and review', async () => {
     const blocked = item(21, 'Resolve a blocker', 'repo-one');
     const review = item(22, 'Review the result', 'repo-two');
@@ -72,7 +94,7 @@ describe('CockpitWorkInbox', () => {
     expect(wrapper.text()).toContain('Ready item');
     expect(wrapper.text()).toContain('Completed item');
     expect(wrapper.findAll('.cockpit-inbox__row-action').map((button) => button.attributes('aria-label'))).toStrictEqual([
-      'Assign #21', 'Assign #22',
+      'View #21', 'View #22',
     ]);
   });
 
@@ -106,7 +128,7 @@ describe('CockpitWorkInbox', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     expect(rows[0]?.get('.cockpit-inbox__row-action').attributes('aria-label')).toBe('View agent for #21');
-    expect(rows[1]?.get('.cockpit-inbox__row-action').attributes('aria-label')).toBe('Assign #22');
+    expect(rows[1]?.get('.cockpit-inbox__row-action').attributes('aria-label')).toBe('View #22');
     expect(wrapper.find('details').exists()).toBe(false);
 
     await rows[0]?.get('.cockpit-inbox__row-action').trigger('click');
@@ -114,7 +136,7 @@ describe('CockpitWorkInbox', () => {
     await rows[0]?.get('.cockpit-inbox__external-action').trigger('click');
 
     expect(wrapper.emitted('select-assigned-agent')).toStrictEqual([['agent-one']]);
-    expect(rows[1]?.getComponent({ name: 'ElCheckbox' }).props('modelValue')).toBe(true);
+    expect(wrapper.get('.work-item-detail').text()).toContain('Ready work');
     expect(open).toHaveBeenCalledWith(assigned.url, '_blank', 'noreferrer');
     open.mockRestore();
   });
@@ -197,11 +219,12 @@ describe('CockpitWorkInbox', () => {
       globalScope: 'all',
       page: 1,
       pageSize: 5,
+      hasNextPage: true,
       totalItems: 11,
     });
 
     expect(wrapper.get('.cockpit-inbox__pagination').text()).toContain('11 items total');
-    expect(wrapper.get('.cockpit-inbox__pagination').text()).toContain('Page 1 of 3');
+    expect(wrapper.get('.cockpit-inbox__pagination').text()).toContain('Page 1');
     expect(wrapper.findAll('.cockpit-inbox__view-count')[0]?.text()).toBe('11');
     expect(wrapper.get<HTMLButtonElement>('[aria-label="Previous page"]').element.disabled).toBe(true);
     expect(wrapper.get<HTMLButtonElement>('[aria-label="Next page"]').element.disabled).toBe(false);
@@ -216,7 +239,7 @@ describe('CockpitWorkInbox', () => {
 function mountInbox(
   items: WorkItem[],
   assignments: Record<string, WorkBacklogAssignment> = {},
-  filters: { activeView?: 'all' | 'backlog' | 'wip' | 'focus'; globalScope?: 'assignedToMe' | 'all' | null; page?: number; pageLoading?: boolean; pageSize?: number; statusFilter?: 'inProgress' | 'blocked' | 'readyForReview' | null; totalItems?: number } = {},
+  filters: { activeView?: 'all' | 'backlog' | 'wip' | 'focus'; globalScope?: 'assignedToMe' | 'all' | null; page?: number; hasNextPage?: boolean; pageLoading?: boolean; pageSize?: number; statusFilter?: 'inProgress' | 'blocked' | 'readyForReview' | null; totalItems?: number } = {},
   startWorkAction = vi.fn().mockResolvedValue(undefined),
 ) {
   return mount(CockpitWorkInbox, {
@@ -242,7 +265,7 @@ function mountInbox(
 }
 
 function item(number: number, title: string, repositoryId: string): WorkItem {
-  return { provider: 'github', id: `owner/${repositoryId}#${number}`, repositoryId, repositoryFullName: `owner/${repositoryId}`, number, title, url: `https://github.com/owner/${repositoryId}/issues/${number}`, state: 'open', assignees: ['nicolas'], labels: [{ name: 'bug' }], createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z' };
+  return { provider: 'github', id: `owner/${repositoryId}#${number}`, sourceId: repositoryId, sourceName: `owner/${repositoryId}`, number, title, url: `https://github.com/owner/${repositoryId}/issues/${number}`, state: 'open', assignees: ['nicolas'], labels: [{ name: 'bug' }], createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z' };
 }
 
 function assignment(workItem: WorkItem, agentId: string, status: WorkBacklogAssignment['status']): WorkBacklogAssignment {

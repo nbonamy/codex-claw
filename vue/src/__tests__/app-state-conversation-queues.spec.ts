@@ -3,7 +3,7 @@ import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkSource } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';

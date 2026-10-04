@@ -1,96 +1,43 @@
 <template>
-  <SettingsPanelFrame
-    :title="$t('surface.settingsIntegrationsPanel.integrations')"
-    title-id="settings-integrations-title"
-  >
-    <template #banner>
-      <SettingsIntegrationBanner />
-    </template>
-
-    <SettingsSection>
+  <SettingsPanelFrame :title="$t('surface.settingsIntegrationsPanel.integrations')" title-id="settings-integrations-title">
+    <template #banner><SettingsIntegrationBanner /></template>
+    <SettingsSection v-for="connection in integrations" :key="connection.provider">
       <article class="settings-integrations-panel__integration">
         <div class="settings-integrations-panel__identity">
-          <span
-            class="settings-integrations-panel__icon"
-            aria-hidden="true"
-          >
-            <GitHubIcon size="var(--icon-xl)" />
+          <span class="settings-integrations-panel__icon" aria-hidden="true">
+            <component :is="providerIcons[connection.provider] ?? BacklogIcon" size="var(--icon-xl)" />
           </span>
           <div>
-            <strong>{{ $t('surface.settingsIntegrationsPanel.gitHub') }}</strong>
-            <span>{{ githubDescription }}</span>
+            <strong>{{ workProviderDefinition(connection.provider).label }}</strong>
+            <span>{{ description(connection) }}</span>
+            <span v-if="connection.detail && ['error', 'notConfigured'].includes(connection.status)" class="settings-integrations-panel__error">{{ localizedText(connection.detail, translate) }}</span>
           </div>
         </div>
-
         <div class="settings-integrations-panel__actions">
-          <el-button
-            v-if="githubConnection.status !== 'connected'"
-            :loading="status === 'loading'"
-            size="small"
-            type="primary"
-            @click="connectGithub"
-          > {{ $t('surface.settingsIntegrationsPanel.connect') }} </el-button>
-          <template v-else>
+          <template v-if="connection.status === 'connected'">
             <span class="settings-integrations-panel__connected">{{ $t('surface.settingsIntegrationsPanel.connected') }}</span>
-            <el-button
-              size="small"
-              @click="emit('disconnect', 'github')"
-            > {{ $t('surface.settingsIntegrationsPanel.disconnect') }} </el-button>
+            <el-button size="small" :aria-label="actionLabel('disconnect', connection.provider)" @click="emit('disconnect', connection.provider)">{{ $t('surface.settingsIntegrationsPanel.disconnect') }}</el-button>
           </template>
+          <el-button v-else-if="connection.status === 'connecting'" size="small" :aria-label="actionLabel('cancel', connection.provider)" @click="emit('disconnect', connection.provider)">{{ $t('linearIntegration.cancel') }}</el-button>
+          <el-button v-else size="small" type="primary" :aria-label="actionLabel('connect', connection.provider)" :loading="status === 'loading'" @click="emit('connect', connection.provider)">{{ $t('surface.settingsIntegrationsPanel.connect') }}</el-button>
         </div>
       </article>
-
-      <!-- <div
-        v-if="githubConnection.status !== 'connected'"
-        class="settings-integrations-panel__config"
-      >
-        <label for="github-client-id">Client ID</label>
-        <div class="settings-integrations-panel__config-row">
-          <el-input
-            id="github-client-id"
-            v-model="clientIdInput"
-            autocomplete="off"
-            :placeholder="$t('surface.settingsIntegrationsPanel.gitHubOAuthOrAppClientId')"
-            size="small"
-            spellcheck="false"
-          />
-          <el-button
-            :disabled="!clientIdChanged"
-            :loading="savingClientId"
-            size="small"
-            @click="saveClientId"
-          >
-            Save
-          </el-button>
-        </div>
-      </div> -->
-
-      <div
-        v-if="authorization?.provider === 'github' && githubConnection.status === 'connecting'"
-        class="settings-integrations-panel__authorization"
-      >
-        <GitHubAuthorizationSteps
-          :authorization="authorization"
-          @open="emit('open-authorization', 'github')"
-        />
+      <div v-if="authorization?.provider === connection.provider && authorization.userCode && connection.status === 'connecting'" class="settings-integrations-panel__authorization">
+        <WorkAuthorizationSteps :authorization="authorization" @open="emit('open-authorization', connection.provider)" />
       </div>
     </SettingsSection>
-
-    <p
-      v-if="configurationError || error"
-      class="settings-integrations-panel__detail"
-    >
-      {{ configurationError ?? error }}
-    </p>
+    <p v-if="error" class="settings-integrations-panel__detail">{{ error }}</p>
   </SettingsPanelFrame>
 </template>
 
 <script setup lang="ts">
+import { computed, type Component } from 'vue';
+import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
+import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
 import { translate } from '../i18n';
-import { computed, ref, watch } from 'vue';
-import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
-import { GitHubIcon } from '../shared/icons/app-icons';
-import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
+import { localizedText } from '../i18n/errors';
+import { BacklogIcon, GitHubIcon, LinearIcon } from '../shared/icons/app-icons';
+import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsSection from './SettingsSection.vue';
@@ -99,83 +46,26 @@ const props = withDefaults(defineProps<{
   authorization?: WorkProviderAuthorization | null;
   connections: WorkIntegrationConnection[];
   error?: string | null;
-  providerSettings?: WorkBacklogState['providerSettings'];
   status?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-  updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
-}>(), {
-  authorization: null,
-  error: null,
-  providerSettings: () => ({}),
-  status: 'notLoaded',
-  updateSettings: async () => undefined,
-});
-
+}>(), { authorization: null, error: null, status: 'notLoaded' });
 const emit = defineEmits<{
-  complete: [provider: WorkProviderKind];
   connect: [provider: WorkProviderKind];
   disconnect: [provider: WorkProviderKind];
   'open-authorization': [provider: WorkProviderKind];
 }>();
-
-const clientIdInput = ref('');
-const configurationError = ref<string | null>(null);
-const savingClientId = ref(false);
-
-const githubConnection = computed<WorkIntegrationConnection>(() => (
-  props.connections.find((connection) => connection.provider === 'github') ?? {
-    provider: 'github',
-    status: 'disconnected',
-  }
-));
-
-const savedClientId = computed(() => props.providerSettings.github?.oauthClientId ?? '');
-
-const clientIdChanged = computed(() => clientIdInput.value.trim() !== savedClientId.value);
-
-const githubDescription = computed(() => {
-  const connection = githubConnection.value;
-  if (connection.status === 'connected') {
-    return connection.accountLabel ? `Signed in as ${connection.accountLabel}` : translate('surface.settingsIntegrationsPanel.signedIn');
-  }
-  if (connection.status === 'connecting') {
-    return translate('surface.settingsIntegrationsPanel.waitingForAuthorization');
-  }
-  if (connection.status === 'notConfigured') {
-    return translate('surface.settingsIntegrationsPanel.gitHubOAuthIsNotConfigured');
-  }
-  return translate('surface.settingsIntegrationsPanel.issuesAndPullRequests');
-});
-
-watch(savedClientId, (value) => {
-  clientIdInput.value = value;
-}, { immediate: true });
-
-async function saveClientId(): Promise<void> {
-  savingClientId.value = true;
-  configurationError.value = null;
-  try {
-    await props.updateSettings({
-      workProviders: {
-        github: {
-          oauthClientId: clientIdInput.value.trim(),
-        },
-      },
-    });
-  } catch (error) {
-    configurationError.value = error instanceof Error ? error.message : String(error);
-    throw error;
-  } finally {
-    savingClientId.value = false;
-  }
+const providerIcons: Partial<Record<WorkProviderKind, Component>> = { github: GitHubIcon, linear: LinearIcon };
+const integrations = computed(() => workProviderKinds.map(provider => props.connections.find(connection => connection.provider === provider) ?? { provider, status: 'notConfigured' } as WorkIntegrationConnection));
+function description(connection: WorkIntegrationConnection): string {
+  if (connection.status === 'connected') return connection.accountLabel
+    ? translate('linearIntegration.signedInAs', { account: connection.accountLabel })
+    : translate('surface.settingsIntegrationsPanel.signedIn');
+  if (connection.status === 'connecting') return translate('surface.settingsIntegrationsPanel.waitingForAuthorization');
+  return localizedText(workProviderDefinition(connection.provider).description, translate) ?? '';
 }
-
-async function connectGithub(): Promise<void> {
-  if (clientIdChanged.value) {
-    await saveClientId();
-  }
-  emit('connect', 'github');
+function actionLabel(action: 'connect' | 'disconnect' | 'cancel', provider: WorkProviderKind): string {
+  const label = action === 'cancel' ? translate('linearIntegration.cancel') : translate(`surface.settingsIntegrationsPanel.${action}`);
+  return `${label} ${workProviderDefinition(provider).label}${action === 'cancel' ? ' authorization' : ''}`;
 }
-
 </script>
 
 <style scoped>
@@ -221,27 +111,11 @@ async function connectGithub(): Promise<void> {
   justify-content: center;
 }
 
+.settings-integrations-panel__identity .settings-integrations-panel__error {
+  color: var(--color-error);
+}
+
 .settings-integrations-panel__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-}
-
-.settings-integrations-panel__config {
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-10);
-  padding: var(--space-10) 0 0;
-}
-
-.settings-integrations-panel__config label {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
-.settings-integrations-panel__config-row {
   display: flex;
   align-items: center;
   gap: var(--space-8);

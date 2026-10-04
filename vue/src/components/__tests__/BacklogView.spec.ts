@@ -1,12 +1,48 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
+import { defineComponent, h, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { WorkItem, WorkRepository } from '@codex-claw/core/contracts';
+import type { WorkItem, WorkSource } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import BacklogView from '../BacklogView.vue';
 import CockpitWorkInbox from '../CockpitWorkInbox.vue';
+import { useCockpitBacklog } from '../use-cockpit-backlog';
 
 describe('BacklogView', () => {
+  it('switches provider before source and rejects a late global feed from the previous provider', async () => {
+    window.localStorage.clear();
+    const snapshot = reactive(createInitialSnapshot());
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected', accountLabel: 'Alex · Acme' }];
+    const linearItem: WorkItem = { ...item(24), provider: 'linear', id: 'linear:uuid', identifier: 'ENG-24', sourceId: 'linear:team', title: 'Linear issue', body: 'Linear details', nativeState: 'Started' };
+    let resolveOld!: (page: import('@codex-claw/core/contracts').WorkItemPage) => void;
+    const load = vi.fn(async (_query, provider) => provider === 'linear'
+      ? { items: [linearItem], totalItems: 1 }
+      : new Promise<import('@codex-claw/core/contracts').WorkItemPage>(resolve => { resolveOld = resolve; }));
+    const source = { ...repository('team', '2026-01-01'), provider: 'linear' as const, id: 'linear:team', name: 'Engineering', fullName: 'Engineering' };
+    const Harness = defineComponent({ setup() {
+      const state = useCockpitBacklog({ getSnapshot: () => snapshot, configure: async input => { snapshot.workBacklog.providerConfigurations[input.provider] = { sourceId: input.configuration.sourceId ?? undefined }; }, confirmLoadAll: async () => true, getWorkBacklogError: () => null, getWorkBacklogStatus: () => 'loaded', getWorkItemsByRepository: () => ({ 'linear:linear:team': [linearItem] }), getWorkRepositories: provider => provider === 'linear' ? [source] : [repository('repo', '2026-01-01')], loadGlobalWorkItems: load, loadWorkItems: async () => {}, loadWorkRepositories: async () => {} });
+      void state.initialize();
+      return () => h(BacklogView, { agents: [], teams: [], workProviders: state.providers.value, workProvider: state.provider.value, workBacklog: state.workBacklog.value, startWorkItemsAction: async () => {}, onSelectWorkProvider: state.selectProvider, onSelectWorkRepository: state.selectRepository });
+    } });
+    const wrapper = mount(Harness);
+    await flushPromises();
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
+    await flushPromises();
+    resolveOld({ items: [item(99)], totalItems: 1 });
+    await flushPromises();
+    expect(wrapper.text()).toContain('ENG-24');
+    expect(wrapper.text()).not.toContain('#99');
+    expect(wrapper.get('.cockpit-view__repositories button').attributes('aria-pressed')).toBe('true');
+    await wrapper.get('.cockpit-inbox__row-action').trigger('click');
+    expect(wrapper.get('.work-item-detail').text()).toContain('Linear details');
+    expect(snapshot.workBacklog.providerConfigurations.linear?.sourceId).toBe('linear:team');
+    expect(load).toHaveBeenCalledTimes(1);
+    snapshot.workBacklog.connections[0]!.status = 'disconnected';
+    await flushPromises();
+    expect(wrapper.find('[aria-label="Backlog provider"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('ENG-24');
+    window.localStorage.clear();
+  });
   it('presents Backlog as an operator inbox and keeps search inside it', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountView(snapshot, []);
@@ -103,14 +139,14 @@ describe('BacklogView', () => {
     ];
     const firstPageItem = {
       ...item(24),
-      repositoryId: paginatedRepositories[1]!.id,
-      repositoryFullName: paginatedRepositories[1]!.fullName,
+      sourceId: paginatedRepositories[1]!.id,
+      sourceName: paginatedRepositories[1]!.fullName,
       updatedAt: '2026-08-13T12:00:00.000Z',
     };
     const secondPageItem = {
       ...item(25),
-      repositoryId: paginatedRepositories[0]!.id,
-      repositoryFullName: paginatedRepositories[0]!.fullName,
+      sourceId: paginatedRepositories[0]!.id,
+      sourceName: paginatedRepositories[0]!.fullName,
       updatedAt: '2026-08-14T00:00:00.000Z',
     };
     await wrapper.setProps({
@@ -195,7 +231,7 @@ describe('BacklogView', () => {
 function mountView(
   snapshot: ReturnType<typeof createInitialSnapshot>,
   items: WorkItem[],
-  repositories: WorkRepository[] = [],
+  repositories: WorkSource[] = [],
   startWorkItemsAction = vi.fn().mockResolvedValue(undefined),
   selectedRepositoryId: string | null = null,
 ) {
@@ -214,7 +250,7 @@ function mountView(
   });
 }
 
-function repository(name: string, updatedAt: string, workItemsUpdatedAt?: string): WorkRepository {
+function repository(name: string, updatedAt: string, workItemsUpdatedAt?: string): WorkSource {
   return {
     provider: 'github',
     id: `nbonamy/${name}`,
@@ -229,5 +265,5 @@ function repository(name: string, updatedAt: string, workItemsUpdatedAt?: string
 }
 
 function item(number: number): WorkItem {
-  return { provider: 'github', id: `nbonamy/codex-claw#${number}`, repositoryId: 'nbonamy/codex-claw', repositoryFullName: 'nbonamy/codex-claw', number, title: `Work item ${number}`, url: `https://github.com/nbonamy/codex-claw/issues/${number}`, state: 'open', labels: [], createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z' };
+  return { provider: 'github', id: `nbonamy/codex-claw#${number}`, sourceId: 'nbonamy/codex-claw', sourceName: 'nbonamy/codex-claw', number, title: `Work item ${number}`, url: `https://github.com/nbonamy/codex-claw/issues/${number}`, state: 'open', labels: [], createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z' };
 }

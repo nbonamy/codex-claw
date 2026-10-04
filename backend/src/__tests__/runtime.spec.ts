@@ -112,6 +112,7 @@ vi.mock('../work-integrations/manager', () => ({
   WorkIntegrationManager: class {
     constructor(options: unknown) { mocks.workIntegrationOptions.push(options); }
     hydrateConnections = mocks.hydrateConnections;
+    close = vi.fn();
     githubConnected = mocks.githubConnected;
     getPullRequest = mocks.getPullRequest;
   },
@@ -497,8 +498,8 @@ describe('clawd runtime', () => {
     const item = {
       provider: 'github' as const,
       id: 'nbonamy/codex-claw#12',
-      repositoryId: 'nbonamy/codex-claw',
-      repositoryFullName: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/codex-claw',
+      sourceName: 'nbonamy/codex-claw',
       number: 12,
       title: 'Fix the picker',
       url: 'https://github.com/nbonamy/codex-claw/issues/12',
@@ -513,8 +514,8 @@ describe('clawd runtime', () => {
       name: 'Ready work',
       enabled: true,
       repositories: [
-        { provider: 'github' as const, repositoryId: 'nbonamy/codex-claw', sourceRepositoryPath: '/src/claw' },
-        { provider: 'github' as const, repositoryId: 'nbonamy/witsy', sourceRepositoryPath: '/src/witsy' },
+        { provider: 'github' as const, sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/src/claw' },
+        { provider: 'github' as const, sourceId: 'nbonamy/witsy', executionRepositoryPath: '/src/witsy' },
       ],
       teamId: 'team-claw',
       selectionPrompt: 'Only ready bugs.',

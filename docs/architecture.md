@@ -1055,6 +1055,48 @@ stores the rotating refresh token beside the access token and refreshes it
 before provider requests. Concurrent requests share one refresh operation
 because GitHub invalidates the old access and refresh tokens after rotation.
 
+Linear uses authorization-code OAuth with S256 PKCE and single-use random state.
+Linear browsing runs in the backend driver through GraphQL. The existing
+`WorkRepository` catalog DTO carries explicit `linearSource` team/project IDs;
+its legacy repository fields identify a backlog scope, never a code checkout.
+Issues use provider-qualified UUID identities plus native identifiers and
+workflow names. Completed/canceled states map to closed; other supported
+workflow types map to open. The numbered global feed traverses the filtered
+cursor connection before slicing, so its total is measured, at the cost of
+fetching the full filtered collection on each uncached page request. Dialog
+catalogs key requests by provider, source and host location and reject late
+responses after a context switch. GitHub continues to own branch/PR and clone
+operations. Browsing does not infer a code repository from Linear names.
+
+Linear uses the app's public OAuth client ID from `CODEX_CLAW_LINEAR_CLIENT_ID`,
+which can also be baked into the backend build from the repository `.env`.
+The registered callback defaults to
+`http://127.0.0.1:5173/api/auth/callback/linear`; an optional
+`CODEX_CLAW_LINEAR_CALLBACK_URI` overrides it at runtime or build time.
+Nonempty legacy `workBacklog.providerSettings.linear` values remain compatible
+and take precedence; blank saved values fall through to app defaults.
+Settings exposes connection controls, with no client ID or callback fields.
+No client secret or API key is used.
+
+The app registration must include the exact callback, and its port must be free.
+`clawd` binds that loopback address only during authorization; a bind failure
+appears in Settings before opening Linear. The browser must run on the same
+computer as `clawd` (the desktop and localhost web hosts). A remote browser
+cannot use this loopback callback: connect on the owning computer. Claw does
+not deploy an OAuth broker or expose the callback on a network interface.
+Cancellation, replacement, timeout, completion, and runtime shutdown dispose
+the listener. An abandoned browser tab expires after ten minutes and can be
+cancelled immediately in Settings.
+
+The requested Linear scopes are `read,write`: read supports backlog browsing;
+write supports the approved agent issue create/update/comment workflows. No
+administrative, schedule, or app-agent scopes are requested. These scope and
+PKCE choices follow [Linear's OAuth protocol](https://linear.app/developers/oauth-2-0-authentication).
+Access and rotated refresh tokens stay in the existing backend token store;
+only account/connection metadata reaches snapshots. Refreshes are coalesced
+per provider. Failed refreshes require reconnection, and an in-flight callback
+or refresh cannot restore a disconnected account. PR credentials remain GitHub's.
+
 ## In-app Browser
 
 The in-app browser is a desktop preview surface hosted in the renderer's
@@ -1110,6 +1152,14 @@ state is local and provider-neutral: newly assigned items are `inProgress`, and
 agents update them to `blocked`, `readyForReview`, or `completed` through the
 `update-work-item` Claw MCP tool using the exact work item id from that prompt.
 Blocked updates include a user-facing note explaining what help is needed.
+Every provider's assignments retain a sanitized issue reference (native identifier,
+URL, body and opaque source identity) through persistence and remote snapshots.
+The backlog source is separate from the execution repository: repository entry
+points use their current repository, while global batch starts require a code
+repository chosen on the selected Claw team's host. This choice is transient;
+there is no saved Linear source-to-repository mapping. Linear branch defaults
+use the full issue identifier, and Claw status updates do not change Linear's
+workflow state.
 Automation-created assignments also store automation origin metadata so one
 execution can be completed after all of its work items finish. Assigning the same
 work item to another agent overwrites that key and resets it to `inProgress`.
@@ -1125,6 +1175,39 @@ depends on the agent still being present. Resetting an assignment clears Codex
 Claw's local assignment metadata and lifecycle state.
 Automations keep their generated agents and isolated worktrees after completion so
 the user can review or continue the work explicitly.
+Linear automations persist each team/project source ID with an explicit code
+repository path on the automation's host. Setup offers the current repository
+when available; unattended runs never infer a clone from a Linear name or ask
+for a repository. This mapping belongs only to that automation. Catalog reads
+do not change the interactive backlog selection. Overlapping sources are
+deduplicated by provider-qualified issue identity before selection; the first
+configured source supplies the execution repository. In-flight reservations
+also prevent concurrent runs from preparing the same issue twice. Native Linear
+identifiers are retained in selection prompts, assignments and execution logs.
+The work-provider boundary has three parts:
+
+- `core/src/contracts/work.ts` defines the shared `WorkSource` and `WorkItem`
+  model. Source IDs and item IDs are opaque; a numeric issue number is optional.
+  Native workflow states and display identifiers supplement common fields.
+- `core/src/work-providers.ts` registers labels, source terminology,
+  repository/PR capabilities, branch conventions and optional hosted MCP
+  endpoints. Validation, Settings, prompts, automation setup and MCP wiring
+  consume this registry.
+- Backend `WorkProviderDriver` adapters own authentication, native API
+  requests and normalization. Shared browsing owns source selection, caching,
+  host isolation and stale-response protection. Global feeds use opaque cursors
+  and optional totals; Linear does not traverse the entire issue connection
+  for each visible page.
+
+Adding a source requires a registry definition, an adapter and runtime
+construction/configuration. It does not require new branches in assignment,
+Mission selection, Settings connection controls or automation workflows.
+Provider-specific logos are optional presentation metadata. Contract tests use
+a third provider with nonnumeric IDs to exercise the shared protocol and UI.
+GitHub code-host operations remain separate from a backlog item's execution
+repository choice. Automation targets explicitly store `sourceId` and
+`executionRepositoryPath`.
+
 Future provider-specific actions, such as claiming tickets, commenting, or
 changing status, should be added behind the work-provider seam without changing
 cockpit tiles into provider-aware UI.

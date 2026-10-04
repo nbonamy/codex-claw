@@ -661,8 +661,8 @@ describe('ClawBackendServer', () => {
     const sanitizedItem = {
       provider: item.provider,
       id: item.id,
-      repositoryId: item.repositoryId,
-      repositoryFullName: item.repositoryFullName,
+      sourceId: item.sourceId,
+      sourceName: item.sourceName,
       number: item.number,
       title: item.title,
       url: item.url,
