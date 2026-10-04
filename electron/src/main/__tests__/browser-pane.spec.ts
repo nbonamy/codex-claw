@@ -58,6 +58,10 @@ const electronMocks = vi.hoisted(() => {
     once = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
       this.listeners.set(event, listener);
     });
+    removeListener = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
+      if (this.listeners.get(event) === listener) this.listeners.delete(event);
+      return this;
+    });
     emit(event: string, ...args: unknown[]) { this.listeners.get(event)?.(...args); }
     getZoomFactor = vi.fn(() => 1);
     setZoomFactor = vi.fn();
@@ -110,6 +114,46 @@ beforeEach(() => {
 });
 
 describe('browser pane helpers', () => {
+  it('waits for a replacement page when a client redirect aborts loadURL', async () => {
+    const owner = { webContents: {} };
+    const guest = electronMocks.createGuest(owner, 60);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(owner as never, 'agent-one', 'primary', '', '', 60);
+    guest.isLoading.mockReturnValue(true);
+    guest.loadURL.mockRejectedValueOnce(Object.assign(new Error('ERR_ABORTED (-3)'), { code: 'ERR_ABORTED', errno: -3 }));
+    let settled = false;
+    const navigation = pane.navigate('agent-one', 'primary', 'https://www.google.com/search?q=dark%20mode')
+      .then(state => { settled = true; return state; });
+    const assertion = expect(navigation).resolves.toMatchObject({ url: 'https://www.google.com/search?q=dark%20mode&sei=redirect' });
+    await Promise.resolve();
+    guest.emit('did-fail-load', {}, -3, '', 'https://www.google.com/search?q=dark%20mode', true);
+    expect(settled).toBe(false);
+    guest.getURL.mockReturnValue('https://www.google.com/search?q=dark%20mode&sei=redirect');
+    guest.isLoading.mockReturnValue(false);
+    guest.emit('did-finish-load');
+    await assertion;
+  });
+
+  it('keeps genuine navigation failures visible, including after an aborted redirect', async () => {
+    const owner = { webContents: {} };
+    const guest = electronMocks.createGuest(owner, 61);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    await pane.open(owner as never, 'agent-one', 'primary', '', '', 61);
+    const failure = Object.assign(new Error('ERR_NAME_NOT_RESOLVED'), { code: 'ERR_NAME_NOT_RESOLVED', errno: -105 });
+    guest.loadURL.mockRejectedValueOnce(failure);
+    await expect(pane.navigate('agent-one', 'primary', 'https://example.com')).rejects.toBe(failure);
+    const abort = Object.assign(new Error('ERR_ABORTED'), { code: 'ERR_ABORTED', errno: -3 });
+    guest.loadURL.mockRejectedValueOnce(abort);
+    await expect(pane.navigate('agent-one', 'primary', 'https://example.com')).rejects.toBe(abort);
+    guest.isLoading.mockReturnValue(true);
+    guest.loadURL.mockRejectedValueOnce(abort);
+    const navigation = pane.navigate('agent-one', 'primary', 'https://example.com');
+    const assertion = expect(navigation).rejects.toThrow('ERR_NAME_NOT_RESOLVED');
+    await Promise.resolve();
+    guest.emit('did-fail-load', {}, -105, 'ERR_NAME_NOT_RESOLVED', 'https://example.com/redirect', true);
+    await assertion;
+  });
+
   it('normalizes a bare host into an https URL', () => {
     expect(normalizeBrowserUrl('example.com/docs')).toBe('https://example.com/docs');
     expect(normalizeBrowserUrl('http://localhost:3000')).toBe('http://localhost:3000/');

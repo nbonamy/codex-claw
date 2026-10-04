@@ -145,7 +145,15 @@ export class BrowserPane {
   async navigate(agentId: string, browserId: string, url: string): Promise<BrowserState> {
     const pane = this.requirePane(agentId, browserId);
     const target = normalizeBrowserUrl(url, pane.fileRoot);
-    await pane.webContents.loadURL(target);
+    try {
+      await pane.webContents.loadURL(target);
+    } catch (error) {
+      // A page can replace its initial navigation before loadURL settles.
+      // Electron rejects that original load even though its replacement is loading.
+      const aborted = error instanceof Error && 'code' in error && error.code === 'ERR_ABORTED';
+      if (!aborted || pane.webContents.isDestroyed() || !pane.webContents.isLoading()) throw error;
+      return this.waitForNavigation(pane);
+    }
     return this.state(pane);
   }
 
@@ -406,7 +414,27 @@ export class BrowserPane {
   private async waitForNavigation(pane: HostedBrowserPane): Promise<BrowserState> {
     const webContents = pane.webContents;
     if (webContents.isLoading()) {
-      await new Promise<void>((resolve) => webContents.once('did-finish-load', () => resolve()));
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          clearTimeout(timeout);
+          webContents.removeListener('did-finish-load', finished);
+          webContents.removeListener('did-fail-load', failed);
+          webContents.removeListener('did-stop-loading', stopped);
+          webContents.removeListener('destroyed', destroyed);
+        };
+        const finished = () => { cleanup(); resolve(); };
+        const fail = (error: Error) => { cleanup(); reject(error); };
+        const failed = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
+          if (isMainFrame && code !== -3) fail(new Error(description || `Navigation failed (${code}).`));
+        };
+        const stopped = () => fail(new Error('Browser navigation was stopped.'));
+        const destroyed = () => fail(new Error('Browser was closed during navigation.'));
+        const timeout = setTimeout(() => fail(new Error('Browser navigation timed out.')), 30_000);
+        webContents.once('did-finish-load', finished);
+        webContents.on('did-fail-load', failed);
+        webContents.once('did-stop-loading', stopped);
+        webContents.once('destroyed', destroyed);
+      });
     }
     return this.state(pane);
   }

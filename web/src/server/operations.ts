@@ -51,6 +51,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   listBackendSkills: [backendMethods.agentSkillsList, named('agentId')],
   listAgentFiles: [backendMethods.agentFilesList, named('agentId')],
   previewAgentFile: [backendMethods.agentFilePreview, named('agentId', 'filePath')],
+  readAgentFileChunk: [backendMethods.agentFileChunkRead, named('agentId', 'filePath', 'offset')],
   getAgentGitDiff: [backendMethods.agentGitDiffGet, namedOptional('agentId', 'target')],
   getAgentGitWorkflow: [backendMethods.agentGitWorkflowGet, named('agentId')],
   generateAgentGitMessage: [backendMethods.agentGitMessageGenerate, named('agentId', 'input')],

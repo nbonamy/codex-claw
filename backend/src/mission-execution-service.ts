@@ -35,6 +35,7 @@ export class MissionExecutionService {
   private readonly remediationDispatches = new Set<string>();
   private readonly remediationTurns = new Map<string, { missionId: string; findingIds: string[]; frozenFindingIds: string[] }>();
   private readonly nonResultTurns = new Set<string>();
+  private readonly completedTurns = new Map<string, Set<string>>();
   private readonly agentTools: MissionAgentTools;
   private readonly workspaces: MissionWorkspaceService;
   constructor(private readonly ports: MissionExecutionPorts) {
@@ -469,7 +470,15 @@ export class MissionExecutionService {
   setTitle(agentId: string, title: string): Promise<{ success: true; title: string }> { return this.agentTools.setTitle(agentId, title); }
   attachRepository(agentId: string, repoPath: string): Promise<{ success: true; repoPath: string }> { return this.agentTools.attachRepository(agentId, repoPath); }
 
-  async agentFinished(agentId: string): Promise<void> {
+  async agentFinished(agentId: string, turnId?: string): Promise<void> {
+    if (turnId) {
+      const completed = this.completedTurns.get(agentId) ?? new Set<string>();
+      if (completed.has(turnId)) return;
+      completed.add(turnId);
+      // Keep recent completions across ticket handoffs without retaining the whole conversation.
+      if (completed.size > 64) completed.delete(completed.values().next().value!);
+      this.completedTurns.set(agentId, completed);
+    }
     const remediationTurn = this.remediationTurns.get(agentId);
     if (remediationTurn) {
       this.remediationTurns.delete(agentId);
@@ -496,6 +505,9 @@ export class MissionExecutionService {
       return;
     }
     if (this.nonResultTurns.delete(agentId)) return;
+    // A completed maintenance/compaction turn is not the end of the assignment
+    // when the prompt manager still has work to deliver, including after resume.
+    if (this.ports.snapshot.queuedPrompts?.some(prompt => prompt.agentId === agentId)) return;
     const mission = this.ports.snapshot.missions?.find(mission => mission.execution?.runs.some(run => run.workerId === agentId && run.status === 'running' && ['implementation', 'review'].includes(run.stage)));
     if (!mission) return;
     await this.ports.missions.change(mission.id, current => {

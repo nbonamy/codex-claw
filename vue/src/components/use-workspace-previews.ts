@@ -28,6 +28,8 @@ export type WorkspacePreviewOptions = {
   getAgentGitDiff: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
   openTab: (tab: RightWorkspaceTab, agentId?: string) => void;
   previewAgentFile: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
+  downloadAgentFile: (agentId: string, filePath: string) => Promise<void>;
+  reportError: (message: string) => void;
   workspaceFor: (agentId: string) => AgentRightWorkspaceState;
 };
 
@@ -46,7 +48,7 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
       await openAgentGitDiff(agent.id);
       return;
     }
-    await openFile(agent.id, filePath);
+    await openFile(agent.id, filePath, true, true);
   }
 
   function openTurnDiff(agentId: string, turnId: string, filePath: string): boolean {
@@ -86,7 +88,7 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
     void openFile(agent.id, filePath, false);
   }
 
-  async function openFile(agentId: string, filePath: string, reveal = true): Promise<void> {
+  async function openFile(agentId: string, filePath: string, reveal = true, downloadUnsupported = false): Promise<void> {
     const agent = agentForId(agentId);
     const trimmedPath = normalizePreviewFilePath(filePath, agent?.folder);
     if (!agent || !trimmedPath) return;
@@ -96,23 +98,35 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
     const requestId = ++filePreviewRequestId;
     workspace.filePreviewRequestIds = { ...workspace.filePreviewRequestIds, [tab]: requestId };
     const existingContent = workspace.filePanels[tab]?.content ?? '';
-    workspace.filePanels = {
-      ...workspace.filePanels,
-      [tab]: filePreviewPanel(trimmedPath, existingContent, 'loading', null),
-    };
-    if (reveal && workspace.activeTab === 'files' && workspace.tabs.includes('files')) {
-      workspace.tabs = workspace.tabs
-        .map((candidate) => candidate === 'files' ? tab : candidate)
-        .filter((candidate, index, tabs) => tabs.indexOf(candidate) === index);
-      workspace.activeTab = tab;
-      workspace.open = true;
-    } else if (reveal) {
-      options.openTab(tab, agent.id);
+    function revealPanel() {
+      workspace.filePanels = {
+        ...workspace.filePanels,
+        [tab]: filePreviewPanel(trimmedPath, existingContent, 'loading', null),
+      };
+      if (reveal && workspace.activeTab === 'files' && workspace.tabs.includes('files')) {
+        workspace.tabs = workspace.tabs
+          .map((candidate) => candidate === 'files' ? tab : candidate)
+          .filter((candidate, index, tabs) => tabs.indexOf(candidate) === index);
+        workspace.activeTab = tab;
+        workspace.open = true;
+      } else if (reveal) {
+        options.openTab(tab, agentId);
+      }
     }
+    if (!downloadUnsupported) revealPanel();
 
     try {
       const result = await options.previewAgentFile(agent.id, trimmedPath);
       if (workspace.filePreviewRequestIds[tab] !== requestId) return;
+      if (downloadUnsupported && (result.kind === 'binary' || result.kind === 'tooLarge')) {
+        try {
+          await options.downloadAgentFile(agent.id, trimmedPath);
+        } catch (error) {
+          options.reportError(error instanceof Error ? error.message : String(error));
+        }
+        return;
+      }
+      if (downloadUnsupported) revealPanel();
       if (result.kind === 'image' && result.dataUrl) {
         const imageTab = rightWorkspaceImageTab(`workspace:${result.path}`);
         workspace.imagePanels = {
@@ -151,6 +165,7 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
       };
     } catch (error) {
       if (workspace.filePreviewRequestIds[tab] !== requestId) return;
+      if (downloadUnsupported) revealPanel();
       workspace.filePanels = {
         ...workspace.filePanels,
         [tab]: filePreviewPanel(

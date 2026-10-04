@@ -1249,15 +1249,20 @@ export class ClawBackendServer {
           folder: requireAgentFolder(agent),
         }));
       }
+      case backendMethods.agentFileChunkRead:
       case backendMethods.agentFilePreview: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
-        return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentFilePreview, {
+        const chunk = message.method === backendMethods.agentFileChunkRead;
+        const offset = chunk ? { offset: params.offset } : {};
+        return this.routeAgentResultRequest(message.id, agentId, message.method, {
           agentId,
           filePath: requireString(params.filePath, 'filePath'),
-        }, (agent) => this.handleAgentDriverRequest(agent, backendMethods.workspaceFilePreview, {
+          ...offset,
+        }, (agent) => this.handleAgentDriverRequest(agent, chunk ? backendMethods.workspaceFileChunkRead : backendMethods.workspaceFilePreview, {
           folder: agentFolder(agent),
           filePath: requireString(params.filePath, 'filePath'),
+          ...offset,
         }));
       }
       case backendMethods.agentVisualizeStart: {
@@ -2893,7 +2898,7 @@ export class ClawBackendServer {
     this.delegatedWorkReports.handleEvent(fullEvent);
     for (const listener of this.handoffListeners) listener(fullEvent);
     if (fullEvent.agentId && providerConversationEventView(fullEvent).type === 'turn.completed') {
-      void this.missionExecution.agentFinished(fullEvent.agentId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
+      void this.missionExecution.agentFinished(fullEvent.agentId, providerConversationEventView(fullEvent).turnId).catch(error => warnMain('missions', 'failed to record mission completion', { message: String(error) }));
     }
     this.agentRequests.record(fullEvent);
     this.emitBackendEvent(fullEvent);

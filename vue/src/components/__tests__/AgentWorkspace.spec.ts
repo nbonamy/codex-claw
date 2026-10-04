@@ -152,9 +152,9 @@ describe('AgentWorkspace', () => {
       await resize(1200);
       expect(panel.style.flexBasis).toBe('420px');
       await resize(600);
-      expect(panel.style.flexBasis).toBe('275px');
+      expect(panel.style.flexBasis).toBe('115px');
       await resize(400);
-      expect(panel.style.flexBasis).toBe('75px');
+      expect(panel.style.flexBasis).toBe('0px');
       expect(workspace.width).toBe(420);
       await resize(1200);
       expect(panel.style.flexBasis).toBe('420px');

@@ -8,16 +8,21 @@ function setup(getAgentGitDiff: (id: string) => Promise<AgentGitDiff>) {
   const snapshot = createInitialSnapshot();
   const agent = snapshot.agents[0]!;
   const workspace = useRightWorkspaceState({ currentAgentId: () => snapshot.activeAgentId ?? undefined, workspaceBody: () => null });
+  const previewAgentFile = vi.fn();
+  const downloadAgentFile = vi.fn().mockResolvedValue(undefined);
+  const reportError = vi.fn();
   const previews = useWorkspacePreviews({
     currentAgent: () => snapshot.agents.find((item) => item.id === snapshot.activeAgentId) ?? null,
     getSnapshot: () => snapshot,
     getAgentGitDiff,
-    previewAgentFile: vi.fn(),
+    previewAgentFile,
+    downloadAgentFile,
+    reportError,
     workspaceFor: workspace.workspaceFor,
     openTab: workspace.openTab,
     closeTab: workspace.closeTab,
   });
-  return { agent, snapshot, workspace, previews };
+  return { agent, snapshot, workspace, previews, previewAgentFile, downloadAgentFile, reportError };
 }
 
 const result: AgentGitDiff = {
@@ -26,6 +31,19 @@ const result: AgentGitDiff = {
 };
 
 describe('workspace diff queries', () => {
+  it.each(['binary', 'tooLarge'])('downloads %s chat files without opening or replacing sidebar tabs', async kind => {
+    const state = setup(vi.fn());
+    state.workspace.openTab('review', state.agent.id);
+    state.previewAgentFile.mockResolvedValue({ path: 'film.mp4', size: 100, kind });
+    await state.previews.openConversationFile({ kind: 'file', path: 'film.mp4', href: 'film.mp4' });
+    expect(state.downloadAgentFile).toHaveBeenCalledWith(state.agent.id, 'film.mp4');
+    expect(state.workspace.workspaceFor(state.agent.id).tabs).toEqual(['review']);
+    expect(state.workspace.workspaceFor(state.agent.id).filePanels).toEqual({});
+    state.downloadAgentFile.mockRejectedValueOnce(new Error('Transfer failed'));
+    await state.previews.openConversationFile({ kind: 'file', path: 'film.mp4', href: 'film.mp4' });
+    expect(state.reportError).toHaveBeenCalledWith('Transfer failed');
+  });
+
   it('keeps a delayed query result attached to its initiating agent', async () => {
     let resolve!: (value: AgentGitDiff) => void;
     const state = setup(() => new Promise((done) => { resolve = done; }));

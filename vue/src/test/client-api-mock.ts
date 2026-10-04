@@ -70,6 +70,7 @@ export function createClientApiMock(
     listBackendSkills: unscripted('listBackendSkills'),
     listAgentFiles: unscripted('listAgentFiles'),
     previewAgentFile: unscripted('previewAgentFile'),
+    readAgentFileChunk: unscripted('readAgentFileChunk'),
     getAgentGitDiff: unscripted('getAgentGitDiff'),
     getAgentGitWorkflow: unscripted('getAgentGitWorkflow'),
     generateAgentGitMessage: unscripted('generateAgentGitMessage'),

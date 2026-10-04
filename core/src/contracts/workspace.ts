@@ -31,6 +31,13 @@ export type AgentFilePreviewResult = {
   mimeType?: string;
 };
 
+export type AgentFileChunk = {
+  path: string;
+  size: number;
+  data: string;
+  nextOffset: number;
+};
+
 export type SourceWorktree = {
   name: string;
   path: string;
