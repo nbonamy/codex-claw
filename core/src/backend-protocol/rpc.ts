@@ -138,6 +138,14 @@ export type ClawBackendRequestMap = {
     params: { agentId: string };
     result: AgentGitWorkflow;
   };
+  [backendMethods.agentTasksList]: {
+    params: { agentId: string };
+    result: import('../delegated-task').DelegatedTask[];
+  };
+  [backendMethods.agentTaskCancel]: {
+    params: { agentId: string; taskId: string };
+    result: import('../delegated-task').DelegatedTask;
+  };
   [backendMethods.agentGitMessageGenerate]: {
     params: { agentId: string; input: AgentGitMessageGenerationInput };
     result: AgentGitMessageGenerationResult;

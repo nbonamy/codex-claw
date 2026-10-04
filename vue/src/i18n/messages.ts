@@ -2,6 +2,11 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    tasks: {
+      title: 'Tasks', assignment: 'Assignment', provisional: 'Saved result · awaiting successful turn completion',
+      evidence: 'Verification', artifacts: 'Artifacts', caveats: 'Caveats',
+      delivery: 'Parent delivery', cancel: 'Cancel task',
+    },
     handoff: {
       action: 'Hand off…', submit: 'Hand off', cancel: 'Cancel', hide: 'Hide',
       engine: 'Coding agent', model: 'Model', defaultModel: 'Provider default',
@@ -1026,6 +1031,21 @@ export const messages = {
               completed: 'Created agent {target}',
               failed: 'Failed creating agent {target}',
               running: 'Creating agent {target}',
+            },
+            waitTasks: {
+              running: 'Waiting for delegated tasks',
+              completed: 'Checked delegated tasks',
+              failed: 'Could not check delegated tasks',
+            },
+            completeTask: {
+              running: 'Submitting task result',
+              completed: 'Submitted task result',
+              failed: 'Could not submit task result',
+            },
+            cancelTask: {
+              running: 'Cancelling delegated task',
+              completed: 'Requested task cancellation',
+              failed: 'Could not cancel delegated task',
             },
             createProject: {
               completed: 'Created project {target}',

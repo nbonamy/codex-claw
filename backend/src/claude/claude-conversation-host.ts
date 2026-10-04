@@ -437,16 +437,17 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return result;
   }
 
-  async interrupt(agent: Agent): Promise<BackendSendResult> {
+  async interrupt(agent: Agent, expectedTurnId?: string): Promise<BackendSendResult> {
     const activeTurn = this.activeTurnsByAgentId.get(agent.id);
     if (!activeTurn) {
       throw new Error('No active Claude turn to interrupt.');
     }
+    if (expectedTurnId && activeTurn.turnId !== expectedTurnId) throw new Error('The requested Claude task turn is no longer active.');
 
     activeTurn.interrupted = true;
     await activeTurn.handle.interrupt();
     this.completeTurn(activeTurn);
-    this.activeTurnsByAgentId.delete(agent.id);
+    if (this.activeTurnsByAgentId.get(agent.id) === activeTurn) this.activeTurnsByAgentId.delete(agent.id);
 
     return {
       backendSession: claudeBackendSession(
@@ -1408,7 +1409,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       backendSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'turn.completed',
-      payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : 'completed' } },
+      payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : activeTurn.error ? 'failed' : 'completed' } },
     });
     this.emit({
       agentId: activeTurn.agentId,

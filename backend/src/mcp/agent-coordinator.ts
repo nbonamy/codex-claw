@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
+import type { DelegatedTask, TaskContract } from '@codex-claw/core/delegated-task';
 
 export type McpAgentInfo = {
   id: string;
@@ -117,6 +118,8 @@ export type UpdateWorkItemResponse =
   };
 
 export type McpCreateAgentInput = {
+  requestId?: string;
+  task?: TaskContract;
   backend?: AgentBackend;
   branchName?: string;
   createWorktree?: boolean;
@@ -130,6 +133,8 @@ export type McpCreateAgentInput = {
 };
 
 export type McpCreateAgentResponse = {
+  taskId?: string;
+  task?: DelegatedTask;
   success: boolean;
   agentId?: string;
   agentName?: string;
@@ -493,6 +498,7 @@ export class ClawMcpAgentCoordinator {
     }
 
     return this.onCreateAgent(agent, {
+      ...(input.task ? { task: input.task, requestId: input.requestId } : {}),
       name: input.name?.trim(),
       prompt: input.prompt?.trim() || undefined,
       instructions: input.instructions?.trim() || undefined,

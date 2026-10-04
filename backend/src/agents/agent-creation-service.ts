@@ -4,6 +4,7 @@ import { createEntityId } from '@codex-claw/core/ids';
 import { resolveAgentBackend } from '@codex-claw/core/agent-backends';
 
 export type AgentCreationOptions = {
+  id?: string;
   select?: boolean;
   afterAgentId?: string;
 };
@@ -12,7 +13,8 @@ export class AgentCreationService {
   constructor(private readonly snapshot: AppSnapshot) {}
 
   create(input: CreateAgentInput, options: AgentCreationOptions = {}): Agent {
-    const id = createEntityId('agent');
+    const id = options.id ?? createEntityId('agent');
+    if (this.snapshot.agents.some(agent => agent.id === id)) throw new Error('Agent already exists.');
     createAgentInSnapshot(this.snapshot, { ...input, backend: resolveAgentBackend(this.snapshot, input.backend) }, undefined, id, options);
     const agent = this.snapshot.agents.find((candidate) => candidate.id === id);
     if (!agent) throw new Error('Agent could not be created.');

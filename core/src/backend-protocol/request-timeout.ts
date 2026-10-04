@@ -15,6 +15,8 @@ const EXTENDED_REQUEST_TIMEOUT_MS = 10 * 60_000;
  * and EXTENDED only for operations designed to run for several minutes.
  */
 const requestTimeoutByMethod = {
+  [backendMethods.agentTasksList]: QUICK_REQUEST_TIMEOUT_MS,
+  [backendMethods.agentTaskCancel]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentHandoff]: EXTENDED_REQUEST_TIMEOUT_MS,
   [backendMethods.driverHandoffCheck]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.providerUsageGet]: IO_REQUEST_TIMEOUT_MS,

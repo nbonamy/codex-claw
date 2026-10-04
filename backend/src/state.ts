@@ -2,6 +2,7 @@ import path from 'node:path';
 import { mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
+import type { DelegatedTask } from '@codex-claw/core/delegated-task';
 import { AppStateStore } from './persistence/store';
 import { logMain } from './log';
 
@@ -79,3 +80,6 @@ function backendStateStore(): AppStateStore {
   }
   return store;
 }
+
+export const loadBackendTasks = (): Promise<DelegatedTask[]> => backendStateStore().loadTasks();
+export const saveBackendTasks = (tasks: DelegatedTask[]): Promise<void> => backendStateStore().saveTasks(tasks);

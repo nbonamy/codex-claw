@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import type { DelegatedTask } from '@codex-claw/core/delegated-task';
+import { tasksSchema } from './task-schema';
 import { mkdir, readFile, readdir, rename, rmdir, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AppSnapshot } from '@codex-claw/core/contracts';
@@ -32,6 +34,22 @@ export type AppStateStoreOptions = {
 };
 
 export class AppStateStore {
+  private taskWrites: Promise<void> = Promise.resolve();
+
+  async loadTasks(): Promise<DelegatedTask[]> {
+    const content = await readIfExists(this.absolute('tasks.json'));
+    if (content === null) return [];
+    const envelope = parseStoreFile('tasks.json', content);
+    return parseData('tasks.json', tasksSchema, migrateData('tasks.json', envelope.data, envelope.schemaVersion, storeSchemaVersion, [])).tasks;
+  }
+
+  saveTasks(tasks: DelegatedTask[]): Promise<void> {
+    // Capture and validate now; tasks have a separate lifetime from roster snapshots.
+    const content = serializeStoreFile(parseData('tasks.json', tasksSchema, { tasks }));
+    const operation = this.taskWrites.then(() => writeFileAtomically(this.absolute('tasks.json'), content));
+    this.taskWrites = operation.catch(() => undefined);
+    return operation;
+  }
   private pending: Map<string, string> | null = null;
   private waiters: Array<{ resolve(): void; reject(error: unknown): void }> = [];
   private writeInFlight = false;

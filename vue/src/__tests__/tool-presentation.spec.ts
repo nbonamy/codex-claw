@@ -17,6 +17,9 @@ import { presentClawTool } from '../tool-presentation';
 
 describe('Claw tool presentation', () => {
   it.each([
+    ['wait-tasks', SquareCheck, 'Checked delegated tasks'],
+    ['complete-task', SquareCheck, 'Submitted task result'],
+    ['cancel-task', SquareCheck, 'Requested task cancellation'],
     ['edit-visualization-canvas', SitemapIcon, 'Edited canvas'],
     ['add-visualization', SitemapIcon, 'Created diagram'],
     ['delete-visualization', SitemapIcon, 'Deleted diagram'],

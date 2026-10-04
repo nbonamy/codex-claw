@@ -4,6 +4,7 @@ import { threadFlagIds } from '@codex-claw/core/thread-flags';
 import type { ClawMcpAgentCoordinator } from './agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './agent-prompts';
 import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+import { taskContractSchema } from '../persistence/task-schema';
 
 export function createCollaborationToolModuleProvider(
   coordinator: ClawMcpAgentCoordinator,
@@ -162,6 +163,8 @@ function registerCollaborationTools(
   server.registerTool('create-agent', {
     description: 'Create a new Codex Claw co-agent in your team, optionally in an isolated worktree. Model and reasoning effort inherit from the caller when the backend matches unless explicitly overridden. Provide an initial prompt to start the co-agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.',
     inputSchema: {
+      requestId: z.string().trim().min(1).max(200).optional().describe('Required in task mode. Reuse the same stable ID when retrying this creation call.'),
+      task: taskContractSchema.optional().describe('Durable assignment contract. Requires prompt and requestId. Returns taskId after startup acceptance, not task completion; inspect or wait with wait-tasks.'),
       name: z.string().optional().describe('Optional custom name. When omitted, the agent displays its branch or folder name.'),
       backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to the caller’s backend.'),
       model: z.string().optional().describe('Optional model override. Inherits the caller model when the backend matches.'),
@@ -173,7 +176,7 @@ function registerCollaborationTools(
       prompt: z.string().optional().describe('Optional initial request shown to the user. Keep it concise and put detailed handoff instructions in instructions. Starts the agent and waits until the handoff is accepted.'),
       instructions: z.string().optional().describe('Optional full handoff: context, decisions, constraints, and acceptance criteria. Requires prompt. Claw wraps this in <context> for the agent, hidden from the displayed request; do not include secrets.'),
     },
-  }, ({ name, backend, model, reasoningEffort, repoPath, createWorktree, branchName, destinationPath, prompt, instructions }) => loggedToolResult('create-agent', {
+  }, ({ name, backend, model, reasoningEffort, repoPath, createWorktree, branchName, destinationPath, prompt, instructions, task, requestId }) => loggedToolResult('create-agent', {
     agentId: callerAgentId,
     repoPath,
     createWorktree: createWorktree === true,
@@ -187,6 +190,8 @@ function registerCollaborationTools(
     branchName,
     destinationPath,
     prompt,
+    task,
+    requestId,
     instructions,
   })));
 

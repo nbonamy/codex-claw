@@ -119,6 +119,8 @@ describe('Codex Claw MCP tool registration', () => {
     const definition = registration?.[1] as { description: string; inputSchema: Record<string, unknown> } | undefined;
     expect(definition?.description).toContain('Codex Claw co-agent');
     expect(Object.keys(definition?.inputSchema ?? {})).toStrictEqual([
+      'requestId',
+      'task',
       'name',
       'backend',
       'model',

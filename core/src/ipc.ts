@@ -1,6 +1,8 @@
 import type { AppCommand, CodexClawApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
+  listAgentTasks: 'agent:tasks:list',
+  cancelAgentTask: 'agent:task:cancel',
   startVisualize: 'agent:visualize:start',
   setVisualizeOpen: 'agent:visualize:open:set',
   generateVisualizationSuggestion: 'agent:visualize:suggestion:generate',

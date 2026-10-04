@@ -70,6 +70,8 @@ vi.mock('@codex-claw/core/automation-manager', () => ({
 }));
 
 vi.mock('../state', () => ({
+  loadBackendTasks: vi.fn().mockResolvedValue([]),
+  saveBackendTasks: vi.fn().mockResolvedValue(undefined),
   loadBackendSnapshot: mocks.loadBackendSnapshot,
   ensureBackendCodexHome: mocks.ensureBackendCodexHome,
   ensureBackendMissionHome: mocks.ensureBackendMissionHome,

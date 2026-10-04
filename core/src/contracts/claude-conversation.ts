@@ -65,7 +65,7 @@ export type ClaudeConversationEvent =
   | ClaudeConversationEventBase & {
       type: 'turn.completed';
       turnId: string;
-      payload: { turn: { id: string; status: 'completed' | 'interrupted' } };
+      payload: { turn: { id: string; status: 'completed' | 'interrupted' | 'failed' } };
     }
   | ClaudeConversationEventBase & {
       type: 'context.compactionStarted';

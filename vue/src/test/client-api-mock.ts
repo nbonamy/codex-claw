@@ -73,6 +73,8 @@ export function createClientApiMock(
     readAgentFileChunk: unscripted('readAgentFileChunk'),
     getAgentGitDiff: unscripted('getAgentGitDiff'),
     getAgentGitWorkflow: unscripted('getAgentGitWorkflow'),
+    listAgentTasks: vi.fn().mockResolvedValue([]),
+    cancelAgentTask: unscripted('cancelAgentTask'),
     generateAgentGitMessage: unscripted('generateAgentGitMessage'),
     stageAgentGitFiles: unscripted('stageAgentGitFiles'),
     commitAgentGitChanges: unscripted('commitAgentGitChanges'),

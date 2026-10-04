@@ -148,6 +148,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
 
     let submission = this.submitTurn(session, params);
     void submission.catch((error: unknown) => {
+      if (session.activeTurn !== activeTurn) return;
       this.rejectTurn(session, normalizeError(error));
     });
 
@@ -177,6 +178,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
           return;
         }
         await session.query.interrupt();
+        if (session.activeTurn !== activeTurn) return;
         this.resolveTurn(session);
         this.denyPendingPermissions(session, 'Claude turn was interrupted.');
       },
