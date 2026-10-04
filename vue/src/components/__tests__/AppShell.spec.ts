@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe('AppShell authentication and conversation', () => {
-  it('queues the Claude steer shortcut and disables shelf steering through the installed SDK', async () => {
+  it('routes the Claude steer shortcut through the installed SDK and enables shelf steering', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.claudeCodeEnabled = true;
     snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
@@ -72,11 +72,11 @@ describe('AppShell authentication and conversation', () => {
       queuedPrompts: [{ id: 'queued-1', agentId: agent.id, text: 'Already queued', createdAt: '2026-10-03T00:00:00Z' }],
     });
     await wrapper.setProps({ backendCapabilities: claudeBackendCapabilities, isSending: true });
-    expect(wrapper.get<HTMLButtonElement>('[aria-label="Steer queued prompt now"]').element.disabled).toBe(true);
+    expect(wrapper.get<HTMLButtonElement>('[aria-label="Steer queued prompt now"]').element.disabled).toBe(false);
     await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter', metaKey: true });
     await flushPromises();
-    expect(wrapper.emitted('sendPrompt')).toEqual([['Do this next']]);
-    expect(wrapper.emitted('steerPrompt')).toBeUndefined();
+    expect(wrapper.emitted('steerPrompt')).toEqual([['Do this next']]);
+    expect(wrapper.emitted('sendPrompt')).toBeUndefined();
   });
 
   it('projects Claude approvals into the controlled pane with their exact transcript item identity', async () => {

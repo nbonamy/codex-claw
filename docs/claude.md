@@ -36,6 +36,15 @@ the `claude server` path.
 
 ## Existing Claw Integration Shape
 
+Claude steering, same-folder native forks, and native goals enter through the
+existing driver/RPC capabilities. The transport keeps ownership of queued input
+until the SDK replays its UUID and the resulting work completes; stopping a
+steered turn closes that owned query. Fork cutoffs come from persisted native
+message boundaries, not renderer IDs. Goal state comes from structured native
+`goal_status` transcript records, with explicit clear distinct from completion.
+See the [capability audit and runtime evidence](research/claude-capabilities.md)
+for the tested versions, semantics, limitations, and reproduction details.
+
 Subscription usage is fetched on demand by `clawd`, using the configured Claude
 home's OAuth login in place (macOS Keychain, credential file fallback elsewhere).
 Credentials never enter IPC, snapshots, or renderer state. The internal

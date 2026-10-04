@@ -2,7 +2,7 @@ import type { Dirent } from 'node:fs';
 import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart } from '@codex-claw/core/contracts';
+import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart, ThreadGoal } from '@codex-claw/core/contracts';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
 import { claudeToolPart, completedClaudeToolPart } from './claude-tool-part-adapter';
@@ -12,6 +12,9 @@ import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkConten
 export type ClaudeTranscriptHistory = {
   backendSession: BackendSession;
   messages: RendererMessage[];
+  turnBoundaries?: Record<string, string>;
+  nativeMessageTurnIds?: Record<string, string>;
+  goal?: ThreadGoal | null;
 };
 
 export type ClaudeTranscriptHistoryOptions = {
@@ -58,14 +61,44 @@ export async function loadClaudeTranscriptHistory(
   const content = await readFile(transcriptPath, 'utf8');
   const settings = claudeTranscriptSettings(content);
   const { model: _model, reasoningEffort: _reasoningEffort, ...session } = agent.backendSession;
+  const turnBoundaries: Record<string, string> = {};
+  const nativeMessageTurnIds: Record<string, string> = {};
+  const goal = claudeTranscriptGoal(content, agent.backendSession.sessionId);
   return {
     backendSession: {
       ...session,
       transcriptSessionId: sessionId,
       ...settings,
     },
-    messages: claudeTranscriptToRendererMessages(content, agent.id, sessionId),
+    messages: claudeTranscriptToRendererMessages(content, agent.id, sessionId, turnBoundaries, nativeMessageTurnIds),
+    turnBoundaries,
+    nativeMessageTurnIds,
+    ...(goal !== undefined ? { goal } : {}),
   };
+}
+
+// Claude Code 2.1.288 persists native /goal state here. SDK 0.3.226 does not
+// deliver its exported active_goal message through the public query iterator.
+export function claudeTranscriptGoal(content: string, sessionId: string): ThreadGoal | null | undefined {
+  let goal: ThreadGoal | null | undefined;
+  for (const line of content.split(/\r?\n/)) {
+    const entry = parseClaudeSdkMessage(line) as Record<string, unknown> | null;
+    if (!entry || entry.isSidechain || entry.type !== 'attachment') continue;
+    const state = entry.attachment;
+    if (!isRecord(state) || state.type !== 'goal_status' || typeof state.condition !== 'string' || typeof state.met !== 'boolean') continue;
+    if (state.sentinel === true && state.met) { goal = null; continue; }
+    const timestamp = typeof entry.timestamp === 'string' ? Date.parse(entry.timestamp) / 1000 : 0;
+    const updatedAt = Number.isFinite(timestamp) ? timestamp : 0;
+    goal = {
+      threadId: sessionId, objective: state.condition, status: state.met ? 'complete' : 'active',
+      tokenBudget: null,
+      tokensUsed: typeof state.tokens === 'number' && Number.isFinite(state.tokens) ? Math.max(0, state.tokens) : 0,
+      timeUsedSeconds: typeof state.durationMs === 'number' && Number.isFinite(state.durationMs) ? Math.max(0, state.durationMs / 1000) : 0,
+      createdAt: state.sentinel || goal?.objective !== state.condition ? updatedAt : goal.createdAt,
+      updatedAt,
+    };
+  }
+  return goal;
 }
 
 export function claudeTranscriptSettings(content: string): ClaudeTranscriptSettings {
@@ -171,13 +204,21 @@ export async function listClaudeTranscriptSummaries(
   return summaries;
 }
 
-export function claudeTranscriptToRendererMessages(content: string, agentId: string, sessionId: string): RendererMessage[] {
+export function claudeTranscriptToRendererMessages(content: string, agentId: string, sessionId: string, turnBoundaries?: Record<string, string>, nativeMessageTurnIds?: Record<string, string>): RendererMessage[] {
   const messages: RendererMessage[] = [];
   let currentTurnId: string | null = null;
   let currentTurnCreatedAt: string | null = null;
   let assistantCreatedAt: string | null = null;
   let assistantSegmentIndex = 0;
   const assistantParts: RendererMessagePart[] = [];
+  const pendingTools = new Set<string>();
+  const rememberBoundary = (entry: TranscriptLine) => {
+    if (!currentTurnId || !entry.uuid) return;
+    if (nativeMessageTurnIds) nativeMessageTurnIds[entry.uuid] = currentTurnId;
+    if (!turnBoundaries) return;
+    if (pendingTools.size) delete turnBoundaries[currentTurnId];
+    else turnBoundaries[currentTurnId] = entry.uuid;
+  };
 
   const flushAssistantMessage = () => {
     if (!currentTurnId || assistantParts.length === 0) {
@@ -209,8 +250,10 @@ export function claudeTranscriptToRendererMessages(content: string, agentId: str
       const toolResults = claudeMessageContentBlocks(entry).filter(isClaudeToolResultBlock);
       if (toolResults.length > 0) {
         for (const toolResult of toolResults) {
+          pendingTools.delete(toolResult.tool_use_id);
           applyToolResult(assistantParts, toolResult);
         }
+        rememberBoundary(entry);
         continue;
       }
 
@@ -225,6 +268,7 @@ export function claudeTranscriptToRendererMessages(content: string, agentId: str
 
       flushAssistantMessage();
       currentTurnId = claudeTurnId(entry, sessionId, messages.length);
+      if (nativeMessageTurnIds && entry.uuid) nativeMessageTurnIds[entry.uuid] = currentTurnId;
       currentTurnCreatedAt = timestampToIso(entry.timestamp);
       assistantSegmentIndex = 0;
       messages.push({
@@ -250,9 +294,16 @@ export function claudeTranscriptToRendererMessages(content: string, agentId: str
         currentTurnCreatedAt = timestampToIso(entry.timestamp);
       }
       assistantCreatedAt ??= timestampToIso(entry.timestamp);
+      for (const block of claudeMessageContentBlocks(entry)) {
+        if (block.type === 'tool_use' && typeof block.id === 'string') pendingTools.add(block.id);
+      }
+      rememberBoundary(entry);
       assistantParts.push(...parts);
       continue;
     }
+
+    // Native goal/evaluator attachments belong to the completed turn's chain.
+    if (entry.type === 'attachment' && currentTurnId && turnBoundaries?.[currentTurnId]) rememberBoundary(entry);
 
     if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
       flushAssistantMessage();
@@ -437,7 +488,7 @@ function claudeTurnId(entry: TranscriptLine, sessionId: string, index: number): 
 }
 
 function claudeProjectDirectoryName(folder: string): string {
-  return folder.replaceAll(path.sep, '-');
+  return folder.replace(/[^a-zA-Z0-9]/g, '-');
 }
 
 function expandHome(value: string): string {

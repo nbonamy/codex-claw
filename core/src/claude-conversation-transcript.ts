@@ -92,8 +92,8 @@ export function ensureAssistantMessage(
 ): RendererMessage {
   let effectiveMessageId = messageId;
   let effectiveCreatedAt = createdAt;
-  const compactionMessage = messageId === assistantMessageId(turnId)
-    ? findCompactionMessages(snapshot, agentId, turnId).at(-1)
+  const boundaryMessage = messageId === assistantMessageId(turnId)
+    ? findAssistantSegmentBoundary(snapshot, agentId, turnId)
     : undefined;
   const message = messageId === assistantMessageId(turnId)
     ? findAssistantMessageForAppend(snapshot, agentId, turnId)
@@ -102,9 +102,11 @@ export function ensureAssistantMessage(
   if (message) {
     return message;
   }
-  if (compactionMessage) {
-    effectiveMessageId = assistantSegmentMessageId(turnId, compactionMessage.createdAt);
-    effectiveCreatedAt = compactionMessage.createdAt;
+  if (boundaryMessage) {
+    effectiveMessageId = boundaryMessage.kind === 'steer'
+      ? `${assistantMessageId(turnId)}-segment-${boundaryMessage.id}`
+      : assistantSegmentMessageId(turnId, boundaryMessage.createdAt);
+    effectiveCreatedAt = boundaryMessage.createdAt;
   }
 
   const nextMessage: RendererMessage = {
@@ -162,16 +164,21 @@ function isPlainEmptyAssistantPlaceholder(message: RendererMessage): boolean {
 }
 
 function findAssistantMessageForAppend(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage | undefined {
-  const compactionMessage = findCompactionMessages(snapshot, agentId, turnId).at(-1);
-  if (!compactionMessage) {
+  const boundaryMessage = findAssistantSegmentBoundary(snapshot, agentId, turnId);
+  if (!boundaryMessage) {
     return findAssistantMessage(snapshot, agentId, turnId);
   }
 
-  const compactionIndex = snapshot.messages.indexOf(compactionMessage);
+  const compactionIndex = snapshot.messages.indexOf(boundaryMessage);
   return snapshot.messages
     .slice(compactionIndex + 1)
     .filter((message) => isAssistantTurnMessage(message, agentId, turnId))
     .at(-1);
+}
+
+function findAssistantSegmentBoundary(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage | undefined {
+  return snapshot.messages.filter((message) => message.agentId === agentId && message.turnId === turnId
+    && (message.kind === 'compaction' || message.kind === 'steer')).at(-1);
 }
 
 export function findAssistantMessage(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage | undefined {

@@ -83,6 +83,9 @@ changes; specify feature behavior in tests:
   lifecycle, generated types, and test fixtures.
 - `docs/claude.md`: Claude Code websocket/SDK protocol research, support
   strategy, and remaining Claude-driver questions.
+- [Claude capability audit](docs/research/claude-capabilities.md): read before adding
+  Claude steering, forks, goals, turn mutations, or context controls; distinguishes
+  SDK contracts, Claw integration gaps, and runtime evidence.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
 - `docs/custom-tools.md`: use when adding or presenting a `codex_claw` MCP tool,

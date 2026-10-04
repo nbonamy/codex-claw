@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
@@ -237,6 +238,7 @@ describe('useAppState', () => {
 
   it('queues an unsupported steer for the targeted Claude agent without steering or consuming its queue', async () => {
     const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.backendRuntimes.find((runtime) => runtime.backend === 'claude')!.capabilities = { ...claudeBackendCapabilities, steerPrompt: false };
     const agent = remoteSnapshot.agents.find(candidate => candidate.id === 'agent-jesse')!;
     agent.backend = 'claude';
     agent.backendDefaults = { kind: 'claude' };

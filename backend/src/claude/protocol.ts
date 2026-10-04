@@ -37,6 +37,7 @@ export type ClaudeSdkMessage =
   }
   | {
     type: 'assistant';
+    uuid?: string;
     session_id?: string;
     error?: string;
     message?: {
@@ -48,6 +49,8 @@ export type ClaudeSdkMessage =
   }
   | {
     type: 'user';
+    uuid?: string;
+    isReplay?: boolean;
     session_id?: string;
     message?: {
       role?: string;

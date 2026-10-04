@@ -32,6 +32,7 @@ export type ClaudeModelDiscoveryParams = {
 
 export type ClaudeTurnHandle = {
   readonly done: Promise<void>;
+  steer?(prompt: string, attachments?: readonly PromptAttachment[]): Promise<boolean>;
   interrupt(): Promise<void>;
 };
 
@@ -83,5 +84,6 @@ export type ClaudeTurnTransport = {
   readContextUsage?(params: ClaudeContextUsageParams): Promise<ClaudeContextUsage | null>;
   closeSession?(sessionId: string): void | Promise<void>;
   deleteSession?(sessionId: string, cwd: string): Promise<void>;
+  forkSession?(sessionId: string, cwd: string, upToMessageId?: string): Promise<string>;
   close(): Promise<void>;
 };

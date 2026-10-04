@@ -26,6 +26,64 @@ function unwrapClaudeConversationEvent(event: BackendEvent) {
 }
 
 describe('ClaudeBackendDriver', () => {
+  it.each([false, true])('waits for native goal clear and reports failure honestly (error: %s)', async (isError) => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const settled = vi.fn();
+    const clearing = driver.clearGoal({ ...agent, backendSession: { kind: 'claude', sessionId: 'session', transport: 'stdio' } });
+    const observed = clearing.then(settled, (error) => { settled(error); });
+    await Promise.resolve();
+    expect(settled).not.toHaveBeenCalled();
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({ prompt: '/goal clear' }), expect.any(Function), expect.any(Function), expect.any(Function));
+    transport.emit({ type: 'result', subtype: 'success', session_id: 'session', is_error: isError, ...(isError ? { result: 'quota exhausted' } : {}) });
+    transport.resolveDone();
+    await observed;
+    if (isError) expect(settled.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    else expect(settled.mock.calls[0]?.[0]).toMatchObject({ cleared: true });
+    await driver.close();
+  });
+
+  it('starts native goals and publishes completion from provider history rather than assistant text', async () => {
+    const transport = createFakeTransport();
+    const completedGoal = { threadId: 'goal-session', objective: 'Ship it', status: 'complete', tokenBudget: null, tokensUsed: 55, timeUsedSeconds: 1.8, createdAt: Date.now() / 1000 + 1, updatedAt: Date.now() / 1000 + 2 };
+    const history = vi.fn()
+      .mockResolvedValueOnce({ backendSession: { kind: 'claude', sessionId: 'goal-session', transport: 'stdio' }, messages: [], goal: { ...completedGoal, status: 'active' } })
+      .mockResolvedValue({ backendSession: { kind: 'claude', sessionId: 'goal-session', transport: 'stdio' }, messages: [], goal: completedGoal });
+    const driver = new ClaudeBackendDriver(transport, history);
+    const events: BackendEvent[] = [];
+    driver.onEvent((event) => events.push(event));
+    const setting = driver.setGoal(agent, 'Ship it');
+    expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({ prompt: '/goal Ship it' }), expect.any(Function), expect.any(Function), expect.any(Function));
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'goal-session' });
+    await expect(setting).resolves.toMatchObject({ goal: { objective: 'Ship it', status: 'active' } });
+    transport.emit({ type: 'assistant', message: { content: 'Goal complete!' } });
+    expect(events.filter((event) => event.type === 'conversation.goalUpdated')).toHaveLength(0);
+    transport.emit({ type: 'result', subtype: 'success', session_id: 'goal-session', is_error: false });
+    transport.resolveDone();
+    await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({ type: 'conversation.goalUpdated', payload: { goal: completedGoal } })));
+    await driver.close();
+  });
+
+  it('forks a selected completed turn using its native boundary and returns an independent child reference', async () => {
+    const transport = createFakeTransport();
+    const forkSession = vi.fn().mockResolvedValue('child-session');
+    const history = vi.fn().mockResolvedValue({
+      backendSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' },
+      messages: [], turnBoundaries: { 'claude-user-1': 'native-answer-1' },
+    });
+    const driver = new ClaudeBackendDriver({ ...transport, forkSession }, history);
+    const parent: Agent = { ...agent, backendSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' } };
+    const child: Agent = { ...agent, id: 'child' };
+    await expect(driver.forkConversation(parent, child, 'unknown')).rejects.toThrow('boundary');
+    expect(forkSession).not.toHaveBeenCalled();
+    const result = await driver.forkConversation(parent, child, 'claude-user-1');
+    expect(forkSession).toHaveBeenCalledExactlyOnceWith('parent-session', agent.folder, 'native-answer-1');
+    expect(result.backendSession).toMatchObject({ kind: 'claude', sessionId: 'child-session' });
+    expect(parent.backendSession?.kind === 'claude' && parent.backendSession.sessionId).toBe('parent-session');
+    await expect(driver.forkConversation(parent, { ...child, folder: '/other' })).rejects.toThrow('folder');
+    await driver.close();
+  });
+
   it('loads models and starts a folderless Quick Chat', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
