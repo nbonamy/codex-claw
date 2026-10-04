@@ -249,10 +249,7 @@ export class MissionExecutionService {
         previousRun.status = 'accepted';
         previousRun.finishedAt = new Date().toISOString();
         current.artifacts.review = { summary: '', pullRequestUrl: '', findings: [] };
-        const stored = await this.ports.writeArtifact(current.id, 'review', '');
-        const updatedAt = new Date().toISOString();
-        const revision = (current.artifactFiles?.review?.revision ?? 0) + 1;
-        (current.artifactFiles ??= {}).review = { revision, size: stored.size, updatedAt };
+        if (current.artifactFiles) delete current.artifactFiles.review;
         runId = this.enqueueRun(current, { feedback: 'Re-review the remediated Mission workspaces and report the current findings.' });
       });
       void this.startLaunch(input.id, runId);

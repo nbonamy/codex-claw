@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, updateMission, type MissionArtifacts } from '@codex-claw/core/missions';
+import { createMission, updateMission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
 import { MissionService } from '../mission-service';
 import { MissionExecutionService } from '../mission-execution-service';
+import { FileMissionArtifactStore } from '../mission-artifact-store';
 
 function setup() {
   const snapshot = createInitialSnapshot();
@@ -13,8 +17,8 @@ function setup() {
   const artifactContents = new Map<string, string>();
   const ports = { snapshot, missions: store, publish: vi.fn().mockResolvedValue(undefined), reportImplementationStartProgress: vi.fn(), validateRepository: vi.fn().mockResolvedValue(undefined),
     ensureMissionHome: vi.fn().mockResolvedValue('/claw/missions/mission'),
-    readArtifact: vi.fn(async (_missionId: string, stage: string) => artifactContents.get(stage) ?? ''),
-    writeArtifact: vi.fn(async (_missionId: string, stage: string, content: string) => { artifactContents.set(stage, content); return { size: content.length }; }),
+    readArtifact: vi.fn(async (_missionId: string, stage: MissionStage) => artifactContents.get(stage) ?? ''),
+    writeArtifact: vi.fn(async (_missionId: string, stage: MissionStage, content: string) => { artifactContents.set(stage, content); return { size: content.length }; }),
     createWorktree: vi.fn(async ({ repoPath, branchName }: { repoPath: string; branchName: string }) => ({ name: branchName, path: `${repoPath}-${branchName.replace('/', '-')}` })),
     getHead: vi.fn().mockResolvedValue('a'.repeat(40)),
     refreshWorkspace: vi.fn().mockResolvedValue(undefined),
@@ -283,8 +287,14 @@ describe('mission execution', () => {
     ]);
   });
 
-  it('re-runs Review in the same Mission stage after remediation completes', async () => {
+  it('re-runs Review with real artifact storage and requires a fresh artifact after remediation', async ({ onTestFinished }) => {
     const h = setup();
+    const root = await mkdtemp(path.join(tmpdir(), 'claw-review-rerun-'));
+    onTestFinished(() => rm(root, { recursive: true, force: true }));
+    const artifacts = new FileMissionArtifactStore(async missionId => path.join(root, missionId));
+    h.ports.readArtifact.mockImplementation((id, stage) => artifacts.read(id, stage));
+    h.ports.writeArtifact.mockImplementation((id, stage, content) => artifacts.write(id, stage, content));
+    const previousArtifact = await artifacts.write(h.current().id, 'review', '# Previous review\nRemediation complete.');
     const workerId = h.originalAgents[0]!.id;
     await h.store.change(h.current().id, mission => {
       mission.stage = 'review';
@@ -299,7 +309,7 @@ describe('mission execution', () => {
       };
       mission.artifactFiles = {
         ...mission.artifactFiles,
-        review: { revision: 2, size: 42, updatedAt: 'before' },
+        review: { revision: 2, size: previousArtifact.size, updatedAt: 'before' },
       };
       mission.execution!.workspaces = [{ repositoryPath: '/repo', path: '/mission/repo', branch: 'mission/review' }];
       mission.execution!.runs = [{
@@ -312,10 +322,18 @@ describe('mission execution', () => {
 
     expect(h.current().stage).toBe('review');
     expect(h.current().artifacts.review).toStrictEqual({ summary: '', pullRequestUrl: '', findings: [] });
-    expect(h.ports.writeArtifact).toHaveBeenCalledWith(h.current().id, 'review', '');
-    expect(h.current().artifactFiles?.review).toMatchObject({ revision: 3, size: 0 });
+    await expect(h.service.readArtifactForMission(h.current().id, 'review')).rejects.toThrow('Mission artifact not found.');
     expect(h.current().execution!.runs[0]).toMatchObject({ status: 'accepted', finishedAt: expect.any(String) });
     expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'review', status: 'running', feedback: expect.stringContaining('Re-review') });
+    const rerun = h.current().execution!.runs[1]!;
+    const resultArtifacts = structuredClone(h.current().artifacts);
+    resultArtifacts.review.summary = 'No findings';
+    await expect(h.service.submit(rerun.workerId!, { summary: 'No findings', artifacts: resultArtifacts }))
+      .rejects.toThrow('Write the stage artifact');
+    await h.service.writeArtifact(rerun.workerId!, { stage: 'review', content: '# Fresh review\nNo findings.' });
+    await expect(h.service.readArtifactForMission(h.current().id, 'review')).resolves.toMatchObject({ content: '# Fresh review\nNo findings.' });
+    await expect(h.service.submit(rerun.workerId!, { summary: 'No findings', artifacts: resultArtifacts }))
+      .resolves.toMatchObject({ success: true, status: 'awaitingReview' });
   });
 
   it('tracks only an accepted remediation turn and rejects overlapping batches', async () => {
