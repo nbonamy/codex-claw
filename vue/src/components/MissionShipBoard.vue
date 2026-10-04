@@ -42,6 +42,7 @@
               :push-branch="pushBranch"
               :create-pull-request="createPullRequest"
               :merge-branch="mergeBranch"
+              :update-from-base="updateFromBase"
               @delivery-complete="recordDelivery(delivery.repositoryPath, $event)"
             />
           </div>
@@ -59,7 +60,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitWorkflow, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import type { Mission } from '@codex-claw/core/missions';
 import type { MissionDelivery, MissionExecutionInput } from '@codex-claw/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, GitForkIcon } from '../shared/icons/app-icons';
@@ -77,6 +78,7 @@ const props = defineProps<{
   pushBranch?: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
+  updateFromBase?: (agentId: string, input: AgentGitUpdateFromBaseInput) => Promise<AgentGitUpdateFromBaseResult>;
   openInAvailable?: boolean;
   openInApplications?: OpenInApplicationCatalog;
 }>();

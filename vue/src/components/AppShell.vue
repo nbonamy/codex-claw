@@ -241,6 +241,7 @@
             :push-branch="props.pushAgentGitBranch"
             :create-pull-request="props.createAgentGitPullRequest"
             :merge-branch="props.mergeAgentGitBranch"
+            :update-from-base="props.updateAgentGitBranchFromBase"
             :open-in-available="missionOpenInAvailable"
             :open-in-applications="openInApplications"
             @open-conversation="openConversation"

@@ -73,7 +73,7 @@ describe('MissionShipBoard', () => {
     expect(wrapper.findComponent({ name: 'GitWorkflowControl' }).exists()).toBe(false);
   });
 
-  it('presents merge and pull request as the pending repository delivery choices', async () => {
+  it('offers a base update for pending delivery and keeps conflicts unshipped for agent resolution', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     const mission = createMission(snapshot, { outcome: 'Ship billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: agent.id });
@@ -86,18 +86,28 @@ describe('MissionShipBoard', () => {
       stagedAddedLines: 0, stagedRemovedLines: 0, unstagedAddedLines: 0, unstagedRemovedLines: 0, untrackedAddedLines: 0, untrackedRemovedLines: 0,
       files: [], stagedFiles: [], unstagedFiles: [], githubConnected: true,
     };
+    const updateFromBase = vi.fn().mockResolvedValue({ workflow, baseBranch: 'main', branch: workflow.branch, conflicts: ['billing.ts'] });
+    const mergeBranch = vi.fn().mockResolvedValue(workflow);
+    const executeMission = vi.fn();
     const wrapper = mount(MissionShipBoard, {
       props: {
         mission, agents: snapshot.agents, gitStatuses: {},
         getWorkflow: vi.fn().mockResolvedValue(workflow),
-        mergeBranch: vi.fn().mockResolvedValue(workflow),
+        mergeBranch, updateFromBase, executeMission,
         createPullRequest: vi.fn().mockResolvedValue(workflow),
       },
     });
 
     await vi.waitFor(() => expect(wrapper.findAll('.git-workflow-control__delivery-action')[0]?.attributes('disabled')).toBeUndefined());
-    expect(wrapper.findAll('.git-workflow-control__delivery-action').map(button => button.text())).toStrictEqual(['Merge', 'Create PR']);
+    expect(wrapper.findAll('.git-workflow-control__delivery-action').map(button => button.text())).toStrictEqual(['Update from main', 'Merge', 'Create PR']);
     expect(wrapper.find('.git-workflow-control__trigger').exists()).toBe(false);
+    await wrapper.findAll('button').find(button => button.text() === 'Update from main')!.trigger('click');
+    await flushPromises();
+    expect(updateFromBase).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true });
+    expect(wrapper.text()).toContain('Agent resolving conflicts');
+    expect(wrapper.text()).toContain('Review the resolved changes before merging.');
+    expect(mergeBranch).not.toHaveBeenCalled();
+    expect(executeMission).not.toHaveBeenCalled();
   });
 
   it('opens the Mission worktree before the repository delivery actions', async () => {

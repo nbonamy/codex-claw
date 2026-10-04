@@ -6,6 +6,16 @@
   >
     <template v-if="presentation === 'delivery'">
       <button
+        v-if="updateEnabled"
+        class="claw-button claw-button--neutral git-workflow-control__delivery-action"
+        type="button"
+        :disabled="busy"
+        @click="selectAction('update-from-base')"
+      >
+        <RefreshIcon aria-hidden="true" />
+        <span>{{ $t('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch }) }}</span>
+      </button>
+      <button
         class="claw-button claw-button--neutral git-workflow-control__delivery-action"
         type="button"
         :disabled="busy || !mergeEnabled || mergeUnavailable"
@@ -347,7 +357,7 @@
     </GitOperationFeedback>
     <template #footer>
       <div v-if="updateOperation.status === 'confirmingDirty'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" @click="updateFromBase(true)">{{ $t('surface.gitWorkflowControl.updateAnyway') }}</button><button class="claw-button claw-button--primary" type="button" @click="commitBeforeUpdate">{{ $t('surface.gitWorkflowControl.commitFirst') }}</button></div>
-      <div v-else-if="updateOperation.status === 'confirmingRequired'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" @click="updateFromBase(false)">{{ $t('surface.gitWorkflowControl.updateBranch') }}</button></div>
+      <div v-else-if="updateOperation.status === 'confirmingRequired'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" @click="updateFromBase(false)">{{ $t('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch }) }}</button></div>
       <div v-else-if="updateOperation.status === 'conflicts'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
       <div v-else-if="updateOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="updateFromBase(Boolean(workflow?.files.length))">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
@@ -573,7 +583,7 @@ const updateOperationDetail = computed(() => updateOperation.value.status === 'c
         ? 'surface.gitWorkflowControl.agentAskedToResolveOneConflict'
         : 'surface.gitWorkflowControl.agentAskedToResolveConflicts',
       { count: updateOperation.value.count, branch: baseBranch.value },
-    )
+    ) + (props.presentation === 'delivery' ? ` ${translate('surface.gitWorkflowControl.reviewResolvedChanges')}` : '')
   : updateOperation.value.status === 'error'
     ? updateOperation.value.message
     : workflow.value?.branch ? `${baseBranch.value} → ${workflow.value.branch}` : baseBranch.value);
@@ -706,7 +716,7 @@ function toggleMenu(): void {
   menuOpen.value = !menuOpen.value;
 }
 function runFirstEnabled(): void { if (firstEnabledAction.value) selectAction(firstEnabledAction.value); }
-function selectAction(action: string): void {
+async function selectAction(action: string): Promise<void> {
   if (busy.value) return;
   menuOpen.value = false;
   if (action === 'commit' && commitEnabled.value) {
@@ -723,29 +733,48 @@ function selectAction(action: string): void {
     pullRequestBody.value = '';
     pullRequestDialogOpen.value = true;
   }
-  else if (action === 'merge' && mergeEnabled.value && !mergeUnavailable.value) prepareMerge();
+  else if (action === 'merge' && mergeEnabled.value && !mergeUnavailable.value) {
+    busy.value = true;
+    try {
+      if (await refreshMergeWorkflow()) prepareMerge();
+    } finally {
+      busy.value = false;
+    }
+  }
   else if (action === 'update-from-base' && updateEnabled.value) {
     resetUpdateOperation();
     updateDialogOpen.value = true;
     if (!workflow.value?.files.length) void updateFromBase(false);
   }
 }
-function prepareMerge(): void {
+async function refreshMergeWorkflow(): Promise<boolean> {
+  const agentId = props.agent.id;
+  await loadWorkflow({ closeMenu: false });
+  if (props.agent.id !== agentId) return false;
+  if (workflowError.value) {
+    ElMessage.error(workflowError.value);
+    return false;
+  }
+  return mergeEnabled.value && !mergeUnavailable.value;
+}
+function prepareMerge(): boolean {
   if (workflow.value?.baseWorktreeDirty) {
     mergeTargetDirtyWarning.value = true;
     mergeDialogOpen.value = true;
-    return;
+    return false;
   }
   if (workflow.value?.baseUpdateRequired && updateEnabled.value) {
+    mergeDialogOpen.value = false;
     resetUpdateOperation();
     resumeMergeAfterUpdate.value = true;
     updateOperation.value = workflow.value.files.length
       ? { status: 'confirmingDirty' }
       : { status: 'confirmingRequired' };
     updateDialogOpen.value = true;
-    return;
+    return false;
   }
   mergeDialogOpen.value = true;
+  return true;
 }
 async function commit(pushAfter: boolean): Promise<void> {
   if (!props.commitChanges) return;
@@ -905,7 +934,7 @@ async function generatePullRequestMessage(): Promise<void> {
   }
 }
 async function merge(pushAfter: boolean): Promise<void> {
-  if (!props.mergeBranch || !canMerge.value) return;
+  if (busy.value || !props.mergeBranch || !canMerge.value) return;
   clearDebugOperationTimers();
   clearMergeSuccessTimer();
   const agentId = props.agent.id;
@@ -917,10 +946,11 @@ async function merge(pushAfter: boolean): Promise<void> {
     operation: 'merge',
     phase: props.reportBackAgentName && reportBack.value ? 'handoff' : 'delivery',
   };
-  mergeOperation.value = { status: 'merging', branch, pushAfter, closeAgentAfterPush };
   let mergeCreated = false;
   let cleanupWarning: MergeCleanupWarning | undefined;
   try {
+    if (!await refreshMergeWorkflow() || !prepareMerge()) return;
+    mergeOperation.value = { status: 'merging', branch, pushAfter, closeAgentAfterPush };
     const mergeResult = await props.mergeBranch!(agentId, {
       strategy: mergeStrategy.value,
       ...(mergeStrategy.value === 'squash' ? { commitMessage: squashCommitMessage.value.trim() } : {}),
