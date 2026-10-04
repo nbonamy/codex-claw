@@ -6,16 +6,16 @@
     <meta name="theme-color" content="#f4f3ef" />
     <meta
       name="description"
-      content="Codex Claw is a native workspace for agentic software engineering, bringing agents, artifacts, and decisions together from idea to delivery."
+      content="Build with Codex, Claude Code, or both. Codex Claw brings your agents, repositories, and remote teams into one native workspace, from idea to delivery."
     />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
-      content="Codex Claw — Build with agents. From idea to delivery."
+      content="Codex Claw — Codex and Claude Code, one team."
     />
     <meta
       property="og:description"
-      content="Support the whole software workflow: shape the work, build with agents, review the results, and ship from one native workspace."
+      content="Use Codex, Claude Code, or both. Direct your agents across repositories and machines, review their work, and ship from one native workspace."
     />
     <meta property="og:url" content="https://codex-claw.nabocorp.com/" />
     <meta
@@ -31,14 +31,14 @@
       name="twitter:image"
       content="https://codex-claw.nabocorp.com/assets/og.png"
     />
-    <title>Codex Claw — Build with agents. From idea to delivery.</title>
+    <title>Codex Claw — Codex and Claude Code, one team.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=0.14.1" />
+    <link rel="stylesheet" href="styles.css?v=0.25.0-docs-2" />
   </head>
   <body>
     <header class="site-header shell">
@@ -52,25 +52,30 @@
         <a href="#workspace">Workspace</a>
         <a href="#automations">Automations</a>
       </nav>
-      <a
-        class="header-cta"
-        href="/desktop/downloads/codex-claw-macos-arm64.dmg"
-        download
-        >Download for macOS <span aria-hidden="true">↓</span></a
-      >
+      <div class="header-actions">
+        <a class="header-docs" href="/docs/">Docs</a>
+        <a
+          class="header-cta"
+          href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+          aria-label="Download for macOS"
+          download
+          >Download<span class="header-platform"> for macOS</span>
+          <span class="header-download-icon" aria-hidden="true">↓</span></a
+        >
+      </div>
     </header>
 
     <main id="top">
       <section class="hero shell">
         <div class="hero-copy reveal">
           <p class="eyebrow">
-            <span class="pulse"></span> A workspace for agentic SWE
+            <span class="pulse"></span> Codex + Claude Code
           </p>
           <h1>Build with agents.<br /><em>From idea to delivery.</em></h1>
           <p class="hero-lede">
-            Codex Claw brings agents, artifacts, and decisions together around
-            software work—from shaping an idea to reviewing and shipping code.
-            Keep the context, progress, and next step in one native workspace.
+            Run Codex and Claude Code side by side—or use either on its own.
+            Organize agents across repositories and machines, review their
+            work, and carry ideas through to delivery in one native workspace.
           </p>
           <div class="hero-actions">
             <a
@@ -86,7 +91,7 @@
           <div class="hero-meta" aria-label="Product details">
             <span>macOS · Apple silicon</span><span class="dot"></span
             ><span>Experimental Linux x64</span><span class="dot"></span
-            ><span>Free with your Codex plan</span>
+            ><span>Free to use</span>
           </div>
         </div>
 
@@ -103,7 +108,7 @@
                 <div class="window-title">
                   <img src="assets/claw-icon.png" alt="" /> Codex Claw
                 </div>
-                <div class="window-version">v0.20</div>
+                <div class="window-version">v0.25</div>
               </div>
               <div class="session-shell">
                 <div class="team-rail" aria-hidden="true">
@@ -226,9 +231,9 @@
             Keep the work moving.<br /><span>Keep the outcome in view.</span>
           </h2>
           <p>
-            Some work starts with a question. Some needs a path from
-            requirements to delivery. Claw supports both, with conversations and
-            artifacts that carry context between steps.
+            Start with a question or take a Mission from requirements to
+            delivery. Choose Codex or Claude Code for each agent, with
+            conversations and artifacts that keep the work in context.
           </p>
         </div>
         <div class="session-story">
@@ -540,7 +545,8 @@
             <h3>Give the next piece of work its own space.</h3>
             <p>
               Agents can share context and propose work in a dedicated worktree.
-              Accept the handoff and keep parallel tasks moving.
+              Run local teams or connect remote teams over SSH, keeping each
+              agent's workspace and progress in view.
             </p>
             <div class="agent-stack" aria-hidden="true">
               <span>🦞</span><span>⚙️</span><span>🛠️</span><i>3 active</i>
@@ -576,12 +582,12 @@
         <div class="download-grid"></div>
         <div class="download-content">
           <p class="eyebrow">
-            <span class="pulse"></span> Free with your Codex plan
+            <span class="pulse"></span> Free to use. Your choice of engine.
           </p>
           <h2>Bring your next idea.<br /><em>Build it with Claw.</em></h2>
           <p>
-            Codex Claw is available for macOS on Apple silicon, with
-            experimental Linux x64 support.
+            Connect Codex, Claude Code, or both. Available for macOS on Apple
+            silicon, with experimental Linux x64 support.
           </p>
           <a
             class="button button-primary"
@@ -590,7 +596,8 @@
             >Download for macOS <span aria-hidden="true">↓</span></a
           >
           <small
-            >No extra per-agent meter. Uses your existing OpenAI account.</small
+            >No Claw subscription or per-agent fee. Provider subscriptions and
+            API usage are separate.</small
           >
         </div>
       </section>

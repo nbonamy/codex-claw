@@ -1,4 +1,6 @@
 import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { expandWorktreeDelegationCommand } from './agents/worktree-delegation';
+import { handoffInProgress } from '@codex-claw/core/agent-handoff';
 import { isAgentRequestResponse } from '@codex-claw/core/agent-request';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
 import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
@@ -128,7 +130,7 @@ export class BackendDriverRpc {
   async refreshConversationContext(agent: Agent): Promise<void> {
     const driver = this.requireDriver(agent.backend);
     if (!agent.backendSession || !driver.releaseConversation || !driver.loadConversation) return;
-    driver.releaseConversation(agent.id);
+    await driver.releaseConversation(agent.id);
     await driver.loadConversation(agent);
   }
 
@@ -245,7 +247,8 @@ export class BackendDriverRpc {
         const { agent } = requireAgentParams(params);
         await this.ensureConnected?.(agent.backend);
         const record = requireRecord(params);
-        const prompt = requireString(record.prompt, 'prompt');
+        const rawPrompt = requireString(record.prompt, 'prompt');
+        const prompt = expandWorktreeDelegationCommand(rawPrompt) ?? rawPrompt;
         const driver = this.requireDriver(agent.backend);
         return driver.sendPrompt(agent, prompt, record.options as SendPromptOptions | undefined);
       }
@@ -310,7 +313,14 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationRelease: {
         const { backend, agentId } = requireBackendAgentIdParams(params);
-        this.requireDriver(backend).releaseConversation?.(agentId);
+        await this.requireDriver(backend).releaseConversation?.(agentId);
+        return null;
+      }
+      case backendMethods.driverHandoffCheck: {
+        const { agent } = requireAgentParams(params);
+        const driver = this.requireDriver(agent.backend);
+        if (!driver.assertHandoffReady) throw unsupportedBackendFeature(agent, 'handoff readiness checks');
+        await driver.assertHandoffReady(agent);
         return null;
       }
       case backendMethods.driverConversationArchive: {
@@ -407,13 +417,15 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverPromptSteer: {
         const { agent } = requireAgentParams(params);
+        if (handoffInProgress(agent)) throw new Error('Wait for the handoff to finish.');
         await this.ensureConnected?.(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.steerPrompt) {
           throw unsupportedBackendFeature(agent, 'prompt steering');
         }
-        const prompt = requireString(record.prompt, 'prompt');
+        const rawPrompt = requireString(record.prompt, 'prompt');
+        const prompt = expandWorktreeDelegationCommand(rawPrompt) ?? rawPrompt;
         const options = record.options as SendPromptOptions | undefined;
         return options
           ? driver.steerPrompt(agent, prompt, options)
@@ -550,6 +562,7 @@ export class BackendDriverRpc {
   }
 
   tryHandlePromptCommand(agent: Agent, prompt: string): Promise<BackendSendResult> | null {
+    if (expandWorktreeDelegationCommand(prompt) !== null) return null;
     return this.requireDriver(agent.backend).tryHandlePromptCommand?.(agent, prompt) ?? null;
   }
 

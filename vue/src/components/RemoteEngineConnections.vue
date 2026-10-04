@@ -5,7 +5,7 @@
         {{ $t('auth.installProvider') }} {{ backendDisplayName(engine.backend) }}
       </button>
       <template v-else>
-        <SettingsEngineConnectionRow :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @connect="connect(engine)" />
+        <SettingsEngineConnectionRow :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @connect="connect(engine)" @disconnect="disconnect(engine.backend)" />
         <RemoteCodexAuthentication v-if="signingIn === engine.backend && engine.backend === 'codex'" :connection="connection" @connected="finishConnection" />
         <RemoteClaudeAuthentication v-if="signingIn === engine.backend && engine.backend === 'claude'" :connection="connection" @connected="finishConnection" />
       </template>
@@ -71,6 +71,18 @@ async function connect(engine: ProviderConnection) {
   try { await setEnabled(engine.backend, true); }
   catch { if (expected === revision) error.value = translate('engineConnection.updateFailed'); }
   finally { if (expected === revision) busy.value = false; }
+}
+async function disconnect(backend: AgentBackend) {
+  busy.value = true;
+  error.value = '';
+  const expected = revision;
+  try {
+    if (!codexClawApi) throw new Error('Backend connection is unavailable.');
+    await codexClawApi.disconnectProvider(backend, props.connection.id);
+    if (expected === revision) { signingIn.value = null; await refresh(); }
+  } catch {
+    if (expected === revision) error.value = translate('engineConnection.disconnectFailed');
+  } finally { if (expected === revision) busy.value = false; }
 }
 async function finishConnection() { signingIn.value = null; await refresh(); }
 watch(() => props.connection.id, () => { engines.value = []; signingIn.value = null; void refresh(); }, { immediate: true });

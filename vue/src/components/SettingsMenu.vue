@@ -75,7 +75,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'open-settings': [];
   'open-whats-new': [];
-  logout: [];
   quit: [];
 }>();
 const popoverVisible = ref(false);
@@ -114,12 +113,6 @@ const menuItems = computed<AppMenuItem[]>(() => [
     type: 'action',
     label: translate('surface.settingsMenu.whatSNew'),
     icon: SparklesIcon,
-  },
-  {
-    id: 'logout',
-    type: 'action',
-    label: translate('surface.settingsMenu.logOut'),
-    icon: QuitIcon,
   },
   ...(clawHostCapabilities.appLifecycle ? [{
     id: 'quit',
@@ -203,8 +196,6 @@ function selectMenuItem(itemId: string): void {
     emit('open-settings');
   } else if (itemId === 'open-whats-new') {
     emit('open-whats-new');
-  } else if (itemId === 'logout') {
-    emit('logout');
   } else if (itemId === 'quit') {
     emit('quit');
   }

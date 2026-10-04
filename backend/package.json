@@ -1,6 +1,6 @@
 {
   "name": "@codex-claw/backend",
-  "version": "0.25.0",
+  "version": "0.25.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.3.226",
     "@codex-app-sdk/backend": "0.12.6",
     "@codex-app-sdk/core": "0.12.6",
-    "@codex-claw/core": "0.25.0",
+    "@codex-claw/core": "0.25.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "pino": "^10.3.1",
     "zod": "^4.4.3"

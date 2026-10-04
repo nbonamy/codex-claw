@@ -46,6 +46,32 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it.each([
+    { backend: 'codex' as const, command: 'delegate' },
+    { backend: 'claude' as const, command: 'worktree' },
+  ])('submits /$command as a Claw command for $backend', async ({ backend, command }) => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backend = backend;
+    snapshot.agents[0]!.backendDefaults = { kind: backend };
+    snapshot.providerConnections = [{ backend, installed: true, connected: true, checking: false }];
+    const sendPromptAction = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountRealShell({ snapshot, realConversationPane: true, sendPromptAction });
+    await wrapper.setProps({
+      backendCommands: defaultBackendCommands(backend),
+      backendSkills: [{ name: 'worktree', path: '/skills/worktree/SKILL.md', enabled: true }],
+    });
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = `/${command}`;
+    await editor.trigger('input');
+    await editor.trigger('keyup');
+    await nextTick();
+    expect(wrapper.find('[aria-label="Commands and skills"]').exists()).toBe(true);
+    await editor.trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(sendPromptAction).toHaveBeenCalledExactlyOnceWith(`/${command}`, undefined);
+    wrapper.unmount();
+  });
+
   it('continues a restored interrupted Codex turn without submitting a prompt', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };

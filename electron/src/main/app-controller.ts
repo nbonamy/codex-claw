@@ -241,8 +241,8 @@ export class AppController {
       return this.listWorkItems(provider, repositoryId, location, query);
     });
 
-    ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string) => {
-      return this.listBackendModels(agentId);
+    ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string, backend?: import('@codex-claw/core/contracts').AgentBackend) => {
+      return this.listBackendModels(agentId, backend);
     });
 
     ipc.handle(ipcChannels.listBackendPlugins, async (_event, agentId: string) => {
@@ -430,6 +430,9 @@ export class AppController {
     ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, turnId?: string) => {
       return this.forkAgent(agentId, turnId);
     });
+    ipc.handle(ipcChannels.handoffAgent, async (_event, agentId: string, input: import('@codex-claw/core/agent-handoff').AgentHandoffInput) => {
+      return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHandoff, { agentId, input }));
+    });
 
     ipc.handle(ipcChannels.moveAgentToTeam, async (_event, input: MoveAgentToTeamInput) => {
       return this.moveAgentToTeam(input);
@@ -487,6 +490,7 @@ export class AppController {
     ipc.handle(ipcChannels.getProviderConnections, (_event, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerConnectionsGet, { remoteConnectionId }));
     ipc.handle(ipcChannels.getProviderUsage, (_event, backend) => this.requireBackendClient().request(backendMethods.providerUsageGet, { backend }));
     ipc.handle(ipcChannels.setProviderEnabled, (_event, backend, enabled, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerEnabledSet, { backend, enabled, remoteConnectionId }));
+    ipc.handle(ipcChannels.disconnectProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerDisconnect, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.configureProviderSetup, (_event, backend, choice) => this.requireBackendClient().request(backendMethods.providerSetupConfigure, { backend, choice }));
     ipc.handle(ipcChannels.installProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerInstall, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.cancelCodexChatGptLogin, (_event, remoteConnectionId?: string, loginId?: string) => this.cancelCodexChatGptLogin(remoteConnectionId, loginId));
@@ -738,12 +742,7 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
-      this.backendClientEventUnsubscribe?.();
-      this.backendClientEventUnsubscribe = this.backendClient.onEvent((event) => this.emitBackendEvent(event));
-      this.backendClientConnectionUnsubscribe?.();
-      this.backendClientConnectionUnsubscribe = this.backendClient.onConnectionState?.((state, error) => {
-        if (state === 'disconnected') this.handleBackendDisconnect(error);
-      }) ?? null;
+      this.subscribeToBackendClient();
       await this.synchronizeBackendState();
       this.setConnectionState({ status: 'connected' });
       logMain('clawd', 'connected to backend', { version: health.version, pid: health.pid });
@@ -759,6 +758,14 @@ export class AppController {
     const result = await this.requireBackendClient().request<WorkProviderConnectResult>(backendMethods.workProviderConnect, { provider });
     await this.adoptBackendSnapshot(result.snapshot);
     return result;
+  }
+
+  private subscribeToBackendClient(): void {
+    if (!this.backendClient) return;
+    this.backendClientEventUnsubscribe ??= this.backendClient.onEvent((event) => this.emitBackendEvent(event));
+    this.backendClientConnectionUnsubscribe ??= this.backendClient.onConnectionState?.((state, error) => {
+      if (state === 'disconnected') this.handleBackendDisconnect(error);
+    }) ?? null;
   }
 
   private async listSshHosts(): Promise<SshHostCandidate[]> {
@@ -1327,8 +1334,8 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPermissionModeUpdate, { agentId, mode }));
   }
 
-  private async listBackendModels(agentId: string): Promise<BackendModelOption[]> {
-    return this.requireBackendClient().request(backendMethods.agentModelsList, { agentId });
+  private async listBackendModels(agentId: string, backend?: import('@codex-claw/core/contracts').AgentBackend): Promise<BackendModelOption[]> {
+    return this.requireBackendClient().request(backendMethods.agentModelsList, { agentId, ...(backend ? { backend } : {}) });
   }
 
   private async listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]> {
@@ -1847,6 +1854,7 @@ export class AppController {
     try {
       await this.backendClient.start();
       const health = await this.backendClient.health();
+      this.subscribeToBackendClient();
       const snapshot = await this.synchronizeBackendState();
       this.reconnectAttempt = 0;
       this.setConnectionState({ status: 'connected' });

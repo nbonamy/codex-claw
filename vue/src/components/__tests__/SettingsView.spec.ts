@@ -65,12 +65,13 @@ describe('SettingsView', () => {
     const connectCodex = vi.fn().mockResolvedValue(undefined);
     const connectClaude = vi.fn().mockResolvedValue(undefined);
     const setProviderEnabled = vi.fn().mockResolvedValue(undefined);
+    const disconnectProvider = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsView, {
       props: {
         activeTab: 'codex',
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
-        connectCodex, connectClaude, setProviderEnabled,
+        connectCodex, connectClaude, setProviderEnabled, disconnectProvider,
       },
     });
 
@@ -91,10 +92,11 @@ describe('SettingsView', () => {
     expect(connectClaude).toHaveBeenCalledOnce();
     await wrapper.setProps({ claudeConnected: true });
     await wrapper.findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
-    expect(setProviderEnabled).toHaveBeenCalledWith('claude', false);
+    expect(disconnectProvider).toHaveBeenCalledWith('claude');
     await wrapper.setProps({ activeTab: 'codex', codexConnected: true });
     await wrapper.findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
-    expect(setProviderEnabled).toHaveBeenLastCalledWith('codex', false);
+    expect(disconnectProvider).toHaveBeenLastCalledWith('codex');
+    expect(setProviderEnabled).not.toHaveBeenCalled();
   });
 
   it('renders controlled appearance settings and emits appearance updates', async () => {

@@ -9,8 +9,42 @@ import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
 import { ClawBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
 import { CodexBackendDriver } from '../codex/codex-driver';
+import { WORKTREE_DELEGATION_PROMPT } from '../agents/worktree-delegation';
 
 describe('BackendDriverRpc', () => {
+  it.each([
+    { backend: 'codex' as const, method: 'driver/prompt/send', prompt: '/delegate', task: '' },
+    { backend: 'claude' as const, method: 'driver/prompt/send', prompt: '/worktree Fix the flaky login\nKeep API compatibility.', task: 'Fix the flaky login\nKeep API compatibility.' },
+    { backend: 'codex' as const, method: 'driver/prompt/steer', prompt: ' /delegate Fix the settings dialog ', task: 'Fix the settings dialog' },
+  ])('expands $prompt through $method for $backend without losing prompt options', async ({ backend, method, prompt, task }) => {
+    const agent = { ...createAgent(), backend };
+    const sendPrompt = vi.fn().mockResolvedValue({});
+    const steerPrompt = vi.fn().mockResolvedValue({});
+    const tryHandlePromptCommand = vi.fn().mockResolvedValue({});
+    const rpc = new BackendDriverRpc(new Map([[backend, createDriver({ backend, sendPrompt, steerPrompt, tryHandlePromptCommand })]]));
+    const options = { model: 'selected-model', inputMethod: 'dictated' as const };
+
+    expect(rpc.tryHandlePromptCommand(agent, prompt)).toBeNull();
+    expect(tryHandlePromptCommand).not.toHaveBeenCalled();
+    await rpc.handle(method, { agent, prompt, options });
+
+    const operation = method.endsWith('/steer') ? steerPrompt : sendPrompt;
+    expect(operation).toHaveBeenCalledExactlyOnceWith(agent,
+      task ? `${WORKTREE_DELEGATION_PROMPT}\n\nTask to delegate:\n${task}` : WORKTREE_DELEGATION_PROMPT,
+      options);
+    expect(method.endsWith('/steer') ? sendPrompt : steerPrompt).not.toHaveBeenCalled();
+    await rpc.close();
+  });
+
+  it.each(['/worktrees list', 'Explain /delegate', '/delegate-other'])('does not expand non-command text: %s', async (prompt) => {
+    const agent = createAgent();
+    const driver = createDriver();
+    const rpc = new BackendDriverRpc(new Map([['codex', driver]]));
+    await rpc.handle('driver/prompt/send', { agent, prompt });
+    expect(driver.sendPrompt).toHaveBeenCalledExactlyOnceWith(agent, prompt, undefined);
+    await rpc.close();
+  });
+
   it.each([
     { account: null, requiresOpenaiAuth: true, connected: false },
     { account: null, requiresOpenaiAuth: false, connected: true },
@@ -42,7 +76,7 @@ describe('BackendDriverRpc', () => {
         .resolves.toMatchObject({ result: state });
       expect(authenticate).toHaveBeenLastCalledWith({ action: 'cancel', loginId: 'login-1' });
       authenticate.mockResolvedValue({ kind: 'codex', connected: false, state });
-      await server.handleMessage({ jsonrpc: '2.0', id: 4, method: 'codex/authentication/logout' });
+      await server.handleMessage({ jsonrpc: '2.0', id: 4, method: 'provider/disconnect', params: { backend: 'codex' } });
       expect(authenticate).toHaveBeenLastCalledWith({ action: 'logout' });
       expect(snapshot.providerConnections?.[0]?.connected).toBe(false);
       expect(driver.sendPrompt).not.toHaveBeenCalled();

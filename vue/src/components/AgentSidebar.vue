@@ -232,6 +232,15 @@
               >{{ session.displayTitle }}</strong>
             </span>
             <span
+              v-if="backendChoices.length > 1 && agentsById.get(session.agentId)"
+              class="agent-sidebar__engine"
+              role="img"
+              :aria-label="backendDisplayName(agentsById.get(session.agentId)!.backend)"
+              :title="backendDisplayName(agentsById.get(session.agentId)!.backend)"
+            >
+              <BackendIcon :backend="agentsById.get(session.agentId)!.backend" monochrome />
+            </span>
+            <span
               v-if="session.status.type === 'awaitingInput'"
               class="agent-sidebar__input-needed"
               :class="{ 'agent-sidebar__input-needed--with-cleanup': isPullRequestFinished(session) }"
@@ -333,6 +342,9 @@ import {
   TargetArrowIcon,
 } from '../shared/icons/app-icons';
 import AgentContextMenu from './AgentContextMenu.vue';
+import BackendIcon from './BackendIcon.vue';
+import { useBackendChoices } from './backend-selection';
+import { backendDisplayName } from '@codex-claw/core/backend-driver';
 import MissionContextMenu from './MissionContextMenu.vue';
 import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
@@ -381,6 +393,7 @@ const emit = defineEmits<{
   'create-agent-worktree-in-repository': [payload: { agentId: string; repositoryName: string; repositoryRoot: string }];
   'duplicate-agent': [agentId: string];
   'fork-agent': [agentId: string];
+  'handoff-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'open-in': [payload: { agentId: string; application: OpenInApplication }];
@@ -413,6 +426,8 @@ const workspaceGroups = computed(() => projectWorkspaceSidebar({
   quickChatsLabel: t('sidebar.chats'),
   unreadAgentIds: props.unreadAgentIds,
 }).sort((left, right) => Number(right.kind === 'quickChats') - Number(left.kind === 'quickChats')));
+const agentsById = computed(() => new Map(props.agents.map(agent => [agent.id, agent])));
+const backendChoices = useBackendChoices(() => props.teamId);
 const quickChatGroup = computed(() => workspaceGroups.value.find((group) => group.kind === 'quickChats') ?? null);
 const contextMenuAgentId = ref<string | null>(null);
 const contextMenuMissionId = ref<string | null>(null);
@@ -670,6 +685,9 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
       break;
     case 'fork-agent':
       emit('fork-agent', agentId);
+      break;
+    case 'handoff-agent':
+      emit('handoff-agent', agentId);
       break;
     case 'edit-agent':
       emit('edit-agent', agentId);
@@ -1032,6 +1050,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   display: grid;
   grid-template-columns:
     var(--agent-sidebar-repository-icon-column-width) minmax(0, 1fr)
+    var(--agent-sidebar-engine-track,)
     var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width));
   align-items: center;
   gap: var(--agent-sidebar-workspace-column-gap);
@@ -1052,6 +1071,15 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__agent--awaiting-input {
   --agent-sidebar-trailing-column-width: max-content;
+}
+
+.agent-sidebar__agent:has(.agent-sidebar__quick-switch-shortcut) {
+  --agent-sidebar-trailing-column-width: 28px;
+}
+
+.agent-sidebar:hover .agent-sidebar__agent:has(.agent-sidebar__engine),
+.agent-sidebar:focus-within .agent-sidebar__agent:has(.agent-sidebar__engine) {
+  --agent-sidebar-engine-track: 18px;
 }
 
 .agent-sidebar__pull-request-attention {
@@ -1091,7 +1119,9 @@ function onResizePointerEnd(event: PointerEvent): void {
   .agent-sidebar__agent,
 .agent-sidebar__workspace-group[data-group-kind="missions"]
   .agent-sidebar__agent {
-  grid-template-columns: minmax(0, 1fr) var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width));
+  grid-template-columns: 0 minmax(0, 1fr)
+    var(--agent-sidebar-engine-track,)
+    var(--agent-sidebar-trailing-column-width, var(--agent-sidebar-status-column-width));
   padding-left: calc(
     var(--agent-sidebar-workspace-inline-padding) + var(--space-10)
   );
@@ -1171,6 +1201,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__meta {
+  grid-column: 2;
   min-width: 0;
   display: grid;
   gap: 1.5px;
@@ -1194,6 +1225,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__status {
+  grid-column: -2;
   width: var(--agent-status-dot-size);
   height: var(--agent-status-dot-size);
   border-radius: var(--radius-full);
@@ -1201,6 +1233,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__input-needed {
+  grid-column: -2;
   padding: var(--space-1) var(--space-4);
   border-radius: var(--radius-sm);
   color: var(--color-primary);
@@ -1213,6 +1246,18 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__input-needed--with-cleanup {
   margin-right: calc(var(--agent-sidebar-status-column-width) + var(--space-4));
+}
+
+.agent-sidebar__engine {
+  grid-column: 3;
+  display: none;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+.agent-sidebar:hover .agent-sidebar__engine,
+.agent-sidebar:focus-within .agent-sidebar__engine {
+  display: grid;
 }
 
 .agent-sidebar__status[data-status="working"],
@@ -1230,13 +1275,13 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__quick-switch-shortcut {
+  grid-column: -2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
   width: 28px;
   height: var(--line-height-18);
-  margin-left: -16px;
   padding: 0 var(--space-2);
   border-radius: var(--radius-full);
   color: var(--color-text-muted);

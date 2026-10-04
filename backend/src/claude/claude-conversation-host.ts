@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { getLocalClaudeAuthentication } from './authentication';
+import { getLocalClaudeAuthentication, logoutLocalClaude } from './authentication';
 import { getClaudeAccountUsage } from './account-usage';
 import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
 import type {
@@ -115,8 +115,8 @@ type ClaudeReviewTurnConfiguration = {
 
 export class ClaudeConversationHost implements AgentBackendDriver {
   async authenticate(request: import('@codex-claw/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@codex-claw/core/contracts/provider-setup').ProviderAuthentication> {
-    if (request.action !== 'check') throw new Error('Manage Claude authentication through its CLI.');
-    const state = await getLocalClaudeAuthentication();
+    if (request.action === 'cancel') throw new Error('Manage Claude authentication through its CLI.');
+    const state = await (request.action === 'logout' ? logoutLocalClaude() : getLocalClaudeAuthentication());
     return { kind: 'claude', connected: state.loggedIn, state };
   }
   readonly backend = 'claude' as const;
@@ -482,7 +482,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     }, response.outcome);
   }
 
-  releaseConversation(agentId: string): void {
+  async releaseConversation(agentId: string): Promise<void> {
     this.turnBoundariesByAgentId.delete(agentId);
     this.goalRefreshIds.delete(agentId);
     this.goalsByAgentId.delete(agentId);
@@ -492,7 +492,14 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     this.contextUsageSessionIdsByAgentId.delete(agentId);
     if (!sessionId) return;
     this.liveSessionIdsByAgentId.delete(agentId);
-    void this.transport.closeSession?.(sessionId);
+    await this.transport.closeSession?.(sessionId);
+  }
+
+  async assertHandoffReady(agent: Agent): Promise<void> {
+    const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
+    if (this.activeTurnsByAgentId.has(agent.id) || snapshot?.busy || snapshot?.activeTurnId || [...this.pendingRequestOwners.values()].some(turn => turn.agentId === agent.id)) {
+      throw new Error('Resolve the Claude turn and requests before handing off.');
+    }
   }
 
   async loadConversation(agent: Agent): Promise<BackendSession | null> {
@@ -585,6 +592,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     if (ref.backend !== 'claude') {
       throw new Error('Claude cannot read non-Claude conversation history.');
     }
+
+    const current = this.conversationReplicasByAgentId.get(agentId)?.getSnapshot();
+    if (current?.sessionId === ref.sessionId) return structuredClone(current.messages);
 
     const history = await this.loadHistory({
       id: agentId,

@@ -24,7 +24,6 @@
     @new-team="openNewTeam"
     @open-settings="openSettings"
     @open-whats-new="openWhatsNew"
-    @logout="logoutCodex"
     @quit="quit"
     @reorder-teams="$emit('reorder-teams', $event)"
     @select-cockpit="openCockpit"
@@ -70,6 +69,7 @@
       :list-repository-branches="listRepositorySessionBranches"
       @duplicate-agent="$emit('duplicate-agent', $event)"
       @fork-agent="$emit('fork-agent', $event)"
+      @handoff-agent="$emit('handoff-agent', $event)"
       @edit-agent="openEditAgent"
       @move-agent-to-team="$emit('move-agent-to-team', $event)"
       @open-in="openAgentIn($event.agentId, $event.application)"
@@ -159,7 +159,7 @@ const emit = defineEmits<{
   'edit-agent': [agentId: string];
   'edit-team': [teamId: string];
   'fork-agent': [agentId: string];
-  logout: [];
+  'handoff-agent': [agentId: string];
   'move-agent-to-team': [input: MoveAgentToTeamInput];
   'new-team': [];
   'open-automations': [];
@@ -282,10 +282,6 @@ function openSettings(): void {
 
 function openWhatsNew(): void {
   emit('open-whats-new');
-}
-
-function logoutCodex(): void {
-  emit('logout');
 }
 
 function quit(): void {

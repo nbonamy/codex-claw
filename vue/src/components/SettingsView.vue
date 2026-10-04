@@ -40,6 +40,7 @@
           :login-pending="codexLoginPending"
           :connection-error="codexConnectionError"
           @connect="connectCodex"
+          @disconnect="disconnectProvider?.('codex')"
           @cancel="cancelCodexLogin"
           :choose-codex-binary="chooseCodexBinary"
           :launch-chat-gpt-app="launchChatGptApp"
@@ -57,6 +58,7 @@
           :busy="claudeConnectionBusy"
           :error="claudeConnectionError"
           @connect="connectClaude"
+          @disconnect="disconnectProvider?.('claude')"
         />
         <SettingsAppearancePanel
           v-else-if="activeTab === 'appearance'"
@@ -139,6 +141,7 @@ withDefaults(defineProps<{
   providerConnections?: ProviderConnection[];
   customizeProvider?: (backend: 'codex' | 'claude') => unknown;
   setProviderEnabled?: (backend: 'codex' | 'claude', enabled: boolean) => unknown;
+  disconnectProvider?: (backend: 'codex' | 'claude') => Promise<void>;
   claudeConnected?: boolean;
   codexConnectionBusy?: boolean;
   claudeConnectionBusy?: boolean;

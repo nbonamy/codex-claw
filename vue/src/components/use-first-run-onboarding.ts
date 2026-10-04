@@ -135,6 +135,26 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     finally { if (!disposed) busy.value = false; }
   }
 
+  async function disconnectProvider(backend: AgentBackend): Promise<void> {
+    const busy = backend === 'codex' ? authenticationLoading : claudeLoading;
+    const error = backend === 'codex' ? authenticationError : claudeError;
+    busy.value = true;
+    error.value = null;
+    try {
+      const result = await requireApi().disconnectProvider(backend);
+      if (disposed) return;
+      if (result.kind === 'codex') {
+        stopPolling();
+        authentication.value = result.state;
+      } else {
+        claudeAuthentication.value = result.state;
+        claudeDialogVisible.value = false;
+      }
+    } catch (cause) {
+      if (!disposed) error.value = errorMessage(cause);
+    } finally { if (!disposed) busy.value = false; }
+  }
+
   function isInstalled(backend: AgentBackend): boolean {
     return providerSetup.value.some(setup => setup.backend === backend && setup.installed);
   }
@@ -219,15 +239,6 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     }
   }
 
-  async function logout(): Promise<void> {
-    authenticationError.value = null;
-    authentication.value = await requireApi().logoutCodex();
-    githubVisible.value = false;
-    completeVisible.value = false;
-    providersVisible.value = !options.hasExistingWorkspace();
-    if (providersVisible.value) setFirstRunOnboardingStage('providers');
-  }
-
   function completeGitHub(): void {
     githubVisible.value = false;
     completeVisible.value = true;
@@ -286,8 +297,8 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     claudeAuthentication, claudeLoading, claudeError, claudeDialogVisible,
     codexConnected, claudeConnected, canContinue, continuing,
     completeVisible, gated, githubVisible, initialAuthenticationLoading, showLogin,
-    cancelChatGptLogin, completeGitHub, finish, load, logout, startChatGptLogin,
-    connectClaude, refreshClaude, refreshConnections, continueWithProviders,
+    cancelChatGptLogin, completeGitHub, finish, load, startChatGptLogin,
+    connectClaude, disconnectProvider, refreshClaude, refreshConnections, continueWithProviders,
     providerSetup, customizingProvider, customizedSetup, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
   };
 }

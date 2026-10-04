@@ -122,6 +122,7 @@ const emit = defineEmits<{
   'duplicate-agent': [agentId: string];
   'edit-agent': [agentId: string];
   'fork-agent': [agentId: string];
+  'handoff-agent': [agentId: string];
   'move-agent-to-team': [payload: { agentId: string; teamId: string }];
   'prompt-agent': [payload: { agentId: string; prompt: string }];
   'restart-agent': [agentId: string];
@@ -231,6 +232,7 @@ function emitContextAgentAction(action: AgentContextMenuAction): void {
   else if (action === 'duplicate-agent') emit('duplicate-agent', agentId);
   else if (action === 'edit-agent') emit('edit-agent', agentId);
   else if (action === 'fork-agent') emit('fork-agent', agentId);
+  else if (action === 'handoff-agent') emit('handoff-agent', agentId);
   else if (action === 'restart-agent') emit('restart-agent', agentId);
   closeAgentMenu();
 }

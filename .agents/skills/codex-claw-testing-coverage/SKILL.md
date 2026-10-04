@@ -49,7 +49,12 @@ owning public seam, the test does not belong.
   tool/approval rendering, diff rendering, filesystem/git behavior, Bench, and
   teams.
 - Prefer tests around public behavior before adding test-only seams.
-- Keep the threshold at or above 85% once coverage tooling is configured.
+- Gate every workspace on exactly 85% statements; report lines, branches, and
+  functions without blocking thresholds. Preserve the measured surface.
+- Coverage complements mandatory meaningful behavioral/regression tests and
+  owning-boundary verification; it cannot replace them.
+- Before release, require the full test suite (including scripts) and
+  all-workspace statement coverage against installed SDK packages.
 
 ## Standard Gates
 

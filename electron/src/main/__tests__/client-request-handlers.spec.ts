@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { createClientRequestHandlers } from '../client-request-handlers';
 
 const computerUseMocks = vi.hoisted(() => ({
+  execute: vi.fn().mockResolvedValue({ clicked: true }),
+  requestAccessibility: vi.fn().mockResolvedValue({ accessibilityTrusted: true }),
+  stop: vi.fn(),
   getStatus: vi.fn().mockResolvedValue({
     accessibilityTrusted: true,
     screenCaptureTrusted: false,
@@ -20,6 +23,9 @@ vi.mock('../computer-use-tools', async (importOriginal) => ({
   ...await importOriginal<typeof import('../computer-use-tools')>(),
   getComputerUseStatus: computerUseMocks.getStatus,
   requestComputerUseScreenCapture: computerUseMocks.requestScreenCapture,
+  executeComputerUseCommand: computerUseMocks.execute,
+  requestComputerUseAccessibility: computerUseMocks.requestAccessibility,
+  stopComputerUseHelper: computerUseMocks.stop,
 }));
 
 const computerUseOptions = () => ({
@@ -41,6 +47,41 @@ vi.mock('electron', () => ({
 }));
 
 describe('createClientRequestHandlers', () => {
+  it('validates browser execution identity and arguments before invoking the desktop port', async () => {
+    const browserExecute = vi.fn().mockResolvedValue({ clicked: '#save' });
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(), getSystemPermissionsStatus: vi.fn(),
+      openAccessibilitySettings: vi.fn(), computerUseOptions, browserExecute,
+    });
+    const execute = handlers['client/browser/execute']!;
+    await expect(execute({ agentId: 'agent-one', browserId: 'secondary', command: 'click', arguments: { selector: '#save' } }))
+      .resolves.toStrictEqual({ clicked: '#save' });
+    expect(browserExecute).toHaveBeenCalledWith('agent-one', 'secondary', 'click', { selector: '#save' });
+    for (const input of [null, [], { agentId: ' ', browserId: 'secondary', command: 'click', arguments: {} },
+      { agentId: 'agent-one', browserId: 'secondary', command: 'click', arguments: [] }]) {
+      await expect(execute(input)).rejects.toThrow('Invalid');
+    }
+    expect(browserExecute).toHaveBeenCalledOnce();
+    browserExecute.mockRejectedValueOnce(new Error('guest closed'));
+    await expect(execute({ agentId: 'agent-one', browserId: 'secondary', command: 'click', arguments: {} })).rejects.toThrow('guest closed');
+  });
+
+  it('dispatches validated Computer Use commands and lifecycle actions to the helper boundary', async () => {
+    const handlers = createClientRequestHandlers({
+      openExternal: vi.fn(), getSystemPermissionsStatus: vi.fn(),
+      openAccessibilitySettings: vi.fn(), computerUseOptions,
+    });
+    await expect(handlers['client/computerUse/execute']!({ command: 'click', arguments: { x: 10, y: 20 } }))
+      .resolves.toStrictEqual({ clicked: true });
+    expect(computerUseMocks.execute).toHaveBeenCalledWith({ command: 'click', arguments: { x: 10, y: 20 }, options: computerUseOptions() });
+    await expect(handlers['client/computerUse/execute']!({ command: 'shell', arguments: {} })).rejects.toThrow('Invalid Computer Use command');
+    await expect(handlers['client/computerUse/execute']!({ command: 'click', arguments: null })).rejects.toThrow('Invalid client request params');
+    expect(computerUseMocks.execute).toHaveBeenCalledOnce();
+    await expect(handlers['client/computerUse/requestAccessibility']!({})).resolves.toMatchObject({ accessibilityTrusted: true });
+    expect(handlers['client/computerUse/stop']!({})).toStrictEqual({ stopped: true });
+    expect(computerUseMocks.stop).toHaveBeenCalledOnce();
+  });
+
   it('opens external URLs through the desktop port', async () => {
     const openExternal = vi.fn().mockResolvedValue(true);
     const handlers = createClientRequestHandlers({

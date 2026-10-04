@@ -107,6 +107,8 @@ Run:
 
 ```bash
 npm run release-notes:check
+npm run test:ai
+npm run test:coverage
 git diff --check
 git status --short
 ```
@@ -125,6 +127,12 @@ Only these paths may be modified:
 
 Abort if another path changed. Review the complete diff and confirm every
 manifest and lockfile workspace version equals the target.
+
+Require all tests (including scripts) to pass and all five workspaces to meet
+the 85% statement coverage gate against installed SDK packages. Lines, branches,
+and functions are reported diagnostics, not blocking metrics. Coverage does
+not replace meaningful behavioral/regression tests or owning-boundary
+verification. Stop before committing, tagging, or publishing if a gate fails.
 
 ## 6. Commit and tag release preparation
 

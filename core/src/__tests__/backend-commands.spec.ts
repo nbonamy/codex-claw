@@ -1,57 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { claudeBackendCommands, codexBackendCommands, defaultBackendCommands } from '../backend-commands';
+import { defaultBackendCommands } from '../backend-commands';
 
 describe('backend command catalog', () => {
-  it('returns Codex slash commands for Codex agents', () => {
-    expect(defaultBackendCommands('codex')).toBe(codexBackendCommands);
-    expect(codexBackendCommands.map((command) => command.slashName)).toStrictEqual([
-      'compact',
-      'review',
-      'visualize',
-      'plan',
-      'goal',
-    ]);
+  it.each(['codex', 'claude'] as const)('offers commands for the selected %s engine without ambiguous slash names', (backend) => {
+    const commands = defaultBackendCommands(backend);
+    expect(commands.every((command) => command.backend === backend)).toBe(true);
+    expect(new Set(commands.map((command) => command.slashName)).size).toBe(commands.length);
+    expect(commands.find((command) => command.slashName === 'compact')).toMatchObject({
+      id: `${backend}.compact`, submitOnSelect: true,
+    });
   });
 
-  it('returns Claude slash commands for Claude agents', () => {
-    expect(defaultBackendCommands('claude')).toBe(claudeBackendCommands);
-    expect(claudeBackendCommands).toStrictEqual([
-      {
-        id: 'claude.compact',
-        backend: 'claude',
-        name: 'compact',
-        displayName: 'Compact',
-        description: 'Compact the current Claude context while preserving a summary.',
-        slashName: 'compact',
-        submitOnSelect: true,
-      },
-      {
-        id: 'claw.review',
-        backend: 'claude',
-        name: 'review',
-        displayName: 'Review',
-        description: 'Open Claw\'s code review workflow.',
-        slashName: 'review',
-        submitOnSelect: true,
-      },
-      {
-        id: 'claw.visualize',
-        backend: 'claude',
-        name: 'visualize',
-        displayName: 'Visualize',
-        description: 'Open Claw Visualize mode for diagrams.',
-        slashName: 'visualize',
-        submitOnSelect: true,
-      },
-      {
-        id: 'claude.plan',
-        backend: 'claude',
-        name: 'plan',
-        displayName: 'Plan',
-        description: 'Switch to Claude Plan mode.',
-        slashName: 'plan',
-        submitOnSelect: true,
-      },
-    ]);
+  it('offers pending goal entry only for Codex', () => {
+    expect(defaultBackendCommands('codex').find((command) => command.slashName === 'goal'))
+      .toMatchObject({ composerMode: { label: 'Goal' } });
+    expect(defaultBackendCommands('claude').some((command) => command.slashName === 'goal')).toBe(false);
   });
 });

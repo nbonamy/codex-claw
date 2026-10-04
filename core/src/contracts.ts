@@ -341,6 +341,7 @@ export type OpenInApplicationCatalog = {
 };
 
 export type Agent = {
+  handoff?: import('./agent-handoff').AgentHandoff;
   id: string;
   teamId?: string;
   delegatedByAgentId?: string;
@@ -676,6 +677,7 @@ export type AppCommand =
   | { type: 'cycle-teams' }
   | { type: 'duplicate-active-agent' }
   | { type: 'fork-active-agent' }
+  | { type: 'handoff-active-agent' }
   | { type: 'debug-approval-request' }
   | { type: 'debug-user-questions' }
   | { type: 'debug-celebrate'; kind: CelebrationKind }
@@ -819,7 +821,7 @@ export type CodexClawApi = {
   listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery): Promise<WorkItemPage>;
   listAssignedWorkItems?(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]>;
   listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery): Promise<WorkItem[]>;
-  listBackendModels(agentId: string): Promise<BackendModelOption[]>;
+  listBackendModels(agentId: string, backend?: AgentBackend): Promise<BackendModelOption[]>;
   listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
@@ -877,6 +879,7 @@ export type CodexClawApi = {
   assignWorkItemToAgent(agentId: string, item: WorkItem): Promise<AppSnapshot>;
   removeWorkItemAssignment(item: WorkItem): Promise<AppSnapshot>;
   duplicateAgent(agentId: string, options?: DuplicateAgentOptions): Promise<AppSnapshot>;
+  handoffAgent(agentId: string, input: import('./agent-handoff').AgentHandoffInput): Promise<AppSnapshot>;
   forkAgent(agentId: string, turnId?: string): Promise<AppSnapshot>;
   moveAgentToTeam(input: MoveAgentToTeamInput): Promise<AppSnapshot>;
   reorderAgents(input: ReorderAgentsInput): Promise<AppSnapshot>;
@@ -900,6 +903,7 @@ export type CodexClawApi = {
   getProviderConnections(remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;
   getProviderUsage(backend: AgentBackend): Promise<AccountRateLimits | null>;
   setProviderEnabled(backend: AgentBackend, enabled: boolean, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;
+  disconnectProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderAuthentication>;
   configureProviderSetup(backend: AgentBackend, choice: import('./contracts/provider-setup').ProviderSetupChange): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
   installProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
   cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication>;

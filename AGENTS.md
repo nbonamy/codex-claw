@@ -76,6 +76,9 @@ changes; specify feature behavior in tests:
   canonical UI, visual references, and design tokens.
 - `docs/team-cockpit.md`: design note for a possible team-scoped Cockpit entry
   inside the agent sidebar while preserving the global Cockpit.
+- `docs/research/provider-handoff.md`: read when designing cross-provider
+  continuation; handoff goals, source evidence, lifecycle and persistence
+  contracts, and validation limits.
 - `docs/agent-provider-selection.md`: draft for provider choice across manual
   agent creation, delegation, projects, Missions, and independent review.
 - `docs/codex.md`: read before changing Codex conversation state, rendering,
@@ -86,6 +89,8 @@ changes; specify feature behavior in tests:
 - [Claude capability audit](docs/research/claude-capabilities.md): read before adding
   Claude steering, forks, goals, turn mutations, or context controls; distinguishes
   SDK contracts, Claw integration gaps, and runtime evidence.
+- `docs/research/synara.md`: competitive analysis for Synara comparisons and
+  provider-neutral workflow decisions; dated source evidence, not a roadmap.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
 - `docs/custom-tools.md`: use when adding or presenting a `codex_claw` MCP tool,
@@ -98,6 +103,9 @@ changes; specify feature behavior in tests:
   backend seam, persistence, and open architecture decisions.
 - `plans/codex-claw.md`: current product progression and commit checkpoints.
 - `docs/codex.png`: visual reference for the target shell.
+- `website/README.md`: read before changing the public VitePress guide in
+  `website/docs/` or the website build and deployment. Public user guides are
+  separate from the internal engineering notes in `docs/`.
 
 When a new doc is needed, discuss it with Nicolas first. If approved, add it
 under `docs/` and link it here.
@@ -118,9 +126,12 @@ configuration. Enforce static architecture rules with lint, type, AST, or
 dependency tooling instead. Coverage is evidence of exercised behavior, never
 a reason to invent a test.
 
-Coverage must stay very high. Once coverage tooling exists, the minimum
-threshold is 85% for statements, branches, functions, and lines. Do not lower
-coverage thresholds to land a change.
+Every workspace (core, backend, vue, electron, web) gates on exactly 85%
+statement coverage. Lines, branches, and functions remain reported diagnostics
+without blocking thresholds. Do not lower the statement threshold or shrink
+the measured surface to land a change. Coverage does not replace meaningful
+behavioral/regression tests or verification at the owning runtime boundary.
+Before release, require the full test suite and all-workspace statement coverage.
 
 Before editing code, read `docs/testing.md`. Before editing UI, also read
 `docs/frontend.md`.

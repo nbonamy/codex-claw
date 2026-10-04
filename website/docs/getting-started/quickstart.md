@@ -1,0 +1,56 @@
+---
+description: Install Claw, connect a provider, and complete a small repository task.
+---
+
+# Quickstart
+
+Start with one repository, one agent, and a small change you can review.
+
+## Install Claw
+
+[Download Codex Claw for macOS](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg), move it to Applications, and launch it. The desktop download supports Apple silicon.
+
+See [Installation](./installation) for requirements.
+
+## Choose your provider's setup
+
+On the first-run screen, select **Customize** beneath Codex or Claude Code. Choose **Separate Claw chats** for its own setup environment, or **Use existing setup** to reuse the provider environment already on your computer. Configure each engine separately.
+
+Use **Connect Codex** or **Connect Claude Code** and complete that engine's authentication steps. Once at least one engine is connected and enabled, select **Continue**. You can manage these choices later in **Settings → Codex** or **Settings → Claude Code**.
+
+The [Codex guide](../providers/codex) and [Claude Code guide](../providers/claude-code) explain the separate setup and sign-in flows. Model access and usage limits come from the provider account you connect.
+
+At the GitHub step, connect your account if you want GitHub workflows, or select **Skip for now** for a local repository task.
+
+## Open your repository
+
+Choose **Existing folder or repository…** from the empty workspace's start-work menu and select your local checkout. You can also open a GitHub repository or clone a repository URL from that menu.
+
+If multiple engines are enabled, select the engine for the new conversation. Keep the default checkout for a small first task. To add another conversation for an open repository, use its **New session** plus button in the sidebar and choose the checkout or branch you want.
+
+For a first task, use a repository whose current changes you understand. If other agents will also write to it, use [separate worktrees](../workflows/worktrees).
+
+## Ask for a bounded change
+
+For example:
+
+```text
+Inspect the settings screen and explain how it saves preferences.
+Then add a helpful empty state where no preferences are available.
+Follow the repository instructions and run the relevant checks.
+```
+
+Follow the conversation as the agent inspects files, proposes work, and runs commands. Respond when it asks for input or an approval.
+
+## Review the result
+
+Open the Git changes and inspect the full diff. Check what was validated and what remains unverified. Ask for corrections, or use [Code Review](../workflows/code-review) for an independent pass.
+
+Before delivery, confirm these four things:
+
+- The agent worked in the intended folder and branch.
+- The complete diff contains only the change you requested.
+- The reported checks exercised the behavior you changed.
+- Any unfinished work or unverified behavior is stated clearly.
+
+When the result is ready, ask for the commit or delivery action you want. A completed turn does not imply a commit, push, or deployment. Continue with [Your first task](./first-task) for a fuller walkthrough.

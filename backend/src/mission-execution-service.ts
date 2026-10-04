@@ -419,7 +419,7 @@ export class MissionExecutionService {
     await this.ports.missions.changeAsync(context.missionId, async mission => {
       const workflow = missionWorkflow(mission.workflow.type);
       const run = mission.execution?.runs.find(run => run.id === context.runId);
-      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) throw new Error('This agent does not own an active run for this mission stage.');
+      if (!run || !this.agentTools.ownsWritableRun(mission, run.id, agentId)) throw new Error('This agent does not own an active run for this mission stage.');
       if (run.stage !== 'implementation' && !mission.artifactFiles?.[run.stage]) throw new Error('Write the stage artifact before submitting it for review.');
       const proposal = structuredClone(mission.artifacts);
       if (run.stage === 'implementation') {
@@ -444,6 +444,7 @@ export class MissionExecutionService {
       }
       if (!isMissionArtifacts(proposal)) throw new Error('Mission evidence is too large. Submit a concise report with references.');
       run.proposal = proposal; run.summary = input.summary.trim(); run.status = 'awaitingReview'; run.finishedAt = new Date().toISOString();
+      delete run.error;
       if (run.stage === 'implementation') {
         this.acceptImplementationResult(mission, run);
         await this.persistImplementationArtifact(mission);

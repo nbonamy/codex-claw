@@ -87,7 +87,7 @@
       @edit-agent="openEditAgent"
       @edit-team="openEditTeam"
       @fork-agent="$emit('fork-agent', $event)"
-      @logout="logoutCodex"
+      @handoff-agent="openHandoff"
       @move-agent-to-team="$emit('move-agent-to-team', $event)"
       @new-team="openNewTeam"
       @open-automations="openAutomations"
@@ -126,6 +126,7 @@
         :claude-connection-error="claudeError ?? snapshot.providerConnections?.find(engine => engine.backend === 'claude')?.error"
         :connect-codex="startChatGptLogin"
         :connect-claude="connectClaude"
+        :disconnect-provider="disconnectProvider"
         :cancel-codex-login="cancelChatGptLogin"
         :active-tab="settingsActiveTab"
         :general-settings="snapshot.general"
@@ -197,6 +198,7 @@
         @close-agent="$emit('close-agent', $event)"
         @duplicate-agent="$emit('duplicate-agent', $event)"
         @fork-agent="$emit('fork-agent', $event)"
+        @handoff-agent="openHandoff"
         @edit-agent="openEditAgent"
         @move-agent-to-team="$emit('move-agent-to-team', $event)"
         @prompt-agent="$emit('send-agent-prompt', $event)"
@@ -347,7 +349,7 @@
           <SplitLayoutControl :model-value="split.layout.value" @update:model-value="split.setLayout" />
         </template>
         <template v-if="split.layout.value !== 'single' && props.agentConversationFor && splitActions" #conversation="{ plan, planVisible, closePlan, headerBindingsFor }">
-          <AgentSplitGrid :layout="split.layout.value" :panes="split.panes.value" :focused-pane-id="split.focusedPaneId.value" @focus="split.focus">
+          <AgentSplitGrid :layout="split.layout.value" :panes="split.panes.value" :focused-pane-id="split.focusedPaneId.value" @focus="focusSplitPane">
             <template #header="{ agentId, topRight, topLeft }">
               <AgentHeader v-bind="headerBindingsFor(agentId, topRight, topLeft)" />
             </template>
@@ -450,6 +452,15 @@
       :list-conversations="listAgentConversations"
       :resume-conversation="resumeAgentConversation"
       @close="resumeSessionAgentId = null"
+    />
+    <AgentHandoffDialog
+      v-if="handoffAgent"
+      :agent="handoffAgent"
+      :blocker="agentHandoffBlocker(snapshot, handoffAgent)"
+      :submit="handoffAgentAction"
+      :list-models="listHandoffModels"
+      :read-messages="readConversationMessages"
+      @close="handoffAgentId = null"
     />
     <ModelFavoritesDialog
       :favorites="managedModelFavorites"
@@ -572,6 +583,8 @@ import { preferredBackendChoices, provideBackendChoices, provideBackendSwitch } 
 import CockpitView from './CockpitView.vue';
 import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
+import AgentHandoffDialog from './AgentHandoffDialog.vue';
+import { agentHandoffBlocker, type AgentHandoffInput } from '@codex-claw/core/agent-handoff';
 import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
 import AgentQuickOpen from './AgentQuickOpen.vue';
@@ -752,6 +765,7 @@ const props = withDefaults(defineProps<{
   deleteAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   listAgentConversations?: (agentId: string, input?: ConversationListInput) => Promise<ConversationSummary[]>;
   resumeAgentConversation?: (agentId: string, target: ConversationResumeTarget) => Promise<void>;
+  handoffAgentAction?: (agentId: string, input: AgentHandoffInput) => Promise<void>;
   readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
   connectWorkProvider?: (provider: WorkProviderKind) => Promise<void>;
   openWorkProviderAuthorization?: (provider: WorkProviderKind) => Promise<void>;
@@ -903,6 +917,7 @@ const props = withDefaults(defineProps<{
   deleteAutomation: async () => undefined,
   listAgentConversations: async () => [],
   resumeAgentConversation: async () => undefined,
+  handoffAgentAction: async () => { throw new Error('Handoff is unavailable.'); },
   readConversationMessages: async () => [],
   connectWorkProvider: async () => undefined,
   openWorkProviderAuthorization: async () => undefined,
@@ -1243,6 +1258,12 @@ const newProjectBusy = ref(false);
 const newProjectError = ref<string | null>(null);
 const modelFavoritesDialogBackend = ref<ModelFavorite['backend'] | null>(null);
 const resumeSessionAgentId = ref<string | null>(null);
+const handoffAgentId = ref<string | null>(null);
+const handoffAgent = computed(() => props.snapshot.agents.find(agent => agent.id === handoffAgentId.value) ?? null);
+function openHandoff(agentId: string) { handoffAgentId.value = agentId; }
+async function listHandoffModels(agentId: string, backend: AgentBackend) {
+  return await codexClawApi?.listBackendModels(agentId, backend) ?? [];
+}
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
 const agentDialogTeamId = ref<string | null>(null);
@@ -1263,7 +1284,7 @@ const firstRunOnboarding = useFirstRunOnboarding({
 const {
   claudeAuthentication, claudeConnected, claudeLoading, claudeError, claudeDialogVisible,
   providerSetup, customizedSetup, customizingProvider, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
-  codexConnected, continuing, connectClaude, refreshClaude, continueWithProviders,
+  codexConnected, continuing, connectClaude, disconnectProvider, refreshClaude, continueWithProviders,
   authentication,
   authenticationCancelling,
   authenticationError,
@@ -1276,7 +1297,6 @@ const {
   cancelChatGptLogin,
   finish: finishFirstRunOnboarding,
   load: loadAuthentication,
-  logout: logoutCodex,
   startChatGptLogin,
 } = firstRunOnboarding;
 const teamDialogVisible = ref(false);
@@ -1569,6 +1589,31 @@ function setSplitPanel(agentId: string, instance: unknown): void {
 function focusedConversationPanel() {
   return split.layout.value === 'single' ? agentWorkspace.value : splitPanels.get(split.focusedPane.value.agentId ?? '');
 }
+const pendingComposerFocusAgentId = ref<string | null>(null);
+// A cold conversation has no composer until history hydration replaces its loader.
+// Only navigation requests focus; clicking a split-pane control keeps its focus.
+function focusSplitPane(paneId: number): void {
+  pendingComposerFocusAgentId.value = null;
+  split.focus(paneId);
+}
+watch([
+  pendingComposerFocusAgentId,
+  () => currentAgent.value?.id,
+  () => {
+    const id = pendingComposerFocusAgentId.value;
+    const view = id ? props.agentConversationFor?.(id) : null;
+    return view
+      ? view.history.hydrating || (view.codexSnapshot ?? view.claudeSnapshot)?.historyLoading
+      : props.isConversationLoading;
+  },
+], ([requestedId, activeId, loading]) => {
+  if (!requestedId || requestedId !== activeId || loading) return;
+  void nextTick(() => {
+    if (pendingComposerFocusAgentId.value !== requestedId || currentAgent.value?.id !== requestedId) return;
+    pendingComposerFocusAgentId.value = null;
+    if (activeSurface.value === 'agent' && !isModalDialogVisible.value) focusedConversationPanel()?.focusComposer();
+  });
+}, { flush: 'post' });
 function addFocusedVisualizationAnnotation(annotation: import('./use-visualization-annotations').VisualizationAnnotationInput): void {
   if (split.layout.value === 'single') addVisualizationAnnotation(annotation);
   else splitPanels.get(currentAgent.value?.id ?? '')?.addVisualizationAnnotation(annotation);
@@ -2214,6 +2259,7 @@ async function setEngineEnabled(backend: AgentBackend, enabled: boolean) {
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
   agentDialogVisible.value
+  || handoffAgentId.value !== null
   || modelFavoritesDialogVisible.value
   || newProjectDialogVisible.value
   || teamDialogVisible.value
@@ -2251,6 +2297,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     duplicateAgent: (agentId) => emit('duplicate-agent', agentId),
     editAgent: openEditAgent,
     forkAgent: (agentId) => { if (forkableAgentIds.value.includes(agentId)) emit('fork-agent', agentId); },
+    handoffAgent: openHandoff,
     focusComposer: () => focusedConversationPanel()?.focusComposer(),
     newTeam: openNewTeam,
     openAgentPalette: () => { agentQuickOpenVisible.value = true; },
@@ -2660,18 +2707,21 @@ function selectTeamFromRail(teamId: string): void {
 
 function selectAgentFromShell(agentId: string): void {
   activeSurface.value = 'agent';
+  pendingComposerFocusAgentId.value = agentId;
   split.select(agentId);
   emit('select-agent', agentId);
 }
 
 function selectAgentFromCockpit(payload: { agentId: string; teamId: string }): void {
   activeSurface.value = 'agent';
+  pendingComposerFocusAgentId.value = payload.agentId;
   emit('select-team', payload.teamId);
   emit('select-agent', payload.agentId);
 }
 
 function selectAgentFromPalette(payload: { agentId: string; teamId: string }): void {
   activeSurface.value = 'agent';
+  pendingComposerFocusAgentId.value = payload.agentId;
   if (payload.teamId === activeTeam.value?.id) split.select(payload.agentId);
   if (payload.teamId !== activeTeam.value?.id) emit('select-team', payload.teamId);
   emit('select-agent', payload.agentId);

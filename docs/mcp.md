@@ -755,9 +755,11 @@ path validation remain mandatory boundaries.
 
 ### Mission tools
 
-Mission tools are registered only when the authenticated backend agent owns the
-current running Mission attempt. Ordinary agents do not receive them in their
-tool catalog, and backend ownership checks still reject cached or late calls.
+Mission tools remain registered for authenticated Mission workers across run
+failures, cancellations, acceptance, and stage transitions. Membership comes
+from the worker's recorded assignments, not its current turn or run status.
+Ordinary agents do not receive them. Tool availability permits inspection;
+backend ownership checks separately control mutations and reject stale calls.
 Mission workers do not receive generic thread-flag tools because the Mission
 workflow owns delegation and worktree transitions explicitly.
 
@@ -771,13 +773,13 @@ already represented by a Mission team member. The tool validates the path as a
 Git repository and persists it without exposing a setup form; implementation
 creates the isolated worktree later, when code work begins.
 
-`list-mission-artifacts` and `read-mission-artifact` let any active Mission
+`list-mission-artifacts` and `read-mission-artifact` let any assigned Mission
 worker discover and consume the canonical Markdown created by earlier stages.
 `write-mission-artifact` writes only the caller's assigned stage under the
 Claw-owned Mission home. Existing files use an expected revision so concurrent
 or stale agents cannot silently overwrite each other.
 
-`upsert-mission-ticket` is exposed only to the active Tickets-stage orchestrator.
+`upsert-mission-ticket` accepts writes only from the current Tickets-stage orchestrator.
 It assigns stable Mission ticket IDs, resolves blocking edges against those IDs,
 persists the structured draft, rewrites the canonical Tickets Markdown artifact,
 and publishes the snapshot after every change. Tracker issue numbers are optional
@@ -785,15 +787,20 @@ external references and never serve as the Mission ticket identity.
 
 `submit-mission-result` is an app-owned stage handoff. The active Mission and run
 are inferred from the authenticated worker; volatile Mission and run IDs are not
-model-authored inputs. Only the worker bound to the current running Mission
-attempt may report artifacts, and the canonical stage artifact must already
-exist. Requirements, Tickets, and Review reports become persisted proposals for
+model-authored inputs. Only the worker bound to the current, unsuperseded Mission
+attempt may report artifacts. Requirements, Tickets, and Review require the
+canonical stage artifact to exist and become persisted proposals for
 human review. Tickets may carry canonical tracker references and zero-based
 dependency indices; invalid/cyclic dependencies are rejected. A completed
 implementation report updates only its assigned ticket, appends verification
 evidence, and continues toward the explicit Review stage. Late reports from
-stopped or accepted attempts are rejected because they no longer have an active
-identity-bound context.
+cancelled or accepted attempts are rejected by mutation ownership checks.
+A failed attempt remains recoverable: its worker can read artifacts, continue
+its assigned work, and submit the result on a later turn without restarting the
+Mission. A successful submission clears the old error. A replacement attempt,
+a stage change, or Mission completion prevents the old attempt from writing.
+Historical workers keep read access without receiving obsolete stage execution
+instructions.
 
 ### Visualize canvas tools
 

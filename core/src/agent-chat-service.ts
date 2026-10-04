@@ -1,12 +1,15 @@
 import type { AgentStatus, AppSnapshot, SendPromptOptions } from './contracts';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from './backend-driver';
 import { backendDisplayName } from './backend-driver';
+import { handoffInProgress } from './agent-handoff';
 
 export type AgentChatEventEmitter = (
   event: BackendEvent,
 ) => void;
 
 export type SendAgentPromptHooks = {
+  /** Backend-owned handoff transaction only; never exposed as a prompt option. */
+  handoff?: boolean;
   appendUserMessage?: boolean;
   onBackendSessionUpdated?: (result: BackendSendResult, wasNewSession: boolean) => void | Promise<void>;
   onPromptFailed?: (error: Error) => void | Promise<void>;
@@ -23,6 +26,7 @@ export function sendAgentPrompt(
   hooks?: SendAgentPromptHooks,
 ): AppSnapshot {
   const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
+  if (agent && handoffInProgress(agent) && !hooks?.handoff) throw new Error('Wait for the handoff to finish.');
   const trimmedPrompt = prompt.trim();
   const hasAttachments = (options?.attachments?.length ?? 0) > 0;
   if (!agent || (!trimmedPrompt && !hasAttachments) || isBusy(agent.status)) {

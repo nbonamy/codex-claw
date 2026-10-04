@@ -84,6 +84,31 @@ describe('ClaudeBackendDriver', () => {
     await driver.close();
   });
 
+  it('reads the completed handoff turn from its live replica and waits for session closure', async () => {
+    const transport = createFakeTransport();
+    const historyLoader = vi.fn().mockResolvedValue(null);
+    const driver = new ClaudeBackendDriver(transport, historyLoader);
+    const started = driver.sendPrompt(agent, 'write a handoff note');
+    transport.emit({ type: 'system', subtype: 'init', session_id: 'handoff-session' });
+    const result = await started;
+    await expect(driver.assertHandoffReady(agent)).rejects.toThrow('Claude turn');
+    transport.emit({ type: 'assistant', session_id: 'handoff-session', message: { content: [{ type: 'text', text: 'Continue the fix.' }] } });
+    transport.emit({ type: 'result', subtype: 'success', session_id: 'handoff-session', is_error: false });
+    await expect(driver.assertHandoffReady(agent)).resolves.toBeUndefined();
+    const messages = await driver.readConversationMessages({ backend: 'claude', sessionId: 'handoff-session', folder: agent.folder }, agent.id);
+    expect(messages).toContainEqual(expect.objectContaining({ turnId: result.turnId, role: 'assistant', status: 'complete', parts: expect.arrayContaining([expect.objectContaining({ type: 'text', text: 'Continue the fix.' })]) }));
+    expect(historyLoader).not.toHaveBeenCalled();
+    let finishClose!: () => void;
+    transport.closeSession.mockImplementationOnce(() => new Promise<void>(resolve => { finishClose = resolve; }));
+    let released = false;
+    const closed = driver.releaseConversation(agent.id).then(() => { released = true; });
+    await Promise.resolve();
+    expect(released).toBe(false);
+    finishClose();
+    await closed;
+    expect(released).toBe(true);
+    await driver.close();
+  });
   it('loads models and starts a folderless Quick Chat', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

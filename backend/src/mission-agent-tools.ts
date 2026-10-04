@@ -22,11 +22,15 @@ export class MissionAgentTools {
   ) {}
 
   contextForAgent(agentId: string): MissionToolContext | undefined {
+    let historicalContext: MissionToolContext | undefined;
     for (const mission of this.ports.snapshot.missions ?? []) {
-      const run = mission.execution?.runs.find(run => (
-        run.workerId === agentId && ['running', 'awaitingReview'].includes(run.status) && run.stage === mission.stage
-      ));
-      if (run) return { missionId: mission.id, runId: run.id, stage: run.stage };
+      // Membership outlives a turn or run. Mutation guards below still enforce ownership.
+      const run = mission.execution?.runs.slice().reverse().find(run => run.workerId === agentId);
+      if (run) {
+        const context = { missionId: mission.id, runId: run.id, stage: run.stage };
+        if (run.stage === mission.stage) return context;
+        historicalContext ??= context;
+      }
       if (mission.stage !== 'review') continue;
       const remediationRepository = mission.artifacts.review.findings?.find(finding => (
         finding.remediation.state === 'fixing' && this.implementationWorkerId(mission, finding.repositoryPath) === agentId
@@ -37,7 +41,18 @@ export class MissionAgentTools {
       ));
       if (reviewRun) return { missionId: mission.id, runId: reviewRun.id, stage: 'review' };
     }
-    return undefined;
+    return historicalContext;
+  }
+
+  ownsWritableRun(mission: Mission, runId: string, agentId: string): boolean {
+    const runs = mission.execution?.runs ?? [];
+    const index = runs.findIndex(run => run.id === runId);
+    const run = runs[index];
+    if (!run || run.workerId !== agentId || mission.status === 'completed' || run.stage !== mission.stage
+      || !['running', 'awaitingReview', 'failed'].includes(run.status)) return false;
+    // A failed assignment can recover, but cannot supersede a replacement or a newer ticket for this worker.
+    return !runs.slice(index + 1).some(candidate => candidate.stage === run.stage
+      && (run.stage !== 'implementation' || candidate.ticketIndex === run.ticketIndex || candidate.workerId === agentId));
   }
 
   developerInstructionsForAgent(agentId: string): string | undefined {
@@ -45,6 +60,7 @@ export class MissionAgentTools {
     if (!context) return undefined;
     const mission = this.requireMission(context.missionId);
     const run = mission.execution!.runs.find(candidate => candidate.id === context.runId)!;
+    if (run.workerId === agentId && !this.ownsWritableRun(mission, run.id, agentId)) return undefined;
     return missionDeveloperInstructions(mission, run, missionTeamRepositories(this.ports.snapshot, mission));
   }
 
@@ -78,7 +94,7 @@ export class MissionAgentTools {
     if (input.stage === 'implementation') throw new Error('Submit implementation evidence with the assigned ticket result.');
     const result = await this.ports.missions.changeAsync(context.missionId, async current => {
       const run = current.execution?.runs.find(run => run.id === context.runId);
-      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== input.stage) {
+      if (!run || !this.ownsWritableRun(current, run.id, agentId) || run.stage !== input.stage) {
         throw new Error('This agent is not working on the active mission stage.');
       }
       const currentRevision = current.artifactFiles?.[input.stage]?.revision ?? 0;
@@ -115,7 +131,7 @@ export class MissionAgentTools {
     await this.ports.validateRepository(repositoryPath);
     const result = await this.ports.missions.changeAsync(context.missionId, async mission => {
       const run = mission.execution?.runs.find(candidate => candidate.id === context.runId);
-      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== 'tickets' || mission.stage !== 'tickets') {
+      if (!run || !this.ownsWritableRun(mission, run.id, agentId) || run.stage !== 'tickets') {
         throw new Error('This agent is not working on the active Tickets stage.');
       }
       const drafts = structuredClone(run.draftTickets ?? []);
@@ -160,7 +176,7 @@ export class MissionAgentTools {
     if (!context) throw new Error('This agent is not working on an active mission run.');
     await this.ports.missions.change(context.missionId, mission => {
       const run = mission.execution?.runs.find(run => run.id === context.runId);
-      if (!run || run.workerId !== agentId || !['running', 'awaitingReview'].includes(run.status) || run.stage !== mission.stage) {
+      if (!run || !this.ownsWritableRun(mission, run.id, agentId)) {
         throw new Error('This agent is not working on an active mission run.');
       }
       mission.outcome = normalized;
@@ -173,6 +189,7 @@ export class MissionAgentTools {
     const context = this.requireContext(agentId);
     const normalized = repoPath.trim();
     const mission = this.requireMission(context.missionId);
+    if (!this.ownsWritableRun(mission, context.runId, agentId)) throw new Error('This agent is not working on an active mission run.');
     await this.executeMission({ id: mission.id, revision: mission.revision, action: 'attachRepository', repoPath: normalized });
     return { success: true, repoPath: normalized };
   }
@@ -264,8 +281,7 @@ export class MissionAgentTools {
 
   private ownsReviewRun(mission: Mission, runId: string, agentId: string): boolean {
     const run = mission.execution?.runs.find(candidate => candidate.id === runId);
-    return !!run && run.workerId === agentId && run.stage === 'review'
-      && ['running', 'awaitingReview'].includes(run.status) && mission.stage === 'review';
+    return !!run && run.stage === 'review' && this.ownsWritableRun(mission, runId, agentId);
   }
 
   private implementationWorkerId(mission: Mission, repositoryPath: string): string | undefined {

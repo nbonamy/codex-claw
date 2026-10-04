@@ -112,6 +112,10 @@ export type AgentGitWorkflow = {
   warning?: {
     type: 'worktreeFolderRetained';
     folder: string;
+  } | {
+    type: 'branchRetained';
+    branch: string;
+    folder?: string;
   };
 };
 

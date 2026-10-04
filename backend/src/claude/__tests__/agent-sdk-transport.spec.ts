@@ -87,6 +87,29 @@ describe('ClaudeAgentSdkTransport', () => {
     } finally { await transport.close(); }
   });
 
+  it.each(['release', 'steered interruption'] as const)('waits for SDK iterator cleanup before reporting %s complete', async (operation) => {
+    const harness = createQueryHarness();
+    const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery, createSessionId: () => 'handoff-session' });
+    const turn = transport.startTurn({ cwd: '/tmp/project', prompt: 'note' }, () => undefined);
+    await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
+    if (operation === 'release') {
+      harness.emit({ type: 'result', subtype: 'success', session_id: 'handoff-session', is_error: false });
+      await turn.done;
+    } else {
+      await turn.steer?.('queued update');
+    }
+    let finish!: () => void;
+    const returned = vi.fn(() => new Promise<IteratorResult<never, void>>(resolve => { finish = () => resolve({ done: true, value: undefined }); }));
+    Object.assign(harness.runtimes[0]!, { return: returned });
+    let closed = false;
+    const closing = (operation === 'release' ? transport.closeSession('handoff-session') : turn.interrupt()).then(() => { closed = true; });
+    await Promise.resolve();
+    expect(closed).toBe(false);
+    expect(returned).toHaveBeenCalledOnce();
+    finish();
+    await closing;
+    await transport.close();
+  });
   it('returns structured automation selection without tools or a persisted conversation', async () => {
     const harness = createQueryHarness();
     const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });

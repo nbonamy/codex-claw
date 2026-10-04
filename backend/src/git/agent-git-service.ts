@@ -566,10 +566,20 @@ export class AgentGitService {
     if (switchTargetBranch) await this.runGit(current.folder, ['switch', targetBranch]);
     await this.runGit(targetFolder, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', '--no-ff', current.branch]);
     if (strategy === 'squash') await this.runGit(targetFolder, ['commit', '-m', normalizedCommitMessage!]);
-    const warning = deleteWorktree
+    let warning = deleteWorktree
       ? await this.removeMergedWorktree(targetFolder, current.folder)
       : undefined;
-    if (deleteBranch) await this.runGit(targetFolder, ['branch', strategy === 'squash' ? '-D' : '-d', current.branch]);
+    if (deleteBranch) {
+      try {
+        // Git's -d checks the upstream, which may lag behind the successful local merge.
+        if (strategy === 'merge') {
+          await this.runGit(targetFolder, ['merge-base', '--is-ancestor', current.branch, 'HEAD']);
+        }
+        await this.runGit(targetFolder, ['branch', '-D', current.branch]);
+      } catch {
+        warning = { type: 'branchRetained', branch: current.branch, ...(warning ? { folder: warning.folder } : {}) };
+      }
+    }
     return { targetFolder, ...(warning ? { warning } : {}) };
   }
 

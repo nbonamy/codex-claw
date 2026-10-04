@@ -131,17 +131,15 @@ describe('SettingsMenu', () => {
     expect(wrapper.findAll('.app-menu__item')).not.toHaveLength(0);
   });
 
-  it('always exposes logout in the lower-left menu and emits menu actions', async () => {
+  it('offers navigation and quit, without a provider log-out action', async () => {
     setElectronTestClient({});
     const wrapper = mountMenu();
 
     await openMenu(wrapper);
     const actions = wrapper.findAll('.app-menu__item');
-    expect(actions.map((button) => button.get('.app-menu__label').text())).toStrictEqual(['Settings', 'What’s New', 'Log out', 'Quit']);
+    expect(actions.map((button) => button.get('.app-menu__label').text())).toStrictEqual(['Settings', 'What’s New', 'Quit']);
     expect(actions[0]?.get('.app-menu__value').text()).toBe('⌘,');
-    expect(actions[2]?.classes()).not.toContain('app-menu__item--danger');
-    await actions[2]?.trigger('click');
-    await openMenu(wrapper);
+    expect(actions[2]?.classes()).toContain('app-menu__item--danger');
     await wrapper.findAll('button').find((button) => button.text() === 'What’s New')?.trigger('click');
     await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => {
@@ -151,13 +149,12 @@ describe('SettingsMenu', () => {
     await openMenu(wrapper);
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
 
-    expect(wrapper.emitted('logout')).toStrictEqual([[]]);
     expect(wrapper.emitted('open-whats-new')).toStrictEqual([[]]);
     expect(wrapper.emitted('open-settings')).toStrictEqual([[]]);
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
 
-  it('omits the Codex account header while preserving menu actions', async () => {
+  it('omits the Codex account header', async () => {
     const wrapper = mountMenu(undefined, {
       account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
     });
@@ -166,9 +163,6 @@ describe('SettingsMenu', () => {
     expect(wrapper.text()).not.toContain('nico@example.com');
     expect(wrapper.text()).not.toContain('pro');
     expect(wrapper.get('[aria-label="Account menu"]').element).toBeInstanceOf(HTMLElement);
-    await wrapper.findAll('button').find((button) => button.text() === 'Log out')?.trigger('click');
-
-    expect(wrapper.emitted('logout')).toStrictEqual([[]]);
   });
 
   it('marks the trigger active when settings is selected', () => {

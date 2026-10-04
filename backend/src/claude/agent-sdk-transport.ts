@@ -44,7 +44,7 @@ export type ClaudeAgentSdkTransportOptions = {
 export type ClaudeQueryRuntime = AsyncIterable<SDKMessage> & Pick<Query,
   'close' | 'interrupt' | 'setModel' | 'setPermissionMode'
   | 'applyFlagSettings' | 'supportedModels' | 'initializationResult' | 'getContextUsage'
->;
+> & Partial<Pick<Query, 'return'>>;
 
 export type ClaudeQueryFactory = (input: {
   prompt: AsyncIterable<SDKUserMessage>;
@@ -173,7 +173,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         // interrupt() alone can leave queued user messages runnable in the SDK.
         if (activeTurn.steered) {
           this.resolveTurn(session);
-          this.closeSessionRecord(session, 'Claude steered turn was interrupted.');
+          await this.closeSession(session.sessionId);
           return;
         }
         await session.query.interrupt();
@@ -201,6 +201,8 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     this.closeSessionRecord(session, 'Claude session released.');
+    // Query.return() awaits the SDK's bounded subprocess cleanup; close() alone initiates it.
+    await session.query.return?.();
   }
 
   async deleteSession(sessionId: string, cwd: string): Promise<void> {

@@ -6,6 +6,22 @@ import { claudeConfigDirectoryOverride } from './config-directory';
 
 const run = promisify(execFile);
 
+/** Let Claude remove its own credentials from the same home used for sign-in. */
+export async function logoutLocalClaude(): Promise<ClaudeAuthentication> {
+  const configDirectory = claudeConfigDirectoryOverride();
+  try {
+    await run(process.env.CODEX_CLAW_CLAUDE_COMMAND || 'claude', ['auth', 'logout'], {
+      env: withDiscoveredRuntimePath({ CLAUDE_CONFIG_DIR: configDirectory }),
+      timeout: 15_000,
+      maxBuffer: 64 * 1024,
+      encoding: 'utf8',
+    });
+  } catch {
+    throw new Error('Could not sign out of Claude Code. Please try again.');
+  }
+  return { loggedIn: false, configDirectory: configDirectory ?? null };
+}
+
 /** Return only safe account metadata, never credential material or raw CLI output. */
 export async function getLocalClaudeAuthentication(): Promise<ClaudeAuthentication> {
   const configDirectory = claudeConfigDirectoryOverride();

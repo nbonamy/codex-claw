@@ -48,6 +48,7 @@ type AppShellCommandOptions = {
     duplicateAgent: (agentId: string) => void;
     editAgent: (agentId: string) => void;
     forkAgent: (agentId: string) => void;
+    handoffAgent?: (agentId: string) => void;
     focusComposer: () => void;
     newTeam: () => void;
     openAgentSurface: () => void;
@@ -510,6 +511,10 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       if (isAgentWorkspaceVisible.value && agent?.status.type === 'idle' && agent.backendSession) {
         options.actions.forkAgent(agent.id);
       }
+      return;
+    }
+    if (command.type === 'handoff-active-agent') {
+      if (isAgentWorkspaceVisible.value && currentAgent.value) options.actions.handoffAgent?.(currentAgent.value.id);
       return;
     }
 
