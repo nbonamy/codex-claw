@@ -322,7 +322,13 @@ const props = defineProps<{
 
 
 const { t } = useI18n();
-const backlog = useWorkSourceBacklog({ location: () => props.location, preferredSourceId: () => props.repositoryId, enabled: () => props.visible });
+const backlog = useWorkSourceBacklog({
+  location: () => props.location,
+  query: { kind: 'all', state: 'all' },
+  preferredSourceId: () => props.repositoryId,
+  restrictToRepository: () => true,
+  enabled: () => props.visible,
+});
 const { items, status, error } = backlog;
 const kindFilter = ref<'issue' | 'pullRequest'>('issue');
 const stateFilter = ref<'open' | 'closed' | 'all'>('open');

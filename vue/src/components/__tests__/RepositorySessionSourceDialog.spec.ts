@@ -76,14 +76,14 @@ describe('RepositorySessionSourceDialog', () => {
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
     await flushPromises();
     expect(wrapper.get<HTMLSelectElement>('[aria-label="Team / project"] select').element.value).toBe('linear:eng');
-    expect(api.listWorkItems).toHaveBeenCalledWith('linear', 'linear:eng', location, { kind: 'all', state: 'all' });
+    expect(api.listWorkItems).toHaveBeenCalledWith('linear', 'linear:eng', location, { kind: 'issue', state: 'open' });
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:ops');
     await flushPromises();
     resolveOld([{ ...item, identifier: 'ENG-24', sourceId: 'linear:eng' }]);
     await flushPromises();
     expect(wrapper.text()).toContain('OPS-24');
     expect(wrapper.text()).not.toContain('ENG-24');
-    expect(api.listWorkItems).toHaveBeenLastCalledWith('linear', 'linear:ops', location, { kind: 'all', state: 'all' });
+    expect(api.listWorkItems).toHaveBeenLastCalledWith('linear', 'linear:ops', location, { kind: 'issue', state: 'open' });
     await wrapper.get('.repository-session-source-dialog__result').trigger('click');
     expect(wrapper.get('.work-item-detail').text()).toContain('Issue details');
     expect(wrapper.get('input[aria-label="Branch"]').element).toHaveProperty('value', 'fix/ops-24');
@@ -223,6 +223,7 @@ describe('RepositorySessionSourceDialog', () => {
         repositoryName: 'codex-claw',
         branches,
         workItems: [issue],
+        selectedRepositoryId: issue.sourceId,
         sessions: [{ agentId: 'agent-main', label: 'main · main' }],
       },
     });
@@ -253,6 +254,7 @@ describe('RepositorySessionSourceDialog', () => {
         repositoryName: 'codex-claw',
         branches,
         workItems: [issue],
+        selectedRepositoryId: issue.sourceId,
       },
     });
     await flushPromises();

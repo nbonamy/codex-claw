@@ -49,6 +49,7 @@ export function useRepositorySession(options: {
   const visible = ref(false);
   const branches = ref<SourceBranch[]>([]);
   const workItems = ref<WorkItem[]>([]);
+  const workSourceId = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const assignmentState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -86,6 +87,7 @@ export function useRepositorySession(options: {
     visible.value = true;
     branches.value = [];
     workItems.value = [];
+    workSourceId.value = null;
     error.value = null;
     assignmentState.value = 'idle';
     assignmentError.value = null;
@@ -98,14 +100,19 @@ export function useRepositorySession(options: {
       try {
         const repositories = await options.loadWorkRepositories(location);
         if (requestId !== sourceRequestId) return;
-        const workRepository = (repositories.length > 0 ? repositories : options.getWorkRepositories())
-          .find((repository) => (
+        const matchingRepositories = (repositories.length > 0 ? repositories : options.getWorkRepositories())
+          .filter((repository) => (
             repository.name === nextSource.repositoryName ||
             repository.fullName.endsWith(`/${nextSource.repositoryName}`)
           ));
-        if (workRepository) workItems.value = await options.loadWorkItems(workRepository.id, location);
+        const workRepository = matchingRepositories.length === 1 ? matchingRepositories[0] : undefined;
+        if (workRepository) {
+          workSourceId.value = workRepository.id;
+          const loadedItems = await options.loadWorkItems(workRepository.id, location);
+          if (requestId === sourceRequestId) workItems.value = loadedItems;
+        }
       } catch {
-        workItems.value = [];
+        if (requestId === sourceRequestId) workItems.value = [];
       }
     } catch (caught) {
       if (requestId !== sourceRequestId) return;
@@ -119,6 +126,7 @@ export function useRepositorySession(options: {
     sourceRequestId += 1;
     visible.value = false;
     source.value = null;
+    workSourceId.value = null;
     loading.value = false;
     error.value = null;
     assignmentState.value = 'idle';
@@ -316,6 +324,7 @@ export function useRepositorySession(options: {
     suggestWorktreePath,
     visible,
     workItems,
+    workSourceId,
     worktreeBranches,
     worktreeBranchesLoading,
     worktreeRepository,

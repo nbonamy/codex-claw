@@ -115,7 +115,7 @@ describe('AppShell work routing', () => {
       { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
       { name: 'feat/work-routing', isDefault: false },
     ]);
-    const loadWorkItems = vi.fn().mockResolvedValue([issue]);
+    const loadWorkItems = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([issue]);
     const createSourceWorktree = vi.fn().mockResolvedValue({
       name: 'work-routing',
       path: '/Users/nbonamy/src/codex-claw-work-routing',
@@ -169,7 +169,8 @@ describe('AppShell work routing', () => {
       state: 'open',
     });
     expect(sourceDialog.props('branches')).toHaveLength(2);
-    expect(sourceDialog.props('workItems')).toStrictEqual([issue]);
+    expect(sourceDialog.props('workItems')).toStrictEqual([]);
+    expect(sourceDialog.props('selectedRepositoryId')).toBe(githubRepository.id);
     expect(sourceDialog.props('sessions')).toStrictEqual([
       { agentId: 'agent-dina', label: 'Dina · main' },
       { agentId: 'agent-jesse', label: 'Jesse · main' },

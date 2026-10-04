@@ -187,7 +187,9 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const backlog = useWorkSourceBacklog({
   location: () => props.location,
-  preferredSourceId: () => props.selectedRepositoryId ?? props.workItems[0]?.sourceId ?? null,
+  query: { kind: 'issue', state: 'open' },
+  preferredSourceId: () => props.selectedRepositoryId,
+  restrictToRepository: () => props.purpose === 'session',
   acceptsSource: source => props.sourceFilter?.(source) ?? true,
   enabled: () => props.visible,
 });

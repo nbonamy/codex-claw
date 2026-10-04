@@ -368,14 +368,15 @@ const scopedAssignments = computed(() => Object.values(props.assignments).filter
   return !props.selectedRepositoryId || assignment.itemId.startsWith(`${props.selectedRepositoryId}#`);
 }));
 const scopedActiveAssignments = computed(() => scopedAssignments.value.filter(isActiveAssignment));
-const totalAssignmentCount = computed(() => props.globalScope
+const hasGlobalTotal = computed(() => Boolean(props.globalScope) && props.totalItems !== undefined);
+const totalAssignmentCount = computed(() => hasGlobalTotal.value
   ? scopedActiveAssignments.value.length
   : filteredRows.value.filter((row) => isActiveAssignment(row.assignment)).length);
-const totalFocusCount = computed(() => props.globalScope
+const totalFocusCount = computed(() => hasGlobalTotal.value
   ? scopedActiveAssignments.value.filter((assignment) => assignment.status === 'blocked' || assignment.status === 'readyForReview').length
   : filteredRows.value.filter((row) => isActiveAssignment(row.assignment) && (row.priority === 'attention' || row.priority === 'review')).length);
 const effectiveTotalItems = computed(() => props.globalScope ? props.totalItems ?? filteredRows.value.length : filteredRows.value.length);
-const totalBacklogCount = computed(() => props.globalScope
+const totalBacklogCount = computed(() => hasGlobalTotal.value
   ? Math.max(0, effectiveTotalItems.value - scopedActiveAssignments.value.length)
   : filteredRows.value.filter((row) => !row.assignment).length);
 const viewContextKey = computed(() => `${props.connection.provider}:${props.selectedRepositoryId ?? `global:${props.globalScope ?? 'unselected'}`}`);

@@ -383,6 +383,7 @@
       :repository-name="repositorySessionSource?.repositoryName ?? ''"
       :branches="repositorySessionSourceBranches"
       :work-items="repositorySessionSourceWorkItems"
+      :selected-repository-id="repositorySession.workSourceId.value"
       :loading="repositorySessionSourceLoading"
       :error="repositorySessionSourceError"
       :sessions="repositorySessionAssignmentSessions"
