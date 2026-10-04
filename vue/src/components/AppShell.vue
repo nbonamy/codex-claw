@@ -2073,8 +2073,7 @@ const conversationPaneState: CodexConversationPaneState = {
       return translate('surface.appShell.askForFollowUpChanges');
     },
     get approvalPreset() { return props.approvalPreset; },
-    get leadingMenuItems() { return permissionModeMenuItems.value; },
-    get menuItems() { return conversationCommandMenuItems(); },
+    get leadingMenuItems() { return [...permissionModeMenuItems.value, ...conversationCommandMenuItems()]; },
     get modelMenuItems() { return modelFavoriteMenuItems.value; },
     get planMode() { return props.planMode; },
     get selectedModelId() { return props.selectedModelId; },

@@ -15,6 +15,7 @@ export function conversationCommandMenuItems(): CodexComposerMenuItem[] {
       label: translate(`chat.composerActions.${command}`), icon,
       payload: { kind: 'claw-command', command },
     })),
+    { id: 'claw-command-modes', type: 'separator' },
   ];
 }
 

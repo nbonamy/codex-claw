@@ -10,7 +10,8 @@ import { ElRadio, ElRadioGroup } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
 import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
 import type { CodexClawApi, RendererMessage } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
@@ -1105,7 +1106,14 @@ describe('AppShell authentication and conversation', () => {
     const draft = { text: 'Keep this draft', selectionStart: 4, selectionEnd: 4 };
     const attachment: CodexNativeAttachment = { id: 'notes', type: 'file', reference: '/tmp/notes.txt', name: 'notes.txt', mimeType: 'text/plain', size: 10 };
     const wrapper = mountRealShell({ realConversationPane: true, sendPromptAction, startVisualize, composerState: draft, composerAttachments: [attachment] });
+    await wrapper.setProps({ backendCapabilities: codexBackendCapabilities, backendCommands: defaultBackendCommands('codex'), approvalPreset: 'ask-for-approval' });
     await wrapper.get('button[aria-label="Composer actions"]').trigger('click');
+    if (label === 'Review') {
+      expect(wrapper.findAll('.chat-composer-action-menu [role="menuitem"], .chat-composer-action-menu [role="menuitemcheckbox"], .chat-composer-action-menu [role="separator"]')
+        .map(row => row.attributes('role') === 'separator' ? '---' : row.text())).toStrictEqual([
+        'Approval', '---', 'Review', 'Delegate', 'Visualize', '---', 'Goal mode', 'Plan mode', '---', 'Add Files & Photos',
+      ]);
+    }
     const item = wrapper.findAll('[role="menuitem"]').find(item => item.text() === label);
     expect(item, `${label} menu item`).toBeDefined();
     await item!.trigger('click');
@@ -1700,7 +1708,6 @@ describe('AppShell authentication and conversation', () => {
     });
 
     expect(conversationControllerState(wrapper).capabilities?.approvalPresets).toStrictEqual([]);
-    expect(conversationControllerState(wrapper).composer?.leadingMenuItems?.map((item) => item.id)).toStrictEqual(['backend-permissions']);
     expect(conversationControllerState(wrapper).composer?.leadingMenuItems?.find((item) => item.id === 'backend-permissions')).toEqual(
       expect.objectContaining({
         id: 'backend-permissions',
