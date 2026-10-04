@@ -2786,6 +2786,7 @@ export class ClawBackendServer {
       clientState: this.clientStateFromSnapshot(snapshot),
     };
     this.onEvent?.(event);
+    this.onBackendEventApplied?.(event);
   }
 
   private backendDriverForAgent(agent: Agent): AgentBackendDriver {

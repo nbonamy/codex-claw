@@ -94,7 +94,13 @@ describe('durable tasks through authenticated MCP and real provider adapters', (
     expect(f.codex.conversation('codex-parent').handle.sendMessage).not.toHaveBeenCalled();
   });
 
-  it.each(['completed', 'interrupted'] as const)('keeps wait-tasks pending after idle until the submitting turn is authoritatively %s', async outcome => {
+  it.each([
+    { outcome: 'completed', followUp: false },
+    { outcome: 'interrupted', followUp: false },
+    { outcome: 'completed', followUp: true },
+    { outcome: 'interrupted', followUp: true },
+    { outcome: 'failed', followUp: true },
+  ] as const)('settles the submitting turn as $outcome after idle (newer turn: $followUp)', async ({ outcome, followUp }) => {
     const f = await setup('codex');
     const created = await f.call(f.parent.id, 'create-agent', { repoPath: '/repo', backend: 'codex', prompt: 'Write bonjour', requestId: 'outcome-order', task: { title: 'French readme', doneWhen: 'Verified' } });
     const task = created.structuredContent.task as DelegatedTask;
@@ -107,11 +113,26 @@ describe('durable tasks through authenticated MCP and real provider adapters', (
     const pending = await waiting;
     expect(pending.timedOut).toBe(true);
     expect(pending.tasks[0]).toMatchObject({ state: 'running', attemptId: task.attemptId, submission });
+    if (followUp) {
+      worker.handle.sendMessage.mockImplementationOnce(async () => {
+        worker.setSnapshot({ activeTurnId: 'follow-up-turn', busy: true });
+        worker.emit({ ...f.metadata, turnId: 'follow-up-turn', type: 'turn.started', payload: { turn: { id: 'follow-up-turn', status: 'inProgress', items: [], error: null } } } as never);
+        return worker.handle.getSnapshot();
+      });
+      const sent = await f.server.handleMessage({ jsonrpc: '2.0', id: 2, method: backendMethods.agentPromptSend, params: { agentId: task.workerAgentId, prompt: 'Inspect the result' } });
+      expect(sent).not.toHaveProperty('error');
+      await vi.waitFor(() => expect(f.tasks.list(f.parent.id)[0]!.executionTurnId).toBe('follow-up-turn'));
+    }
     const terminal = f.tasks.wait(f.parent.id, { taskIds: [task.id], mode: 'all', timeoutMs: 1000 });
     worker.emit({ ...f.metadata, type: 'turn.completed', payload: { status: outcome, error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null } });
     const settled = await terminal;
     expect(settled.timedOut).toBe(false);
     expect(settled.tasks[0]).toMatchObject({ state: outcome, attemptId: task.attemptId, submission });
+    if (followUp) {
+      expect(settled.tasks[0]!.executionTurnId).toBe('follow-up-turn');
+      expect(f.snapshot.agents.find(agent => agent.id === task.workerAgentId)!.status.type).toBe('working');
+    }
+    expect((await f.store.loadTasks())[0]).toMatchObject({ state: outcome, submission });
     if (outcome === 'completed') await vi.waitFor(() => expect(f.tasks.list(f.parent.id)[0]!.delivery?.state).toBe('accepted'));
     else expect(f.tasks.list(f.parent.id)[0]!.delivery).toBeUndefined();
   });
@@ -120,6 +141,31 @@ describe('durable tasks through authenticated MCP and real provider adapters', (
     const f = await setup('codex');
     f.snapshot.agents.splice(f.snapshot.agents.indexOf(f.parent), 1);
     await expect(f.server.sendTaskPrompt(f.parent, 'Saved results')).rejects.toThrow('removed');
+    expect(f.codex.conversation('codex-parent').handle.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each(['agent', 'team'] as const)('interrupts retained assignments when the worker is removed through %s deletion', async removal => {
+    const f = await setup('codex');
+    if (removal === 'team') {
+      const createdTeam = await f.server.handleMessage({ jsonrpc: '2.0', id: 1, method: backendMethods.teamCreate, params: { input: { name: 'Remaining team', color: '#1B4FB2' } } });
+      expect(createdTeam).not.toHaveProperty('error');
+    }
+    const created = await f.call(f.parent.id, 'create-agent', { repoPath: '/repo', backend: 'codex', prompt: 'Perform the assignment', requestId: 'removed-worker', task: { title: 'Assignment', doneWhen: 'Verified' } });
+    const task = created.structuredContent.task as DelegatedTask;
+    await f.call(task.workerAgentId, 'complete-task', { summary: 'Provisional result', evidence: ['Checked'], artifacts: ['result.txt'], caveats: [] });
+    const submission = f.tasks.list(f.parent.id)[0]!.submission;
+    expect(submission).toBeDefined();
+    const waiting = f.tasks.wait(f.parent.id, { taskIds: [task.id], timeoutMs: 1000 });
+    const deleted = await f.server.handleMessage({ jsonrpc: '2.0', id: 2,
+      method: removal === 'agent' ? backendMethods.agentDelete : backendMethods.teamDelete,
+      params: removal === 'agent' ? { agentId: task.workerAgentId } : { teamId: f.parent.teamId },
+    });
+    expect(deleted).not.toHaveProperty('error');
+    expect(f.snapshot.agents.some(agent => agent.id === task.workerAgentId)).toBe(false);
+    const settled = await waiting;
+    expect(settled.timedOut).toBe(false);
+    expect(settled.tasks[0]).toMatchObject({ id: task.id, workerAgentId: task.workerAgentId, state: 'interrupted', submission });
+    expect((await f.store.loadTasks())[0]).toEqual(settled.tasks[0]);
     expect(f.codex.conversation('codex-parent').handle.sendMessage).not.toHaveBeenCalled();
   });
 

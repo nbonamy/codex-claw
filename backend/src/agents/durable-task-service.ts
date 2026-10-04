@@ -244,7 +244,7 @@ export class DurableTaskService {
     if (!event.agentId) return;
     const agentId = event.agentId;
     const latestTurn = this.latestTurns.get(agentId);
-    if (view.type === 'turn.completed' && latestTurn && view.turnId !== latestTurn) return;
+    const olderCompletion = view.type === 'turn.completed' && latestTurn !== undefined && view.turnId !== latestTurn;
     if (view.type === 'turn.started' && view.turnId) {
       this.turns.set(agentId, view.turnId);
       this.latestTurns.set(agentId, view.turnId);
@@ -256,12 +256,15 @@ export class DurableTaskService {
       const payload = view.payload as { status?: string; turn?: { status?: string }; type?: string };
       const outcome = payload.status ?? payload.turn?.status;
       for (const task of tasks) {
-        if (task.parentAgentId === agentId) {
+        if (task.parentAgentId === agentId && !olderCompletion) {
           if (view.type === 'turn.started') { task.parentWakeBlocked = false; task.parentStopRequested = false; }
           if (view.type === 'turn.completed' && outcome === 'completed' && !task.parentStopRequested) task.parentWakeBlocked = false;
           if (view.type === 'turn.completed' && outcome !== 'completed') task.parentWakeBlocked = true;
         }
         if (task.workerAgentId !== agentId || terminal(task)) continue;
+        // Readiness can release a newer turn before the submitting turn's outcome arrives.
+        // Only that saved submission may settle from an older completion.
+        if (olderCompletion && task.submission?.turnId !== view.turnId) continue;
         if (view.type === 'agent.statusChanged' && payload.type === 'awaitingInput') task.state = 'needs-input';
         if (view.type === 'agent.statusChanged' && payload.type === 'working' && this.turns.has(agentId)) task.state = 'running';
         if (view.type === 'agent.statusChanged' && payload.type === 'error') {

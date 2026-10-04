@@ -259,12 +259,4 @@ describe('durable assignment lifecycle', () => {
     expect(f.send).toHaveBeenCalledTimes(2);
   });
 
-  it('surfaces removal of a worker without losing its assignment', async () => {
-    const f = fixture();
-    const task = await f.create();
-    f.agents.splice(1, 1);
-    f.event(f.parent.id, 'snapshot.updated', undefined, {});
-    await vi.waitFor(() => expect(f.disk()[0]!.state).toBe('interrupted'));
-    expect(f.service.list(f.parent.id)[0]!.workerAgentId).toBe(task.workerAgentId);
-  });
 });
