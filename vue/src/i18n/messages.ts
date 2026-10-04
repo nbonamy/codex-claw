@@ -6,11 +6,10 @@ export const messages = {
     backlogSource: { provider: 'Backlog provider', teamProject: 'Team / project', repository: 'Repository', codeRepository: 'Code repository', chooseCodeRepository: 'Choose a code repository', sources: 'Sources', retry: 'Retry', filterSources: 'Filter sources', openSource: 'Open {repository} in Linear' },
     linearIntegration: {
       name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',
-      cancelLabel: 'Cancel Linear authorization', openLabel: 'Open Linear authorization',
+      cancelLabel: 'Cancel Linear authorization',
       cancel: 'Cancel',
       setup: 'Connect your Linear account for backlog work.',
-      authorize: 'Authorize in your browser', open: 'Open Linear',
-      returnToClaw: 'Approve access in Linear, then return here. Claw finishes connecting automatically.',
+      signedInAs: 'Signed in as {account}',
     },
     handoff: {
       action: 'Hand off…', submit: 'Hand off', cancel: 'Cancel', hide: 'Hide',

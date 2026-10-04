@@ -49,6 +49,10 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
       authorization.value = result.authorization ?? null;
       if (result.authorization) scheduleAuthorizationPoll(provider);
       else clearAuthorizationPoll(provider);
+      if (result.authorization?.flow === 'browser') {
+        await clawPlatformActions.openExternal?.(result.authorization.verificationUri);
+        if (revision !== authorizationRevision) return;
+      }
       status.value = 'loaded';
     } catch (cause) {
       if (revision !== authorizationRevision) return;

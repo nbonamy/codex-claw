@@ -77,18 +77,26 @@
     </SettingsSection>
 
     <SettingsSection>
-      <SettingsRow :title="$t('linearIntegration.name')" :description="linearDescription" :error="linearError">
-        <template #control>
-          <el-button v-if="linearConnection.status === 'connected'" size="small" :aria-label="$t('linearIntegration.disconnectLabel')" @click="emit('disconnect', 'linear')">{{ $t('surface.settingsIntegrationsPanel.disconnect') }}</el-button>
+      <article class="settings-integrations-panel__integration">
+        <div class="settings-integrations-panel__identity">
+          <span class="settings-integrations-panel__icon" aria-hidden="true">
+            <LinearIcon size="var(--icon-xl)" />
+          </span>
+          <div>
+            <strong>{{ $t('linearIntegration.name') }}</strong>
+            <span>{{ linearDescription }}</span>
+            <span v-if="linearError" class="settings-integrations-panel__error">{{ linearError }}</span>
+          </div>
+        </div>
+        <div class="settings-integrations-panel__actions">
+          <template v-if="linearConnection.status === 'connected'">
+            <span class="settings-integrations-panel__connected">{{ $t('surface.settingsIntegrationsPanel.connected') }}</span>
+            <el-button size="small" :aria-label="$t('linearIntegration.disconnectLabel')" @click="emit('disconnect', 'linear')">{{ $t('surface.settingsIntegrationsPanel.disconnect') }}</el-button>
+          </template>
           <el-button v-else-if="linearConnection.status === 'connecting'" size="small" :aria-label="$t('linearIntegration.cancelLabel')" @click="emit('disconnect', 'linear')">{{ $t('linearIntegration.cancel') }}</el-button>
           <el-button v-else size="small" type="primary" :aria-label="$t('linearIntegration.connectLabel')" :loading="status === 'loading'" @click="emit('connect', 'linear')">{{ $t('surface.settingsIntegrationsPanel.connect') }}</el-button>
-        </template>
-      </SettingsRow>
-      <SettingsRow v-if="authorization?.provider === 'linear' && linearConnection.status === 'connecting'" :title="$t('linearIntegration.authorize')" :description="$t('linearIntegration.returnToClaw')">
-        <template #control>
-          <el-button size="small" type="primary" :aria-label="$t('linearIntegration.openLabel')" @click="emit('open-authorization', 'linear')">{{ $t('linearIntegration.open') }}</el-button>
-        </template>
-      </SettingsRow>
+        </div>
+      </article>
     </SettingsSection>
 
     <p
@@ -104,12 +112,11 @@
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import type { UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
-import { GitHubIcon } from '../shared/icons/app-icons';
+import { GitHubIcon, LinearIcon } from '../shared/icons/app-icons';
 import GitHubAuthorizationSteps from './GitHubAuthorizationSteps.vue';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsSection from './SettingsSection.vue';
-import SettingsRow from './SettingsRow.vue';
 import { localizedText } from '../i18n/errors';
 
 const props = withDefaults(defineProps<{
@@ -139,7 +146,9 @@ const configurationError = ref<string | null>(null);
 const savingClientId = ref(false);
 const linearConnection = computed<WorkIntegrationConnection>(() => props.connections.find(connection => connection.provider === 'linear') ?? { provider: 'linear', status: 'notConfigured' });
 const linearDescription = computed(() => {
-  if (linearConnection.value.status === 'connected') return [translate('surface.settingsIntegrationsPanel.connected'), linearConnection.value.accountLabel].filter(Boolean).join(' · ');
+  if (linearConnection.value.status === 'connected') return linearConnection.value.accountLabel
+    ? translate('linearIntegration.signedInAs', { account: linearConnection.value.accountLabel })
+    : translate('surface.settingsIntegrationsPanel.signedIn');
   if (linearConnection.value.status === 'connecting') return translate('surface.settingsIntegrationsPanel.waitingForAuthorization');
   return translate('linearIntegration.setup');
 });
@@ -243,6 +252,10 @@ async function connectGithub(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.settings-integrations-panel__identity .settings-integrations-panel__error {
+  color: var(--color-error);
 }
 
 .settings-integrations-panel__actions {

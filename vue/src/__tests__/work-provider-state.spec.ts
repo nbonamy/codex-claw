@@ -22,7 +22,7 @@ describe('work provider authorization state', () => {
     expect(api.listWorkRepositories).toHaveBeenCalledWith('linear');
   });
 
-  it('opens Linear in the host browser and ignores a poll that finishes after cancellation', async () => {
+  it('opens Linear on connect, allows reopening, and ignores a poll that finishes after cancellation', async () => {
     vi.useFakeTimers();
     let snapshot = createInitialSnapshot();
     const { api } = createClientApiMock(snapshot);
@@ -40,8 +40,10 @@ describe('work provider authorization state', () => {
     configureClawClient({ platform: 'desktop', api });
     const state = createWorkProviderState({ getSnapshot: () => snapshot, adoptSnapshot: value => { snapshot = value; } });
     await state.connect('linear');
-    await state.openAuthorization('linear');
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/oauth/authorize?state=public', '_blank', 'noopener,noreferrer');
+    expect(openExternal).toHaveBeenCalledTimes(1);
+    await state.openAuthorization('linear');
+    expect(openExternal).toHaveBeenCalledTimes(2);
     const poll = state.completeConnection('linear');
     await state.disconnect('linear');
     completePoll(connected);

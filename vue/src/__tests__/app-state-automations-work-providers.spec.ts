@@ -83,6 +83,7 @@ describe('useAppState', () => {
     await state.connectWorkProvider('github');
     expect(state.snapshot.value).toStrictEqual(connectingSnapshot);
     expect(state.workProviderAuthorization.value?.userCode).toBe('ABCD-1234');
+    expect(openExternal).not.toHaveBeenCalled();
 
     await state.openWorkProviderAuthorization('github');
     expect(openExternal).toHaveBeenCalledWith('https://github.com/login/device', '_blank', 'noopener,noreferrer');
