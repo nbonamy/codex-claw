@@ -1,6 +1,5 @@
 <template>
   <div
-    ref="root"
     class="open-in-control"
     :class="{ 'open-in-control--compact': variant === 'compact' }"
   >
@@ -19,29 +18,40 @@
       />
       <ExternalLinkIcon v-else aria-hidden="true" />
     </button>
-    <button
-      class="open-in-control__menu-trigger"
-      type="button"
-      :aria-label="$t('surface.openInControl.chooseOpenInApplication')"
-      :title="$t('surface.openInControl.chooseApplication')"
-      :aria-expanded="menuOpen"
-      :disabled="disabled || catalog.applications.length === 0"
-      @click.stop="menuOpen = !menuOpen"
+    <el-popover
+      v-model:visible="menuOpen"
+      placement="bottom-end"
+      trigger="click"
+      :teleported="true"
+      :width="220"
+      :offset="variant === 'compact' ? 4 : 8"
+      :show-arrow="false"
+      popper-class="claw-popover"
     >
-      <ChevronDown aria-hidden="true" />
-    </button>
-    <AppMenu
-      v-if="menuOpen"
-      class="open-in-control__menu"
-      :ariaLabel="$t('surface.openInControl.openInApplication')"
-      :items="menuItems"
-      @select="selectApplication"
-    />
+      <template #reference>
+        <button
+          class="open-in-control__menu-trigger"
+          type="button"
+          :aria-label="$t('surface.openInControl.chooseOpenInApplication')"
+          :title="$t('surface.openInControl.chooseApplication')"
+          :aria-expanded="menuOpen"
+          :disabled="disabled || catalog.applications.length === 0"
+        >
+          <ChevronDown aria-hidden="true" />
+        </button>
+      </template>
+      <AppMenu
+        class="app-menu--embedded"
+        :ariaLabel="$t('surface.openInControl.openInApplication')"
+        :items="menuItems"
+        @select="selectApplication"
+      />
+    </el-popover>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
 import { ChevronDown, ExternalLinkIcon } from './icons/app-icons';
 import AppMenu from './menu/AppMenu.vue';
@@ -58,7 +68,6 @@ const emit = defineEmits<{
   open: [application: OpenInApplication];
 }>();
 
-const root = ref<HTMLElement | null>(null);
 const menuOpen = ref(false);
 const menuItems = computed(() => openInMenuItems(props.catalog));
 const currentApplication = computed(() => (
@@ -67,9 +76,6 @@ const currentApplication = computed(() => (
   ?? props.catalog.applications[0]
   ?? null
 ));
-
-onMounted(() => document.addEventListener('click', closeMenuOnOutsideClick));
-onBeforeUnmount(() => document.removeEventListener('click', closeMenuOnOutsideClick));
 
 function openCurrentApplication(): void {
   if (!props.disabled && currentApplication.value) emit('open', currentApplication.value.id);
@@ -83,9 +89,6 @@ function selectApplication(itemId: string): void {
   emit('open', application);
 }
 
-function closeMenuOnOutsideClick(event: MouseEvent): void {
-  if (!root.value?.contains(event.target as Node)) menuOpen.value = false;
-}
 </script>
 
 <style scoped>
@@ -156,15 +159,4 @@ function closeMenuOnOutsideClick(event: MouseEvent): void {
   height: var(--icon-md);
 }
 
-.open-in-control__menu {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + var(--space-2));
-  right: 0;
-  min-width: 220px;
-}
-
-.open-in-control--compact .open-in-control__menu {
-  top: calc(100% + var(--space-1));
-}
 </style>
