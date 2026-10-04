@@ -34,6 +34,90 @@ function setup() {
 }
 
 describe('mission execution', () => {
+  it('retains Mission tools and accepts a later result after an implementation turn ends without submitting', async () => {
+    const h = setup();
+    await h.configure();
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'implementation';
+      mission.artifacts.requirements = { problem: 'Linear OAuth', acceptance: 'Connect' };
+      mission.artifacts.tickets = [{ title: 'Connect Linear', repositoryPath: h.originalAgents[0]!.folder!, done: false }];
+    });
+    await h.command({ action: 'run' });
+    await h.service.waitForLaunches();
+    const workerId = h.current().execution!.runs.at(-1)!.workerId!;
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+    const { createClawMcpServer } = await import('../mcp/tools');
+    const { createMissionToolModuleProvider } = await import('../mcp/mission-tools');
+    const { createCollaborationToolModuleProvider } = await import('../mcp/collaboration-tools');
+    const coordinator = {
+      missionContext: (id: string) => h.service.contextForAgent(id),
+      listMissionArtifacts: (id: string) => h.service.listArtifacts(id),
+      submitMissionResult: (id: string, input: Parameters<typeof h.service.submit>[1]) => h.service.submit(id, input),
+    } as unknown as import('../mcp/agent-coordinator').ClawMcpAgentCoordinator;
+    const callTool = async (name: string, args: Record<string, unknown> = {}) => {
+      const server = createClawMcpServer({ agentId: workerId, url: new URL(`http://localhost/mcp?agentId=${workerId}`) }, [createCollaborationToolModuleProvider(coordinator), createMissionToolModuleProvider(coordinator)]);
+      const client = new Client({ name: 'mission-lifecycle-repro', version: '1' });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      try {
+        await server.connect(serverTransport);
+        await client.connect(clientTransport);
+        return await client.callTool({ name, arguments: args });
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    };
+    await expect(callTool('list-mission-artifacts')).resolves.toMatchObject({ isError: false });
+    await h.service.agentFinished(workerId);
+    expect(h.current().execution!.runs.at(-1)!.status).toBe('failed');
+    await expect(callTool('list-mission-artifacts')).resolves.toMatchObject({ isError: false });
+    const artifacts = structuredClone(h.current().artifacts);
+    artifacts.tickets[0]!.done = true;
+    artifacts.implementation = { changes: 'OAuth implemented in a local commit.', tests: 'Callback tests pass.' };
+    await expect(callTool('submit-mission-result', { summary: 'Recovered after clarification', artifacts })).resolves.toMatchObject({
+      isError: false, structuredContent: { success: true, status: 'accepted' },
+    });
+    expect(h.current().artifacts.tickets[0]!.done).toBe(true);
+    expect(h.current().execution!.runs.at(-1)!.error).toBeUndefined();
+    await expect(callTool('list-mission-artifacts')).resolves.toMatchObject({ isError: false });
+    await expect(callTool('submit-mission-result', { summary: 'Duplicate', artifacts })).resolves.toMatchObject({ isError: true });
+    expect(h.current().artifacts.implementation).toStrictEqual(artifacts.implementation);
+  });
+
+  it('keeps historical and cancelled workers able to read artifacts without reviving their assignments', async () => {
+    const h = setup();
+    await h.command({ action: 'run' }); await h.service.waitForLaunches();
+    const run = h.current().execution!.runs.at(-1)!;
+    await h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Approved problem' });
+    await h.command({ action: 'cancel', runId: run.id });
+    await expect(h.service.readArtifact(run.workerId!, 'requirements')).resolves.toMatchObject({ content: '# Approved problem' });
+    await expect(h.service.writeArtifact(run.workerId!, { stage: 'requirements', content: '# Cancelled write' })).rejects.toThrow('active mission stage');
+    await h.store.change(h.current().id, mission => { mission.stage = 'implementation'; });
+    expect(h.service.contextForAgent(run.workerId!)).toMatchObject({ missionId: h.current().id });
+    expect(h.service.developerInstructionsForAgent(run.workerId!)).toBeUndefined();
+    expect(h.service.contextForAgent('unrelated-agent')).toBeUndefined();
+    await expect(h.service.readArtifact('unrelated-agent', 'requirements')).rejects.toThrow();
+  });
+
+  it('recovers failed Review writes but rejects a superseded worker result', async () => {
+    const h = setup();
+    const workerId = h.originalAgents[0]!.id;
+    await h.store.change(h.current().id, mission => {
+      mission.stage = 'review';
+      mission.execution!.runs = [{ id: 'failed-review', stage: 'review', memberId: workerId, workerId, status: 'failed', skills: [], feedback: '', startedAt: 'before', error: 'Interrupted' }];
+    });
+    await h.service.writeArtifact(workerId, { stage: 'review', content: '# Recovered review' });
+    await h.store.change(h.current().id, mission => {
+      mission.execution!.runs.push({ id: 'replacement-review', stage: 'review', memberId: h.originalAgents[1]!.id, workerId: h.originalAgents[1]!.id, status: 'running', skills: [], feedback: '', startedAt: 'now' });
+    });
+    await expect(h.service.readArtifact(workerId, 'review')).resolves.toMatchObject({ content: '# Recovered review' });
+    await expect(h.service.writeArtifact(workerId, { stage: 'review', content: '# Stale review' })).rejects.toThrow('active mission stage');
+    const artifacts = structuredClone(h.current().artifacts);
+    artifacts.review.summary = 'Stale result';
+    await expect(h.service.submit(workerId, { summary: 'Stale result', artifacts })).rejects.toThrow('active run');
+  });
+
   it('persists structured Review findings and remediates the selected set', async () => {
     const h = setup();
     const repositoryPath = h.originalAgents[0]!.folder!;
