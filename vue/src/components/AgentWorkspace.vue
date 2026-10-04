@@ -72,6 +72,7 @@
       :subagent-tree="subagentTreeFor(agent.id)"
       :load-subagent-messages="(conversationId) => loadSubagentMessages(agent.id, conversationId)"
       :backlog-items="rightWorkspaceFor(agent.id).backlogItems"
+      :backlog-location="snapshot.teams.find(team => team.id === agent.teamId)?.remoteConnectionId ? { kind: 'remote', remoteConnectionId: snapshot.teams.find(team => team.id === agent.teamId)!.remoteConnectionId! } : undefined"
       :backlog-status="rightWorkspaceFor(agent.id).backlogStatus"
       :backlog-error="rightWorkspaceFor(agent.id).backlogError"
       :github-repository="snapshot.agentGitStatuses[agent.id]?.githubRepository ?? null"

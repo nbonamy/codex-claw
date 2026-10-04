@@ -1,8 +1,9 @@
 <template>
   <section class="repository-backlog" :aria-label="$t('surface.repositoryBacklogPanel.repositoryBacklog')">
+    <BacklogSourceSelector :provider="linear.provider.value" :sources="linear.sources.value" :source-id="linear.sourceId.value" :show-source="linear.provider.value === 'linear'" @select-provider="linear.selectProvider" @select-source="linear.selectSource" />
     <header class="repository-backlog__repository">
       <div>
-        <GitHubIcon aria-hidden="true" />
+        <GitHubIcon v-if="linear.provider.value === 'github'" aria-hidden="true" />
         <strong>{{ repositoryName }}</strong>
       </div>
       <span v-if="branch" class="repository-backlog__branch-pill">
@@ -13,7 +14,7 @@
         type="button"
         :aria-label="t('repositoryBacklog.refresh')"
         :disabled="status === 'loading'"
-        @click="emit('refresh')"
+        @click="linear.provider.value === 'linear' ? linear.refresh() : emit('refresh')"
       >
         <IconRefresh :class="{ 'repository-backlog__spin': status === 'loading' }" aria-hidden="true" />
       </button>
@@ -32,6 +33,7 @@
           {{ t('repositoryBacklog.issues') }}
         </button>
         <button
+          v-if="linear.provider.value === 'github'"
           type="button"
           role="radio"
           :aria-checked="kindFilter === 'pullRequest'"
@@ -94,7 +96,7 @@
                 <span>{{ t('repositoryBacklog.assignee') }}</span>
                 <el-select v-model="assigneeFilter" size="small" :aria-label="$t('surface.repositoryBacklogPanel.workItemAssignee')">
                   <el-option :label="t('repositoryBacklog.anyone')" value="all" />
-                  <el-option :label="t('repositoryBacklog.assignedToMe')" value="me" :disabled="!accountLabel" />
+                  <el-option :label="t('repositoryBacklog.assignedToMe')" value="me" :disabled="linear.provider.value === 'github' && !accountLabel" />
                   <el-option :label="t('repositoryBacklog.unassigned')" value="unassigned" />
                 </el-select>
               </label>
@@ -147,7 +149,7 @@
     <div v-else-if="error" class="repository-backlog__state repository-backlog__state--error">
       <IconAlertCircle aria-hidden="true" />
       <span>{{ error }}</span>
-      <button type="button" @click="emit('refresh')">{{ t('repositoryBacklog.retry') }}</button>
+      <button type="button" @click="linear.provider.value === 'linear' ? linear.refresh() : emit('refresh')">{{ t('repositoryBacklog.retry') }}</button>
     </div>
 
     <div v-else-if="filteredItems.length === 0" class="repository-backlog__state">
@@ -205,6 +207,7 @@
         class="repository-backlog__start-work"
         :class="{ 'repository-backlog__start-work--menu': selectedAssignment }"
       >
+        <LinearIssueDetail v-if="selectedItem.provider === 'linear'" :item="selectedItem" />
         <template v-if="selectedAssignment">
           <AppMenu
             class="app-menu--embedded repository-backlog__assignment-menu"
@@ -213,7 +216,7 @@
             @select="selectAssignmentMenuItem"
           />
         </template>
-        <template v-else-if="operationState === 'idle' || operationState === 'error'">
+        <template v-else-if="selectedItem.provider === 'github' && (operationState === 'idle' || operationState === 'error')">
           <header>
             <strong>{{ t('repositoryBacklog.startWork', { number: selectedItem.number }) }}</strong>
             <button type="button" :aria-label="$t('surface.repositoryBacklogPanel.close')" @click="closeStartWork"><IconX aria-hidden="true" /></button>
@@ -229,7 +232,7 @@
           />
         </template>
 
-        <div v-else class="repository-backlog__operation-state" :data-state="operationState">
+        <div v-else-if="selectedItem.provider === 'github'" class="repository-backlog__operation-state" :data-state="operationState">
           <span v-if="operationState === 'running'" class="repository-backlog__operation-spinner" aria-hidden="true" />
           <IconCircleCheck v-else aria-hidden="true" />
           <strong>{{ operationState === 'running' ? t('repositoryBacklog.starting') : t('repositoryBacklog.started') }}</strong>
@@ -295,10 +298,14 @@ import type { AppMenuItem } from '../shared/menu/app-menu';
 import type { RepositoryWorkStartInput } from './right-workspace';
 import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
+import BacklogSourceSelector from './BacklogSourceSelector.vue';
+import LinearIssueDetail from './LinearIssueDetail.vue';
+import { useLinearBacklog } from './use-linear-backlog';
 
 defineOptions({ name: 'RepositoryBacklogPanel' });
 
 const props = defineProps<{
+  location?: import('@codex-claw/core/contracts').AutomationLocation;
   agent: Agent;
   agents: readonly Agent[];
   assignments: Record<string, WorkBacklogAssignment>;
@@ -321,6 +328,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const linear = useLinearBacklog(() => props.location);
+const items = computed(() => linear.provider.value === 'linear' ? linear.items.value : props.items);
+const status = computed(() => linear.provider.value === 'linear' ? linear.status.value : props.status);
+const error = computed(() => linear.provider.value === 'linear' ? linear.error.value : props.error);
 const kindFilter = ref<'issue' | 'pullRequest'>('issue');
 const stateFilter = ref<'open' | 'closed' | 'all'>('open');
 const assigneeFilter = ref<'all' | 'me' | 'unassigned'>('all');
@@ -346,20 +357,20 @@ const currentSessionOptions = computed<WorkItemAssignmentSession[]>(() => [{
 const operationWorkspaceLabel = computed(() => branchName.value || props.branch || t('repositoryBacklog.currentWorkspace'));
 
 const accountLabel = computed(() => props.connection?.accountLabel?.trim() ?? '');
-const repositoryName = computed(() => props.repositoryId.split('/').at(-1) ?? props.repositoryId);
-const labelOptions = computed(() => [...new Set(props.items.flatMap((item) => item.labels.map((label) => label.name)))].sort());
+const repositoryName = computed(() => linear.provider.value === 'linear' ? linear.sources.value.find(source => source.id === linear.sourceId.value)?.fullName ?? 'Linear' : props.repositoryId.split('/').at(-1) ?? props.repositoryId);
+const labelOptions = computed(() => [...new Set(items.value.flatMap((item) => item.labels.map((label) => label.name)))].sort());
 const activeFilterCount = computed(() => Number(stateFilter.value !== 'open') + Number(assigneeFilter.value !== 'all') + Number(Boolean(labelFilter.value)));
-const kindItems = computed(() => props.items.filter((item) => (item.kind ?? 'issue') === kindFilter.value));
+const kindItems = computed(() => items.value.filter((item) => (item.kind ?? 'issue') === kindFilter.value));
 const filteredItems = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase();
-  return props.items
+  return items.value
     .filter((item) => (item.kind ?? 'issue') === kindFilter.value)
     .filter((item) => stateFilter.value === 'all' || item.state === stateFilter.value)
     .filter((item) => assigneeFilter.value === 'all'
-      || (assigneeFilter.value === 'me' && Boolean(accountLabel.value) && item.assignees?.includes(accountLabel.value))
+      || (assigneeFilter.value === 'me' && (item.provider === 'linear' ? item.assignedToViewer : Boolean(accountLabel.value) && item.assignees?.includes(accountLabel.value)))
       || (assigneeFilter.value === 'unassigned' && (item.assignees?.length ?? 0) === 0))
     .filter((item) => !labelFilter.value || item.labels.some((label) => label.name === labelFilter.value))
-    .filter((item) => !query || `${item.number} ${item.title} ${item.authorName ?? ''}`.toLocaleLowerCase().includes(query))
+    .filter((item) => !query || `${item.identifier ?? item.number} ${item.title} ${item.authorName ?? ''}`.toLocaleLowerCase().includes(query))
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 });
 const assignmentGroups = computed(() => ([
@@ -407,8 +418,17 @@ watch(labelOptions, (labels) => {
 });
 
 watch(() => props.repositoryId, () => {
+  closeStartWork();
   loadFilterDefaults();
 }, { immediate: true });
+
+watch([linear.provider, linear.sourceId, () => JSON.stringify(props.location)], () => {
+  closeStartWork();
+  closeSearch();
+  clearFilters();
+  kindFilter.value = 'issue';
+  loadFilterDefaults();
+});
 
 watch([stateFilter, assigneeFilter, labelFilter], () => {
   defaultsSaved.value = false;
@@ -435,12 +455,12 @@ const RepositoryItemRow = (rowProps: { item: WorkItem; assignment: WorkBacklogAs
         target: '_blank',
         rel: 'noopener noreferrer',
         onClick: (event: MouseEvent) => event.stopPropagation(),
-      }, [h('span', `#${item.number}`), h('strong', item.title)]),
+      }, [h('span', item.identifier ?? `#${item.number}`), h('strong', item.title)]),
       assignmentNote
         ? h('p', { class: 'repository-backlog__assignment-note' }, assignmentNote)
         : h('div', { class: 'repository-backlog__item-meta' }, [
           h('span', { class: `repository-backlog__state-dot repository-backlog__state-dot--${item.state}` }),
-          h('span', item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed')),
+          h('span', item.nativeState ?? (item.state === 'open' ? t('repositoryBacklog.open') : t('repositoryBacklog.closed'))),
           label ? h('span', { class: 'repository-backlog__label', style: labelStyle(label.color) }, label.name) : null,
         ]),
     ]),
@@ -510,7 +530,7 @@ function readFilterDefaults(): {
     const value = JSON.parse(stored) as Record<string, unknown>;
     return {
       state: value.state === 'closed' || value.state === 'all' ? value.state : 'open',
-      assignee: value.assignee === 'unassigned' || (value.assignee === 'me' && accountLabel.value) ? value.assignee : 'all',
+      assignee: value.assignee === 'unassigned' || (value.assignee === 'me' && (linear.provider.value === 'linear' || accountLabel.value)) ? value.assignee : 'all',
       label: typeof value.label === 'string' && value.label.length <= 100 && (labelOptions.value.length === 0 || labelOptions.value.includes(value.label)) ? value.label : '',
     };
   } catch {
@@ -519,10 +539,11 @@ function readFilterDefaults(): {
 }
 
 function filterDefaultsKey(): string {
-  return `repositoryBacklogFilters:${props.repositoryId}`;
+  return linear.provider.value === 'github' ? `repositoryBacklogFilters:${props.repositoryId}` : `repositoryBacklogFilters:linear:${JSON.stringify(props.location)}:${linear.sourceId.value}`;
 }
 
 function openItem(item: WorkItem, element?: HTMLElement): void {
+  if (!items.value.some(candidate => candidate.id === item.id)) return;
   const reference = element ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
   if (reference) virtualReference.value = reference;
   selectedItem.value = item;

@@ -2,6 +2,7 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    backlogSource: { provider: 'Backlog provider', teamProject: 'Team / project', repository: 'Repository', sources: 'Sources', retry: 'Retry', filterSources: 'Filter sources', openSource: 'Open {repository} in Linear' },
     linearIntegration: {
       name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',
       cancelLabel: 'Cancel Linear authorization', openLabel: 'Open Linear authorization',

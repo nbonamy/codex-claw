@@ -1,11 +1,37 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Agent, WorkItem } from '@codex-claw/core/contracts';
 import { i18n } from '../../i18n';
 import RepositoryBacklogPanel from '../RepositoryBacklogPanel.vue';
+import { createClientApiMock } from '../../test/client-api-mock';
+import { configureClawClient } from '../../platform-api';
 
 describe('RepositoryBacklogPanel', () => {
+  it('shows native Linear details, filters by the viewer and resets details when the source changes', async () => {
+    const { api } = createClientApiMock();
+    configureClawClient({ platform: 'desktop', api });
+    api.listWorkRepositories.mockResolvedValue(['a', 'b'].map(id => ({ provider: 'linear', id: `linear:${id}`, owner: id, name: id, fullName: id, url: 'https://linear.app', isPrivate: true })));
+    const item = workItem({ provider: 'linear', id: 'linear:issue', repositoryId: 'linear:a', identifier: 'ENG-12', nativeState: 'Started', body: 'Repair login', assignedToViewer: true, assignees: ['Alex'] });
+    api.listWorkItems.mockResolvedValue([item]);
+    const wrapper = mountPanel();
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
+    await flushPromises();
+    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:a');
+    await flushPromises();
+    expect(wrapper.text()).toContain('ENG-12');
+    expect(wrapper.text()).toContain('Started');
+    expect(wrapper.findAll('[role="radio"]')).toHaveLength(1);
+    await wrapper.get('.repository-backlog__item-actions').trigger('click');
+    expect(wrapper.get('.linear-issue-detail').text()).toContain('Repair login');
+    expect(wrapper.findComponent({ name: 'WorkItemAssignmentPicker' }).exists()).toBe(false);
+    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:b');
+    await flushPromises();
+    expect(wrapper.find('.linear-issue-detail').exists()).toBe(false);
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('github');
+    expect(wrapper.findAll('[role="radio"]')).toHaveLength(2);
+    configureClawClient();
+  });
   beforeEach(() => {
     window.localStorage.clear();
   });
@@ -278,7 +304,7 @@ describe('RepositoryBacklogPanel', () => {
       .find((popover) => popover.attributes('popper-class')?.includes('repository-backlog__filters-popover'))
       ?.vm.$emit('update:visible', true);
     await nextTick();
-    wrapper.findAllComponents({ name: 'ElSelect' }).at(0)?.vm.$emit('update:modelValue', 'closed');
+    await wrapper.get('[aria-label="Work item state"] select').setValue('closed');
     await nextTick();
     await wrapper.get('.repository-backlog__filter-menu footer button').trigger('click');
 

@@ -196,16 +196,17 @@
     />
 
     <RepositoryBacklogPanel
-      v-if="tabs.includes('backlog') && githubRepository && prefillRepositoryWork && startRepositoryWork"
+      v-if="tabs.includes('backlog') && prefillRepositoryWork && startRepositoryWork"
       v-show="activeTab === 'backlog'"
       :agent="agent"
       :agents="agents ?? []"
+      :location="backlogLocation"
       :assignments="workAssignments"
       :branch="gitStatus?.branch"
       :connection="githubConnection"
       :error="backlogError"
       :items="backlogItems"
-      :repository-id="githubRepository"
+      :repository-id="githubRepository ?? ''"
       :prefill-action="prefillRepositoryWork"
       :clear-assignment-action="clearRepositoryWorkAssignment"
       :close-agent-action="closeRepositoryWorkAgent"
@@ -437,6 +438,7 @@ const props = withDefaults(defineProps<{
   subagentTree?: AgentSubagentTree | null;
   loadSubagentMessages?: (conversationId: string) => Promise<RendererMessage[]>;
   backlogItems?: WorkItem[];
+  backlogLocation?: import('@codex-claw/core/contracts').AutomationLocation;
   backlogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   backlogError?: string | null;
   githubRepository?: string | null;

@@ -54,11 +54,11 @@
                 <el-option v-for="assignee in assigneeOptions" :key="assignee" :label="assignee" :value="assignee" />
               </el-select>
             </label>
-            <span class="cockpit-inbox__provider"><GitHubIcon aria-hidden="true" /> {{ providerLabel }}</span>
+            <span class="cockpit-inbox__provider"><GitHubIcon v-if="connection.provider === 'github'" aria-hidden="true" /> {{ providerLabel }}</span>
           </div>
         </el-popover>
 
-        <el-button class="cockpit-inbox__start-work" type="primary" :icon="PlayerPlayIcon" :disabled="selectedItems.length === 0" @click="openStartWorkDialog"> {{ $t('surface.cockpitWorkInbox.startWork') }} </el-button>
+        <el-button v-if="connection.provider === 'github'" class="cockpit-inbox__start-work" type="primary" :icon="PlayerPlayIcon" :disabled="selectedItems.length === 0" @click="openStartWorkDialog"> {{ $t('surface.cockpitWorkInbox.startWork') }} </el-button>
         <button class="cockpit-inbox__refresh" type="button" :disabled="status === 'loading'" :aria-label="$t('surface.cockpitWorkInbox.refreshWorkItems')" @click="emit('refresh', selectedRepositoryId)">
           <RefreshIcon aria-hidden="true" />
         </button>
@@ -106,14 +106,14 @@
             <el-checkbox
               class="cockpit-inbox__selection"
               :model-value="selectedItemIds.has(row.item.id)"
-              :disabled="Boolean(row.assignment)"
+              :disabled="Boolean(row.assignment) || row.item.provider === 'linear'"
               :aria-label="row.assignment ? $t('dynamic.cockpit.assigned', { number: row.item.number }) : $t('dynamic.cockpit.select', { number: row.item.number })"
               @click.stop
               @change="toggleSelection(row)"
             />
             <span class="cockpit-inbox__repository">{{ repositoryName(row.item) }}</span>
             <span class="cockpit-inbox__number">
-              {{ row.item.kind === 'pullRequest' ? $t('surface.cockpitWorkInbox.pR') : '' }} #{{ row.item.number }}
+              {{ row.item.kind === 'pullRequest' ? $t('surface.cockpitWorkInbox.pR') : '' }} {{ row.item.identifier ?? `#${row.item.number}` }}
             </span>
             <strong class="cockpit-inbox__title">{{ row.item.title }}</strong>
 
@@ -138,7 +138,7 @@
             </span>
             <span v-else class="cockpit-inbox__branch" />
 
-            <span class="cockpit-inbox__status" :data-status="row.status">{{ row.statusLabel }}</span>
+            <span class="cockpit-inbox__status" :data-status="row.status">{{ row.assignment ? row.statusLabel : row.item.nativeState ?? row.statusLabel }}</span>
             <span class="cockpit-inbox__elapsed">{{ elapsed(row.activityAt) }}</span>
 
             <div class="cockpit-inbox__row-actions">
@@ -149,7 +149,7 @@
                   :aria-label="row.assignment ? $t('dynamic.cockpit.viewAgent', { number: row.item.number }) : $t('dynamic.cockpit.assign', { number: row.item.number })"
                   @click.stop="selectRow(row)"
                 >
-                  <EyeIcon v-if="row.assignment" aria-hidden="true" />
+                  <EyeIcon v-if="row.assignment || row.item.provider === 'linear'" aria-hidden="true" />
                   <PlusCircleIcon v-else aria-hidden="true" />
                 </button>
               </el-tooltip>
@@ -199,6 +199,9 @@
       </div>
     </footer>
 
+    <el-dialog :model-value="Boolean(detailItem)" class="claw-dialog" @update:model-value="detailItem = null">
+      <LinearIssueDetail v-if="detailItem" :item="detailItem" />
+    </el-dialog>
     <el-dialog
       class="claw-dialog cockpit-inbox__start-dialog"
       :model-value="startWorkDialogOpen"
@@ -244,6 +247,7 @@ import { agentDisplayName } from '@codex-claw/core/agent-display';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
+import LinearIssueDetail from './LinearIssueDetail.vue';
 import AgentAvatar from './AgentAvatar.vue';
 import BackendSelector from './BackendSelector.vue';
 
@@ -293,6 +297,7 @@ const searchOpen = ref(false);
 const searchInput = ref<{ focus: () => void } | null>(null);
 const selectedItemIds = ref(new Set<string>());
 const startWorkDialogOpen = ref(false);
+const detailItem = ref<WorkItem | null>(null);
 const startingWork = ref(false);
 const startWorkError = ref<string | null>(null);
 const selectedTeamId = ref('');
@@ -304,7 +309,7 @@ watch(() => props.activeView, (view) => { localActiveView.value = view; });
 watch(() => props.searchQuery, (query) => { effectiveSearchQuery.value = query; });
 const agentsById = computed(() => new Map(props.agents.map((agent) => [agent.id, agent])));
 const sortedRepositories = computed(() => [...props.repositories].sort((a, b) => a.fullName.localeCompare(b.fullName)));
-const providerLabel = computed(() => props.connection.provider === 'github' ? translate('surface.cockpitWorkInbox.gitHub') : translate('surface.cockpitWorkInbox.provider'));
+const providerLabel = computed(() => props.connection.provider === 'github' ? translate('surface.cockpitWorkInbox.gitHub') : 'Linear');
 const repositoryIcons = computed(() => props.repositoryIcons);
 const tagOptions = computed(() => [...new Set(props.items.flatMap((item) => item.labels.map((label) => label.name)))].sort());
 const assigneeOptions = computed(() => [...new Set(props.items.flatMap((item) => item.assignees ?? []))].sort());
@@ -319,7 +324,7 @@ const filteredRows = computed(() => {
     if (props.selectedRepositoryId && row.item.repositoryId !== props.selectedRepositoryId) return false;
     if (props.selectedTagName && !row.item.labels.some((label) => label.name === props.selectedTagName)) return false;
     if (props.selectedAssigneeLogin && !(row.item.assignees ?? []).includes(props.selectedAssigneeLogin)) return false;
-    if (query && !`${row.item.repositoryFullName} ${row.item.number} ${row.item.title}`.toLocaleLowerCase().includes(query)) return false;
+    if (query && !`${row.item.repositoryFullName} ${row.item.identifier ?? row.item.number} ${row.item.title}`.toLocaleLowerCase().includes(query)) return false;
     return true;
   });
 });
@@ -345,7 +350,8 @@ const effectiveTotalItems = computed(() => props.globalScope ? props.totalItems 
 const totalBacklogCount = computed(() => props.globalScope
   ? Math.max(0, effectiveTotalItems.value - scopedActiveAssignments.value.length)
   : filteredRows.value.filter((row) => !row.assignment).length);
-const viewContextKey = computed(() => props.selectedRepositoryId ?? `global:${props.globalScope ?? 'unselected'}`);
+const viewContextKey = computed(() => `${props.connection.provider}:${props.selectedRepositoryId ?? `global:${props.globalScope ?? 'unselected'}`}`);
+watch(viewContextKey, () => { detailItem.value = null; startWorkDialogOpen.value = false; selectedItemIds.value = new Set(); });
 const totalPages = computed(() => Math.max(1, Math.ceil(props.totalItems / props.pageSize)));
 const priorityOrder: Priority[] = ['attention', 'review', 'progress', 'ready'];
 const groupedRows = computed(() => priorityOrder.map((priority) => ({
@@ -473,6 +479,7 @@ function defaultTeamId(): string {
 }
 
 function toggleSelection(row: InboxRow): void {
+  if (row.item.provider === 'linear') { detailItem.value = row.item; return; }
   if (row.assignment) return;
   const next = new Set(selectedItemIds.value);
   if (next.has(row.item.id)) next.delete(row.item.id);

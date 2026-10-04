@@ -223,6 +223,8 @@
         @select-work-tag="selectWorkTagForCockpit"
         @select-work-assignee="selectWorkAssigneeForCockpit"
         @select-work-repository="selectWorkRepositoryForCockpit"
+        :work-provider="cockpitBacklogState.provider.value"
+        @select-work-provider="cockpitBacklogState.selectProvider"
         @select-agent="selectAgentFromCockpit"
       />
       <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :implementation-start-progress="missionImplementationStartProgress" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @chat-about-review-finding="prepareMissionReviewDiscussion" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
@@ -374,6 +376,7 @@
     <RepositorySessionSourceDialog
       v-model:backend="repositorySession.backend.value"
       :visible="repositorySessionSourceVisible"
+      :location="resolveRepositorySessionContext(snapshot, repositorySessionSource).location"
       :repository-name="repositorySessionSource?.repositoryName ?? ''"
       :branches="repositorySessionSourceBranches"
       :work-items="repositorySessionSourceWorkItems"
@@ -391,6 +394,7 @@
     <RepositorySessionSourceDialog
       :visible="missionIssuePickerVisible"
       purpose="missionIssue"
+      :location="missionIssueLocation()"
       repository-name=""
       :repositories="missionIssueRepositories"
       :selected-repository-id="missionIssueRepositoryId"
@@ -1785,13 +1789,13 @@ const cockpitBacklogState = useCockpitBacklog({
   getWorkBacklogError: () => props.workBacklogError,
   getWorkBacklogStatus: () => props.workBacklogStatus,
   getWorkItemsByRepository: () => props.workItemsByRepository,
-  getWorkRepositories: () => props.workRepositoriesByProvider.github ?? [],
-  loadGlobalWorkItems: (query) => props.loadGlobalWorkItems('github', undefined, query),
-  loadWorkItems: async (repositoryId) => {
-    await props.loadWorkItems('github', repositoryId);
+  getWorkRepositories: (provider) => props.workRepositoriesByProvider[provider] ?? [],
+  loadGlobalWorkItems: (query, provider) => props.loadGlobalWorkItems(provider, undefined, query),
+  loadWorkItems: async (repositoryId, provider) => {
+    await props.loadWorkItems(provider, repositoryId);
   },
-  loadWorkRepositories: async () => {
-    await props.loadWorkRepositories('github');
+  loadWorkRepositories: async (provider) => {
+    await props.loadWorkRepositories(provider);
   },
 });
 const {

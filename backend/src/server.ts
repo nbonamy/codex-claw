@@ -3039,7 +3039,13 @@ function requireBacklogConfiguration(params: unknown): WorkBacklogConfigurationI
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Invalid work backlog configuration input.');
   }
-  return input as WorkBacklogConfigurationInput;
+  const value = input as Record<string, unknown>;
+  const provider = requireWorkProvider(value);
+  const configuration = requireRecord(value.configuration);
+  for (const key of ['repositoryId', 'assigneeLogin', 'tagName']) {
+    if (configuration[key] !== undefined && configuration[key] !== null && typeof configuration[key] !== 'string') throw new Error('Invalid work backlog configuration input.');
+  }
+  return { provider, configuration };
 }
 
 function requireWorkProvider(params: unknown): WorkProviderKind {

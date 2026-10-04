@@ -50,10 +50,11 @@ export type GitHubWorkBacklogConfigurationInput = {
 
 export type WorkBacklogProviderConfigurations = {
   github?: GitHubWorkBacklogConfiguration;
+  linear?: GitHubWorkBacklogConfiguration;
 };
 
 export type WorkBacklogConfigurationInput = {
-  provider: 'github';
+  provider: WorkProviderKind;
   configuration: GitHubWorkBacklogConfigurationInput;
 };
 
@@ -72,6 +73,7 @@ export type WorkProviderAuthorization = {
   expiresAt: string;
 };
 
+/** Legacy catalog DTO. For Linear this is a backlog scope, never a Git repository. */
 export type WorkRepository = {
   provider: WorkProviderKind;
   id: string;
@@ -82,6 +84,8 @@ export type WorkRepository = {
   isPrivate: boolean;
   updatedAt?: string;
   workItemsUpdatedAt?: string;
+  /** Backlog scope only; never a code repository or clone target. */
+  linearSource?: { teamId: string; teamName: string; projectId?: string; projectName?: string };
 };
 
 export type WorkItemLabel = {
@@ -119,6 +123,10 @@ export type WorkItem = {
   repositoryId: string;
   repositoryFullName: string;
   number: number;
+  identifier?: string;
+  nativeState?: string;
+  assignedToViewer?: boolean;
+  linearSource?: WorkRepository['linearSource'];
   title: string;
   url: string;
   state: WorkItemState;

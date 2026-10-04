@@ -19,7 +19,7 @@ describe('work provider authorization state', () => {
     await state.completeConnection('linear');
     expect(state.status.value).toBe('loaded');
     expect(snapshot.workBacklog.connections[1]?.accountLabel).toBe('Alex');
-    expect(api.listWorkRepositories).not.toHaveBeenCalled();
+    expect(api.listWorkRepositories).toHaveBeenCalledWith('linear');
   });
 
   it('opens Linear in the host browser and ignores a poll that finishes after cancellation', async () => {

@@ -286,7 +286,7 @@ export class WorkIntegrationManager {
     const generation = this.invalidate(provider);
     await this.writeToken(provider, () => this.options.tokenStore.delete(provider));
     if (this.generation(provider) !== generation) return this.snapshot();
-    if (provider === 'github') delete this.snapshot().workBacklog.providerConfigurations.github;
+    delete this.snapshot().workBacklog.providerConfigurations[provider];
     this.setConnection({
       provider,
       status: this.driver(provider).configured() ? 'disconnected' : 'notConfigured',
@@ -301,21 +301,19 @@ export class WorkIntegrationManager {
   }
 
   async configureBacklog(input: WorkBacklogConfigurationInput): Promise<AppSnapshot> {
-    if (input.provider === 'github') {
+    {
       const repositoryId = normalizedOptionalString(input.configuration.repositoryId);
       if (repositoryId) {
         const assigneeLogin = normalizedOptionalString(input.configuration.assigneeLogin);
         const tagName = normalizedOptionalString(input.configuration.tagName);
-        this.snapshot().workBacklog.providerConfigurations.github = {
+        this.snapshot().workBacklog.providerConfigurations[input.provider] = {
           repositoryId,
           ...(assigneeLogin ? { assigneeLogin } : {}),
           ...(tagName ? { tagName } : {}),
         };
       } else {
-        delete this.snapshot().workBacklog.providerConfigurations.github;
+        delete this.snapshot().workBacklog.providerConfigurations[input.provider];
       }
-    } else {
-      input.provider satisfies never;
     }
     await this.options.saveSnapshot();
     return this.snapshot();

@@ -461,7 +461,7 @@ function isWorkIntegrationConnection(value: unknown): boolean {
 }
 
 function isProviderConfigurations(value: unknown): boolean {
-  return isRecord(value) && optional(value, 'github', isGitHubProviderConfiguration);
+  return isRecord(value) && optional(value, 'github', isGitHubProviderConfiguration) && optional(value, 'linear', isGitHubProviderConfiguration);
 }
 
 function isGitHubProviderConfiguration(value: unknown): boolean {

@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceBranch, WorkItem } from '@codex-claw/core/contracts';
 import '../../styles/base.css';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
+import { createClientApiMock } from '../../test/client-api-mock';
+import { configureClawClient } from '../../platform-api';
 
 const branches: SourceBranch[] = [
   { name: 'main', isDefault: true, worktreePath: '/repos/project' },
@@ -29,6 +31,62 @@ const issue: WorkItem = {
 };
 
 describe('RepositorySessionSourceDialog', () => {
+  it('selects a Linear issue in the Mission picker with its provider and source intact', async () => {
+    const { api } = createClientApiMock();
+    configureClawClient({ platform: 'desktop', api });
+    api.listWorkRepositories.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', isPrivate: true, url: 'https://linear.app' }]);
+    const selected: WorkItem = { ...issue, provider: 'linear', id: 'linear:uuid', identifier: 'ENG-24', repositoryId: 'linear:team', linearSource: { teamId: 'team', teamName: 'Engineering' } };
+    api.listWorkItems.mockResolvedValue([selected]);
+    const wrapper = mount(RepositorySessionSourceDialog, { props: { visible: true, repositoryName: '', purpose: 'missionIssue' } });
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
+    await flushPromises();
+    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:team');
+    await flushPromises();
+    await wrapper.get('[aria-label="Search issues"]').setValue('ENG-24');
+    await wrapper.get('.repository-session-source-dialog__result').trigger('click');
+    expect(wrapper.emitted('select-work-item')).toEqual([[selected]]);
+    expect(wrapper.find('[role="tab"]').exists()).toBe(false);
+    configureClawClient();
+  });
+  it('browses Linear on the selected host, ignores an older source response, and keeps branch navigation on GitHub', async () => {
+    const { api } = createClientApiMock();
+    configureClawClient({ platform: 'desktop', api });
+    const source = (id: string) => ({ provider: 'linear' as const, id: `linear:${id}`, owner: id, name: id, fullName: id, url: 'https://linear.app', isPrivate: true });
+    api.listWorkRepositories.mockResolvedValue([source('eng'), source('ops')]);
+    let resolveOld!: (items: WorkItem[]) => void;
+    const item = { ...issue, provider: 'linear' as const, id: 'linear:uuid', identifier: 'OPS-24', repositoryId: 'linear:ops', body: 'Issue details', nativeState: 'In progress' };
+    api.listWorkItems.mockImplementation(async (_provider, id) => id === 'linear:eng' ? new Promise(resolve => { resolveOld = resolve; }) : [item]);
+    const location = { kind: 'remote' as const, remoteConnectionId: 'remote-one' };
+    const wrapper = mount(RepositorySessionSourceDialog, { props: { visible: true, repositoryName: 'claw', branches, workItems: [issue], location } });
+    await wrapper.findAll('[role="tab"]')[2].trigger('click');
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
+    await flushPromises();
+    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:eng');
+    await flushPromises();
+    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:ops');
+    await flushPromises();
+    resolveOld([{ ...item, identifier: 'ENG-24', repositoryId: 'linear:eng' }]);
+    await flushPromises();
+    expect(wrapper.text()).toContain('OPS-24');
+    expect(wrapper.text()).not.toContain('ENG-24');
+    expect(api.listWorkItems).toHaveBeenLastCalledWith('linear', 'linear:ops', location, { kind: 'issue', state: 'all' });
+    await wrapper.get('.repository-session-source-dialog__result').trigger('click');
+    expect(wrapper.get('.linear-issue-detail').text()).toContain('Issue details');
+    expect(wrapper.findComponent({ name: 'WorkItemAssignmentPicker' }).exists()).toBe(false);
+    await wrapper.get('[aria-label="Back"]').trigger('click');
+    await wrapper.findAll('[role="tab"]')[0].trigger('click');
+    await wrapper.get('.repository-session-source-dialog__result').trigger('click');
+    expect(wrapper.emitted('select-branch')).toEqual([[branches[0]]]);
+    await wrapper.findAll('[role="tab"]')[2].trigger('click');
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('github');
+    api.listWorkRepositories.mockRejectedValueOnce(new Error('Linear unavailable'));
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('Linear unavailable');
+    await wrapper.findAll('[role="tab"]')[0].trigger('click');
+    expect(wrapper.findAll('.repository-session-source-dialog__result')).toHaveLength(3);
+    configureClawClient();
+  });
   it('renders a footer only when there is a backend choice', async () => {
     const choices = ref<('codex' | 'claude')[]>(['codex']);
     const wrapper = mount(RepositorySessionSourceDialog, {
@@ -124,7 +182,7 @@ describe('RepositorySessionSourceDialog', () => {
     expect(wrapper.find('[role="tab"]').exists()).toBe(false);
     expect(wrapper.findAll('.repository-session-source-dialog__result')).toHaveLength(1);
     expect(wrapper.text()).not.toContain('Update UI');
-    wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'second');
+    await wrapper.get('[aria-label="Repository"] select').setValue('second');
     expect(wrapper.emitted('select-repository')).toStrictEqual([['second']]);
     await wrapper.get('[aria-label="Search issues"]').setValue('not found');
     expect(wrapper.find('.repository-session-source-dialog__result').exists()).toBe(false);

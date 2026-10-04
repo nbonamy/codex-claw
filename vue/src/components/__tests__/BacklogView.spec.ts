@@ -1,12 +1,45 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
+import { defineComponent, h, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import type { WorkItem, WorkRepository } from '@codex-claw/core/contracts';
 import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
 import BacklogView from '../BacklogView.vue';
 import CockpitWorkInbox from '../CockpitWorkInbox.vue';
+import { useCockpitBacklog } from '../use-cockpit-backlog';
 
 describe('BacklogView', () => {
+  it('switches provider before source and rejects a late global feed from the previous provider', async () => {
+    window.localStorage.clear();
+    const snapshot = reactive(createInitialSnapshot());
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected', accountLabel: 'Alex · Acme' }];
+    const linearItem: WorkItem = { ...item(24), provider: 'linear', id: 'linear:uuid', identifier: 'ENG-24', repositoryId: 'linear:team', title: 'Linear issue', body: 'Linear details', nativeState: 'Started' };
+    let resolveOld!: (page: import('@codex-claw/core/contracts').WorkItemPage) => void;
+    const load = vi.fn(async (_query, provider) => provider === 'linear'
+      ? { items: [linearItem], page: 1, pageSize: 25, totalItems: 1 }
+      : new Promise<import('@codex-claw/core/contracts').WorkItemPage>(resolve => { resolveOld = resolve; }));
+    const source = { ...repository('team', '2026-01-01'), provider: 'linear' as const, id: 'linear:team', name: 'Engineering', fullName: 'Engineering' };
+    const Harness = defineComponent({ setup() {
+      const state = useCockpitBacklog({ getSnapshot: () => snapshot, configure: async input => { snapshot.workBacklog.providerConfigurations[input.provider] = { repositoryId: input.configuration.repositoryId ?? undefined }; }, confirmLoadAll: async () => true, getWorkBacklogError: () => null, getWorkBacklogStatus: () => 'loaded', getWorkItemsByRepository: () => ({ 'linear:linear:team': [linearItem] }), getWorkRepositories: provider => provider === 'linear' ? [source] : [repository('repo', '2026-01-01')], loadGlobalWorkItems: load, loadWorkItems: async () => {}, loadWorkRepositories: async () => {} });
+      void state.initialize();
+      return () => h(BacklogView, { agents: [], teams: [], workProvider: state.provider.value, workBacklog: state.workBacklog.value, startWorkItemsAction: async () => {}, onSelectWorkProvider: state.selectProvider, onSelectWorkRepository: state.selectRepository });
+    } });
+    const wrapper = mount(Harness);
+    await flushPromises();
+    await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
+    await flushPromises();
+    resolveOld({ items: [item(99)], page: 1, pageSize: 25, totalItems: 1 });
+    await flushPromises();
+    expect(wrapper.text()).toContain('ENG-24');
+    expect(wrapper.text()).not.toContain('#99');
+    await wrapper.get('.cockpit-view__repositories button').trigger('click');
+    await flushPromises();
+    await wrapper.get('.cockpit-inbox__row').trigger('click');
+    expect(wrapper.get('.linear-issue-detail').text()).toContain('Linear details');
+    expect(snapshot.workBacklog.providerConfigurations.linear?.repositoryId).toBe('linear:team');
+    expect(load).toHaveBeenLastCalledWith({ assignment: 'viewer', state: 'open', page: 1, pageSize: 25 }, 'linear');
+    window.localStorage.clear();
+  });
   it('presents Backlog as an operator inbox and keeps search inside it', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountView(snapshot, []);

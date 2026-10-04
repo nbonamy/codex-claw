@@ -933,6 +933,7 @@ function sanitizeWorkIntegrationConnection(value: unknown): WorkIntegrationConne
 function cloneWorkBacklogProviderConfigurations(value: WorkBacklogState['providerConfigurations']): WorkBacklogState['providerConfigurations'] {
   return {
     ...(value.github ? { github: { ...value.github } } : {}),
+    ...(value.linear ? { linear: { ...value.linear } } : {}),
   };
 }
 
@@ -942,8 +943,10 @@ function sanitizeWorkBacklogProviderConfigurations(value: unknown): WorkBacklogS
   }
 
   const github = sanitizeGitHubWorkBacklogConfiguration(value.github);
+  const linear = sanitizeGitHubWorkBacklogConfiguration(value.linear);
   return {
     ...(github ? { github } : {}),
+    ...(linear ? { linear } : {}),
   };
 }
 

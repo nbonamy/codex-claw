@@ -1000,6 +1000,18 @@ before provider requests. Concurrent requests share one refresh operation
 because GitHub invalidates the old access and refresh tokens after rotation.
 
 Linear uses authorization-code OAuth with S256 PKCE and single-use random state.
+Linear browsing runs in the backend driver through GraphQL. The existing
+`WorkRepository` catalog DTO carries explicit `linearSource` team/project IDs;
+its legacy repository fields identify a backlog scope, never a code checkout.
+Issues use provider-qualified UUID identities plus native identifiers and
+workflow names. Completed/canceled states map to closed; other supported
+workflow types map to open. The numbered global feed traverses the filtered
+cursor connection before slicing, so its total is measured, at the cost of
+fetching the full filtered collection on each uncached page request. Dialog
+catalogs key requests by provider, source and host location and reject late
+responses after a context switch. GitHub continues to own branch/PR and clone
+operations. Browsing does not infer a code repository from Linear names.
+
 The public client ID and exact registered callback URL resolve from
 `workBacklog.providerSettings.linear` in Settings, then
 `CODEX_CLAW_LINEAR_CLIENT_ID` / `CODEX_CLAW_LINEAR_CALLBACK_URI`, then optional

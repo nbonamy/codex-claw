@@ -3,6 +3,7 @@ import { createServer, type Server } from 'node:http';
 import type { WorkProviderSettings } from '@codex-claw/core/contracts';
 import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
+import { linearAssignedItems, linearGlobalItems, linearItems, linearSources } from './linear-backlog';
 
 type Attempt = {
   id: string;
@@ -168,8 +169,8 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
     return viewer.organization?.name ? `${viewer.name} · ${viewer.organization.name}` : viewer.name;
   }
 
-  // Backlog source and issue methods arrive in the separate browse ticket.
-  async listRepositories(): Promise<never> { throw new Error('Linear backlog browsing is not available yet.'); }
-  async listGlobalItems(): Promise<never> { throw new Error('Linear backlog browsing is not available yet.'); }
-  async listItems(): Promise<never> { throw new Error('Linear backlog browsing is not available yet.'); }
+  listRepositories = linearSources;
+  listGlobalItems = linearGlobalItems;
+  listItems = linearItems;
+  listAssignedItems = linearAssignedItems;
 }
