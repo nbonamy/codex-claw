@@ -51,6 +51,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { translate } from '../i18n';
 import { useBackendChoices } from './backend-selection';
+import { conversationMenuCommand, type ConversationMenuCommand } from './conversation-command-menu';
 import type {
   Agent,
   SavedPromptDraft,
@@ -95,6 +96,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'remove-review-finding': [];
   'open-review': [agentId: string];
+  'composer-command': [agentId: string, command: ConversationMenuCommand];
   'close-plan': [];
 }>();
 const pane = ref<InstanceType<typeof ConversationPane> | null>(null);
@@ -113,7 +115,11 @@ const conversation = useAgentConversation({
   agentId: () => props.view.agent.id,
   state,
   actions: props.actions,
-  onMenuSelect: (item) => props.selectModelMenuItem(item),
+  onMenuSelect: (item) => {
+    const command = conversationMenuCommand(item.payload);
+    if (command) return emit('composer-command', props.view.agent.id, command);
+    return props.selectModelMenuItem(item);
+  },
   openLink: (...args) => props.openLink(...args),
   openImage: (...args) => props.openImage(...args),
   openVisualization: (...args) => props.openVisualization(...args),
