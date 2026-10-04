@@ -71,7 +71,7 @@ export const surfaceMessages = {
     "alsoDelete": "Also delete",
     "cancel": "Cancel",
     "keepWorktree": "Keep worktree",
-    "discardChanges": "Discard uncommitted changes, including untracked files. This cannot be undone.",
+    "discardChanges": "This worktree has uncommitted changes. I’m OK with losing them.",
     "deleteWorktree": "Delete worktree"
   },
   "agentDialog": {
