@@ -1,6 +1,5 @@
 <template>
   <div class="conversation-pane" :data-conversation-agent-id="agent?.id" @keydown.capture="handleDraftShortcut" @focusin.capture="handleDraftFocusIn">
-    <AgentTasks :tasks="taskView.tasks.value" :error="taskView.error.value" @cancel="taskView.cancel" />
     <div v-if="agent?.handoff?.phase === 'failed'" class="conversation-pane__handoff" role="status">
       <p>{{ agent.handoff.error }}</p>
       <details v-if="agent.handoff.note">
@@ -158,9 +157,6 @@ import type {
 import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
 import { agentDisplayName } from '@codex-claw/core/agent-display';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
-import AgentTasks from './AgentTasks.vue';
-import { useAgentTasks } from './use-agent-tasks';
-import { codexClawApi } from '../platform-api';
 import ConversationLoadError from './ConversationLoadError.vue';
 import AgentMention from './AgentMention.vue';
 import ComposerContextCards, { type ComposerContextCard } from './ComposerContextCards.vue';
@@ -238,7 +234,6 @@ provideClawToolPresentation(
   },
 );
 
-const taskView = useAgentTasks(() => props.agent?.id ?? '', () => codexClawApi);
 const emit = defineEmits<{
   'add-text-annotation': [payload: { selection: CodexMessageTextSelection; comment: string }];
   'annotate-attachment': [attachment: CodexNativeAttachment];
