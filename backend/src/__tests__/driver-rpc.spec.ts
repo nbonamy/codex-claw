@@ -32,6 +32,12 @@ describe('BackendDriverRpc', () => {
     expect(operation).toHaveBeenCalledExactlyOnceWith(agent,
       task ? `${WORKTREE_DELEGATION_PROMPT}\n\nTask to delegate:\n${task}` : WORKTREE_DELEGATION_PROMPT,
       options);
+    const delivered = operation.mock.calls[0]![1] as string;
+    expect(delivered).toMatch(/<context>\n[\s\S]+\n<\/context>/u);
+    expect(delivered.replace(/\s*<context>[\s\S]*?<\/context>/u, '').trim()).toBe(
+      'Delegate this task to a new agent in a dedicated worktree.'
+      + (task ? `\n\nTask to delegate:\n${task}` : ''),
+    );
     expect(method.endsWith('/steer') ? sendPrompt : steerPrompt).not.toHaveBeenCalled();
     await rpc.close();
   });
