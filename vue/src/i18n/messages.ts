@@ -660,6 +660,7 @@ export const messages = {
       completeAction: 'Start using Codex Claw',
     },
     chat: {
+      composerActions: { review: 'Review', delegate: 'Delegate', visualize: 'Visualize' },
       quickChatHeadline: 'What can I help with?',
       savedDrafts: {
         title: 'Saved drafts',

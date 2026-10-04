@@ -203,7 +203,8 @@ export class ClawBackendServer {
           const reconnected = connections.filter(connection => connection.connected && connection.installed && connection.enabled !== false && !connection.checking
             && !this.snapshot.providerConnections?.some(previous => previous.backend === connection.backend && previous.connected && previous.installed && previous.enabled !== false));
           this.snapshot.providerConnections = connections;
-          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          // Publish the client projection without replacing live agents/review contexts.
+          this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
           for (const agent of this.snapshot.agents) {
             if (reconnected.some(connection => connection.backend === agent.backend)) this.agentPrompts?.drain(agent.id);
           }
@@ -2094,7 +2095,7 @@ export class ClawBackendServer {
           if (!Array.isArray(providers) || !providers.every(isProviderConnection)) throw new Error('Remote engine connections are unavailable. Update the remote runtime.');
           const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
           if (connection) connection.providerConnections = providers;
-          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
           return createClawRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
@@ -2121,7 +2122,7 @@ export class ClawBackendServer {
           if (!Array.isArray(providers) || !providers.every(isProviderConnection)) throw new Error('Remote engine connections are unavailable. Update the remote runtime.');
           const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
           if (connection) connection.providerConnections = providers;
-          this.emitEvent({ type: 'snapshot.updated', payload: this.remoteTeams.clientSnapshotFromKnownRemotes() });
+          this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
           return createClawRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');

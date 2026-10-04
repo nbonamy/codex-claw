@@ -365,6 +365,7 @@
                 :open-image="(image, context) => agentWorkspace?.openConversationImage(image, context, agentId) ?? false"
                 :open-visualization="visualization => agentWorkspace?.openConversationVisualization(visualization, agentId)"
                 @open-review="openRightWorkspaceTab('codeReview', $event)"
+                @composer-command="runConversationMenuCommand"
                 @remove-review-finding="pendingReviewClarification = null" />
             </template>
           </AgentSplitGrid>
@@ -600,6 +601,7 @@ import AgentConversationPanel from './AgentConversationPanel.vue';
 import SplitLayoutControl from './SplitLayoutControl.vue';
 import { useSplitWorkspace } from './use-split-workspace';
 import type { AgentConversationActions } from './use-agent-conversation';
+import { conversationCommandMenuItems, conversationMenuCommand, type ConversationMenuCommand } from './conversation-command-menu';
 import { claudePaneClientRequests } from './claude-pane-client-requests';
 import type { AgentConversationView } from '../app-state';
 import MissionCodeReview from './MissionCodeReview.vue';
@@ -2072,6 +2074,7 @@ const conversationPaneState: CodexConversationPaneState = {
     },
     get approvalPreset() { return props.approvalPreset; },
     get leadingMenuItems() { return permissionModeMenuItems.value; },
+    get menuItems() { return conversationCommandMenuItems(); },
     get modelMenuItems() { return modelFavoriteMenuItems.value; },
     get planMode() { return props.planMode; },
     get selectedModelId() { return props.selectedModelId; },
@@ -2118,6 +2121,8 @@ const conversationPaneActions: CodexConversationPaneActions = {
   interrupt: () => emit('interrupt-agent'),
   loadOlderHistory: () => props.loadOlderAgentHistory?.(currentAgent.value?.id ?? ''),
   menuSelect: (item) => {
+    const composerCommand = conversationMenuCommand(item.payload);
+    if (composerCommand && currentAgent.value) return runConversationMenuCommand(currentAgent.value.id, composerCommand);
     const favoriteCommand = modelFavoriteCommand(item.payload);
     if (favoriteCommand) {
       void handleModelFavoriteCommand(favoriteCommand);
@@ -2146,6 +2151,22 @@ const conversationPaneActions: CodexConversationPaneActions = {
     if (settings.serviceTier !== undefined) emit('select-service-tier', settings.serviceTier);
   },
 };
+
+async function runConversationMenuCommand(agentId: string, command: ConversationMenuCommand): Promise<void> {
+  try {
+    if (command === 'review') { openRightWorkspaceTab('codeReview', agentId); return; }
+    if (command === 'visualize') return await startVisualizeForAgent(agentId);
+    await backendSwitch.settled();
+    if (props.agentConversationActions) await props.agentConversationActions.send(agentId, '/delegate');
+    else if (currentAgent.value?.id === agentId) {
+      requireConnectedConversation();
+      if (props.sendPromptAction) await props.sendPromptAction('/delegate');
+      else emit('sendPrompt', '/delegate');
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error));
+  }
+}
 
 type ModelFavoriteCommand =
   | { kind: 'model-favorite-add' | 'model-favorite-select'; favorite: ModelFavorite }
