@@ -70,6 +70,44 @@ async function setup(parentBackend: 'codex' | 'claude') {
 }
 
 describe('durable tasks through authenticated MCP and real provider adapters', () => {
+  it('honors Stop while automatic parent delivery is awaiting a turn identity', async () => {
+    const f = await setup('codex');
+    const created = await f.call(f.parent.id, 'create-agent', { repoPath: '/repo', backend: 'codex', prompt: 'Perform the assignment', requestId: 'stopped-delivery', task: { title: 'Assignment', doneWhen: 'Verified' } });
+    const task = created.structuredContent.task as DelegatedTask;
+    await f.call(task.workerAgentId, 'complete-task', { summary: 'Verified', evidence: ['Checked'], artifacts: [], caveats: [] });
+    const parent = f.codex.conversation('codex-parent');
+    let accept!: () => void;
+    const acceptance = new Promise<void>(resolve => { accept = resolve; });
+    parent.handle.sendMessage.mockImplementationOnce(async () => {
+      parent.setSnapshot({ activeTurnId: null, busy: true });
+      await acceptance;
+      parent.setSnapshot({ activeTurnId: 'delivery-turn', busy: true });
+      parent.emit({ ...f.metadata, conversationId: 'codex-parent', turnId: 'delivery-turn', type: 'turn.started', payload: { turn: { id: 'delivery-turn', status: 'inProgress', items: [], error: null } } } as never);
+      return parent.handle.getSnapshot();
+    });
+    const worker = f.codex.conversation('codex-worker');
+    worker.setSnapshot({ activeTurnId: null, busy: false });
+    worker.emit({ ...f.metadata, type: 'turn.completed', payload: { status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null } });
+    await vi.waitFor(() => expect(parent.handle.sendMessage).toHaveBeenCalledOnce());
+    await f.server.handleMessage({ jsonrpc: '2.0', id: 1, method: backendMethods.agentInterrupt, params: { agentId: f.parent.id } });
+    expect(parent.handle.interrupt).not.toHaveBeenCalled();
+    expect((await f.store.loadTasks())[0]!.parentStopRequested).toBe(true);
+    accept();
+    await vi.waitFor(() => expect(parent.handle.interrupt).toHaveBeenCalledOnce());
+    expect(f.tasks.mayStartAutomatedPrompt(f.parent.id)).toBe(false);
+    expect((await f.store.loadTasks())[0]).toMatchObject({ state: 'completed', parentStopRequested: true, parentWakeBlocked: true, delivery: { state: 'accepted', acceptance: { turnId: 'delivery-turn' } } });
+
+    // A duplicate late start is still the stopped automatic turn, not user consent.
+    parent.emit({ ...f.metadata, conversationId: 'codex-parent', turnId: 'delivery-turn', type: 'turn.started', payload: { turn: { id: 'delivery-turn', status: 'inProgress', items: [], error: null } } } as never);
+    expect(f.tasks.mayStartAutomatedPrompt(f.parent.id)).toBe(false);
+    parent.setSnapshot({ activeTurnId: null, busy: false });
+    parent.emit({ ...f.metadata, conversationId: 'codex-parent', turnId: 'delivery-turn', type: 'turn.completed', payload: { status: 'interrupted', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null } });
+    await f.server.handleMessage({ jsonrpc: '2.0', id: 2, method: backendMethods.agentPromptSend, params: { agentId: f.parent.id, prompt: 'Continue with my next request' } });
+    await vi.waitFor(() => expect(f.tasks.mayStartAutomatedPrompt(f.parent.id)).toBe(true));
+    await vi.waitFor(async () => expect((await f.store.loadTasks())[0]!.parentStopRequested).toBe(false));
+    expect(parent.handle.interrupt).toHaveBeenCalledOnce();
+  });
+
   it.each(['error result', 'unexpected iterator end', 'explicit interruption'] as const)('retains the provisional Claude result without delivering success after %s', async outcome => {
     const f = await setup('codex');
     const creating = f.call(f.parent.id, 'create-agent', { repoPath: '/repo', backend: 'claude', prompt: 'Write bonjour', requestId: 'claude-outcome', task: { title: 'French readme', doneWhen: 'Verified' } });

@@ -27,6 +27,7 @@ export class DurableTaskService {
   private readonly turns = new Map<string, string>();
   private readonly latestTurns = new Map<string, string>();
   private readonly stoppedParents = new Set<string>();
+  private readonly parentAdmissions = new Map<string, { turnId?: string; stopRequested: boolean }>();
   private readonly listeners = new Set<() => void>();
   private readonly dispatching = new Set<string>();
   private readonly creating = new Map<string, { fingerprint: string; promise: Promise<DelegatedTask> }>();
@@ -143,7 +144,7 @@ export class DurableTaskService {
 
   async cancel(caller: string, id: string): Promise<DelegatedTask> {
     const requested = this.list(caller, [id])[0]!;
-    if (!terminal(requested)) this.stoppedParents.add(requested.workerAgentId);
+    if (!terminal(requested)) this.stopAutomaticPrompts(requested.workerAgentId);
     const task = await this.change(tasks => {
       const task = tasks.find(task => task.id === id)!;
       if (!terminal(task)) {
@@ -187,8 +188,14 @@ export class DurableTaskService {
 
   /** A stop is durable before invoking the provider so a racing result cannot revive the parent. */
   async blockParent(parentId: string): Promise<void> {
-    this.stoppedParents.add(parentId);
+    this.stopAutomaticPrompts(parentId);
     await this.change(tasks => { for (const task of tasks) if (task.parentAgentId === parentId) { task.parentWakeBlocked = true; task.parentStopRequested = true; } });
+  }
+
+  private stopAutomaticPrompts(agentId: string): void {
+    this.stoppedParents.add(agentId);
+    const admission = this.parentAdmissions.get(agentId);
+    if (admission) admission.stopRequested = true;
   }
 
   async recover(): Promise<void> {
@@ -245,10 +252,18 @@ export class DurableTaskService {
     const agentId = event.agentId;
     const latestTurn = this.latestTurns.get(agentId);
     const olderCompletion = view.type === 'turn.completed' && latestTurn !== undefined && view.turnId !== latestTurn;
+    let preserveStop = false;
     if (view.type === 'turn.started' && view.turnId) {
+      const admission = this.parentAdmissions.get(agentId);
+      if (admission && (!admission.turnId || admission.turnId === view.turnId)) {
+        admission.turnId = view.turnId;
+        preserveStop = admission.stopRequested;
+      } else {
+        this.parentAdmissions.delete(agentId);
+      }
       this.turns.set(agentId, view.turnId);
       this.latestTurns.set(agentId, view.turnId);
-      this.stoppedParents.delete(agentId);
+      if (!preserveStop) this.stoppedParents.delete(agentId);
     }
     if (view.type === 'turn.completed' && this.turns.get(agentId) === view.turnId) this.turns.delete(agentId);
     if (!['turn.started', 'turn.completed', 'agent.statusChanged', 'agent.closed'].includes(view.type)) return;
@@ -257,7 +272,7 @@ export class DurableTaskService {
       const outcome = payload.status ?? payload.turn?.status;
       for (const task of tasks) {
         if (task.parentAgentId === agentId && !olderCompletion) {
-          if (view.type === 'turn.started') { task.parentWakeBlocked = false; task.parentStopRequested = false; }
+          if (view.type === 'turn.started' && !preserveStop) { task.parentWakeBlocked = false; task.parentStopRequested = false; }
           if (view.type === 'turn.completed' && outcome === 'completed' && !task.parentStopRequested) task.parentWakeBlocked = false;
           if (view.type === 'turn.completed' && outcome !== 'completed') task.parentWakeBlocked = true;
         }
@@ -329,8 +344,14 @@ export class DurableTaskService {
         await this.change(tasks => { for (const task of tasks) if (batch.some(item => item.id === task.id)) task.delivery!.state = 'pending'; });
         return;
       }
+      // Retain the automatic turn identity until a different turn starts: its
+      // delayed or repeated start event is not consent to clear a user's Stop.
+      const admission: { turnId?: string; stopRequested: boolean } = { stopRequested: false };
+      this.parentAdmissions.set(parentId, admission);
+      let receipt: TaskAcceptance | undefined;
       try {
-        const receipt = await this.ports.send(currentParent, `Claw task results (${batch[0]!.delivery!.id}). These are saved task outcomes, not new assignments. No acknowledgment to workers is needed. Review results and continue only within the user's authorization. Completion does not approve merge, publication, or Mission progression.\n${JSON.stringify(batch.map(task => ({ taskId: task.id, title: task.assignment.title, workerAgentId: task.workerAgentId, result: task.submission })))}`);
+        receipt = await this.ports.send(currentParent, `Claw task results (${batch[0]!.delivery!.id}). These are saved task outcomes, not new assignments. No acknowledgment to workers is needed. Review results and continue only within the user's authorization. Completion does not approve merge, publication, or Mission progression.\n${JSON.stringify(batch.map(task => ({ taskId: task.id, title: task.assignment.title, workerAgentId: task.workerAgentId, result: task.submission })))}`);
+        admission.turnId ??= receipt.turnId;
         await this.change(tasks => {
           for (const task of tasks) if (batch.some(item => item.id === task.id)) task.delivery = { ...task.delivery!, state: 'accepted', acceptance: receipt };
         });
@@ -341,6 +362,12 @@ export class DurableTaskService {
             task.detail = `Parent acceptance unconfirmed. Result retained; use wait-tasks to recover. ${String(error)}`;
           }
         });
+      }
+      if (receipt && admission.stopRequested && admission.turnId) {
+        // The first Stop may have preceded provider turn identity. The driver's
+        // expected-turn guard prevents this retry from interrupting newer work.
+        try { await this.ports.interrupt(currentParent, admission.turnId); }
+        catch (error) { this.ports.onError(error); }
       }
     } finally { this.dispatching.delete(parentId); }
   }
