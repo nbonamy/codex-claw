@@ -1,4 +1,6 @@
 import { computed, nextTick, ref } from 'vue';
+import { backlogConnectionsKey } from '../backlog-providers';
+import { createInitialSnapshot } from '@codex-claw/core/snapshot';
 import { ElDialog } from 'element-plus';
 import { backendChoicesKey } from '../backend-selection';
 import { flushPromises, mount } from '@vue/test-utils';
@@ -37,11 +39,13 @@ describe('RepositorySessionSourceDialog', () => {
     api.listWorkRepositories.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', isPrivate: true, url: 'https://linear.app' }]);
     const selected: WorkItem = { ...issue, provider: 'linear', id: 'linear:uuid', identifier: 'ENG-24', repositoryId: 'linear:team', linearSource: { teamId: 'team', teamName: 'Engineering' } };
     api.listWorkItems.mockResolvedValue([selected]);
-    const wrapper = mount(RepositorySessionSourceDialog, { props: { visible: true, repositoryName: '', purpose: 'missionIssue' } });
-    await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
+    const wrapper = mount(RepositorySessionSourceDialog, {
+      props: { visible: true, repositoryName: '', purpose: 'missionIssue' },
+      global: { provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'disconnected' }, { provider: 'linear', status: 'connected' }] } },
+    });
     await flushPromises();
-    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:team');
-    await flushPromises();
+    expect(wrapper.find('[aria-label="Backlog provider"]').exists()).toBe(false);
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Team / project"] select').element.value).toBe('linear:team');
     await wrapper.get('[aria-label="Search issues"]').setValue('ENG-24');
     await wrapper.get('.repository-session-source-dialog__result').trigger('click');
     expect(wrapper.emitted('select-work-item')).toEqual([[selected]]);
@@ -57,12 +61,16 @@ describe('RepositorySessionSourceDialog', () => {
     const item = { ...issue, provider: 'linear' as const, id: 'linear:uuid', identifier: 'OPS-24', repositoryId: 'linear:ops', body: 'Issue details', nativeState: 'In progress' };
     api.listWorkItems.mockImplementation(async (_provider, id) => id === 'linear:eng' ? new Promise(resolve => { resolveOld = resolve; }) : [item]);
     const location = { kind: 'remote' as const, remoteConnectionId: 'remote-one' };
+    const remoteSnapshot = createInitialSnapshot();
+    remoteSnapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected' }];
+    api.getAutomationSnapshot.mockResolvedValue(remoteSnapshot);
     const wrapper = mount(RepositorySessionSourceDialog, { props: { visible: true, repositoryName: 'claw', branches, workItems: [issue], location } });
+    await flushPromises();
     await wrapper.findAll('[role="tab"]')[2].trigger('click');
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('linear');
     await flushPromises();
-    await wrapper.get('[aria-label="Team / project"] select').setValue('linear:eng');
-    await flushPromises();
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Team / project"] select').element.value).toBe('linear:eng');
+    expect(api.listWorkItems).toHaveBeenCalledWith('linear', 'linear:eng', location, { kind: 'issue', state: 'all' });
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:ops');
     await flushPromises();
     resolveOld([{ ...item, identifier: 'ENG-24', repositoryId: 'linear:eng' }]);
@@ -177,11 +185,11 @@ describe('RepositorySessionSourceDialog', () => {
         branches,
         workItems: [issue, pullRequest],
       },
+      global: { provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }] } },
     });
     await flushPromises();
 
-    // The compact dialog removes Element Plus's default header padding. Reserve
-    // its 48px close-button hit target before placing the repository selector.
+    // The search header reserves the close-button hit target in compact mode.
     expect(getComputedStyle(wrapper.get('.el-dialog__header').element).paddingRight).toBe('48px');
 
     expect(wrapper.find('[role="tab"]').exists()).toBe(false);

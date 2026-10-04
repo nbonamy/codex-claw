@@ -6,6 +6,7 @@ import { i18n } from '../../i18n';
 import RepositoryBacklogPanel from '../RepositoryBacklogPanel.vue';
 import { createClientApiMock } from '../../test/client-api-mock';
 import { configureClawClient } from '../../platform-api';
+import { backlogConnectionsKey } from '../backlog-providers';
 
 describe('RepositoryBacklogPanel', () => {
   it('shows native Linear details, filters by the viewer and resets details when the source changes', async () => {
@@ -520,6 +521,7 @@ function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBacklogPane
   return mount(RepositoryBacklogPanel, {
     props,
     global: {
+      provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected' }] },
       plugins: [i18n],
       stubs: {
         ElPopover: {

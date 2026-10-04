@@ -1,11 +1,12 @@
 import type { AutomationLocation, WorkItem, WorkProviderKind, WorkRepository } from '@codex-claw/core/contracts';
-import { computed, onScopeDispose, ref, watch } from 'vue';
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue';
+import { useBacklogConnections, useBacklogProviders } from './backlog-providers';
 import { codexClawApi } from '../platform-api';
 import { AsyncCatalogCache } from '../async-catalog-cache';
 
 /** Dialog-local Linear browsing. Code-repository selection remains with callers. */
 export function useLinearBacklog(location: () => AutomationLocation | undefined) {
-  const provider = ref<WorkProviderKind>('github');
+  const { provider, providers } = useBacklogProviders(useBacklogConnections(location));
   const sources = ref<WorkRepository[]>([]);
   const sourceId = ref<string | null>(null);
   const items = ref<WorkItem[]>([]);
@@ -16,17 +17,21 @@ export function useLinearBacklog(location: () => AutomationLocation | undefined)
   const locationKey = computed(() => JSON.stringify(location() ?? { kind: 'local' }));
   let revision = 0;
   onScopeDispose(() => { ++revision; });
-  watch(locationKey, () => { void selectProvider(provider.value); });
+  watch([provider, locationKey, () => providers.value.length > 0], () => { void loadProvider(); }, { immediate: true });
 
   async function selectProvider(next: WorkProviderKind): Promise<void> {
-    const request = ++revision;
     provider.value = next;
+    await nextTick();
+  }
+
+  async function loadProvider(): Promise<void> {
+    const request = ++revision;
     sourceId.value = null;
     sources.value = [];
     items.value = [];
     error.value = null;
     status.value = 'notLoaded';
-    if (next !== 'linear') return;
+    if (provider.value !== 'linear' || !providers.value.includes('linear')) return;
     status.value = 'loading';
     const entry = catalogs.load(`linear:${locationKey.value}`, request, async () => {
       if (!codexClawApi?.listWorkRepositories) throw new Error('Backlog browsing is unavailable.');
@@ -37,6 +42,7 @@ export function useLinearBacklog(location: () => AutomationLocation | undefined)
     sources.value = entry.value;
     status.value = entry.status;
     error.value = entry.error;
+    if (entry.status === 'loaded' && entry.value[0]) await selectSource(entry.value[0].id);
   }
 
   async function selectSource(id: string | null): Promise<void> {
@@ -56,6 +62,6 @@ export function useLinearBacklog(location: () => AutomationLocation | undefined)
     status.value = entry.status;
     error.value = entry.error;
   }
-  return { provider, sources, sourceId, items, status, error, selectProvider, selectSource,
-    refresh: () => sourceId.value ? selectSource(sourceId.value) : selectProvider(provider.value) };
+  return { provider, providers, sources, sourceId, items, status, error, selectProvider, selectSource,
+    refresh: () => sourceId.value ? selectSource(sourceId.value) : loadProvider() };
 }

@@ -226,6 +226,7 @@
         @select-work-assignee="selectWorkAssigneeForCockpit"
         @select-work-repository="selectWorkRepositoryForCockpit"
         :work-provider="cockpitBacklogState.provider.value"
+        :work-providers="cockpitBacklogState.providers.value"
         @select-work-provider="cockpitBacklogState.selectProvider"
         @select-agent="selectAgentFromCockpit"
       />
@@ -662,6 +663,7 @@ import { useImageAnnotation } from './use-image-annotation';
 import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useVisualizationAnnotations } from './use-visualization-annotations';
 import { useCockpitBacklog } from './use-cockpit-backlog';
+import { provideBacklogConnections } from './backlog-providers';
 import { useWorkspacePreviews } from './use-workspace-previews';
 import { downloadAgentFile } from '../download-agent-file';
 import { useWorkItemRouting } from './use-work-item-routing';
@@ -1005,6 +1007,7 @@ type PendingMissionReviewDiscussion = {
 
 type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 provideBackendChoices(() => props.snapshot, openSettings);
+provideBacklogConnections(() => props.snapshot.workBacklog.connections);
 const backendSwitch = provideBackendSwitch((id, backend) => props.updateAgent({ id, backend }));
 const agentSidebarCollapsed = ref(false);
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);

@@ -16,7 +16,7 @@
     </header>
 
     <div class="automation-editor__body">
-      <BacklogSourceSelector :provider="provider" :show-source="false" @select-provider="selectProvider" />
+      <BacklogSourceSelector :provider="provider" :providers="['github', 'linear']" :show-source="false" @select-provider="selectProvider" />
       <div v-if="!providerConnected" class="automation-editor__notice">
         {{ $t('automationSources.connect', { provider: providerLabel }) }}
       </div>

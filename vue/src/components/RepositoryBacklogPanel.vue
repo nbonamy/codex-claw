@@ -1,6 +1,6 @@
 <template>
   <section class="repository-backlog" :aria-label="$t('surface.repositoryBacklogPanel.repositoryBacklog')">
-    <BacklogSourceSelector :provider="linear.provider.value" :sources="linear.sources.value" :source-id="linear.sourceId.value" :show-source="linear.provider.value === 'linear'" @select-provider="linear.selectProvider" @select-source="linear.selectSource" />
+    <BacklogSourceSelector size="small" :provider="linear.provider.value" :providers="linear.providers.value" :sources="linear.sources.value" :source-id="linear.sourceId.value" :show-source="linear.provider.value === 'linear'" @select-provider="linear.selectProvider" @select-source="linear.selectSource" />
     <header class="repository-backlog__repository">
       <div>
         <GitHubIcon v-if="linear.provider.value === 'github'" aria-hidden="true" />

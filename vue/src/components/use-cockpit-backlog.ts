@@ -8,6 +8,7 @@ import type {
   WorkProviderKind,
 } from '@codex-claw/core/contracts';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { useBacklogProviders } from './backlog-providers';
 
 type CockpitBacklogConfiguration = {
   assigneeLogin: string | null;
@@ -39,7 +40,8 @@ export function useCockpitBacklog(options: {
   loadWorkItems: (repositoryId: string, provider: WorkProviderKind) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind) => Promise<void>;
 }) {
-  const provider = ref<WorkProviderKind>(rememberedProvider());
+  const { provider, providers } = useBacklogProviders(() => options.getSnapshot().workBacklog.connections, rememberedProvider());
+  let initialized = false;
   let contextRevision = 0;
   const pendingConfiguration = ref<CockpitBacklogConfiguration | null>(null);
   const globalScope = ref<GlobalScope | null>(null);
@@ -94,6 +96,8 @@ export function useCockpitBacklog(options: {
   });
 
   async function initialize(): Promise<void> {
+    initialized = true;
+    if (!providers.value.includes(provider.value)) return;
     const revision = contextRevision;
     globalScope.value = null;
     if (options.getWorkRepositories(provider.value).length === 0) {
@@ -101,6 +105,11 @@ export function useCockpitBacklog(options: {
       await nextTick();
     }
     if (revision !== contextRevision) return;
+    const firstSource = options.getWorkRepositories(provider.value)[0];
+    if (provider.value === 'linear' && firstSource) {
+      await selectRepository(firstSource.id);
+      return;
+    }
     pendingConfiguration.value = { repositoryId: null, assigneeLogin: null, tagName: null };
     const scope = rememberedGlobalScope(provider.value) === 'all' ? 'all' : 'assignedToMe';
     globalScope.value = scope;
@@ -216,16 +225,21 @@ export function useCockpitBacklog(options: {
     }
   }
 
-  return {
-    provider,
-    async selectProvider(next: WorkProviderKind): Promise<void> {
+  watch([provider, () => providers.value.length > 0], async () => {
       ++contextRevision;
-      provider.value = next;
-      try { window.localStorage.setItem('cockpitBacklogProvider', next); } catch { /* Optional renderer preference. */ }
+      try { window.localStorage.setItem('cockpitBacklogProvider', provider.value); } catch { /* Optional renderer preference. */ }
       pendingConfiguration.value = null;
       feeds.all = emptyFeed();
       feeds.assignedToMe = emptyFeed();
-      await initialize();
+      if (initialized) await initialize();
+  });
+
+  return {
+    provider,
+    providers,
+    async selectProvider(next: WorkProviderKind): Promise<void> {
+      provider.value = next;
+      await nextTick();
     },
     changePage,
     initialize,

@@ -9,7 +9,6 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <BacklogSourceSelector v-if="!selectedWorkItem && (purpose === 'missionIssue' || tab === 'issues')" :provider="linear.provider.value" :sources="linear.provider.value === 'linear' ? linear.sources.value : repositories" :source-id="linear.provider.value === 'linear' ? linear.sourceId.value : selectedRepositoryId" :show-source="purpose === 'missionIssue' || linear.provider.value === 'linear'" @select-provider="selectProvider" @select-source="selectSource" />
       <div v-if="!selectedWorkItem" class="repository-session-source-dialog__search-row">
         <SearchIcon aria-hidden="true" />
         <input
@@ -35,6 +34,19 @@
       </el-tabs>
       <span class="repository-session-source-dialog__repository"><RepositoryIcon aria-hidden="true" />{{ repositoryName }}</span>
     </div>
+
+    <BacklogSourceSelector
+      v-if="!selectedWorkItem && (purpose === 'missionIssue' || tab === 'issues') && linear.providers.value.length"
+      class="repository-session-source-dialog__sources"
+      size="small"
+      :provider="linear.provider.value"
+      :providers="linear.providers.value"
+      :sources="linear.provider.value === 'linear' ? linear.sources.value : repositories"
+      :source-id="linear.provider.value === 'linear' ? linear.sourceId.value : selectedRepositoryId"
+      :show-source="purpose === 'missionIssue' || linear.provider.value === 'linear'"
+      @select-provider="linear.selectProvider"
+      @select-source="selectSource"
+    />
 
     <section class="repository-session-source-dialog__results" aria-live="polite">
       <p v-if="purpose === 'missionIssue' && linear.provider.value === 'github' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
@@ -173,12 +185,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const linear = useLinearBacklog(() => props.location);
 const effectiveLoading = computed(() => linear.provider.value === 'linear' && tab.value === 'issues' ? linear.status.value === 'loading' : props.loading);
-async function selectProvider(provider: import('@codex-claw/core/contracts').WorkProviderKind): Promise<void> {
-  selectedWorkItem.value = null;
-  query.value = '';
-  resetPreparation();
-  await linear.selectProvider(provider);
-}
 function selectSource(id: string | null): void {
   selectedWorkItem.value = null;
   query.value = '';
@@ -194,6 +200,11 @@ let selectionRevision = 0;
 watch([selectedWorkItem, () => props.visible, () => JSON.stringify(props.location)], () => { ++selectionRevision; }, { flush: 'sync' });
 const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
 const preparationVisible = ref(false);
+watch([linear.provider, () => linear.providers.value.length > 0], () => {
+  selectedWorkItem.value = null;
+  query.value = '';
+  resetPreparation();
+});
 const tab = ref<SourceTab>(props.purpose === 'missionIssue' ? 'issues' : 'branches');
 const tabs = computed<ReadonlyArray<{ id: SourceTab; label: string }>>(() => [
   { id: 'branches', label: t('repositories.sessionSource.branches') },
@@ -347,23 +358,14 @@ function resetPreparation(clearSelection = true): void {
   font: inherit;
 }
 
-.repository-session-source-dialog--issue-picker .repository-session-source-dialog__search-row {
-  grid-template-columns: var(--icon-md) minmax(0, 1fr) minmax(160px, 220px);
-}
-
-/* The compact dialog otherwise puts the selector beneath Element Plus's 48px close button. */
-:global(.repository-session-source-dialog--issue-picker.claw-dialog--compact .el-dialog__header) {
+/* Keep the search clear of the close button in every picker mode. */
+:global(.repository-session-source-dialog.claw-dialog--compact .el-dialog__header) {
   padding-right: 48px;
 }
 
-.repository-session-source-dialog__repository-select { min-width: 0; }
-
-@media (max-width: 680px) {
-  .repository-session-source-dialog--issue-picker .repository-session-source-dialog__search-row {
-    grid-template-columns: var(--icon-md) minmax(0, 1fr);
-  }
-
-  .repository-session-source-dialog__repository-select { grid-column: 1 / -1; }
+.repository-session-source-dialog__sources {
+  padding: var(--space-6) var(--space-8);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .repository-session-source-dialog__assignment-header {

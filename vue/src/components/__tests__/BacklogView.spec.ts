@@ -22,7 +22,7 @@ describe('BacklogView', () => {
     const Harness = defineComponent({ setup() {
       const state = useCockpitBacklog({ getSnapshot: () => snapshot, configure: async input => { snapshot.workBacklog.providerConfigurations[input.provider] = { repositoryId: input.configuration.repositoryId ?? undefined }; }, confirmLoadAll: async () => true, getWorkBacklogError: () => null, getWorkBacklogStatus: () => 'loaded', getWorkItemsByRepository: () => ({ 'linear:linear:team': [linearItem] }), getWorkRepositories: provider => provider === 'linear' ? [source] : [repository('repo', '2026-01-01')], loadGlobalWorkItems: load, loadWorkItems: async () => {}, loadWorkRepositories: async () => {} });
       void state.initialize();
-      return () => h(BacklogView, { agents: [], teams: [], workProvider: state.provider.value, workBacklog: state.workBacklog.value, startWorkItemsAction: async () => {}, onSelectWorkProvider: state.selectProvider, onSelectWorkRepository: state.selectRepository });
+      return () => h(BacklogView, { agents: [], teams: [], workProviders: state.providers.value, workProvider: state.provider.value, workBacklog: state.workBacklog.value, startWorkItemsAction: async () => {}, onSelectWorkProvider: state.selectProvider, onSelectWorkRepository: state.selectRepository });
     } });
     const wrapper = mount(Harness);
     await flushPromises();
@@ -32,12 +32,15 @@ describe('BacklogView', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('ENG-24');
     expect(wrapper.text()).not.toContain('#99');
-    await wrapper.get('.cockpit-view__repositories button').trigger('click');
-    await flushPromises();
+    expect(wrapper.get('.cockpit-view__repositories button').attributes('aria-pressed')).toBe('true');
     await wrapper.get('.cockpit-inbox__row').trigger('click');
     expect(wrapper.get('.linear-issue-detail').text()).toContain('Linear details');
     expect(snapshot.workBacklog.providerConfigurations.linear?.repositoryId).toBe('linear:team');
-    expect(load).toHaveBeenLastCalledWith({ assignment: 'viewer', state: 'open', page: 1, pageSize: 25 }, 'linear');
+    expect(load).toHaveBeenCalledTimes(1);
+    snapshot.workBacklog.connections[0]!.status = 'disconnected';
+    await flushPromises();
+    expect(wrapper.find('[aria-label="Backlog provider"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('ENG-24');
     window.localStorage.clear();
   });
   it('presents Backlog as an operator inbox and keeps search inside it', async () => {

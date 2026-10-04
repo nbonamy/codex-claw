@@ -23,6 +23,8 @@ describe('Linear issue to repository session', () => {
       state: 'open', labels: [], createdAt: '', updatedAt: '' };
     const { api } = createClientApiMock();
     configureClawClient({ platform: 'desktop', api });
+    snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected' }];
+    api.getAutomationSnapshot.mockResolvedValue(snapshot);
     api.listWorkRepositories.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', url: 'https://linear.app', isPrivate: true }]);
     api.listWorkItems.mockResolvedValue([issue]);
     const createWorktree = vi.fn().mockResolvedValue({ name: 'fix/eng-12', path: '/remote/code-eng-12' });

@@ -2,7 +2,7 @@
   <section class="cockpit-view" :aria-label="$t('surface.cockpitView.backlog')">
     <aside class="cockpit-view__navigation" :aria-label="$t('surface.cockpitView.backlogNavigation')">
       <nav>
-        <BacklogSourceSelector :provider="workProvider ?? 'github'" :show-source="false" @select-provider="emit('select-work-provider', $event)" />
+        <BacklogSourceSelector class="cockpit-view__provider" size="small" full-width :provider="workProvider ?? 'github'" :providers="workProviders ?? []" :show-source="false" @select-provider="emit('select-work-provider', $event)" />
         <div class="cockpit-view__navigation-section">
           <strong>{{ $t(workProvider === 'linear' ? 'backlogSource.sources' : 'surface.cockpitView.repositories') }}</strong>
           <el-dropdown
@@ -164,6 +164,7 @@ type SummaryMetric = { count: number; filter: SummaryFilter; id: 'working' | 'bl
 
 const props = defineProps<{
   workProvider?: import('@codex-claw/core/contracts').WorkProviderKind;
+  workProviders?: import('@codex-claw/core/contracts').WorkProviderKind[];
   agents: Agent[];
   repositoryIcons?: Record<string, string>;
   teams: Team[];
@@ -282,6 +283,10 @@ function selectWorkView(view: InboxView): void {
   padding: var(--space-24) var(--space-12) var(--space-16);
   border-right: 1px solid var(--color-border);
   background: var(--color-shell-sidebar);
+}
+
+.cockpit-view__provider {
+  margin: 0 var(--space-6);
 }
 
 .cockpit-view__repository-filter {
