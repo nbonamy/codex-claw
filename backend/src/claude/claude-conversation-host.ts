@@ -29,7 +29,7 @@ import {
 import { createUserMessage } from '@workspace/core/claude-conversation-transcript';
 import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@workspace/core/backend-driver';
 import { claudeWorkingDirectory } from './working-directory';
-import { claudeConfigDirectory } from './config-directory';
+import { claudeConfigDirectory, claudeConfigDirectoryOverride } from './config-directory';
 import { agentScopedMcpUrl, appMcpUrlForAgent } from '../mcp/codex-config';
 import { appDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
@@ -93,6 +93,7 @@ type ActiveClaudeTurn = {
   rejectStart: (error: Error) => void;
   startResolved: boolean;
   error: Error | null;
+  authenticationFailed?: boolean;
 };
 
 type EventListener = (event: BackendEvent) => void;
@@ -427,7 +428,11 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         .then(() => this.refreshGoal(agent, activeTurn as ActiveClaudeTurn, goalRefreshId));
     });
 
-    const result = await started;
+    const result = await started.catch((error: unknown) => {
+      const normalizedError = normalizeProcessError(error);
+      if (isClaudeAuthenticationError(normalizedError.message)) this.markAuthenticationFailed(activeTurn ?? undefined);
+      throw normalizedError;
+    });
     const turn = activeTurn as ActiveClaudeTurn | null;
     if (waitForCompletion && turn) {
       await turn.handle.done;
@@ -733,6 +738,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
 
     if (message.type === 'assistant') {
       if (typeof message.error === 'string' && message.error.trim()) {
+        if (message.error === 'authentication_failed') this.markAuthenticationFailed(activeTurn);
         return;
       }
 
@@ -755,7 +761,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     if (message.type === 'result') {
       const errorMessage = claudeResultErrorMessage(message);
       if (errorMessage) {
-        this.failTurn(activeTurn, new Error(normalizeClaudeErrorMessage(errorMessage)));
+        this.failTurn(activeTurn, new Error(normalizeClaudeErrorMessage(activeTurn.authenticationFailed ? 'authentication_failed' : errorMessage)));
       } else {
         this.completeTurn(activeTurn);
       }
@@ -1368,6 +1374,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     }
 
     const normalizedError = normalizeProcessError(error);
+    if (isClaudeAuthenticationError(normalizedError.message)) this.markAuthenticationFailed(activeTurn);
     if (!activeTurn.startResolved) {
       activeTurn.rejectStart(normalizedError);
     } else {
@@ -1377,6 +1384,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
   }
 
   private failTurn(activeTurn: ActiveClaudeTurn, error: Error): void {
+    if (isClaudeAuthenticationError(error.message)) this.markAuthenticationFailed(activeTurn);
     activeTurn.error = error;
     this.emit({
       backend: this.backend,
@@ -1396,6 +1404,18 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       payload: { message: error.message },
     });
     this.completeTurn(activeTurn);
+  }
+
+  private markAuthenticationFailed(activeTurn?: ActiveClaudeTurn): void {
+    if (activeTurn?.authenticationFailed) return;
+    if (activeTurn) activeTurn.authenticationFailed = true;
+    this.emit({
+      type: 'provider.authenticationChanged',
+      payload: {
+        kind: 'claude', connected: false,
+        state: { loggedIn: false, configDirectory: claudeConfigDirectoryOverride() ?? null },
+      },
+    });
   }
 
   private completeTurn(activeTurn: ActiveClaudeTurn): void {
@@ -1698,7 +1718,7 @@ function normalizeProcessError(error: unknown): Error {
 
 function normalizeClaudeErrorMessage(message: string): string {
   const trimmedMessage = message.trim();
-  if (/not logged in/i.test(trimmedMessage) || /authentication_failed/i.test(trimmedMessage)) {
+  if (isClaudeAuthenticationError(trimmedMessage)) {
     return 'Claude Code is not logged in. Open Claude Code and run /login, then try again.';
   }
 
@@ -1707,6 +1727,10 @@ function normalizeClaudeErrorMessage(message: string): string {
   }
 
   return trimmedMessage || 'Claude failed to run.';
+}
+
+function isClaudeAuthenticationError(message: string): boolean {
+  return /not logged in|authentication_failed|OAuth session expired and could not be refreshed/i.test(message);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

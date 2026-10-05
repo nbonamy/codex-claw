@@ -3,6 +3,7 @@ import type { MainToRendererEvent } from './contracts';
 export type SnapshotEventOwner = 'runtime' | 'coordination' | 'subagent' | 'renderer';
 
 export const snapshotEventOwnership = {
+  'provider.authenticationChanged': 'renderer',
   'backend.statusChanged': 'runtime',
   'client.connectionChanged': 'renderer',
   'snapshot.updated': 'runtime',

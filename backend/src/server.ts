@@ -595,7 +595,7 @@ export class AppBackendServer {
 
   async requireConnectedEngine(backend?: Agent['backend']): Promise<Agent['backend']> {
     if (this.providerSetup?.isChanging(backend)) throw new Error('Engine setup is changing. Try again when it finishes.');
-    await this.providerConnections?.refresh();
+    await this.providerConnections?.refreshDisconnected(backend);
     return resolveAgentBackend(this.snapshot, backend);
   }
 
@@ -2937,6 +2937,10 @@ export class AppBackendServer {
   }
 
   private handleBackendEvent(event: BackendEvent, options: { persist?: boolean } = {}): void {
+    if (event.type === 'provider.authenticationChanged') {
+      const authentication = event.payload;
+      this.providerConnections?.observe(authentication.kind, authentication.connected, authentication);
+    }
     if (event.type === 'remoteControl.statusChanged') {
       const status = remoteControlStatusFromUnknown(event.payload);
       if (status) {

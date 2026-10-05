@@ -32,6 +32,15 @@ and surfaced separately from accounts without quotas. API-key/third-party
 billing has no subscription usage row. Korus does not refresh or rewrite OAuth
 credentials; an expired login needs to be refreshed through Claude Code.
 
+Claude authentication failures emit the app-owned `provider.authenticationChanged`
+event with disconnected, credential-free account metadata. The owning daemon
+updates its connection observation and publishes a snapshot immediately, so
+Settings and new-work admission no longer rely on the previously cached login.
+This leaves the engine's enabled preference and existing conversations intact;
+service errors and usage limits do not imply logout. Claude Code still owns
+credential renewal and sign-in. Failed turns remain valid conversation snapshots
+across the backend transport and history refresh.
+
 First-run onboarding offers Codex and Claude independently and requires an
 explicit Continue after at least one authenticates. Local Claude status is
 checked by `daemon` against the SDK's configured home; sign-in instructions use

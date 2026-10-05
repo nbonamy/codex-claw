@@ -27,5 +27,12 @@ describe('SettingsClaudeCodePanel', () => {
     expect(wrapper.emitted('connect')).toHaveLength(1);
     await wrapper.findAll('button').find(button => button.text() === 'Customize')!.trigger('click');
     expect(wrapper.emitted('customize')).toEqual([[]]);
+    await wrapper.setProps({ connected: false, enabled: true, authentication: { kind: 'claude', connected: false, state: { loggedIn: false } } });
+    const account = wrapper.findAll('.settings-row')[0]!;
+    expect(account.text()).not.toContain('user@example.com');
+    expect(account.text()).toContain('Disconnected');
+    expect(account.findAll('button').map(button => button.text())).toContain('Connect');
+    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('false');
+    expect(wrapper.get('[role="switch"]').attributes('aria-disabled')).toBe('true');
   });
 });

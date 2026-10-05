@@ -28,6 +28,14 @@ export class ProviderConnections {
     return this.list();
   }
 
+  /** Re-checks engines last seen disconnected so a login done outside the app is noticed on the next admission. */
+  async refreshDisconnected(backend?: AgentBackend): Promise<ProviderConnection[]> {
+    for (const [candidate, state] of this.states) {
+      if ((backend === undefined || candidate === backend) && state.installed && !state.connected && !state.checking) this.states.delete(candidate);
+    }
+    return await this.refresh();
+  }
+
   observe(backend: AgentBackend, connected: boolean, authentication?: ProviderAuthentication): void {
     this.revisions.set(backend, (this.revisions.get(backend) ?? 0) + 1);
     this.pending.delete(backend);

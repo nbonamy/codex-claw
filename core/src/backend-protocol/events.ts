@@ -155,6 +155,7 @@ function expectEventContext(event: EventRecord): void {
       expectAgentBackend(event);
       return;
     case 'snapshot.updated':
+    case 'provider.authenticationChanged':
     case 'remoteControl.statusChanged':
     case 'browser.annotationCreated':
     case 'mission.implementationStartProgress':

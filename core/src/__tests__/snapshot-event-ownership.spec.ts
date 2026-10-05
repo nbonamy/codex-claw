@@ -47,6 +47,7 @@ const subagentEventTypes = [
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'subagent'>[];
 
 const rendererEventTypes = [
+  'provider.authenticationChanged',
   'client.connectionChanged',
   'remoteControl.statusChanged',
   'models.changed',

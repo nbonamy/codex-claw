@@ -2108,6 +2108,9 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
       };
       return;
     }
+    case 'provider.authenticationChanged':
+      // The owning host publishes connection state through snapshot.updated.
+      return;
     case 'conversation.historyLoadFailed':
       syncHistoryPageStateFromMainEvent(event);
       return;

@@ -1,7 +1,8 @@
 import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@workspace/core/contracts';
-import type { AppBackendEvent } from '@workspace/core/backend-protocol/events';
+import { decodeAppBackendEvent, type AppBackendEvent } from '@workspace/core/backend-protocol/events';
+import { getLocalClaudeAuthentication } from '../authentication';
 import { ClaudeBackendDriver } from '../claude-driver';
 import { ClaudeAgentSdkTransport } from '../agent-sdk-transport';
 import { createQueryHarness } from './sdk-query-fixture';
@@ -12,6 +13,7 @@ import { createTestSnapshot } from '../../__tests__/server-test-fixtures';
 vi.mock('@workspace/core/runtime-discovery', () => ({
   withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
 }));
+vi.mock('../authentication', () => ({ getLocalClaudeAuthentication: vi.fn() }));
 
 function agent(id = 'claude-a'): Agent {
   return { id, name: id, folder: '/tmp/project', teamId: 'team-test', backend: 'claude', status: { type: 'idle' }, createdAt: '', updatedAt: '' };
@@ -19,7 +21,7 @@ function agent(id = 'claude-a'): Agent {
 
 describe(`Claude Agent SDK → ${product.name} backend`, () => {
   const servers: AppBackendServer[] = [];
-  function setup() {
+  function setup(withConnections = false) {
     const sdk = createQueryHarness();
     const driver = new ClaudeBackendDriver(new ClaudeAgentSdkTransport({ createQuery: sdk.createQuery }));
     const snapshot = createTestSnapshot();
@@ -29,11 +31,88 @@ describe(`Claude Agent SDK → ${product.name} backend`, () => {
     const events: AppBackendEvent[] = [];
     const server = new AppBackendServer({ version: 'test', pid: 1, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['claude', driver]])), onEvent: (event) => events.push(event),
+      ...(withConnections ? { providerSetup: { isChanging: () => false, list: () => [{ backend: 'claude', installed: true, homePath: '/app/claude' }] } as never } : {}),
     });
     servers.push(server);
     return { sdk, driver, server, snapshot, events, send: (agentId: string, prompt: string) => server.handleMessage({ jsonrpc: '2.0', id: `${agentId}-${prompt}`, method: 'agent/prompt/send', params: { agentId, prompt } }) };
   }
   afterEach(async () => { await Promise.all(servers.splice(0).map((server) => server.close())); });
+
+  it('keeps a failed turn readable across the backend wire after refreshing its conversation', async () => {
+    const { sdk, send, driver, snapshot, events } = setup();
+    const pending = send('claude-a', 'keep my prompt');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await pending;
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: true, result: 'Service unavailable' });
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
+    await driver.loadConversation(snapshot.agents[0]!);
+    const frame = events.filter(event => event.type === 'claude.conversationSnapshotChanged').at(-1)!;
+    expect(frame.payload.snapshot).toMatchObject({ busy: false, activeTurnId: null, turns: [{ status: 'failed' }], error: 'Service unavailable' });
+    expect(frame.payload.snapshot.messages).toContainEqual(expect.objectContaining({ role: 'user', parts: expect.arrayContaining([expect.objectContaining({ text: 'keep my prompt' })]) }));
+    expect(() => decodeAppBackendEvent(JSON.parse(JSON.stringify(frame)))).not.toThrow();
+  });
+
+  it.each([
+    ['authentication_failed', 'Failed to authenticate: OAuth session expired and could not be refreshed', false],
+    ['authentication_failed', 'Credentials rejected', false],
+    [null, 'Failed to authenticate: OAuth session expired and could not be refreshed', false],
+    ['server_error', 'Service unavailable', true],
+    ['rate_limit', 'Usage limit reached', true],
+  ])('updates engine connection after %s without changing enablement or losing the conversation', async (error, text, connected) => {
+    vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true, account: { type: 'subscription', email: 'user@example.com' } });
+    const { sdk, send, server, snapshot, events } = setup(true);
+    const pending = send('claude-a', 'hello');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await pending;
+    expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: true, enabled: true });
+    if (error) sdk.emit({ type: 'assistant', session_id: 'session-a', error, message: { content: [{ type: 'text', text }] } });
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: true, result: text });
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
+    expect(snapshot.providerConnections?.[0]).toMatchObject({ connected, enabled: true, authentication: { kind: 'claude', connected, state: { loggedIn: connected } } });
+    expect(snapshot.agents[0]!.backendSession).toMatchObject({ sessionId: 'session-a' });
+    for (const event of events) expect(() => decodeAppBackendEvent(JSON.parse(JSON.stringify(event)))).not.toThrow();
+    if (!connected) {
+      expect(events.filter(event => event.type === 'provider.authenticationChanged')).toHaveLength(1);
+      expect(events).toContainEqual(expect.objectContaining({ type: 'snapshot.updated', payload: expect.objectContaining({
+        providerConnections: expect.arrayContaining([expect.objectContaining({ backend: 'claude', connected: false })]),
+      }) }));
+      expect(snapshot.providerConnections?.[0]?.authentication?.state).not.toHaveProperty('account');
+      vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: false });
+      expect(await send('claude-a', 'blocked until login')).toMatchObject({ error: { message: expect.stringContaining('not connected') } });
+      vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true });
+      await server.handleMessage({ jsonrpc: '2.0', id: 'reconnect', method: 'claude/authentication/get' });
+      expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: true });
+    }
+  });
+
+  it('admits a retried prompt after an external login without a manual authentication check', async () => {
+    vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true, account: { type: 'subscription', email: 'user@example.com' } });
+    const { sdk, send, snapshot } = setup(true);
+    const pending = send('claude-a', 'hello');
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
+    await pending;
+    sdk.emit({ type: 'assistant', session_id: 'session-a', error: 'authentication_failed', message: { content: [{ type: 'text', text: 'x' }] } });
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: true, result: 'x' });
+    await vi.waitFor(() => expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: false }));
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
+    vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true });
+    const retry = await send('claude-a', 'try again');
+    expect(retry).not.toHaveProperty('error');
+    expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: true });
+  });
+
+  it('marks Claude disconnected when authentication fails before session initialization', async () => {
+    vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true });
+    const { sdk, send, snapshot } = setup(true);
+    sdk.createQuery.mockImplementationOnce(() => { throw new Error('Failed to authenticate: OAuth session expired and could not be refreshed'); });
+    await send('claude-a', 'hello');
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('error'));
+    expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: false, enabled: true });
+    expect(snapshot.agents).toHaveLength(2);
+  });
 
   it('does not let a late interrupt callback settle or release the next turn', async () => {
     const { sdk, send, driver, snapshot, events } = setup();

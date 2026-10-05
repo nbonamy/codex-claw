@@ -29,7 +29,7 @@ export function isProviderConnection(value: unknown): value is ProviderConnectio
     && (candidate.authentication === undefined || (isProviderAuthentication(candidate.authentication) && candidate.authentication.kind === candidate.backend));
 }
 
-function isProviderAuthentication(value: unknown): value is ProviderAuthentication {
+export function isProviderAuthentication(value: unknown): value is ProviderAuthentication {
   if (!record(value) || typeof value.connected !== 'boolean' || !record(value.state)) return false;
   const state = value.state;
   if (value.kind === 'claude') return typeof state.loggedIn === 'boolean'

@@ -19,6 +19,22 @@ describe('host engine connections', () => {
     expect((await connections.refresh())[0]?.connected).toBe(false);
     expect(detect).toHaveBeenCalledTimes(2);
   });
+  it('re-checks only disconnected engines on demand', async () => {
+    const authenticate = vi.fn().mockResolvedValue(auth(false));
+    const connections = new ProviderConnections({
+      detect: () => [{ backend: 'claude', installed: true, homePath: '/claude' }, { backend: 'codex', installed: true, homePath: '/codex' }], authenticate, changed: vi.fn(),
+    });
+    await connections.refresh();
+    connections.observe('codex', true);
+    authenticate.mockClear();
+    authenticate.mockResolvedValue(auth(true));
+    await connections.refreshDisconnected('claude');
+    expect(authenticate.mock.calls).toStrictEqual([['claude']]);
+    expect(connections.list().find(item => item.backend === 'claude')?.connected).toBe(true);
+    authenticate.mockClear();
+    await connections.refreshDisconnected();
+    expect(authenticate).not.toHaveBeenCalled();
+  });
   it('skips absent engines and shares concurrent authentication probes', async () => {
     const authenticate = vi.fn(async () => auth(true));
     const connections = new ProviderConnections({

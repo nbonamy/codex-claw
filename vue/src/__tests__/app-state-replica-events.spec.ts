@@ -377,6 +377,7 @@ describe('useAppState', () => {
       'codex.conversationEventReceived',
       'codex.conversationSnapshotChanged',
       'remoteControl.statusChanged',
+      'provider.authenticationChanged',
       'workspace.fileActivityDetected',
       'git.operationProgress',
       'mission.implementationStartProgress',
@@ -412,6 +413,13 @@ describe('useAppState', () => {
         rect: { x: 1, y: 2, width: 3, height: 4 },
       },
       occurredAt: '2026-06-05T00:00:03.000Z',
+    });
+
+    listeners[0]?.({
+      seq: 4,
+      type: 'provider.authenticationChanged',
+      payload: { kind: 'claude', connected: false, state: { loggedIn: false } },
+      occurredAt: '2026-06-05T00:00:04.000Z',
     });
 
     expect(state.snapshot.value).toBe(originalSnapshot);

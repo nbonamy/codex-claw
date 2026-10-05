@@ -62,6 +62,10 @@ type AgentPromptRetryScheduledPayload = {
 };
 type AppEvent =
   | EventWith<{
+      type: 'provider.authenticationChanged';
+      payload: import('./provider-setup').ProviderAuthentication;
+    }>
+  | EventWith<{
       type: 'backend.statusChanged';
       backend: AgentBackend;
       payload: BackendRuntimeStatus;

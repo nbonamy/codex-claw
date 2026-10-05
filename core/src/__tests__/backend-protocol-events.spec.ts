@@ -105,6 +105,10 @@ function createFixtures(): EventFixtures {
   const turn = { ...codexThread, turnId: 'turn-1' };
 
   return {
+    'provider.authenticationChanged': {
+      ...base, type: 'provider.authenticationChanged',
+      payload: { kind: 'claude', connected: false, state: { loggedIn: false } },
+    },
     'plan.reviewResolved': {
       ...base, agentId: 'agent-1', type: 'plan.reviewResolved',
       payload: { reviewId: 'review-1', resolution: 'accept' },
@@ -718,6 +722,10 @@ describe(`${product.name} backend event decoder`, () => {
 
   it.each([
     [null, '$: expected an object'],
+    [
+      { seq: 1, occurredAt, type: 'provider.authenticationChanged', payload: { kind: 'claude', connected: false, state: {} } },
+      '$.payload: expected provider authentication',
+    ],
     [
       {
         seq: '1',

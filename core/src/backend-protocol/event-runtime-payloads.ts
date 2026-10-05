@@ -1,4 +1,5 @@
 import { product } from '../product';
+import { isProviderAuthentication } from '../contracts/provider-setup';
 import { isAppTextDescriptor } from '../app-text';
 import { isAccountRateLimits } from '../snapshot-guard-collections';
 import { decodeAppSnapshot } from '../snapshot-guards';
@@ -339,7 +340,7 @@ function expectClaudeConversationSnapshot(value: unknown, path: string): void {
   expectArray(value.turns, `${path}.turns`, (turn, turnPath) => {
     expectRecord(turn, turnPath);
     expectString(turn.id, `${turnPath}.id`);
-    expectLiteral(turn.status, ['inProgress', 'completed', 'interrupted'], `${turnPath}.status`);
+    expectLiteral(turn.status, ['inProgress', 'completed', 'interrupted', 'failed'], `${turnPath}.status`);
   });
   expectArray(value.messages, `${path}.messages`, (message, messagePath) => {
     expectRecord(message, messagePath);
@@ -384,6 +385,11 @@ function expectClaudeConversationEvent(value: unknown, path: string): void {
 }
 
 export const runtimePayloadValidators = {
+  'provider.authenticationChanged': (value, path) => {
+    if (!isProviderAuthentication(value)) {
+      throw new Error(`Invalid ${product.name} backend event at ${path}: expected provider authentication.`);
+    }
+  },
   'backend.statusChanged': expectBackendRuntimeStatus,
   'snapshot.updated': expectAppSnapshot,
   'account.rateLimitsUpdated': expectRateLimits,

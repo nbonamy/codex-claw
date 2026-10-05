@@ -88,6 +88,7 @@ describe('connected engine admission', () => {
       await expect(server.handleMessage(disconnect)).resolves.toMatchObject({ result: { kind: 'claude', connected: false } });
       expect(driverRpc.handle).toHaveBeenLastCalledWith('driver/provider/authentication', { backend: 'claude', action: 'logout' });
       expect(snapshot.general.providerEnabled?.claude).not.toBe(false);
+      vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: false });
       const rejected = await server.handleMessage({ jsonrpc: '2.0', id: 3, method: 'agent/prompt/send', params: { agentId: agent.id, prompt: 'New work' } });
       expect(rejected).toMatchObject({ error: { message: expect.stringContaining('not connected') } });
       expect(snapshot.agents).toHaveLength(1);
