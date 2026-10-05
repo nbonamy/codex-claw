@@ -216,7 +216,7 @@ describe('ClaudeAgentSdkTransport', () => {
       hostedMcpServerUrls: {
         github: 'http://127.0.0.1:4321/mcp/providers/github?agentId=agent-1',
       },
-      allowedTools: ['mcp__workspace__*'],
+      allowedTools: [`mcp__${product.mcpServerName}__*`],
     }, (message) => firstMessages.push(message));
 
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
@@ -231,9 +231,9 @@ describe('ClaudeAgentSdkTransport', () => {
       model: 'sonnet',
       permissionMode: 'default',
       sessionId: '11111111-1111-4111-8111-111111111111',
-      allowedTools: ['mcp__workspace__*'],
+      allowedTools: ['mcp__korus__*'],
       mcpServers: {
-        workspace: {
+        korus: {
           type: 'http',
           url: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
         },
@@ -287,7 +287,7 @@ describe('ClaudeAgentSdkTransport', () => {
       permissionMode: 'acceptEdits',
       appendSystemPrompt: `${product.name} instructions`,
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
-      allowedTools: ['mcp__workspace__*'],
+      allowedTools: [`mcp__${product.mcpServerName}__*`],
     }, (message) => secondMessages.push(message));
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(2));
 
@@ -307,7 +307,7 @@ describe('ClaudeAgentSdkTransport', () => {
       sessionId: '11111111-1111-4111-8111-111111111111',
       appendSystemPrompt: `${product.name} instructions`,
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
-      allowedTools: ['mcp__workspace__*'],
+      allowedTools: [`mcp__${product.mcpServerName}__*`],
     }, () => undefined);
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(3));
     expect(harness.runtimes[0]?.setModel).toHaveBeenLastCalledWith(undefined);
@@ -367,7 +367,7 @@ describe('ClaudeAgentSdkTransport', () => {
       model: 'haiku',
       appendSystemPrompt: `${product.name} instructions`,
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude',
-      allowedTools: ['mcp__workspace__*'],
+      allowedTools: [`mcp__${product.mcpServerName}__*`],
     });
     expect(harness.runtimes).toHaveLength(1);
     harness.runtimes[0]?.getContextUsage.mockResolvedValueOnce({

@@ -10,6 +10,26 @@ import type { Agent, AgentBackend } from '@workspace/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
+  it('clips long repository text inside its label without clipping the icon or actions', () => {
+    const source = agents[0]!;
+    const name = 'a-very-long-project-name-that-does-not-fit-in-the-sidebar';
+    const wrapper = mount(AgentSidebar, {
+      attachTo: document.body,
+      props: { agents: [{ ...source, workspace: { ...source.workspace!, repositoryName: name } }], activeAgentId: source.id, teamName: 'Team' },
+    });
+    const label = wrapper.get('.agent-sidebar__workspace-label');
+    const text = label.get('strong');
+    expect(text.text()).toBe(name);
+    expect(getComputedStyle(label.element).overflow).toBe('hidden');
+    expect(getComputedStyle(text.element).textOverflow).toBe('ellipsis');
+    expect(getComputedStyle(text.element).whiteSpace).toBe('nowrap');
+    expect(getComputedStyle(text.element).maxWidth).toBe('100%');
+    const header = label.element.parentElement!;
+    expect(header.querySelector('.repository-icon-picker')).not.toBeNull();
+    expect(header.querySelector('.agent-sidebar__workspace-actions')).not.toBeNull();
+    expect(label.find('.repository-icon-picker').exists()).toBe(false);
+  });
+
   it('does not reveal engine icons solely because a selected Mission row retains focus', async () => {
     const { createMission } = await import('@workspace/core/missions');
     const { createInitialSnapshot } = await import('@workspace/core/snapshot-construction');

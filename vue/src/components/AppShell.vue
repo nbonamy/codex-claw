@@ -571,7 +571,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { workProviderDefinition } from '@workspace/core/work-providers';
 import { workProviderLabel, workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
 import { workItemAssignmentKey } from '@workspace/core/work-assignments';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentBackend, AgentFileActivity } from '@workspace/core/contracts';
@@ -581,6 +581,7 @@ import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import { defaultTeamColor } from '@workspace/core/team-colors';
 import { projectAgentMentionLabels } from '@workspace/core/workspace-sidebar';
 import { appApi } from '../platform-api';
+import { codeReviewSettingsKey, useCodeReviewSettings } from './code-review-settings';
 import AgentDialog from './AgentDialog.vue';
 import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
@@ -1008,6 +1009,8 @@ type PendingMissionReviewDiscussion = {
 
 type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
 provideBackendChoices(() => props.snapshot, openSettings);
+const reviewSettings = useCodeReviewSettings();
+provide(codeReviewSettingsKey, { ...reviewSettings, preferences: () => props.snapshot.general.codeReviewDefaults });
 provideBacklogConnections(() => props.snapshot.workBacklog.connections);
 const backendSwitch = provideBackendSwitch((id, backend) => props.updateAgent({ id, backend }));
 const agentSidebarCollapsed = ref(false);
@@ -1025,7 +1028,7 @@ const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((a
   agent.status.type === 'working' ||
   agent.status.type === 'awaitingInput'
 )));
-const agentSidebarMinWidth = 80;
+const agentSidebarMinWidth = 200;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
 const missionSurfaceStorageKey = 'app.activeMissionId';

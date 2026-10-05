@@ -84,10 +84,14 @@ normal Claude conversation replica while adding only the review-session finding
 tools; clarification and batched remediation resume that same session id. An
 independent reviewer starts without the source conversation history but inherits
 its selected model and reasoning effort. For an independent reviewer, `Review
-again` deletes the old Claude session and starts a fresh one on the same sidebar
+again` retains the old Claude session and starts a fresh one on the same sidebar
 agent. Current-thread reviews preserve the user-owned session for every round
-and after finish; an independent reviewer's agent and session are removed when
-the review finishes.
+and after finish; an independent reviewer's agent is removed when the review
+finishes, but its native history is retained and a report is saved first.
+Inspection turns must successfully call `finish_review_round({ findingCount })`
+before returning. Korus validates the count against its ledger and waits for
+the turn to end before advancing. Missing confirmation fails the round and
+pauses automatic mode; native `ReportFindings` calls do not populate this ledger.
 
 The transport configures:
 
@@ -96,6 +100,12 @@ The transport configures:
 - the active Korus agent's working directory, model, and permission mode;
 - Korus's agent-scoped collaboration MCP server and allowed-tool rule;
 - partial streaming events for responsive text and tool cards.
+
+Claude's app-owned MCP server is named `korus`, from `product.mcpServerName`.
+Claude Code reserves `workspace` and silently omits a dynamic server with that
+name. Tool allow rules, review prompts, and collaboration instructions must use
+the same configured namespace. Codex retains its existing `workspace` namespace;
+tool presentation recognizes both names, including retained Claude history.
 
 The live Claude transport uses the Agent SDK and feeds its messages into one
 Claude conversation host. The host is the sole owner of the normalized Claude

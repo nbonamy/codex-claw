@@ -9,6 +9,13 @@ const findingTitle = findingTitleSchema;
 const findingBody = findingBodySchema;
 
 export function registerReviewTools(server: McpServer, context: ReviewToolContext): void {
+  server.registerTool('finish_review_round', {
+    description: 'Required after each review inspection, including clean reviews. Declare the total findings you identified in the current round across all priorities, not merely those already registered. Register each finding with report_finding first. If the count is rejected, register missing findings and call this tool again; do not lower the count to hide unregistered findings. This confirms the inspection only; Korus owns remediation and closing the review.',
+    inputSchema: {
+      findingCount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).describe('Total findings identified in this inspection across P0–P3, including zero only when none were found. Each must also be registered. Not a count of tool calls or previous-round findings.'),
+    },
+  }, (input) => reviewToolResult(() => context.finishReviewRound(input)));
+
   server.registerTool('report_finding', {
     description: 'Create one durable structured code review finding supported by concrete evidence.',
     inputSchema: {

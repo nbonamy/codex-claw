@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { product } from '@workspace/core/product';
 import type { Agent, AppSnapshot, BackendSession } from '@workspace/core/contracts';
 import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import { activeCodeReviewRound, codeReviewLedger } from '@workspace/core/code-review';
@@ -13,7 +14,7 @@ function agent(id: string): Agent {
   };
 }
 
-type ReviewScript = (handlers: ReviewToolHandlers) => Promise<{ text: string }>;
+type ReviewScript = (handlers: ReviewToolHandlers) => Promise<{ text: string; findingCount?: number }>;
 
 function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent): Promise<void> => undefined) {
   const snapshot: AppSnapshot = createEmptySnapshot();
@@ -27,7 +28,17 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
   const deleted: string[] = [];
   const handoffs: Array<{ from: string; to: string; content: string }> = [];
   const changed = vi.fn();
+  const saveReport = vi.fn(async (_agent: Agent, session: import('@workspace/core/code-review').CodeReviewSession) => `/reports/${session.id}.md`);
+  const git = {
+    prepare: vi.fn().mockResolvedValue({ baseRef: 'a'.repeat(40), head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' }),
+    inspect: vi.fn().mockResolvedValue({ head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' }),
+    commit: vi.fn().mockResolvedValue({ head: 'c'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'committed', commit: 'c'.repeat(40) }),
+  };
   const agentCreation = new AgentCreationService(snapshot);
+  const resetReviewer = vi.fn(async (reviewer: Agent) => {
+    reset.push(reviewer.id);
+    delete reviewer.backendSession;
+  });
   const tools: CodeReviewToolPort = {
     createReviewToolContext: (agentId, _sessionId, handlers) => {
       activeHandlers = handlers;
@@ -38,6 +49,7 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
   let tick = 0;
   const service = new CodeReviewService({
     snapshot,
+    git,
     createAgent: (input, options) => agentCreation.create(input, options),
     tools,
     now: () => new Date(`2026-09-19T10:${String(tick++).padStart(2, '0')}:00.000Z`),
@@ -45,12 +57,11 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
       turns.push({ prompt, ...(reviewerSession ? { reviewerSession } : {}) });
       const script = scripts.shift();
       const result = script && activeHandlers ? await script(activeHandlers) : { text: '' };
+      if (result.findingCount !== undefined) await activeHandlers!.finishReviewRound({ findingCount: result.findingCount });
       return { ...result, reviewerSession: reviewerSession ?? { kind: 'codex', threadId: `review-thread-${turns.length}` } };
     },
-    resetReviewer: async (reviewer) => {
-      reset.push(reviewer.id);
-      delete reviewer.backendSession;
-    },
+    resetReviewer,
+    saveReport,
     deleteReviewer: async (reviewer, handoff) => {
       deleted.push(reviewer.id);
       await deleteReviewer(reviewer);
@@ -58,8 +69,9 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
       snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== reviewer.id);
     },
     changed,
+    reportProgress: (reviewer, to, content) => { handoffs.push({ from: reviewer.id, to, content }); },
   });
-  return { owner, snapshot, service, turns, reset, deleted, handoffs, changed };
+  return { owner, snapshot, service, turns, reset, deleted, handoffs, changed, git, tools, resetReviewer, saveReport };
 }
 
 function reviewer(test: ReturnType<typeof harness>, session: { reviewerAgentId: string }): Agent {
@@ -69,7 +81,266 @@ function reviewer(test: ReturnType<typeof harness>, session: { reviewerAgentId: 
 }
 
 describe('CodeReviewService', () => {
-  it('uses a selected reviewer backend without copying the source provider settings', () => {
+  it('pauses an automatic review when the provider ends without explicitly finishing the inspection', async () => {
+    const test = harness([async () => ({ text: 'I reported three findings using a different tool.' })]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+      automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 },
+    });
+    await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    expect(session.status).toBe('failed');
+    expect(session.automation?.reason).toContain('finish_review_round');
+    expect(test.deleted).toEqual([]);
+    expect(test.git.commit).not.toHaveBeenCalled();
+    expect(reviewer(test, session).backendSession).toBeDefined();
+  });
+
+  it('lets the reviewer correct a count mismatch but waits for the turn to end before closing', async () => {
+    let endTurn!: () => void;
+    let confirmed!: () => void;
+    const confirmation = new Promise<void>(resolve => { confirmed = resolve; });
+    const test = harness([async tools => {
+      await expect(tools.finishReviewRound({ findingCount: 1 })).rejects.toThrow('report_finding');
+      await tools.reportFinding({ priority: 'p3', title: 'Improve diagnostic', body: 'A minor diagnostic issue.' });
+      await expect(tools.finishReviewRound({ findingCount: 1 })).resolves.toMatchObject({ findingCount: 1 });
+      confirmed();
+      await new Promise<void>(resolve => { endTurn = resolve; });
+      return { text: 'One P3 finding.' };
+    }]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+      automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 },
+    });
+    await confirmation;
+    expect(session.status).toBe('reviewing');
+    expect(test.deleted).toEqual([]);
+    expect(test.git.commit).not.toHaveBeenCalled();
+    endTurn();
+    await vi.waitFor(() => expect(test.deleted).toHaveLength(1));
+    expect(session.rounds[0]?.inspectionCompletion).toMatchObject({ findingCount: 1 });
+  });
+
+  it('invalidates a finish confirmation when the ledger changes even if its count stays the same', async () => {
+    const test = harness([async tools => {
+      const finding = await tools.reportFinding({ priority: 'p3', title: 'Improve diagnostic', body: 'A minor diagnostic issue.' });
+      await tools.finishReviewRound({ findingCount: 1 });
+      await tools.updateFinding({ findingId: finding.id, priority: 'p1' });
+      return { text: 'Actually urgent.' };
+    }]);
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent',
+      automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 },
+    });
+    await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    expect(session.automation?.reason).toContain('finish_review_round');
+    expect(test.turns).toHaveLength(1);
+    expect(test.deleted).toEqual([]);
+  });
+
+  it('does not reuse an accepted completion when resuming an interrupted inspection', async () => {
+    const test = harness([async () => ({ text: 'Clean.', findingCount: 0 })]);
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const restored = harness([async () => ({ text: 'I forgot the completion tool.' })]);
+    const savedReviewer = structuredClone(reviewer(test, session));
+    savedReviewer.codeReview!.status = 'reviewing';
+    savedReviewer.codeReview!.rounds[0]!.status = 'reviewing';
+    restored.snapshot.agents.push(savedReviewer);
+    expect(savedReviewer.codeReview!.rounds[0]!.inspectionCompletion).toBeDefined();
+    await restored.service.resumeInterrupted(savedReviewer);
+    await vi.waitFor(() => expect(savedReviewer.codeReview?.status).toBe('failed'));
+    expect(savedReviewer.codeReview?.rounds[0]?.inspectionCompletion).toBeUndefined();
+    expect(restored.deleted).toEqual([]);
+  });
+
+  it('automatically fixes, commits and re-reviews while other agents remain active in the folder', async () => {
+    let findingId = '';
+    const test = harness([
+      async handlers => { findingId = (await handlers.reportFinding({ priority: 'p2', title: 'Fix authorization', body: 'An unauthorized write is possible.' })).id; return { text: 'Found a defect.', findingCount: 1 }; },
+      async handlers => { await handlers.updateFinding({ findingId, status: 'fixed', evidence: 'npm test: authorization regression and full suite passed' }); return { text: 'Fixed and verified.' }; },
+      async () => ({ text: 'No actionable findings.', findingCount: 0 }),
+    ]);
+    test.git.inspect.mockImplementation(async () => test.git.commit.mock.calls.length
+      ? { head: 'c'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'committed' }
+      : { head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' });
+    test.owner.status = { type: 'working' };
+    test.snapshot.agents.push({ ...agent('another-worker'), status: { type: 'awaitingInput' } });
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent', backend: 'codex', model: 'review-model', reasoningEffort: 'high',
+      automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 },
+    });
+    expect(reviewer(test, session).backendDefaults).toMatchObject({ model: 'review-model', reasoningEffort: 'high' });
+    await vi.waitFor(() => expect(test.deleted).toHaveLength(1));
+    expect(test.git.commit).toHaveBeenCalledOnce();
+    expect(session.rounds).toHaveLength(2);
+    expect(test.turns[2]?.reviewerSession).toBeUndefined();
+    expect(test.turns[2]?.prompt).toContain('a'.repeat(40));
+    expect(test.handoffs[0]?.content).toContain('c'.repeat(40));
+    expect(test.handoffs[0]?.content).toContain('authorization regression');
+    expect(test.handoffs[0]?.content).toContain(`/reports/${session.id}.md`);
+    expect(session.rounds[0]?.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
+    expect(session.rounds[0]?.summary).toBe('Found a defect.');
+    expect(session.rounds[1]?.summary).toBe('No actionable findings.');
+    expect(test.saveReport).toHaveBeenCalledTimes(2);
+    expect(test.saveReport.mock.invocationCallOrder[0]).toBeLessThan(test.resetReviewer.mock.invocationCallOrder[0]!);
+    expect(test.snapshot.general.codeReviewDefaults).toMatchObject({ backend: 'codex', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 }, providers: { codex: { model: 'review-model', reasoningEffort: 'high' } } });
+  });
+
+  it('keeps the reviewer and pauses automatic completion when saving its report fails', async () => {
+    const test = harness([async () => ({ text: 'No actionable findings.', findingCount: 0 })]);
+    test.saveReport.mockRejectedValue(new Error('Report disk is full.'));
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } });
+    await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    expect(test.deleted).toEqual([]);
+    expect(reviewer(test, session).backendSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
+    expect(session.automation?.reason).toContain('Report disk is full');
+  });
+
+  it('keeps a review open if new findings arrive while its report is being saved', async () => {
+    let handlers!: ReviewToolHandlers;
+    const test = harness([async tools => { handlers = tools; return { text: 'No findings.', findingCount: 0 }; }]);
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    const visibleReviewer = reviewer(test, session);
+    test.service.submit(visibleReviewer, session.id);
+    let release!: (path: string) => void;
+    test.saveReport.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const finishing = test.service.finish(visibleReviewer, session.id);
+    await expect(test.service.finish(visibleReviewer, session.id)).rejects.toThrow('already responding');
+    await handlers.reportFinding({ priority: 'p1', title: 'Check access', body: 'A late finding must not be lost.' });
+    release('/reports/review.md');
+    await expect(finishing).rejects.toThrow('review changed');
+    expect(test.deleted).toEqual([]);
+    expect(visibleReviewer.codeReview?.status).toBe('ready');
+  });
+
+  it('pauses at the round limit and reports unfinished work without deleting the reviewer', async () => {
+    const test = harness([async handlers => { await handlers.reportFinding({ priority: 'p1', title: 'Fix access', body: 'Access is unchecked.' }); return { text: '', findingCount: 1 }; }]);
+    const session = test.service.start(test.owner, { scope: { type: 'branch', baseRef: 'main' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 1 } });
+    await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    expect(test.git.commit).not.toHaveBeenCalled();
+    expect(test.deleted).toEqual([]);
+    expect(session.automation?.reason).toContain('round limit');
+    expect(session.status).toBe('ready');
+  });
+
+  it('does not automatically remediate priorities outside the selected threshold', async () => {
+    const test = harness([async handlers => { await handlers.reportFinding({ priority: 'p3', title: 'Polish diagnostics', body: 'A minor problem.' }); return { text: '', findingCount: 1 }; }]);
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } });
+    await vi.waitFor(() => expect(test.deleted).toHaveLength(1));
+    expect(test.git.commit).not.toHaveBeenCalled();
+    expect(test.handoffs[0]?.content).toContain('P3');
+    expect(session.rounds[0]?.findings[0]?.decision.state).not.toBe('rejected');
+  });
+
+  it.each(['validation', 'commit', 'repeated'] as const)('pauses and reports %s failures without declaring success', async failure => {
+    let findingId = '';
+    const test = harness([
+      async handlers => { findingId = (await handlers.reportFinding({ priority: 'p1', title: 'Fix access', body: 'Access is unchecked.' })).id; return { text: '', findingCount: 1 }; },
+      async handlers => { await handlers.updateFinding({ findingId, status: 'fixed', ...(failure !== 'validation' ? { evidence: 'npm test passed' } : {}) }); return { text: '' }; },
+      async handlers => { await handlers.reportFinding({ priority: 'p1', title: 'Fix access', body: 'Still unchecked.', priorFindingId: findingId }); return { text: '', findingCount: 1 }; },
+    ]);
+    if (failure === 'commit') test.git.commit.mockRejectedValue(new Error('Commit hook failed.'));
+    else test.git.commit.mockResolvedValue({ head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial', commit: 'c'.repeat(40) });
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } });
+    await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    expect(test.deleted).toEqual([]);
+    expect(test.handoffs).toHaveLength(1);
+    expect(test.handoffs[0]?.content).toContain('not an approval to ship');
+    expect(session.automation?.reason).toMatch(failure === 'validation' ? /Validation evidence/ : failure === 'commit' ? /Commit hook/ : /remains unresolved/);
+    if (failure === 'validation') expect(test.git.commit).not.toHaveBeenCalled();
+    expect(test.turns).toHaveLength(failure === 'repeated' ? 3 : 2);
+  });
+
+  it('stops during remediation without committing or starting another round when the provider eventually returns', async () => {
+    let finishFix!: () => void;
+    let findingId = '';
+    const test = harness([
+      async handlers => { findingId = (await handlers.reportFinding({ priority: 'p2', title: 'Fix access', body: 'Access is unchecked.' })).id; return { text: '', findingCount: 1 }; },
+      async handlers => {
+        await new Promise<void>(resolve => { finishFix = resolve; });
+        await handlers.updateFinding({ findingId, status: 'fixed', evidence: 'Tests passed' });
+        return { text: '' };
+      },
+    ]);
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } });
+    await vi.waitFor(() => expect(finishFix).toBeTypeOf('function'));
+    await test.service.discard(reviewer(test, session), session.id);
+    finishFix();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(session.automation?.state).toBe('paused');
+    expect(session.rounds).toHaveLength(1);
+    expect(test.git.commit).not.toHaveBeenCalled();
+    expect(test.deleted).toEqual([]);
+  });
+
+  it('detects unexpected workspace edits during inspection and refuses to remediate them', async () => {
+    const test = harness([async () => ({ text: 'No findings', findingCount: 0 })]);
+    test.git.inspect.mockResolvedValue({ head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'external-edit' });
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } });
+    await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    expect(session.automation?.reason).toContain('outside remediation');
+    expect(test.git.commit).not.toHaveBeenCalled();
+    expect(test.deleted).toEqual([]);
+  });
+
+  it('restores an interrupted automatic review as paused without replaying provider turns or Git writes', async () => {
+    const test = harness([async () => ({ text: '', findingCount: 0 })]);
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    session.automation = { enabled: true, maxPriority: 'p2', maxRounds: 3, state: 'running', commits: ['c'.repeat(40)], baseRef: 'a'.repeat(40), head: 'c'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'committed' };
+    session.status = 'fixing';
+    const restored = structuredClone(test.snapshot);
+    const runReview = vi.fn();
+    const restoredService = new CodeReviewService({ snapshot: restored, createAgent: vi.fn(), tools: test.tools, runReview, resetReviewer: vi.fn(), deleteReviewer: vi.fn(), saveReport: test.saveReport, git: test.git, changed: vi.fn() });
+    const restoredReviewer = restored.agents.find(agent => agent.id === session.reviewerAgentId)!;
+    await restoredService.resumeInterrupted(restoredReviewer);
+    expect(restoredReviewer.codeReview).toMatchObject({ status: 'failed', automation: { state: 'paused', commits: ['c'.repeat(40)] } });
+    expect(runReview).not.toHaveBeenCalled();
+    expect(test.git.commit).not.toHaveBeenCalled();
+  });
+
+  it('allows a paused review to be remediated and reviewed again manually', async () => {
+    let findingId = '';
+    const test = harness([
+      async handlers => { findingId = (await handlers.reportFinding({ priority: 'p2', title: 'Fix access', body: 'Access is unchecked.' })).id; return { text: '', findingCount: 1 }; },
+      async handlers => { await handlers.updateFinding({ findingId, status: 'fixed' }); return { text: 'Fixed manually.' }; },
+      async () => ({ text: 'No findings', findingCount: 0 }),
+    ]);
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 1 } });
+    await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    const agent = reviewer(test, session);
+    test.service.submit(agent, session.id);
+    await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
+    await test.service.reviewAgain(agent, session.id);
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    expect(session.rounds).toHaveLength(2);
+    expect(test.git.commit).not.toHaveBeenCalled();
+    expect(test.deleted).toEqual([]);
+  });
+
+  it.each(['failure', 'stop'] as const)('does not resume an automatic retry after reset %s', async outcome => {
+    const test = harness([async () => { throw new Error('Provider unavailable'); }]);
+    const input = { scope: { type: 'uncommitted' as const }, threadMode: 'independent' as const, automation: { enabled: true, maxPriority: 'p2' as const, maxRounds: 3 } };
+    const first = test.service.start(test.owner, input);
+    await vi.waitFor(() => expect(first.automation?.state).toBe('paused'));
+    const agent = reviewer(test, first);
+    let release!: () => void;
+    test.resetReviewer.mockImplementation(async () => {
+      await new Promise<void>(resolve => { release = resolve; });
+      if (outcome === 'failure') throw new Error('Reset unavailable');
+    });
+    const retry = test.service.start(agent, input);
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    if (outcome === 'stop') await test.service.discard(agent, retry.id);
+    release();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(retry.automation?.state).toBe('paused');
+    expect(test.turns).toHaveLength(1);
+    expect(test.git.commit).not.toHaveBeenCalled();
+    expect(test.handoffs).toHaveLength(2);
+  });
+  it('uses a selected reviewer backend without copying the source provider settings', async () => {
     const test = harness([]);
     test.snapshot.general.claudeCodeEnabled = true;
     test.owner.backendDefaults = { kind: 'codex', model: 'codex-model', reasoningEffort: 'high' };
@@ -78,9 +349,13 @@ describe('CodeReviewService', () => {
     });
     expect(reviewer(test, session)).toMatchObject({ backend: 'claude', backendDefaults: { kind: 'claude' } });
     expect(reviewer(test, session).backendDefaults).toStrictEqual({ kind: 'claude' });
+    await vi.waitFor(() => expect(test.turns).toHaveLength(1));
+    expect(test.turns[0]!.prompt).toContain(`mcp__${product.mcpServerName}__report_finding`);
+    expect(test.turns[0]!.prompt).toContain(`mcp__${product.mcpServerName}__finish_review_round`);
+    expect(test.turns[0]!.prompt).not.toContain('mcp__workspace__');
   });
   it('creates an independent reviewer as a normal adjacent agent for the same workspace', async () => {
-    const test = harness([async () => ({ text: '' })]);
+    const test = harness([async () => ({ text: '', findingCount: 0 })]);
     const neighbor = agent('neighbor');
     test.owner.avatar = 'owl';
     test.owner.openInApplication = 'vscode';
@@ -123,7 +398,7 @@ describe('CodeReviewService', () => {
   });
 
   it('discards an independent review by deleting its visible reviewer agent', async () => {
-    const test = harness([async () => ({ text: '' })]);
+    const test = harness([async () => ({ text: '', findingCount: 0 })]);
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent',
     });
@@ -138,7 +413,7 @@ describe('CodeReviewService', () => {
   });
 
   it('retains an independent review ledger when its visible reviewer cannot be deleted', async () => {
-    const test = harness([async () => ({ text: '' })], async () => {
+    const test = harness([async () => ({ text: '', findingCount: 0 })], async () => {
       throw new Error('Reviewer agent could not be deleted.');
     });
     const session = test.service.start(test.owner, {
@@ -156,7 +431,7 @@ describe('CodeReviewService', () => {
   });
 
   it('notifies the original thread when an independent review finishes without fixes', async () => {
-    const test = harness([async () => ({ text: '' })]);
+    const test = harness([async () => ({ text: '', findingCount: 0 })]);
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent',
     });
@@ -169,14 +444,14 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([{
       from: visibleReviewer.id,
       to: test.owner.id,
-      content: 'Independent review completed. No code changes were made.',
+      content: `Independent review completed. No code changes were made.\nReview report: /reports/${session.id}.md`,
     }]);
   });
 
   it('retries a failed independent review against the original target in the same visible reviewer', async () => {
     const test = harness([
       async () => { throw new Error('Reviewer stopped.'); },
-      async () => ({ text: '' }),
+      async () => ({ text: '', findingCount: 0 }),
     ]);
     const failed = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent',
@@ -196,10 +471,46 @@ describe('CodeReviewService', () => {
     expect(test.turns[1]?.reviewerSession).toBeUndefined();
   });
 
+  it('keeps automation and saved preferences when retrying a failed automatic review', async () => {
+    const test = harness([
+      async () => { throw new Error('Reviewer stopped.'); },
+      async () => ({ text: '', findingCount: 0 }),
+    ]);
+    const automation = { enabled: true, maxPriority: 'p1' as const, maxRounds: 4 };
+    const failed = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'independent', model: 'review-model', automation,
+    });
+    await vi.waitFor(() => expect(failed.status).toBe('failed'));
+    const saved = structuredClone(test.snapshot.general.codeReviewDefaults);
+    const visibleReviewer = reviewer(test, failed);
+
+    const retried = test.service.start(visibleReviewer, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation });
+
+    expect(retried.automation).toMatchObject({ enabled: true, maxPriority: 'p1', maxRounds: 4, state: 'running' });
+    expect(visibleReviewer.backendDefaults).toMatchObject({ model: 'review-model' });
+    expect(test.snapshot.general.codeReviewDefaults).toEqual(saved);
+    await vi.waitFor(() => expect(retried.status).not.toBe('reviewing'));
+  });
+
+  it('rejects review model overrides on the current thread and leaves the agent and saved preferences alone', () => {
+    const test = harness([]);
+    test.owner.backendSession = { kind: 'codex', threadId: 'current-thread' };
+    test.owner.backendDefaults = { kind: 'codex', model: 'owner-model', reasoningEffort: 'low' };
+    const saved = structuredClone(test.snapshot.general.codeReviewDefaults);
+
+    expect(() => test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode: 'current', model: 'review-model', reasoningEffort: 'high',
+    })).toThrow('Invalid code review settings');
+
+    expect(test.owner.backendDefaults).toEqual({ kind: 'codex', model: 'owner-model', reasoningEffort: 'low' });
+    expect(test.owner.codeReview).toBeUndefined();
+    expect(test.snapshot.general.codeReviewDefaults).toEqual(saved);
+  });
+
   it('keeps every round in the current thread and never disposes that user-owned conversation', async () => {
     const test = harness([
-      async () => ({ text: '' }),
-      async () => ({ text: '' }),
+      async () => ({ text: '', findingCount: 0 }),
+      async () => ({ text: '', findingCount: 0 }),
     ]);
     test.owner.backendSession = { kind: 'codex', threadId: 'current-thread' };
 
@@ -242,14 +553,14 @@ describe('CodeReviewService', () => {
         findingId = (await context.reportFinding({
           priority: 'p2', title: 'Check the retry path', body: 'The retry may fail.',
         })).id;
-        return { text: '' };
+        return { text: '', findingCount: 1 };
       },
       async (context) => {
         await context.reportFinding({
           priority: 'p2', title: 'Check the retry path again', body: 'The latest code still fails.',
           priorFindingId: findingId,
         });
-        return { text: '' };
+        return { text: '', findingCount: 1 };
       },
     ]);
     const session = test.service.start(test.owner, {
@@ -280,16 +591,16 @@ describe('CodeReviewService', () => {
           priority: 'p2', title: 'Invalidate the round one cache',
           body: 'The cache could be stale.',
         })).id;
-        return { text: '' };
+        return { text: '', findingCount: 1 };
       },
       async (tools) => {
         secondSkippedId = (await tools.reportFinding({
           priority: 'p3', title: 'Reduce round two logging',
           body: 'The log could be noisy.',
         })).id;
-        return { text: '' };
+        return { text: '', findingCount: 1 };
       },
-      async () => ({ text: '' }),
+      async () => ({ text: '', findingCount: 0 }),
     ]);
 
     const session = test.service.start(test.owner, {
@@ -347,7 +658,7 @@ describe('CodeReviewService', () => {
           title: 'This mutation must not stick',
           status: 'fixed',
         })).rejects.toThrow('Only a finding currently being fixed can be marked fixed.');
-        return { text: '' };
+        return { text: '', findingCount: 2 };
       },
       async () => ({ text: 'The public route reaches the mutation directly.' }),
       async (tools) => {
@@ -358,7 +669,7 @@ describe('CodeReviewService', () => {
         });
         return { text: '' };
       },
-      async () => ({ text: '' }),
+      async () => ({ text: '', findingCount: 0 }),
     ]);
 
     const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
@@ -415,7 +726,7 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([{
       from: visibleReviewer.id,
       to: test.owner.id,
-      content: 'Independent review completed.\n- P0 — Authorize before writing\nNo reply to the reviewer is needed.',
+      content: `Independent review completed.\n- P0 — Authorize before writing\nNo reply to the reviewer is needed.\nReview report: /reports/${session.id}.md`,
     }]);
   });
 
@@ -455,6 +766,7 @@ describe('CodeReviewService', () => {
             priority: 'p1', title: 'Keep the review tool context alive',
             body: 'The reviewer thread retains its initial MCP server configuration.',
           })).id;
+          await tools.finishReviewRound({ findingCount: 1 });
         } else {
           await tools.updateFinding({ findingId, status: 'fixed' });
         }
@@ -462,6 +774,7 @@ describe('CodeReviewService', () => {
       },
       resetReviewer: async () => undefined,
       deleteReviewer: async () => undefined,
+      saveReport: async () => '/reports/current.md',
       changed: vi.fn(),
     });
 
@@ -478,7 +791,7 @@ describe('CodeReviewService', () => {
   });
 
   it('restores the review tool URL for an open reviewer after backend restart', async () => {
-    const test = harness([async () => ({ text: '' })]);
+    const test = harness([async () => ({ text: '', findingCount: 0 })]);
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent',
     });
@@ -496,6 +809,7 @@ describe('CodeReviewService', () => {
       runReview: vi.fn(),
       resetReviewer: vi.fn(),
       deleteReviewer: vi.fn(),
+      saveReport: test.saveReport,
       changed: vi.fn(),
     });
 
@@ -518,7 +832,7 @@ describe('CodeReviewService', () => {
             priority: 'p2', title, body: `${title} finding body.`,
           })).id);
         }
-        return { text: '' };
+        return { text: '', findingCount: 2 };
       },
       async (tools) => {
         await firstFixCanFinish;
@@ -556,13 +870,13 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([{
       from: visibleReviewer.id,
       to: test.owner.id,
-      content: 'Independent review completed.\n- P2 — First\n- P2 — Second\nNo reply to the reviewer is needed.',
+      content: `Independent review completed.\n- P2 — First\n- P2 — Second\nNo reply to the reviewer is needed.\nReview report: /reports/${session.id}.md`,
     }]);
   });
 
   it('keeps finding tools available after the review turn and reopens a completed round', async () => {
     let tools!: ReviewToolHandlers;
-    const test = harness([async (context) => { tools = context; return { text: '' }; }]);
+    const test = harness([async (context) => { tools = context; return { text: '', findingCount: 0 }; }]);
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent',
     });
@@ -599,7 +913,7 @@ describe('CodeReviewService', () => {
           priority: 'p1', title: 'Fix the original finding',
           body: 'The review identified one concrete defect.',
         })).id;
-        return { text: '' };
+        return { text: '', findingCount: 1 };
       },
       async (tools) => {
         lateFindingId = (await tools.reportFinding({
@@ -632,7 +946,7 @@ describe('CodeReviewService', () => {
         findingId = (await tools.reportFinding({
           priority: 'p2', title: 'Check this suspected failure', body: 'This might fail.',
         })).id;
-        return { text: '' };
+        return { text: '', findingCount: 1 };
       },
       async (tools) => {
         await tools.deleteFinding({ findingId });
@@ -663,7 +977,7 @@ describe('CodeReviewService', () => {
             priority: 'p1', title, body: `${title} body.`,
           })).id);
         }
-        return { text: '' };
+        return { text: '', findingCount: 2 };
       },
       async (tools) => {
         await tools.updateFinding({
@@ -714,7 +1028,7 @@ describe('CodeReviewService', () => {
         priority: 'p1', title: 'Restore this fix',
         body: 'The process stopped mid-fix; resume the same review thread.',
       })).id;
-      return { text: '' };
+      return { text: '', findingCount: 1 };
     }]);
     const session = original.service.start(original.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
     await vi.waitFor(() => expect(session.status).toBe('ready'));

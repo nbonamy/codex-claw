@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { appMcpServerName } from '@workspace/core/product';
 import {
   activeCodeReviewRound,
   codeReviewLedger,
+  isCodeReviewStartInput,
   type CodeReviewDecisionInput,
   type CodeReviewDiscussionInput,
   type CodeReviewFinding,
@@ -15,6 +17,7 @@ import type { BackendCodeReviewResult } from '@workspace/core/backend-driver';
 import type { Agent, AppSnapshot, BackendSession, CreateAgentInput } from '@workspace/core/contracts';
 import type { AgentCreationOptions } from '../agents/agent-creation-service';
 import type { ReviewToolHandlers } from './review-tool-registry';
+import { ReviewGit, type ReviewGitPort } from './review-git';
 
 export type CodeReviewToolPort = {
   createReviewToolContext(agentId: string, sessionId: string, handlers: ReviewToolHandlers): { id: string; url: string };
@@ -32,25 +35,40 @@ export type CodeReviewServiceOptions = {
     reviewerSession?: BackendSession,
   ): Promise<BackendCodeReviewResult>;
   resetReviewer(agent: Agent): Promise<void>;
-  deleteReviewer(agent: Agent, handoff?: { targetAgentId: string; content: string }): Promise<void>;
+  deleteReviewer(agent: Agent, handoff?: { targetAgentId: string; content: string }, retainConversation?: boolean): Promise<void>;
+  saveReport(agent: Agent, session: CodeReviewSession): Promise<string>;
   changed(): Promise<void> | void;
+  git?: ReviewGitPort;
+  reportProgress?(agent: Agent, targetAgentId: string, content: string): void;
   now?: () => Date;
 };
 
 export class CodeReviewService {
   private readonly now: () => Date;
   private readonly activeRoundTurns = new Set<string>();
+  private readonly activeInspections = new Set<string>();
   private readonly reviewContexts = new WeakMap<CodeReviewSession, { id: string; url: string }>();
+  private readonly git: ReviewGitPort;
 
   constructor(private readonly options: CodeReviewServiceOptions) {
     this.now = options.now ?? (() => new Date());
+    this.git = options.git ?? new ReviewGit();
     for (const agent of options.snapshot.agents) {
       const session = agent.codeReview;
+      if (session?.automation?.state === 'running') {
+        session.automation.state = 'paused';
+        session.automation.reason = 'Automatic review was interrupted. Inspect the files and commits before continuing manually.';
+        session.status = 'failed';
+        const round = activeCodeReviewRound(session);
+        round.status = 'failed';
+        round.error = session.automation.reason;
+      }
       if (session && session.status !== 'finished') this.reviewToolContext(agent, session);
     }
   }
 
   start(agent: Agent, input: CodeReviewStartInput): CodeReviewSession {
+    if (!isCodeReviewStartInput(input)) throw new Error('Invalid code review settings.');
     if (!agent.folder) throw new Error('Code review requires an agent workspace.');
     if (input.threadMode === 'current' && !agent.backendSession) {
       throw new Error('The current thread is not available for review.');
@@ -59,6 +77,7 @@ export class CodeReviewService {
       throw new Error('A branch review requires a base reference.');
     }
     const current = agent.codeReview;
+    if (current) this.requireIdleRound(activeCodeReviewRound(current));
     if (
       current?.status === 'failed'
       && current.threadMode === 'independent'
@@ -82,6 +101,8 @@ export class CodeReviewService {
     const reviewer = input.threadMode === 'current'
       ? agent
       : this.createIndependentReviewer(agent, input.backend ?? agent.backend);
+    this.applySelection(reviewer, input);
+    this.rememberSettings(reviewer, input);
     if (current?.status === 'failed') this.closeReviewToolContext(current);
     const session = this.newSession(agent, reviewer, input);
     const firstRound = activeCodeReviewRound(session);
@@ -102,8 +123,12 @@ export class CodeReviewService {
     reviewer: Agent,
     input: CodeReviewStartInput,
   ): CodeReviewSession {
+    if (input.backend && input.backend !== reviewer.backend) {
+      throw new Error('Start a new review to change the backend of an existing reviewer.');
+    }
     if (reviewer.codeReview) this.closeReviewToolContext(reviewer.codeReview);
     const session = this.newSession(target, reviewer, input);
+    this.applySelection(reviewer, input);
     reviewer.codeReview = session;
     void this.options.changed();
     void this.resetAndExecuteRound(reviewer, session, activeCodeReviewRound(session));
@@ -115,24 +140,31 @@ export class CodeReviewService {
     session: CodeReviewSession,
     round: CodeReviewRound,
   ): Promise<void> {
+    const wasAutomatic = session.automation?.state === 'running';
+    this.activeRoundTurns.add(round.id);
     try {
       await this.options.resetReviewer(reviewer);
     } catch (error) {
+      if (reviewer.codeReview !== session) return;
       round.status = 'failed';
       round.error = error instanceof Error ? error.message : String(error);
       round.completedAt = this.timestamp();
       session.status = 'failed';
       session.updatedAt = round.completedAt;
+      if (session.automation?.state === 'running') await this.pauseAutomatic(reviewer, session, round.error);
       await this.options.changed();
       return;
+    } finally {
+      this.activeRoundTurns.delete(round.id);
     }
-    if (reviewer.codeReview !== session) return;
+    if (reviewer.codeReview !== session || (wasAutomatic && session.automation?.state !== 'running')) return;
     await this.executeRound(reviewer, session, round, undefined);
   }
 
   decide(agent: Agent, input: CodeReviewDecisionInput): void {
     const { session, finding } = this.findFinding(agent, input);
     this.requireArbitration(session);
+    if (session.automation?.state === 'running') throw new Error('Stop automatic review before selecting findings.');
     const decidedAt = this.timestamp();
     finding.decision = input.decision === 'select'
       ? { state: 'selected', decidedAt }
@@ -148,6 +180,7 @@ export class CodeReviewService {
   discuss(agent: Agent, input: CodeReviewDiscussionInput): void {
     const { session, round, finding } = this.findFinding(agent, input);
     this.requireArbitration(session);
+    if (session.automation?.state === 'running') throw new Error('Stop automatic review before discussing findings.');
     this.requireIdleRound(round);
     const question = requiredText(input.question, 'A finding question is required.');
     const createdAt = this.timestamp();
@@ -160,6 +193,7 @@ export class CodeReviewService {
 
   submit(agent: Agent, sessionId: string): void {
     const session = this.findSession(agent, sessionId);
+    if (session.automation?.state === 'running') throw new Error('Stop automatic review before submitting a manual round.');
     this.requireArbitration(session);
     const round = activeCodeReviewRound(session);
     this.requireIdleRound(round);
@@ -193,24 +227,43 @@ export class CodeReviewService {
   async finish(agent: Agent, sessionId: string): Promise<void> {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('The review is not ready to finish.');
-    if (session.threadMode === 'independent') {
-      const target = this.options.snapshot.agents.find((candidate) => candidate.id === session.targetAgentId);
-      await this.options.deleteReviewer(agent, target
-        ? { targetAgentId: target.id, content: independentReviewHandoff(session) }
-        : undefined);
-      this.closeReviewToolContext(session);
-      return;
-    }
+    const round = activeCodeReviewRound(session);
+    this.requireIdleRound(round);
+    const revision = session.updatedAt;
     const finishedAt = this.timestamp();
-    session.status = 'finished';
-    session.finishedAt = finishedAt;
-    session.updatedAt = finishedAt;
-    this.closeReviewToolContext(session);
-    delete agent.codeReview;
+    this.activeRoundTurns.add(round.id);
+    try {
+      const reportPath = await this.options.saveReport(agent, structuredClone({
+        ...session, status: 'finished', finishedAt, updatedAt: finishedAt,
+      }));
+      this.requireOpenReviewSession(session);
+      if (session.status !== 'readyToFinish' || session.updatedAt !== revision) {
+        throw new Error('The review changed while saving its report. Inspect it before finishing.');
+      }
+      if (session.threadMode === 'independent') {
+        const target = this.options.snapshot.agents.find((candidate) => candidate.id === session.targetAgentId);
+        await this.options.deleteReviewer(agent, target
+          ? { targetAgentId: target.id, content: `${reviewHandoff(session)}\nReview report: ${reportPath}` }
+          : undefined, true);
+        this.closeReviewToolContext(session);
+        return;
+      }
+      session.status = 'finished';
+      session.finishedAt = finishedAt;
+      session.updatedAt = finishedAt;
+      this.closeReviewToolContext(session);
+      delete agent.codeReview;
+    } finally {
+      this.activeRoundTurns.delete(round.id);
+    }
   }
 
   async discard(agent: Agent, sessionId: string): Promise<void> {
     const session = this.findSession(agent, sessionId);
+    if (session.automation?.state === 'running') {
+      await this.pauseAutomatic(agent, session, 'Automatic review was stopped. Inspect the current changes before continuing manually.');
+      return;
+    }
     if (session.threadMode === 'independent') {
       await this.options.deleteReviewer(agent);
       this.closeReviewToolContext(session);
@@ -229,9 +282,17 @@ export class CodeReviewService {
     const session = this.findSession(agent, sessionId);
     if (session.status !== 'readyToFinish') throw new Error('Complete the current remediation before reviewing again.');
     const previousRound = activeCodeReviewRound(session);
+    this.requireIdleRound(previousRound);
+    const wasAutomatic = session.automation?.state === 'running';
     if (session.threadMode === 'independent') {
-      await this.options.resetReviewer(agent);
-      delete previousRound.reviewerSession;
+      this.activeRoundTurns.add(previousRound.id);
+      try {
+        await this.options.saveReport(agent, session);
+        if (agent.codeReview !== session || (wasAutomatic && session.automation?.state !== 'running')) return previousRound;
+        await this.options.resetReviewer(agent);
+      }
+      finally { this.activeRoundTurns.delete(previousRound.id); }
+      if (agent.codeReview !== session || (wasAutomatic && session.automation?.state !== 'running')) return previousRound;
     }
     const round = this.newRound(session.rounds.length + 1);
     if (session.threadMode === 'current') round.reviewerSession = requiredReviewerSession(previousRound);
@@ -277,6 +338,10 @@ export class CodeReviewService {
   async handleTurnInterrupted(agent: Agent): Promise<boolean> {
     const session = agent.codeReview;
     if (!session) return false;
+    if (session.automation?.state === 'running') {
+      await this.pauseAutomatic(agent, session, 'Automatic review was stopped. Inspect the current changes before continuing manually.');
+      return true;
+    }
     const round = activeCodeReviewRound(session);
     const interruptedRemediation = session.status === 'fixing'
       || (
@@ -307,15 +372,32 @@ export class CodeReviewService {
     round: CodeReviewRound,
     initialReviewerSession?: BackendSession,
   ): Promise<void> {
+    const wasAutomatic = session.automation?.state === 'running';
     this.activeRoundTurns.add(round.id);
+    this.activeInspections.add(round.id);
+    delete round.inspectionCompletion;
     const context = this.reviewToolContext(agent, session);
     try {
-      const result = await this.options.runReview(agent, reviewPrompt(session), context.url, initialReviewerSession);
+      if (session.automation?.state === 'running') {
+        if (!session.automation.baseRef) {
+          Object.assign(session.automation, await this.git.prepare(agent.folder!, session.scope));
+          await this.options.changed();
+        } else await this.assertReviewWorkspace(agent, session, true);
+        if (session.automation.state !== 'running' || agent.codeReview !== session) return;
+      }
+      const result = await this.options.runReview(agent, reviewPrompt(session, appMcpServerName(agent.backend)), context.url, initialReviewerSession);
       if (agent.codeReview !== session) {
         return;
       }
       agent.backendSession = result.reviewerSession;
       round.reviewerSession = result.reviewerSession;
+      round.summary = result.text;
+      if (wasAutomatic && session.automation?.state !== 'running') return;
+      if (session.automation?.state === 'running') await this.assertReviewWorkspace(agent, session, true);
+      const completion = (round as CodeReviewRound).inspectionCompletion;
+      if (!completion || completion.findingCount !== round.findings.length) {
+        throw new Error('The reviewer ended its turn without an accepted finish_review_round confirmation. Register each finding with report_finding, then call finish_review_round with the total current-round findingCount (including zero for a clean review).');
+      }
       const completedAt = this.timestamp();
       round.status = 'ready';
       round.completedAt = completedAt;
@@ -328,10 +410,13 @@ export class CodeReviewService {
       round.completedAt = this.timestamp();
       session.status = 'failed';
       session.updatedAt = round.completedAt;
+      if (session.automation?.state === 'running') await this.pauseAutomatic(agent, session, round.error);
     } finally {
+      this.activeInspections.delete(round.id);
       this.activeRoundTurns.delete(round.id);
     }
     await this.options.changed();
+    if (agent.codeReview === session && session.automation?.state === 'running') await this.advanceAutomatic(agent, session);
   }
 
   private async executeDiscussion(
@@ -397,6 +482,18 @@ export class CodeReviewService {
         if (incomplete.length > 0) {
           throw new Error(`Reviewer did not update ${incomplete.length} finding(s) to fixed: ${incomplete.map((finding) => finding.title).join(', ')}.`);
         }
+        if (session.automation?.state === 'running') {
+          if (findings.some(finding => finding.remediation.state !== 'fixed' || !finding.remediation.evidence?.trim())) {
+            throw new Error('Validation evidence is missing. Inspect the fixes before committing.');
+          }
+          const beforeCommit = await this.assertReviewWorkspace(agent, session, false);
+          if (session.automation.state !== 'running' || agent.codeReview !== session) return;
+          const committed = await this.git.commit(agent.folder!, beforeCommit, round.number);
+          Object.assign(session.automation, { head: committed.head, branch: committed.branch, fingerprint: committed.fingerprint });
+          if (committed.commit) session.automation.commits.push(committed.commit);
+          await this.options.changed();
+          if (session.automation.state !== 'running' || agent.codeReview !== session) return;
+        }
       }
       const completedAt = this.timestamp();
       const newFindings = round.findings.some((finding) => finding.remediation.state === 'notStarted');
@@ -411,10 +508,108 @@ export class CodeReviewService {
       round.error = error instanceof Error ? error.message : String(error);
       session.status = 'failed';
       session.updatedAt = this.timestamp();
+      if (session.automation?.state === 'running') await this.pauseAutomatic(agent, session, round.error!);
     } finally {
       this.activeRoundTurns.delete(round.id);
     }
     await this.options.changed();
+    if (agent.codeReview === session && session.automation?.state === 'running') {
+      if (session.status === 'readyToFinish') {
+        try { await this.reviewAgain(agent, session.id); }
+        catch (error) { await this.pauseAutomatic(agent, session, error instanceof Error ? error.message : String(error)); }
+      } else await this.pauseAutomatic(agent, session, 'New findings appeared during remediation. Inspect them before continuing.');
+    }
+  }
+
+  private async advanceAutomatic(agent: Agent, session: CodeReviewSession): Promise<void> {
+    const auto = session.automation!;
+    const round = activeCodeReviewRound(session);
+    try {
+      const qualifying = round.findings.filter(finding => finding.priority <= auto.maxPriority);
+      if (qualifying.length === 0) {
+        round.status = 'completed';
+        session.status = 'readyToFinish';
+        auto.state = 'completed';
+        await this.options.changed();
+        await this.finish(agent, session.id);
+        await this.options.changed();
+        return;
+      }
+      if (round.number >= auto.maxRounds) {
+        await this.pauseAutomatic(agent, session, 'The automatic review round limit was reached with unresolved findings.');
+        return;
+      }
+      const repeated = qualifying.some(finding => session.rounds.slice(0, -1).some(previous => previous.findings.some(prior =>
+        prior.id === finding.id || (prior.title.toLowerCase().trim() === finding.title.toLowerCase().trim()
+          && prior.location?.file === finding.location?.file))));
+      if (repeated) {
+        await this.pauseAutomatic(agent, session, 'A finding remains unresolved after remediation. Inspect it before another attempt.');
+        return;
+      }
+      for (const finding of round.findings) {
+        finding.decision = finding.priority <= auto.maxPriority
+          ? { state: 'selected', decidedAt: this.timestamp() }
+          : { state: 'undecided' };
+      }
+      // Do not record low-priority findings as user rejections in the cumulative ledger.
+      const submittedAt = this.timestamp();
+      for (const finding of round.findings) finding.remediation = finding.priority <= auto.maxPriority
+        ? { state: 'pending', queuedAt: submittedAt } : { state: 'skipped', startedAt: submittedAt };
+      round.status = 'submitted';
+      session.status = 'fixing';
+      await this.options.changed();
+      if (auto.state === 'running') await this.executeFixes(agent, session, round);
+    } catch (error) {
+      await this.pauseAutomatic(agent, session, error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  private async pauseAutomatic(agent: Agent, session: CodeReviewSession, reason: string): Promise<void> {
+    const auto = session.automation;
+    if (!auto || auto.state === 'paused') return;
+    auto.state = 'paused';
+    auto.reason = reason;
+    const round = activeCodeReviewRound(session);
+    // An in-flight provider may still finish, but cannot commit or start another round.
+    if (session.status === 'reviewing' || session.status === 'fixing') {
+      session.status = 'failed';
+      round.status = 'failed';
+      round.error = reason;
+    }
+    await this.options.changed();
+    try { this.options.reportProgress?.(agent, session.targetAgentId, reviewHandoff(session)); }
+    catch { /* The durable paused ledger remains visible if its target cannot receive the report. */ }
+  }
+
+  private async assertReviewWorkspace(agent: Agent, session: CodeReviewSession, unchanged: boolean) {
+    const actual = await this.git.inspect(agent.folder!);
+    if (actual.head !== session.automation!.head || actual.branch !== session.automation!.branch
+      || (unchanged && actual.fingerprint !== session.automation!.fingerprint)) {
+      throw new Error('The workspace changed outside remediation. Inspect the changes before continuing.');
+    }
+    return actual;
+  }
+
+  private applySelection(reviewer: Agent, input: CodeReviewStartInput): void {
+    if (input.model === undefined && input.reasoningEffort === undefined) return;
+    reviewer.backendDefaults = {
+      ...reviewer.backendDefaults, kind: reviewer.backend,
+      ...(input.model ? { model: input.model, userSelectedModel: true, reasoningEffort: input.reasoningEffort } : {}),
+      ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+    };
+  }
+
+  private rememberSettings(reviewer: Agent, input: CodeReviewStartInput): void {
+    // Only a new independent-reviewer setup is a preference; current-thread reviews and retries are not.
+    if (input.threadMode === 'current') return;
+    const previous = this.options.snapshot.general.codeReviewDefaults;
+    this.options.snapshot.general.codeReviewDefaults = {
+      backend: reviewer.backend,
+      automation: input.automation ?? { enabled: false, maxPriority: previous?.automation.maxPriority ?? 'p2', maxRounds: previous?.automation.maxRounds ?? 3 },
+      providers: { ...previous?.providers, [reviewer.backend]: {
+        ...(input.model ? { model: input.model } : {}), ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+      } },
+    };
   }
 
   private reviewToolContext(agent: Agent, session: CodeReviewSession): { id: string; url: string } {
@@ -434,10 +629,35 @@ export class CodeReviewService {
 
   private reviewToolHandlers(session: CodeReviewSession): ReviewToolHandlers {
     return {
+      finishReviewRound: (input) => this.finishReviewRound(session, input.findingCount),
       reportFinding: (input) => this.reportFinding(session, activeCodeReviewRound(session), input),
       updateFinding: (input) => this.updateFinding(session, input),
       deleteFinding: (input) => this.deleteFinding(session, input.findingId),
     };
+  }
+
+  private async finishReviewRound(session: CodeReviewSession, findingCount: number): Promise<{ roundId: string; findingCount: number }> {
+    this.requireOpenReviewSession(session);
+    const round = activeCodeReviewRound(session);
+    if (!this.activeInspections.has(round.id) || session.status !== 'reviewing') {
+      throw new Error('There is no active review inspection to finish.');
+    }
+    delete round.inspectionCompletion;
+    if (!Number.isSafeInteger(findingCount) || findingCount < 0) throw new Error('findingCount must be a non-negative integer.');
+    if (findingCount !== round.findings.length) {
+      await this.options.changed();
+      throw new Error(`You declared ${findingCount} findings, but ${round.findings.length} are registered in this round. Call report_finding for each missing finding (with its priority), reconcile existing findings with update_finding/delete_finding if needed, then call finish_review_round again with the total count across all priorities.`);
+    }
+    const completion = { findingCount, confirmedAt: this.timestamp() };
+    round.inspectionCompletion = completion;
+    session.updatedAt = completion.confirmedAt;
+    try {
+      await this.options.changed();
+    } catch (error) {
+      if (round.inspectionCompletion === completion) delete round.inspectionCompletion;
+      throw error;
+    }
+    return { roundId: round.id, findingCount };
   }
 
   private async reportFinding(
@@ -447,6 +667,7 @@ export class CodeReviewService {
   ): Promise<CodeReviewFinding> {
     this.requireOpenReviewSession(session);
     const now = this.timestamp();
+    if (this.activeInspections.has(round.id)) delete round.inspectionCompletion;
     const prior = input.priorFindingId
       ? this.findFindingInSession(session, input.priorFindingId)
       : undefined;
@@ -478,6 +699,8 @@ export class CodeReviewService {
     this.requireOpenReviewSession(session);
     const finding = this.findFindingInSession(session, input.findingId);
     if (!finding) throw new Error('Code review finding was not found.');
+    const round = activeCodeReviewRound(session);
+    if (this.activeInspections.has(round.id)) delete round.inspectionCompletion;
     if (input.status === 'fixed' && finding.remediation.state !== 'fixing') {
       throw new Error('Only a finding currently being fixed can be marked fixed.');
     }
@@ -503,6 +726,7 @@ export class CodeReviewService {
     this.requireOpenReviewSession(session);
     if (!this.findFindingInSession(session, findingId)) throw new Error('Code review finding was not found.');
     for (const round of session.rounds) {
+      if (this.activeInspections.has(round.id)) delete round.inspectionCompletion;
       round.findings = round.findings.filter((finding) => finding.id !== findingId);
     }
     session.updatedAt = this.timestamp();
@@ -553,6 +777,7 @@ export class CodeReviewService {
       status: 'reviewing',
       activeRoundId: round.id,
       rounds: [round],
+      ...(input.automation?.enabled ? { automation: { ...input.automation, state: 'running' as const, commits: [] } } : {}),
       createdAt,
       updatedAt: createdAt,
     };
@@ -618,21 +843,36 @@ export class CodeReviewService {
   }
 }
 
-function independentReviewHandoff(session: CodeReviewSession): string {
+function reviewHandoff(session: CodeReviewSession): string {
   const latestFindings = new Map<string, CodeReviewFinding>();
   for (const round of session.rounds) {
     for (const finding of round.findings) latestFindings.set(finding.id, finding);
   }
   const remediated = [...latestFindings.values()].filter((finding) => finding.remediation.state === 'fixed');
+  if (session.automation) {
+    const auto = session.automation;
+    const remaining = [...latestFindings.values()].filter(finding => finding.remediation.state !== 'fixed');
+    return [
+      auto.state === 'completed' ? 'Automatic review completed.' : 'Automatic review paused; it is not an approval to ship.',
+      `${session.rounds.length} review round(s). Priority threshold: ${auto.maxPriority.toUpperCase()}.`,
+      ...(auto.reason ? [auto.reason] : []),
+      ...remediated.map(finding => `- Fixed ${finding.priority.toUpperCase()} — ${finding.title}\n  Verification: ${finding.remediation.state === 'fixed' ? finding.remediation.evidence ?? 'Not recorded' : ''}`),
+      ...remaining.map(finding => `- Remaining ${finding.priority.toUpperCase()} — ${finding.title}`),
+      `Local commits: ${auto.commits.join(', ') || 'none'}. No push or merge was performed.`,
+      'No reply to the reviewer is needed.',
+    ].join('\n');
+  }
   if (remediated.length === 0) return 'Independent review completed. No code changes were made.';
   const summary = ['Independent review completed.',
     ...remediated.map((finding) => `- ${finding.priority.toUpperCase()} — ${finding.title.replace(/\s+/g, ' ').trim()}`)];
   return [...summary, 'No reply to the reviewer is needed.'].join('\n');
 }
 
-function reviewPrompt(session: CodeReviewSession): string {
+function reviewPrompt(session: CodeReviewSession, mcpServerName: string): string {
   const ledger = codeReviewLedger(session);
-  const detailedScope = session.scope.type === 'branch'
+  const detailedScope = session.automation?.baseRef
+    ? `all changes against the fixed baseline ${session.automation.baseRef}, including subsequent review commits and working changes (use git diff ${session.automation.baseRef} and inspect untracked files). Do not recalculate the baseline or review only the latest commit`
+    : session.scope.type === 'branch'
     ? `the current branch against ${session.scope.baseRef}, including uncommitted changes`
     : 'only the current uncommitted changes (staged, unstaged, and untracked)';
   const visibleScope = session.scope.type === 'branch'
@@ -644,8 +884,13 @@ This structured review ledger is cumulative across every previous round in this 
 ${JSON.stringify(ledger, null, 2)}
 
 Review ${detailedScope} independently. Do not report findings outside this scope. Use the ordinary repository tools already supplied by the harness to inspect code and tests.
+${session.automation ? 'This is an automatic review inspection: do not modify files, commit, push, or merge. Report every actionable finding, including lower-priority findings; the review workflow owns priority selection and completion.' : ''}
 
-Structured findings are the source of truth for this review. You can add, edit, or delete findings while this reviewer thread remains open, including after an inspection turn ends. For every actionable defect, call report_finding with an imperative title of at most 80 characters and one concise Markdown paragraph explaining why it matters. Use update_finding to correct a reported finding, and delete_finding to retract one that is no longer actionable. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID. After the inspection and all finding tool calls are complete, end the turn with a natural summary of one or two short sentences. If there are no actionable findings, say so plainly; otherwise state how many findings you reported and invite the user to review them or ask questions. Do not list or repeat the findings in chat, imply that the review is an approval to ship, or use a generic "Review complete" response. There is no tool for completing the review workflow.
+Structured findings are the source of truth for this review. You can add, edit, or delete findings while this reviewer thread remains open, including after an inspection turn ends. For every actionable defect, call mcp__${mcpServerName}__report_finding with its P0–P3 priority, an imperative title of at most 80 characters, and one concise Markdown paragraph explaining why it matters. Native tools such as ReportFindings do not register findings in Korus. Use update_finding to correct a reported finding, and delete_finding to retract one that is no longer actionable. Check prior fixed findings for regressions; only report one again when it is currently actionable, using its prior finding ID.
+
+Before ending this inspection turn, you MUST call mcp__${mcpServerName}__finish_review_round({ findingCount }) with the total findings you identified in this round across ALL priorities, excluding previous rounds. Count all identified findings, not merely those already registered. A clean inspection requires findingCount: 0 and means you found no actionable defects. If the tool rejects the count, register every missing finding with mcp__${mcpServerName}__report_finding, reconcile the ledger, and call finish_review_round again; do not lower the count to hide unregistered findings. Any finding changes after acceptance require a new finish_review_round call. Do not end the turn until it succeeds. This confirms only the inspection: Korus owns remediation, later rounds, and closing the review.
+
+After accepted inspection completion, end the turn with a natural summary of one or two short sentences. If there are no actionable findings, say so plainly; otherwise state how many findings you registered. Do not list or repeat the findings in chat, imply that the review is an approval to ship, or use a generic "Review complete" response.
 </context>
 
 Review ${visibleScope}.`;
@@ -669,6 +914,7 @@ Round: ${round.number}
 ${findingContext}
 
 Keep the changes focused and add or update behavior-level tests when appropriate. Immediately after each individual finding is fixed and verified, call update_finding with its id and status "fixed" before moving to the next finding. Do not wait until all findings are fixed to update their statuses. Include concise verification evidence when useful.
+${session.automation ? 'Automatic remediation: run the relevant tests and checks. Every fixed finding MUST include evidence naming the commands and results (or a specific reason a check does not apply). If validation fails or a fix needs a product decision, leave the finding unresolved and explain the blocker. Do not commit, stage, push, merge, change branches, or discard changes: the review workflow owns the local commit after validation. Preserve unrelated files; no background work may remain when this turn ends.' : ''}
 </context>`;
 }
 

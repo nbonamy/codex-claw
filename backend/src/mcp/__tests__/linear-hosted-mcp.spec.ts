@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { product } from '@workspace/core/product';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type { WorkProviderKind } from '@workspace/core/contracts';
 import { WorkIntegrationManager } from '../../work-integrations/manager';
@@ -153,7 +154,7 @@ describe('Linear hosted MCP through daemon', () => {
         expect(options.mcpServers?.github).toStrictEqual({ type: 'http', url: `${new URL(url).origin}/mcp/providers/github?agentId=${agent.id}` });
         if (connected) expect(options.mcpServers?.linear).toStrictEqual({ type: 'http', url: `${new URL(url).origin}/mcp/providers/linear?agentId=${agent.id}` });
         else expect(options.mcpServers).not.toHaveProperty('linear');
-        expect(options.allowedTools).toStrictEqual(['mcp__workspace__*']);
+        expect(options.allowedTools).toStrictEqual([`mcp__${product.mcpServerName}__*`]);
         if (index > 0) expect(options.resume).toBe('persisted-session');
         expect(JSON.stringify(options.mcpServers)).not.toMatch(/secret|refresh|Bearer/);
         sdk.emit({ type: 'system', subtype: 'init', session_id: 'persisted-session' }, index);

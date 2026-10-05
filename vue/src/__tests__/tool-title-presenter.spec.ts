@@ -6,6 +6,8 @@ import { presentAppToolTitle } from '../tool-title-presenter';
 
 describe(`${product.name} tool title presenter`, () => {
   it.each([
+    [`mcp__${product.mcpServerName}__report_finding`, {}, 'completed', 'Reported finding'],
+    [`${product.mcpServerName}.report_finding`, {}, 'completed', 'Reported finding'],
     ['workspace.wait-tasks', {}, 'running', 'Waiting for delegated tasks'],
     ['workspace.wait-tasks', {}, 'completed', 'Checked delegated tasks'],
     ['workspace.wait-tasks', {}, 'error', 'Could not check delegated tasks'],

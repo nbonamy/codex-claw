@@ -10,6 +10,45 @@ import { clearFirstRunOnboardingStage } from '../onboarding-session';
 import { deferred } from './app-state-test-harness';
 
 describe('useAppState', () => {
+  it('restores the original composer and next prompt options when a completed reviewer disappears', async () => {
+    const initial = createInitialSnapshot();
+    const owner = initial.agents[0]!;
+    owner.backendDefaults = { kind: 'codex', model: 'gpt-6-astra', reasoningEffort: 'high', userSelectedModel: true };
+    delete owner.backendSession;
+    const reviewer = { ...owner, id: 'reviewer', backend: 'claude' as const, backendDefaults: { kind: 'claude' as const, model: 'sonnet', reasoningEffort: 'high' as const, userSelectedModel: true } };
+    initial.agents.push(reviewer);
+    initial.teams[0]!.agentIds.push(reviewer.id);
+    initial.activeAgentId = reviewer.id;
+    const completed = structuredClone(initial);
+    completed.agents = completed.agents.filter(agent => agent.id !== reviewer.id);
+    completed.teams[0]!.agentIds = completed.teams[0]!.agentIds.filter(id => id !== reviewer.id);
+    completed.activeAgentId = owner.id;
+    let receive!: (event: MainToRendererEvent) => void;
+    const sendPrompt = vi.fn().mockResolvedValue(completed);
+    stubElectronTestWindow({ app: {
+      getSnapshot: vi.fn().mockResolvedValue(initial),
+      listBackendModels: vi.fn(async id => {
+        const model = id === reviewer.id ? 'sonnet' : 'gpt-6-astra';
+        return [{ id: model, model, displayName: model, supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'High' }] }];
+      }),
+      onEvent: vi.fn(listener => { receive = listener; return () => {}; }),
+      sendPrompt,
+    } });
+    const state = useAppState();
+    await state.loadSnapshot();
+    expect(state.selectedModelId.value).toBe('sonnet');
+    receive({ seq: 1, source: 'backend', occurredAt: '2026-10-05T13:43:29.750Z', type: 'snapshot.updated', payload: completed });
+    await vi.waitFor(() => expect(state.selectedModelId.value).toBe('gpt-6-astra'));
+    expect(state.activeAgent.value?.id).toBe(owner.id);
+    expect(state.selectedReasoningEffort.value).toBe('high');
+    await state.sendAgentPrompt(owner.id, 'Continue');
+    expect(sendPrompt).toHaveBeenCalledExactlyOnceWith(owner.id, 'Continue', expect.objectContaining({ model: 'gpt-6-astra', reasoningEffort: 'high' }));
+    receive({ seq: 2, source: 'backend', occurredAt: '2026-10-05T13:44:00.000Z', type: 'snapshot.updated', payload: createEmptySnapshot() });
+    expect(state.activeAgent.value).toBeNull();
+    expect(state.selectedModelId.value).toBeNull();
+    expect(state.selectedReasoningEffort.value).toBeNull();
+  });
+
   afterEach(() => {
     clearConfetti();
     clearFirstRunOnboardingStage();

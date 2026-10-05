@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { isAppMcpServerName } from '@workspace/core/product';
 import type { RendererToolPart, RendererToolPartUpdate } from '@workspace/core/contracts';
 import type { ClaudeSdkContentBlock } from './protocol';
 
@@ -163,9 +164,9 @@ export function claudeToolPart(
     });
   }
 
-  const mcp = mcpToolName(block.name);
+  const mcp = claudeMcpToolName(block.name);
   if (mcp) {
-    const appTool = mcp.server === 'workspace' ? mcp.tool.replaceAll('_', '-') : '';
+    const appTool = isAppMcpServerName(mcp.server) ? mcp.tool.replaceAll('_', '-') : '';
     const presentedInput = appTool === 'set-status'
       ? statusInput(input)
       : appTool === 'finish-turn'
@@ -372,7 +373,7 @@ function searchTarget(subject?: string, searchPath?: string): string | undefined
   return subject ?? searchPath;
 }
 
-function mcpToolName(name: string): { server: string; tool: string } | null {
+export function claudeMcpToolName(name: string): { server: string; tool: string } | null {
   const match = /^mcp__([^_].*?)__(.+)$/u.exec(name);
   if (!match?.[1] || !match[2]) {
     return null;

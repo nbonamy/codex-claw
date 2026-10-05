@@ -1,3 +1,4 @@
+import { isAppMcpServerName } from '@workspace/core/product';
 import {
   type CodexToolTitlePresenterContext,
 } from '@codex-app-sdk/vue';
@@ -45,6 +46,7 @@ const TOOL_KEYS: Record<string, string> = {
   'create-worktree': 'createWorktree',
   'display-markdown': 'displayMarkdown',
   'delete-finding': 'deleteFinding',
+  'finish-review-round': 'finishReviewRound',
   'suggest-visualizations': 'suggestVisualizations',
   'add-visualization': 'addVisualization',
   'read-visualization-canvas': 'readVisualizationCanvas',
@@ -105,9 +107,8 @@ export function appToolName(
   if (metadataTool) return metadataTool;
 
   const rawName = typeof descriptorTool === 'string' ? descriptorTool : functionName;
-  const toolName = rawName.startsWith('mcp__workspace__')
-    ? rawName.slice('mcp__workspace__'.length)
-    : /^(?:workspace)[._](.+)$/.exec(rawName)?.[1];
+  const match = /^mcp__(.+?)__(.+)$/.exec(rawName) ?? /^([^._]+)[._](.+)$/.exec(rawName);
+  const toolName = match && isAppMcpServerName(match[1]) ? match[2] : undefined;
   if (!toolName) return undefined;
 
   return toolName.replaceAll('_', '-');
@@ -117,7 +118,7 @@ export function appMcpToolName(
   kind?: string,
   metadata?: Readonly<Record<string, unknown>>,
 ): string | undefined {
-  if (kind !== 'mcp' || metadata?.server !== 'workspace' || typeof metadata.tool !== 'string') {
+  if (kind !== 'mcp' || !isAppMcpServerName(metadata?.server) || typeof metadata?.tool !== 'string') {
     return undefined;
   }
   const tool = metadata.tool.trim().replaceAll('_', '-');

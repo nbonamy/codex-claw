@@ -602,7 +602,7 @@ function claudeQueryOptions(
       ? {
           mcpServers: {
             ...(params.mcpServerUrl ? {
-              workspace: {
+              [product.mcpServerName]: {
                 type: 'http' as const,
                 url: params.mcpServerUrl,
               },

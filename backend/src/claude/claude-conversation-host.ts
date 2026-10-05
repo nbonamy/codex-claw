@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { isAppMcpServerName, product } from '@workspace/core/product';
 import { randomUUID } from 'node:crypto';
 import { getLocalClaudeAuthentication, logoutLocalClaude } from './authentication';
 import { getClaudeAccountUsage } from './account-usage';
@@ -44,6 +45,7 @@ import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type Claude
 import { claudeToolResultText } from './claude-tool-result';
 import {
   claudeToolFileActivity,
+  claudeMcpToolName,
   claudeToolPart,
   claudeToolPartInputUpdate,
   completedClaudeToolPart,
@@ -208,12 +210,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     });
     try {
       const started = await this.sendPromptWithConfiguration(reviewer, input.prompt, {}, {
-      mcpServerUrl: input.reviewMcpServerUrl,
-      allowedTools: [
-        'mcp__workspace__report_finding',
-        'mcp__workspace__update_finding',
-        'mcp__workspace__delete_finding',
-      ],
+        mcpServerUrl: input.reviewMcpServerUrl,
+        allowedTools: ['report_finding', 'update_finding', 'delete_finding', 'finish_review_round', 'set-status', 'finish_turn']
+          .map(tool => `mcp__${product.mcpServerName}__${tool}`),
       });
       targetTurnId = started.turnId ?? null;
       if (!targetTurnId) throw new Error('Claude did not start the review turn.');
@@ -472,7 +471,8 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       throw new Error(`Claude permission request '${response.id}' is no longer pending.`);
     }
     await this.transport.respondToPermissionRequest(response.id, clientResponseFromAgentResponse(response).payload ?? {}, owner.agentId);
-    if (this.pendingRequestOwners.get(key!) === owner) this.pendingRequestOwners.delete(key!);
+    if (this.pendingRequestOwners.get(key!) !== owner) return;
+    this.pendingRequestOwners.delete(key!);
     this.emitConversation({
       agentId: owner.agentId,
       backend: this.backend,
@@ -481,6 +481,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       type: 'clientRequest.resolved',
       payload: { id: response.id },
     }, response.outcome);
+    this.resumeStatusAfterRequest(owner);
   }
 
   async releaseConversation(agentId: string): Promise<void> {
@@ -1155,16 +1156,17 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       });
       return;
     }
+    const mcp = claudeMcpToolName(request.toolName);
     const payload: Extract<ClientRequest, { kind: 'confirm_tool' }> = {
       id: request.id,
       kind: 'confirm_tool',
       payload: {
         confirmation: {
           argumentsPreview: formatPermissionArguments(request.input),
-          integrationId: 'claude',
-          integrationName: 'Claude',
+          integrationId: mcp?.server ?? 'claude',
+          integrationName: isAppMcpServerName(mcp?.server) ? product.name : mcp?.server ?? 'Claude',
           summary: request.title ?? request.description ?? request.displayName ?? `Claude wants to use ${request.toolName}.`,
-          toolName: request.toolName,
+          toolName: mcp?.tool ?? request.toolName,
           allowConversation: request.allowConversation,
           allowAlways: request.allowAlways,
         },
@@ -1430,7 +1432,12 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       type: 'clientRequest.resolved',
       payload: { id: requestId },
     }, { kind: 'cancelled', reason: 'provider_cancelled' });
-    if (!activeTurn.completed && ![...this.pendingRequestOwners.values()].includes(activeTurn)) {
+    this.resumeStatusAfterRequest(activeTurn);
+  }
+
+  private resumeStatusAfterRequest(activeTurn: ActiveClaudeTurn): void {
+    if (this.activeTurnsByAgentId.get(activeTurn.agentId) === activeTurn && !activeTurn.completed
+      && ![...this.pendingRequestOwners.values()].includes(activeTurn)) {
       this.emit({ agentId: activeTurn.agentId, type: 'agent.statusChanged', payload: { type: 'working' } });
     }
   }
@@ -1578,7 +1585,7 @@ function claudeTurnParams(
         agentScopedMcpUrl(serverUrl, agent.id),
       ]),
     ),
-    allowedTools: mcpServerUrl ? ['mcp__workspace__*'] : [],
+    allowedTools: mcpServerUrl ? [`mcp__${product.mcpServerName}__*`] : [],
     ...(options.attachments?.length ? { attachments: [...options.attachments] } : {}),
   };
 }

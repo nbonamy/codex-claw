@@ -75,7 +75,7 @@
                 type="button"
                 role="radio"
                 :aria-checked="threadMode === 'current'"
-                :disabled="!currentThreadAvailable"
+                :disabled="!currentThreadAvailable || automatic"
                 @click="threadMode = 'current'"
               >
                 <span class="code-review-panel__choice-content">
@@ -86,14 +86,35 @@
                   </span>
                 </span>
               </button>
-              <BackendSelector v-model="reviewBackend" :team-id="agent.teamId" class="code-review-panel__backend" size="small" :disabled="busy || threadMode === 'current'" />
             </div>
           </fieldset>
+          <fieldset>
+            <legend>{{ t('automaticReview.model') }}</legend>
+            <div class="code-review-panel__model-selectors">
+              <BackendSelector v-model="reviewBackend" :team-id="agent.teamId" class="code-review-panel__backend" size="small" :disabled="busy || threadMode === 'current'" />
+              <el-select :model-value="threadMode === 'current' ? '' : reviewModel" @update:model-value="reviewModel = $event" :empty-values="[null, undefined]" :aria-label="t('automaticReview.model')" :disabled="busy || modelsLoading || threadMode === 'current'" size="small">
+                <el-option value="" :label="t(effectiveBackend === agent.backend ? 'automaticReview.currentModel' : 'automaticReview.defaultModel')" />
+                <el-option v-for="model in reviewModels.filter(option => option.model)" :key="model.id" :value="model.model" :label="model.displayName" />
+              </el-select>
+              <el-select :model-value="threadMode === 'current' ? '' : reviewEffort" @update:model-value="reviewEffort = $event" :empty-values="[null, undefined]" :aria-label="t('automaticReview.effort')" :disabled="busy || modelsLoading || threadMode === 'current' || !effortOptions.length" size="small">
+                <el-option value="" :label="t(effectiveBackend === agent.backend && !reviewModel ? 'automaticReview.currentEffort' : 'automaticReview.defaultEffort')" />
+                <el-option v-for="effort in effortOptions" :key="effort.reasoningEffort" :value="effort.reasoningEffort" :label="effort.reasoningEffort" />
+              </el-select>
+            </div>
+          </fieldset>
+          <p v-if="modelsError" role="status">{{ t('automaticReview.modelError') }} <button type="button" class="app-button app-button--tertiary" @click="modelReload++">{{ t('automaticReview.retry') }}</button></p>
+          <div class="code-review-panel__automatic">
+            <div class="code-review-panel__toggle">
+              <span>{{ t('automaticReview.title') }}</span>
+              <button v-if="automatic" class="code-review-panel__configure" type="button" :disabled="busy" @click="automaticSettingsOpen = true">{{ t('automaticReview.configure') }}</button>
+              <el-switch v-model="automatic" :aria-label="t('automaticReview.title')" :disabled="busy" />
+            </div>
+          </div>
         </div>
         <button
           class="app-button app-button--primary code-review-panel__start"
           type="button"
-          :disabled="busy"
+          :disabled="busy || modelsLoading"
           @click="startSelectedReview"
         >
           <IconSparkles aria-hidden="true" />
@@ -112,6 +133,11 @@
           sessionStatus
         }}</span>
       </header>
+      <div v-if="session.automation" class="code-review-panel__automation-status" role="status">
+        <span v-if="session.automation.state === 'running'">{{ t('automaticReview.running', { round: session.rounds.length, max: session.automation.maxRounds }) }}</span>
+        <span v-else>{{ session.automation.reason }}</span>
+        <button v-if="session.automation.state === 'running'" class="app-button app-button--secondary" type="button" :disabled="busy" @click="run(() => reviewSettings.stop(agent.id, session!.id))">{{ t('automaticReview.stop') }}</button>
+      </div>
 
       <div
         class="code-review-panel__rounds"
@@ -193,7 +219,7 @@
       />
 
       <footer
-        v-if="selectedRoundId === session.activeRoundId && session.status !== 'reviewing' && session.status !== 'fixing'"
+        v-if="session.automation?.state !== 'running' && selectedRoundId === session.activeRoundId && session.status !== 'reviewing' && session.status !== 'fixing'"
         class="code-review-panel__footer"
       >
         <template v-if="session.status === 'ready'">
@@ -249,6 +275,25 @@
         </template>
       </footer>
     </template>
+    <FormDialog v-if="!session" v-model="automaticSettingsOpen" :title="t('automaticReview.title')" width="440px" teleported>
+      <div class="app-form-dialog">
+        <FormDialogField :label="t('automaticReview.priorities')">
+          <el-select v-model="maxPriority" :aria-label="t('automaticReview.priorities')" :disabled="busy">
+            <el-option value="p0" :label="t('automaticReview.critical')" />
+            <el-option value="p1" :label="t('automaticReview.high')" />
+            <el-option value="p2" :label="t('automaticReview.normal')" />
+            <el-option value="p3" :label="t('automaticReview.all')" />
+          </el-select>
+        </FormDialogField>
+        <FormDialogField :label="t('automaticReview.rounds')">
+          <el-input-number v-model="maxRounds" :aria-label="t('automaticReview.rounds')" :min="1" :max="10" :step="1" :precision="0" :disabled="busy" />
+        </FormDialogField>
+        <p class="app-form-dialog__help">{{ t('automaticReview.independent') }} {{ t('automaticReview.consent') }}</p>
+      </div>
+      <template #footer>
+        <button type="button" class="app-button app-button--primary" @click="automaticSettingsOpen = false">{{ t('automaticReview.done') }}</button>
+      </template>
+    </FormDialog>
     <p v-if="error" class="code-review-panel__error" role="alert">
       {{ error }}
     </p>
@@ -278,7 +323,12 @@ import {
 import type { Agent, AgentGitStatus, AppSnapshot } from "@workspace/core/contracts";
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 import BackendSelector from './BackendSelector.vue';
+import FormDialog from '../shared/dialog/FormDialog.vue';
+import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import { useBackendChoices } from './backend-selection';
+import { useCodeReviewSettings } from './code-review-settings';
+import type { BackendModelOption } from '@workspace/core/contracts';
+import type { CodeReviewPriority } from '@workspace/core/code-review';
 
 const props = defineProps<{
   agent: Agent;
@@ -309,9 +359,58 @@ const busy = ref(false);
 const error = ref<string | null>(null);
 const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
 const threadMode = ref<CodeReviewThreadMode>("independent");
-const reviewBackend = ref<Agent['backend'] | undefined>(props.agent.backend);
+const reviewSettings = useCodeReviewSettings();
+const remembered = reviewSettings.preferences();
+const reviewBackend = ref<Agent['backend'] | undefined>(remembered?.backend ?? props.agent.backend);
+const automatic = ref(remembered?.automation.enabled ?? false);
+const automaticSettingsOpen = ref(false);
+const maxPriority = ref<CodeReviewPriority>(remembered?.automation.maxPriority ?? 'p2');
+const maxRounds = ref(remembered?.automation.maxRounds ?? 3);
+const reviewModel = ref('');
+const reviewEffort = ref('');
+const reviewModels = ref<BackendModelOption[]>([]);
+const modelsLoading = ref(false);
+const modelsError = ref(false);
+const modelReload = ref(0);
+const effectiveBackend = computed(() => threadMode.value === 'current' ? props.agent.backend : reviewBackend.value);
+const selections = { ...remembered?.providers };
+const effortOptions = computed(() => reviewModels.value.find(model => model.model === reviewModel.value)?.supportedReasoningEfforts ?? []);
+watch(automatic, enabled => { if (enabled) threadMode.value = 'independent'; });
+watch([effectiveBackend, () => props.agent.id, () => Boolean(props.agent.codeReview), modelReload], async ([backend], previous, cleanup) => {
+  let current = true;
+  cleanup(() => { current = false; });
+  const sameSetup = previous?.[1] === props.agent.id && !previous?.[2] && !props.agent.codeReview;
+  if (previous?.[0] && sameSetup && !modelsLoading.value) selections[previous[0]] = { model: reviewModel.value, reasoningEffort: reviewEffort.value };
+  else if (!sameSetup) Object.assign(selections, reviewSettings.preferences()?.providers);
+  reviewModels.value = [];
+  reviewModel.value = '';
+  reviewEffort.value = '';
+  modelsError.value = false;
+  if (!backend || props.agent.codeReview) { modelsLoading.value = false; return; }
+  modelsLoading.value = true;
+  try {
+    const catalog = await reviewSettings.listModels(props.agent.id, backend);
+    if (!current) return;
+    reviewModels.value = catalog.filter(model => !model.hidden);
+    const selection = selections[backend];
+    const model = reviewModels.value.find(model => model.model === selection?.model);
+    reviewModel.value = model?.model ?? '';
+    reviewEffort.value = model?.supportedReasoningEfforts?.some(effort => effort.reasoningEffort === selection?.reasoningEffort) ? selection!.reasoningEffort! : '';
+  } catch { if (current) modelsError.value = true; }
+  finally { if (current) modelsLoading.value = false; }
+}, { immediate: true });
+watch(reviewModel, () => {
+  if (!effortOptions.value.some(option => option.reasoningEffort === reviewEffort.value)) reviewEffort.value = '';
+});
 const connectedBackends = useBackendChoices(() => props.agent.teamId);
-watch(() => props.agent.id, () => { reviewBackend.value = props.agent.backend; });
+watch(() => props.agent.id, () => {
+  automaticSettingsOpen.value = false;
+  const latest = reviewSettings.preferences();
+  reviewBackend.value = latest?.backend ?? props.agent.backend;
+  automatic.value = latest?.automation.enabled ?? false;
+  maxPriority.value = latest?.automation.maxPriority ?? 'p2';
+  maxRounds.value = latest?.automation.maxRounds ?? 3;
+});
 const selectedRoundId = ref("");
 const session = computed(() => props.agent.codeReview ?? null);
 const branchScope = computed(() => props.gitStatus?.diffCatalog?.branch);
@@ -393,6 +492,7 @@ const progressItems = computed(() =>
 const canArbitrate = computed(
   () =>
     session.value?.status === "ready" &&
+    session.value?.automation?.state !== 'running' &&
     selectedRoundId.value === session.value.activeRoundId,
 );
 const selectedCount = computed(
@@ -493,7 +593,7 @@ function submitRound(): void {
 }
 
 function startSelectedReview(): void {
-  if (nothingToReview.value) return;
+  if (nothingToReview.value || modelsLoading.value) return;
   if (!connectedBackends.value.includes(threadMode.value === 'current' ? props.agent.backend : reviewBackend.value!)) {
     error.value = t('engineConnection.required');
     return;
@@ -504,6 +604,9 @@ function startSelectedReview(): void {
   void run(() => props.startReview(props.agent.id, {
     scope: reviewScope, threadMode: threadMode.value,
     ...(threadMode.value === 'independent' ? { backend: reviewBackend.value } : {}),
+    ...(threadMode.value === 'independent' && reviewModel.value ? { model: reviewModel.value } : {}),
+    ...(threadMode.value === 'independent' && reviewEffort.value ? { reasoningEffort: reviewEffort.value } : {}),
+    automation: { enabled: automatic.value, maxPriority: maxPriority.value, maxRounds: maxRounds.value ?? 3 },
   }));
 }
 
@@ -513,9 +616,12 @@ function retryReview(): void {
   const reviewScope: CodeReviewStartInput["scope"] = review.scope.type === "branch"
     ? { type: "branch", baseRef: review.scope.baseRef }
     : { type: "uncommitted" };
+  const { automation } = review;
+  // The failed reviewer keeps its backend and model; only the automatic setup must be carried over.
   void run(() => props.startReview(props.agent.id, {
-    scope: reviewScope,
+    scope: automation?.baseRef ? { type: 'branch', baseRef: automation.baseRef } : reviewScope,
     threadMode: review.threadMode,
+    ...(automation ? { automation: { enabled: true, maxPriority: automation.maxPriority, maxRounds: automation.maxRounds } } : {}),
   }));
 }
 
@@ -548,6 +654,42 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 </script>
 
 <style scoped>
+.code-review-panel__automatic {
+  display: grid;
+  gap: var(--space-4);
+  text-align: left;
+}
+
+.code-review-panel__toggle > span {
+  margin-right: auto;
+}
+
+.code-review-panel__configure {
+  padding: 0;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: var(--font-size-12);
+  cursor: pointer;
+}
+
+.code-review-panel__configure:hover {
+  text-decoration: underline;
+}
+
+.code-review-panel__toggle,
+.code-review-panel__automation-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.code-review-panel__automation-status {
+  padding: var(--space-4);
+  font-size: var(--font-size-12);
+}
+
 .code-review-panel {
   min-height: 100%;
   display: flex;
@@ -574,10 +716,15 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   text-align: left;
 }
 
-.code-review-panel__choices .code-review-panel__backend {
+.code-review-panel__model-selectors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.code-review-panel__model-selectors > *,
+.code-review-panel__model-selectors > .code-review-panel__backend {
   width: 100%;
-  grid-column: 1;
-  justify-self: start;
 }
 
 .code-review-panel__start {

@@ -1216,10 +1216,12 @@ describe('AppShell authentication and conversation', () => {
 
     wrapper.getComponent({ name: 'RightWorkspacePanel' }).vm.$emit('openTab', 'codeReview');
     await nextTick();
+    await flushPromises();
     await wrapper.findAll('button').find((button) => button.text().includes('Start review'))!.trigger('click');
     await flushPromises();
 
     expect(startCodeReview).toHaveBeenCalledExactlyOnceWith(source.id, {
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3 },
       backend: 'codex',
       scope: { type: 'uncommitted' },
       threadMode: 'independent',

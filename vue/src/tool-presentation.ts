@@ -73,7 +73,7 @@ const COMPUTER_USE_TOOLS = new Set([
   'computer-use-type-text',
 ]);
 const MESSAGE_TOOLS = new Set(['broadcast-message', 'check-messages', 'send-message']);
-const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding', 'delete-finding', 'report-mission-review-finding', 'update-mission-review-finding']);
+const REVIEW_TOOLS = new Set(['mark-finding-complete', 'report-finding', 'update-finding', 'delete-finding', 'finish-review-round', 'report-mission-review-finding', 'update-mission-review-finding']);
 const VISUALIZE_TOOLS = new Set(['suggest-visualizations', 'add-visualization', 'get-visualization', 'list-visualizations', 'delete-visualization', 'replace-visualization', 'read-visualization-canvas', 'edit-visualization-canvas', 'view-visualization-canvas']);
 const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent']);
 const TASK_TOOLS = new Set(['wait-tasks', 'complete-task', 'cancel-task']);

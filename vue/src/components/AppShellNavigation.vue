@@ -197,7 +197,7 @@ const missionAgentIds = computed(() => new Set(
 const sidebarAgents = computed(() => props.activeTeamAgents.filter(agent => !missionAgentIds.value.has(agent.id)));
 const teamMissions = computed(() => (props.snapshot.missions ?? []).filter(mission => mission.teamId === props.activeTeam?.id));
 
-const agentSidebarMinWidth = 80;
+const agentSidebarMinWidth = 200;
 const agentSidebarMaxWidth = 420;
 const {
   activeTeam,

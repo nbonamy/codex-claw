@@ -412,7 +412,7 @@ const emit = defineEmits<{
 }>();
 
 const missionsCollapsed = ref(false);
-const minWidth = computed(() => props.minWidth ?? 72);
+const minWidth = computed(() => props.minWidth ?? 200);
 const maxWidth = computed(() => props.maxWidth ?? 420);
 const resizeStep = 16;
 const currentWidth = computed(() => clampWidth(props.width ?? 260));
@@ -758,7 +758,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 <style scoped>
 .agent-sidebar {
   --agent-sidebar-width: 260px;
-  --agent-sidebar-min-width: 72px;
+  --agent-sidebar-min-width: 200px;
   --agent-sidebar-max-width: 420px;
   --agent-sidebar-row-min-height: 30px;
   --agent-sidebar-workspace-icon-size: 16px;
@@ -965,9 +965,11 @@ function onResizePointerEnd(event: PointerEvent): void {
 }
 
 .agent-sidebar__workspace-label {
+  display: flex;
   min-width: 0;
   min-height: var(--agent-sidebar-row-min-height);
-  justify-content: start;
+  overflow: hidden;
+  justify-content: flex-start;
   border-radius: var(--radius-sm);
   text-align: left;
 }
@@ -1035,6 +1037,7 @@ function onResizePointerEnd(event: PointerEvent): void {
 
 .agent-sidebar__workspace-label strong {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-semibold);

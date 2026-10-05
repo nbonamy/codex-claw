@@ -182,7 +182,7 @@ describe('AgentSidebar interactions', () => {
     expect(wrapper.attributes('style')).toContain('--agent-sidebar-max-width: 420px');
   });
 
-  it('allows the shell to shrink the sidebar to avatar-only size by default', () => {
+  it('keeps the expanded sidebar readable when given an undersized width', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -195,8 +195,11 @@ describe('AgentSidebar interactions', () => {
       },
     });
 
-    expect(wrapper.attributes('style')).toContain('--agent-sidebar-width: 72px');
-    expect(wrapper.attributes('style')).toContain('--agent-sidebar-min-width: 72px');
+    expect(wrapper.attributes('style')).toContain('--agent-sidebar-width: 200px');
+    const handle = wrapper.get('[aria-label="Resize agent sidebar"]');
+    expect(handle.attributes('aria-valuemin')).toBe('200');
+    await handle.trigger('keydown', { key: 'ArrowLeft' });
+    expect(wrapper.emitted('resize-sidebar')).toStrictEqual([[200]]);
   });
 
   it('emits clamped resize widths from the right border drag handle', async () => {

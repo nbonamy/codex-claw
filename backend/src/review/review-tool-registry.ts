@@ -5,6 +5,7 @@ import type {
 } from '@workspace/core/code-review';
 
 export type ReviewToolHandlers = {
+  finishReviewRound(input: { findingCount: number }): Promise<{ roundId: string; findingCount: number }>;
   reportFinding(input: CodeReviewFindingInput): Promise<CodeReviewFinding> | CodeReviewFinding;
   updateFinding(input: CodeReviewFindingUpdateInput): Promise<CodeReviewFinding> | CodeReviewFinding;
   deleteFinding(input: { findingId: string }): Promise<{ findingId: string; deleted: true }> | { findingId: string; deleted: true };
@@ -23,6 +24,7 @@ export class ReviewToolRegistry {
     const context: ReviewToolContext = {
       id: contextId,
       agentId,
+      finishReviewRound: async (input) => this.run(context, () => handlers.finishReviewRound(input)),
       reportFinding: (input) => this.run(context, () => handlers.reportFinding(input)),
       updateFinding: (input) => this.run(context, () => handlers.updateFinding(input)),
       deleteFinding: (input) => this.run(context, () => handlers.deleteFinding(input)),

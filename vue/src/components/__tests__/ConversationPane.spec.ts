@@ -629,7 +629,7 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.chat-message--assistant').exists()).toBe(false);
   });
 
-  it(`keeps working feedback visible while a ${product.name} status tool is hidden`, () => {
+  it.each(['workspace', product.mcpServerName])('keeps working feedback visible while a %s status tool is hidden', (server) => {
     const controller = createCodexConversationPaneController({
       state: {
         identity: {
@@ -643,8 +643,8 @@ describe('ConversationPane', () => {
           }, {
             id: 'status-tool', role: 'assistant', status: 'streaming',
             turnId: 'turn-status', createdAt: '2026-06-05T00:00:01.000Z',
-            parts: [{ type: 'tool', id: 'call-status', kind: 'mcp', title: 'workspace.set-status',
-              status: 'running', metadata: { server: 'workspace', tool: 'set-status' } }],
+            parts: [{ type: 'tool', id: 'call-status', kind: 'mcp', title: `${server}.set-status`,
+              status: 'running', metadata: { server, tool: 'set-status' } }],
           }],
         },
         composer: { placeholder: 'Ask for follow-up changes' },
@@ -654,8 +654,38 @@ describe('ConversationPane', () => {
     const wrapper = mountPane({ controller, agent });
 
     expect(wrapper.get('.chat-message__thinking').text()).toBe('Working');
-    expect(wrapper.text()).not.toContain('workspace.set-status');
+    expect(wrapper.text()).not.toContain(`${server}.set-status`);
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
+  });
+
+  it.each([
+    ['running', 'Finishing review round'],
+    ['completed', 'Review round finished'],
+    ['failed', 'Could not finish review round'],
+  ] as const)('renders the review completion tool while %s without its raw name', (status, label) => {
+    const controller = createCodexConversationPaneController({
+      state: {
+        identity: {
+          conversationKey: `agent:${agent.id}`,
+          busy: status === 'running',
+          activeTurnId: status === 'running' ? 'review-turn' : null,
+          messages: [{
+            id: 'review-message', role: 'assistant',
+            status: status === 'running' ? 'streaming' : 'complete',
+            turnId: 'review-turn', createdAt: '',
+            parts: [{ type: 'tool', id: 'review-completion', kind: 'mcp', status,
+              title: `${product.mcpServerName}.finish_review_round`, input: { findingCount: 3 },
+              metadata: { server: product.mcpServerName, tool: 'finish_review_round' } }],
+          }],
+        },
+        composer: { placeholder: 'Ask for follow-up changes' },
+      },
+      actions: {},
+    });
+    const wrapper = mountPane({ controller, agent });
+    expect(wrapper.get('.chat-tool-call').text()).toContain(label);
+    expect(wrapper.text()).not.toContain('finish_review_round');
+    expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
   });
 
   it('renders task waiting and restored results without raw tool names or false completion', async () => {

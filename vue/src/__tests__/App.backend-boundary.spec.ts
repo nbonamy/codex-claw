@@ -250,6 +250,7 @@ describe('Unified backend → mounted application', () => {
     await flushPromises();
 
     expect(api.startCodeReview).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3 },
       backend: 'codex',
       scope: { type: 'uncommitted' },
       threadMode: 'independent',

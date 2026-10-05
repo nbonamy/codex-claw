@@ -3,6 +3,18 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    automaticReview: {
+      title: 'Automatic remediation', description: 'Review, fix, verify, and repeat with a fresh reviewer.',
+      configure: 'Configure', done: 'Done',
+      consent: 'Commits the reviewed working changes and fixes locally. Never pushes or merges. Pause other work in this folder.',
+      priorities: 'Fix priorities', critical: 'P0 only', high: 'P0–P1', normal: 'P0–P2', all: 'P0–P3',
+      rounds: 'Maximum review rounds', model: 'Review model', effort: 'Review effort',
+      currentModel: 'Current model', currentEffort: 'Current effort', defaultModel: 'Default model', defaultEffort: 'Default effort',
+      independent: 'Automatic mode uses an independent reviewer for each round.',
+      stop: 'Stop automatic review', paused: 'Automatic review paused', running: 'Automatic · round {round} of {max}',
+      modelError: 'Could not load models. You can use the default model or retry.', retry: 'Retry models',
+      manual: 'Continue manually',
+    },
     workAuthorization: {
       copyCode: 'Copy {provider} device code {code}', step2: 'Step 2: Open {provider}',
       pasteCode: `{provider} will ask for the code. Paste it there, authorize ${product.name}, then come back here.`,
@@ -1111,6 +1123,11 @@ export const messages = {
               completed: 'Reported finding',
               failed: 'Failed reporting finding',
               running: 'Reporting finding',
+            },
+            finishReviewRound: {
+              completed: 'Review round finished',
+              failed: 'Could not finish review round',
+              running: 'Finishing review round',
             },
             deleteFinding: {
               completed: 'Deleted finding',

@@ -20,7 +20,8 @@ import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
 import { runtimeGitHubOAuthClientId, runtimeLinearOAuthSettings } from './runtime-config';
 import { LinearWorkProviderDriver } from './work-integrations/linear-driver';
 import { AppBackendServer } from './server';
-import { backendCodexHomeDir, backendProviderTokensFilePath, backupProviderSetup, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { backendCodexHomeDir, backendHomeDir, backendProviderTokensFilePath, backupProviderSetup, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
+import { saveCodeReviewReport } from './review/review-report';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
 import { WorkIntegrationManager } from './work-integrations/manager';
@@ -271,6 +272,7 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
       mcpService.recordPromptInputMethod(agentId, promptOptions?.inputMethod);
     },
     codeReviewTools: mcpService,
+    saveCodeReviewReport: (agent, session) => saveCodeReviewReport(backendHomeDir(), agent, session),
     workIntegrations,
     automationRunner,
     remoteClients: new RemoteDaemonClientManager({

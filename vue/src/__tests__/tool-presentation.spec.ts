@@ -121,6 +121,11 @@ describe(`${product.name} tool presentation`, () => {
     expect(presentAppTool(context('browser-open', {}, 'github'), translate)).toBeUndefined();
     expect(presentAppTool({ ...context('browser-open', {}), kind: 'generic' }, translate)).toBeUndefined();
   });
+
+  it('recognizes the configured server namespace in Claude tool metadata', () => {
+    expect(presentAppTool(context('report_finding', {}, product.mcpServerName), translate))
+      .toStrictEqual({ icon: MessageReportIcon, title: 'Reported finding' });
+  });
 });
 
 function context(

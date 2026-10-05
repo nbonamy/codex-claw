@@ -10,8 +10,33 @@ export type CodeReviewThreadMode = 'current' | 'independent';
 
 export type CodeReviewStartInput = {
   backend?: 'codex' | 'claude';
+  model?: string;
+  reasoningEffort?: string;
+  automation?: CodeReviewAutomationSettings;
   scope: CodeReviewScope;
   threadMode: CodeReviewThreadMode;
+};
+
+export type CodeReviewAutomationSettings = {
+  enabled: boolean;
+  maxPriority: CodeReviewPriority;
+  maxRounds: number;
+};
+
+export type CodeReviewPreferences = {
+  backend: 'codex' | 'claude';
+  automation: CodeReviewAutomationSettings;
+  providers: Partial<Record<'codex' | 'claude', { model?: string; reasoningEffort?: string }>>;
+};
+
+export type CodeReviewAutomation = CodeReviewAutomationSettings & {
+  state: 'running' | 'paused' | 'completed';
+  baseRef?: string;
+  head?: string;
+  branch?: string;
+  fingerprint?: string;
+  commits: string[];
+  reason?: string;
 };
 
 export type CodeReviewLocation = {
@@ -62,6 +87,10 @@ export type CodeReviewRound = {
   status: 'reviewing' | 'ready' | 'submitted' | 'completed' | 'failed';
   /** Provider conversation used for review, clarification, and fixes in this round. */
   reviewerSession?: BackendSession;
+  /** Provider's final inspection summary; full conversation remains provider-owned. */
+  summary?: string;
+  /** Explicit model acknowledgment of the current round's registered findings. */
+  inspectionCompletion?: { findingCount: number; confirmedAt: string };
   findings: CodeReviewFinding[];
   startedAt: string;
   completedAt?: string;
@@ -79,6 +108,7 @@ export type CodeReviewSession = {
   status: 'reviewing' | 'ready' | 'fixing' | 'readyToFinish' | 'finished' | 'failed';
   activeRoundId: string;
   rounds: CodeReviewRound[];
+  automation?: CodeReviewAutomation;
   createdAt: string;
   updatedAt: string;
   finishedAt?: string;
@@ -202,7 +232,27 @@ export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSe
 
 export function isCodeReviewStartInput(value: unknown): value is CodeReviewStartInput {
   return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode)
-    && (value.backend === undefined || value.backend === 'codex' || value.backend === 'claude');
+    && (value.backend === undefined || value.backend === 'codex' || value.backend === 'claude')
+    && optionalSelection(value.model) && optionalSelection(value.reasoningEffort)
+    && (value.threadMode === 'independent' || (value.model === undefined && value.reasoningEffort === undefined))
+    && (value.automation === undefined || (isCodeReviewAutomationSettings(value.automation)
+      && (!value.automation.enabled || value.threadMode === 'independent')));
+}
+
+export function isCodeReviewAutomationSettings(value: unknown): value is CodeReviewAutomationSettings {
+  return isRecord(value) && typeof value.enabled === 'boolean' && isPriority(value.maxPriority)
+    && Number.isInteger(value.maxRounds) && Number(value.maxRounds) >= 1 && Number(value.maxRounds) <= 10;
+}
+
+export function isCodeReviewPreferences(value: unknown): value is CodeReviewPreferences {
+  return isRecord(value) && (value.backend === 'codex' || value.backend === 'claude')
+    && isCodeReviewAutomationSettings(value.automation) && isRecord(value.providers)
+    && Object.entries(value.providers).every(([backend, selection]) => (backend === 'codex' || backend === 'claude')
+      && isRecord(selection) && optionalSelection(selection.model) && optionalSelection(selection.reasoningEffort));
+}
+
+function optionalSelection(value: unknown): boolean {
+  return value === undefined || (typeof value === 'string' && value.trim().length > 0 && value.length <= 200);
 }
 
 export function isCodeReviewDecisionInput(value: unknown): value is CodeReviewDecisionInput {
@@ -224,6 +274,15 @@ export function isCodeReviewSession(value: unknown): value is CodeReviewSession 
   if (!isCodeReviewScope(value.scope) || !isCodeReviewThreadMode(value.threadMode)) return false;
   if (!isReviewSessionStatus(value.status) || typeof value.activeRoundId !== 'string') return false;
   if (!Array.isArray(value.rounds) || value.rounds.length === 0 || value.rounds.some((round) => !isCodeReviewRound(round))) return false;
+  if (value.automation !== undefined) {
+    const auto = value.automation;
+    if (!isRecord(auto)
+      || !['running', 'paused', 'completed'].includes(String(auto.state))
+      || !Array.isArray(auto.commits) || !auto.commits.every(commit => typeof commit === 'string')
+      || !optionalSelection(auto.baseRef) || !optionalSelection(auto.head) || !optionalSelection(auto.fingerprint)
+      || !optionalSelection(auto.branch)
+      || (auto.reason !== undefined && typeof auto.reason !== 'string') || !isCodeReviewAutomationSettings(auto)) return false;
+  }
   return typeof value.createdAt === 'string' && typeof value.updatedAt === 'string';
 }
 
@@ -260,6 +319,11 @@ function isCodeReviewRound(value: unknown): value is CodeReviewRound {
     && typeof value.id === 'string'
     && Number.isInteger(value.number)
     && (value.reviewerSession === undefined || isBackendSession(value.reviewerSession))
+    && (value.summary === undefined || typeof value.summary === 'string')
+    && (value.inspectionCompletion === undefined || (isRecord(value.inspectionCompletion)
+      && Number.isSafeInteger(value.inspectionCompletion.findingCount)
+      && Number(value.inspectionCompletion.findingCount) >= 0
+      && typeof value.inspectionCompletion.confirmedAt === 'string'))
     && isReviewRoundStatus(value.status)
     && Array.isArray(value.findings)
     && value.findings.every(isCodeReviewFinding)

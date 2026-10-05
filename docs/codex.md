@@ -236,8 +236,8 @@ when using that same backend; users can choose another enabled backend.
 `Review again` archives the independent
 reviewer's conversation and binds a fresh one to the same sidebar agent, while
 current-thread reviews keep the user-owned conversation for the whole workflow.
-Finishing removes an independent reviewer agent and its conversation but leaves
-a current-thread conversation intact.
+Finishing removes an independent reviewer agent while retaining its archived
+conversation and saving a report; a current-thread conversation remains intact.
 Korus persists the selected Git scope, reviewer identity, opaque conversation
 reference, and app-owned finding ledger without creating a second transcript
 model.
@@ -502,11 +502,14 @@ This keeps normal Codex config and normal Codex data untouched.
 
 Independent product review rounds create a fresh SDK conversation; a first round
 configured for the current thread loads that conversation instead. Both replace
-the normal Korus MCP URL with a review-session URL. That stable URL adds only the
-two finding actions documented in `docs/mcp.md`; normal repository tools remain
-owned by the Codex harness. After the turn completes, Korus reads the normal
-assistant response for finding discussion, archives the temporary conversation,
-and forgets it. Findings themselves live in Korus's active review ledger.
+the normal Korus MCP URL with a review-session URL. That stable URL adds the
+finding actions and `finish_review_round` documented in `docs/mcp.md`; normal
+repository tools remain owned by the Codex harness. A successful finish call
+confirms the current-round finding count, including zero, but Korus also waits
+for the inspection turn to end before advancing. Missing confirmation fails
+the round and pauses automatic mode. Clarification and remediation continue in
+the same conversation; fresh independent rounds archive the previous one.
+Findings live in Korus's review ledger and are saved to a report on completion.
 
 ## Notifications And Server Requests
 

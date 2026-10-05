@@ -13,6 +13,8 @@ import { AppMcpService } from '../service';
 import { HostedMcpGateway } from '../hosted-mcp-gateway';
 import { structuredToolResult } from '../tool-result';
 import { createVisualizeToolModuleProvider } from '../visualize-tools';
+import { CodeReviewService } from '../../review/code-review-service';
+import { AgentCreationService } from '../../agents/agent-creation-service';
 
 describe('AppMcpService', () => {
   let service: AppMcpService | null = null;
@@ -20,6 +22,48 @@ describe('AppMcpService', () => {
   afterEach(async () => {
     await service?.stop();
     service = null;
+  });
+
+  it('returns recoverable round-count errors over MCP and persists an accepted inspection', async () => {
+    const snapshot = createInitialSnapshot();
+    const owner = snapshot.agents[0]!;
+    service = new AppMcpService({ snapshot });
+    await service.start();
+    let saved: AppSnapshot | undefined;
+    let sequence = 0;
+    const reviewService = new CodeReviewService({
+      snapshot,
+      createAgent: (input, options) => new AgentCreationService(snapshot).create(input, options),
+      tools: service,
+      changed: () => { saved = structuredClone(snapshot); },
+      resetReviewer: vi.fn(), deleteReviewer: vi.fn(), saveReport: vi.fn(),
+      runReview: async (_agent, _prompt, url) => {
+        const call = async (name: string, args: Record<string, unknown>) => (await postJson(url, {
+          jsonrpc: '2.0', id: ++sequence, method: 'tools/call', params: { name, arguments: args },
+        })).result;
+        for (const input of [{}, { findingCount: -1 }, { findingCount: 1.5 }, { findingCount: '2' }]) {
+          expect((await call('finish_review_round', input)).isError).toBe(true);
+        }
+        const mismatch = await call('finish_review_round', { findingCount: 2 });
+        expect(mismatch.isError).toBe(true);
+        expect(mismatch.content[0].text).toContain('2 findings, but 0');
+        expect(mismatch.content[0].text).toContain('report_finding');
+        const first = await call('report_finding', { priority: 'p1', title: 'Authorize writes', body: 'Ownership is unchecked.' });
+        await call('report_finding', { priority: 'p1', title: 'Authorize writes', body: 'More precise evidence.', priorFindingId: first.structuredContent.id });
+        await call('report_finding', { priority: 'p3', title: 'Improve diagnostics', body: 'A diagnostic is misleading.' });
+        const accepted = await call('finish_review_round', { findingCount: 2 });
+        expect(accepted).toMatchObject({ isError: false, structuredContent: { findingCount: 2 } });
+        expect(saved?.agents.find(agent => agent.id === owner.id)?.codeReview).toMatchObject({
+          status: 'reviewing', rounds: [{ inspectionCompletion: { findingCount: 2 } }],
+        });
+        return { text: 'Two findings registered.', reviewerSession: { kind: 'codex', threadId: 'review-thread' } };
+      },
+    });
+    owner.backendSession = { kind: 'codex', threadId: 'review-thread' };
+    const session = reviewService.start(owner, { scope: { type: 'uncommitted' }, threadMode: 'current' });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    expect(session.rounds[0]?.findings.map(finding => finding.priority)).toEqual(['p1', 'p3']);
+    expect(session.rounds[0]?.inspectionCompletion?.findingCount).toBe(2);
   });
 
   it('offers create-project only to Quick Chats and routes the handoff through the shared project operation', async () => {
@@ -170,6 +214,7 @@ describe('AppMcpService', () => {
     const updateFinding = vi.fn().mockResolvedValue({ id: 'finding-1', status: 'fixed' });
     const deleteFinding = vi.fn().mockResolvedValue({ findingId: 'finding-1', deleted: true });
     const review = service.createReviewToolContext('agent-dina', 'review-session-1', {
+      finishReviewRound: vi.fn().mockResolvedValue({ roundId: 'round-1', findingCount: 0 }),
       reportFinding,
       updateFinding,
       deleteFinding,
@@ -185,10 +230,10 @@ describe('AppMcpService', () => {
     const scopedNames = scoped.result.tools.map((tool: { name: string }) => tool.name);
 
     expect(ordinaryNames).not.toEqual(expect.arrayContaining([
-      'report_finding', 'update_finding', 'delete_finding',
+      'report_finding', 'update_finding', 'delete_finding', 'finish_review_round',
     ]));
     expect(scopedNames).toEqual(expect.arrayContaining([
-      'report_finding', 'update_finding', 'delete_finding',
+      'report_finding', 'update_finding', 'delete_finding', 'finish_review_round',
     ]));
     expect(scopedNames).not.toContain('mark_finding_complete');
     expect(scopedNames).not.toEqual(expect.arrayContaining([

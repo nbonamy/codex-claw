@@ -3,6 +3,7 @@ import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettin
 import { repositoryIconKeyForRemote } from './git-remote';
 import { isApprovalPreset } from './approval-presets';
 import { claudeBackendCapabilities } from './backend-capabilities';
+import { isCodeReviewPreferences } from './code-review';
 
 export const defaultPluginSettings: AppPluginSettings = {
   computerUseEnabled: false,
@@ -137,6 +138,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     ...(isRecord(value.providerHomes) ? { providerHomes: normalizeProviderHomes(value.providerHomes) } : {}),
     ...(isRecord(value.providerEnabled) ? { providerEnabled: Object.fromEntries(Object.entries(value.providerEnabled).filter(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && typeof enabled === 'boolean')) } : {}),
     ...(isRecord(value.providerModelDefaults) ? { providerModelDefaults: normalizeProviderModelDefaults(value.providerModelDefaults) } : {}),
+    ...(isCodeReviewPreferences(value.codeReviewDefaults) ? { codeReviewDefaults: structuredClone(value.codeReviewDefaults) } : {}),
     ...(isRecord(value.providerApprovalDefaults) ? { providerApprovalDefaults: normalizeProviderApprovalDefaults(value.providerApprovalDefaults) } : {}),
     agentListCompact: value.agentListCompact === true,
     cockpitAgentViewMode: value.cockpitAgentViewMode === 'recent' ? 'recent' : 'teams',

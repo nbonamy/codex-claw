@@ -2236,6 +2236,11 @@ function adoptBackgroundSnapshot(nextSnapshot: AppSnapshot): void {
   if (activeAgentId && nextSnapshot.agents.some((agent) => agent.id === activeAgentId)) {
     selectAgentInSnapshot(nextSnapshot, activeAgentId);
   }
+  if (nextSnapshot.activeAgentId !== activeAgentId) {
+    adoptNavigationSnapshot(nextSnapshot);
+    if (nextSnapshot.activeAgentId) void loadActiveAgentCatalogs(nextSnapshot.activeAgentId);
+    return;
+  }
   snapshot.value = nextSnapshot;
   pruneUnreadAgentIds();
   pruneConversationFrames();

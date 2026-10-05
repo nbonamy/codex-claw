@@ -630,8 +630,8 @@ describe('ClaudeBackendDriver', () => {
       hostedMcpServerUrls: {
         github: 'http://127.0.0.1:4321/mcp/providers/github?agentId=agent-claude',
       },
-      allowedTools: ['mcp__workspace__*'],
-      appendSystemPrompt: expect.stringContaining('Use the workspace MCP server for agent collaboration.'),
+      allowedTools: [`mcp__${product.mcpServerName}__*`],
+      appendSystemPrompt: expect.stringContaining(`Use the ${product.mcpServerName} MCP server for agent collaboration.`),
     });
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain(
       'call set-status exactly once as your very first action',
@@ -668,7 +668,7 @@ describe('ClaudeBackendDriver', () => {
     const result = driver.sendPrompt(reviewer, 'I found another issue');
     expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
-      allowedTools: ['mcp__workspace__*'],
+      allowedTools: [`mcp__${product.mcpServerName}__*`],
     });
     transport.resolveDone();
     await result;
@@ -693,10 +693,14 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
       prompt: 'Review the current diff.',
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
+      appendSystemPrompt: expect.stringContaining(`Use the ${product.mcpServerName} MCP server`),
       allowedTools: [
-        'mcp__workspace__report_finding',
-        'mcp__workspace__update_finding',
-        'mcp__workspace__delete_finding',
+        `mcp__${product.mcpServerName}__report_finding`,
+        `mcp__${product.mcpServerName}__update_finding`,
+        `mcp__${product.mcpServerName}__delete_finding`,
+        `mcp__${product.mcpServerName}__finish_review_round`,
+        `mcp__${product.mcpServerName}__set-status`,
+        `mcp__${product.mcpServerName}__finish_turn`,
       ],
       model: 'opus',
       effort: 'xhigh',

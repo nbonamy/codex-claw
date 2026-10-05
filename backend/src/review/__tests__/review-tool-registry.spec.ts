@@ -14,6 +14,7 @@ describe('ReviewToolRegistry', () => {
   it('routes finding changes through an agent-scoped, durable session context', async () => {
     const registry = new ReviewToolRegistry();
     const handlers = {
+      finishReviewRound: vi.fn(async ({ findingCount }: { findingCount: number }) => ({ roundId: 'round-1', findingCount })),
       reportFinding: vi.fn(async () => finding()),
       updateFinding: vi.fn(async () => ({ ...finding(), priority: 'p0' as const })),
       deleteFinding: vi.fn(async ({ findingId }: { findingId: string }) => ({ findingId, deleted: true as const })),

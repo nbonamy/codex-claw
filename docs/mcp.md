@@ -34,6 +34,12 @@ not Codex-specific protocols. Codex and Claude receive the same Korus-owned
 endpoints through their session-local configuration; each backend translates
 only that configuration into its native launch contract.
 
+Claude receives the app-owned endpoint under `product.mcpServerName` (`korus`);
+`workspace` is reserved by Claude Code. Codex retains `workspace`. Generated
+instructions use the provider's actual namespace, while shared tool descriptions
+and recovery errors use unqualified tool names. Presentation recognizes both
+names so retained conversations remain readable.
+
 ## Boundary
 
 `daemon` owns the MCP server, collaboration state, and backend-owned tool
@@ -698,7 +704,7 @@ state, not Codex transcript duplication.
 ### Review-scoped finding tools
 
 Each review session receives a dedicated MCP URL whose tool surface adds
-`report_finding`, `update_finding`, and `delete_finding`. The URL is derived
+`report_finding`, `update_finding`, `delete_finding`, and `finish_review_round`. The URL is derived
 from the durable review session ID and remains stable across app restarts,
 inspection, clarification, remediation, and later rounds because the provider
 conversation may retain its initial MCP configuration. The reviewer can change
@@ -713,8 +719,19 @@ it before returning; the registry itself does not own finding storage.
 
 User decisions and workflow actions are backend methods, not model tools. The
 renderer uses the unified client contract to accept, decline, assign, discuss,
-submit, repeat, or finish a review. A reviewer turn ending makes the round
-ready; there is deliberately no `complete_review` tool.
+submit, repeat, or finish a review. Inspection completion is a separate model
+acknowledgment: `finish_review_round({ findingCount })` requires a non-negative
+integer equal to the current round's saved finding count across all priorities.
+Counts refer to findings, not tool calls or previous rounds. A mismatch returns
+an MCP error directing the model to register missing findings with
+`mcp__workspace__report_finding`, reconcile the ledger, and retry the finish call.
+Finding mutations during inspection invalidate an earlier acknowledgment.
+The acknowledgment is persisted but does not itself advance the workflow: the
+provider turn must also finish successfully. Ending without valid confirmation
+fails the round and pauses automatic mode, retaining the reviewer and findings.
+A clean inspection requires explicit confirmation of zero findings. Restarted
+inspections require fresh confirmation. Clarification and remediation turns do
+not use this tool; Korus still owns their transitions and final review closure.
 
 ## Error Handling
 

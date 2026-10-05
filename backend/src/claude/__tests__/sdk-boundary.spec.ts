@@ -144,20 +144,36 @@ describe(`Claude Agent SDK → ${product.name} backend`, () => {
     await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
   });
 
-  it('exposes an SDK permission as a normalized pending request and returns the targeted decision', async () => {
+  it.each(['Edit', `mcp__${product.mcpServerName}__set-status`])('preserves %s approval identity and leaves Input only after the last response', async (toolName) => {
     const { sdk, driver, server, snapshot, events } = setup();
     const pending = driver.sendPrompt(agent(), 'edit');
     await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
     sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
     await pending;
-    const permission = sdk.options[0]!.canUseTool!('Edit', { file_path: '/tmp/project/file.ts' }, {
+    const permission = sdk.options[0]!.canUseTool!(toolName, { file_path: '/tmp/project/file.ts' }, {
       signal: new AbortController().signal, toolUseID: 'edit-item', requestId: 'permission',
     });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'agentRequest.created')).toBe(true));
     expect(snapshot.agentRequests?.['claude-a']).toMatchObject([{ id: 'permission', kind: 'toolConfirmation', conversationId: 'session-a' }]);
+    const isMcp = toolName.startsWith('mcp__');
+    expect(events).toContainEqual(expect.objectContaining({ type: 'claude.conversationEventReceived', payload: expect.objectContaining({ event: expect.objectContaining({
+      type: 'approval.requested', payload: expect.objectContaining({ payload: { confirmation: expect.objectContaining({
+        integrationId: isMcp ? product.mcpServerName : 'claude', toolName: isMcp ? 'set-status' : 'Edit',
+      }) } }),
+    }) }) }));
+    const secondPermission = sdk.options[0]!.canUseTool!('Read', { file_path: '/tmp/project/another.ts' }, {
+      signal: new AbortController().signal, toolUseID: 'read-item', requestId: 'permission-2',
+    });
+    await vi.waitFor(() => expect(snapshot.agentRequests?.['claude-a']).toHaveLength(2));
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 'answer', method: 'agent/request/respond', params: { response: { agentId: 'claude-a', id: 'permission', outcome: { kind: 'decision', decision: 'deny' } } } })).resolves.not.toHaveProperty('error');
     await expect(permission).resolves.toMatchObject({ behavior: 'deny' });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'agentRequest.resolved')).toBe(true));
+    expect(snapshot.agents[0]!.status.type).toBe('awaitingInput');
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'answer-2', method: 'agent/request/respond', params: { response: { agentId: 'claude-a', id: 'permission-2', outcome: { kind: 'decision', decision: 'allow' } } } })).resolves.not.toHaveProperty('error');
+    await expect(secondPermission).resolves.toMatchObject({ behavior: 'allow' });
+    expect(snapshot.agents[0]!.status.type).toBe('working');
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'session-a', is_error: false });
+    await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
   });
 
   it.each([false, true])('removes an SDK-cancelled permission before turn completion (already aborted: %s)', async (alreadyAborted) => {

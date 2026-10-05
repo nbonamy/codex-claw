@@ -43,6 +43,7 @@ describe('AppBackendServer code review workflow', () => {
         await context.updateFinding({ findingId: 'saved-finding', status: 'fixed', evidence: 'Ownership verified.' });
       } else {
         await context.reportFinding({ priority: 'p1', title: 'Check ownership', body: 'Authorize before writing.' });
+        await context.finishReviewRound({ findingCount: 1 });
       }
       return { text: '', reviewerSession: input.reviewerSession };
     });
@@ -158,7 +159,7 @@ describe('AppBackendServer code review workflow', () => {
     await server.close();
   });
 
-  it('owns reviewer configuration, readiness, arbitration, remediation, review again, and finish', async () => {
+  it.each(['codex', 'claude'] as const)('retains %s review conversations through review again and finish', async (backend) => {
     const snapshot = createTestSnapshot();
     const owner: Agent = {
       id: 'agent-owner',
@@ -186,23 +187,31 @@ describe('AppBackendServer code review workflow', () => {
           location: { file: 'src/auth.ts', line: 42 },
         });
         findingId = finding.id;
+        await activeHandlers.finishReviewRound({ findingCount: 1 });
       } else if (reviewRun === 2) {
         await activeHandlers.updateFinding({ findingId, status: 'fixed' });
+      } else {
+        await activeHandlers.finishReviewRound({ findingCount: 0 });
       }
       return {
         text: '',
-        reviewerSession: input.reviewerSession ?? { kind: 'codex' as const, threadId: `review-thread-${reviewRun}` },
+        reviewerSession: input.reviewerSession ?? (backend === 'codex'
+          ? { kind: 'codex' as const, threadId: `review-thread-${reviewRun}` }
+          : { kind: 'claude' as const, sessionId: `review-thread-${reviewRun}`, transport: 'stdio' as const }),
       };
     });
     const disposeCodeReview = vi.fn().mockResolvedValue(undefined);
+    const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
+    const saveCodeReviewReport = vi.fn().mockResolvedValue('/reports/review.md');
     const releaseConversation = vi.fn();
     const sendAgentMessage = vi.fn();
     const driver: AgentBackendDriver = {
-      backend: 'codex',
-      getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
-      getCapabilities: () => codexBackendCapabilities,
+      backend,
+      getRuntimeStatus: () => ({ backend, status: 'running' }),
+      getCapabilities: () => backend === 'codex' ? codexBackendCapabilities : claudeBackendCapabilities,
       runCodeReview,
       disposeCodeReview,
+      ...(backend === 'codex' ? { archiveAgentConversation } : {}),
       releaseConversation,
       sendPrompt: vi.fn(),
       interrupt: vi.fn(),
@@ -215,7 +224,8 @@ describe('AppBackendServer code review workflow', () => {
       version: 'test',
       snapshot,
       sendAgentMessage,
-      driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
+      saveCodeReviewReport,
+      driverRpc: new BackendDriverRpc(new Map([[backend, driver]])),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
       codeReviewTools: {
         createReviewToolContext: (agentId, _sessionId, handlers) => {
@@ -228,7 +238,7 @@ describe('AppBackendServer code review workflow', () => {
 
     const started = await request(server, backendMethods.agentCodeReviewStart, {
       agentId: owner.id,
-      input: { scope: { type: 'uncommitted' }, threadMode: 'independent' },
+      input: { scope: { type: 'uncommitted' }, threadMode: 'independent', backend, model: 'review-model', reasoningEffort: 'low' },
     });
     const reviewer = snapshot.agents.find((candidate) => candidate.id !== owner.id)!;
     await vi.waitFor(() => expect(reviewer.codeReview?.status).toBe('ready'));
@@ -237,11 +247,13 @@ describe('AppBackendServer code review workflow', () => {
     expect(session).toMatchObject({ targetAgentId: owner.id, reviewerAgentId: reviewer.id, threadMode: 'independent' });
     expect(reviewer).toMatchObject({
       folder: owner.folder,
-      backend: owner.backend,
-      backendDefaults: { kind: 'codex', model: 'gpt-5.6-sol', reasoningEffort: 'high' },
+      backend,
+      backendDefaults: { kind: backend, model: 'review-model', reasoningEffort: 'low' },
       teamId: owner.teamId,
     });
     expect(snapshot.agentGitStatuses[reviewer.id]).toStrictEqual(snapshot.agentGitStatuses[owner.id]);
+    expect(owner.backendDefaults).toMatchObject({ model: 'gpt-5.6-sol', reasoningEffort: 'high' });
+    expect(snapshot.general.codeReviewDefaults?.providers[backend]).toStrictEqual({ model: 'review-model', reasoningEffort: 'low' });
     const round = session.rounds[0]!;
     expect(runCodeReview).toHaveBeenNthCalledWith(1, reviewer, expect.objectContaining({
       reviewMcpServerUrl: expect.stringContaining('reviewContextId=1'),
@@ -255,30 +267,34 @@ describe('AppBackendServer code review workflow', () => {
     await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
 
     expect(runCodeReview).toHaveBeenNthCalledWith(2, reviewer, expect.objectContaining({
-      reviewerSession: { kind: 'codex', threadId: 'review-thread-1' },
+      reviewerSession: backend === 'codex' ? { kind: 'codex', threadId: 'review-thread-1' } : { kind: 'claude', sessionId: 'review-thread-1', transport: 'stdio' },
     }));
     expect(round.findings[0]!.remediation.state).toBe('fixed');
 
     await request(server, backendMethods.agentCodeReviewAgain, { agentId: reviewer.id, sessionId: session.id });
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     expect(session.rounds).toHaveLength(2);
-    expect(disposeCodeReview).toHaveBeenCalledExactlyOnceWith(
-      reviewer,
-      { kind: 'codex', threadId: 'review-thread-1' },
-    );
+    expect(disposeCodeReview).not.toHaveBeenCalled();
+    expect(round.reviewerSession).toBeDefined();
+    expect(saveCodeReviewReport).toHaveBeenCalledOnce();
+    expect(saveCodeReviewReport.mock.invocationCallOrder[0]).toBeLessThan(releaseConversation.mock.invocationCallOrder[0]!);
     expect(releaseConversation).toHaveBeenCalledExactlyOnceWith(reviewer.id);
     expect(runCodeReview.mock.calls[2]?.[1]).not.toHaveProperty('reviewerSession');
     await request(server, backendMethods.agentCodeReviewRoundSubmit, { agentId: reviewer.id, sessionId: session.id });
     const finished = await request(server, backendMethods.agentCodeReviewFinish, { agentId: reviewer.id, sessionId: session.id });
     expect(snapshot.agents).toStrictEqual([owner]);
     expect(snapshot.agentGitStatuses[reviewer.id]).toBeUndefined();
-    expect(disposeCodeReview).toHaveBeenCalledTimes(2);
+    expect(disposeCodeReview).not.toHaveBeenCalled();
+    expect(archiveAgentConversation).toHaveBeenCalledTimes(backend === 'codex' ? 2 : 0);
+    expect(saveCodeReviewReport).toHaveBeenCalledTimes(2);
+    expect(releaseConversation).toHaveBeenCalledTimes(2);
     expect(finished.activeAgentId).toBe(owner.id);
     expect(sendAgentMessage).toHaveBeenCalledExactlyOnceWith(
       reviewer.id,
       owner.id,
       expect.stringContaining('- P1 — Authorize before writing'),
     );
+    expect(sendAgentMessage.mock.calls[0]?.[2]).toContain('/reports/review.md');
 
     await server.close();
   });
@@ -305,6 +321,7 @@ describe('AppBackendServer code review workflow', () => {
           priority: 'p1', title: 'Authorize before writing',
           body: 'The public mutation writes before checking ownership.',
         })).id;
+        await activeHandlers.finishReviewRound({ findingCount: 1 });
         return {
           text: '',
           reviewerSession: { kind: 'codex' as const, threadId: 'review-thread' },
@@ -368,6 +385,7 @@ describe('AppBackendServer code review workflow', () => {
   });
 
   it('closes the review tool context when its visible reviewer is deleted normally', async () => {
+    let reviewTools!: ReviewToolHandlers;
     const snapshot = createTestSnapshot();
     const owner: Agent = {
       id: 'agent-owner', teamId: snapshot.teams[0]!.id, name: 'Owner', folder: '/repo',
@@ -381,10 +399,10 @@ describe('AppBackendServer code review workflow', () => {
       backend: 'codex',
       getRuntimeStatus: () => ({ backend: 'codex', status: 'running' }),
       getCapabilities: () => codexBackendCapabilities,
-      runCodeReview: vi.fn(async (_agent, input) => ({
-        text: '',
-        reviewerSession: input.reviewerSession ?? { kind: 'codex', threadId: 'review-thread' },
-      })),
+      runCodeReview: vi.fn(async (_agent, input) => {
+        await reviewTools.finishReviewRound({ findingCount: 0 });
+        return { text: '', reviewerSession: input.reviewerSession ?? { kind: 'codex', threadId: 'review-thread' } };
+      }),
       archiveAgentConversation: vi.fn().mockResolvedValue(undefined),
       releaseConversation,
       sendPrompt: vi.fn(),
@@ -399,7 +417,10 @@ describe('AppBackendServer code review workflow', () => {
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
       codeReviewTools: {
-        createReviewToolContext: () => ({ id: 'review-context', url: 'http://review.test/mcp' }),
+        createReviewToolContext: (_agentId, _sessionId, handlers) => {
+          reviewTools = handlers;
+          return { id: 'review-context', url: 'http://review.test/mcp' };
+        },
         closeReviewToolContext,
       },
     });

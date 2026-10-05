@@ -124,6 +124,11 @@ describe('AppShell navigation and teams', () => {
     await nextTick();
 
     expect(sidebar().attributes('style')).toContain('--agent-sidebar-width: 320px');
+    resizeHandle.element.dispatchEvent(pointerEvent('pointermove', 40));
+    resizeHandle.element.dispatchEvent(pointerEvent('pointerup', 40));
+    await nextTick();
+    expect(sidebar().attributes('style')).toContain('--agent-sidebar-width: 200px');
+    expect(resizeHandle.attributes('aria-valuenow')).toBe('200');
   });
 
   it('resolves the active team from legacy agent membership when teamId is missing', () => {

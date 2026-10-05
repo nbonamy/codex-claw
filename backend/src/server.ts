@@ -104,6 +104,7 @@ export type AppBackendServerOptions = {
   deleteMissionHome?: (missionId: string) => Promise<void>;
   missionArtifactStore?: MissionArtifactStorage;
   codeReviewTools?: CodeReviewToolPort;
+  saveCodeReviewReport?: (agent: Agent, session: CodeReviewSession) => Promise<string>;
   agentCreation?: AgentCreationService;
   visualizeService?: VisualizeService;
 };
@@ -425,6 +426,7 @@ export class AppBackendServer {
         snapshot: this.snapshot,
         createAgent: (input, creationOptions) => this.agentCreation.create(input, creationOptions),
         tools: options.codeReviewTools,
+        saveReport: options.saveCodeReviewReport ?? (async () => { throw new Error('Review report storage is unavailable.'); }),
         runReview: async (agent, prompt, reviewMcpServerUrl, reviewerSession) => {
           return await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewRun, {
             agent,
@@ -435,12 +437,12 @@ export class AppBackendServer {
           }) as import('@workspace/core/backend-driver').BackendCodeReviewResult;
         },
         resetReviewer: async (agent) => {
-          await this.disposeAndReleaseReviewConversation(agent);
+          await this.disposeAndReleaseReviewConversation(agent, true);
           restartAgentConversation(this.snapshot, agent.id);
           this.agentRequests.clearAgent(agent.id);
         },
-        deleteReviewer: async (agent, handoff) => {
-          await this.disposeAndReleaseReviewConversation(agent);
+        deleteReviewer: async (agent, handoff, retainConversation) => {
+          await this.disposeAndReleaseReviewConversation(agent, retainConversation);
           if (handoff && this.sendAgentMessage) {
             this.sendAgentMessage(agent.id, handoff.targetAgentId, handoff.content);
           }
@@ -449,6 +451,7 @@ export class AppBackendServer {
           this.agentRequests.clearAgent(agent.id);
         },
         changed: async () => { await this.persistAndEmitSnapshot(); },
+        reportProgress: (agent, targetAgentId, content) => { this.sendAgentMessage?.(agent.id, targetAgentId, content); },
       });
     }
     this.unsubscribeDriverEvents = this.driverRpc?.onEvent((event) => this.handleBackendEvent(event));
@@ -549,11 +552,14 @@ export class AppBackendServer {
     await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
   }
 
-  private async disposeAndReleaseReviewConversation(agent: Agent): Promise<void> {
+  private async disposeAndReleaseReviewConversation(agent: Agent, retainConversation = false): Promise<void> {
     if (agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
       await this.handleAgentDriverRequest(agent, backendMethods.driverInterrupt, { agent }).catch(() => undefined);
     }
-    if (agent.backendSession) {
+    if (agent.backendSession && retainConversation) {
+      // Archive when supported (Codex); otherwise leave native history intact (Claude).
+      await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+    } else if (agent.backendSession) {
       await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewDispose, {
         agent,
         reviewerSession: agent.backendSession,

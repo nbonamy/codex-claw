@@ -76,11 +76,35 @@ function session(): CodeReviewSession {
 }
 
 describe('code review ledger', () => {
+  it('preserves optional inspection summaries through serialization and rejects malformed summaries', () => {
+    const review = session();
+    review.rounds[0]!.summary = 'Found an authorization defect.';
+    review.rounds[0]!.inspectionCompletion = { findingCount: 2, confirmedAt: 'now' };
+    const restored = JSON.parse(JSON.stringify(review));
+    expect(isCodeReviewSession(restored)).toBe(true);
+    expect(restored.rounds[0].summary).toBe('Found an authorization defect.');
+    expect(restored.rounds[0].inspectionCompletion).toEqual({ findingCount: 2, confirmedAt: 'now' });
+    for (const findingCount of [-1, 1.5, '2']) {
+      const malformed = structuredClone(restored);
+      malformed.rounds[0].inspectionCompletion.findingCount = findingCount;
+      expect(isCodeReviewSession(malformed)).toBe(false);
+    }
+    restored.rounds[0].summary = { invalid: true };
+    expect(isCodeReviewSession(restored)).toBe(false);
+  });
   it('accepts only complete review setup choices', () => {
     expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent' })).toBe(true);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: 'origin/main' }, threadMode: 'current' })).toBe(true);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: '' }, threadMode: 'current' })).toBe(false);
     expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'anchored' })).toBe(false);
+    const automatic = { scope: { type: 'uncommitted' }, threadMode: 'independent', model: 'review-model', reasoningEffort: 'high', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } };
+    expect(isCodeReviewStartInput(automatic)).toBe(true);
+    expect(isCodeReviewStartInput({ ...automatic, threadMode: 'current' })).toBe(false);
+    for (const maxRounds of [0, 11, 1.5, '3']) expect(isCodeReviewStartInput({ ...automatic, automation: { ...automatic.automation, maxRounds } })).toBe(false);
+    expect(isCodeReviewStartInput({ ...automatic, model: {} })).toBe(false);
+    expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'current', model: 'review-model' })).toBe(false);
+    expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'current', reasoningEffort: 'high' })).toBe(false);
+    expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent', model: 'review-model' })).toBe(true);
   });
 
   it('carries skipped exclusions, fixed regression checks, and behavior-changing discussion', () => {

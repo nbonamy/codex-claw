@@ -123,11 +123,11 @@ describe('Claude tool part adapter', () => {
     });
   });
 
-  it(`preserves MCP identity for ${product.name}-owned tool presentation`, () => {
+  it.each(['workspace', product.mcpServerName])('preserves %s tool identity without exposing private announcement text', (server) => {
     const part = claudeToolPart({
       type: 'tool_use',
       id: 'mcp-1',
-      name: 'mcp__workspace__set_status',
+      name: `mcp__${server}__set_status`,
       input: {
         status: 'Testing',
         announcement: { phase: 'start', text: 'A phrase that must not enter renderer state.' },
@@ -136,22 +136,22 @@ describe('Claude tool part adapter', () => {
 
     expect(part).toMatchObject({
       kind: 'mcp',
-      title: 'workspace.set_status',
+      title: `${server}.set_status`,
       input: { status: 'Testing' },
       metadata: {
         provider: 'claude',
-        server: 'workspace',
+        server,
         tool: 'set_status',
       },
     });
     expect(JSON.stringify(part)).not.toContain('phrase that must not');
   });
 
-  it('keeps finish-turn effects while removing the spoken phrase from renderer state', () => {
+  it.each(['workspace', product.mcpServerName])('keeps %s finish-turn effects while removing the spoken phrase', (server) => {
     const part = claudeToolPart({
       type: 'tool_use',
       id: 'mcp-finish',
-      name: 'mcp__workspace__finish_turn',
+      name: `mcp__${server}__finish_turn`,
       input: {
         flag: 'ready_for_review',
         announcement: { text: 'A private completion phrase.' },
