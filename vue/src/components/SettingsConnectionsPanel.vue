@@ -30,7 +30,7 @@
             :class="`settings-connections-panel__dot--${connection.status}`"
             aria-hidden="true"
           />
-          <div>
+          <div class="settings-connections-panel__summary">
             <strong>{{ connection.name }}</strong>
             <span>{{ connectionLabel(connection) }}</span>
             <span
@@ -46,7 +46,6 @@
                 @click="checkConnection(connection.id)"
               >{{ $t('surface.settingsConnectionsPanel.upgrade') }}</button>
             </span>
-            <RemoteEngineConnections v-if="connection.status === 'ready'" :connection="connection" />
           </div>
         </div>
         <div class="settings-connections-panel__actions">
@@ -85,6 +84,7 @@
             />
           </el-popover>
         </div>
+        <RemoteEngineConnections v-if="connection.status === 'ready'" class="settings-connections-panel__engines" :connection="connection" />
       </article>
     </SettingsSection>
 
@@ -518,6 +518,19 @@ function statusLabel(status: RemoteConnection['status']): string {
   border-bottom: 1px solid var(--color-border);
 }
 
+.settings-connections-panel__connection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2) var(--space-6);
+  padding: var(--space-6);
+}
+
+.settings-connections-panel__engines {
+  grid-column: 1 / -1;
+  margin-left: calc(8px + var(--space-8));
+}
+
 .settings-connections-panel__connection:last-child,
 .settings-connections-panel__host:last-child {
   border-bottom: 0;
@@ -530,11 +543,18 @@ function statusLabel(status: RemoteConnection['status']): string {
   gap: var(--space-8);
 }
 
-.settings-connections-panel__identity div,
-.settings-connections-panel__host div {
+.settings-connections-panel__summary,
+.settings-connections-panel__host > div {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+.settings-connections-panel__summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--space-6);
 }
 
 .settings-connections-panel__identity strong,
@@ -544,9 +564,9 @@ function statusLabel(status: RemoteConnection['status']): string {
   font-weight: 600;
 }
 
-.settings-connections-panel__identity span,
-.settings-connections-panel__host span,
-.settings-connections-panel__identity em {
+.settings-connections-panel__summary > span,
+.settings-connections-panel__host > div > span,
+.settings-connections-panel__detail em {
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
   font-style: normal;
@@ -556,6 +576,7 @@ function statusLabel(status: RemoteConnection['status']): string {
 }
 
 .settings-connections-panel__detail {
+  grid-column: 1 / -1;
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-3);

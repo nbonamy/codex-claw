@@ -829,9 +829,9 @@ describe('AppShell authentication and conversation', () => {
       },
     });
 
-    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(`${product.name}`);
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(product.defaultTeamName);
     expect(wrapper.text()).toContain('Sessions');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).text()).toBe(product.defaultTeamName);
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Ready to get going');
     expect(wrapper.text()).toContain('Chat with Dina');

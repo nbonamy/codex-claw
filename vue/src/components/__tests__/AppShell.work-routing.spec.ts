@@ -899,8 +899,8 @@ describe('AppShell work routing', () => {
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Settings menu"]').classes()).toContain('settings-menu__trigger--active');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('false');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).classes()).not.toContain('team-rail__team--active');
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).classes()).not.toContain('team-rail__team--active');
     expect(wrapper.text()).toContain('Accessibility');
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Theme');
@@ -934,7 +934,7 @@ describe('AppShell work routing', () => {
       updateTeam,
     });
 
-    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.defaultTeamName}"]`).trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Team')?.trigger('click');
 
     expect(wrapper.text()).toContain('Edit Team');

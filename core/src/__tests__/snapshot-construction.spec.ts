@@ -1,4 +1,3 @@
-import { product } from '../product';
 import { describe, expect, it } from 'vitest';
 import type { AppSnapshot } from '../contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '../snapshot-construction';
@@ -14,8 +13,8 @@ describe('snapshot construction', () => {
       ...expectedEmptySnapshot(),
       teams: [{
         id: 'team-app',
-        name: product.name,
-        avatar: product.name.slice(0, 2).toUpperCase(),
+        name: '/<',
+        avatar: '/<',
         color: '#1B4FB2',
         agentIds: ['agent-dina', 'agent-jesse'],
       }],
@@ -123,8 +122,8 @@ function expectedEmptySnapshot(): AppSnapshot {
   return {
     teams: [{
       id: 'team-app',
-      name: product.name,
-      avatar: product.name.slice(0, 2).toUpperCase(),
+      name: '/<',
+      avatar: '/<',
       color: '#1B4FB2',
       agentIds: [],
     }],

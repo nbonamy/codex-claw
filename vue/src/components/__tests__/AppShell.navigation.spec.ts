@@ -144,8 +144,8 @@ describe('AppShell navigation and teams', () => {
         },
     });
 
-    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(`${product.name}`);
-    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('true');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(product.defaultTeamName);
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).attributes('aria-pressed')).toBe('true');
   });
 
   it('resolves the active team from the active agent team id when no team is selected', () => {
@@ -197,7 +197,7 @@ describe('AppShell navigation and teams', () => {
         },
     });
 
-    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).attributes('aria-pressed')).toBe('true');
   });
 
   it('falls back to the first team when no active agent is selected', () => {
@@ -213,9 +213,9 @@ describe('AppShell navigation and teams', () => {
         },
     });
 
-    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(`${product.name}`);
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(product.defaultTeamName);
     expect(wrapper.text()).toContain('Dina');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).attributes('aria-pressed')).toBe('true');
   });
 
   it('uses product fallback title when no teams exist', () => {
@@ -273,7 +273,7 @@ describe('AppShell navigation and teams', () => {
     expect(wrapper.findAll('.agent-sidebar__agent')).toHaveLength(0);
     expect(wrapper.text()).toContain(`Welcome to ${product.name}`);
 
-    await wrapper.get(`[aria-label="${product.name}"]`).trigger('click');
+    await wrapper.get(`[aria-label="${product.defaultTeamName}"]`).trigger('click');
 
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-app']]);
   });
@@ -317,7 +317,7 @@ describe('AppShell navigation and teams', () => {
 
     expect(wrapper.getComponent({ name: 'TeamRail' }).props('unreadTeamIds'))
       .toStrictEqual(['team-app']);
-    expect(wrapper.get(`[aria-label="${product.name}, unread activity"]`).classes())
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}, unread activity"]`).classes())
       .toContain('team-rail__team--unread');
   });
 
@@ -344,11 +344,11 @@ describe('AppShell navigation and teams', () => {
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).attributes('aria-pressed')).toBe('false');
     expect(loadWorkRepositories).not.toHaveBeenCalled();
     expect(loadGlobalWorkItems).not.toHaveBeenCalled();
 
-    await wrapper.get(`[aria-label="${product.name}"]`).trigger('click');
+    await wrapper.get(`[aria-label="${product.defaultTeamName}"]`).trigger('click');
 
     expect(wrapper.find('.agent-cockpit').exists()).toBe(false);
     expect(wrapper.emitted('select-team')).toStrictEqual([['team-app']]);
@@ -379,7 +379,7 @@ describe('AppShell navigation and teams', () => {
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.find('.conversation-pane').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get(`[aria-label="${product.defaultTeamName}"]`).attributes('aria-pressed')).toBe('false');
     expect(wrapper.find('.automation-welcome__button').exists()).toBe(true);
   });
 

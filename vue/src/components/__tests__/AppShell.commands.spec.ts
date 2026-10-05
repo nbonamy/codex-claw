@@ -688,7 +688,7 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.emitted('close-agent')).toStrictEqual([['agent-dina']]);
     expect(confirm).toHaveBeenCalledWith(
       expect.stringContaining('missions and quick chats will be removed'),
-      `Close ${product.name}?`,
+      `Close ${product.defaultTeamName}?`,
       {
         cancelButtonText: 'Cancel',
         confirmButtonText: 'Close Team',

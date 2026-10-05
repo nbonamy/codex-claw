@@ -16,12 +16,19 @@ afterEach(() => { configureAppClient(undefined); document.body.innerHTML = ''; }
 describe('RemoteEngineConnections', () => {
   it('toggles an authenticated remote engine from cached status without another auth check', async () => {
     const { api } = createClientApiMock();
-    const engine = { backend: 'claude' as const, installed: true, connected: true, checking: false, enabled: true };
+    const engine = { backend: 'claude' as const, installed: true, connected: true, checking: false, enabled: true,
+      authentication: { kind: 'claude' as const, connected: true, state: { loggedIn: true, account: { type: 'subscription' as const, email: 'user@example.com', subscription: 'pro' } } },
+    };
     api.getProviderConnections.mockResolvedValue([engine]);
     api.setProviderEnabled.mockResolvedValueOnce([{ ...engine, enabled: false }]).mockResolvedValue([engine]);
     configureAppClient({ platform: 'desktop', api });
     const wrapper = mount(RemoteEngineConnections, { props: { connection }, global: { components: { ElSwitch } } });
     await flushPromises();
+    const row = wrapper.get('.settings-row');
+    expect(row.text()).toContain('Claude Code');
+    expect(row.text()).toContain('user@example.com · pro');
+    expect(row.get('button').text()).toBe('Disconnect');
+    expect(row.get('[role="switch"]').attributes('aria-label')).toBe('Enable engine · Claude Code');
     await wrapper.get('[role="switch"]').trigger('click');
     await flushPromises();
     expect(api.setProviderEnabled).toHaveBeenCalledExactlyOnceWith('claude', false, 'wall-e');

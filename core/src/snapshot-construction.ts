@@ -120,8 +120,8 @@ export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnec
 function createDefaultTeam(): AppSnapshot['teams'][number] {
   return {
     id: seedTeamId,
-    name: product.name,
-    avatar: product.name.slice(0, 2).toUpperCase(),
+    name: product.defaultTeamName,
+    avatar: product.defaultTeamName,
     color: defaultTeamColor,
     agentIds: [],
   };

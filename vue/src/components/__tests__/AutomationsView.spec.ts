@@ -353,7 +353,7 @@ describe('AutomationsView', () => {
     });
 
     expect(wrapper.text()).toContain('GitHub bugs');
-    expect(wrapper.text()).toContain(`${product.name} · nbonamy/agent-workspace · Every hour`);
+    expect(wrapper.text()).toContain(`${product.defaultTeamName} · nbonamy/agent-workspace · Every hour`);
     expect(wrapper.text()).toContain('Jun 9');
     expect(wrapper.text()).toContain('1 execution');
     expect(wrapper.text()).not.toContain('Every few minutes');
@@ -573,7 +573,7 @@ describe('AutomationsView', () => {
       ],
     });
 
-    expect(wrapper.text()).toContain(`${product.name} · nbonamy/agent-workspace · Every hour`);
+    expect(wrapper.text()).toContain(`${product.defaultTeamName} · nbonamy/agent-workspace · Every hour`);
     expect(wrapper.text()).toContain('Unknown');
   });
 });

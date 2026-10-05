@@ -15,7 +15,7 @@ describe('CockpitAgentsView', () => {
     });
 
     expect(wrapper.findAll('.cockpit-view__agent-card')).toHaveLength(2);
-    expect(wrapper.text()).toContain(`${product.name}`);
+    expect(wrapper.text()).toContain(product.defaultTeamName);
     expect(wrapper.text()).toContain('Dina');
 
     await wrapper.findAll('.cockpit-view__agent-card')[0]!.trigger('click');

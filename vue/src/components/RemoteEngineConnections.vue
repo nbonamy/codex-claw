@@ -5,7 +5,7 @@
         {{ $t('auth.installProvider') }} {{ backendDisplayName(engine.backend) }}
       </button>
       <template v-else>
-        <SettingsEngineConnectionRow :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @connect="connect(engine)" @disconnect="disconnect(engine.backend)" />
+        <SettingsEngineConnectionRow compact :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @connect="connect(engine)" @disconnect="disconnect(engine.backend)" />
         <RemoteCodexAuthentication v-if="signingIn === engine.backend && engine.backend === 'codex'" :connection="connection" @connected="finishConnection" />
         <RemoteClaudeAuthentication v-if="signingIn === engine.backend && engine.backend === 'claude'" :connection="connection" @connected="finishConnection" />
       </template>
@@ -90,5 +90,10 @@ onScopeDispose(() => { ++revision; });
 </script>
 
 <style scoped>
-.remote-engine-connections { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+.remote-engine-connections {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
 </style>
