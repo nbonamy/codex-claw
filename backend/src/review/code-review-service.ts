@@ -4,6 +4,7 @@ import {
   activeCodeReviewRound,
   codeReviewLedger,
   isCodeReviewStartInput,
+  type CodeReviewAutomationSettings,
   type CodeReviewDecisionInput,
   type CodeReviewDiscussionInput,
   type CodeReviewFinding,
@@ -18,6 +19,9 @@ import type { Agent, AppSnapshot, BackendSession, CreateAgentInput } from '@work
 import type { AgentCreationOptions } from '../agents/agent-creation-service';
 import type { ReviewToolHandlers } from './review-tool-registry';
 import { ReviewGit, type ReviewGitPort } from './review-git';
+
+export type AutomaticReviewStartInput = Omit<CodeReviewStartInput, 'threadMode' | 'automation'>
+  & Partial<Pick<CodeReviewAutomationSettings, 'maxPriority' | 'maxRounds' | 'autoCommit'>>;
 
 export type CodeReviewToolPort = {
   createReviewToolContext(agentId: string, sessionId: string, handlers: ReviewToolHandlers): { id: string; url: string };
@@ -67,7 +71,26 @@ export class CodeReviewService {
     }
   }
 
-  start(agent: Agent, input: CodeReviewStartInput): CodeReviewSession {
+  startAutomatic(agent: Agent, input: AutomaticReviewStartInput): CodeReviewSession {
+    if (agent.codeReview) throw new Error('Reviewers cannot launch another automatic review.');
+    if (agent.sessionKind === 'quickChat') throw new Error('Automatic review requires a project workspace.');
+    const saved = this.options.snapshot.general.codeReviewDefaults?.automation;
+    return this.start(agent, {
+      scope: input.scope,
+      backend: input.backend ?? agent.backend,
+      model: input.model,
+      reasoningEffort: input.reasoningEffort,
+      threadMode: 'independent',
+      automation: {
+        enabled: true,
+        maxPriority: input.maxPriority ?? saved?.maxPriority ?? 'p2',
+        maxRounds: input.maxRounds ?? saved?.maxRounds ?? 3,
+        autoCommit: input.autoCommit ?? false,
+      },
+    }, { rememberSettings: false });
+  }
+
+  start(agent: Agent, input: CodeReviewStartInput, options: { rememberSettings?: boolean } = {}): CodeReviewSession {
     if (!isCodeReviewStartInput(input)) throw new Error('Invalid code review settings.');
     if (!agent.folder) throw new Error('Code review requires an agent workspace.');
     if (input.threadMode === 'current' && !agent.backendSession) {
@@ -102,7 +125,7 @@ export class CodeReviewService {
       ? agent
       : this.createIndependentReviewer(agent, input.backend ?? agent.backend);
     this.applySelection(reviewer, input);
-    this.rememberSettings(reviewer, input);
+    if (options.rememberSettings !== false) this.rememberSettings(reviewer, input);
     if (current?.status === 'failed') this.closeReviewToolContext(current);
     const session = this.newSession(agent, reviewer, input);
     const firstRound = activeCodeReviewRound(session);

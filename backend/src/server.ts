@@ -72,7 +72,7 @@ import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
 import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
 import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
 import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewStartInput, type CodeReviewFinding, type CodeReviewSession } from '@workspace/core/code-review';
-import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
+import { CodeReviewService, type CodeReviewToolPort, type AutomaticReviewStartInput } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
 import { ProjectCreationService, type CreatedProject } from './projects/project-creation-service';
 import { VisualizeService, directVisualizationPrompt, generateVisualizationSuggestionPrompt, initialVisualizePrompt } from './visualize-service';
@@ -459,6 +459,14 @@ export class AppBackendServer {
 
   async submitMissionResult(agentId: string, input: MissionResultInput) {
     return this.missionExecution.submit(agentId, input);
+  }
+
+  async startAutomaticReview(agentId: string, input: AutomaticReviewStartInput) {
+    const agent = this.snapshot.agents.find(candidate => candidate.id === agentId);
+    if (!agent) throw new Error('The review target is no longer available.');
+    const session = this.requireCodeReviews().startAutomatic(agent, input);
+    await this.persistAndEmitSnapshot();
+    return { success: true as const, reviewId: session.id, reviewerAgentId: session.reviewerAgentId };
   }
 
   async createProjectFromQuickChat(agentId: string, name: string, prompt: string, backend?: Agent['backend']): Promise<CreatedProject> {

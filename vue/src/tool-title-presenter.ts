@@ -47,6 +47,7 @@ const TOOL_KEYS: Record<string, string> = {
   'display-markdown': 'displayMarkdown',
   'delete-finding': 'deleteFinding',
   'finish-review-round': 'finishReviewRound',
+  'start-automatic-review': 'startAutomaticReview',
   'suggest-visualizations': 'suggestVisualizations',
   'add-visualization': 'addVisualization',
   'read-visualization-canvas': 'readVisualizationCanvas',

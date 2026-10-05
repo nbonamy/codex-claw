@@ -47,6 +47,7 @@ import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-to
 import { AgentCreationService } from '../agents/agent-creation-service';
 import type { AppMcpToolModuleProvider } from './tool-modules';
 import { createQuickChatProjectToolModuleProvider } from './quick-chat-project-tools';
+import { createAutomaticReviewToolModuleProvider, type StartAutomaticReview } from './automatic-review-tools';
 import type { CreatedProject } from '../projects/project-creation-service';
 import type { DurableTaskService } from '../agents/durable-task-service';
 
@@ -68,6 +69,7 @@ export type AppMcpServiceOptions = {
   worktreeManager?: WorktreeManager;
   agentCreation?: AgentCreationService;
   createProject?: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude') => Promise<CreatedProject>;
+  startAutomaticReview?: StartAutomaticReview;
   toolModuleProviders?: readonly AppMcpToolModuleProvider[];
 };
 
@@ -135,6 +137,7 @@ export class AppMcpService {
       hostedMcpGateway: options.hostedMcpGateway,
       reviewTools: this.reviewTools,
       toolModuleProviders: [
+        ...(options.startAutomaticReview ? [createAutomaticReviewToolModuleProvider({ snapshot: this.snapshot, start: options.startAutomaticReview })] : []),
         ...(options.createProject ? [createQuickChatProjectToolModuleProvider({ snapshot: this.snapshot, createProject: options.createProject })] : []),
         ...(options.toolModuleProviders ?? []),
       ],

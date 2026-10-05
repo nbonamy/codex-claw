@@ -56,6 +56,21 @@ does not undo files or commits. After a backend restart, interrupted automatic
 reviews stay paused for inspection rather than replaying commits or fixes.
 You can continue manually after inspecting the checkout.
 
+### Start from chat
+
+You can explicitly ask your agent to **run an automatic review of my uncommitted
+changes**, or of the current branch against a specified base. The agent starts
+an independent reviewer with the calling thread's provider, model, and effort
+unless you request overrides. It reuses your saved priority and round limits,
+but local commits stay off unless you explicitly request them—even if the panel
+previously had commits enabled.
+
+The launch response confirms that review started, not that it passed. The report
+returns to the originating conversation automatically. Avoid editing the reviewed
+files while it runs. Agents are instructed not to start this workflow for a
+generic request to review, finish, or ship work; it requires an explicit request
+for automatic review because it can modify files.
+
 ## Inspect the findings
 
 Findings are ordered by priority, from P0 through P3. Read the reported impact and open the affected file where a location is available. Ask for clarification through the finding's discussion action before deciding whether to fix it.

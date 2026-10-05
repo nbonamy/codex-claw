@@ -701,6 +701,31 @@ Persisting MCP inbox history is not part of the first no-team communication
 milestone. If we add durable collaboration history later, it should be app
 state, not Codex transcript duplication.
 
+### `start_automatic_review`
+
+Workspace threads can launch the existing automatic review workflow through
+this caller-scoped tool. It creates an independent reviewer without selecting
+it, returns `reviewId` and `reviewerAgentId` after persisting startup, and sends
+the completed or paused report back through the existing review handoff.
+Quick Chats and review agents do not receive the launch tool. The service also
+rejects nested reviews and the existing workflow rejects duplicate active runs.
+
+The caller must choose `scope: { type: "uncommitted" }` or
+`scope: { type: "branch", baseRef }`. Optional `backend`, `model`, and
+`reasoningEffort` override caller defaults; cross-provider reviews use the new
+provider's defaults rather than transferring incompatible selections. Optional
+`maxPriority` and `maxRounds` fall back to saved review settings, then P2 and 3.
+`autoCommit` always defaults to false, even when the saved preference is true.
+The usual review service owns Git checks, remediation, commits, reports, and
+cleanup; no second review loop or renderer command is involved.
+
+Tool descriptions and stable agent instructions require an explicit user
+request for automatic review and separate explicit authorization for local
+commits. Generic review/finish/ship requests, teammate messages, and review
+readiness are not launch authorization. This is model-facing invocation policy,
+not a claim that the server can verify natural-language consent. Agents must
+stop editing the reviewed files after launch and must not relaunch to poll.
+
 ### Review-scoped finding tools
 
 Each review session receives a dedicated MCP URL whose tool surface adds
@@ -717,7 +742,7 @@ provider harness continues to supply repository reading, search, Git,
 and test tools. The review tools mutate the active app-owned ledger and persist
 it before returning; the registry itself does not own finding storage.
 
-User decisions and workflow actions are backend methods, not model tools. The
+User decisions and manual workflow actions are backend methods, not model tools. The
 renderer uses the unified client contract to accept, decline, assign, discuss,
 submit, repeat, or finish a review. Inspection completion is a separate model
 acknowledgment: `finish_review_round({ findingCount })` requires a non-negative

@@ -144,6 +144,7 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     worktreeManager,
     agentCreation,
     createProject: (agentId, name, prompt, backend) => server.createProjectFromQuickChat(agentId, name, prompt, backend),
+    startAutomaticReview: (agentId, input) => server.startAutomaticReview(agentId, input),
     toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService), createTaskToolModuleProvider(tasks)],
   });
   const mcpServerUrl = await mcpService.start();

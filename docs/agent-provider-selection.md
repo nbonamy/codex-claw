@@ -49,6 +49,7 @@ quick actions such as starting a session on main.
 | Create project from Quick Chat | Tool call and provisioning progress | Same tool-call rule: optional backend, default to the caller's backend |
 | New Mission | Empty requirements chat | Choose or override the lead's backend before the first prompt |
 | Independent code review | Start-review flow | Optional provider select, shown only with multiple connected backends |
+| Automatic review through MCP | Explicit user request only | Independent reviewer; defaults to the calling thread's backend, model, and effort, with optional requested overrides |
 
 Progress dialogs display the provider selected before creation begins.
 Acquisition flows carry an explicit selection through subsequent steps.
@@ -105,8 +106,11 @@ and project creation from Quick Chat. Duplicate and fork preserve their source
 backend.
 
 Independent review exposes an optional provider selection so Claude can review
-Codex work and vice versa. It defaults to the source agent's backend, without
-persisting a separate reviewer preference. Findings, triage, remediation,
+Codex work and vice versa. The panel remembers review provider, model, effort,
+and automation preferences. The `start_automatic_review` tool instead inherits
+the caller's current provider/model/effort, using saved review preferences only
+for the priority threshold and round limit. Its local-commit default is always
+off and requires an explicit user request to enable. Findings, triage, remediation,
 and the completion message remain Korus-owned. Changing the reviewer provider
 must not transfer provider-specific conversation IDs or incompatible model
 settings; model selection must remain valid for the selected backend.

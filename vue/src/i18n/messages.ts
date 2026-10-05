@@ -1133,6 +1133,11 @@ export const messages = {
               failed: 'Could not finish review round',
               running: 'Finishing review round',
             },
+            startAutomaticReview: {
+              completed: 'Started automatic review',
+              failed: 'Could not start automatic review',
+              running: 'Starting automatic review',
+            },
             deleteFinding: {
               completed: 'Deleted finding',
               failed: 'Could not delete finding',

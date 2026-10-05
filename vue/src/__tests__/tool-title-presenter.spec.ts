@@ -6,6 +6,9 @@ import { presentAppToolTitle } from '../tool-title-presenter';
 
 describe(`${product.name} tool title presenter`, () => {
   it.each([
+    ['workspace.start_automatic_review', {}, 'running', 'Starting automatic review'],
+    [`${product.mcpServerName}.start_automatic_review`, {}, 'completed', 'Started automatic review'],
+    ['workspace.start_automatic_review', {}, 'error', 'Could not start automatic review'],
     [`mcp__${product.mcpServerName}__report_finding`, {}, 'completed', 'Reported finding'],
     [`${product.mcpServerName}.report_finding`, {}, 'completed', 'Reported finding'],
     ['workspace.wait-tasks', {}, 'running', 'Waiting for delegated tasks'],
