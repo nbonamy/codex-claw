@@ -31,7 +31,8 @@ export class ReviewGit implements ReviewGitPort {
 
   async inspect(folder: string): Promise<ReviewGitSnapshot> {
     const head = (await git(folder, ['rev-parse', '--verify', 'HEAD'])).trim();
-    const branch = (await git(folder, ['symbolic-ref', '--quiet', 'HEAD'])).trim();
+    const branch = (await git(folder, ['symbolic-ref', '--quiet', 'HEAD']).catch(() => '')).trim();
+    if (!branch) throw new Error('Automatic review requires a checked-out branch. Switch from the detached HEAD before continuing.');
     const status = await git(folder, ['status', '--porcelain=v1', '-z', '--untracked-files=all']);
     if ((await git(folder, ['diff', '--name-only', '--diff-filter=U', '-z'])).length) {
       throw new Error('Resolve merge conflicts before continuing automatic review.');

@@ -67,6 +67,12 @@ describe('automatic review git boundary', () => {
     expect(await git('status', '--porcelain')).toBe('?? nested/');
   });
 
+  it('explains that automatic review needs a checked-out branch on a detached HEAD', async () => {
+    const { git, service, folder } = await repository();
+    await git('checkout', '--detach');
+    await expect(service.prepare(folder, { type: 'uncommitted' })).rejects.toThrow('checked-out branch');
+  });
+
   it('does not commit outside an agent subfolder or bypass a failing commit hook', async () => {
     const { folder, git, service } = await repository();
     await mkdir(path.join(folder, 'subfolder'));

@@ -201,7 +201,8 @@ describe('AppBackendServer code review workflow', () => {
       };
     });
     const disposeCodeReview = vi.fn().mockResolvedValue(undefined);
-    const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
+    // The first archive (between rounds) fails: housekeeping errors must not block the review.
+    const archiveAgentConversation = vi.fn().mockRejectedValueOnce(new Error('thread not found')).mockResolvedValue(undefined);
     const saveCodeReviewReport = vi.fn().mockResolvedValue('/reports/review.md');
     const releaseConversation = vi.fn();
     const sendAgentMessage = vi.fn();

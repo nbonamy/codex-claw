@@ -558,7 +558,8 @@ export class AppBackendServer {
     }
     if (agent.backendSession && retainConversation) {
       // Archive when supported (Codex); otherwise leave native history intact (Claude).
-      await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent });
+      // Archiving is housekeeping; a provider failure must not block reset, retry or finish.
+      await this.driverRpc?.handle(backendMethods.driverConversationArchive, { agent }).catch(() => undefined);
     } else if (agent.backendSession) {
       await this.handleAgentDriverRequest(agent, backendMethods.driverCodeReviewDispose, {
         agent,
