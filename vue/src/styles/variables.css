@@ -134,6 +134,7 @@
   --space-32: 64px;
 
   --workbench-appbar-height: 48px;
+  --workbench-subheader-height: 65px;
   --workbench-layout-header-offset: 0px;
   --workbench-layout-footer-offset: 0px;
   --conversation-content-width: 780px;

@@ -1,17 +1,14 @@
 <template>
   <section class="mission-workspace" :aria-label="t('missions.workspace')">
-    <header class="mission-workspace__header">
-      <button v-if="sidebarCollapsed" type="button" class="mission-workspace__navigation-button" @click="emit('expand-sidebar')">
-        {{ t('missions.showNavigation') }}
-      </button>
+    <WorkspaceHeader class="mission-workspace__header" :sidebar-collapsed="sidebarCollapsed">
+      <SidebarExpandButton v-if="sidebarCollapsed" :label="t('surface.agentHeader.showAgentSidebar')" @click="emit('expand-sidebar')" />
       <div class="mission-workspace__identity">
-        <span>{{ t('missions.workflow') }}</span>
-        <h1>{{ mission.outcome }}</h1>
+        <h1 class="workspace-header__title">{{ mission.outcome }}</h1>
       </div>
       <span class="mission-workspace__mission-status" :data-status="mission.status">{{ t(`missions.${mission.status}`) }}</span>
-    </header>
+    </WorkspaceHeader>
 
-    <div class="mission-workspace__body">
+    <div class="mission-workspace__body workspace-body">
       <MissionStageRail :mission="mission" :viewed-stage="viewedStage" @view-stage="viewedStage = $event" />
 
       <main class="mission-workspace__workbench">
@@ -154,6 +151,8 @@ import { missionWorkflow } from '@workspace/core/mission-workflows';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput, type MissionImplementationStartProgress } from '@workspace/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
+import SidebarExpandButton from '../shared/SidebarExpandButton.vue';
+import WorkspaceHeader from '../shared/WorkspaceHeader.vue';
 import MissionConversationRail from './MissionConversationRail.vue';
 import MissionImplementationBoard from './MissionImplementationBoard.vue';
 import WorkspaceProvisioningProgressDialog, { type WorkspaceProvisioningOperation } from './WorkspaceProvisioningProgressDialog.vue';

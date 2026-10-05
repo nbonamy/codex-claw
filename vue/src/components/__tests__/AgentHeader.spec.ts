@@ -41,7 +41,7 @@ describe('AgentHeader', () => {
     expect(wrapper.text()).toContain('Ready to get going');
     expect(wrapper.find('.agent-header__activity-line').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Show agent sidebar"]').exists()).toBe(false);
-    expect(wrapper.classes()).toContain('agent-header--with-sidebar-edge');
+    expect(getComputedStyle(wrapper.element).boxShadow).toBe('var(--shadow-content-edge)');
     expect(wrapper.find('.agent-header__avatar').exists()).toBe(false);
   });
 
@@ -517,7 +517,7 @@ describe('AgentHeader', () => {
     expect(wrapper.get('.agent-header__avatar').classes()).toContain('agent-avatar--sm');
     expect(wrapper.get('.agent-header__avatar').text()).toBe('🦞');
     expect(wrapper.classes()).not.toContain('agent-header--sidebar-collapsed');
-    expect(wrapper.classes()).not.toContain('agent-header--with-sidebar-edge');
+    expect(getComputedStyle(wrapper.element).boxShadow).toBe('none');
 
     await wrapper.get('[aria-label="Show agent sidebar"]').trigger('click');
 

@@ -1,17 +1,14 @@
 <template>
-  <header
+  <WorkspaceHeader
     class="agent-header"
-    :class="{ 'agent-header--with-sidebar-edge': !sidebarCollapsed }"
+    :sidebar-collapsed="sidebarCollapsed"
   >
-    <button
+    <SidebarExpandButton
       v-if="sidebarCollapsed"
       class="agent-header__expand"
-      type="button"
-      :aria-label="$t('surface.agentHeader.showAgentSidebar')"
+      :label="$t('surface.agentHeader.showAgentSidebar')"
       @click="emit('expand-sidebar')"
-    >
-      <PanelLeftOpenIcon class="agent-header__expand-icon" />
-    </button>
+    />
 
     <div
       v-if="agent"
@@ -25,7 +22,7 @@
         size="sm"
       />
       <div class="agent-header__agent-line">
-        <strong>{{ displayName }}</strong>
+        <strong class="workspace-header__title">{{ displayName }}</strong>
         <span
           v-if="agentLocationLabel"
           class="agent-header__folder"
@@ -49,7 +46,7 @@
       v-else
       class="agent-header__identity"
     >
-      <strong>{{ $t('surface.agentHeader.noAgent') }}</strong>
+      <strong class="workspace-header__title">{{ $t('surface.agentHeader.noAgent') }}</strong>
     </div>
 
     <div class="agent-header__activity">
@@ -119,7 +116,7 @@
         @install="emit('install-update')"
       />
     </div>
-  </header>
+  </WorkspaceHeader>
 </template>
 
 <script setup lang="ts">
@@ -128,7 +125,9 @@ import { localizedText } from '../i18n/errors';
 import { computed, ref } from 'vue';
 import type { Agent, AgentGitDiffTarget, AgentGitStatus, AgentSubagentTree, BackendRuntimeStatus, DesktopUpdateStatus, OpenInApplication, OpenInApplicationCatalog, TurnGitDiff } from '@workspace/core/contracts';
 import { agentDisplayName } from '@workspace/core/agent-display';
-import { ListIcon, PanelLeftOpenIcon } from '../shared/icons/app-icons';
+import { ListIcon } from '../shared/icons/app-icons';
+import SidebarExpandButton from '../shared/SidebarExpandButton.vue';
+import WorkspaceHeader from '../shared/WorkspaceHeader.vue';
 import { IconLayoutSidebarRight } from '@tabler/icons-vue';
 import AgentAvatar from './AgentAvatar.vue';
 import UpdateAvailableBadge from './UpdateAvailableBadge.vue';
@@ -261,25 +260,9 @@ const gitReviewAvailable = computed(() => {
 <style scoped>
 .agent-header {
   --agent-status-dot-size: 10px;
-  position: relative;
-  z-index: 5;
-  flex: 0 0 var(--workbench-appbar-height);
-  min-height: var(--workbench-appbar-height);
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  min-width: 0;
-  padding: 0 var(--space-4) 0 var(--space-8);
-  background: var(--color-shell-main);
-  border-bottom: 1px solid var(--color-shell-appbar-divider);
-  -webkit-app-region: drag;
 }
 
-.agent-header--with-sidebar-edge {
-  box-shadow: var(--shadow-content-edge);
-}
-
-.agent-header--pane {
+.agent-header.agent-header--pane {
   -webkit-app-region: no-drag;
 }
 
@@ -296,11 +279,6 @@ const gitReviewAvailable = computed(() => {
   display: flex;
   align-items: center;
   gap: var(--space-6);
-}
-
-.agent-header__identity strong {
-  color: var(--color-text);
-  font-weight: var(--font-weight-bold);
 }
 
 .agent-header__identity .agent-header__agent-line {
@@ -383,22 +361,4 @@ const gitReviewAvailable = computed(() => {
   height: var(--icon-md);
 }
 
-.agent-header:has(.agent-header__expand) {
-  padding-left: var(--space-16);
-}
-
-.agent-header__expand {
-  display: flex;
-  align-items: center;
-  padding: 0;
-  border: none;
-  background: transparent;
-  -webkit-app-region: no-drag;
-}
-
-.agent-header__expand-icon {
-  width: var(--icon-md);
-  height: var(--icon-md);
-  color: var(--color-text-muted);
-}
 </style>

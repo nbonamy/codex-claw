@@ -72,7 +72,6 @@ export const messages = {
       shipBoard: 'Repository delivery', shipRepositoryCount: '{complete} of {total} repositories delivered', shipPending: 'Ready to ship', shipPullRequestCreated: 'Pull request created', shipMerged: 'Merged', shipActionsHint: 'Commit any remaining changes, then create a pull request or merge this repository.', shipOpenConversation: 'Open the implementation conversation for {repository}', shipConversationHint: 'Select a repository to open its implementation conversation.', shipAgentUnavailable: 'The implementation agent for this repository is unavailable.', shipPullRequest: 'PR #{number}', shipDebugFixture: 'Debug fixture — delivery actions are disabled.',
       proposal: 'Artifact ready for review',
       runStatus: { preparing: 'Preparing workspace', running: 'Stage in progress', awaitingReview: 'Awaiting your review', accepted: 'Accepted', cancelled: 'Stopped', failed: 'Failed' },
-      showNavigation: 'Show mission navigation',
       new: 'New mission', title: 'Missions',
       actions: 'Mission actions', deleteMission: 'Delete {mission}', deleteTitle: 'Delete {mission}?', deleteAction: 'Delete mission',
       deleteDescription: 'The mission, conversations, artifacts, and generated skills will be deleted.',

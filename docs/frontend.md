@@ -132,6 +132,9 @@ component is single-use.
 | Pointer-positioned context menu overlay | `AppContextMenu` | `vue/src/shared/menu/AppContextMenu.vue` |
 | Application launcher and icon catalog | `OpenInControl` | `vue/src/shared/OpenInControl.vue` |
 | Product glyphs, including GitHub | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
+| Reopen the collapsed agent sidebar from a surface header | `SidebarExpandButton` | `vue/src/shared/SidebarExpandButton.vue` |
+| Workspace header height, title, divider, and edge shadow | `WorkspaceHeader` and `.workspace-header__title` | `vue/src/shared/WorkspaceHeader.vue` |
+| Workspace body containment and edge shadow | `.workspace-body` | `vue/src/styles/base.css` |
 | Dialog chrome and footer actions | `.app-dialog`, `.app-button` | `vue/src/styles/base.css` |
 | Form dialog structure and fields | `FormDialog`, `FormDialogField` | `vue/src/shared/dialog/` |
 | Searchable keyboard command palettes | `QuickOpenDialog` | `vue/src/shared/QuickOpenDialog.vue` |

@@ -76,9 +76,8 @@ function stageStatus(stage: MissionStage): string {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  padding: var(--space-10) var(--space-8);
+  padding-bottom: var(--space-10);
   border-right: 1px solid var(--color-border);
-  border-left: 1px solid var(--color-border);
   background: color-mix(
     in srgb,
     var(--color-surface),
@@ -88,9 +87,12 @@ function stageStatus(stage: MissionStage): string {
 
 .mission-stage-rail__heading {
   display: flex;
+  min-height: var(--workbench-subheader-height);
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-6);
-  padding: 0 var(--space-4) var(--space-10);
+  padding: 0 var(--space-12);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .mission-stage-rail__heading > svg {
@@ -117,7 +119,7 @@ function stageStatus(stage: MissionStage): string {
   display: grid;
   gap: var(--space-3);
   margin: 0;
-  padding: 0;
+  padding: var(--space-8);
   list-style: none;
 }
 
@@ -176,7 +178,7 @@ function stageStatus(stage: MissionStage): string {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: var(--space-4);
-  margin-top: auto;
+  margin: auto var(--space-8) 0;
   padding: var(--space-8) var(--space-4) 0;
   border-top: 1px solid var(--color-border);
   font-size: var(--font-size-12);

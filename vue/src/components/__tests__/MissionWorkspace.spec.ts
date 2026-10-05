@@ -7,6 +7,7 @@ import type { Agent, OpenInApplicationCatalog } from '@workspace/core/contracts'
 import MissionWorkspace from '../MissionWorkspace.vue';
 import WorkspaceProvisioningProgressDialog from '../WorkspaceProvisioningProgressDialog.vue';
 import MissionTicketBoard, { type MissionTicketComment } from '../MissionTicketBoard.vue';
+import '../../styles/base.css';
 
 function missionWithRun(status: MissionRun['status'], proposal = false): Mission {
   const snapshot = createInitialSnapshot();
@@ -110,6 +111,9 @@ describe('MissionWorkspace', () => {
     const wrapper = mountWorkspace(mission);
     await flushPromises();
 
+    expect(wrapper.get('.mission-workspace__identity').text()).toBe(mission.outcome);
+    expect(getComputedStyle(wrapper.get('.mission-workspace__header').element).boxShadow).toBe('var(--shadow-content-edge)');
+    expect(getComputedStyle(wrapper.get('.mission-workspace__body').element).boxShadow).toBe('var(--shadow-content-edge)');
     expect(wrapper.get('[aria-label="Workflow progress"]').findAll('button')).toHaveLength(5);
     expect(wrapper.get('[aria-current="step"]').text()).toContain('Requirements');
     expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Shaping requirements');
@@ -127,12 +131,21 @@ describe('MissionWorkspace', () => {
     expect(wrapper.find('textarea').exists()).toBe(false);
     expect(wrapper.find('select').exists()).toBe(false);
     const stageHeader = wrapper.get('.mission-workspace__stage-header');
+    const conversationHeader = wrapper.get('.mission-conversation-rail__navigation > header');
+    expect(getComputedStyle(stageHeader.element).minHeight).not.toBe('');
+    expect(getComputedStyle(stageHeader.element).minHeight).toBe(getComputedStyle(conversationHeader.element).minHeight);
+    expect(getComputedStyle(wrapper.get('.mission-stage-rail__heading').element).minHeight).toBe(getComputedStyle(stageHeader.element).minHeight);
     const scrollingContent = wrapper.get('.mission-workspace__workbench-scroll');
     expect(scrollingContent.element.contains(stageHeader.element)).toBe(false);
 
     await wrapper.setProps({ sidebarCollapsed: true });
-    await wrapper.get('.mission-workspace__navigation-button').trigger('click');
+    const sidebarButton = wrapper.get('button[aria-label="Show agent sidebar"]');
+    expect(sidebarButton.text()).toBe('');
+    expect(sidebarButton.find('svg').exists()).toBe(true);
+    await sidebarButton.trigger('click');
     expect(wrapper.emitted('expand-sidebar')).toStrictEqual([[]]);
+    await wrapper.setProps({ sidebarCollapsed: false });
+    expect(wrapper.find('button[aria-label="Show agent sidebar"]').exists()).toBe(false);
   });
 
   it('keeps the proposal beside its conversation and carries the accepted artifact into the next stage', async () => {

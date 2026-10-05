@@ -2,6 +2,16 @@
   box-sizing: border-box;
 }
 
+.workspace-body {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-content-edge);
+}
+
 html,
 body,
 #app {

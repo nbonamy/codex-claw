@@ -114,16 +114,16 @@ function conversationKey(run: Conversation['run']): string {
 
 .mission-conversation-rail__navigation {
   flex: 0 0 auto;
-  border-bottom: 1px solid var(--color-border);
   background: var(--color-surface-lowest);
 }
 
 .mission-conversation-rail__navigation > header {
   display: flex;
-  min-height: 56px;
+  min-height: var(--workbench-subheader-height);
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-6) var(--space-8);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .mission-conversation-rail__heading {
@@ -191,6 +191,7 @@ function conversationKey(run: Conversation['run']): string {
   gap: var(--space-8);
   padding: 0 var(--space-8);
   overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .mission-conversation-rail__switcher button {

@@ -5,24 +5,7 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  overflow: hidden;
   background: var(--color-surface-lowest);
-}
-
-.mission-workspace__header {
-  display: flex;
-  min-height: 64px;
-  align-items: center;
-  gap: var(--space-8);
-  padding: 0 var(--space-10);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.mission-workspace__navigation-button {
-  border: 0;
-  color: var(--color-primary);
-  background: transparent;
-  cursor: pointer;
 }
 
 .mission-workspace__identity {
@@ -30,26 +13,15 @@
   flex: 1;
 }
 
-.mission-workspace__identity > span,
 .mission-workspace__stage-header small {
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
 }
 
-.mission-workspace h1,
 .mission-workspace h2,
 .mission-workspace h3,
 .mission-workspace p {
   margin: 0;
-}
-
-.mission-workspace h1 {
-  overflow: hidden;
-  margin-top: var(--space-1);
-  font-size: var(--font-size-18);
-  font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .mission-workspace__mission-status,
@@ -83,8 +55,6 @@
       300px,
       36%
     );
-  flex: 1;
-  min-height: 0;
 }
 
 .mission-workspace__workbench {
@@ -98,7 +68,7 @@
 .mission-workspace__stage-header {
   z-index: 3;
   display: flex;
-  min-height: 38px;
+  min-height: var(--workbench-subheader-height);
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;

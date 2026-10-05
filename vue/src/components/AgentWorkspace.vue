@@ -3,7 +3,7 @@
     v-if="!splitHeaders && !isAgentEmpty && currentAgent"
     v-bind="headerBindingsFor(emptySplitPane ? null : currentAgent.id, true, true)"
   />
-  <div ref="workspaceBody" class="app-shell__body" @dragstart.capture="linkDrag.start">
+  <div ref="workspaceBody" class="app-shell__body workspace-body" @dragstart.capture="linkDrag.start">
     <AgentEmptyState v-if="isAgentEmpty" @start-work="handleStartWorkAction" />
     <div v-else class="app-shell__conversations" :class="{ 'app-shell__conversations--split': splitHeaders }">
     <div v-if="$slots['layout-control']" class="app-shell__layout-control">
@@ -754,14 +754,7 @@ defineExpose({
   width: 240px;
 }
 .app-shell__body {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
   display: flex;
-  box-shadow: var(--shadow-content-edge);
 }
 
 .app-shell__right-workspace {
