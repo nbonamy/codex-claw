@@ -115,7 +115,7 @@ Persistence metadata is additive and optional inside the existing agent entity, 
 
 ## Evidence and validation
 
-Source baselines: Korus `307e2e3530038ca7471d4dab81532514c69415b9` (0.25.0), sibling SDK `576bce8ddc5287425b0f2785ad49f7e3def6c310`, Synara commit above. The original uncommitted comparative report at `/Users/nbonamy/src/codex-claw/docs/research/synara.md` was read as background.
+Source baselines: Korus `307e2e3530038ca7471d4dab81532514c69415b9` (0.25.0), sibling SDK `576bce8ddc5287425b0f2785ad49f7e3def6c310`, Synara commit above. The original uncommitted comparative report at `./docs/research/synara.md` was read as background.
 
 The isolated worktree was initialized with `npm ci --ignore-scripts --no-audit --no-fund` to avoid shared SDK prepare builds. Its needed existing environment file was kept private (0600); no live Korus state was copied. Dev overrides remain `file:../codex-app-sdk/packages/*`, with `install-links=true`. Installed copies were refreshed directly from the sibling's existing build, without modifying/rebuilding the sibling. All are 0.12.6. Vue initially had stale hash `8bc380b77c38a2cce488185c134f80c3f9c2305bc631c827be477674b13a6561`; refreshed sibling hash is `ba7d1d4d2b1c7cf47e1772e0b898c334d4c9940ec0f39e0af052a8279a0534dc`. The stale bundle caused four existing Claude controlled-pane tests to fail; refreshing resolved them.
 
