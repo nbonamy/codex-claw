@@ -1,18 +1,16 @@
 # Backend Architecture
 
-Status: desktop extraction plus initial web host, 2026-08-07.
+Status: implemented backend architecture. See [Architecture](architecture.md)
+and [Protocol](protocol.md) for current product and contract details.
 
 Contract update, 2026-09-16: the semantic remediation separates domain facts,
 provider frames, client effects and local transport events; navigation/preferences
 are client-scoped, runtime loading is explicit, and review/input have targeted
 lifecycles. [Protocol](protocol.md) is authoritative for current names and
-payloads; historical extraction checkpoints below describe the migration's
-earlier state. The [semantic audit](../plans/backend-semantics-audit.md) records
-the complete baseline-to-current mapping.
+payloads; historical design alternatives below explain the extraction decisions.
 
-This document is the architecture record for extracting most of Korus's
-Electron main process into a separate TypeScript backend process, tentatively
-still called `daemon`.
+This document records backend process, transport, packaging, and security
+decisions. `daemon` runs separately from Electron main.
 
 `daemon` is not a replacement for Codex app-server. It is the Korus product
 backend: the app-owned process that orchestrates Codex app-server, Claude Code,
@@ -395,35 +393,6 @@ product monorepo; `electron` and `web` are host runtimes; `vue` is the reusable
 UI; `backend` is the product backend; and `core` is the compile-time contract
 bridge.
 
-## Source Facts
-
-- Codex app-server supports multiple transports today: stdio JSONL, an
-  experimental unsupported WebSocket transport, Unix socket WebSocket
-  connections, and `off`. Its connection lifecycle is initialize, initialized,
-  thread start/resume, turn start, then stream notifications. Source:
-  <https://developers.openai.com/codex/app-server>.
-- Node SEA lets a bundled script be injected into a Node binary so the target
-  machine does not need Node installed. It is marked active development, module
-  loading inside the injected script cannot read filesystem dependencies, and
-  applications should bundle to a standalone JavaScript file first. Source:
-  <https://nodejs.org/api/single-executable-applications.html>.
-- Node SEA platform support is not equal everywhere: Node's docs say CI coverage
-  is Windows, macOS arm64 only, and supported Linux distributions and
-  architectures except Alpine and s390x. That matters for macOS x64 and release
-  confidence. Source:
-  <https://nodejs.org/api/single-executable-applications.html#platform-support>.
-- Electron recommends `utilityProcess` for many standalone Node child-process
-  use cases when `runAsNode` is disabled. Utility processes have Node and
-  message ports, but their stdin cannot be configured as a pipe. Source:
-  <https://www.electronjs.org/docs/latest/api/utility-process>.
-- Electron's `runAsNode` fuse controls whether `ELECTRON_RUN_AS_NODE` is
-  respected. The official docs describe disabling unused powerful features as a
-  security hardening measure and note that disabling this fuse breaks
-  `child_process.fork`, recommending utility processes instead. Source:
-  <https://www.electronjs.org/docs/latest/tutorial/fuses>.
-- Korus currently disables `FuseV1Options.RunAsNode` in
-  `forge.config.ts`, so the existing packaged app deliberately does not support
-  using the Electron executable as a Node runtime.
 
 ## Target Shape
 
@@ -1175,187 +1144,6 @@ standalone daemon can later replace that implementation with a native keychain
 package or platform credential helper behind the same port after packaging is
 settled.
 
-## Implementation Slicing
-
-### Phase 1: Extract The In-Process Core
-
-Goal: make the backend boundary real without adding a process boundary.
-
-Work:
-
-- Create the npm workspace layout: `core`, `backend`, and `electron`.
-- Move the current Electron app package into `electron/` while preserving the
-  existing Forge/Vite behavior.
-- Move platform-neutral contracts and pure helpers from `src/shared` into
-  `core/src`.
-- Add backend core modules under `backend/src` with no `electron` imports.
-- Define a `AppCore` interface shaped around app-owned requests and events.
-- Move snapshot ownership, backend driver registry, MCP server ownership,
-  automation runner/scheduler, source repository scanning, file/git services, and
-  work-provider orchestration behind that interface incrementally.
-- Replace direct Electron `AppController` mutation paths with calls into the
-  backend core.
-- Keep Electron main responsible for dialogs, open-external, app quit, native
-  system permission callbacks, window state, and renderer IPC. Keep the
-  product-level system permission and transcription APIs in `daemon`.
-
-Tests:
-
-- Unit-test core request handlers without Electron.
-- Keep existing `AppController` tests passing by injecting an in-process core.
-- Add seam tests proving no `backend/src` or `core/src` file imports
-  `electron`.
-
-Commit checkpoints:
-
-- `chore: split repo into npm workspaces`
-- `feat: add backend core interface`
-- `feat: move core contracts into workspace`
-- `feat: move snapshot ownership into backend core`
-- `feat: route agent backend operations through core`
-- `feat: route source file git and automation services through core`
-
-### Phase 2: Define The Daemon Protocol
-
-Goal: make process communication testable while still running in-process.
-
-Work:
-
-- Add shared protocol contracts under `core/src/backend-protocol` with
-  JSON-RPC envelope types, request/event maps, error codes, and schema
-  validation.
-- Add an in-process transport/client adapter that speaks the same request names
-  without serialization.
-- Move event sequence ownership into the core.
-- Add request timeout and cancellation semantics.
-
-Tests:
-
-- Protocol contract tests for every request and event.
-- Round-trip tests through the in-process transport.
-- Error-shape tests for unknown method, invalid params, timeout, and backend
-  unavailable.
-
-Commit checkpoints:
-
-- `feat: add backend rpc protocol contracts`
-- `test: cover backend protocol request validation`
-- `feat: route electron main through backend client`
-
-### Phase 3: Add The Stdio Backend Process
-
-Goal: run the backend as a separate local process in development.
-
-Work:
-
-- Add `backend/src/daemon` entrypoint with `--stdio` and `--version`.
-- Add newline-delimited JSON-RPC framing.
-- Add `AppBackendProcessClient` in Electron main.
-- Add startup, health, restart, close, and crash error propagation.
-- In development, spawn the compiled backend with the local Node runtime.
-
-Tests:
-
-- Stdio transport tests with fake streams.
-- Process-client tests that spawn a fixture backend.
-- App-controller tests that use a fake process client.
-
-Commit checkpoints:
-
-- `feat: add daemon stdio entrypoint`
-- `feat: connect electron main to daemon over stdio`
-- `test: cover daemon process lifecycle`
-
-### Phase 4: Package Runtime Spike
-
-Goal: decide the packaged local runtime with evidence.
-
-Work:
-
-- Bundle `daemon` into standalone JavaScript.
-- Spike Node SEA for macOS arm64 first, then the rest of the supported release
-  matrix.
-- If SEA is not ready, spike `utilityProcess` as a temporary packaged transport
-  while keeping stdio for dev and future SSH.
-- Do not enable `RunAsNode` unless we explicitly accept the security tradeoff.
-
-Tests:
-
-- `daemon --version` smoke test for the chosen packaged runtime.
-- Packaged app starts backend, calls `snapshot/get`, and exits cleanly.
-- If using SEA, verify signing/notarization behavior for the helper binary.
-- If using `utilityProcess`, verify message-port transport and crash handling.
-
-Commit checkpoints:
-
-- `chore: bundle daemon for packaged runtime spike`
-- `feat: package daemon runtime`
-- `test: add packaged daemon smoke test`
-
-### Phase 5: Local Always-On Daemon
-
-Goal: let agents and automations keep running when the UI window is closed.
-
-Work:
-
-- Add `daemon serve`. Done for the Unix socket transport.
-- Add Unix socket and Windows named-pipe transports. Unix socket is done;
-  Windows named pipe remains.
-- Add per-user macOS LaunchAgent install/uninstall from Settings > General.
-- Add authenticated local connection handshake.
-- Add reconnect, daemon health, and stale-client cleanup.
-- Local `daemon` is per user for v1, with state and socket under
-  `APP_HOME` or `~/.korus`.
-- Add remaining platform startup integrations after protocol stability.
-
-Tests:
-
-- Socket/pipe auth tests.
-- Reconnect and event replay tests.
-- Multi-client event fanout tests.
-- Persistence tests across backend restart with UI disconnected.
-
-Commit checkpoints:
-
-- `feat: add local daemon daemon transport`
-- `feat: add macos daemon launchagent installer`
-- `feat: reconnect electron main to daemon`
-- `test: cover daemon auth and replay`
-
-### Phase 6: Remote SSH Backend
-
-Goal: run `daemon` on another machine without exposing a raw network daemon.
-
-Work:
-
-- Add backend location records. Started as persisted SSH connection records;
-  team remote pointers and agent-location routing are the app contract.
-- Add SSH stdio transport. The command model is recorded on ready connections;
-  remote clients now prefer an existing remote daemon and fall back to one-shot
-  stdio.
-- Make agent folders, source folders, repo discovery, git, files, and
-  artifacts location-aware. Source, git, files, and most agent-scoped
-  handlers are routed through `BackendLocation`, `AgentLocation`, and
-  `BackendHandle`; keep collapsing remaining one-off routing branches into
-  those helpers when the semantics are not genuinely special.
-- Add remote folder browsing and repo selection.
-- Keep native folder picker local-only.
-- Decide how remote hosts get a Node runtime or standalone `daemon` binary; the
-  first install slice copies bundled JavaScript and expects `node` on the
-  remote host.
-
-Tests:
-
-- SSH config parser and install/probe tests. Done for connection management.
-- Fake SSH stdio transport tests for remote agent execution.
-- Location-aware path validation tests.
-- Renderer tests for local versus remote folder affordances.
-
-Commit checkpoints:
-
-- `feat: add backend locations`
-- `feat: connect remote daemon over ssh stdio`
-- `feat: make agent folders location aware`
 
 ## Testing Strategy
 
@@ -1386,33 +1174,3 @@ Coverage areas:
 
 Docs-only exploration, like this file, does not require Vitest. Run markdown
 and diff hygiene checks instead.
-
-## Open Questions
-
-- Should the first stdio process run only in development until the packaging
-  spike lands, or should it be enabled behind a local feature flag in packaged
-  builds too?
-- Is the product willing to enable Electron `RunAsNode`, or should that remain
-  permanently disabled?
-- Is macOS x64 part of the supported packaged release matrix for `daemon`?
-- Should local state remain one app-wide backend location, or should we model
-  locations before the first daemon lands?
-- Which standalone-daemon credential helper should back the work-integration
-  token-store port when `daemon` is launched without Electron?
-- Should the backend event buffer be in-memory only at first, or persisted so
-  UI reconnect after backend restart can replay recent activity?
-
-## Immediate Recommendation
-
-Start with the workspace reorg, then Phase 1 and Phase 2. The reorg is the
-foundation: root becomes orchestration-only, `electron` stays the desktop
-client, `backend` becomes `daemon`, and `core` becomes the only compile-time
-contract bridge. Once Electron main talks to a `BackendClient` and the
-backend package has no Electron imports, add stdio in Phase 3 and run the
-packaging spike with real evidence.
-
-The first hard decision after this document is packaging: Node SEA versus
-Electron utility process versus enabling `RunAsNode`. My recommendation is to
-keep `RunAsNode` disabled, spike SEA as the real backend binary, and keep
-`utilityProcess` available only as a temporary packaged-app bridge if SEA is not
-ready.

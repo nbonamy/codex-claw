@@ -1,12 +1,16 @@
 # Claude conversation capability audit
 
-Source snapshot: October 3, 2026. Authenticated runtime and authorized implementation follow-up: October 4, 2026 UTC. Implementation on `research/claude-capabilities`; nothing deployed.
+Historical evidence: October 3–4, 2026. The steering, native fork, and goal
+integration described below is merged and included in Korus 0.26.0. Baseline
+capability tables and worktree validation notes record the investigation at
+that time; they are not a current backlog or release gate. Read
+[Claude integration](../claude.md) for the maintained integration guidance.
 
 ## Implementation follow-up
 
 Nicolas subsequently authorized implementation. This section supersedes the audit's original missing-integration classifications and research-only handoff below.
 
-| Capability | Current worktree behavior | Evidence |
+| Capability | Implemented behavior | Evidence |
 | --- | --- | --- |
 | Steering | Implemented. Inputs enter the active SDK query; UUID replay acknowledgments keep Korus busy through any additional result. Stopping a steered turn closes its owned query so queued work cannot survive into the next send. | Fake-SDK → real driver → backend RPC tests; authenticated driver probe below. |
 | Native fork/resume | Implemented. Same-folder, idle forks use `forkSession`; selected turns resolve to native persisted boundaries, including trailing goal records. Incomplete tool chains have no selectable cutoff. Child messages get their own native IDs; existing resume reapplies query configuration. | Native helper boundary test, history safety fixture, real driver fork/child recall; earlier R5 proves fresh-process independence. |

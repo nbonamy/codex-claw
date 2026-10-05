@@ -141,8 +141,7 @@ Claude backend; a unified backend fake drives application state and mounted UI.
 Korus tests its adapter translations and product behavior, not either SDK's
 implementation. Process/socket transport tests still validate Korus's own wire
 framing, decoding and lifecycle. Real provider smoke tests remain opt-in and are
-never required for the normal test gate. The complete gap/value inventory is
-tracked separately in the backend semantics and testing plan.
+never required for the normal test gate.
 
 ## Preload And IPC Tests
 

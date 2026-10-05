@@ -9,9 +9,9 @@ teams of coding agents with native conversation and artifact rendering.
 - TypeScript across main, preload, renderer, shared contracts, and tests.
 - Vue 3 with TypeScript and Element Plus for the renderer.
 - Vitest for unit, component, contract, and desktop workflow tests.
-- Codex is the implemented backend today, talking to the Codex app-server from
-  Electron main. The shared contracts and main-process seams are backend-aware
-  so a future Claude Code driver can be added without rewriting renderer UI.
+- Codex and Claude Code are supported through provider drivers in `daemon`.
+  Electron and the renderer use app-owned contracts rather than talking
+  directly to either provider runtime.
 
 Core product surfaces:
 
@@ -28,8 +28,7 @@ Core product surfaces:
 `core/src/product.json` owns product branding and external identity. Keep
 implementation identifiers, package names, filenames, and CSS brand-neutral;
 read product metadata for visible names, instructions, paths, and packaging.
-Authored documentation may use the product name. Existing repository and
-website URLs remain unchanged until their infrastructure is renamed.
+Authored documentation may use the product name.
 
 Preserve the product and process boundaries:
 
@@ -85,13 +84,13 @@ changes; specify feature behavior in tests:
 - `docs/research/provider-handoff.md`: read when designing cross-provider
   continuation; handoff goals, source evidence, lifecycle and persistence
   contracts, and validation limits.
-- `docs/agent-provider-selection.md`: draft for provider choice across manual
+- `docs/agent-provider-selection.md`: provider choice across manual
   agent creation, delegation, projects, Missions, and independent review.
 - `docs/codex.md`: read before changing Codex conversation state, rendering,
   actions, history, or transport; it defines the SDK/Korus ownership boundary,
   lifecycle, generated types, and test fixtures.
-- `docs/claude.md`: Claude Code websocket/SDK protocol research, support
-  strategy, and remaining Claude-driver questions.
+- `docs/claude.md`: Claude Agent SDK integration, configured homes, conversation
+  ownership, and capability boundaries.
 - [Claude capability audit](docs/research/claude-capabilities.md): read before adding
   Claude steering, forks, goals, turn mutations, or context controls; distinguishes
   SDK contracts, Korus integration gaps, and runtime evidence.
@@ -101,8 +100,8 @@ changes; specify feature behavior in tests:
   tools, inbox state, backend enablement, security, and tests.
 - `docs/custom-tools.md`: use when adding or presenting a `workspace` MCP tool,
   including agent status, structured results, lifecycle titles, and tests.
-- `docs/backend-architecture.md`: architecture record and implementation
-  slicing for extracting the backend core into a separate TypeScript process.
+- `docs/backend-architecture.md`: backend process, transport, packaging, and
+  security architecture.
 - `docs/protocol.md`: app-owned JSON-RPC backend protocol between clients,
   `daemon`, and client callbacks implemented by Electron today.
 - `docs/architecture.md`: product model, process architecture, IPC,

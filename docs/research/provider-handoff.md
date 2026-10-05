@@ -1,8 +1,10 @@
 # Provider handoff: goal, boundaries, and evidence
 
-October 3, 2026. Research and design recommendation, revised to reflect Nicolas's decisions and subsequent authorization to implement (`go`). This is not a separate implementation plan. Implementation and validation were performed in a dedicated worktree.
+Implemented in Korus 0.26.0. This document retains the handoff design decisions,
+lifecycle contracts, and dated validation evidence from October 3, 2026.
+Worktree setup and validation notes below are historical, not outstanding work.
 
-## Recommended MVP
+## Implemented workflow
 
 **Hand off… replaces the current Korus agent with a new agent in the same workspace, using a note written by the current agent.** The old provider conversation and files are preserved.
 
