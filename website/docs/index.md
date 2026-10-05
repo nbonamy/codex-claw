@@ -9,10 +9,6 @@ description: Install Korus, connect your coding agents, and take software work f
 
 Korus is a desktop workspace for agentic software engineering. Keep conversations, repositories, browser previews, plans, and diffs together as you move from an idea to delivery.
 
-::: info Release availability
-The published app is 0.25.2. This guide also covers changes implemented on main for the intended 0.26.0 release, including Linear, delegation commands, and additional Claude conversation controls. Those sections are marked as upcoming; they do not indicate that 0.26.0 has shipped.
-:::
-
 <div class="docs-grid">
   <a class="docs-card" href="./getting-started/quickstart.html"><strong>Quickstart →</strong><span>Install Korus and take your first task through to a reviewed diff.</span></a>
   <a class="docs-card" href="./providers/"><strong>Provider guides →</strong><span>Connect Codex or Claude Code and choose an engine for your agents.</span></a>

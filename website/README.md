@@ -24,6 +24,10 @@ customized default theme. The navigation follows Getting started, Providers,
 Workflows, Features, Reference, and Troubleshooting. Internal engineering notes
 stay in the repository's top-level `docs/` directory and are not published.
 
+Describe product behavior directly in the public guide. Do not add release
+planning notices, upcoming-version labels, or comparisons between `main` and
+the published app. Keep release status and version history in release notes.
+
 Run from the repository root:
 
 ```bash
@@ -59,6 +63,12 @@ The visual identity uses warm off-white, charcoal, and restrained slate-blue
 accents. Films keep charcoal title cards and the same quiet accent palette;
 green and red communicate success and defects. Shared film branding comes
 from `videos/product.mjs`, including the closing URL from product metadata.
+
+All Korus marks use the exact geometry in `electron/assets/icon.svg`. The
+website and Vue branding PNGs share a rounded web presentation; desktop icons
+remain full-square. Composite the canonical vector into thumbnails, the social
+card, and the channel banner rather than asking image generation to redraw it.
+Re-export the films after updating their shared `website/assets/app-icon.png`.
 
 The hero currently uses a lightweight HTML and CSS product composition. It is deliberately structured as a replaceable media frame so a current release screenshot can take over later without changing the page narrative.
 

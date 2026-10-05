@@ -24,7 +24,7 @@ Open **Files** to browse the agent's folder, expand directories, or search by pa
 
 When available, **Open In** opens the selected project file in a detected editor or application. The file preview is for inspection; ask the agent to change a file or open it in your editor when you want to edit it yourself.
 
-In the upcoming release after 0.25.2, clicking a file link in chat downloads the file when it is binary or too large to preview. Previewable text and images still open in the workspace. This fallback applies to chat file links; a missing or unreadable file still reports an error.
+Clicking a file link in chat downloads the file when it is binary or too large to preview. Previewable text and images still open in the workspace. This fallback applies to chat file links; a missing or unreadable file still reports an error.
 
 Open **Changes** or press **⌘G** to inspect Git diffs. The agent header's diff selector lets you choose the scope:
 
@@ -41,10 +41,6 @@ The **Changes** pane's refresh action reloads the selected diff. Its **…** men
 Use the full repository diff before delivery so earlier or unrelated edits are accounted for.
 
 ## Browse and start backlog work
-
-::: info Upcoming release
-Linear backlog support and the provider/source selectors described here are implemented on main for the intended 0.26.0 release, not the published 0.25.2 app.
-:::
 
 Connect [GitHub or Linear](../providers/#connect-github-or-linear) in Settings first. Open **Backlog** from the left rail to browse work across sources, or use the repository's **Backlog** pane or **Create from…** issue picker for work in that repository.
 

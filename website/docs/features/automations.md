@@ -6,10 +6,6 @@ description: Connect work integrations and automate the intake of matching work.
 
 Automations periodically check configured GitHub or Linear sources, select open work items, and start a dedicated agent in a worktree for each selected item. They are useful for recurring issue triage and implementation work.
 
-::: info Upcoming release
-Linear sources and their code-repository mappings are implemented on main for the intended 0.26.0 release. The published 0.25.2 app supports GitHub automations.
-:::
-
 ## Connect the work source
 
 Before creating an automation:

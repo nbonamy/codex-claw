@@ -20,7 +20,7 @@ Use the composer's file mentions, skills, and attachment controls to supply rele
 
 Choose a model in the composer before sending when you need a particular provider model. Reasoning effort and service tier controls are Codex-specific; the choices shown depend on the provider's available catalog.
 
-In the upcoming release after 0.25.2, the composer's **+** menu includes **Review**, **Delegate**, and **Visualize** for both engines. These open [Code Review](../workflows/code-review), request [worktree delegation](../workflows/worktrees#delegate-implementation), and open [Visualize](./visualize), respectively. The corresponding slash commands remain available.
+The composer's **+** menu includes **Review**, **Delegate**, and **Visualize** for both engines. These open [Code Review](../workflows/code-review), request [worktree delegation](../workflows/worktrees#delegate-implementation), and open [Visualize](./visualize), respectively. The corresponding slash commands remain available.
 
 ## Discuss before implementation
 
@@ -43,7 +43,7 @@ Open a document or diff in the workspace when you need to examine it while conti
 
 | Action | Use it when |
 | --- | --- |
-| **Steer** | Correct or add a constraint to a running turn. Claude Code support is new in the upcoming release after 0.25.2. |
+| **Steer** | Correct or add a constraint to a running turn. |
 | **Queue** | Save a follow-up for after the current turn. Inspect the pending prompt list if you need to edit or remove a queued instruction. |
 | **Interrupt** | Stop the current turn before assigning a different direction. Both providers support interruption. |
 
@@ -65,7 +65,7 @@ Include a short explanation when changing a constraint so the agent can carry it
 
 Codex turn actions can edit, retry, delete, or fork from a turn. Use the action shown on the relevant message. These actions change the conversation's context; they do not roll back edits already made to the repository. Claude Code does not expose edit, retry, or delete turn actions.
 
-In the upcoming release after 0.25.2, Claude Code supports native conversation forks while idle, including from a completed turn when that boundary is available. The fork has independent conversation history but uses the same folder. It does not create a worktree or restore earlier file contents. If a turn cannot be used as a fork point, reload the conversation and choose an available completed boundary.
+Claude Code supports native conversation forks while idle, including from a completed turn when that boundary is available. The fork has independent conversation history but uses the same folder. It does not create a worktree or restore earlier file contents. If a turn cannot be used as a fork point, reload the conversation and choose an available completed boundary.
 
 Use `/compact` or **Agent → Compact Session** when the conversation is long and you want a context summary. The agent must be idle for the shell's compact action. Codex also supports **Replace conversation with summary** from the agent context menu.
 
@@ -96,7 +96,7 @@ For parallel work that keeps the original agent open and creates an isolated che
 
 Use `/goal` to define an outcome the agent should keep working toward. Keep the condition concrete and inspect the resulting evidence before accepting it as done.
 
-Claude goal support is new in the upcoming release after 0.25.2. It uses Claude Code's native goal behavior and requires native goal hooks to be enabled. Claude goals do not support a token budget or live iteration counters. An interrupted goal can appear paused; a failed run or unverifiable goal state can appear blocked. Clearing a goal removes it rather than claiming it succeeded.
+Claude goals use Claude Code's native goal behavior and require native goal hooks to be enabled. Claude goals do not support a token budget or live iteration counters. An interrupted goal can appear paused; a failed run or unverifiable goal state can appear blocked. Clearing a goal removes it rather than claiming it succeeded.
 
 ## Resume work
 

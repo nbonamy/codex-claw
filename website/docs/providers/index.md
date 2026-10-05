@@ -53,10 +53,6 @@ Authentication, model availability, and usage limits belong to the selected prov
 
 Coding engines and backlog integrations are separate choices. Codex or Claude Code runs the agent; GitHub or Linear supplies the work items.
 
-::: info Upcoming release
-Linear and the shared backlog provider/source selectors are implemented on main for the intended 0.26.0 release. They are not included in the published 0.25.2 app.
-:::
-
 Open **Settings → Integrations** and connect the service you want to use:
 
 | Integration | Connect | Backlog source |

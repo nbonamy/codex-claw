@@ -55,7 +55,7 @@ Confirm that the engine responds and uses the intended working folder before ass
 
 ## Conversation controls
 
-For steering, forks, and goals, see [Conversations](../features/conversations). These Claude capabilities are implemented on main for the intended 0.26.0 release and are not included in the published 0.25.2 app. Steering waits for a tool boundary or following turn; forks require an idle conversation and keep the same working folder; goals require native hooks and do not support token budgets. Edit, retry, and delete turn actions remain unavailable.
+For steering, forks, and goals, see [Conversations](../features/conversations). Steering waits for a tool boundary or following turn; forks require an idle conversation and keep the same working folder; goals require native hooks and do not support token budgets. Edit, retry, and delete turn actions remain unavailable.
 
 ## Configure instructions, skills, and external tools
 

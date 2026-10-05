@@ -19,9 +19,9 @@ export default defineConfig({
   },
   // These assets are already owned by the public landing page.
   vite: { publicDir: fileURLToPath(new URL("../../assets", import.meta.url)) },
-  head: [["link", { rel: "icon", href: "/docs/app-icon.png" }]],
+  head: [["link", { rel: "icon", href: "/docs/app-icon.png?v=mark-2" }]],
   themeConfig: {
-    logo: { src: "/app-icon.png", alt: "" },
+    logo: { src: "/app-icon.png?v=mark-2", alt: "" },
     siteTitle: `${product.name} Docs`,
     nav: [
       { text: "Website", link: product.websiteUrl },

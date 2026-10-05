@@ -8,10 +8,6 @@ A Mission turns a feature into a staged workflow with an approved brief, reposit
 
 Use a direct agent conversation for a focused fix or investigation. Use a Mission when you want explicit requirements and ticket approval before implementation, especially when the feature spans repositories. Mission workers are separate Korus agents; they are not simply native subagents of the conversation where you started.
 
-::: info Upcoming release
-Linear issue selection and **Update from main** in Ship are implemented on main for the intended 0.26.0 release. They are not included in the published 0.25.2 app.
-:::
-
 ## Prepare the team
 
 Connect the [providers](../providers/) the team will use. Add at least one repository-backed agent to the team before creating a Mission. For a feature spanning an API and a frontend, add an agent for each repository to that same team. Tickets can only target repositories represented in the Mission's team.
