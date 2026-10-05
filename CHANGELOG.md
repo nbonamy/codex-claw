@@ -4,6 +4,15 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.26.2] - 2026-10-05
+
+### Improvements
+
+- Remote engine settings now use compact, single-line rows for accounts,
+  connection actions, and enable toggles, with host actions kept at the top.
+- New installations use `/<` as the default team's name and avatar. Existing
+  team names are unchanged.
+
 ## [0.26.1] - 2026-10-04
 
 ### Improvements

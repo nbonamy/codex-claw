@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.26.1",
+  "currentVersion": "0.26.2",
   "releases": [
+    {
+      "version": "0.26.2",
+      "releasedAt": "2026-10-05",
+      "sourceSha256": "92cf0a7e8478020b416919ba5b9badce2052386ad085ab7adcd375912bf374a5",
+      "markdown": "### Improvements\n\n- Remote engine settings now use compact, single-line rows for accounts,\n  connection actions, and enable toggles, with host actions kept at the top.\n- New installations use `/<` as the default team's name and avatar. Existing\n  team names are unchanged."
+    },
     {
       "version": "0.26.1",
       "releasedAt": "2026-10-04",
