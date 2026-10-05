@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 
 // Catch navigation that disappears at responsive breakpoints. This exercises
 // the actual built page and its styles through a browser, without source assertions.
-test("visitors can open documentation from the header at desktop and phone widths", async () => {
+test("navigation and illustrations stay readable at desktop and phone widths", async () => {
   const artifact = new URL("../dist/website/", import.meta.url);
   const types = {
     ".css": "text/css",
@@ -41,7 +41,7 @@ test("visitors can open documentation from the header at desktop and phone width
         ? route.continue()
         : route.abort(),
     );
-    for (const width of [1440, 761, 760, 390, 320]) {
+    for (const width of [1440, 1040, 820, 761, 760, 600, 430, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(origin);
       for (const selector of [".hero-copy", ".hero h1", ".hero-lede"]) {
@@ -71,6 +71,65 @@ test("visitors can open documentation from the header at desktop and phone width
           downloadBounds.x + downloadBounds.width <= width,
         `Download fits at ${width}px`,
       );
+      // Card previews must neither overlap wrapped copy nor escape their cards.
+      for (const card of await page.locator(".capability").all()) {
+        const layout = await card.evaluate((element) => {
+          const copy = element.querySelector("p");
+          const preview = copy.nextElementSibling;
+          const a = copy.getBoundingClientRect();
+          const b = preview.getBoundingClientRect();
+          const outer = element.getBoundingClientRect();
+          return {
+            overlap:
+              a.left < b.right &&
+              b.left < a.right &&
+              a.top < b.bottom &&
+              b.top < a.bottom,
+            contained:
+              b.left >= outer.left &&
+              b.right <= outer.right &&
+              b.bottom <= outer.bottom,
+          };
+        });
+        assert.equal(
+          layout.overlap,
+          false,
+          `Card preview overlaps copy at ${width}px`,
+        );
+        assert.equal(
+          layout.contained,
+          true,
+          `Card preview escapes its card at ${width}px`,
+        );
+      }
+      // The selection and remediation action must not get clipped on phones.
+      // Check rendered geometry rather than freezing the illustration's copy.
+      const review = page.getByRole("img", { name: /review findings/i });
+      await review.scrollIntoViewIfNeeded();
+      await page.waitForFunction(() =>
+        document.querySelector(".git-panel")?.classList.contains("is-visible"),
+      );
+      await review.evaluate((element) =>
+        Promise.all(
+          element.getAnimations().map((animation) => animation.finished),
+        ),
+      );
+      const panelBounds = await review.boundingBox();
+      assert.ok(
+        panelBounds.x >= 0 && panelBounds.x + panelBounds.width <= width,
+      );
+      for (const selector of [".finding-row", ".findings-footer"]) {
+        const elements = review.locator(selector);
+        assert.ok(await elements.count());
+        for (const element of await elements.all()) {
+          assert.ok(
+            await element.evaluate(
+              (node) => node.scrollWidth <= node.clientWidth,
+            ),
+            `Review contents fit at ${width}px: ${selector}`,
+          );
+        }
+      }
       await docs.click();
       await page.getByRole("heading", { level: 1 }).waitFor();
       assert.equal(new URL(page.url()).pathname, "/docs/");

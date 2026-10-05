@@ -418,37 +418,53 @@
           </div>
           <div
             class="git-panel reveal delay-1"
-            aria-label="__PRODUCT_NAME__ Git review preview"
+            role="img"
+            aria-label="__PRODUCT_NAME__ review findings: two issues selected for fixes, with P1, P2, and P3 priority labels and a Fix selected findings action"
           >
             <div class="git-panel-head">
-              <span>Review</span
-              ><small>fix/gh-286 <i>·</i> example-project</small
-              ><button type="button" tabindex="-1">Git actions⌄</button>
+              <span>Code review</span>
+              <small>feature/session-restore</small>
+              <span class="review-round">Round 1</span>
             </div>
-            <div class="git-stats">
-              <span class="added">+184</span><span class="removed">−52</span
-              ><span>4 files</span
-              ><span class="branch-pill">2 commits ahead</span>
+            <div class="findings-summary">
+              <strong>3 findings</strong>
+              <span>Choose what to fix</span>
             </div>
-            <div class="file-tabs">
-              <span class="active">All changes</span><span>Staged 2</span
-              ><span>Unstaged 1</span><span>Untracked 1</span>
+            <div class="findings-list" aria-hidden="true">
+              <div class="finding-row is-selected">
+                <div class="finding-heading">
+                  <span class="finding-priority priority-high">P1</span>
+                  <strong>Restore the correct session</strong>
+                  <span class="finding-toggle is-on"></span>
+                </div>
+                <div class="finding-detail">
+                  <span>src/session/restore.ts:42</span>
+                  <p>
+                    A delayed response can replace the active session. Check the
+                    session ID before applying the result.
+                  </p>
+                </div>
+              </div>
+              <div class="finding-row is-selected">
+                <div class="finding-heading">
+                  <span class="finding-priority priority-medium">P2</span>
+                  <strong>Keep drafts when switching tabs</strong>
+                  <span class="finding-toggle is-on"></span>
+                </div>
+              </div>
+              <div class="finding-row">
+                <div class="finding-heading">
+                  <span class="finding-priority priority-low">P3</span>
+                  <strong>Clarify the empty-state message</strong>
+                  <span class="finding-toggle"></span>
+                </div>
+              </div>
             </div>
-            <div class="diff-file">
-              <span>vue/src/composables/useSessionRestore.ts</span
-              ><b>+91 −18</b>
-            </div>
-            <pre
-              class="diff"
-            ><code><span class="context">  const totalPages = computed(() =&gt;</span>
-<span class="removed-line">-   Math.ceil(items.value.length / pageSize)</span>
-<span class="added-line">+   Math.max(1, Math.ceil(totalItems.value / pageSize))</span>
-<span class="context">  );</span>
-<span class="added-line">+ const visiblePage = computed(() =&gt; cachedPages[page.value]);</span></code></pre>
-            <div class="git-menu" aria-hidden="true">
-              <span>Commit changes <kbd>⌘↵</kbd></span
-              ><span>Push branch</span><span>Create draft PR</span
-              ><span>Merge into main</span>
+            <div class="findings-footer" aria-hidden="true">
+              <span>2 of 3 selected</span>
+              <span class="findings-action"
+                >Fix selected findings <span>→</span></span
+              >
             </div>
           </div>
         </div>

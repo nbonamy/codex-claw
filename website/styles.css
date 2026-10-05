@@ -1617,10 +1617,12 @@ input {
   font-weight: 700;
 }
 .git-panel {
+  --review-muted: #a7aab2;
+  --review-border: #41454d;
+  --review-accent: #adc5da;
   position: relative;
   min-width: 0;
   overflow: hidden;
-  min-height: 445px;
   border: 1px solid #3f4145;
   border-radius: 14px;
   background: #26272a;
@@ -1634,134 +1636,150 @@ input {
   padding: 0 18px;
   border-bottom: 1px solid #3d3f42;
 }
-.git-panel-head > span {
+.git-panel-head > span:first-child {
   font-size: 15px;
   font-weight: 700;
 }
 .git-panel-head small {
   flex: 1;
-  color: #95979c;
-  font:
-    9px "DM Mono",
-    monospace;
-}
-.git-panel-head small i {
-  color: #5b5e63;
-  font-style: normal;
-}
-.git-panel-head button {
-  padding: 8px 10px;
-  border: 1px solid #54565b;
-  border-radius: 6px;
-  color: #e8e9ea;
-  background: #2f3135;
-  font-size: 9px;
-}
-.git-stats {
-  display: flex;
-  gap: 13px;
-  align-items: center;
-  padding: 14px 18px;
-  color: #95979c;
-  border-bottom: 1px solid #393b3f;
-  font:
-    9px "DM Mono",
-    monospace;
-}
-.git-stats .added {
-  color: #63c49d;
-}
-.git-stats .removed {
-  color: #ee8585;
-}
-.branch-pill {
-  margin-left: auto;
-  padding: 4px 7px;
-  border-radius: 10px;
-  color: #b9c2db;
-  background: #393c45;
-}
-.file-tabs {
-  display: flex;
-  gap: 18px;
-  padding: 12px 18px;
-  color: #929599;
-  border-bottom: 1px solid #393b3f;
-  font-size: 9px;
-}
-.file-tabs .active {
-  color: #f2f2f2;
-}
-.diff-file {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 18px;
-  color: #d4d5d8;
-  background: #2c2d30;
-  font:
-    9px "DM Mono",
-    monospace;
-}
-.diff-file b {
-  color: #74c9a7;
-}
-.diff {
-  margin: 0;
-  padding: 18px;
-  color: #c5c6c9;
-  background: #212326;
-  font:
-    10px/1.9 "DM Mono",
-    monospace;
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--review-muted);
+  font:
+    9px "DM Mono",
+    monospace;
 }
-.diff code {
-  display: block;
-}
-.diff code span {
-  display: block;
-  margin-inline: -18px;
-  padding-inline: 18px;
+.review-round {
+  margin-left: auto;
+  padding: 5px 9px;
+  border: 1px solid var(--review-border);
+  border-radius: 6px;
+  color: var(--review-accent);
+  font-size: 11px;
   white-space: nowrap;
 }
-.added-line {
-  color: #b8e7d2;
-  background: rgba(44, 130, 95, 0.22);
-}
-.removed-line {
-  color: #efb9b9;
-  background: rgba(159, 65, 65, 0.2);
-}
-.context {
-  color: #95979c;
-}
-.git-menu {
-  position: absolute;
-  right: 15px;
-  top: 49px;
-  width: 156px;
-  display: grid;
-  overflow: hidden;
-  padding: 5px;
-  border: 1px solid #55575d;
-  border-radius: 8px;
-  background: #2e3034;
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.3);
-}
-.git-menu span {
+.findings-summary {
   display: flex;
   justify-content: space-between;
-  padding: 8px;
+  gap: 12px;
+  align-items: center;
+  padding: 22px 20px 16px;
+  font-size: 13px;
+}
+.findings-summary > span {
+  color: var(--review-muted);
+  font-size: 11px;
+}
+.findings-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 20px 22px;
+}
+.finding-row {
+  min-width: 0;
+  border: 1px solid var(--review-border);
+  border-radius: 8px;
+  color: var(--review-muted);
+  background: #2c2e33;
+}
+.finding-row.is-selected {
+  border-color: #607487;
+  color: #f1f3f5;
+  background: #2d343d;
+}
+.finding-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 12px;
+}
+.finding-heading strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.finding-priority {
+  flex: 0 0 auto;
+  padding: 3px 6px;
   border-radius: 4px;
-  color: #d8d9db;
-  font-size: 9px;
+  font:
+    600 11px "DM Mono",
+    monospace;
 }
-.git-menu span:first-child {
-  background: #3f4146;
+.priority-high {
+  color: #ffc4c4;
+  background: #663a40;
 }
-.git-menu kbd {
-  color: #92959a;
-  font: inherit;
+.priority-medium {
+  color: #f6d59d;
+  background: #58482e;
+}
+.priority-low {
+  color: #c0c3cc;
+  background: #41444c;
+}
+.finding-toggle {
+  display: flex;
+  align-items: center;
+  flex: 0 0 28px;
+  height: 16px;
+  padding: 2px;
+  border-radius: 10px;
+  background: #555a64;
+}
+.finding-toggle::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--white);
+}
+.finding-toggle.is-on {
+  justify-content: flex-end;
+  background: var(--blue);
+}
+.finding-detail {
+  padding: 14px 16px 18px;
+  border-top: 1px solid var(--review-border);
+}
+.finding-detail > span {
+  color: var(--review-accent);
+  overflow-wrap: anywhere;
+  font:
+    11px "DM Mono",
+    monospace;
+}
+.finding-detail p {
+  margin: 10px 0 0;
+  color: #c9ced5;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.findings-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+  border-top: 1px solid var(--review-border);
+  color: var(--review-muted);
+  font-size: 12px;
+}
+.findings-action {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 14px;
+  border-radius: 7px;
+  color: var(--white);
+  background: var(--blue);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .automations-section {
@@ -1981,6 +1999,8 @@ input {
 }
 .capability {
   position: relative;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   min-height: 300px;
   padding: 29px;
@@ -2003,21 +2023,28 @@ input {
 }
 .capability p {
   max-width: 450px;
-  margin: 0;
+  margin: 0 0 28px;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.7;
 }
 .capability-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  column-gap: 32px;
   grid-column: span 2;
   min-height: 320px;
   background: linear-gradient(120deg, #f3f5fa, rgba(251, 251, 248, 0.9));
 }
+.capability-wide > .capability-label,
+.capability-wide > h3,
+.capability-wide > p {
+  grid-column: 1;
+}
 .tool-stream {
-  position: absolute;
-  right: 35px;
-  bottom: 34px;
-  width: 300px;
+  grid-column: 2;
+  grid-row: 1 / 4;
+  align-self: end;
   display: grid;
   gap: 8px;
 }
@@ -2045,10 +2072,9 @@ input {
   box-shadow: 0 0 0 3px rgba(83, 110, 134, 0.1);
 }
 .tab-preview {
-  position: absolute;
-  left: 28px;
-  bottom: 30px;
+  margin-top: auto;
   display: flex;
+  flex-wrap: wrap;
   gap: 5px;
 }
 .tab-preview span {
@@ -2067,9 +2093,7 @@ input {
   background: #f2f4fa;
 }
 .agent-stack {
-  position: absolute;
-  left: 28px;
-  bottom: 30px;
+  margin-top: auto;
   display: flex;
   align-items: center;
 }
@@ -2093,10 +2117,7 @@ input {
   font-style: normal;
 }
 .daemon-status {
-  position: absolute;
-  left: 28px;
-  right: 28px;
-  bottom: 30px;
+  margin-top: auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2121,10 +2142,7 @@ input {
   color: var(--faint);
 }
 .computer-target {
-  position: absolute;
-  left: 28px;
-  right: 28px;
-  bottom: 30px;
+  margin-top: auto;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -2343,13 +2361,12 @@ input {
     min-height: 280px;
   }
   .capability-wide {
+    display: flex;
     grid-column: auto;
-    min-height: 390px;
   }
   .tool-stream {
-    left: 28px;
-    right: 28px;
-    width: auto;
+    align-self: stretch;
+    margin-top: auto;
   }
   .workflow-section,
   .git-section,
@@ -2360,12 +2377,6 @@ input {
   .workflow-grid,
   .git-grid {
     gap: 55px;
-  }
-  .git-panel {
-    min-height: 430px;
-  }
-  .git-menu {
-    display: none;
   }
   .section-heading {
     display: block;
@@ -2463,16 +2474,14 @@ input {
     grid-template-columns: 39px 1fr;
     gap: 12px;
   }
-  .git-panel {
-    min-height: 392px;
-  }
-  .git-panel-head small,
-  .file-tabs span:nth-child(n + 3),
-  .branch-pill {
+  .git-panel-head small {
     display: none;
   }
-  .diff {
-    font-size: 8px;
+  .findings-list {
+    padding-inline: 12px;
+  }
+  .findings-action {
+    width: 100%;
   }
 }
 
