@@ -1,6 +1,6 @@
 {
   "name": "agent-workspace",
-  "version": "0.25.2",
+  "version": "0.26.0",
   "private": true,
   "overrides": {
     "@codex-app-sdk/backend": "file:../codex-app-sdk/packages/backend",

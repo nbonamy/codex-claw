@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.25.2",
+  "currentVersion": "0.26.0",
   "releases": [
+    {
+      "version": "0.26.0",
+      "releasedAt": "2026-10-04",
+      "sourceSha256": "d282d2cbefde128e4283a14262828d645ce5c9315e8916d6cf48e8c930af2124",
+      "markdown": "### New features\n\n- Codex Claw is now Korus, with a new macOS icon and a refreshed website and\n  guides at meetkorus.dev. Desktop downloads and update checks now use the new\n  domain.\n- Connect Linear in Settings and use team or project issues alongside GitHub\n  as a backlog source. Start agents, plan Missions, and configure automations\n  against an explicitly chosen code repository. Agents can access Linear's\n  issue tools without treating a Linear project as a Git repository.\n- Use `/delegate` or its `/worktree` alias to hand a task to a new teammate in\n  a dedicated worktree while keeping the original conversation open. The\n  current agent prepares the handoff; detailed instructions stay out of the\n  visible chat prompt. Delegation does not automatically merge the work.\n- Delegated tasks can save structured results, wait for workers, and cancel\n  assigned work. Saved outcomes survive restarts and are delivered back to\n  the parent without treating completion as permission to merge or advance\n  a Mission.\n- Claude conversations now support steering during active work, native forks\n  from completed turns, and native goals. Steering is delivered at tool or\n  response boundaries rather than immediately interrupting generation; forks\n  currently require an idle conversation in the same folder.\n- Open Review, Delegate, and Visualize directly from the composer's + menu,\n  with grouped actions and Goal mode above Plan mode.\n- Mission shipping now offers Update from the base branch and checks for new\n  base commits before merging, so branch updates and conflict resolution can\n  happen in the worktree before delivery.\n\n### Improvements and fixes\n\n- Plain text entered in the in-app browser address bar now runs a Google\n  search. Normal navigation redirects no longer surface an aborted-load error.\n  Unsupported chat file previews, including videos, download instead of\n  opening an empty sidebar pane.\n- Closing a dirty worktree now offers an explicit confirmation to discard\n  uncommitted changes, including untracked files, rather than refusing deletion.\n- Existing review contexts reopen after reconnecting or restarting. Mission\n  review reruns no longer fail on an empty previous artifact; Mission workers\n  retain their tools and can receive a new ticket assignment, and queued work\n  no longer causes a false Mission failure.\n- Chat panes keep a 480px minimum width beside artifacts. Open In menus escape\n  clipped panes, engine icons disappear when leaving the sidebar, and the\n  text-selection action is labeled Annotate.\n- Codex startup and reconnect use asynchronous runtime discovery, avoiding\n  blocking shell probes. Idle notifications no longer falsely mark turns as\n  interrupted, and late completions do not clear newer work. Conversation\n  lists avoid duplicate entries, and failing SDK listeners no longer reject\n  unrelated requests.\n- Chat Markdown is only reparsed when its text changes, reducing repeated\n  rendering work while responses stream.\n- Retrying an initial backend connection failure now restores event updates.\n  Structured secrets and prompt content are redacted from diagnostic logs.\n\n### Upgrade notes\n\n- Korus uses `~/.korus` instead of `~/.codex-claw`; existing data is not migrated\n  automatically. To retain an earlier setup, copy it while the app is closed\n  and update saved absolute paths, including separate provider homes.\n- The desktop app is now `Korus.app`, the daemon is `korusd`, and configuration\n  environment variables use the `APP_` prefix instead of `CODEX_CLAW_`."
+    },
     {
       "version": "0.25.2",
       "releasedAt": "2026-10-03",
@@ -11,13 +17,13 @@
     {
       "version": "0.25.1",
       "releasedAt": "2026-10-03",
-      "sourceSha256": "cabb8d6bff6e7df17d2f452dbe9117efb2e4c8d547c77d0ce3c80a1a88b450d3",
+      "sourceSha256": "ae15ac2e9b8d6bc7f07f87781543375b2e6fc7f0e1a4acc026973a69116a321a",
       "markdown": "### New features\n\n- Use Hand off from an agent's context menu or the Agent menu to continue its\n  work with a new Codex or Claude agent in the same workspace. Choose the\n  engine and model, optionally add instructions, and let the current agent\n  write a handoff note before Korus closes it and starts its replacement.\n  Hand off is available for idle workspace agents after pending work is resolved.\n- Identify each agent's engine by hovering over the sidebar or focusing it\n  with the keyboard. Icons appear beside the right-aligned status without\n  reserving space when hidden, and are omitted when only one engine is enabled.\n\n### Improvements and fixes\n\n- Disconnect in Settings now signs out of Codex or Claude in the configured\n  home, including on SSH hosts, instead of only disabling the engine.\n  Reconnecting opens the sign-in flow. The separate enable toggle preserves\n  sign-in, and the Codex-only Log out action has been removed from the user menu.\n- Selecting an agent focuses its composer, including after a cold conversation\n  finishes loading. Clicking controls in another split pane keeps their focus.\n- Merging a worktree no longer reports failure just because its remote-tracking\n  branch is behind. If branch or worktree cleanup cannot finish, Korus reports\n  the successful merge separately from the cleanup warning."
     },
     {
       "version": "0.25.0",
       "releasedAt": "2026-10-03",
-      "sourceSha256": "4a0a11f0b3fbfde01cc08e8ee91f15b8591257abeeec623bf934016ebe1c4b82",
+      "sourceSha256": "9ca2c478489e6f2b8a658ec7313719570dda9696a907246e6c597c1ef7077705",
       "markdown": "### New features\n\n- Work with two agents side by side or stacked, or four agents in a grid.\n  Split panes replace attached-agent sidebar tabs. Each team keeps its layout\n  while switching teams, and one shared artifact sidebar follows the focused\n  agent without closing when that agent has no open tabs.\n- Use Codex, Claude Code, or both. Setup detects installed engines, offers\n  installation and sign-in, and lets each engine use a separate Korus home or\n  its existing setup. New setups separate chats while reusing existing skills.\n  Engine pickers appear only when more than one engine is available.\n- Manage each engine's account, conversation location, skill sharing, and\n  enabled status in Settings, with engine connection controls on SSH hosts too.\n  Changing conversation location requires explicit acknowledgment before\n  removing that engine's local agents and Quick Chats from Korus.\n- See Codex and Claude subscription usage together in the user menu, including\n  remaining allowance and reset times. API-billed Claude accounts have no\n  subscription quota row.\n- Drag supported file and web links from conversations into the sidebar to\n  open their content in a new tab.\n- Model, reasoning-effort, service-tier, and approval or permission choices\n  become defaults for new agents and Quick Chats using the same engine,\n  without changing existing agents.\n- Agents waiting for a response or approval show a prominent blue Input label\n  in the sidebar.\n\n### Improvements and fixes\n\n- Codex and Claude tool approvals use a consistent card in the composer,\n  preserving the draft, attachments, and caret when the request is resolved.\n- Free-text Other answers to agent questions are immediately editable and grow\n  as you type.\n- Split composers no longer steal focus or selection from one another during\n  background updates.\n- For engines without steering, including Claude Code, the steering shortcut\n  sends through the normal queue path and the queue shelf's Steer action is\n  disabled.\n- Fixed Codex Device Pairing in Settings so Allow connections reaches the\n  backend instead of silently remaining off.\n- Engine connection checks are cached for the session and refreshed by explicit\n  connection or setup actions. Startup returns to setup when no engine is\n  available, and Korus prevents disabling the last active engine.\n- Claude authentication, saved conversations, skills, plans, and personalized\n  instructions follow the configured Claude home. Codex personalization also\n  follows its selected home.\n- Repository skills no longer disappear when a global catalog refresh arrives;\n  skill updates stay scoped to their engine and folder. Exact skill aliases\n  rank ahead of substring matches.\n- Composer action menus respect the app's theme colors.\n\n### Upgrade notes\n\n- App state migrates automatically from `state.json` to separate roster,\n  settings, and visualization files after creating a verified backup. Older\n  Korus builds cannot open the migrated state directly; downgrading requires\n  restoring the pre-migration backup.\n- Closing a Quick Chat now deletes its provider session, with archive as a\n  fallback when deletion is unavailable. Closing a regular agent still archives\n  its conversation."
     },
     {
@@ -77,13 +83,13 @@
     {
       "version": "0.21.0",
       "releasedAt": "2026-09-25",
-      "sourceSha256": "59c9405e74b341c7f2be3633b5e4e700dae254810dd27651d544e9d12d17f556",
+      "sourceSha256": "9e9a23f0200a4ca8e9250d7858a9f8c697dcc938964fd00b148cedb96a7bb3c4",
       "markdown": "### New features\n\n- Visualize diagrams now open on a persistent canvas. Edit supported Mermaid\n  shapes, annotate selected elements for the agent, and export the canvas as a\n  PNG. SVG and generated-image diagrams remain image elements on the canvas.\n- Visualize diagrams now belong to their Git repository instead of the agent\n  that created them. Agents in linked worktrees share diagrams and editable\n  canvases, which remain available after a worktree agent is removed.\n- Browser tabs can copy their current URL or open it in the system browser.\n  The address bar also offers an open-external action on hover or focus.\n\n### Improvements and fixes\n\n- Creating a project from a Quick Chat now shows progress through folder\n  creation, agent setup, and the first prompt.\n- In-app browser pages remain visible beneath Korus menus and dialogs instead\n  of disappearing when an overlay opens. The empty browser surface is white\n  and no longer shows a loading message.\n- Tool-opened browser pages now keep the requested URL in the address bar,\n  and resizing the workspace no longer stalls when the pointer crosses the\n  embedded browser.\n- Workspace tab labels collapse before their close buttons, keeping the close\n  action available until tabs reach icon-only width.\n- Selecting `/goal` opens a composer mode for the objective rather than sending\n  an empty goal immediately. Slash-menu keyboard selection now distinguishes\n  Tab completion from Enter activation.\n- The conversation shows “Working” when hidden Korus tool activity is the only\n  visible sign of an active turn, and skill reads show the skill name instead\n  of `SKILL.md`."
     },
     {
       "version": "0.20.7",
       "releasedAt": "2026-09-24",
-      "sourceSha256": "2b8316e0ef93c90fb55280a8c24e1d21f55fe8deb31b1fc8771f0462a50b5e63",
+      "sourceSha256": "ae7c067239cfb3fb6a213eb7a3e8d4fbd9e7dd0e60b46b9cab9b6dc7f8cff99a",
       "markdown": "### New features\n\n- Turn a Quick Chat into a project on request. Codex Korus creates the\n  folder and a project agent, hands over the conversation's decisions, and\n  keeps the original Quick Chat available.\n\n### Improvements and fixes\n\n- Projects can use ordinary folders without Git. New projects start with an\n  empty folder, and folder agents stay separate from Quick chats.\n- Quick Chats can access Korus tools, including project creation.\n- Codex Korus uses its own Computer Use tools instead of the bundled alternative;\n  older Computer Use calls also have readable activity labels.\n- Workspace tabs keep a stable height when labels appear or collapse, and\n  multi-target tool titles display their overflow count consistently."
     },
     {
@@ -119,7 +125,7 @@
     {
       "version": "0.20.1",
       "releasedAt": "2026-09-23",
-      "sourceSha256": "332325427d78217321b0880068c449680bc2c45fe0372369838c5f90e3ae5463",
+      "sourceSha256": "0976c96b4c3d7dbbb93ffa93c5b83e8e1435681e1407ad0aa76461efa2efde5f",
       "markdown": "### New features\n\n- Start a Mission from an open GitHub issue in any repository represented by its\n  team. The issue picker opens on the first available repository, and the issue\n  details become the Mission's starting context.\n\n### Improvements and fixes\n\n- Missions now belong to their team. Closing a team also removes its Missions\n  and workers while leaving Mission worktrees on disk, with the effect stated\n  in the confirmation dialog.\n- Restarting Codex Korus restores the selected Mission workspace instead of\n  showing its lead as an ordinary agent thread."
     },
     {
@@ -131,7 +137,7 @@
     {
       "version": "0.19.5",
       "releasedAt": "2026-09-18",
-      "sourceSha256": "4810ad7e16b9beb5ccc4b44fa9ede0b53c2e3e7f7aa46e42f197422f8e1cb5f6",
+      "sourceSha256": "516b0b14cb99dd90bfcb330dd34f512b22b94d1324481111a9fada637a66e7ed",
       "markdown": "### Improvements and fixes\n\n- File links in conversations can now preview files anywhere on the agent's\n  local or remote host, including shared instructions and other resources\n  outside the repository.\n- `/compact` is passed through to Codex instead of opening Korus's retired\n  session-compression dialog. Slash-command suggestions now appear only when\n  `/` is the first character in the prompt.\n- Delegation instructions now distinguish engine-native subagents from separate\n  Korus co-agents, asking for clarification when a request is ambiguous.\n- The selected agent row preserves the sidebar's translucent background."
     },
     {
@@ -149,7 +155,7 @@
     {
       "version": "0.19.2",
       "releasedAt": "2026-09-15",
-      "sourceSha256": "a629f1c29646540e6f4d9a7e1bf0bd08e10f03af6f26e91021af47306f79988f",
+      "sourceSha256": "710d287c206434ad82338a39984a413f206ef7ac3ed36f5e6cdc937307622b6a",
       "markdown": "### New features\n\n- Press Command-K to search and jump to any agent across teams. Results show\n  repository and team context, prioritize unread agents and then recent\n  activity, and switch teams automatically when needed.\n- Remote teams can now create Git projects, browse existing folders, and clone\n  GitHub repositories directly on their devbox. Connection settings detect\n  mismatched Korus and Codex versions, upgrade both managed runtimes together,\n  and support ChatGPT device-code sign-in without moving tokens through Korus.\n- Personalization settings can edit the global developer instructions used by\n  Codex or Claude, with an explicit option to replace both. Git settings now\n  accept custom guidance for generated commit messages and pull request titles\n  and descriptions.\n\n### Improvements and fixes\n\n- Codex conversations use reasoning summaries as activity labels and correctly\n  reopen a completed work group when an asynchronous answer resumes the turn.\n  Codex memory support is enabled for new app-server sessions.\n- Queued prompts are delivered only once when turn completion and idle events\n  arrive together.\n- Remote folder selection is more compact and direct, while longer remote\n  discovery, authentication, prompt, and repository operations have enough\n  time to finish without spurious request timeouts.\n- Active-team rail indicators now pulse by brightness without fading, and Git\n  worktree initialization is grouped with the rest of the Git settings."
     },
     {
@@ -167,7 +173,7 @@
     {
       "version": "0.18.0",
       "releasedAt": "2026-09-13",
-      "sourceSha256": "7381d2d7f6705aeaec3d1c629c3a76a9103de71be0b49d13d353c178f0e90721",
+      "sourceSha256": "be67e96c5f8c80d22efa6935faf24d46cf45a06f635ca2fc2806ba1bb26984cf",
       "markdown": "### New features\n\n- Connected GitHub accounts now give Codex and Claude agents access to\n  GitHub's hosted MCP tools through Korus-managed, automatically refreshed\n  credentials. Korus avoids duplicate GitHub tool surfaces while preserving the\n  ChatGPT connector as a fallback when its own GitHub connection is unavailable.\n- Create an empty Git-backed project directly from the Add Project menu.\n- Choose which changes to review from the agent header: the current branch,\n  all uncommitted work, unstaged or staged changes, the latest turn, or an\n  individual recent commit.\n\n### Improvements and fixes\n\n- Switching teams now updates immediately and shows the selected conversation's\n  loading state instead of blocking navigation or briefly appearing empty.\n- Git statistics refresh while an active agent edits files, and Git reviews now\n  load reliably without clone errors or hiding valid branch and commit diffs.\n- Assistant activity keeps its original order around final responses, and\n  generated media produced during a turn stays grouped with its collapsible\n  work details."
     },
     {
@@ -179,7 +185,7 @@
     {
       "version": "0.16.0",
       "releasedAt": "2026-09-03",
-      "sourceSha256": "45f8d2eead6a5fbc2cb562acb552e465954ba4b7428adff7beaad9eea55463bd",
+      "sourceSha256": "4a3ee1ba6bf7416940731c8f13a9eda63173337e36966af7b8820aa7b0132c9b",
       "markdown": "### New features\n\n- Agents can now speak a brief acknowledgment when work starts and an optional\n  completion cue through on-device neural voices on macOS. Voice, agent scope,\n  foreground-only behavior, previews, and a global mute shortcut are available\n  in Settings.\n- Delegated Git work can now report back to its parent agent when creating a\n  pull request or merging directly. Korus asks the worker for a final handoff,\n  shows the handoff phase in progress, and lets the operation continue in the\n  background.\n- Korus now tracks pull requests created for agents and flags them when they are\n  merged or closed, with guided cleanup for the agent, worktree, and local\n  branch while preserving work from unmerged pull requests.\n\n### Improvements and fixes\n\n- Repository and agent drag-and-drop are now distinct: repositories move with\n  all their agents, while agents can only be reordered inside their repository.\n- The active sidebar session is easier to distinguish from other sessions.\n- Agent celebrations now respect the celebration setting and vary their visual\n  effect instead of always showing confetti.\n- Rolling back a long, paginated Codex conversation now uses the current Codex\n  revert protocol and refreshes the retained history correctly."
     },
     {
@@ -191,7 +197,7 @@
     {
       "version": "0.15.1",
       "releasedAt": "2026-09-02",
-      "sourceSha256": "4b5acdfb6ce9fde106076c8ff028f72a00835f3e64cd05069ccc91ede2466cd5",
+      "sourceSha256": "9145e9bde499bf6225a3eb17adacd9e013346e72494ca7910006a71d0f933b93",
       "markdown": "### Improvements and fixes\n\n- Resumed goals now continue running across restarts, remain visibly marked as\n  working between turns, and leave the composer shelf once complete.\n- Korus agents now receive explicit guidance for single-call worktree\n  delegation, persistent Markdown presentation, and meaningful celebrations,\n  making those existing workflows more reliable to invoke."
     },
     {
@@ -209,7 +215,7 @@
     {
       "version": "0.14.2",
       "releasedAt": "2026-09-01",
-      "sourceSha256": "6f41376a62d90e680e92554830365cd760f34fac3741c958fae3b5f4895518f5",
+      "sourceSha256": "785b4df99bb993a7908b7acd1d86faca4cf592d1e9217c4ddc91ad801651c721",
       "markdown": "### New features\n\n- Starting work from an issue or pull request now shows a staged preparation\n  view while Codex Korus creates the branch or isolated worktree, starts the\n  session, and hands over the work context.\n- Inline conversation images now open or focus a reusable image workspace tab,\n  while the explicit maximize control opens the stock fullscreen viewer.\n\n### Improvements and fixes\n\n- Older conversation history now prefetches as the transcript reaches the top,\n  avoids duplicate requests, and preserves the visible scroll position as\n  earlier messages arrive.\n- Initial ChatGPT connection now uses a smooth edge-to-edge progress indicator."
     },
     {
@@ -221,7 +227,7 @@
     {
       "version": "0.14.0",
       "releasedAt": "2026-09-01",
-      "sourceSha256": "1496c708b3ae2d3a251968d46b611c9f82dae75b759deac941c73a07efe0aae6",
+      "sourceSha256": "d43a853b944d74de5aaefd0312af08b85ab46a198b50b8d027ea253e7733e556",
       "markdown": "### New features\n\n- Loops are now Automations throughout Codex Korus, with existing saved loops,\n  execution history, and work assignments migrated automatically.\n- GitHub can now be connected directly from first-run onboarding or the\n  repository picker through a secure browser authorization flow.\n- Experimental Linux x64 builds now bundle the matching Codex runtime while\n  keeping macOS-only Computer Use and Appshots features disabled.\n\n### Improvements and fixes\n\n- First-run setup now provides a consistent ChatGPT and optional GitHub\n  onboarding experience, ending with a single celebratory completion screen.\n- Generated images now render through an app-scoped local-media protocol,\n  restoring image previews without exposing arbitrary local files.\n- Long and restored conversations now omit unnecessary historical tool\n  payloads, reducing synchronization size while preserving the genuine latest\n  messages when older history loads.\n- The GitHub repository picker now keeps a stable height across loading, empty,\n  filtered, and populated states."
     },
     {
@@ -233,7 +239,7 @@
     {
       "version": "0.12.0",
       "releasedAt": "2026-08-30",
-      "sourceSha256": "b66c76ea9f50da085428acefe2d3ad449abed415a5ea661aba34a76fef3dcd53",
+      "sourceSha256": "796fde84357196f68aeeaba6d18877dd0af1ba5ab697bbcde7ce7a83734a43c9",
       "markdown": "### New features\n\n- Sessions is now organized around repositories, branches, worktrees, and chats,\n  with collapsible repository groups, persistent custom repository icons, and\n  compact controls for starting work where it belongs.\n- Projects can now be added from a local folder, a GitHub repository, or a\n  repository URL, then opened from a branch, pull request, or issue without\n  leaving Korus.\n- Repository work can now continue in an existing session on a branch or start\n  in a new isolated session and worktree, with branch-aware worktree creation\n  and assignment directly from the Sessions workflow.\n- Workspace-free Quick Chats now provide persistent conversations for work that\n  does not belong to a repository.\n- Team agents can now be mentioned in prompts with stable `@` suggestions, and\n  agents can trigger optional, user-controlled celebration effects for the\n  moments that deserve them.\n\n### Improvements and fixes\n\n- Long conversations now synchronize with bounded snapshot and transcript\n  payloads, keep retry progress out of durable history, and use Codex 0.151.0's\n  stable image-aware compaction support to reclaim substantially more context.\n- Fast mode now remains enabled for a conversation after Korus restarts.\n- Agent editing is now limited to an optional display name, while unnamed\n  sessions consistently use their branch or conversation title.\n- ChatGPT integrations now offer to quit an already-running normal instance\n  before relaunching it with Korus's isolated Codex home.\n- Cockpit now shows unread indicators for teams containing unread sessions,\n  native Edit menu actions are restored, subagent conversations recover from\n  oversized-history failures, and recalled prompts no longer depend on browser\n  text selection."
     },
     {
@@ -263,7 +269,7 @@
     {
       "version": "0.10.0",
       "releasedAt": "2026-08-12",
-      "sourceSha256": "18815d2c37fe79ff4b405b39e9b039dd01c90d5d5d5d2718242c5dbf9f0ffa57",
+      "sourceSha256": "46eb51b31f265b79752774c93f1d77cc52c831f9e1157ecf2e7b177e57dc4f83",
       "markdown": "### New features\n\n- A new repository Backlog workspace lets you browse, search, and filter GitHub\n  issues and pull requests, then prefill a custom prompt or dispatch focused\n  investigate, fix, feedback, and review actions to the current agent or an\n  isolated duplicate; work can stay in the current folder or use a new\n  worktree, while pull requests check out their actual head branch.\n\n### Improvements and fixes\n\n- Conversation titles now stay aligned with Korus agent names, including agent\n  renames, and closing an agent archives its Codex conversation.\n- Git status refreshes are now limited to meaningful active-agent and Git\n  lifecycle events, avoiding redundant background requests and stale results.\n- Long code lines in conversations now wrap instead of overflowing the message\n  pane."
     },
     {
@@ -281,7 +287,7 @@
     {
       "version": "0.8.1",
       "releasedAt": "2026-08-09",
-      "sourceSha256": "aa7f8169615541f364e4293c07d423d79202a7d23e84a0218473b6fc105ba027",
+      "sourceSha256": "3cc26fc63b9ae2ca88553d8bd061b0cf65740d1e3b14e7ced64a68a909d19fc9",
       "markdown": "### Improvements and fixes\n\n- What’s New now lets you browse notes from every previous Codex Korus release."
     },
     {
@@ -299,13 +305,13 @@
     {
       "version": "0.6.1",
       "releasedAt": "2026-08-07",
-      "sourceSha256": "5c4b507cc5fc9a1904ee5e98883fb9b90882f2b9b8e488b2e3288f6b589bdef7",
+      "sourceSha256": "c55b0ae7a7b3dd8b19287c41228e949986cd3c50be4948dc2f0c0bd7217893cb",
       "markdown": "### New features\n\n- Codex Korus now shares ChatGPT's installed skills and plugins by default,\n  explicitly asks existing installs before migrating their resource folders,\n  and provides a General → Advanced setting for fresh or copied isolation.\n- The prompt composer now grows with longer messages until twelve lines are\n  visible, then scrolls internally.\n- Pressing Escape twice within two seconds now interrupts an active response,\n  even when the composer does not have focus.\n\n### Improvements and fixes\n\n- Changing skills and plugin sharing now keeps the desktop app open while a\n  blocking reconnect screen safely restarts the backend and refreshes\n  conversations, resource catalogs, and workspace state.\n- Dialogs now use consistent body padding without double-spacing forms,\n  including the create and edit forms for teams and agents.\n- Computer Use activity now identifies the target app, control, coordinates,\n  window, or display, including dedicated presentation for screenshots and\n  Screen Recording permission requests.\n- Absolute file links outside an agent repository now open as read-only tabs in\n  that agent's sidebar workspace.\n- Passive Computer Use checks, app discovery, permission requests, and\n  screenshots no longer display the blue virtual cursor over the desktop."
     },
     {
       "version": "0.6.0",
       "releasedAt": "2026-08-06",
-      "sourceSha256": "580d081bc98bdb5cf87dbf152d07ca03e55c62cd2354c78c3e21eb3bda20bcac",
+      "sourceSha256": "4dad13be4f836ffc87b7638dd31eb6ed7612f0fbd1cdb6ad43212525148ccc54",
       "markdown": "### New features\n\n- Codex Korus now bundles its local Codex app-server executable, while remote\n  agents continue using the Codex installation on their remote host.\n- Existing Codex conversations can now be forked into a new agent from the\n  agent menu or from a specific user or assistant message.\n- Image annotation now lets you mark up a composer image with arrows,\n  rectangles, numbered comments, zoom, color inspection, and Retina-aware\n  measurements, then send the annotated image and feedback together.\n- Appshots capture the frontmost macOS window directly into the active agent\n  with a configurable dual-Command, dual-Option, or dual-Shift hotkey and an\n  optional confirmation sound.\n- Computer Use can now capture a target application window or macOS display as\n  an image, with Screen Recording permission surfaced in Settings.\n- Clicking an image in a conversation now opens it in a dedicated per-agent\n  workspace tab.\n\n### Improvements and fixes\n\n- Execution plans now keep a stable Task list heading and show the model's\n  plan-update title as a separate, full-width block below the header.\n- Duplicated and forked agents now appear directly below their source agent.\n- Conversations now open with less initial history while older turns remain\n  available on demand.\n- Historical image attachments render previews again, and selected attachments\n  stay contained within the composer.\n- Web searches now use their own tool presentation, while new SDK tool kinds\n  keep their intended identity instead of falling back to a generic tool.\n- Message actions are disabled while an agent is busy, controlled composer\n  caret movement is preserved, and user-message presentation is more\n  consistent."
     },
     {
@@ -329,19 +335,19 @@
     {
       "version": "0.3.1",
       "releasedAt": "2026-08-02",
-      "sourceSha256": "29e6898e6dadb764e926b1fad84dcbc2091b7f42fbe148b9ffc56b30b0d00abe",
+      "sourceSha256": "5c68abaa4dd962610ec13009660340fd8bcc514ced5e6a85fdcf0036f1228d81",
       "markdown": "### New features\n\n- Added macOS update checks, a Codex Korus menu action, a downloaded-update\n  badge, and install-and-relaunch flow.\n- Added the signed desktop release publishing workflow and update feed.\n- Added live file activity in conversations and clickable file targets for\n  reads, edits, and creates.\n- Published the Codex Korus landing page with release downloads and product\n  documentation.\n\n### Improvements and fixes\n\n- Computer Use MCP tools are hidden until explicitly enabled, while plugin\n  settings persist across launches and apply to new and resumed conversations.\n- Refined Plugins and Integrations settings cards, banners, spacing, and\n  dialog presentation.\n\n- Update checks now run at startup and once per hour in packaged builds.\n- Git review now includes untracked files and keeps the change statistics\n  visible alongside long filenames.\n- File activity no longer opens files unexpectedly; explicit file targets remain\n  available from the conversation.\n- Preserved conversation workspace context while navigating between agents.\n- Refined exploration labels and made right-sidebar resize affordances subtler."
     },
     {
       "version": "0.3.0",
       "releasedAt": "2026-08-02",
-      "sourceSha256": "8fd2d9e80648c68880eeafbe1cf230efa9225cf05b04012c09f5e4c7de465f3d",
+      "sourceSha256": "818b2426a9dbd97eb324531b788d402f185c431cb8e62602b0002ccad8c883d2",
       "markdown": "### New features\n\n- In-app browser with agent-specific tabs, annotations, and tools that continue\n  working while another agent is selected.\n- Native macOS Computer Use tools for agents to inspect and operate desktop\n  applications.\n- Git workspace review, source previews, streamlined agent setup, compact agent\n  lists, and a refined native macOS shell.\n- ChatGPT authentication, mobile device pairing, Fast mode, and clearer Korus\n  tool presentation.\n- Per-agent drafts, attachments, queues, model settings, and side-panel state.\n- Prompt automation through the `codex-Korus://` deep-link protocol.\n- Sender labels and cleaner message bubbles for agent-to-agent collaboration.\n\n### Improvements and fixes\n\n- Made agent switching immediate and kept the interface responsive with several\n  agents streaming concurrently.\n- Reduced conversation rendering, catalog loading, snapshot processing, and\n  long-session memory overhead; inactive transcripts now unload safely after\n  five minutes and reload on demand.\n- Prevented backend event-stream overload and output-backpressure crashes.\n- Stabilized queued and steered prompt submission, attachments, compaction\n  state, background-agent selection, and app-server reconnection.\n- Preserved live tool calls, drafts, queues, and conversation state across agent\n  switches and background activity.\n- Fixed GitHub token refresh, device pairing, Fast mode hydration, catalog\n  flicker, status clearing, and tool presentation regressions."
     },
     {
       "version": "0.2.0",
       "releasedAt": "2026-06-18",
-      "sourceSha256": "30b1586fdd88f4540adb4756dcb947c6af0648692748fa7d8adcea4431ca143f",
+      "sourceSha256": "189aefdab9a65613b56b51e138c50e7b2f91485f1f3384f29d9c5742c288ff6e",
       "markdown": "### New features\n\n- Always-on background agents through the `Korusd` daemon, including automatic\n  daemon upgrades when the desktop app is updated.\n- SSH connections to remote Korus instances with remote teams, agents, loops,\n  and work integrations.\n- Conversation history and resume, source and Git diff previews, agent Git\n  statistics, and repository worktree selection.\n- System permission controls and sleep prevention while agents are working.\n\n### Improvements and fixes\n\n- Made agent and team state survive desktop restarts while background work\n  continues in the daemon.\n- Improved remote connection recovery, conversation hydration, agent restart\n  behavior, and packaged runtime discovery.\n- Fixed direct teammate delivery, GitHub authentication in packaged builds,\n  snapshot consistency, and scoped file previews."
     },
     {

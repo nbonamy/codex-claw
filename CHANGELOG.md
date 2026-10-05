@@ -4,6 +4,68 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.26.0] - 2026-10-04
+
+### New features
+
+- Codex Claw is now Korus, with a new macOS icon and a refreshed website and
+  guides at meetkorus.dev. Desktop downloads and update checks now use the new
+  domain.
+- Connect Linear in Settings and use team or project issues alongside GitHub
+  as a backlog source. Start agents, plan Missions, and configure automations
+  against an explicitly chosen code repository. Agents can access Linear's
+  issue tools without treating a Linear project as a Git repository.
+- Use `/delegate` or its `/worktree` alias to hand a task to a new teammate in
+  a dedicated worktree while keeping the original conversation open. The
+  current agent prepares the handoff; detailed instructions stay out of the
+  visible chat prompt. Delegation does not automatically merge the work.
+- Delegated tasks can save structured results, wait for workers, and cancel
+  assigned work. Saved outcomes survive restarts and are delivered back to
+  the parent without treating completion as permission to merge or advance
+  a Mission.
+- Claude conversations now support steering during active work, native forks
+  from completed turns, and native goals. Steering is delivered at tool or
+  response boundaries rather than immediately interrupting generation; forks
+  currently require an idle conversation in the same folder.
+- Open Review, Delegate, and Visualize directly from the composer's + menu,
+  with grouped actions and Goal mode above Plan mode.
+- Mission shipping now offers Update from the base branch and checks for new
+  base commits before merging, so branch updates and conflict resolution can
+  happen in the worktree before delivery.
+
+### Improvements and fixes
+
+- Plain text entered in the in-app browser address bar now runs a Google
+  search. Normal navigation redirects no longer surface an aborted-load error.
+  Unsupported chat file previews, including videos, download instead of
+  opening an empty sidebar pane.
+- Closing a dirty worktree now offers an explicit confirmation to discard
+  uncommitted changes, including untracked files, rather than refusing deletion.
+- Existing review contexts reopen after reconnecting or restarting. Mission
+  review reruns no longer fail on an empty previous artifact; Mission workers
+  retain their tools and can receive a new ticket assignment, and queued work
+  no longer causes a false Mission failure.
+- Chat panes keep a 480px minimum width beside artifacts. Open In menus escape
+  clipped panes, engine icons disappear when leaving the sidebar, and the
+  text-selection action is labeled Annotate.
+- Codex startup and reconnect use asynchronous runtime discovery, avoiding
+  blocking shell probes. Idle notifications no longer falsely mark turns as
+  interrupted, and late completions do not clear newer work. Conversation
+  lists avoid duplicate entries, and failing SDK listeners no longer reject
+  unrelated requests.
+- Chat Markdown is only reparsed when its text changes, reducing repeated
+  rendering work while responses stream.
+- Retrying an initial backend connection failure now restores event updates.
+  Structured secrets and prompt content are redacted from diagnostic logs.
+
+### Upgrade notes
+
+- Korus uses `~/.korus` instead of `~/.codex-claw`; existing data is not migrated
+  automatically. To retain an earlier setup, copy it while the app is closed
+  and update saved absolute paths, including separate provider homes.
+- The desktop app is now `Korus.app`, the daemon is `korusd`, and configuration
+  environment variables use the `APP_` prefix instead of `CODEX_CLAW_`.
+
 ## [0.25.2] - 2026-10-03
 
 ### Fixes
