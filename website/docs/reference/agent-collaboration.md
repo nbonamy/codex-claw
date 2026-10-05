@@ -1,10 +1,10 @@
 ---
-description: Understand how agents share status and coordinate through Claw's built-in MCP tools.
+description: Understand how agents share status and coordinate through Korus's built-in MCP tools.
 ---
 
 # Agent collaboration
 
-Claw supplies built-in collaboration and workspace tools to each agent. They are available to both Codex and Claude Code through MCP, without manually adding a server URL or passing an agent ID.
+Korus supplies built-in collaboration and workspace tools to each agent. They are available to both Codex and Claude Code through MCP, without manually adding a server URL or passing an agent ID.
 
 ## Coordinate work
 
@@ -24,18 +24,18 @@ The sidebar shows an agent's short status while it works. An agent can also mark
 
 Give each writing task an owner and a separate worktree when isolation is needed. A message coordinates intent; the actual diff and checks still establish the result.
 
-## Native subagents and Claw teammates
+## Native subagents and Korus teammates
 
-A provider-native subagent works inside its parent provider session. A Claw teammate has its own identity, folder, and conversation in the team.
+A provider-native subagent works inside its parent provider session. A Korus teammate has its own identity, folder, and conversation in the team.
 
 Specify which one you want when delegating:
 
 | Request | Result |
 | --- | --- |
-| “Use native subagents to audit these three modules.” | Child work stays within the provider's parent session; it does not create separate Claw team agents. |
-| “Create a Claw teammate in a worktree to implement the filter.” | A separate agent appears in the team, with its own folder and conversation. |
+| “Use native subagents to audit these three modules.” | Child work stays within the provider's parent session; it does not create separate Korus team agents. |
+| “Create a Korus teammate in a worktree to implement the filter.” | A separate agent appears in the team, with its own folder and conversation. |
 
-Native subagent availability follows the provider's tools and settings. For a substantial independent repository change, a dedicated Claw agent and worktree keep the outcome separately reviewable.
+Native subagent availability follows the provider's tools and settings. For a substantial independent repository change, a dedicated Korus agent and worktree keep the outcome separately reviewable.
 
 Give the new teammate a self-contained objective, scope, constraints, and validation requirement. Creation in a worktree creates the isolated workspace and starts the teammate with that prompt. See [Parallel agents](../workflows/parallel-agents) and [Worktrees](../workflows/worktrees).
 
@@ -59,7 +59,7 @@ Ask the parent or worker to cancel a tracked task when it should stop. Cancellat
 | Browser | “Open the local preview in your in-app browser and check the form.” |
 | Visualize | Open Visualize, then ask for a diagram or a targeted canvas edit. |
 | Computer Use | Enable it in Settings, then name the macOS app and task. |
-| Work item status | Ask the assigned agent to report whether its GitHub or Linear work is in progress, blocked, ready for review, or completed. This tracks work in Claw, separately from the source issue's status. |
+| Work item status | Ask the assigned agent to report whether its GitHub or Linear work is in progress, blocked, ready for review, or completed. This tracks work in Korus, separately from the source issue's status. |
 
 See [Workspace & diffs](../features/workspace), [Browser](../features/browser), [Visualize](../features/visualize), and [Computer Use](../features/computer-use) for the corresponding setup and interaction flows.
 
@@ -67,6 +67,6 @@ See [Workspace & diffs](../features/workspace), [Browser](../features/browser), 
 
 Tell the agent which teammate needs a decision or task and what outcome you expect. Review the resulting work through the receiving agent's conversation and artifacts.
 
-Claw collaboration messages go to other Claw agents. Sending an email, Slack message, or GitHub comment is a separate action through that service's integration; name that action explicitly when you want it.
+Korus collaboration messages go to other Korus agents. Sending an email, Slack message, or GitHub comment is a separate action through that service's integration; name that action explicitly when you want it.
 
-Connecting Linear also makes its hosted tools available to agents through Claw. Ask explicitly when you want the agent to comment on an issue or change its Linear status; connecting the integration or finishing a Claw assignment is not itself that request.
+Connecting Linear also makes its hosted tools available to agents through Korus. Ask explicitly when you want the agent to comment on an issue or change its Linear status; connecting the integration or finishing a Korus assignment is not itself that request.

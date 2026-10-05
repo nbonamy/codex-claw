@@ -1,7 +1,7 @@
 {
-  "name": "@codex-claw/core",
+  "name": "@workspace/core",
   "version": "0.25.2",
-  "description": "Platform-neutral Codex Claw product contracts and state primitives.",
+  "description": "Platform-neutral Application product contracts and state primitives.",
   "private": true,
   "type": "module",
   "exports": {

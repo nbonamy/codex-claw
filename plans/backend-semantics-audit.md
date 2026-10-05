@@ -13,7 +13,7 @@ methods** at the audit baseline. After remediation: **163 registered RPC methods
 
 ## Scope and how to read this
 
-The primary subject is **Claw's backend abstraction**, not the SDKs and not a
+The primary subject is **Korus's backend abstraction**, not the SDKs and not a
 UI redesign. The inventory includes every registered JSON-RPC method and every
 top-level app event, plus the direct `AgentBackendDriver` interface. Host callbacks
 and internal driver RPC are separated so they are not confused with product APIs.
@@ -65,7 +65,7 @@ Transient provider request handles are reconstructed, not saved to disk.
 
 - Rename contracts end to end, but also inspect their payload, identity, lifetime
   and side effects: a better name alone does not establish a domain boundary.
-- Keep provider transcripts native; normalize only Claw-owned product facts.
+- Keep provider transcripts native; normalize only Korus-owned product facts.
 - Persist review decisions and client preferences at their respective ownership
   boundaries. Replayed events and another client's actions must not reopen work.
 - Verify changed behavior at public seams; distinguish passing tests from a
@@ -82,7 +82,7 @@ concrete gaps; all five received implementation changes and regression coverage:
 | Git refresh depended on legacy shared selection | Debounced file-change refresh is agent-scoped, not selection-scoped. Cached client selection explicitly loads/refreshes without clearing the conversation. Service and application-state tests cover both. |
 | Remote snapshot operations changed shared navigation | Removed shared selection writes from remote result adoption. The two-server test verifies another client's preferences and shared navigation remain unchanged. |
 | Overlapping creations selected the first new entity | Capture the exact created ID inside each operation before asynchronous persistence; never infer it from a shared before/after ID-set difference. Concurrent agent/team creation tests assert separate client selections. |
-| Provider adapters discarded targeted request identity | Key pending requests by agent plus request ID, retain identity through owner lookup, and strip Claw metadata only at the chosen native request. Codex approval/question and Claude SDK collision tests verify one agent cannot answer another's request. |
+| Provider adapters discarded targeted request identity | Key pending requests by agent plus request ID, retain identity through owner lookup, and strip Korus metadata only at the chosen native request. Codex approval/question and Claude SDK collision tests verify one agent cannot answer another's request. |
 
 The coverage gate was rerun: core, backend, Vue and Electron still fail their
 configured thresholds; web passes. No thresholds changed. No live SSH or desktop
@@ -119,7 +119,7 @@ by the backend payload.
 3. **Unified events have provider-specific shapes.** Settings are Codex-only; session
    identity and mode updates differ between providers. Renaming `thread` alone is insufficient.
 4. **Input requests are not a unified domain lifecycle.** Approvals and questions use
-   provider frames plus partially overlapping Claw events. A headless policy should not
+   provider frames plus partially overlapping Korus events. A headless policy should not
    need to inspect those frames to discover a pending request.
 5. **Selection mixes navigation with runtime work.** Agent/team selection persists
    active selection and triggers hydration/refresh; remote selection also changes remote state.
@@ -146,7 +146,7 @@ Source: [event union](../core/src/contracts.ts),
 | Current event | Purpose today | Rename needed? | Proposed name |
 | --- | --- | --- | --- |
 | `backend.statusChanged` | Provider runtime availability and capabilities. | No | — |
-| `client.connectionChanged` | Client's connection to clawd changed. | Move; name is accurate | Keep in client transport events, outside backend domain events |
+| `client.connectionChanged` | Client's connection to daemon changed. | Move; name is accurate | Keep in client transport events, outside backend domain events |
 | `snapshot.updated` | Authoritative product snapshot changed. | No | — |
 | `account.rateLimitsUpdated` | Provider account usage/rate limits changed. | No; normalize direct vs wrapped payload | — |
 | `devicePairing.statusChanged` | Remote-control environment connection state changed. | Yes | `remoteControl.statusChanged` |
@@ -272,7 +272,7 @@ Source: [registered methods](../core/src/backend-protocol/methods.ts),
 | `team/delete` | Delete team at owning location. | No | — |
 | `team/disconnect` | Remove local pointer, leaving remote team running. | No | — |
 
-Client-state APIs may still use clawd persistence, but must not mutate another
+Client-state APIs may still use daemon persistence, but must not mutate another
 client's navigation implicitly. These changes need client identity/state scoping,
 not just a new prefix. Headless operation must not depend on selecting an agent.
 

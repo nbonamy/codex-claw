@@ -1,4 +1,4 @@
-# Codex Claw codebase hardening v2
+# Korus codebase hardening v2
 
 ## Purpose
 
@@ -38,7 +38,7 @@ from this branch/commit unless a later row explicitly advances it.
 | Dead-workflow deletion on `main` | `a3673ec160134d3d12591316997adb8fa59b6354` | Canonical 84-file deletion checkpoint: 147 additions and 4,171 deletions |
 | Dead-workflow deletion on review branch | `92551b034a1ee30602c9f3e4b649d38d931501b5` | Cherry-pick adapted to retained contract owners: 86 files, 149 additions, and 4,188 deletions |
 | Skill-event regression fix on `main` | `fdb27e6e6f163807a205ef6e5315ef82007854ff` | Defensive Codex skill-summary normalization shared by list and event paths |
-| Skill-event regression fix on review branch | `b29854c` | Cherry-pick of the Claw fix over retained contract owners |
+| Skill-event regression fix on review branch | `b29854c` | Cherry-pick of the Korus fix over retained contract owners |
 | Companion SDK provider-boundary fix | `8fe46e3fdfff4723d965050924b63577ddd3bdf5` | Normalizes nullable app-server skill metadata to the SDK string-or-absent surface contract; validated locally but not pushed |
 
 At authoring time the only pre-existing working-tree modification was
@@ -55,7 +55,7 @@ This is verified evidence about the review branch, not a final qualification:
 - unsigned Electron build: passed;
 - the only recent full-suite timing sample was **30.25s**; it is a single run,
   not the required three-run median and therefore cannot decide performance;
-- current conversation benchmark: Claw renderer replica 7.1855 Hz, 139.17ms
+- current conversation benchmark: Korus renderer replica 7.1855 Hz, 139.17ms
   mean, 134.11–144.67ms range, 10 samples; sibling SDK backend 2.1666 Hz,
   461.56ms mean, 451.73–471.07ms range, three samples;
 - dependency-cycle checks previously reported zero cycles.
@@ -124,12 +124,12 @@ typecheck; full lint including Stylelint and Knip (apart from Knip's existing
 A real Codex app-server `skills/list` response returned
 `interface.brandColor: null`. The generated SDK type and SDK surface contract
 promised string-or-absent, but the SDK mapper preserved the runtime `null`.
-Phase 1's strict Claw decoder correctly rejected the malformed
+Phase 1's strict Korus decoder correctly rejected the malformed
 `skills.changed` event: sequence 9 was dropped, and sequence 10 then triggered
 replica resynchronization rather than silently adopting an invalid payload.
 
 A 374ms red adapter-to-decoder test reproduced the provider payload through the
-real Claw event boundary. Claw commit
+real Korus event boundary. Korus commit
 `fdb27e6e6f163807a205ef6e5315ef82007854ff` now defensively normalizes skill
 metadata in one helper used by direct list and both event paths; review-branch
 cherry-pick `b29854c` preserves the same behavior over the retained contract
@@ -137,7 +137,7 @@ owners. SDK commit `8fe46e3fdfff4723d965050924b63577ddd3bdf5`
 normalizes at the preferred provider boundary so its public surface fulfills
 the declared invariant. The SDK commit is locally validated but not pushed.
 
-Claw validation passed: full `npm run test:ai` at 271 files / 2,043 tests,
+Korus validation passed: full `npm run test:ai` at 271 files / 2,043 tests,
 lint, all-workspace typecheck, and unsigned Electron build. SDK validation
 passed: Backend 62 files / 1,146 tests, compatibility build, and documentation
 build.
@@ -206,7 +206,7 @@ Retain the exact committed files:
 - `core/src/__tests__/contract-domains.spec.ts` only while it proves public
   compatibility and runtime constant identity.
 
-The compatibility import `@codex-claw/core/contracts` stays public. Production
+The compatibility import `@workspace/core/contracts` stays public. Production
 callers move to a domain module only as part of a concrete ownership change:
 
 | Contract module | First organic direct consumers | Why the direct import is justified |
@@ -461,7 +461,7 @@ The shared turn, permission, context, model, and transport declarations were
 moved losslessly to `backend/src/claude/transport.ts` and active imports were
 updated. Runtime/export searches found no `ClaudeCliTransport` construction or
 fallback, so the class, CLI helpers, spec, and stale documentation were removed.
-Backend `clawd` stdio, SSH stdio, Electron backend stdio, and the Claude Agent
+Backend `daemon` stdio, SSH stdio, Electron backend stdio, and the Claude Agent
 SDK transport remain active.
 
 Automated validation is included in the completed checkpoint evidence above.
@@ -497,7 +497,7 @@ qualification, not evidence already claimed by this deletion checkpoint.
 - Keep `RepositoryBacklogPanel.vue`, `CockpitWorkInbox.vue`, and
   `CockpitView.vue`; these are active product surfaces. Only their proven dead
   props/events may be removed.
-- Keep `backend/src/stdio.ts`, `backend/src/clawd.ts`, SSH stdio, and Electron's
+- Keep `backend/src/stdio.ts`, `backend/src/daemon.ts`, SSH stdio, and Electron's
   backend process client. “Legacy Claude CLI” does not mean “stdio is legacy.”
 - Keep `ClaudeAgentSdkTransport` and provider-neutral `ClaudeTurnTransport`
   semantics.
@@ -548,7 +548,7 @@ runtime. A candidate without those targets remains review-only.
 | Current evidence | To-be owner, interface, direction, and action | Invariants and direct tests | Exit evidence |
 | --- | --- | --- | --- |
 | `backend/src/driver-rpc.ts` is 466 lines/47 cases; `BackendDriverRpc`/`AgentBackendDriver` use `string + unknown -> Promise<unknown>` and six `as never` casts | **Extract/consolidate:** a discriminated `BackendRequestMap` couples method to decoded input/result. Runtime decoder returns a typed request; handler registry is exhaustive. Driver owns provider methods only; source/files/worktrees leave it. Protocol -> decoder -> typed handler -> driver, never reverse | Unknown rejected with path-safe errors; method/result correlation; cancellation/error mapping; Codex/Claude capability differences | Zero `as never` dispatch casts; every registered method in map or explicitly non-driver; exhaustive compile-time registry; direct decoder/dispatcher tests |
-| `backend/src/server.ts` is 2,761 lines and routes about 102 request cases while constructing services, mutating state, persisting, routing local/remote, and publishing events | **Extract:** typed dispatcher plus coherent request owners, a location router, and backend event coordinator. **Keep:** `ClawBackendServer` as thin lifecycle façade. `runtime.ts` constructs owners; sibling request owners communicate through narrow ports, not imports | Request identity, authorization, local/remote equivalence, persistence-before-publication, event order, snapshot projection, errors and cancellation | Root switch eliminated or limited to exhaustive owner lookup; server constructor/interface cardinality decreases; direct owner tests replace most server cases; no new service bag |
+| `backend/src/server.ts` is 2,761 lines and routes about 102 request cases while constructing services, mutating state, persisting, routing local/remote, and publishing events | **Extract:** typed dispatcher plus coherent request owners, a location router, and backend event coordinator. **Keep:** `AppBackendServer` as thin lifecycle façade. `runtime.ts` constructs owners; sibling request owners communicate through narrow ports, not imports | Request identity, authorization, local/remote equivalence, persistence-before-publication, event order, snapshot projection, errors and cancellation | Root switch eliminated or limited to exhaustive owner lookup; server constructor/interface cardinality decreases; direct owner tests replace most server cases; no new service bag |
 | Prompt submission is split among Core `agent-chat-service`, backend `AgentPromptManager`, MCP, automations, and server callbacks | **Consolidate:** backend `AgentPromptService.submit/steer/interrupt/respond/queue/retry` owns session creation, queue transitions, persistence hooks, and event effects. MCP/automation/server call it; Core retains pure reducers/invariants only | Same prompt order, attachment policy, dictated-input metadata, queue semantics, retry, session updates, failure recovery, provider events | One mutation owner per prompt transition; no bypass from MCP/automation; direct prompt service tests; fewer callback parameters/caller branches |
 | Backend lifecycle behavior is spread across server, `agent-conversation-service`, `agent-workspace-service`, driver calls, and close/delete flows | **Extract/consolidate:** `AgentLifecycleService` owns create, duplicate, close, backend-session reset, worktree/branch cleanup coordination, and status transitions through narrow Git/workspace ports | Agent IDs/names/team order, worktree initialization, close timeout/background behavior, cleanup ordering, remote ownership, no deleted-worktree prompt | Lifecycle integration tests own create/duplicate/close/cleanup; server only dispatches; one status transition policy |
 | `core/src/agent-manager.ts` is 664 lines and combines lifecycle/topology, conversation resets, ordering, backlog assignment, and folder normalization | **Extract:** pure invariant owners: `agent-lifecycle`, `agent-conversation-state`, `agent-work-assignments`, and `sidebar-ordering`; keep a small façade only if callers benefit. Use named reset policies | Immutable snapshot behavior, ID/order uniqueness, selected-agent repair, reset semantics, assignment cleanup | Each decision lives in one pure owner with direct tests; façade decisions approach zero; no circular Core imports |
@@ -557,7 +557,7 @@ runtime. A candidate without those targets remains review-only.
 | `backend/src/state-persistence.ts` is 1,357 lines/71 functions/81 `if`s | **Keep deep public façade; extract private codecs:** app root, agents, subagents, work, topology, primitive values. Persistence may import codecs; codecs may import contracts, never server/services | Released shape migrations, normalization/repair, corrupt subrecord recovery, invalid JSON behavior, defaults, unknown additive fields | `load/save` façade stays narrow; every codec has direct migration tests; no behavior move mixed with relocation; decisions localized, not merely redistributed |
 | `backend/src/codex/codex-driver.ts` is a shallow public wrapper over 1,744-line `codex-surface-adapter.ts`; Claude driver is 1,266 lines | **Consolidate public provider entrypoints, extract private owners:** session lifecycle, event translation, transcript/history, approval/tool semantics. Do not invent a shared Codex/Claude base beyond `AgentBackendDriver` | Provider-specific session resume, tools, approvals, model/effort, compaction, transcript, file events, MCP configuration | One public driver per provider; private modules have provider-local interfaces/direct tests; wrapper-to-adapter pass-through removed; no renderer/provider leakage |
 | `backend/src/mcp/service.ts` owns mailbox storage/delivery and many unrelated model-facing workflows; coordinator duplicates orchestration callbacks | **Extract/consolidate:** `McpMailboxService` owns inbox/envelopes/delivery/read state. Workflow tools call backend domain services through explicit ports. HTTP/tool registration remains MCP adapter. The parked `prepare-work` slice is already deleted | Message ordering, recipient identity, unread state, tool result presentation, caller authorization, create-agent atomicity | Mailbox tests independent of create-agent/Git/browser tools; workflow policy has one backend owner; MCP adapter contains no state mutation policy |
-| Service construction and environment/lifecycle wiring are split between `clawd.ts`, server constructor, and ad hoc factories | **Extract:** `backend/src/runtime.ts` composition root creates persistence, drivers, scheduler, services, router, replica, event coordinator, server. Domain modules never import runtime | Singletons, shutdown order, daemon/stdio/socket modes, injected clocks/IDs, no eager provider side effects | One construction root; server no longer `new`s domain services; runtime smoke tests cover start/stop modes; dependency graph acyclic |
+| Service construction and environment/lifecycle wiring are split between `daemon.ts`, server constructor, and ad hoc factories | **Extract:** `backend/src/runtime.ts` composition root creates persistence, drivers, scheduler, services, router, replica, event coordinator, server. Domain modules never import runtime | Singletons, shutdown order, daemon/stdio/socket modes, injected clocks/IDs, no eager provider side effects | One construction root; server no longer `new`s domain services; runtime smoke tests cover start/stop modes; dependency graph acyclic |
 
 ### Electron and Web adapters
 
@@ -788,7 +788,7 @@ Coverage remediation is explicit work, not a surprise final gate:
 - `npm run lint`, Stylelint, Knip, package-boundary tests, and Madge green;
 - `npm run build:backend`;
 - `npm run build:web`;
-- `CODEX_CLAW_SKIP_SIGNING=1 npm run build`;
+- `APP_SKIP_SIGNING=1 npm run build`;
 - manual desktop smoke: first-run/auth, existing-auth startup, create agent and
   worktree, prompt/stream/approval, Git status/operation, backlog/Cockpit,
   settings, Claude prompt/resume/interrupt, remote reconnect if configured;
@@ -816,13 +816,13 @@ the evidence columns is incomplete.
 | 2026-09-04 | Plan v2 authoring | Complete | Prior mechanical plan -> exhaustive deletion/ownership/type-safety plan | Preserves all candidates while requiring activation gates and Scenario A/B consequences | Markdown structure/path/table sanity and `git diff --check` | — | Preserve modified `plans/codebase-hardening.md` |
 | 2026-09-04 | Independent plan and baseline review | Complete | Initial v2 draft -> corrected exhaustive inventory and staged gates | Corrected rollback provenance, candidate classifications, activation policy, coverage debt, and branch-history policy | Independent review findings reconciled against source | — | Exhaustive inventories remain appendices; review does not itself authorize a candidate |
 | 2026-09-04 | Phase 0: Scenario A decision | Complete | A/B decision pending -> Scenario A selected | Keeps checkpoints 1–4 as the dependency floor for approved typed-request, prompt, lifecycle, and renderer ownership; Scenario B remains exact fallback | Mechanical fidelity, export/runtime identity, cycle, consumer, and ownership-needs audit | — | Passing tests support compatibility; architectural value is the concrete dependency floor, not greenness alone |
-| 2026-09-04 | Phase 0: provisional qualification | Complete | Review branch at `20a0b929…` | No ownership change; qualifies the branch provisionally before manual smoke and coverage remediation | `test:ai` 277 files / 2,103 tests passed; lint passed; unsigned build passed; cycles zero; benchmarks 7.1855 Hz Claw and 2.1666 Hz SDK; one 30.25s full-suite timing is not a median | — | Backend/Vue/Electron coverage debt and manual desktop smoke remain pending; this is not final qualification |
+| 2026-09-04 | Phase 0: provisional qualification | Complete | Review branch at `20a0b929…` | No ownership change; qualifies the branch provisionally before manual smoke and coverage remediation | `test:ai` 277 files / 2,103 tests passed; lint passed; unsigned build passed; cycles zero; benchmarks 7.1855 Hz Korus and 2.1666 Hz SDK; one 30.25s full-suite timing is not a median | — | Backend/Vue/Electron coverage debt and manual desktop smoke remain pending; this is not final qualification |
 | — | Phase 0: retained snapshot/event manual validation | Pending | — | — | — | — | Must include manual app smoke; provisional automated gates alone are insufficient |
 | 2026-09-05 | Phase 1: obsolete workflow vertical slices | Complete | `main` 84 files, +147/-4,171 -> review branch 86 files, +149/-4,188 after contract-owner adaptation | Removed orphan backlog; composer and complete create-item path; disabled work-routing; obsolete Claude CLI while retaining losslessly moved transport contracts | Focused Core 5/40, Backend 4/59, Vue App 1/5, backlog 3/41; typecheck; lint/Stylelint/Knip; `test:ai` 272 files / 2,046 tests; diff check | `a3673ec160134d3d12591316997adb8fa59b6354` on `main`; `92551b034a1ee30602c9f3e4b649d38d931501b5` here | Unsupported create-item/work-routing compatibility removed; normal parser ignores obsolete additive snapshot fields; live `create_agent`, Claude Agent SDK, and stdio preserved |
-| 2026-09-05 | Phase 1: nullable skill-event regression | Complete | Real app-server `interface.brandColor: null` -> string-or-absent app and SDK surfaces | One Claw normalization helper protects list/event paths; SDK provider boundary removes the upstream representation leak; strict event validation remains unchanged | 374ms red adapter-to-decoder reproduction; Claw `test:ai` 271/2,043, lint, typecheck, unsigned build; SDK Backend 62/1,146, compatibility and docs builds | Claw `fdb27e6e6f163807a205ef6e5315ef82007854ff`; review `b29854c`; SDK `8fe46e3fdfff4723d965050924b63577ddd3bdf5` local/not pushed | Sequence 9 rejection and sequence 10 resync proved strictness worked; generated types alone are not runtime evidence |
+| 2026-09-05 | Phase 1: nullable skill-event regression | Complete | Real app-server `interface.brandColor: null` -> string-or-absent app and SDK surfaces | One Korus normalization helper protects list/event paths; SDK provider boundary removes the upstream representation leak; strict event validation remains unchanged | 374ms red adapter-to-decoder reproduction; Korus `test:ai` 271/2,043, lint, typecheck, unsigned build; SDK Backend 62/1,146, compatibility and docs builds | Korus `fdb27e6e6f163807a205ef6e5315ef82007854ff`; review `b29854c`; SDK `8fe46e3fdfff4723d965050924b63577ddd3bdf5` local/not pushed | Sequence 9 rejection and sequence 10 resync proved strictness worked; generated types alone are not runtime evidence |
 | 2026-09-06 | Phase 1: P1 Core and adapter/UI dead code | Complete / uncommitted | 45 implementation files, +14/-322 before this ledger update; orphan 278,088-byte PNG also removed | Removed dead Core exports/helpers, Electron wrapper/logger/imports, Vue event relay/helper/icon exports, two orphan component modules and owner-only tests | Focused 17 files / 181 tests; full `test:ai` 272 files / 2,066 tests; all-workspace lint/typecheck/Stylelint/Knip; Core/Backend/Vue/Web builds and Electron typecheck; production-only unused-symbol probes clean | — | Re-audit preserved live `DashboardIcon`, `SquareCheck`, and `isConversationLoading`; the later final unsigned root build passes against the refreshed sibling SDK |
 | 2026-09-06 | Phase 1: proven compatibility dead code | Complete / uncommitted | Four dormant compatibility groups -> absent | Removed unused snapshot façade re-exports, write-only `completionInstructionsDeliveredAt`, `agent/folder/update`, and `automation/due/run`; active owner implementations and scheduler execution remain | Included in the focused/full gates above; protocol/source inventory has zero remaining references to the removed request methods or field | — | Remaining compatibility rows stay pending because they protect released persistence/wire forms or useful test adapters and are not proven dead |
-| 2026-09-06 | Phase 1: SDK turn-contract migration | Complete | Message-index/message-id compatibility path -> stable turn ids end to end; Codex prompt optimism also has one SDK-owned message identity | Migrated fork/delete/edit/retry through Core contracts, protocol, backend driver/service, Electron, Web, Vue controller/actions, and docs; removed Claw's message-to-turn and retry-prompt reconstruction helpers because the SDK now owns those semantics; classified turn mutations as 120-second backend operations so successful long-thread actions are not abandoned after five seconds; removed Claw's competing Codex prompt insertion so the SDK append/update lifecycle can attach the authoritative turn id without duplicating the row | Focused Core/Backend/Electron/Vue suites; all-workspace typecheck and lint/Stylelint/Knip; full `test:ai` 272 files / 2,072 tests; unsigned production build before the prompt-identity regression; delayed-success transport regression at six seconds; real-order SDK append/update regression | Current Phase 1 checkpoint | Claw supplies active-turn and turn lifecycle identity; the SDK now exposes normal mutations only on the latest terminal turn, with fork further restricted to completed turns; production logs identified the timeout rather than transcript reduction as the observed stale-row cause; Claude retains Claw-owned optimistic prompt rendering |
+| 2026-09-06 | Phase 1: SDK turn-contract migration | Complete | Message-index/message-id compatibility path -> stable turn ids end to end; Codex prompt optimism also has one SDK-owned message identity | Migrated fork/delete/edit/retry through Core contracts, protocol, backend driver/service, Electron, Web, Vue controller/actions, and docs; removed Korus's message-to-turn and retry-prompt reconstruction helpers because the SDK now owns those semantics; classified turn mutations as 120-second backend operations so successful long-thread actions are not abandoned after five seconds; removed Korus's competing Codex prompt insertion so the SDK append/update lifecycle can attach the authoritative turn id without duplicating the row | Focused Core/Backend/Electron/Vue suites; all-workspace typecheck and lint/Stylelint/Knip; full `test:ai` 272 files / 2,072 tests; unsigned production build before the prompt-identity regression; delayed-success transport regression at six seconds; real-order SDK append/update regression | Current Phase 1 checkpoint | Korus supplies active-turn and turn lifecycle identity; the SDK now exposes normal mutations only on the latest terminal turn, with fork further restricted to completed turns; production logs identified the timeout rather than transcript reduction as the observed stale-row cause; Claude retains Korus-owned optimistic prompt rendering |
 | — | Phase 1: compatibility candidates | Pending | — | — | — | — | One producer/history audit per candidate |
 | — | Phase 1: typed ESLint L1 | Pending | — | — | — | — | Next after remaining P1 proven-safe symbol cleanup |
 | — | Phase 2: backend/Core ownership review | Pending | — | — | — | — | Add only activated candidates as new rows |

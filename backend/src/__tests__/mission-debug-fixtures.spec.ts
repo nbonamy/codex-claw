@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, featureStages, isMission } from '@codex-claw/core/missions';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission, featureStages, isMission } from '@workspace/core/missions';
 import { applyMissionDebugFixture } from '../mission-debug-fixtures';
 
 describe('Mission debug fixtures', () => {
@@ -9,7 +9,7 @@ describe('Mission debug fixtures', () => {
     snapshot.agents[0]!.folder = '/repo/api';
     snapshot.agents[1]!.folder = '/repo/web';
     const mission = createMission(snapshot, { outcome: 'Debug mission', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
-    const missionWorker = { ...structuredClone(snapshot.agents[0]!), id: 'agent-mission-worker', name: 'Mission worker', folder: '/claw/missions/debug' };
+    const missionWorker = { ...structuredClone(snapshot.agents[0]!), id: 'agent-mission-worker', name: 'Mission worker', folder: '/app/missions/debug' };
     snapshot.agents.push(missionWorker);
     mission.execution!.runs.push({
       id: 'run-existing', stage: 'requirements', memberId: snapshot.agents[0]!.id, workerId: missionWorker.id,

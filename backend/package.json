@@ -1,12 +1,12 @@
 {
-  "name": "@codex-claw/backend",
+  "name": "@workspace/backend",
   "version": "0.25.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --config vite.config.ts",
-    "dev:run": "node dist/clawd.mjs --stdio",
-    "serve": "node dist/clawd.mjs serve",
+    "dev:run": "node dist/daemon.mjs --stdio",
+    "serve": "node dist/daemon.mjs serve",
     "build": "vite build --config vite.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
@@ -18,7 +18,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.3.226",
     "@codex-app-sdk/backend": "0.12.6",
     "@codex-app-sdk/core": "0.12.6",
-    "@codex-claw/core": "0.25.2",
+    "@workspace/core": "0.25.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "pino": "^10.3.1",
     "zod": "^4.4.3"

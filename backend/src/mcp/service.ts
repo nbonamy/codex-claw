@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
-import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { handoffInProgress } from '@codex-claw/core/agent-handoff';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { resolveAgentBackend } from '@codex-claw/core/agent-backends';
-import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
-import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { handoffInProgress } from '@workspace/core/agent-handoff';
+import { requireAgentFolder } from '@workspace/core/agent-folder';
+import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { resolveAgentBackend } from '@workspace/core/agent-backends';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@workspace/core/backend-driver';
+import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
 import type {
   Agent,
   AnnouncementPhase,
@@ -28,31 +28,31 @@ import type {
   SourceWorktree,
   WorkBacklogAssignment,
   WorkBacklogAssignmentStatus
-} from '@codex-claw/core/contracts';
-import { updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
-import { completeAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
-import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
+} from '@workspace/core/contracts';
+import { updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@workspace/core/agent-manager';
+import { completeAutomationExecutionInSnapshot } from '@workspace/core/automation-manager';
+import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
 import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
 import { WorktreeManager, type WorktreeInitializationProgress } from '../worktrees/worktree-manager';
 import type { BackendDriverRpc } from '../driver-rpc';
-import { ClawMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type MissionToolPort, type UpdateWorkItemResponse } from './agent-coordinator';
+import { AppMcpAgentCoordinator, McpToolError, type AnnouncementResponse, type CelebrationResponse, type DisplayMarkdownInput, type DisplayMarkdownResponse, type McpCreateAgentInput, type McpCreateAgentResponse, type MissionToolPort, type UpdateWorkItemResponse } from './agent-coordinator';
 import { agentMessagesPrompt, type MessageInfo } from './agent-prompts';
-import { ClawMcpHttpServer } from './http-server';
+import { AppMcpHttpServer } from './http-server';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway } from './hosted-mcp-gateway';
 import path from 'node:path';
 import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
 import { AgentCreationService } from '../agents/agent-creation-service';
-import type { ClawMcpToolModuleProvider } from './tool-modules';
+import type { AppMcpToolModuleProvider } from './tool-modules';
 import { createQuickChatProjectToolModuleProvider } from './quick-chat-project-tools';
 import type { CreatedProject } from '../projects/project-creation-service';
 import type { DurableTaskService } from '../agents/durable-task-service';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
-export type ClawMcpServiceOptions = {
+export type AppMcpServiceOptions = {
   tasks?: DurableTaskService;
   persistSnapshot?: () => Promise<void>;
   missionTools?: MissionToolPort;
@@ -68,20 +68,20 @@ export type ClawMcpServiceOptions = {
   worktreeManager?: WorktreeManager;
   agentCreation?: AgentCreationService;
   createProject?: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude') => Promise<CreatedProject>;
-  toolModuleProviders?: readonly ClawMcpToolModuleProvider[];
+  toolModuleProviders?: readonly AppMcpToolModuleProvider[];
 };
 
-export class ClawMcpService {
+export class AppMcpService {
   private readonly tasks?: DurableTaskService;
   private readonly persistSnapshot?: () => Promise<void>;
   private readonly snapshot: AppSnapshot;
-  private readonly coordinator: ClawMcpAgentCoordinator;
-  private readonly server: ClawMcpHttpServer;
+  private readonly coordinator: AppMcpAgentCoordinator;
+  private readonly server: AppMcpHttpServer;
   private readonly computerUseEnabled: () => boolean;
   private readonly now: () => Date;
   private readonly resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   private readonly worktreeManager: WorktreeManager;
-  private readonly queueSpokenAnnouncement?: ClawMcpServiceOptions['queueSpokenAnnouncement'];
+  private readonly queueSpokenAnnouncement?: AppMcpServiceOptions['queueSpokenAnnouncement'];
   private eventSink: ((event: BackendEvent) => void) | null = null;
   private driverRpc: BackendDriverRpc | null = null;
   private readonly queuedMessageIds = new Set<string>();
@@ -89,7 +89,7 @@ export class ClawMcpService {
   private readonly reviewTools = new ReviewToolRegistry();
   private readonly agentCreation: AgentCreationService;
 
-  constructor(options: ClawMcpServiceOptions) {
+  constructor(options: AppMcpServiceOptions) {
     this.tasks = options.tasks;
     this.persistSnapshot = options.persistSnapshot;
     this.snapshot = options.snapshot;
@@ -100,7 +100,7 @@ export class ClawMcpService {
     this.worktreeManager = options.worktreeManager ?? new WorktreeManager();
     this.agentCreation = options.agentCreation ?? new AgentCreationService(this.snapshot);
     this.eventSink = options.onEvent ?? null;
-    this.coordinator = new ClawMcpAgentCoordinator({
+    this.coordinator = new AppMcpAgentCoordinator({
       missionTools: options.missionTools,
       getAgents: () => this.snapshot.agents,
       now: this.now,
@@ -127,7 +127,7 @@ export class ClawMcpService {
       onCreateSourceWorktree: (input) => this.createSourceWorktree(input),
       onCreateAgent: (agent, input) => this.createAgentFromMcp(agent, input),
     });
-    this.server = new ClawMcpHttpServer({
+    this.server = new AppMcpHttpServer({
       coordinator: this.coordinator,
       computerUse: options.computerUse,
       computerUseEnabled: this.computerUseEnabled,

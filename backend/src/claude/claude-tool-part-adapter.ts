@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { RendererToolPart, RendererToolPartUpdate } from '@codex-claw/core/contracts';
+import type { RendererToolPart, RendererToolPartUpdate } from '@workspace/core/contracts';
 import type { ClaudeSdkContentBlock } from './protocol';
 
 type ClaudeToolUseBlock = Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>;
@@ -165,10 +165,10 @@ export function claudeToolPart(
 
   const mcp = mcpToolName(block.name);
   if (mcp) {
-    const clawTool = mcp.server === 'codex_claw' ? mcp.tool.replaceAll('_', '-') : '';
-    const presentedInput = clawTool === 'set-status'
+    const appTool = mcp.server === 'workspace' ? mcp.tool.replaceAll('_', '-') : '';
+    const presentedInput = appTool === 'set-status'
       ? statusInput(input)
-      : clawTool === 'finish-turn'
+      : appTool === 'finish-turn'
         ? finishTurnInput(input)
         : input;
     return toolPart(block, {

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AgentBackendDriver, BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
-import type { Agent } from '@codex-claw/core/contracts';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import type { AgentBackendDriver, BackendCodeReviewResult } from '@workspace/core/backend-driver';
+import type { Agent } from '@workspace/core/contracts';
 import { BackendDriverRpc } from '../driver-rpc';
-import { ClawBackendServer } from '../server';
+import { AppBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
 import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
 
-describe('ClawBackendServer code review workflow', () => {
+describe('AppBackendServer code review workflow', () => {
   it.each(['reviewing', 'fixing'] as const)('resumes a persisted %s session after startup connection detection without replacing the open context', async status => {
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = { path: '/repo', initialized: true, recentRepoNames: [] };
@@ -54,7 +54,7 @@ describe('ClawBackendServer code review workflow', () => {
       onEvent: () => () => undefined, close: vi.fn(),
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot, saveSnapshot,
       driverRpc: new BackendDriverRpc(new Map([['claude', driver]])),
       providerSetup: { isChanging: () => false, list: () => [{ backend: 'claude', installed: true }] } as never,
@@ -85,7 +85,7 @@ describe('ClawBackendServer code review workflow', () => {
   });
 
   it('rejects malformed finding decisions at the backend protocol boundary', async () => {
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot: createTestSnapshot(),
       codeReviewTools: {
         createReviewToolContext: () => ({ id: 'unused', url: 'http://review.test/mcp' }),
@@ -140,7 +140,7 @@ describe('ClawBackendServer code review workflow', () => {
       changedFiles: 2, addedLines: 12, removedLines: 3, hasUntracked: false,
       state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot,
       driverRpc: new BackendDriverRpc(new Map()),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
@@ -211,7 +211,7 @@ describe('ClawBackendServer code review workflow', () => {
       close: vi.fn(),
     };
     let context = 0;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test',
       snapshot,
       sendAgentMessage,
@@ -329,7 +329,7 @@ describe('ClawBackendServer code review workflow', () => {
       onEvent: () => () => undefined,
       close: vi.fn(),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
@@ -394,7 +394,7 @@ describe('ClawBackendServer code review workflow', () => {
       close: vi.fn(),
     };
     const closeReviewToolContext = vi.fn();
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
@@ -420,8 +420,8 @@ describe('ClawBackendServer code review workflow', () => {
   });
 });
 
-async function request(server: ClawBackendServer, method: string, params: unknown): Promise<import('@codex-claw/core/contracts').AppSnapshot> {
+async function request(server: AppBackendServer, method: string, params: unknown): Promise<import('@workspace/core/contracts').AppSnapshot> {
   const response = await server.handleMessage({ jsonrpc: '2.0', id: method, method, params });
   expect(response).toHaveProperty('result');
-  return (response as { result: import('@codex-claw/core/contracts').AppSnapshot }).result;
+  return (response as { result: import('@workspace/core/contracts').AppSnapshot }).result;
 }

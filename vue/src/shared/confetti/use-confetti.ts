@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { CelebrationKind } from '@codex-claw/core/contracts';
+import type { CelebrationKind } from '@workspace/core/contracts';
 
 export type ConfettiPiece = {
   id: string;

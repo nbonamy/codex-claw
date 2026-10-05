@@ -11,7 +11,7 @@ context.
 
 This document summarizes findings from
 `/Users/nbonamy/src/claude-code-source-code-full-main` and maps them against
-Codex Claw's current Codex app-server integration. The goal is to understand
+Korus's current Codex app-server integration. The goal is to understand
 Claude Code's websocket JSON solution, identify a viable Claude backend path,
 and name the places where Codex assumptions have leaked into our app-owned
 contracts.
@@ -27,14 +27,14 @@ inconsistent in a few direct-connect areas:
 - Those files are not present in the inspected folder.
 - The present `src/server/web/*` files implement a browser terminal over PTY.
   That is a terminal-streaming server, not the structured JSON agent protocol
-  Codex Claw wants.
+  Korus wants.
 
 So this document treats the client-side direct-connect protocol as real, but
 marks the missing server implementation as unresolved. We should verify against
 the installed Claude Code binary or a fuller source snapshot before building on
 the `claude server` path.
 
-## Existing Claw Integration Shape
+## Existing Korus Integration Shape
 
 Claude steering, same-folder native forks, and native goals enter through the
 existing driver/RPC capabilities. The transport keeps ownership of queued input
@@ -53,26 +53,26 @@ An asynchronous interrupt callback may only settle and release its own turn;
 it cannot clear a newer turn using the same session. Readiness and successful
 task completion remain separate concepts.
 
-Subscription usage is fetched on demand by `clawd`, using the configured Claude
+Subscription usage is fetched on demand by `daemon`, using the configured Claude
 home's OAuth login in place (macOS Keychain, credential file fallback elsewhere).
 Credentials never enter IPC, snapshots, or renderer state. The internal
 `api.anthropic.com/api/oauth/usage` endpoint requires `user:inference` and
 `user:profile` scopes and provides overall five-hour and weekly percentages.
 This is a CLI-internal endpoint, not a stable public SDK API; errors are bounded
 and surfaced separately from accounts without quotas. API-key/third-party
-billing has no subscription usage row. Claw does not refresh or rewrite OAuth
+billing has no subscription usage row. Korus does not refresh or rewrite OAuth
 credentials; an expired login needs to be refreshed through Claude Code.
 
 First-run onboarding offers Codex and Claude independently and requires an
 explicit Continue after at least one authenticates. Local Claude status is
-checked by `clawd` against the SDK's configured home; sign-in instructions use
+checked by `daemon` against the SDK's configured home; sign-in instructions use
 that exact directory and support both Claude subscriptions and Console API
 billing. Onboarding completion is persisted, but live engine authentication is
 not. A Claude-only installation does not need successful Codex authentication.
 Existing workspaces remain accessible when an engine is disconnected; new work
 requires a connected engine on its owning host.
 
-Codex Claw currently talks to provider runtimes through `clawd`. The daemon
+Korus currently talks to provider runtimes through `daemon`. The daemon
 owns the Codex app-server and Claude Code child processes, request routing, and
 provider-to-app event adaptation. Electron and Web clients consume app-owned
 backend events and `RendererMessage` shapes.
@@ -110,11 +110,11 @@ prompt send, interrupt, history hydration, rollback, request responses, model
 loading, and skill loading through the backend driver. Claude is represented in
 shared contracts and capabilities.
 
-Update, 2026-08-09: Codex Claw's Claude driver lives under
+Update, 2026-08-09: Korus's Claude driver lives under
 `backend/src/claude/` and now uses the official
 `@anthropic-ai/claude-agent-sdk` as its default transport. The SDK launches the
 Claude Code executable, so it keeps Claude Code's coding-agent
-behavior, local login, settings, skills, hooks, and project instructions. Claw
+behavior, local login, settings, skills, hooks, and project instructions. Korus
 does not call the Messages API directly or replace Claude Code with a generic
 model loop.
 
@@ -122,7 +122,7 @@ Claude Code installation is explicit in onboarding or Settings, including on
 remote hosts. SSH connection setup does not install a coding engine. The
 Anthropic installer owns its per-user
 `~/.local/bin/claude` launcher and `~/.local/share/claude/versions` directory;
-Claw does not copy Claude into its pinned Codex runtime directory. Remote
+Korus does not copy Claude into its pinned Codex runtime directory. Remote
 authentication is separate: the remote user signs in with Claude Code before
 running Claude agents there. If remote Claude installation fails, Codex remains
 available on that connection. Settings can retry installation independently.
@@ -135,12 +135,12 @@ Settings presents `claude auth login --claudeai` for a Claude subscription and
 `claude auth login --console` for Anthropic Console API billing. The user runs
 one command in an interactive shell on that host, then refreshes status.
 Claude Code owns the login and credentials;
-Claw does not move them between machines.
+Korus does not move them between machines.
 
-Each live Claude session owns one long-running Agent SDK query. Claw sends
+Each live Claude session owns one long-running Agent SDK query. Korus sends
 subsequent turns through that query's streaming input instead of spawning a new
 `claude -p` process for every prompt. A persisted agent with no live query is
-resumed through the SDK's `resume` option. Claw retains at most one idle live
+resumed through the SDK's `resume` option. Korus retains at most one idle live
 query per agent: switching conversations releases the previous query, while an
 agent-identity, instruction, MCP, or permission-safety change restarts and
 resumes the query so stale configuration cannot leak into later turns. The
@@ -159,8 +159,8 @@ the review finishes.
 
 - the Claude Code system-prompt and tool presets;
 - user, project, and local setting sources;
-- the active Claw agent's working directory, model, and permission mode;
-- Claw's agent-scoped collaboration MCP server and allowed-tool rule;
+- the active Korus agent's working directory, model, and permission mode;
+- Korus's agent-scoped collaboration MCP server and allowed-tool rule;
 - partial streaming events for responsive text and tool cards.
 
 The live Claude transport uses the Agent SDK and feeds its messages into one
@@ -184,15 +184,15 @@ transcript and maps SDK stream messages into immutable
 - `tool_result` blocks update those tool cards and their semantic lifecycle.
 - `result` completes the turn or emits an app error.
 
-Claude text currently has no equivalent explicit work/final phase in Claw's
+Claude text currently has no equivalent explicit work/final phase in Korus's
 adapter. It therefore remains unphased and uses the shared SDK renderer's
-existing flat message layout. Claw does not guess a final-answer boundary or
+existing flat message layout. Korus does not guess a final-answer boundary or
 label every Claude message as final; if the provider exposes reliable phase
 semantics later, the driver can populate the same provider-neutral fields.
 
 The host maintains one `ClaudeConversationSnapshot` per agent and publishes a
 bounded reset followed by revisioned provider deltas. The renderer applies
-those deltas with the shared Claude replica; `AppSnapshot` and the generic Claw
+those deltas with the shared Claude replica; `AppSnapshot` and the generic Korus
 coordination reducer never contain or mutate Claude messages.
 Conversation refreshes republish the snapshot of an open live session, preserving
 its message identities and turn state. Transcript history is used when no live
@@ -205,7 +205,7 @@ streaming display, session resume, and interrupt through the
 normalized into the Claude provider snapshot. Claude's `AskUserQuestion` tool
 is normalized to the provider's multi-question form, and the response is
 routed back to the blocked SDK tool call. Session-scoped and persistent
-permission suggestions back Claw's Allow for conversation and Always allow
+permission suggestions back Korus's Allow for conversation and Always allow
 choices.
 The main and split panes project pending permission parts into the shared SDK
 composer's `confirm_tool` requests, using the exact transcript tool-part ID.
@@ -215,7 +215,7 @@ Claude's proactive permission posture remains distinct from Codex approval
 presets. The composer renders a capability-driven Permissions submenu with
 Claude's own `default`, `acceptEdits`, `dontAsk`, `auto`, and
 `bypassPermissions` modes. Native `plan` permission mode remains behind
-Claw's separate Plan-mode control. The last permission choice is persisted in
+Korus's separate Plan-mode control. The last permission choice is persisted in
 the Claude branch of the agent defaults and routed to the Claude driver as an
 opaque mode ID. The driver validates the advertised mode before applying it;
 `bypassPermissions` also enables the Agent SDK's explicit dangerous-skip
@@ -223,22 +223,22 @@ safety gate. Codex continues to use its independent approval-preset contract
 and menu.
 Claude advertises prompt attachments through the shared composer. The Electron
 attachment registry resolves renderer-safe references before they reach
-`clawd`; the Agent SDK transport sends supported images, PDFs, and text/source
+`daemon`; the Agent SDK transport sends supported images, PDFs, and text/source
 files as native multimodal content blocks. Other binary files remain available
 to Claude Code by their trusted local path. Rollback and edit/retry remain
 disabled until those surfaces are implemented reliably for Claude. Model
 listing is local.
 Claude context usage comes from the Agent SDK's `getContextUsage()` control
-request and is normalized into Claw's provider-neutral context gauge after
+request and is normalized into Korus's provider-neutral context gauge after
 session initialization, turns, and compaction. Selecting a persisted Claude
 conversation also opens a short-lived, non-persisting SDK query to restore the
 exact gauge without sending a prompt or changing the transcript. Claude's
-automatic and manual compaction status/boundary messages reuse Claw's existing
+automatic and manual compaction status/boundary messages reuse Korus's existing
 compaction lifecycle.
 `/compact` (including optional summary instructions) remains a Claude-owned
-local command; Claw routes it without displaying a user prompt, and completed
+local command; Korus routes it without displaying a user prompt, and completed
 boundaries are restored from Claude transcript history.
-Skill listing is filesystem-derived: Claw reads user skills from `~/.claude/skills`
+Skill listing is filesystem-derived: Korus reads user skills from `~/.claude/skills`
 and project skills from `<agent-folder>/.claude/skills`, parses each
 `SKILL.md` frontmatter, and lets project skills override global skills with the
 same name.
@@ -246,7 +246,7 @@ Folderless Quick Chats use the user's home directory as Claude's runtime cwd,
 without assigning a project folder to the agent. Model discovery, turns, and
 transcript recovery use that same directory; skill discovery includes only
 user skills. Claude conversation references retain a null folder for these chats.
-Claude advertises `planMode: "prompted"`: Claw owns the composer Plan-mode
+Claude advertises `planMode: "prompted"`: Korus owns the composer Plan-mode
 flag, and when the renderer sends `planMode: true`, the driver keeps the prompt
 text unchanged and starts the Agent SDK turn with its native `permissionMode:
 "plan"`. This avoids relying on the interactive `/plan` slash command, which
@@ -256,13 +256,13 @@ a provider-specific plan flow:
 - `EnterPlanMode` marks the Claude session as planning.
 - `system/status.permissionMode: "plan"` is normalized to
   `conversation.modeUpdated`.
-- Claude may write a private plan file under `~/.claude/plans/...`; Claw treats
+- Claude may write a private plan file under `~/.claude/plans/...`; Korus treats
   that `Write` tool's streamed `content` as `turn.proposedPlanDelta` and does
   not render the private write as a generic chat tool.
-- `ExitPlanMode` carries the final `input.plan`; Claw normalizes it to
+- `ExitPlanMode` carries the final `input.plan`; Korus normalizes it to
   `turn.proposedPlanCompleted` and opens the app-owned plan preview.
 
-Claude's plan file is a provider artifact, not Claw's source of truth. The
+Claude's plan file is a provider artifact, not Korus's source of truth. The
 source of truth for the UI is the app-owned agent plan stored from normalized
 plan events. Plan comments keep `planMode` enabled and send a follow-up prompt
 so Claude can emit a new `ExitPlanMode` plan; confirming clears Plan mode and
@@ -289,7 +289,7 @@ displayable records:
 
 On agent selection or startup hydration, the Claude conversation host emits a
 `claude.conversationSnapshotChanged` frame. Later SDK and transcript events are
-transported in `claude.conversationEventReceived` frames. Claw owns the outer
+transported in `claude.conversationEventReceived` frames. Korus owns the outer
 agent/revision envelope but does not reinterpret the provider event.
 
 The Resume Session dialog opened from an agent's sidebar menu is the Claude
@@ -305,11 +305,11 @@ idle.
 
 The Agent SDK launches the configured executable directly rather than through
 a shell. Prompt and developer-instruction text is delivered over the SDK input
-stream and is not included in Claw's process logs.
+stream and is not included in Korus's process logs.
 
-Before a Claude session starts, Claw offers the safe local aliases `opus`,
+Before a Claude session starts, Korus offers the safe local aliases `opus`,
 `sonnet`, and `haiku`, with `sonnet` as the default. When a Claude agent is
-selected, Claw opens a short-lived Agent SDK query with session persistence
+selected, Korus opens a short-lived Agent SDK query with session persistence
 disabled, reads its initialization model catalog, and closes it without sending
 a prompt. The composer therefore refreshes to the SDK's current models after a
 restart without creating an empty Claude conversation. Display names,
@@ -319,21 +319,21 @@ effort is passed to the Agent SDK on the first turn and updated on later turns
 with its runtime flag settings API. Claude transcript hydration also reads the
 latest main-thread assistant model and effort from the JSONL record, so opening
 or reloading a conversation restores its own selection. When older history has
-no such metadata, Claw falls back to the last Claude model and effort used by
+no such metadata, Korus falls back to the last Claude model and effort used by
 that agent; resolved transcript model IDs are matched back to the SDK catalog's
 friendly model entry.
 
 The transport prepends common user binary folders such as `~/.local/bin`,
 `~/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` to `PATH` because packaged or
 GUI-launched Electron processes often do not inherit the user's shell PATH. Set
-`CODEX_CLAW_CLAUDE_COMMAND=/absolute/path/to/claude` to override executable
-resolution. If Claude Code emits the common unauthenticated stream result, Claw
+`APP_CLAUDE_COMMAND=/absolute/path/to/claude` to override executable
+resolution. If Claude Code emits the common unauthenticated stream result, Korus
 normalizes it to an actionable app error telling the user to open Claude Code
 and run `/login`.
 
 ## Configured Home Foundation
 
-Claw honors a process-wide `CLAUDE_CONFIG_DIR` for Claude SDK queries,
+Korus honors a process-wide `CLAUDE_CONFIG_DIR` for Claude SDK queries,
 transcript hydration, Resume Session discovery, personal skill discovery, and
 private plan streaming. SDK session deletion uses that same process environment.
 On startup, provider setup applies the persisted Claude home to the process;
@@ -344,12 +344,12 @@ directories and skips broken links.
 Personalization reads and writes `CLAUDE.md` in that configured home, so the
 editor and Claude's native instruction loading address the same file.
 
-New setups default to `~/.codex-claw/claude-home`, with personal skills linked
+New setups default to `~/.korus/claude-home`, with personal skills linked
 from the existing Claude home. Onboarding can select the existing home instead,
 or disable skill sharing. Existing private skill folders are never replaced.
 Existing Claude-enabled installations retain their current home; no history or
 credentials are copied. Provider homes are persisted in `general.providerHomes`.
-Changing a home is disallowed once that provider owns Claw agents. Before that,
+Changing a home is disallowed once that provider owns Korus agents. Before that,
 only its idle driver is replaced, without restarting the app or other provider.
 An isolated home requires its own authentication.
 
@@ -369,10 +369,10 @@ For an isolated authentication probe, use the unmodified CLI's own flow. Choose
 subscription login (`--claudeai`) or Console/API billing (`--console`):
 
 ```sh
-CLAUDE_CONFIG_DIR="$HOME/.codex-claw/claude-home" claude auth login --claudeai
+CLAUDE_CONFIG_DIR="$HOME/.korus/claude-home" claude auth login --claudeai
 # Alternatively, for Console/API billing:
-CLAUDE_CONFIG_DIR="$HOME/.codex-claw/claude-home" claude auth login --console
-CLAUDE_CONFIG_DIR="$HOME/.codex-claw/claude-home" claude auth status
+CLAUDE_CONFIG_DIR="$HOME/.korus/claude-home" claude auth login --console
+CLAUDE_CONFIG_DIR="$HOME/.korus/claude-home" claude auth status
 ```
 
 For an isolated Console-key probe, choose the CLI's API-key creation option
@@ -386,11 +386,11 @@ remote cutover must update the instructions and status check together.
 
 `configured-home.spec.ts` covers restart/history/resume routing, symlinked
 skills, private plan streaming, and real SDK deletion against temporary homes.
-Its scripted query tests prove Claw's routing, not browser login or live-model
+Its scripted query tests prove Korus's routing, not browser login or live-model
 session persistence. A live probe on 2026-10-02 with Claude Code 2.1.283 confirmed
 an authenticated first prompt followed by history hydration and a second prompt
 in a fresh Node process, retaining the same session ID and recalling the first
-prompt's marker. The probe used Claw's real driver/SDK transport with tools
+prompt's marker. The probe used Korus's real driver/SDK transport with tools
 disabled; it did not restart the desktop app or migrate existing conversations.
 
 That probe exposed Claude's canonical cwd storage (`/tmp` becomes `/private/tmp`
@@ -401,7 +401,7 @@ preserving logical-path history and reads for removed workspaces.
 ## Claude Websocket Surfaces
 
 Claude Code has three websocket-adjacent surfaces in the inspected source.
-Only the first two are relevant for a native structured Claw integration.
+Only the first two are relevant for a native structured Korus integration.
 
 ### CCR Remote Sessions
 
@@ -444,7 +444,7 @@ Reliability behavior:
 - treats `4001` as "session not found", but retries three times because
   compaction can briefly make a session look stale.
 
-This is valuable as protocol evidence, but it is not the right first Claw
+This is valuable as protocol evidence, but it is not the right first Korus
 backend because it depends on Anthropic-hosted sessions, OAuth org context,
 CCR APIs, and HTTP event submission.
 
@@ -458,7 +458,7 @@ Files:
 - `src/main.tsx` references feature-gated `claude server` and `claude open`
   flows, but the server implementation files are missing in this tree.
 
-This path is closer to what Codex Claw could own locally.
+This path is closer to what Korus could own locally.
 
 Session creation is HTTP:
 
@@ -574,7 +574,7 @@ It has useful transport patterns we should copy if we own a websocket transport:
 - close codes `1002`, `4001`, and `4003` are permanent unless `4003` can be
   recovered by refreshed auth headers.
 
-This is more robust than the direct-connect client. If Claw uses a websocket
+This is more robust than the direct-connect client. If Korus uses a websocket
 backend, it should use this design rather than the minimal
 `DirectConnectSessionManager` behavior.
 
@@ -591,7 +591,7 @@ terminal. Its websocket protocol mixes raw strings with small JSON control
 messages such as `resize`, `ping`, `pong`, `session`, `resumed`, `error`, and
 `exit`.
 
-This is not a good fit for Codex Claw. It recreates a terminal UI instead of
+This is not a good fit for Korus. It recreates a terminal UI instead of
 exposing structured assistant/tool events.
 
 ## Claude SDK Message Protocol
@@ -633,7 +633,7 @@ The existing Claude `sdkMessageAdapter` converts only a subset for its REPL:
 - `tool_progress` -> informational progress
 - many other types are ignored
 
-Claw should build its own adapter rather than reuse this REPL adapter directly,
+Korus should build its own adapter rather than reuse this REPL adapter directly,
 because we need native tool placement, app-owned statuses, and artifact panes.
 
 ### Control Messages
@@ -714,7 +714,7 @@ Important control request subtypes:
 - `reload_plugins`, `stop_task`, `apply_flag_settings`, `get_settings`.
 - `elicitation`: asks the SDK consumer to handle MCP elicitation.
 
-For Claw's first Claude milestone, the minimum useful set is:
+For Korus's first Claude milestone, the minimum useful set is:
 
 - incoming SDK message stream;
 - outbound `user`;
@@ -728,7 +728,7 @@ For Claw's first Claude milestone, the minimum useful set is:
 `set_model`, `set_permission_mode`, `get_context_usage`, `mcp_status`, and
 `elicitation` are useful next.
 
-## Recommended Claw Architecture
+## Recommended Korus Architecture
 
 Claude support should arrive as a backend driver in Electron main, not as
 renderer remote-session hooks.
@@ -750,7 +750,7 @@ The implemented ownership flow is:
 
 ```text
 Claude Agent SDK -> Claude conversation host -> provider snapshot/event
-                 -> Claw revisioned transport frame -> Claude renderer replica -> UI
+                 -> Korus revisioned transport frame -> Claude renderer replica -> UI
 ```
 
 ### Transport Choice
@@ -837,7 +837,7 @@ must receive a `control_response` error.
 
 ### Permissions
 
-Claude permission requests map cleanly to Claw's existing
+Claude permission requests map cleanly to Korus's existing
 `approval.requested` UI:
 
 - `tool_name` -> tool name.
@@ -857,7 +857,7 @@ Response mapping:
 
 ### MCP Enablement
 
-Do not globally mutate Claude Code MCP config for Claw.
+Do not globally mutate Claude Code MCP config for Korus.
 
 Likely options:
 
@@ -875,15 +875,15 @@ avoids mutating global user state.
 
 ### Models, Thinking, Skills
 
-The current Claw model and skill contracts are backend-neutral. Codex returns
+The current Korus model and skill contracts are backend-neutral. Codex returns
 its catalog from app-server; Claude refreshes its model catalog from the Agent
 SDK after session initialization and exposes only model-supported effort levels.
 
 Claude exposes model information through the Agent SDK and `system/init`
 messages. The SDK's `supportedModels()` response supplies model-specific effort
-levels, which Claw maps to its backend-neutral reasoning-effort picker and
+levels, which Korus maps to its backend-neutral reasoning-effort picker and
 passes as the SDK `effort` option. Adaptive thinking remains SDK-controlled for
-now: Claw does not expose a separate thinking-budget control.
+now: Korus does not expose a separate thinking-budget control.
 
 Claude `system/init` contains `skills`, `plugins`, `slash_commands`, and
 `tools`, but the inspected websocket protocol does not show a direct equivalent
@@ -912,7 +912,7 @@ Claude Driver Work".
   `planMode`, `goals`, and `skills`.
 - Previously, `AppSnapshot.appServer` described a single Codex app-server
   instead of a generic backend runtime.
-- Previously, `CodexClawApi` exposed `listCodexModels()` and
+- Previously, `AppApi` exposed `listCodexModels()` and
   `listCodexSkills()`.
 
 ### Main Process
@@ -963,7 +963,7 @@ Claude Driver Work".
 The local Agent SDK path, provider-owned conversation host, renderer replica,
 streaming, resume, permissions, user questions, plans, compaction, context, and
 interrupt are implemented. Remaining work should add provider capabilities
-without widening Claw's ownership:
+without widening Korus's ownership:
 
 - Codex-style active-turn steering;
 - Codex-style goals;
@@ -982,9 +982,9 @@ without widening Claw's ownership:
 - Is direct-connect websocket exactly one JSON object per frame, NDJSON per
   frame, or both? The client accepts NDJSON frames; outgoing direct-connect
   messages are single JSON strings.
-- Which Claude permission persistence options should map to Claw's
+- Which Claude permission persistence options should map to Korus's
   `allow_conversation` and `always_allow` buttons?
 - Does Claude have a safe equivalent to Codex `turn/rollback`, or should edit
   and retry start as unsupported for Claude agents?
 - Does Claude expose a richer runtime skills catalog than the filesystem
-  `SKILL.md` sources Claw currently parses?
+  `SKILL.md` sources Korus currently parses?

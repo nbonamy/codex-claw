@@ -4,8 +4,8 @@
     :class="`codex-login--${variant}`"
     :layout="variant === 'connecting' ? 'centered' : 'editorial'"
     :label="t(variant === 'connecting'
-      ? 'surface.codexLoginLanding.connectingToCodexClaw'
-      : 'surface.codexLoginLanding.signInToCodexClaw')"
+      ? 'surface.codexLoginLanding.connectingToApp'
+      : 'surface.codexLoginLanding.signInToApp')"
   >
     <div
       class="codex-login__content"
@@ -14,7 +14,7 @@
       <div class="codex-login__mark">
         <img
           :src="appIconUrl"
-          :alt="$t('surface.codexLoginLanding.codexClaw')"
+          :alt="$t('surface.codexLoginLanding.app')"
         >
       </div>
       <template v-if="variant === 'connecting'">
@@ -83,8 +83,8 @@ import { useI18n } from 'vue-i18n';
 import OnboardingLandingFrame from './OnboardingLandingFrame.vue';
 import BackendIcon from './BackendIcon.vue';
 import { CheckIcon } from '../shared/icons/app-icons';
-import type { AgentBackend } from '@codex-claw/core/contracts';
-import type { ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { AgentBackend } from '@workspace/core/contracts';
+import type { ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
 
 const appIconUrl = new URL('../../assets/icon.png', import.meta.url).href;
 

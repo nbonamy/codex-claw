@@ -1,6 +1,6 @@
 import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { conversationControllerActions, mountShell } from './app-shell-test-harness';
 import type { VisualizationAnnotationInput } from '../use-visualization-annotations';
 

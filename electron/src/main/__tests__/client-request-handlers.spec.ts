@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { createClientRequestHandlers } from '../client-request-handlers';
 
@@ -29,10 +30,10 @@ vi.mock('../computer-use-tools', async (importOriginal) => ({
 }));
 
 const computerUseOptions = () => ({
-  appPath: '/Applications/Codex Claw.app/Contents/Resources/app.asar',
+  appPath: `/Applications/${product.name}.app/Contents/Resources/app.asar`,
   isPackaged: true,
   platform: 'darwin' as const,
-  resourcesPath: '/Applications/Codex Claw.app/Contents/Resources',
+  resourcesPath: `/Applications/${product.name}.app/Contents/Resources`,
 });
 
 vi.mock('electron', () => ({

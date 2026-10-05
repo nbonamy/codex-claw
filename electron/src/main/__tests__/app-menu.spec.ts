@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MenuItemConstructorOptions } from 'electron';
 import { buildAppMenuTemplate, installAppMenu, type AppMenuCallbacks } from '../app-menu';
@@ -81,7 +82,7 @@ describe('app menu', () => {
   it('builds app-owned file, view, and agent menus with the native Edit menu', () => {
     const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
-    expect(menu.map((item) => item.label)).toStrictEqual(['Codex Claw', 'File', undefined, 'View', 'Agent', 'Window', 'Help']);
+    expect(menu.map((item) => item.label)).toStrictEqual([`${product.name}`, 'File', undefined, 'View', 'Agent', 'Window', 'Help']);
 
     expect(menuLabels(submenu(menu, 'File'))).toStrictEqual([
       'New Team',
@@ -213,7 +214,7 @@ describe('app menu', () => {
     expect(menuItem(menu, 'View', 'Browser')?.accelerator).toBe('CommandOrControl+B');
   });
 
-  it('offers update installation or checking in the Codex Claw menu', () => {
+  it(`offers update installation or checking in the ${product.name} menu`, () => {
     const checkForUpdates = vi.fn();
     const installUpdate = vi.fn();
     const menu = buildAppMenuTemplate({
@@ -222,7 +223,7 @@ describe('app menu', () => {
       installUpdate,
     }, { debugMode: false, updateStatus: { state: 'downloaded', version: '0.4.0' } }, 'darwin');
 
-    clickItem(menu, 'Codex Claw', 'Install Update and Relaunch');
+    clickItem(menu, `${product.name}`, 'Install Update and Relaunch');
     expect(installUpdate).toHaveBeenCalledOnce();
 
     const checkingMenu = buildAppMenuTemplate({
@@ -230,7 +231,7 @@ describe('app menu', () => {
       checkForUpdates,
       installUpdate,
     }, { debugMode: false, updateStatus: { state: 'checking' } }, 'darwin');
-    expect(menuItem(checkingMenu, 'Codex Claw', 'Checking for Updates...')).toMatchObject({ enabled: false });
+    expect(menuItem(checkingMenu, `${product.name}`, 'Checking for Updates...')).toMatchObject({ enabled: false });
 
     const idleMenuCallbacks = {
       ...callbacks(),
@@ -242,10 +243,10 @@ describe('app menu', () => {
       { debugMode: false, updateStatus: { state: 'idle' } },
       'darwin',
     );
-    clickItem(idleMenu, 'Codex Claw', 'Check for Updates...');
+    clickItem(idleMenu, `${product.name}`, 'Check for Updates...');
     expect(checkForUpdates).toHaveBeenCalledOnce();
-    expect(menuItem(idleMenu, 'Codex Claw', 'Settings...')?.accelerator).toBe('CommandOrControl+,');
-    clickItem(idleMenu, 'Codex Claw', 'Settings...');
+    expect(menuItem(idleMenu, `${product.name}`, 'Settings...')?.accelerator).toBe('CommandOrControl+,');
+    clickItem(idleMenu, `${product.name}`, 'Settings...');
     expect((idleMenu[0]?.submenu as MenuItemConstructorOptions[]).map((item) => item.type ?? item.role ?? item.label)).toStrictEqual([
       'about',
       'Check for Updates...',
@@ -258,7 +259,7 @@ describe('app menu', () => {
       'hideOthers',
       'unhide',
       'separator',
-      'Quit Codex Claw',
+      `Quit ${product.name}`,
     ]);
     expect(idleMenuCallbacks.sendAppCommand).toHaveBeenCalledWith({ type: 'open-settings' });
   });
@@ -280,7 +281,7 @@ describe('app menu', () => {
 
     const template = electronMenuMocks.buildFromTemplate.mock.calls.at(-1)?.[0];
     if (!Array.isArray(template)) throw new Error('Menu template was not built');
-    clickItem(template, 'Codex Claw', 'Check for Updates...');
+    clickItem(template, `${product.name}`, 'Check for Updates...');
 
     expect(checkForUpdates).toHaveBeenCalledOnce();
     expect(electronMenuMocks.setApplicationMenu).toHaveBeenCalledOnce();
@@ -340,7 +341,7 @@ describe('app menu', () => {
       'UI Previews',
       'Effects',
       'separator',
-      'Open Codex Claw Website',
+      `Open ${product.name} Website`,
     ]);
     expect(submenuLabels(debugMenu, 'Debug', 'Agent Fixtures')).toStrictEqual([
       'Send Message',
@@ -449,7 +450,7 @@ describe('app menu', () => {
     clickNestedItem(debugMenu, 'Debug', 'Effects', 'Stars');
     clickNestedItem(debugMenu, 'Debug', 'Effects', 'Shapes');
     clickNestedItem(debugMenu, 'Debug', 'Effects', 'School Pride');
-    clickItem(debugMenu, 'Debug', 'Open Codex Claw Website');
+    clickItem(debugMenu, 'Debug', `Open ${product.name} Website`);
 
     expect(debugCallbacks.reload).toHaveBeenCalledOnce();
     expect(debugCallbacks.toggleDeveloperTools).toHaveBeenCalledOnce();
@@ -496,7 +497,7 @@ describe('app menu', () => {
     });
     expect(debugCallbacks.sendAppCommand).toHaveBeenNthCalledWith(12, {
       type: 'open-browser',
-      url: 'https://codex-claw.nabocorp.com',
+      url: product.websiteUrl,
     });
     expect(electronClipboardMocks.readImage).toHaveBeenCalledOnce();
     expect(electronClipboardMocks.image.toDataURL).toHaveBeenCalledWith({ scaleFactor: 2 });

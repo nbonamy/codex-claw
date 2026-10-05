@@ -25,7 +25,7 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@codex-claw/core': path.resolve(__dirname, '../core/src'),
+      '@workspace/core': path.resolve(__dirname, '../core/src'),
     },
   },
   test: {

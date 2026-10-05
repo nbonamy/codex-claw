@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
-import { resolveRuntimeExecutable } from '@codex-claw/core/runtime-discovery';
+import { resolveRuntimeExecutable } from '@workspace/core/runtime-discovery';
 import { resolveCodexCommand } from './codex-command';
 import { backendHomeDir } from '../state';
 import { remoteCodexInstallCommand } from '../connections/remote-codex-install';
@@ -9,19 +10,19 @@ import { installProviderCli, providerHomePaths, type ProviderLifecycle } from '.
 
 export function createCodexLifecycle(): ProviderLifecycle {
   const paths = providerHomePaths('codex', process.env.CODEX_HOME);
-  const resources = (homePath: string) => ({ clawCodexHome: homePath, userCodexHome: paths.existing });
+  const resources = (homePath: string) => ({ appCodexHome: homePath, userCodexHome: paths.existing });
   return {
     home: (_snapshot, choice = { isolated: true, shareSkills: true }) => ({
       ...choice, homePath: choice.isolated ? paths.isolated : paths.existing,
     }),
     installed: snapshot => Boolean(resolveRuntimeExecutable(resolveCodexCommand(snapshot.general.codexBinaryPath,
-      { bundledPath: process.env.CODEX_CLAW_BUNDLED_CODEX_PATH }) || 'codex')),
+      { bundledPath: process.env.APP_BUNDLED_CODEX_PATH }) || 'codex')),
     async prepareHome(home, configuring) {
       await mkdir(home.homePath, { recursive: true, mode: 0o700 });
       if (!home.isolated) return;
       await initializeCodexResourceSharing(home.shareSkills, resources(home.homePath));
       if (configuring && (await getCodexResourceSharingStatus(home.shareSkills, resources(home.homePath))).migrationRequired) {
-        throw new Error('This Claw home already has private skills or plugins. They were kept; disable sharing to continue.');
+        throw new Error(`This ${product.name} home already has private skills or plugins. They were kept; disable sharing to continue.`);
       }
     },
     install: () => installProviderCli(remoteCodexInstallCommand(path.join(backendHomeDir(), 'codex'))),

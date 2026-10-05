@@ -1,9 +1,9 @@
-import type { Agent, AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
-import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import { createEntityId } from '@codex-claw/core/ids';
-import { isMissionArtifacts, missionTicketReady, type Mission, type MissionArtifacts, type MissionReviewFinding, type MissionStage } from '@codex-claw/core/missions';
-import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionImplementationStartProgress, type MissionResultInput, type MissionReviewFindingInput, type MissionReviewFindingUpdateInput, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import type { Agent, AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@workspace/core/contracts';
+import { createAgentInSnapshot } from '@workspace/core/agent-manager';
+import { createEntityId } from '@workspace/core/ids';
+import { isMissionArtifacts, missionTicketReady, type Mission, type MissionArtifacts, type MissionReviewFinding, type MissionStage } from '@workspace/core/missions';
+import { missionWorkflow } from '@workspace/core/mission-workflows';
+import { pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionImplementationStartProgress, type MissionResultInput, type MissionReviewFindingInput, type MissionReviewFindingUpdateInput, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@workspace/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { MissionAgentTools } from './mission-agent-tools';
 import { missionAgent, missionTeamRepositories, sameSkills, shouldCompactBeforeRun, stageKickoffPrompt } from './mission-execution-policy';
@@ -720,6 +720,6 @@ function missionFindingFixPrompt(mission: Mission, findings: MissionReviewFindin
       finding.body,
       '',
     ]),
-    'Apply each fix only inside the Mission worktree mapped to its repository. Keep fixes focused and verify each one. Commit the verified remediation in one or more coherent local commits before marking findings fixed; do not push. After each finding is fixed and committed, call codex_claw.update-mission-review-finding with its ID, status "fixed", and concise verification evidence. Do not submit another Review result or start another review round.',
+    'Apply each fix only inside the Mission worktree mapped to its repository. Keep fixes focused and verify each one. Commit the verified remediation in one or more coherent local commits before marking findings fixed; do not push. After each finding is fixed and committed, call workspace.update-mission-review-finding with its ID, status "fixed", and concise verification evidence. Do not submit another Review result or start another review round.',
   ].join('\n');
 }

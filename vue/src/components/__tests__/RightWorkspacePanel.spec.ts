@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElTooltip } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentSubagentTree, OpenInApplicationCatalog, RendererMessage } from '@codex-claw/core/contracts';
+import type { AgentSubagentTree, OpenInApplicationCatalog, RendererMessage } from '@workspace/core/contracts';
 import RightWorkspacePanel from '../RightWorkspacePanel.vue';
 import BrowserPanel from '../BrowserPanel.vue';
 import { rightWorkspaceFileTab, type RightWorkspaceFilePanel, type RightWorkspaceFileTab, type RightWorkspaceImagePanel, type RightWorkspaceImageTab, type RightWorkspaceTab } from '../right-workspace';
@@ -15,7 +16,7 @@ class ResizeObserverStub {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  delete window.codexClaw;
+  delete window.app;
 });
 
 function mountPanel(
@@ -32,7 +33,7 @@ function mountPanel(
   },
 ) {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
-  window.codexClaw = {
+  window.app = {
     browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
     browserSetBounds: vi.fn().mockResolvedValue(undefined),
     browserSetVisible: vi.fn().mockResolvedValue(undefined),
@@ -82,7 +83,7 @@ describe('RightWorkspacePanel', () => {
     expect(wrapper.find('[aria-label="Drop link to open in sidebar"]').exists()).toBe(false);
     expect(wrapper.findComponent(BrowserPanel).exists()).toBe(true);
   });
-  it('shows a Claw launcher when no workspace tab has been opened', async () => {
+  it(`shows a ${product.name} launcher when no workspace tab has been opened`, async () => {
     const wrapper = mountPanel([], null);
 
     expect(wrapper.get('[aria-label="Open a workspace tab"]').text()).toContain('Review');
@@ -277,20 +278,20 @@ describe('RightWorkspacePanel', () => {
   it('renders an existing repository backlog without offering it in the add-tab menu', async () => {
     const startRepositoryWork = vi.fn().mockResolvedValue(undefined);
     const launcher = mountPanel([], null);
-    await launcher.setProps({ githubRepository: 'nbonamy/codex-claw' });
+    await launcher.setProps({ githubRepository: 'nbonamy/agent-workspace' });
 
     expect(launcher.get('[aria-label="Open a workspace tab"]').text()).not.toContain('Backlog');
 
     const wrapper = mountPanel(['backlog'], 'backlog');
     await wrapper.setProps({
-      githubRepository: 'nbonamy/codex-claw',
+      githubRepository: 'nbonamy/agent-workspace',
       startRepositoryWork,
     });
 
     expect(wrapper.get('[role="tab"]').text()).toBe('Backlog');
     expect(wrapper.get('[role="tab"]').findComponent({ name: 'BacklogIcon' }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'RepositoryBacklogPanel' }).props()).toMatchObject({
-      repositoryId: 'nbonamy/codex-claw',
+      repositoryId: 'nbonamy/agent-workspace',
       startWorkAction: startRepositoryWork,
     });
 
@@ -486,7 +487,7 @@ describe('RightWorkspacePanel', () => {
   it('keeps the native browser visible while tab menus open and close', async () => {
     const wrapper = mountPanel(['browser'], 'browser');
     await flushPromises();
-    const browserSetVisible = vi.mocked(window.codexClaw!.browserSetVisible);
+    const browserSetVisible = vi.mocked(window.app!.browserSetVisible);
     browserSetVisible.mockClear();
 
     await wrapper.get('.right-workspace-panel__tab').trigger('contextmenu');

@@ -1,3 +1,4 @@
+import { product } from '../product';
 import { expect, it } from 'vitest';
 
 import { createInitialSnapshot } from '../snapshot-construction';
@@ -24,10 +25,10 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).toContain('Check permissions');
     expect(prompt).toContain('User-provided context and feedback:');
     expect(prompt).toContain('Only owners');
-    expect(prompt).toContain('codex_claw.submit-mission-result');
-    expect(prompt).toContain('codex_claw.list-mission-artifacts');
-    expect(prompt).toContain('codex_claw.read-mission-artifact');
-    expect(prompt).toContain('codex_claw.write-mission-artifact');
+    expect(prompt).toContain('workspace.submit-mission-result');
+    expect(prompt).toContain('workspace.list-mission-artifacts');
+    expect(prompt).toContain('workspace.read-mission-artifact');
+    expect(prompt).toContain('workspace.write-mission-artifact');
     if (stage === 'tickets') {
       expect(prompt).toContain('Continue as the same Mission orchestrator');
     }
@@ -40,7 +41,7 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
       expect(prompt).toContain('After submission succeeds, end with one or two short, natural sentences');
       expect(prompt).not.toContain('Do not edit source checkouts or other Mission worktrees');
     }
-    expect(prompt).toContain('Claw-owned Mission skill');
+    expect(prompt).toContain(`${product.name}-owned Mission skill`);
     expect(prompt).toContain('already visible in the Mission workspace');
     expect(missionDeveloperInstructions(mission, { ...run, skills: [], ticketIndex: undefined, feedback: '' })).toContain('no agent-run skill');
   }

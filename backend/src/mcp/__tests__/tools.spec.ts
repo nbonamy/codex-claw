@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import * as z from 'zod/v4';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ClawMcpAgentCoordinator } from '../agent-coordinator';
+import type { AppMcpAgentCoordinator } from '../agent-coordinator';
 import { McpToolError } from '../agent-coordinator';
 import { STRUCTURED_TOOL_RESULT_NOTICE } from '../tool-result';
 
@@ -31,7 +32,7 @@ vi.mock('../../log', () => ({
   warnMain: mocks.warnMain,
 }));
 
-import { createClawMcpServer } from '../tools';
+import { createAppMcpServer } from '../tools';
 import { createCollaborationToolModuleProvider } from '../collaboration-tools';
 import { createMissionToolModuleProvider } from '../mission-tools';
 import { createMissionReviewToolModuleProvider } from '../mission-review-tools';
@@ -41,7 +42,7 @@ import type { InAppBrowserClient } from '../browser-tools';
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 
-describe('Codex Claw MCP tool registration', () => {
+describe(`${product.name} MCP tool registration`, () => {
   const handlers = new Map<string, ToolHandler>();
   const coordinator = {
     missionContext: vi.fn(),
@@ -117,7 +118,7 @@ describe('Codex Claw MCP tool registration', () => {
 
     const registration = mocks.registerTool.mock.calls.find(([name]) => name === 'create-agent');
     const definition = registration?.[1] as { description: string; inputSchema: Record<string, unknown> } | undefined;
-    expect(definition?.description).toContain('Codex Claw co-agent');
+    expect(definition?.description).toContain(`${product.name} co-agent`);
     expect(Object.keys(definition?.inputSchema ?? {})).toStrictEqual([
       'requestId',
       'task',
@@ -154,9 +155,9 @@ describe('Codex Claw MCP tool registration', () => {
     ['update-work-item', { workItemId: 'github:o/r#1', status: 'readyForReview' }, 'updateWorkItem', ['agent-dina', 'github:o/r#1', 'readyForReview', undefined]],
     ['update-work-item', { workItemId: 'github:o/r#1', status: 'blocked', note: 'Need API access' }, 'updateWorkItem', ['agent-dina', 'github:o/r#1', 'blocked', 'Need API access']],
     ['list-repos', {}, 'listSourceRepositories', ['agent-dina']],
-    ['list-worktrees', { repoPath: '/src/claw' }, 'listSourceWorktrees', ['agent-dina', '/src/claw']],
-    ['create-worktree', { repoPath: '/src/claw', branchName: 'tests' }, 'createSourceWorktree', ['agent-dina', { repoPath: '/src/claw', branchName: 'tests' }]],
-    ['create-agent', { repoPath: '/src/claw', backend: 'claude' }, 'createAgent', ['agent-dina', { repoPath: '/src/claw', backend: 'claude' }]],
+    ['list-worktrees', { repoPath: '/src/app' }, 'listSourceWorktrees', ['agent-dina', '/src/app']],
+    ['create-worktree', { repoPath: '/src/app', branchName: 'tests' }, 'createSourceWorktree', ['agent-dina', { repoPath: '/src/app', branchName: 'tests' }]],
+    ['create-agent', { repoPath: '/src/app', backend: 'claude' }, 'createAgent', ['agent-dina', { repoPath: '/src/app', backend: 'claude' }]],
     ['display-markdown', { markdown: '# Report' }, 'displayMarkdown', ['agent-dina', { markdown: '# Report' }]],
   ])('adapts %s arguments to the coordinator', async (tool, input, method, expectedArguments) => {
     createServer();
@@ -239,19 +240,19 @@ describe('Codex Claw MCP tool registration', () => {
 
   it('preserves every optional creation and display field', async () => {
     createServer();
-    coordinator.createSourceWorktree.mockResolvedValue({ path: '/src/claw-tests' });
+    coordinator.createSourceWorktree.mockResolvedValue({ path: '/src/app-tests' });
     coordinator.createAgent.mockResolvedValue({ success: true });
     coordinator.displayMarkdown.mockResolvedValue({ success: true });
 
     await handlers.get('create-worktree')?.({
-      repoPath: '/src/claw',
+      repoPath: '/src/app',
       branchName: 'tests',
-      destinationPath: '/src/claw-tests',
+      destinationPath: '/src/app-tests',
     });
     expect(coordinator.createSourceWorktree).toHaveBeenCalledWith('agent-dina', {
-      repoPath: '/src/claw',
+      repoPath: '/src/app',
       branchName: 'tests',
-      destinationPath: '/src/claw-tests',
+      destinationPath: '/src/app-tests',
     });
 
     const agentInput = {
@@ -259,10 +260,10 @@ describe('Codex Claw MCP tool registration', () => {
       backend: 'codex',
       model: 'gpt-5.6-sol',
       reasoningEffort: 'high',
-      repoPath: '/src/claw',
+      repoPath: '/src/app',
       createWorktree: true,
       branchName: 'tests',
-      destinationPath: '/src/claw-tests',
+      destinationPath: '/src/app-tests',
       prompt: 'Run the focused tests and fix the failure.',
     };
     await handlers.get('create-agent')?.(agentInput);
@@ -294,8 +295,8 @@ describe('Codex Claw MCP tool registration', () => {
   });
 
   function createServer(computerUse?: ComputerUseClient, browser?: InAppBrowserClient) {
-    const typedCoordinator = coordinator as unknown as ClawMcpAgentCoordinator;
-    return createClawMcpServer({
+    const typedCoordinator = coordinator as unknown as AppMcpAgentCoordinator;
+    return createAppMcpServer({
       agentId: 'agent-dina',
       url: new URL('http://127.0.0.1/mcp?agentId=agent-dina'),
     }, [

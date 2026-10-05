@@ -1,1 +1,1 @@
-export const seedTeamId = 'team-codex-claw';
+export const seedTeamId = 'team-app';

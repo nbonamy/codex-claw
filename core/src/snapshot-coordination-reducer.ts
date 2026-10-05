@@ -3,7 +3,7 @@ import { setAgentStatusInSnapshot } from './agent-manager';
 import type { SnapshotEventOwnedBy } from './snapshot-event-ownership';
 import { agentConversationId, planReviewFromEvent } from './plan-review';
 
-/** Applies Claw-owned prompt, approval, and diff projections. */
+/** Applies App-owned prompt, approval, and diff projections. */
 export function applyCoordinationEventToSnapshot(
   snapshot: AppSnapshot,
   event: SnapshotEventOwnedBy<'coordination'>,

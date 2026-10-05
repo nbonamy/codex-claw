@@ -1,5 +1,6 @@
+import { product } from '@workspace/core/product';
 import os from 'node:os';
-import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
+import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse } from '@workspace/core/agent-request';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
@@ -26,13 +27,13 @@ import type {
   SubagentIdentityChange,
   SubagentOperationChange,
   SubagentStatusChange
-} from '@codex-claw/core/contracts';
-import type { BackendCodeReviewInput, BackendCodeReviewResult, BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { codexApprovalPresetFromDefaults } from '@codex-claw/core/codex-approval-presets';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { agentFolder } from '@codex-claw/core/agent-folder';
-import { shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
+} from '@workspace/core/contracts';
+import type { BackendCodeReviewInput, BackendCodeReviewResult, BackendEvent, BackendTextGenerationInput, BackendTextGenerationResult } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { codexApprovalPresetFromDefaults } from '@workspace/core/codex-approval-presets';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { agentFolder } from '@workspace/core/agent-folder';
+import { shouldSyncConversationTitleFromAgent } from '@workspace/core/conversation-title';
 import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
 import type {
   CodexConversationEvent,
@@ -392,7 +393,7 @@ export class CodexSurfaceAgentAdapter {
   async setApprovalPreset(agent: Agent, preset: ApprovalPreset) {
     const session = await this.ensureSession(agent);
     const effective = effectiveApprovalPreset(preset, session.handle.getSnapshot().approvalPresets);
-    if (!effective) throw new Error('No Claw approval preset satisfies the Codex app-server requirements.');
+    if (!effective) throw new Error(`No ${product.name} approval preset satisfies the Codex app-server requirements.`);
     await invokeCodexConversationBridgeOperation(
       this.surface, session.handle.id, 'updateConversationSettings', [{ approvalPreset: effective }],
     );
@@ -780,7 +781,7 @@ export class CodexSurfaceAgentAdapter {
         await this.renameSessionIfNeeded(session, agentDisplayName(agent));
       }
     } catch {
-      // Naming is best effort and must not prevent the first prompt. clawd
+      // Naming is best effort and must not prevent the first prompt. daemon
       // retries through its normal post-session title synchronization.
     }
     return session;
@@ -862,7 +863,7 @@ export class CodexSurfaceAgentAdapter {
       const interruptedTurnId = snapshot.activeTurnId;
       const resumedActiveGoal = snapshot.goal?.status === 'active';
       if (interruptedTurnId && !resumedActiveGoal) {
-        // A newly created Claw backend has no ownership of an old in-progress
+        // A newly created App backend has no ownership of an old in-progress
         // turn unless app-server is continuing a persistent goal. Leaving a
         // genuinely orphaned turn active permanently disables the composer
         // after an app restart, so ask app-server to end only that case before

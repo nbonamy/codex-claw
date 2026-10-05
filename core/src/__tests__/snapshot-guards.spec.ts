@@ -67,7 +67,7 @@ describe('snapshot guards', () => {
       { name: 'work backlog provider settings', mutate: (snapshot) => { snapshot.workBacklog.providerSettings.github!.oauthClientId = 42 as never; } },
       { name: 'work backlog assignment', mutate: (snapshot) => { snapshot.workBacklog.assignments.item!.status = 'working' as never; } },
       { name: 'remote connection', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.status = 'connected' as never; } },
-      { name: 'remote clawd version', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.clawdVersion = 42 as never; } },
+      { name: 'remote daemon version', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.daemonVersion = 42 as never; } },
       { name: 'remote Codex version', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.codexVersion = 42 as never; } },
       { name: 'remote transport', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.transport!.args = [42 as never]; } },
       { name: 'general settings', mutate: (snapshot) => { snapshot.general.celebrationsEnabled = 'yes' as never; } },
@@ -136,11 +136,11 @@ function completeSnapshot(): AppSnapshot {
     delegatedByAgentId: 'agent-parent',
     pullRequest: {
       provider: 'github',
-      repository: 'openai/codex-claw',
+      repository: 'openai/agent-workspace',
       branch: 'feature/deep-guards',
       number: 12,
       title: 'Deepen snapshot validation',
-      url: 'https://github.com/openai/codex-claw/pull/12',
+      url: 'https://github.com/openai/agent-workspace/pull/12',
       draft: false,
       headSha: 'abc123',
       state: 'open',
@@ -151,12 +151,12 @@ function completeSnapshot(): AppSnapshot {
     workspace: {
       kind: 'git',
       folder: '/repo',
-      repositoryName: 'codex-claw',
+      repositoryName: 'agent-workspace',
       repositoryRoot: '/repo',
       branch: 'feature/deep-guards',
       isLinkedWorktree: true,
       primaryWorktreeRoot: '/repo-main',
-      originUrl: 'git@github.com:openai/codex-claw.git',
+      originUrl: 'git@github.com:openai/agent-workspace.git',
       updatedAt: '2026-09-04T00:00:00.000Z',
     },
     backendSession: { kind: 'codex', threadId: 'thread-codex' },
@@ -244,7 +244,7 @@ function completeSnapshot(): AppSnapshot {
     enabled: true,
     repositories: [{
       provider: 'github',
-      sourceId: 'openai/codex-claw',
+      sourceId: 'openai/agent-workspace',
       executionRepositoryPath: '/repo',
     }],
     teamId: snapshot.teams[0]!.id,
@@ -263,14 +263,14 @@ function completeSnapshot(): AppSnapshot {
         agentName: 'Dina',
         workItemId: 'issue-1',
         workItemTitle: 'Deep guards',
-        workItemUrl: 'https://github.com/openai/codex-claw/issues/1',
+        workItemUrl: 'https://github.com/openai/agent-workspace/issues/1',
         conversationRef: { backend: 'codex', threadId: 'thread-codex' },
       }, {
         agentId: claudeAgent.id,
         agentName: 'Claude',
         workItemId: 'issue-2',
         workItemTitle: 'More guards',
-        workItemUrl: 'https://github.com/openai/codex-claw/issues/2',
+        workItemUrl: 'https://github.com/openai/agent-workspace/issues/2',
         conversationRef: { backend: 'claude', folder: '/repo', sessionId: 'session-claude' },
       }],
     }],
@@ -330,8 +330,8 @@ function completeSnapshot(): AppSnapshot {
   snapshot.agentGitStatuses = {
     agent: {
       folder: '/repo',
-      repository: 'codex-claw',
-      githubRepository: 'openai/codex-claw',
+      repository: 'agent-workspace',
+      githubRepository: 'openai/agent-workspace',
       branch: 'feature/deep-guards',
       upstream: 'origin/feature/deep-guards',
       ahead: 1,
@@ -448,7 +448,7 @@ function completeSnapshot(): AppSnapshot {
       connectedAt: '2026-09-04T00:00:00.000Z',
     }],
     providerConfigurations: {
-      github: { sourceId: 'openai/codex-claw', assigneeLogin: 'octocat', tagName: 'codex' },
+      github: { sourceId: 'openai/agent-workspace', assigneeLogin: 'octocat', tagName: 'codex' },
     },
     providerSettings: {
       github: { oauthClientId: 'client-id' },
@@ -491,7 +491,7 @@ function completeSnapshot(): AppSnapshot {
   };
   snapshot.general.plugins = { computerUseEnabled: true, chromeEnabled: true };
   snapshot.general.repositoryIcons = { repo: '🦞' };
-  snapshot.sourceFolder = { path: '/repo', initialized: true, recentRepoNames: ['codex-claw'] };
+  snapshot.sourceFolder = { path: '/repo', initialized: true, recentRepoNames: ['agent-workspace'] };
   snapshot.theme = { id: 'dark', mode: 'system', uiFontSize: 14, chatFontSize: 15, codeFontSize: 13 };
   return snapshot;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { projectCockpitAgentSections } from '../cockpit-agent-layout';
 
 describe('projectCockpitAgentSections', () => {

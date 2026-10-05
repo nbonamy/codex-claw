@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsIntegrationsPanel from '../SettingsIntegrationsPanel.vue';
@@ -84,9 +85,9 @@ describe('SettingsIntegrationsPanel', () => {
     expect(wrapper.text()).toContain('ABCD-1234');
     expect(wrapper.text()).toContain('Step 1: Copy the code');
     expect(wrapper.text()).toContain('Step 2: Open GitHub');
-    expect(wrapper.text()).toContain('GitHub will ask for the code. Paste it there, authorize Codex Claw, then come back here.');
+    expect(wrapper.text()).toContain(`GitHub will ask for the code. Paste it there, authorize ${product.name}, then come back here.`);
     expect(wrapper.text()).toContain('Step 3: Come back here');
-    expect(wrapper.text()).toContain('Codex Claw will finish the connection automatically once GitHub approves it.');
+    expect(wrapper.text()).toContain(`${product.name} will finish the connection automatically once GitHub approves it.`);
     expect(wrapper.find('[aria-label="Waiting for GitHub authorization"]').exists()).toBe(true);
 
     wrapper.getComponent({ name: 'WorkAuthorizationSteps' }).vm.$emit('open');

@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import AppMenu from '../../shared/menu/AppMenu.vue';
 import CockpitAgentsView from '../CockpitAgentsView.vue';
 import CockpitView from '../CockpitView.vue';

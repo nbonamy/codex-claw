@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { RemoteConnection } from '@codex-claw/core/contracts';
+import type { RemoteConnection } from '@workspace/core/contracts';
 import RemoteClaudeAuthentication from '../RemoteClaudeAuthentication.vue';
 
 const connection: RemoteConnection = {
@@ -41,7 +41,7 @@ describe('RemoteClaudeAuthentication', () => {
       await flushPromises();
       expect(writeText).toHaveBeenLastCalledWith('env -u CLAUDE_CONFIG_DIR claude auth login --console');
       expect(writeText).toHaveBeenCalledTimes(2);
-      (document.body.querySelector('.claw-dialog__footer .claw-button--primary') as HTMLButtonElement).click();
+      (document.body.querySelector('.app-dialog__footer .app-button--primary') as HTMLButtonElement).click();
       await flushPromises();
       expect(wrapper.text()).toContain('Claude connected');
       expect(document.body.querySelector('.remote-claude-auth__command')).toBeNull();

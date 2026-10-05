@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { ElPopover } from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
-import type { Agent, Team } from '@codex-claw/core/contracts';
+import type { Agent, Team } from '@workspace/core/contracts';
 
 import {
   agents,
@@ -19,7 +20,7 @@ describe('AgentSidebar interactions', () => {
         agents: [{ ...agents[0], backendSession: { kind: 'codex', threadId: 'thread-dina' } }, agents[1]],
         activeAgentId: 'agent-dina',
         forkableAgentIds: ['agent-dina'],
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -33,10 +34,10 @@ describe('AgentSidebar interactions', () => {
   it('emits move targets from the context menu submenu', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
-        agents: agents.map((agent) => ({ ...agent, teamId: 'team-codex-claw' })),
+        agents: agents.map((agent) => ({ ...agent, teamId: 'team-app' })),
         activeAgentId: 'agent-dina',
         teams,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -65,10 +66,10 @@ describe('AgentSidebar interactions', () => {
     };
     const wrapper = mount(AgentSidebar, {
       props: {
-        agents: agents.map((agent) => ({ ...agent, teamId: 'team-codex-claw' })),
+        agents: agents.map((agent) => ({ ...agent, teamId: 'team-app' })),
         activeAgentId: 'agent-dina',
         teams: [...teams, remoteTeam],
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -117,7 +118,7 @@ describe('AgentSidebar interactions', () => {
     });
 
     expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Skwad')).toBe(false);
-    expect(portaledMenuItems().some((item) => item.textContent?.trim() === 'Codex Claw')).toBe(false);
+    expect(portaledMenuItems().some((item) => item.textContent?.trim() === `${product.name}`)).toBe(false);
   });
 
   it('closes the context menu when the menu emits close', async () => {
@@ -125,7 +126,7 @@ describe('AgentSidebar interactions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -149,7 +150,7 @@ describe('AgentSidebar interactions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -166,7 +167,7 @@ describe('AgentSidebar interactions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
         width: 180,
         minWidth: 220,
         maxWidth: 420,
@@ -186,7 +187,7 @@ describe('AgentSidebar interactions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
         width: 40,
       },
       global: {
@@ -203,7 +204,7 @@ describe('AgentSidebar interactions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
         width: 260,
         minWidth: 220,
         maxWidth: 420,
@@ -227,7 +228,7 @@ describe('AgentSidebar interactions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
         width: 260,
       },
       global: {
@@ -248,7 +249,7 @@ describe('AgentSidebar interactions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },

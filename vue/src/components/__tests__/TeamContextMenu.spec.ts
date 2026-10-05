@@ -1,11 +1,12 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TeamContextMenu from '../TeamContextMenu.vue';
-import type { Team } from '@codex-claw/core/contracts';
+import type { Team } from '@workspace/core/contracts';
 
 const team: Team = {
-  id: 'team-codex-claw',
-  name: 'Codex Claw',
+  id: 'team-app',
+  name: `${product.name}`,
   avatar: 'CC',
   color: '#1B4FB2',
   agentIds: ['agent-dina'],
@@ -39,7 +40,7 @@ describe('TeamContextMenu', () => {
 
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Team')?.trigger('click');
 
-    expect(wrapper.emitted('edit-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('edit-team')).toStrictEqual([['team-app']]);
   });
 
   it('requests close for the selected team', async () => {
@@ -47,7 +48,7 @@ describe('TeamContextMenu', () => {
 
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Close Team')?.trigger('click');
 
-    expect(wrapper.emitted('request-close-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('request-close-team')).toStrictEqual([['team-app']]);
   });
 
   it('shows separate disconnect and delete actions for remote teams', async () => {
@@ -68,8 +69,8 @@ describe('TeamContextMenu', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Disconnect')?.trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Delete Team')?.trigger('click');
 
-    expect(wrapper.emitted('request-disconnect-team')).toStrictEqual([['team-codex-claw']]);
-    expect(wrapper.emitted('request-close-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('request-disconnect-team')).toStrictEqual([['team-app']]);
+    expect(wrapper.emitted('request-close-team')).toStrictEqual([['team-app']]);
   });
 
   it('disables close when the rail has only one team', async () => {

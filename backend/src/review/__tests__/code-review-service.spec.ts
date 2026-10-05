@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, AppSnapshot, BackendSession } from '@codex-claw/core/contracts';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { activeCodeReviewRound, codeReviewLedger } from '@codex-claw/core/code-review';
+import type { Agent, AppSnapshot, BackendSession } from '@workspace/core/contracts';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import { activeCodeReviewRound, codeReviewLedger } from '@workspace/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from '../code-review-service';
 import type { ReviewToolHandlers } from '../review-tool-registry';
 import { AgentCreationService } from '../../agents/agent-creation-service';
@@ -88,7 +88,7 @@ describe('CodeReviewService', () => {
       kind: 'codex', model: 'gpt-5.6-sol', reasoningEffort: 'high',
     };
     test.owner.workspace = {
-      kind: 'git', folder: '/repo', repositoryName: 'claw', repositoryRoot: '/repo',
+      kind: 'git', folder: '/repo', repositoryName: 'app', repositoryRoot: '/repo',
       branch: 'feat/review', isLinkedWorktree: false, primaryWorktreeRoot: '/repo',
       updatedAt: '2026-09-19T10:00:00.000Z',
     };

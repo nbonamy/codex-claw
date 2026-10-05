@@ -1,8 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import { visualizationSuggestionLimits } from '@codex-claw/core/visualize';
+import { visualizationSuggestionLimits } from '@workspace/core/visualize';
 import type { VisualizeService } from '../visualize-service';
-import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+import { loggedToolResult, type AppMcpToolModuleProvider } from './tool-modules';
 
 const visualizationContent = z.discriminatedUnion('kind', [
   z.object({
@@ -16,7 +16,7 @@ const visualizationContent = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export function createVisualizeToolModuleProvider(visualize: VisualizeService): ClawMcpToolModuleProvider {
+export function createVisualizeToolModuleProvider(visualize: VisualizeService): AppMcpToolModuleProvider {
   return {
     id: 'visualize',
     resolve: ({ agentId }) => ({

@@ -2,7 +2,7 @@
   <el-popover
     v-model:visible="popoverVisible"
     placement="right-end"
-    popper-class="claw-popover settings-menu-popover"
+    popper-class="app-popover settings-menu-popover"
     trigger="click"
     :width="220"
   >
@@ -55,11 +55,11 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
-import type { AccountRateLimitWindow, AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount } from '@codex-claw/core/contracts';
+import type { AccountRateLimitWindow, AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount } from '@workspace/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { BrandSpeedTest, QuitIcon, SettingsIcon, SparklesIcon, UserCircleIcon } from '../shared/icons/app-icons';
-import { clawHostCapabilities, codexClawApi } from '../platform-api';
+import { appHostCapabilities, appApi } from '../platform-api';
 
 const props = withDefaults(defineProps<{
   active?: boolean;
@@ -89,7 +89,7 @@ watch([popoverVisible, () => quotaBackends.value.join(','), () => JSON.stringify
   let cancelled = false;
   async function refreshUsage(backend: AgentBackend): Promise<void> {
     try {
-      const limits = await codexClawApi?.getProviderUsage(backend);
+      const limits = await appApi?.getProviderUsage(backend);
       if (!cancelled && limits !== undefined) fetchedUsage.value[backend] = limits;
     } catch {
       if (!cancelled) usageErrors.value[backend] = true;
@@ -114,7 +114,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
     label: translate('surface.settingsMenu.whatSNew'),
     icon: SparklesIcon,
   },
-  ...(clawHostCapabilities.appLifecycle ? [{
+  ...(appHostCapabilities.appLifecycle ? [{
     id: 'quit',
     type: 'action',
     label: translate('surface.settingsMenu.quit'),

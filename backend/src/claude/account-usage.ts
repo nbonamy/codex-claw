@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { platform, userInfo } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { AccountRateLimits, AccountRateLimitWindow } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, AccountRateLimitWindow } from '@workspace/core/contracts';
 import { claudeConfigDirectory, claudeConfigDirectoryOverride } from './config-directory';
 
 const run = promisify(execFile);

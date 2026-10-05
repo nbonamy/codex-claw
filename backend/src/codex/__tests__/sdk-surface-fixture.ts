@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
+import type { Agent } from '@workspace/core/contracts';
+import type { BackendEvent } from '@workspace/core/backend-driver';
 import type { CodexConversation, CodexSurface } from '@codex-app-sdk/backend';
 import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexSurfaceEvent } from '@codex-app-sdk/core/surface';
 import { CodexBackendDriver } from '../codex-driver';

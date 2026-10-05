@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { projectClientSnapshot } from '@workspace/core/client-preferences';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { ClientPreferencesService } from '../client-preferences-service';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 

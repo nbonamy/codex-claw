@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentBackend, AgentCreationProgress, BackendDefaults, SourceRepository } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend, AgentCreationProgress, BackendDefaults, SourceRepository } from '@workspace/core/contracts';
 import { requireRepositoryName } from '../create-source-repository';
 
 export type ProjectCreationInput = {

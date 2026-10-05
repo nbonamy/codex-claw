@@ -1,14 +1,20 @@
-# Codex Claw website
+# Korus website
 
 This contains the static landing page and VitePress documentation for [codex-claw.nabocorp.com](https://codex-claw.nabocorp.com).
 
 ## Local preview
 
 ```bash
-python3 -m http.server 4173 --directory website
+npm run docs:build
+node website/build.mjs
+python3 -m http.server 4173 --directory dist/website
 ```
 
 Then open <http://127.0.0.1:4173>.
+
+Product metadata comes from `core/src/product.json`. The landing-page build
+expands `__PRODUCT_NAME__`; VitePress reads the same definition. Preview the
+built artifact so the name and documentation are both available.
 
 ## Documentation
 
@@ -56,11 +62,11 @@ When a product screenshot is ready, replace the `.product-window` element inside
 <img
   class="product-screenshot"
   src="assets/product-shell.png"
-  alt="Codex Claw with repository-grouped sessions, an active conversation, and a review pane"
+  alt="Korus with repository-grouped sessions, an active conversation, and a review pane"
 />
 ```
 
-Keep the screenshot free of private repository names, issue content, messages, and account details. The website positions Claw as a workspace for agentic software engineering workflows. Missions, direct repository sessions, Review, and Visualize support that story; the page should explain their value without becoming a release changelog.
+Keep the screenshot free of private repository names, issue content, messages, and account details. The website positions Korus as a workspace for agentic software engineering workflows. Missions, direct repository sessions, Review, and Visualize support that story; the page should explain their value without becoming a release changelog.
 
 Run the static-site checks with:
 
@@ -86,11 +92,11 @@ Preview the films from the repository root with `python3 -m http.server 4174 --d
 node videos/render-mission-film.mjs
 ```
 
-The render writes `videos/assets/mission-film.mp4` and `videos/assets/mission-film-poster.png`. These rebuildable outputs are ignored by Git; run the renderer for each film when you need an MP4 or poster. The thumbnails remain as source artwork, and the viewers reuse the website's Claw icon. Set `CODEX_CLAW_FILM_CHROME` if Chrome is not at the default macOS path. The deterministic `window.seekFilm(seconds)` renderer drives both the preview and frame export, so the encoded video matches the editable source.
+The render writes `videos/assets/mission-film.mp4` and `videos/assets/mission-film-poster.png`. These rebuildable outputs are ignored by Git; run the renderer for each film when you need an MP4 or poster. The thumbnails remain as source artwork, and the viewers reuse the website's Korus icon. Set `APP_FILM_CHROME` if Chrome is not at the default macOS path. The deterministic `window.seekFilm(seconds)` renderer drives both the preview and frame export, so the encoded video matches the editable source.
 
 ## Code Review product film
 
-`videos/review-film.html` is a separate, illustrative 50-second walkthrough of Claw's standalone `/review` command: open Review, choose branch scope and an independent reviewer, inspect structured findings, remediate the selected issues, run a second round, and finish. It is not the Mission Review stage or a captured live review. Preview it at <http://127.0.0.1:4174/videos/review-film.html> and export its MP4 and poster with:
+`videos/review-film.html` is a separate, illustrative 50-second walkthrough of Korus's standalone `/review` command: open Review, choose branch scope and an independent reviewer, inspect structured findings, remediate the selected issues, run a second round, and finish. It is not the Mission Review stage or a captured live review. Preview it at <http://127.0.0.1:4174/videos/review-film.html> and export its MP4 and poster with:
 
 ```bash
 node videos/render-mission-film.mjs review-film
@@ -106,7 +112,7 @@ node videos/render-mission-film.mjs delegation-film
 
 ## Quick Chat to project product film
 
-`videos/project-film.html` is a separate, illustrative 43-second film: discuss an app idea in Quick Chat, explicitly ask Claw to create a project, see the folder/agent/handoff setup, then open the new project agent while the original Quick Chat remains. The project folder is not shown as a Git repository or worktree. Preview it at <http://127.0.0.1:4174/videos/project-film.html> and export its ignored MP4 and poster with:
+`videos/project-film.html` is a separate, illustrative 43-second film: discuss an app idea in Quick Chat, explicitly ask Korus to create a project, see the folder/agent/handoff setup, then open the new project agent while the original Quick Chat remains. The project folder is not shown as a Git repository or worktree. Preview it at <http://127.0.0.1:4174/videos/project-film.html> and export its ignored MP4 and poster with:
 
 ```bash
 node videos/render-mission-film.mjs project-film
@@ -140,7 +146,7 @@ certificate if this is the first deploy, and installs the matching nginx site on
 ./website/deploy.sh
 ```
 
-Override `CODEX_CLAW_WEBSITE_HOST`, `CODEX_CLAW_WEBSITE_ROOT`, or `CODEX_CLAW_NGINX_CONFIG` when needed. The remote account must be able to run `sudo install`, `sudo nginx -t`, and `sudo systemctl reload nginx`.
+Override `APP_WEBSITE_HOST`, `APP_WEBSITE_ROOT`, or `APP_NGINX_CONFIG` when needed. The remote account must be able to run `sudo install`, `sudo nginx -t`, and `sudo systemctl reload nginx`.
 
 Desktop releases use the same host and are published with:
 

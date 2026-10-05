@@ -4,7 +4,7 @@ description: Common macOS shortcuts for navigating agents and their workspace.
 
 # Keyboard shortcuts
 
-These shortcuts apply to the Claw desktop shell on macOS. Conversation controls can also have provider-specific shortcuts.
+These shortcuts apply to the Korus desktop shell on macOS. Conversation controls can also have provider-specific shortcuts.
 
 ## Navigation
 
@@ -43,7 +43,7 @@ Some shortcuts require an active agent workspace and are suspended while a modal
 | ⌘Shift X | Save the active prompt draft. |
 | ⌘Shift V | Open saved prompt drafts. |
 | ⌘, | Open Settings. |
-| ⌘Q | Quit through Claw's app lifecycle flow. |
+| ⌘Q | Quit through Korus's app lifecycle flow. |
 
 ## Composer commands
 
@@ -53,9 +53,9 @@ Type `/` in the composer to discover commands. These commands are available for 
 | --- | --- |
 | `/plan` | Enter Plan mode. |
 | `/compact` | Compact conversation context. |
-| `/review` | Open Claw's [Code Review](../workflows/code-review) workflow. |
+| `/review` | Open Korus's [Code Review](../workflows/code-review) workflow. |
 | `/visualize` | Open [Visualize](../features/visualize). |
-| `/delegate [task]` | Ask the current agent to hand off work to a new Claw teammate in a worktree. Upcoming release after 0.25.2. |
+| `/delegate [task]` | Ask the current agent to hand off work to a new Korus teammate in a worktree. Upcoming release after 0.25.2. |
 | `/worktree [task]` | Alias for `/delegate`. Upcoming release after 0.25.2. |
 
 The upcoming release also adds **Review**, **Delegate**, and **Visualize** to the composer's **+** menu. See [Worktree delegation](../workflows/worktrees#delegate-implementation) for handoff and local-commit behavior.

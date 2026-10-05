@@ -9,15 +9,15 @@
         <PlusIcon :stroke-width="1" aria-hidden="true" />
       </button>
     </div>
-    <button type="button" class="claw-button claw-button--tertiary visualize-editor__action visualize-editor__fit" :disabled="!ready" :aria-label="translate('visualize.fitCanvas')" :title="translate('visualize.fitCanvas')" @click="editor?.fit()">
+    <button type="button" class="app-button app-button--tertiary visualize-editor__action visualize-editor__fit" :disabled="!ready" :aria-label="translate('visualize.fitCanvas')" :title="translate('visualize.fitCanvas')" @click="editor?.fit()">
       <ArrowsMinimizeIcon :stroke-width="1" aria-hidden="true" />
     </button>
     <div class="visualize-editor__toolbar">
-      <button type="button" class="claw-button claw-button--tertiary visualize-editor__action" :disabled="!ready" :aria-pressed="annotating" :aria-label="translate(annotating ? 'visualize.stopAnnotating' : 'visualize.annotateCanvas')" :title="translate(annotating ? 'visualize.stopAnnotating' : 'visualize.annotateCanvas')" @click="toggleAnnotation">
+      <button type="button" class="app-button app-button--tertiary visualize-editor__action" :disabled="!ready" :aria-pressed="annotating" :aria-label="translate(annotating ? 'visualize.stopAnnotating' : 'visualize.annotateCanvas')" :title="translate(annotating ? 'visualize.stopAnnotating' : 'visualize.annotateCanvas')" @click="toggleAnnotation">
         <X v-if="annotating" :stroke-width="1" aria-hidden="true" />
         <PlusCircleIcon v-else :stroke-width="1" aria-hidden="true" />
       </button>
-      <button type="button" class="claw-button claw-button--tertiary visualize-editor__action" :disabled="!ready || savingPng" :aria-label="translate('visualize.savePng')" :title="translate('visualize.savePng')" @click="savePng">
+      <button type="button" class="app-button app-button--tertiary visualize-editor__action" :disabled="!ready || savingPng" :aria-label="translate('visualize.savePng')" :title="translate('visualize.savePng')" @click="savePng">
         <DownloadIcon :stroke-width="1" aria-hidden="true" />
       </button>
     </div>
@@ -50,14 +50,14 @@
     />
     <div v-if="error || !ready" class="visualize-editor__status">
       <span role="status">{{ error || translate('common.loading') }}</span>
-      <button v-if="error" type="button" class="claw-button claw-button--secondary" @click="retry">{{ translate('visualize.retrySave') }}</button>
+      <button v-if="error" type="button" class="app-button app-button--secondary" @click="retry">{{ translate('visualize.retrySave') }}</button>
     </div>
   </div>
 </template>
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch, toRaw } from 'vue';
-import { selectedCanvasElements, type CanvasDocument, type SaveCanvasInput } from '@codex-claw/core/visualize-canvas';
-import type { Visualization } from '@codex-claw/core/visualize';
+import { selectedCanvasElements, type CanvasDocument, type SaveCanvasInput } from '@workspace/core/visualize-canvas';
+import type { Visualization } from '@workspace/core/visualize';
 import type { CanvasAnnotationTarget, CanvasScene, mountCanvas } from './excalidraw-editor';
 import { translate } from '../i18n';
 import { ArrowsMinimizeIcon, DownloadIcon, MinusIcon, PlusCircleIcon, PlusIcon, X } from '../shared/icons/app-icons';

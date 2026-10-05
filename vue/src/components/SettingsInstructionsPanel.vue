@@ -41,7 +41,7 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
 import { useDebouncedSave } from '../shared/use-debounced-save';
-import type { AppGeneralSettings, UpdateSettingsInput, WorktreeInitializationMode } from '@codex-claw/core/contracts';
+import type { AppGeneralSettings, UpdateSettingsInput, WorktreeInitializationMode } from '@workspace/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';

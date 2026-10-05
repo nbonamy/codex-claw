@@ -45,9 +45,9 @@
 </template>
 
 <script setup lang="ts">
-import { workProviderLabel } from '@codex-claw/core/work-item-prompts';
+import { workProviderLabel } from '@workspace/core/work-item-prompts';
 import { computed, ref, watch } from 'vue';
-import type { WorkProviderAuthorization } from '@codex-claw/core/contracts';
+import type { WorkProviderAuthorization } from '@workspace/core/contracts';
 import { CheckIcon, CopyIcon } from '../shared/icons/app-icons';
 
 const props = defineProps<{

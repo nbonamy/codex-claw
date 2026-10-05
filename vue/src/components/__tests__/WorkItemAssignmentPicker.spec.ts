@@ -2,17 +2,17 @@ import { mount } from '@vue/test-utils';
 import { computed } from 'vue';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it } from 'vitest';
-import type { WorkItem } from '@codex-claw/core/contracts';
+import type { WorkItem } from '@workspace/core/contracts';
 import WorkItemAssignmentPicker from '../WorkItemAssignmentPicker.vue';
 
 const issue: WorkItem = {
   provider: 'github',
-  id: 'github:nbonamy/codex-claw#24',
-  sourceId: 'nbonamy/codex-claw',
-  sourceName: 'nbonamy/codex-claw',
+  id: 'github:nbonamy/agent-workspace#24',
+  sourceId: 'nbonamy/agent-workspace',
+  sourceName: 'nbonamy/agent-workspace',
   number: 24,
   title: 'Repository-first sessions',
-  url: 'https://github.com/nbonamy/codex-claw/issues/24',
+  url: 'https://github.com/nbonamy/agent-workspace/issues/24',
   state: 'open',
   kind: 'issue',
   labels: [],
@@ -44,7 +44,7 @@ describe('WorkItemAssignmentPicker', () => {
     expect(wrapper.find('.work-item-assignment-picker__workspace').text()).not.toContain('Workspace');
     expect(wrapper.find('.work-item-assignment-picker__workspace').text()).not.toContain('New worktree');
     await wrapper.get('.backend-selector select').setValue('claude');
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
       { action: 'fix', destination: 'new', item: issue, backend: 'claude' },
@@ -69,7 +69,7 @@ describe('WorkItemAssignmentPicker', () => {
     expect(wrapper.text()).toContain('Uses the selected agent’s current folder. No worktree will be created.');
     expect(wrapper.find('.work-item-assignment-picker__branch-warning svg').exists()).toBe(true);
     expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-24');
-    await wrapper.get('.claw-button--secondary').trigger('click');
+    await wrapper.get('.app-button--secondary').trigger('click');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
       { action: 'investigate', agentId: 'agent-main', destination: 'existing', item: issue },
@@ -91,18 +91,18 @@ describe('WorkItemAssignmentPicker', () => {
       props: {
         item: issue,
         branchName: 'fix/gh-24',
-        existingWorktreePath: '/Users/nbonamy/src/codex-claw-fix-gh-24',
+        existingWorktreePath: '/Users/nbonamy/src/agent-workspace-fix-gh-24',
       },
     });
 
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
 
     expect(wrapper.emitted('submit')).toBeUndefined();
     expect(wrapper.text()).toContain('Worktree already exists');
     expect(wrapper.text()).toContain('fix/gh-24 is already checked out at:');
-    expect(wrapper.text()).toContain('/Users/nbonamy/src/codex-claw-fix-gh-24');
+    expect(wrapper.text()).toContain('/Users/nbonamy/src/agent-workspace-fix-gh-24');
 
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
 
     expect(wrapper.emitted('submit')).toStrictEqual([[
       { action: 'fix', destination: 'new', item: issue, reuseExisting: true, backend: 'codex' },

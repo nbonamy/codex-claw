@@ -47,7 +47,7 @@
     <p v-else class="model-favorites-dialog__empty">{{ $t('surface.appShell.noModelFavorites') }}</p>
 
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="emit('close')">
+      <button class="app-button app-button--tertiary" type="button" @click="emit('close')">
         {{ $t('common.close') }}
       </button>
     </template>
@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import type { BackendModelOption, ModelFavorite } from '@codex-claw/core/contracts';
+import type { BackendModelOption, ModelFavorite } from '@workspace/core/contracts';
 import { ref, watch } from 'vue';
 import { translate } from '../i18n';
 import { ArrowsVerticalIcon, Trash2Icon } from '../shared/icons/app-icons';

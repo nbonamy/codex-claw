@@ -54,7 +54,7 @@ describe('agent-manager lifecycle', () => {
 
     expect(updateAgentFolder(snapshot, 'agent-dina', '/Users/nbonamy/src/id8', '2026-06-05T00:00:01.000Z')).toStrictEqual({
       id: 'agent-dina',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       name: 'Dina',
       avatar: 'DI',
       folder: '/Users/nbonamy/src/id8',
@@ -71,12 +71,12 @@ describe('agent-manager lifecycle', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const workspace = {
       kind: 'git' as const,
-      folder: '/Users/nbonamy/src/codex-claw',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
       branch: 'main',
       isLinkedWorktree: false,
-      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace',
       updatedAt: '2026-08-27T12:00:00.000Z',
     };
 
@@ -165,7 +165,7 @@ describe('agent-manager lifecycle', () => {
     expect(snapshot.teams[0].activeAgentId).toBe('agent-new-jules');
     expect(snapshot.agents.at(-1)).toStrictEqual({
       id: 'agent-new-jules',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       delegatedByAgentId: 'agent-dina',
       name: 'Jules',
       avatar: '🤖',
@@ -228,9 +228,9 @@ describe('agent-manager lifecycle', () => {
     }, '2026-06-05T10:11:12.000Z', 'agent-new-abby');
 
     expect(result).toBe(snapshot);
-    expect(snapshot.agents.at(-1)?.teamId).toBe('team-codex-claw');
+    expect(snapshot.agents.at(-1)?.teamId).toBe('team-app');
     expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-jesse']);
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.activeAgentId).toBe('agent-new-abby');
   });
 
@@ -255,7 +255,7 @@ describe('agent-manager lifecycle', () => {
       'agent-background',
     ]);
     expect(snapshot.teams[0].activeAgentId).toBe('agent-background');
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.activeAgentId).toBe('agent-dina');
   });
 
@@ -299,13 +299,13 @@ describe('agent-manager lifecycle', () => {
 
     createAgentInSnapshot(snapshot, {
       name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
+      folder: '/home/nicolas/src/agent-workspace',
     }, '2026-06-05T10:11:12.000Z', 'agent-remote-dina');
 
     expect(snapshot.agents.at(-1)).toMatchObject({
       id: 'agent-remote-dina',
       name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
+      folder: '/home/nicolas/src/agent-workspace',
     });
     expect(snapshot.agents.at(-1)).not.toHaveProperty('remoteConnectionId');
   });
@@ -316,11 +316,11 @@ describe('agent-manager lifecycle', () => {
 
     createAgentInSnapshot(snapshot, {
       name: ' ',
-      folder: '/tmp/codex-claw',
-    }, '2026-06-05T10:11:12.000Z', 'agent-new-codex-claw');
+      folder: '/tmp/agent-workspace',
+    }, '2026-06-05T10:11:12.000Z', 'agent-new-agent-workspace');
 
     expect(snapshot.agents.at(-1)?.name).toBeNull();
-    expect(snapshot.agents.at(-1)?.id).toBe('agent-new-codex-claw');
+    expect(snapshot.agents.at(-1)?.id).toBe('agent-new-agent-workspace');
   });
 
   it('renames working agents without clearing runtime state', () => {
@@ -370,7 +370,7 @@ describe('agent-manager lifecycle', () => {
       id: 'agent-dina',
       name: 'Dina Prime',
       avatar: 'DI',
-      folder: '~/src/codex-claw',
+      folder: '~/src/agent-workspace',
       status: { type: 'working', detail: 'Running tests' },
       backendSession: { kind: 'codex', threadId: 'thread-old' },
       plan: { turnId: 'turn-plan' },
@@ -394,7 +394,7 @@ describe('agent-manager lifecycle', () => {
 
     expect(snapshot.agents[0].name).toBeNull();
     expect(snapshot.agents[0].avatar).toBe('DI');
-    expect(snapshot.agents[0].folder).toBe('~/src/codex-claw');
+    expect(snapshot.agents[0].folder).toBe('~/src/agent-workspace');
     expect(snapshot.agents[0].backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-existing' });
   });
 
@@ -449,7 +449,7 @@ describe('agent-manager lifecycle', () => {
     selectAgent(snapshot, 'agent-jesse');
 
     expect(snapshot.activeAgentId).toBe('agent-jesse');
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.teams[0].activeAgentId).toBe('agent-jesse');
   });
 });

@@ -1,7 +1,7 @@
 import type {
   SpokenAnnouncementQueueResult,
   SpokenAnnouncementRequest,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -246,9 +246,9 @@ export class NativeSpokenAnnouncementEngine implements SpokenAnnouncementEngine 
 
 export function resolveSpokenAnnouncementHelperPath(options: NativeSpokenAnnouncementOptions): string {
   if (options.isPackaged) {
-    return path.join(options.resourcesPath, 'codex-claw-tts-helper');
+    return path.join(options.resourcesPath, 'app-tts-helper');
   }
-  return path.join(options.appPath, '.tts', 'codex-claw-tts-helper');
+  return path.join(options.appPath, '.tts', 'app-tts-helper');
 }
 
 export function createRuntimeSpokenAnnouncementQueue(options: NativeSpokenAnnouncementOptions): SpokenAnnouncementQueue {

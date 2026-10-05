@@ -1,11 +1,12 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAppState } from '../app-state';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { CodexClawApi, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppApi, MainToRendererEvent } from '@workspace/core/contracts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
 import { clearFirstRunOnboardingStage } from '../onboarding-session';
-import { snapshotEventOwnership } from '@codex-claw/core/snapshot-event-ownership';
+import { snapshotEventOwnership } from '@workspace/core/snapshot-event-ownership';
 describe('useAppState', () => {
   afterEach(() => {
     clearConfetti();
@@ -17,18 +18,18 @@ describe('useAppState', () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents.push({
-      id: 'agent-jesse', teamId: 'team-codex-claw', name: 'Jesse', avatar: 'J',
+      id: 'agent-jesse', teamId: 'team-app', name: 'Jesse', avatar: 'J',
       folder: '/Users/nbonamy/src/other', backend: 'codex', status: { type: 'working' },
       createdAt: '2026-06-05T00:00:00.000Z', updatedAt: '2026-06-05T00:00:00.000Z',
     });
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     await state.loadSnapshot();
@@ -91,13 +92,13 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((nextListener) => {
           listeners.push(nextListener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -163,13 +164,13 @@ describe('useAppState', () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     await state.loadSnapshot();
@@ -200,13 +201,13 @@ describe('useAppState', () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     const remoteSnapshot = createInitialSnapshot();
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     await state.loadSnapshot();
@@ -254,13 +255,13 @@ describe('useAppState', () => {
   it('tracks aggregate Mission Implementation startup progress', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     await state.loadSnapshot();
@@ -290,13 +291,13 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.general.celebrationsEnabled = false;
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     await state.loadSnapshot();
@@ -317,13 +318,13 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     delete (remoteSnapshot.general as Partial<typeof remoteSnapshot.general>).celebrationsEnabled;
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     await state.loadSnapshot();
@@ -346,13 +347,13 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((nextListener) => {
           listeners.push(nextListener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -389,7 +390,7 @@ describe('useAppState', () => {
     listeners[0]?.({
       seq: 1,
       type: 'remoteControl.statusChanged',
-      payload: { status: 'connected', serverName: 'Claw test' },
+      payload: { status: 'connected', serverName: `${product.name} test` },
       occurredAt: '2026-06-05T00:00:01.000Z',
     });
     listeners[0]?.({

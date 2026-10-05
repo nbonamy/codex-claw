@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { ipcChannels } from '@codex-claw/core/ipc';
-import type { ClawBackendClientPort } from '../backend-client';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { ipcChannels } from '@workspace/core/ipc';
+import type { AppBackendClientPort } from '../backend-client';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
 
 const native = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => any>(),
@@ -33,8 +34,8 @@ vi.mock('electron', async () => {
 });
 vi.mock('../main-window', () => ({ createMainWindow: native.createWindow }));
 vi.mock('../app-menu', () => ({ installAppMenu: vi.fn() }));
-vi.mock('../backend-client', () => ({ createRuntimeClawBackendClient: native.factory }));
-vi.mock('../daemon-startup-maintenance', () => ({ ensureCurrentClawdDaemonForStartup: native.maintenance }));
+vi.mock('../backend-client', () => ({ createRuntimeAppBackendClient: native.factory }));
+vi.mock('../daemon-startup-maintenance', () => ({ ensureCurrentDaemonForStartup: native.maintenance }));
 vi.mock('../appshots', () => ({ captureAppshot: native.capture }));
 vi.mock('../spoken-announcements', async (importOriginal) => ({
   ...await importOriginal<typeof import('../spoken-announcements')>(),
@@ -64,13 +65,13 @@ function windowFixture() {
 function backendFixture() {
   const snapshot = createInitialSnapshot();
   const state = { snapshot, lastEventSeq: 0, clientState: { sourceFolderPath: '/projects', shouldPreventDisplaySleep: false } };
-  let emit = (_event: ClawBackendEvent) => {};
+  let emit = (_event: AppBackendEvent) => {};
   let disconnect = (_state: 'connected' | 'disconnected', _error?: Error) => {};
   const unsubscribe = vi.fn();
   const unsubscribeConnection = vi.fn();
   const backend = {
     start: vi.fn().mockResolvedValue(undefined),
-    health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: 'test', pid: 123 }),
+    health: vi.fn().mockResolvedValue({ ok: true, name: 'daemon', version: 'test', pid: 123 }),
     request: vi.fn(async (method: string): Promise<unknown> => {
       if (method === 'snapshot/get') return state;
       if (method === 'client/state/get') return state.clientState;
@@ -80,14 +81,14 @@ function backendFixture() {
     onConnectionState: vi.fn((listener: typeof disconnect) => { disconnect = listener; return unsubscribeConnection; }),
     close: vi.fn().mockResolvedValue(undefined),
   };
-  return { backend, state, unsubscribe, unsubscribeConnection, emit: (event: ClawBackendEvent) => emit(event),
+  return { backend, state, unsubscribe, unsubscribeConnection, emit: (event: AppBackendEvent) => emit(event),
     disconnect: (error?: Error) => disconnect('disconnected', error) };
 }
 function setup() {
   const fixture = backendFixture();
   const window = windowFixture();
   native.createWindow.mockReturnValue(window);
-  const controller = new AppController(fixture.state.snapshot, fixture.backend as ClawBackendClientPort,
+  const controller = new AppController(fixture.state.snapshot, fixture.backend as AppBackendClientPort,
     undefined, undefined, undefined, new AppshotsKeyMonitor());
   controllers.push(controller);
   controller.registerIpcHandlers();
@@ -155,8 +156,8 @@ describe('controller desktop lifecycle', () => {
     native.ready = true;
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([window as never]);
     const event = { preventDefault: vi.fn() };
-    app.emit('open-url', event, 'codex-claw://new?prompt=from-url');
-    app.emit('second-instance', {}, ['claw', 'codex-claw://new?prompt=from-argv']);
+    app.emit('open-url', event, `${product.protocolScheme}://new?prompt=from-url`);
+    app.emit('second-instance', {}, ['app', `${product.protocolScheme}://new?prompt=from-argv`]);
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.appCommand, {
       type: 'open-agent-composer', prompt: 'from-argv', submit: true,
@@ -229,7 +230,7 @@ describe('controller desktop lifecycle', () => {
 
   it('delivers deep links only after each renderer load and reuses or replaces its native window', async () => {
     const { controller, window } = setup();
-    controller.openDeepLink('codex-claw://new?prompt=first');
+    controller.openDeepLink(`${product.protocolScheme}://new?prompt=first`);
     controller.createWindow();
     expect(window.webContents.send).not.toHaveBeenCalled();
     window.webContents.emit('did-finish-load');
@@ -238,7 +239,7 @@ describe('controller desktop lifecycle', () => {
     });
     window.webContents.send.mockClear();
     window.webContents.emit('did-start-loading');
-    controller.openDeepLink('codex-claw://new?prompt=second');
+    controller.openDeepLink(`${product.protocolScheme}://new?prompt=second`);
     expect(window.webContents.send).not.toHaveBeenCalled();
     window.webContents.emit('did-finish-load');
     expect(window.webContents.send).toHaveBeenCalledTimes(1);
@@ -299,7 +300,7 @@ describe('controller desktop lifecycle', () => {
     const { controller, backend, state, emit, window } = setup();
     controller.createWindow();
     await controller.initialize();
-    const event = (seq: number): ClawBackendEvent => ({
+    const event = (seq: number): AppBackendEvent => ({
       seq, occurredAt: '2026-10-04T00:00:00Z', type: 'agent.statusChanged',
       agentId: 'agent-dina', payload: { type: 'working' },
     });
@@ -357,7 +358,7 @@ describe('controller desktop lifecycle', () => {
     startMainApp();
     await vi.advanceTimersByTimeAsync(0);
     expect(native.createWindow).toHaveBeenCalledOnce();
-    expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith('codex-claw');
+    expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith(product.protocolScheme);
     let release!: () => void;
     fixture.backend.close.mockReturnValue(new Promise<void>(resolve => { release = resolve; }));
     const quit = { preventDefault: vi.fn() };

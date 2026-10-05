@@ -2,19 +2,19 @@ import { access, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writ
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
+import type { Agent } from '@workspace/core/contracts';
+import type { BackendEvent } from '@workspace/core/backend-driver';
 import { ClaudeBackendDriver } from '../claude-driver';
 import { ClaudeAgentSdkTransport } from '../agent-sdk-transport';
 import { createQueryHarness } from './sdk-query-fixture';
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
-  const homedir = () => process.env.CLAW_TEST_USER_HOME!;
+  const homedir = () => process.env.APP_TEST_USER_HOME!;
   return { ...actual, homedir, default: { ...actual, homedir } };
 });
 
-vi.mock('@codex-claw/core/runtime-discovery', () => ({
+vi.mock('@workspace/core/runtime-discovery', () => ({
   withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
 }));
 
@@ -24,9 +24,9 @@ describe('Claude configured home', () => {
   const drivers: ClaudeBackendDriver[] = [];
 
   beforeEach(async () => {
-    root = await realpath(await mkdtemp(path.join(tmpdir(), 'claw-claude-home-')));
-    configDir = path.join(root, 'claw', 'claude-home');
-    vi.stubEnv('CLAW_TEST_USER_HOME', path.join(root, 'personal'));
+    root = await realpath(await mkdtemp(path.join(tmpdir(), 'app-claude-home-')));
+    configDir = path.join(root, 'app', 'claude-home');
+    vi.stubEnv('APP_TEST_USER_HOME', path.join(root, 'personal'));
     vi.stubEnv('CLAUDE_CONFIG_DIR', configDir);
   });
 
@@ -46,7 +46,7 @@ describe('Claude configured home', () => {
     const recordedCwd = linkedWorkspace ? path.join(root, 'physical-repo') : agent.folder!;
     await mkdir(recordedCwd, { recursive: true });
     if (linkedWorkspace) await symlink(recordedCwd, agent.folder!, 'dir');
-    // Claude records the physical cwd even when Claw opens the workspace through a symlink.
+    // Claude records the physical cwd even when App opens the workspace through a symlink.
     const projectDir = path.join(configDir, 'projects', recordedCwd.replaceAll(path.sep, '-'));
     await mkdir(projectDir, { recursive: true });
     await writeFile(path.join(projectDir, `${sessionId}.jsonl`), JSON.stringify({
@@ -85,7 +85,7 @@ describe('Claude configured home', () => {
   });
 
   it('does not introduce a custom authentication home for sessions using the default setup', async () => {
-    vi.stubEnv('CLAUDE_CONFIG_DIR', path.join(process.env.CLAW_TEST_USER_HOME!, '.claude'));
+    vi.stubEnv('CLAUDE_CONFIG_DIR', path.join(process.env.APP_TEST_USER_HOME!, '.claude'));
     const sdk = createQueryHarness();
     const driver = new ClaudeBackendDriver(new ClaudeAgentSdkTransport({ createQuery: sdk.createQuery }));
     drivers.push(driver);

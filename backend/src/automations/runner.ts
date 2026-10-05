@@ -8,13 +8,13 @@ import type {
   SourceWorktree,
   WorkItem,
   WorkProviderKind,
-} from '@codex-claw/core/contracts';
-import { assignWorkItemToAgentInSnapshot, createAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { recordAutomationExecutionInSnapshot } from '@codex-claw/core/automation-manager';
-import { createEntityId, type IdGenerator } from '@codex-claw/core/ids';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt, workItemBranchName, workItemDisplayIdentifier, workProviderLabel } from '@codex-claw/core/work-item-prompts';
+} from '@workspace/core/contracts';
+import { assignWorkItemToAgentInSnapshot, createAgentInSnapshot } from '@workspace/core/agent-manager';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { recordAutomationExecutionInSnapshot } from '@workspace/core/automation-manager';
+import { createEntityId, type IdGenerator } from '@workspace/core/ids';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
+import { workItemAssignmentPrompt, workItemBranchName, workItemDisplayIdentifier, workProviderLabel } from '@workspace/core/work-item-prompts';
 import { logMain, warnMain } from '../log';
 
 type WorkItemLister = {

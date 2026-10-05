@@ -1,4 +1,4 @@
-import type { Agent, AgentStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentStatus } from '@workspace/core/contracts';
 import { localizedText } from '../i18n/errors';
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;

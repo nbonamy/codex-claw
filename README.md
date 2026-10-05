@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="vue/assets/icon.png" width="112" height="112" alt="Codex Claw app icon" />
+  <img src="vue/assets/icon.png" width="112" height="112" alt="Korus app icon" />
 </p>
 
-<h1 align="center">Codex Claw</h1>
+<h1 align="center">Korus</h1>
 
 <p align="center">
   <strong>Your agents, in one cockpit.</strong><br />
@@ -18,14 +18,14 @@
 </p>
 
 <p align="center">
-  <img src="website/assets/claw-screenshot.png" alt="Codex Claw with repository-grouped agents, a conversation, and input-needed status, shown with demo data" width="960" />
+  <img src="website/assets/app-screenshot.png" alt="Korus with repository-grouped agents, a conversation, and input-needed status, shown with demo data" width="960" />
 </p>
 
-Codex Claw brings Codex and Claude Code into one workspace. Use either engine
+Korus brings Codex and Claude Code into one workspace. Use either engine
 on its own or run a mixed team: give agents their own conversations and
 workspaces, see what everyone is doing, and step in when your input is needed.
 
-Claw is free to use. Connect your provider accounts; provider subscriptions
+Korus is free to use. Connect your provider accounts; provider subscriptions
 and API usage are billed separately.
 
 ## One cockpit for the whole team
@@ -42,7 +42,7 @@ and API usage are billed separately.
   tool calls, approvals, command output, file changes, and diffs in a native
   conversation UI.
 - **Let agents collaborate** — Agents can discover teammates, share status,
-  send messages, queue follow-up work, and coordinate through Claw's
+  send messages, queue follow-up work, and coordinate through Korus's
   built-in MCP tools.
 - **Browse without leaving** — Every agent can keep an in-app browser for
   research, local previews, and browser-based tools—even while another agent is
@@ -52,8 +52,8 @@ and API usage are billed separately.
 - **Review with context** — Open Git changes, source files, turn-specific diffs,
   Markdown, execution plans, and Plan-mode proposals beside the conversation.
 - **Keep Codex work accessible from your phone** — Pair Codex mobile with
-  Claw's Codex connection while agents continue running through the background
-  `clawd` daemon. This pairing is specific to Codex.
+  Korus's Codex connection while agents continue running through the background
+  `daemon` daemon. This pairing is specific to Codex.
 - **Automate the queue** — Assign GitHub work from the Cockpit or use
   Automations to watch for matching issues, deploy the right agent, and keep
   work moving.
@@ -64,24 +64,24 @@ Create agents from repositories and give each one a prompt, then move freely
 between active conversations: drafts, attachments,
 queues, model settings, browser tabs, and sidebar state stay with the agent.
 
-Queue a follow-up while an agent is working; Claw sends it when the current
+Queue a follow-up while an agent is working; Korus sends it when the current
 turn finishes. Codex also supports steering the active turn. Keep two or four
 agents visible in split panes, with one shared artifact sidebar following the
-focused agent. Quit the desktop app without stopping the team; `clawd` keeps
+focused agent. Quit the desktop app without stopping the team; `daemon` keeps
 background work alive and restores the durable state when you return.
 
-## Get Codex Claw
+## Get Korus
 
 The current desktop release supports macOS on Apple silicon.
 
 1. [Download the latest DMG](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg).
-2. Move Codex Claw to Applications and launch it.
+2. Move Korus to Applications and launch it.
 3. Connect Codex, Claude Code, or both, then choose Continue. Only one connected
    engine is required. Claude Code supports subscription or API-key setup.
 4. Create a team, add an agent from a repository, and start coding. When both
    engines are enabled, choose which one the agent uses.
 
-By default, Claw keeps its conversations separate from your existing agent
+By default, Korus keeps its conversations separate from your existing agent
 chats and reuses your skills. Choose Customize for either engine during setup
 to use your existing setup instead. A separate setup requires its own sign-in.
 Settings shows each engine's account, conversation location, and enabled state.
@@ -117,7 +117,7 @@ npm run typecheck
 Builds consume the pinned Computer Use artifact and verify its checksum. Set
 `COMPUTER_USE_LOCAL=1` in `.env` to build the helper from a sibling
 `computer-use` checkout instead.
-Linux support is experimental. Computer Use and Appshots are currently
+Linux support is experimental. Computer Use and Screenshots are currently
 macOS-only; Linux builds skip the Computer Use helper and do not package its
 native automation dependency.
 
@@ -125,20 +125,20 @@ macOS release packaging signs and notarizes by default. For local packaging
 checks that do not need signing:
 
 ```bash
-CODEX_CLAW_SKIP_SIGNING=1 npm run package
+APP_SKIP_SIGNING=1 npm run package
 ```
 
 ## Architecture
 
-Codex Claw separates the desktop shell from the long-running agent backend:
+Korus separates the desktop shell from the long-running agent backend:
 
 ```text
-Vue renderer → typed preload IPC → Electron main → clawd → backend driver
+Vue renderer → typed preload IPC → Electron main → daemon → backend driver
                                                           ├─ Codex app-server
                                                           └─ Claude Agent SDK
 ```
 
-Electron owns native desktop integration. `clawd` owns agent runtime state,
+Electron owns native desktop integration. `daemon` owns agent runtime state,
 persistence, collaboration, backend processes, git, approvals, and background
 work. The renderer consumes app-owned events rather than provider protocol
 types.

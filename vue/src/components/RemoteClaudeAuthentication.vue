@@ -3,13 +3,13 @@
     <span v-if="authentication?.loggedIn">{{ $t('surface.remoteClaudeAuth.connected') }}</span>
     <template v-else-if="authentication">
       <span>{{ $t('surface.remoteClaudeAuth.signInRequired') }}</span>
-      <button class="claw-button claw-button--secondary" type="button" @click="dialogVisible = true">
+      <button class="app-button app-button--secondary" type="button" @click="dialogVisible = true">
         {{ $t('surface.remoteClaudeAuth.connect') }}
       </button>
     </template>
     <template v-else-if="error">
       <span :title="error">{{ $t('surface.remoteClaudeAuth.unavailable') }}</span>
-      <button class="claw-button claw-button--secondary" type="button" :disabled="checking" @click="refresh">
+      <button class="app-button app-button--secondary" type="button" :disabled="checking" @click="refresh">
         {{ $t('surface.remoteClaudeAuth.retry') }}
       </button>
     </template>
@@ -21,7 +21,7 @@
       :subtitle="$t('surface.remoteClaudeAuth.runOnHost', { host: connection.host })"
       :teleported="true"
     >
-      <div class="claw-form-dialog">
+      <div class="app-form-dialog">
         <FormDialogField v-for="option in loginOptions" :key="option.id" :label="$t(option.labelKey)">
           <div class="remote-claude-auth__command-row">
             <code class="remote-claude-auth__command">{{ option.command }}</code>
@@ -32,8 +32,8 @@
         <p v-if="error" class="remote-claude-auth__error">{{ $t('surface.remoteClaudeAuth.unavailable') }}</p>
       </div>
       <template #footer>
-        <button class="claw-button claw-button--tertiary" type="button" @click="dialogVisible = false">{{ $t('surface.remoteClaudeAuth.close') }}</button>
-        <button class="claw-button claw-button--primary" type="button" :disabled="checking" :aria-busy="checking" @click="refresh">
+        <button class="app-button app-button--tertiary" type="button" @click="dialogVisible = false">{{ $t('surface.remoteClaudeAuth.close') }}</button>
+        <button class="app-button app-button--primary" type="button" :disabled="checking" :aria-busy="checking" @click="refresh">
           {{ $t('surface.remoteClaudeAuth.refresh') }}
         </button>
       </template>
@@ -43,13 +43,13 @@
 
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, watch } from 'vue';
-import type { ClaudeAuthentication, CodexClawApi, RemoteConnection } from '@codex-claw/core/contracts';
+import type { ClaudeAuthentication, AppApi, RemoteConnection } from '@workspace/core/contracts';
 import { CheckIcon, CopyIcon } from '../shared/icons/app-icons';
-import { codexClawApi } from '../platform-api';
+import { appApi } from '../platform-api';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 
-type ClaudeAuthApi = Pick<CodexClawApi, 'getClaudeAuthentication'>;
+type ClaudeAuthApi = Pick<AppApi, 'getClaudeAuthentication'>;
 const props = defineProps<{ connection: RemoteConnection; api?: ClaudeAuthApi }>();
 const emit = defineEmits<{ connected: [] }>();
 const baseLoginOptions = [
@@ -70,7 +70,7 @@ const copyFailedCommand = ref<LoginOptionId | null>(null);
 let revision = 0;
 
 async function refresh(): Promise<void> {
-  const client = props.api ?? codexClawApi;
+  const client = props.api ?? appApi;
   if (!client || props.connection.status !== 'ready') return;
   const expectedRevision = ++revision;
   checking.value = true;

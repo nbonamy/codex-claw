@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const chromePath =
-  process.env.CODEX_CLAW_FILM_CHROME ??
+  process.env.APP_FILM_CHROME ??
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const filmName = process.argv[2] ?? "mission-film";
 if (
@@ -52,6 +52,8 @@ const posterSecond =
             ? 23
             : 12;
 const allowedFiles = new Map([
+  ["/product.mjs", ["product.mjs", "text/javascript; charset=utf-8"]],
+  ["/core/src/product.json", ["../core/src/product.json", "application/json"]],
   [`/${filmName}.html`, [`${filmName}.html`, "text/html; charset=utf-8"]],
   [`/${filmName}.css`, [`${filmName}.css`, "text/css; charset=utf-8"]],
   [`/${filmName}.mjs`, [`${filmName}.mjs`, "text/javascript; charset=utf-8"]],
@@ -59,8 +61,8 @@ const allowedFiles = new Map([
   ["/review-film.css", ["review-film.css", "text/css; charset=utf-8"]],
   ["/delegation-film.css", ["delegation-film.css", "text/css; charset=utf-8"]],
   [
-    "/website/assets/claw-icon.png",
-    ["../website/assets/claw-icon.png", "image/png"],
+    "/website/assets/app-icon.png",
+    ["../website/assets/app-icon.png", "image/png"],
   ],
 ]);
 
@@ -137,7 +139,7 @@ async function writeFrame(stream, buffer) {
 }
 
 async function render() {
-  const profilePath = await mkdtemp(join(tmpdir(), "codex-claw-film-"));
+  const profilePath = await mkdtemp(join(tmpdir(), "app-film-"));
   const server = createServer(async (request, response) => {
     const pathname = new URL(request.url, "http://localhost").pathname;
     const file = allowedFiles.get(pathname);

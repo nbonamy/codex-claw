@@ -48,8 +48,8 @@
 </template>
 
 <script setup lang="ts">
-import type { AgentBackend, AppSnapshot, ClaudeAuthentication, CodexAuthentication, WorkProviderAuthorization } from '@codex-claw/core/contracts';
-import type { ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { AgentBackend, AppSnapshot, ClaudeAuthentication, CodexAuthentication, WorkProviderAuthorization } from '@workspace/core/contracts';
+import type { ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
 import ProviderSetupDialog from './ProviderSetupDialog.vue';
 import { toRefs } from 'vue';
 import CodexLoginLanding from './CodexLoginLanding.vue';

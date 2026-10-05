@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -15,7 +16,7 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@codex-claw/core/runtime-discovery';
+import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@workspace/core/runtime-discovery';
 import { debugMain, logMain } from '../log';
 import {
   type ClaudePermissionRequest,
@@ -286,7 +287,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     }
   }
 
-  async generateText(input: import('@codex-claw/core/backend-driver').BackendTextGenerationInput): Promise<{ text: string }> {
+  async generateText(input: import('@workspace/core/backend-driver').BackendTextGenerationInput): Promise<{ text: string }> {
     if (this.closing) throw new Error('Claude transport is closed.');
     const prompt = new AsyncPushQueue<SDKUserMessage>();
     const sessionId = this.createSessionId();
@@ -362,7 +363,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     logMain('claude-agent-sdk', resumeSessionId ? 'resuming Claude SDK session' : 'starting Claude SDK session', {
       sessionId,
       cwd: session.cwd,
-      command: this.options.command ?? process.env.CODEX_CLAW_CLAUDE_COMMAND ?? 'claude',
+      command: this.options.command ?? process.env.APP_CLAUDE_COMMAND ?? 'claude',
     });
     void this.consumeSession(session);
     return session;
@@ -446,14 +447,14 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     if (!onPermissionRequest) {
       return Promise.resolve({
         behavior: 'deny',
-        message: 'Codex Claw cannot display this Claude permission request.',
+        message: `${product.name} cannot display this Claude permission request.`,
       });
     }
 
     if (toolName === 'ExitPlanMode') {
       return Promise.resolve({
         behavior: 'deny',
-        message: 'Codex Claw captured the proposed plan. Wait for the user to review or request implementation.',
+        message: `${product.name} captured the proposed plan. Wait for the user to review or request implementation.`,
       });
     }
 
@@ -575,7 +576,7 @@ function claudeQueryOptions(
   canUseTool: CanUseTool,
   transportOptions: ClaudeAgentSdkTransportOptions,
 ): ClaudeQueryOptions {
-  const command = transportOptions.command ?? process.env.CODEX_CLAW_CLAUDE_COMMAND ?? 'claude';
+  const command = transportOptions.command ?? process.env.APP_CLAUDE_COMMAND ?? 'claude';
   const permissionMode = normalizedPermissionMode(params.permissionMode);
   const env = claudeEnvironment(transportOptions.env, transportOptions.runtimeDiscovery);
   return {
@@ -601,7 +602,7 @@ function claudeQueryOptions(
       ? {
           mcpServers: {
             ...(params.mcpServerUrl ? {
-              codex_claw: {
+              workspace: {
                 type: 'http' as const,
                 url: params.mcpServerUrl,
               },
@@ -820,7 +821,7 @@ function permissionResult(pending: PendingPermission, response: ClaudePermission
   };
 }
 
-function askUserQuestions(input: Record<string, unknown>): import('@codex-claw/core/contracts').AskUserQuestion[] {
+function askUserQuestions(input: Record<string, unknown>): import('@workspace/core/contracts').AskUserQuestion[] {
   if (!Array.isArray(input.questions)) return [];
   return input.questions.flatMap((value, index) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
@@ -854,7 +855,7 @@ function askUserQuestions(input: Record<string, unknown>): import('@codex-claw/c
 }
 
 function claudeAskUserAnswers(
-  answers: import('@codex-claw/core/contracts').AskUserAnswers,
+  answers: import('@workspace/core/contracts').AskUserAnswers,
 ): Record<string, string> {
   return Object.fromEntries(Object.entries(answers).map(([question, value]) => [
     question,
@@ -875,7 +876,7 @@ function claudeEnvironment(
   // send reads and deletes to a different store than the running conversation.
   env.CLAUDE_CONFIG_DIR = claudeConfigDirectoryOverride();
   delete env.NODE_OPTIONS;
-  env.CLAUDE_AGENT_SDK_CLIENT_APP = 'codex-claw';
+  env.CLAUDE_AGENT_SDK_CLIENT_APP = 'agent-workspace';
   return env;
 }
 

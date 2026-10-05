@@ -1,18 +1,19 @@
-import { approvalAgentRequest, approvalOutcome } from '@codex-claw/core/agent-request';
+import { product } from '../product';
+import { approvalAgentRequest, approvalOutcome } from '@workspace/core/agent-request';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { ClawBackendEvent as RpcClawBackendEvent } from '../backend-protocol/rpc';
+import type { AppBackendEvent as RpcAppBackendEvent } from '../backend-protocol/rpc';
 import {
-  decodeClawBackendEvent,
-  type ClawBackendEvent,
+  decodeAppBackendEvent,
+  type AppBackendEvent,
 } from '../backend-protocol/events';
 import type { AppSnapshot } from '../contracts';
 import { createInitialSnapshot } from '../snapshot-construction';
 
-type EventOf<Type extends ClawBackendEvent['type']> = Extract<
-  ClawBackendEvent,
+type EventOf<Type extends AppBackendEvent['type']> = Extract<
+  AppBackendEvent,
   { type: Type }
 >;
-type EventFixtures = { [Type in ClawBackendEvent['type']]: EventOf<Type> };
+type EventFixtures = { [Type in AppBackendEvent['type']]: EventOf<Type> };
 
 const occurredAt = '2026-09-04T12:00:00.000Z';
 const usage = {
@@ -477,12 +478,12 @@ function createFixtures(): EventFixtures {
   };
 }
 
-describe('Claw backend event decoder', () => {
+describe(`${product.name} backend event decoder`, () => {
   it('accepts one representative for every typed event key without cloning it', () => {
     const fixtures = createFixtures();
 
     for (const event of Object.values(fixtures)) {
-      expect(decodeClawBackendEvent(event)).toBe(event);
+      expect(decodeAppBackendEvent(event)).toBe(event);
     }
   });
 
@@ -543,8 +544,8 @@ describe('Claw backend event decoder', () => {
       },
     };
 
-    expect(decodeClawBackendEvent(codexPrompt)).toBe(codexPrompt);
-    expect(decodeClawBackendEvent(claudePrompt)).toBe(claudePrompt);
+    expect(decodeAppBackendEvent(codexPrompt)).toBe(codexPrompt);
+    expect(decodeAppBackendEvent(claudePrompt)).toBe(claudePrompt);
   });
 
   it('accepts rich coordination metadata for retries and approvals', () => {
@@ -589,9 +590,9 @@ describe('Claw backend event decoder', () => {
       },
     };
 
-    expect(decodeClawBackendEvent(retry)).toBe(retry);
-    expect(decodeClawBackendEvent(requested)).toBe(requested);
-    expect(decodeClawBackendEvent(resolved)).toBe(resolved);
+    expect(decodeAppBackendEvent(retry)).toBe(retry);
+    expect(decodeAppBackendEvent(requested)).toBe(requested);
+    expect(decodeAppBackendEvent(resolved)).toBe(resolved);
   });
 
   it('accepts populated provider conversation snapshot frames', () => {
@@ -653,8 +654,8 @@ describe('Claw backend event decoder', () => {
     };
     claudeFrame.payload.snapshot.error = 'Interrupted by user';
 
-    expect(decodeClawBackendEvent(codexFrame)).toBe(codexFrame);
-    expect(decodeClawBackendEvent(claudeFrame)).toBe(claudeFrame);
+    expect(decodeAppBackendEvent(codexFrame)).toBe(codexFrame);
+    expect(decodeAppBackendEvent(claudeFrame)).toBe(claudeFrame);
   });
 
   it('accepts provider event frames with all optional routing context', () => {
@@ -679,14 +680,14 @@ describe('Claw backend event decoder', () => {
     claudeFrame.payload.event.threadId = 'claude-session-1';
     claudeFrame.payload.event.turnId = 'turn-1';
 
-    expect(decodeClawBackendEvent(codexFrame)).toBe(codexFrame);
-    expect(decodeClawBackendEvent(claudeFrame)).toBe(claudeFrame);
+    expect(decodeAppBackendEvent(codexFrame)).toBe(codexFrame);
+    expect(decodeAppBackendEvent(claudeFrame)).toBe(claudeFrame);
   });
 
   it('rejects a Claude event routed under a different agent', () => {
     const event = createFixtures()['claude.conversationEventReceived'];
 
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       ...event,
       agentId: 'agent-other',
     })).toThrow('$.payload.event.agentId: expected the outer agent id');
@@ -704,12 +705,12 @@ describe('Claw backend event decoder', () => {
       },
     };
 
-    expect(decodeClawBackendEvent(withSideChannels)).toBe(withSideChannels);
+    expect(decodeAppBackendEvent(withSideChannels)).toBe(withSideChannels);
   });
 
   it('rejects a Codex event routed under a different conversation', () => {
     const event = createFixtures()['codex.conversationEventReceived'];
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       ...event,
       threadId: 'thread-other',
     })).toThrow('$.payload.event.conversationId: expected the outer thread id');
@@ -742,7 +743,7 @@ describe('Claw backend event decoder', () => {
   ])(
     'rejects malformed envelopes with structural diagnostics',
     (value, diagnostic) => {
-      expect(() => decodeClawBackendEvent(value)).toThrow(diagnostic);
+      expect(() => decodeAppBackendEvent(value)).toThrow(diagnostic);
     },
   );
 
@@ -753,7 +754,7 @@ describe('Claw backend event decoder', () => {
       payload: { models: [{ id: 42, model: 'gpt', displayName: 'GPT' }] },
     };
 
-    expect(() => decodeClawBackendEvent(malformed)).toThrow(
+    expect(() => decodeAppBackendEvent(malformed)).toThrow(
       '$.payload.models[0].id: expected a string',
     );
   });
@@ -761,7 +762,7 @@ describe('Claw backend event decoder', () => {
   it('requires an actionable history load failure description', () => {
     const event = createFixtures()['conversation.historyLoadFailed'];
 
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       ...event,
       payload: { detail: 'provider diagnostics stay in backend logs' },
     })).toThrow('$.payload.error: expected a string');
@@ -771,7 +772,7 @@ describe('Claw backend event decoder', () => {
     const event = createFixtures()['conversation.turnDiffUpdated'];
     const malformed = { ...event, turnId: undefined };
 
-    expect(() => decodeClawBackendEvent(malformed)).toThrow(
+    expect(() => decodeAppBackendEvent(malformed)).toThrow(
       '$.turnId: expected a string',
     );
   });
@@ -780,10 +781,10 @@ describe('Claw backend event decoder', () => {
     const event = createFixtures()['snapshot.updated'];
 
     expect(() =>
-      decodeClawBackendEvent({ ...event, snapshot: { teams: [] } }),
+      decodeAppBackendEvent({ ...event, snapshot: { teams: [] } }),
     ).toThrow('$.snapshot: expected full application snapshot');
     expect(() =>
-      decodeClawBackendEvent({
+      decodeAppBackendEvent({
         ...event,
         clientState: { sourceFolderPath: '/src' },
       }),
@@ -797,7 +798,7 @@ describe('Claw backend event decoder', () => {
 
     let error: unknown;
     try {
-      decodeClawBackendEvent(malformed);
+      decodeAppBackendEvent(malformed);
     } catch (candidate) {
       error = candidate;
     }
@@ -807,12 +808,12 @@ describe('Claw backend event decoder', () => {
   });
 
   it('keeps the rpc compatibility export identical to the owner type', () => {
-    expectTypeOf<ClawBackendEvent>().toEqualTypeOf<RpcClawBackendEvent>();
+    expectTypeOf<AppBackendEvent>().toEqualTypeOf<RpcAppBackendEvent>();
     expectTypeOf<
-      ReturnType<typeof decodeClawBackendEvent>
-    >().toEqualTypeOf<ClawBackendEvent>();
+      ReturnType<typeof decodeAppBackendEvent>
+    >().toEqualTypeOf<AppBackendEvent>();
     expectTypeOf<
-      Extract<ClawBackendEvent, { type: 'snapshot.updated' }>['snapshot']
+      Extract<AppBackendEvent, { type: 'snapshot.updated' }>['snapshot']
     >().toEqualTypeOf<AppSnapshot | undefined>();
   });
 });

@@ -1,4 +1,4 @@
-import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { agentDisplayName } from '@workspace/core/agent-display';
 import { preferredBackendChoices } from './backend-selection';
 import type {
   Agent,
@@ -12,8 +12,8 @@ import type {
   SourceWorktree,
   WorkItem,
   WorkSource,
-} from '@codex-claw/core/contracts';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
+} from '@workspace/core/contracts';
+import { workItemAssignmentPrompt } from '@workspace/core/work-item-prompts';
 import { computed, ref } from 'vue';
 import { translate } from '../i18n';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';

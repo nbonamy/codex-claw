@@ -1,7 +1,8 @@
-import type { AppCommand } from '@codex-claw/core/contracts';
+import type { AppCommand } from '@workspace/core/contracts';
+import { product } from '@workspace/core/product';
 
-export const codexClawDeepLinkScheme = 'codex-claw';
-const codexClawDeepLinkProtocol = `${codexClawDeepLinkScheme}:`;
+export const appDeepLinkScheme = product.protocolScheme;
+const appDeepLinkProtocol = `${appDeepLinkScheme}:`;
 const MAX_DEEP_LINK_PROMPT_LENGTH = 100_000;
 
 export function appCommandFromDeepLink(value: string): AppCommand | null {
@@ -12,7 +13,7 @@ export function appCommandFromDeepLink(value: string): AppCommand | null {
     return null;
   }
   if (
-    url.protocol !== codexClawDeepLinkProtocol
+    url.protocol !== appDeepLinkProtocol
     || url.username
     || url.password
     || url.port
@@ -47,5 +48,5 @@ export function appCommandFromDeepLink(value: string): AppCommand | null {
 }
 
 export function deepLinksFromArgv(argv: readonly string[]): string[] {
-  return argv.filter((value) => value.startsWith(`${codexClawDeepLinkProtocol}//`));
+  return argv.filter((value) => value.startsWith(`${appDeepLinkProtocol}//`));
 }

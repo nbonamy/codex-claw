@@ -41,8 +41,8 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Mission } from '@codex-claw/core/missions';
-import { pendingMissionRun } from '@codex-claw/core/mission-execution';
+import type { Mission } from '@workspace/core/missions';
+import { pendingMissionRun } from '@workspace/core/mission-execution';
 import { CodeIcon, SparklesIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 
 type Conversation = { key: string; agentId: string; run: NonNullable<Mission['execution']>['runs'][number] };

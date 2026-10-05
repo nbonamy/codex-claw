@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SourceFolderListInput } from '@codex-claw/core/contracts';
+import type { SourceFolderListInput } from '@workspace/core/contracts';
 import { codexPairingUrl } from '../../device-pairing';
 import SettingsConnectionsPanel from '../SettingsConnectionsPanel.vue';
-import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { bundledCodexVersion } from '@workspace/core/codex-release';
 
 describe('codexPairingUrl', () => {
   it('wraps the opaque code in the ChatGPT Codex pairing deep link', () => {
@@ -81,12 +82,12 @@ describe('SettingsConnectionsPanel', () => {
           hostName: 'devbox.internal',
           user: 'nicolas',
           status: 'ready',
-          detail: 'Ready (clawd 0.1.0)',
+          detail: 'Ready (daemon 0.1.0)',
           sourceFolderPath: '~/src',
           transport: {
             type: 'ssh-stdio',
             command: 'ssh',
-            args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+            args: ['devbox', 'node ~/.agent-workspace/daemon.mjs --stdio'],
           },
           createdAt: '2026-06-14T10:00:00.000Z',
           updatedAt: '2026-06-14T10:00:00.000Z',
@@ -109,13 +110,13 @@ describe('SettingsConnectionsPanel', () => {
 
     expect(wrapper.text()).toContain('devbox');
     expect(wrapper.text()).toContain('nicolas@devbox.internal');
-    expect(wrapper.text()).toContain('Ready (clawd 0.1.0)');
+    expect(wrapper.text()).toContain('Ready (daemon 0.1.0)');
 
     await wrapper.get('[aria-label="Connection settings for devbox"]').trigger('click');
     await flushPromises();
-    expect([...document.body.querySelectorAll('.claw-dialog__footer .claw-button')].map((button) => [...button.classList])).toStrictEqual([
-      ['claw-button', 'claw-button--tertiary'],
-      ['claw-button', 'claw-button--primary'],
+    expect([...document.body.querySelectorAll('.app-dialog__footer .app-button')].map((button) => [...button.classList])).toStrictEqual([
+      ['app-button', 'app-button--tertiary'],
+      ['app-button', 'app-button--primary'],
     ]);
     bodyButton('Browse')?.click();
     await flushPromises();
@@ -153,7 +154,7 @@ describe('SettingsConnectionsPanel', () => {
     expect(removeRemoteConnection).toHaveBeenCalledWith('connection-devbox');
   });
 
-  it('offers to upgrade an SSH connection when its clawd version differs', async () => {
+  it('offers to upgrade an SSH connection when its daemon version differs', async () => {
     const checkRemoteConnection = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsConnectionsPanel, {
       props: {
@@ -164,7 +165,7 @@ describe('SettingsConnectionsPanel', () => {
           name: 'wall-e',
           host: 'wall-e',
           status: 'ready',
-          detail: 'Ready (clawd 0.15.0)',
+          detail: 'Ready (daemon 0.15.0)',
           createdAt: '2026-06-14T10:00:00.000Z',
           updatedAt: '2026-06-14T10:00:00.000Z',
         }, {
@@ -173,9 +174,9 @@ describe('SettingsConnectionsPanel', () => {
           name: 'eve',
           host: 'eve',
           status: 'ready',
-          clawdVersion: '0.19.1',
+          daemonVersion: '0.19.1',
           codexVersion: bundledCodexVersion,
-          detail: 'Ready (clawd 0.19.1)',
+          detail: 'Ready (daemon 0.19.1)',
           createdAt: '2026-06-14T10:00:00.000Z',
           updatedAt: '2026-06-14T10:00:00.000Z',
         }],
@@ -208,7 +209,7 @@ describe('SettingsConnectionsPanel', () => {
           name: 'devbox',
           host: 'devbox',
           status: 'ready',
-          detail: 'Ready (clawd 0.21.1, Codex 0.155.1, Claude 2.1.283)',
+          detail: 'Ready (daemon 0.21.1, Codex 0.155.1, Claude 2.1.283)',
           createdAt: '2026-06-14T10:00:00.000Z',
           updatedAt: '2026-06-14T10:00:00.000Z',
         }],
@@ -280,7 +281,7 @@ describe('SettingsConnectionsPanel', () => {
     };
     const getRemoteControlStatus = vi.fn().mockResolvedValue({
       status: 'connected',
-      serverName: 'Claw',
+      serverName: `${product.name}`,
       installationId: 'installation-1',
       environmentId: 'environment-1',
       allowRemoteControl: true,

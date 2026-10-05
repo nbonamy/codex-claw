@@ -1,6 +1,6 @@
 ---
 name: prepare-release
-description: Prepare and publish a Codex Claw desktop release by invoking the repo-level update-changelog audit, presenting an evidence-backed semantic-version recommendation, synchronizing package versions, freezing generated release notes, committing and tagging the release with SDK provenance, then building and publishing it by default. Use when Nicolas asks to prepare, cut, freeze, version, build, or publish a Codex Claw release, including $prepare-release with or without a version.
+description: Prepare and publish a Korus desktop release by invoking the repo-level update-changelog audit, presenting an evidence-backed semantic-version recommendation, synchronizing package versions, freezing generated release notes, committing and tagging the release with SDK provenance, then building and publishing it by default. Use when Nicolas asks to prepare, cut, freeze, version, build, or publish a Korus release, including $prepare-release with or without a version.
 ---
 
 # Prepare Release
@@ -11,7 +11,7 @@ explicitly says not to build or publish.
 
 ## 1. Require clean, reproducible repositories
 
-Codex Claw's release build consumes the live sibling checkout at
+Korus's release build consumes the live sibling checkout at
 `../codex-app-sdk`. Before any mutation, require both repositories to be clean:
 
 ```bash
@@ -35,7 +35,7 @@ version with the release request.
 Require its result to contain:
 
 - a non-empty, fully audited `## Unreleased` section;
-- Claw and SDK baseline/HEAD evidence;
+- Korus and SDK baseline/HEAD evidence;
 - an exact semantic-version recommendation and rationale;
 - `<sdk-head>` matching the value recorded in step 1.
 
@@ -84,7 +84,7 @@ Update all version-owned files together with `apply_patch`:
 - `vue/package.json`
 - `electron/package.json`
 - `web/package.json`
-- the internal `@codex-claw/*` dependencies in workspace manifests
+- the internal `@workspace/*` dependencies in workspace manifests
 
 Mechanically refresh the lockfile:
 
@@ -152,7 +152,7 @@ release-prep commit:
 
 ```bash
 git tag -a "v<target-version>" \
-  -m "codex claw <target-version>" \
+  -m "app <target-version>" \
   -m "codex-app-sdk: <sdk-head>"
 ```
 
@@ -163,7 +163,7 @@ existing tag.
 ## 7. Build and publish by default
 
 If Nicolas explicitly opted out of building or publishing, report the version,
-Claw commit hash, local tag, and recorded SDK commit, then stop without pushing.
+Korus commit hash, local tag, and recorded SDK commit, then stop without pushing.
 
 Otherwise, immediately before building, require both repositories to be clean
 again and verify that the live SDK `HEAD` exactly matches the commit recorded
@@ -176,7 +176,7 @@ Run the complete signed and notarized macOS publication workflow:
 npm run publish
 ```
 
-Never set `CODEX_CLAW_SKIP_SIGNING` for a release. Require the publish command
+Never set `APP_SKIP_SIGNING` for a release. Require the publish command
 to complete successfully before publishing Git state. Then push the current
 branch and the new tag explicitly:
 
@@ -192,10 +192,10 @@ never claim the release was published.
 
 ## 8. Celebrate and report
 
-After every publication and Git verification succeeds, call the Codex Claw
+After every publication and Git verification succeeds, call the Korus
 `celebrate` tool exactly once. Choose the effect deliberately: vary it from the
 most recent visible celebration, rotate `confetti`, `stars`, and `shapes` for
 ordinary releases, and reserve `schoolPride` for a major product or team
 milestone. The release is complete only after that call returns. Then report
-the version, Claw commit hash, pushed tag, recorded SDK commit, and published
+the version, Korus commit hash, pushed tag, recorded SDK commit, and published
 macOS artifact.

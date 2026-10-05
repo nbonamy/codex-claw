@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexAuthentication, RemoteConnection } from '@codex-claw/core/contracts';
+import type { CodexAuthentication, RemoteConnection } from '@workspace/core/contracts';
 import RemoteCodexAuthentication from '../RemoteCodexAuthentication.vue';
 import { configureElectronTestClient } from '../../test/client';
 
@@ -48,7 +48,7 @@ describe('RemoteCodexAuthentication', () => {
     const { client, wrapper } = render();
     await flushPromises();
     expect(client.getCodexAuthentication).toHaveBeenCalledWith('wall-e');
-    expect(wrapper.get('button').classes()).toContain('claw-button--secondary');
+    expect(wrapper.get('button').classes()).toContain('app-button--secondary');
     await wrapper.get('button').trigger('click');
     await flushPromises();
     expect(client.startCodexChatGptDeviceCodeLogin).toHaveBeenCalledWith('wall-e');

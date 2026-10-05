@@ -7,7 +7,7 @@
     <template v-if="presentation === 'delivery'">
       <button
         v-if="updateEnabled"
-        class="claw-button claw-button--neutral git-workflow-control__delivery-action"
+        class="app-button app-button--neutral git-workflow-control__delivery-action"
         type="button"
         :disabled="busy"
         @click="selectAction('update-from-base')"
@@ -16,7 +16,7 @@
         <span>{{ $t('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch }) }}</span>
       </button>
       <button
-        class="claw-button claw-button--neutral git-workflow-control__delivery-action"
+        class="app-button app-button--neutral git-workflow-control__delivery-action"
         type="button"
         :disabled="busy || !mergeEnabled || mergeUnavailable"
         @click="selectAction('merge')"
@@ -25,7 +25,7 @@
         <span>{{ $t('surface.gitWorkflowControl.merge') }}</span>
       </button>
       <button
-        class="claw-button claw-button--neutral git-workflow-control__delivery-action"
+        class="app-button app-button--neutral git-workflow-control__delivery-action"
         type="button"
         :disabled="busy || !prEnabled"
         @click="selectAction('create-pr')"
@@ -69,7 +69,7 @@
   <el-dialog
     v-if="commitDialogOpen"
     v-model="commitDialogOpen"
-    class="claw-dialog git-workflow-control__dialog"
+    class="app-dialog git-workflow-control__dialog"
     :class="{ 'git-workflow-control__dialog--transient': commitOperation.status !== 'editing' && commitOperation.status !== 'error' }"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
@@ -78,7 +78,7 @@
     :close-on-press-escape="!commitOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.commitChanges') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch ?? 'detached HEAD' }}</span></div></template>
+    <template #header><div class="app-form-dialog__header git-workflow-control__dialog-header"><h2 class="app-dialog__title">{{ $t('surface.gitWorkflowControl.commitChanges') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch ?? 'detached HEAD' }}</span></div></template>
     <div
       v-if="commitOperation.status === 'editing'"
       class="git-workflow-control__dialog-form"
@@ -133,19 +133,19 @@
     <template #footer>
       <div
         v-if="commitOperation.status === 'editing'"
-        class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canCommit" @click="commit(false)">{{ $t('surface.gitWorkflowControl.commit') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">{{ $t('surface.gitWorkflowControl.commitAndPush') }}</button></div>
+        class="app-dialog__footer"
+      ><button class="app-button app-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--secondary" type="button" :disabled="busy || !canCommit" @click="commit(false)">{{ $t('surface.gitWorkflowControl.commit') }}</button><button class="app-button app-button--primary" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">{{ $t('surface.gitWorkflowControl.commitAndPush') }}</button></div>
       <div
         v-else-if="commitOperation.status === 'error'"
-        class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button" :class="commitOperation.commitCreated ? 'claw-button--primary' : 'claw-button--secondary'" type="button" @click="commitOperation.commitCreated ? retryCommitPush() : returnToCommitForm()">{{ commitOperation.commitCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.back') }}</button></div>
+        class="app-dialog__footer"
+      ><button class="app-button app-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button" :class="commitOperation.commitCreated ? 'app-button--primary' : 'app-button--secondary'" type="button" @click="commitOperation.commitCreated ? retryCommitPush() : returnToCommitForm()">{{ commitOperation.commitCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.back') }}</button></div>
     </template>
   </el-dialog>
 
   <el-dialog
     v-if="pushDialogOpen"
     v-model="pushDialogOpen"
-    class="claw-dialog git-workflow-control__dialog"
+    class="app-dialog git-workflow-control__dialog"
     :class="{ 'git-workflow-control__dialog--transient': pushOperation.status === 'pushing' || pushOperation.status === 'success' }"
     width="min(620px, calc(100vw - 32px))"
     :teleported="false"
@@ -154,7 +154,7 @@
     :close-on-press-escape="!pushOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.pushChanges') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="app-form-dialog__header git-workflow-control__dialog-header"><h2 class="app-dialog__title">{{ $t('surface.gitWorkflowControl.pushChanges') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div
       v-if="pushOperation.status === 'confirming'"
       class="git-workflow-control__push-summary"
@@ -179,19 +179,19 @@
     <template #footer>
       <div
         v-if="pushOperation.status === 'confirming'"
-        class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy" @click="push">{{ $t('surface.gitWorkflowControl.push') }}</button></div>
+        class="app-dialog__footer"
+      ><button class="app-button app-button--tertiary" type="button" @click="pushDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--primary" type="button" :disabled="busy" @click="push">{{ $t('surface.gitWorkflowControl.push') }}</button></div>
       <div
         v-else-if="pushOperation.status === 'error'"
-        class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pushDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="push">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
+        class="app-dialog__footer"
+      ><button class="app-button app-button--tertiary" type="button" @click="pushDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="push">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 
   <el-dialog
     v-if="pullRequestDialogOpen"
     v-model="pullRequestDialogOpen"
-    class="claw-dialog git-workflow-control__dialog"
+    class="app-dialog git-workflow-control__dialog"
     :class="{ 'git-workflow-control__dialog--transient': pullRequestOperation.status === 'success' }"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
@@ -200,7 +200,7 @@
     :close-on-press-escape="!pullRequestOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header git-workflow-control__dialog-header"><h2 class="claw-dialog__title">{{ $t('surface.gitWorkflowControl.createPullRequest') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="app-form-dialog__header git-workflow-control__dialog-header"><h2 class="app-dialog__title">{{ $t('surface.gitWorkflowControl.createPullRequest') }}</h2><span class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div
       v-if="pullRequestOperation.status === 'editing'"
       class="git-workflow-control__dialog-form git-workflow-control__pull-request-form"
@@ -243,23 +243,23 @@
     <template #footer>
       <div
         v-if="pullRequestOperation.status === 'editing'"
-        class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.createPR') }}</button></div>
+        class="app-dialog__footer"
+      ><button class="app-button app-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--primary" type="button" :disabled="busy || !pullRequestTitle.trim()" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.createPR') }}</button></div>
       <div
         v-else-if="pullRequestOperation.status === 'creating'"
-        class="claw-dialog__footer"
-      ><button class="claw-button claw-button--secondary" type="button" @click="runPullRequestInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
+        class="app-dialog__footer"
+      ><button class="app-button app-button--secondary" type="button" @click="runPullRequestInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
       <div
         v-else-if="pullRequestOperation.status === 'error'"
-        class="claw-dialog__footer"
-      ><button class="claw-button claw-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
+        class="app-dialog__footer"
+      ><button class="app-button app-button--tertiary" type="button" @click="pullRequestDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="createPullRequest">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 
   <el-dialog
     v-if="mergeDialogOpen"
     v-model="mergeDialogOpen"
-    class="claw-dialog git-workflow-control__dialog"
+    class="app-dialog git-workflow-control__dialog"
     :class="{
       'git-workflow-control__dialog--transient': mergeOperation.status === 'success',
     }"
@@ -270,7 +270,7 @@
     :close-on-press-escape="!mergeOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !mergeTargetDirtyWarning }"><h2 class="claw-dialog__title">{{ mergeDialogTitle }}</h2><span v-if="mergeTargetDirtyWarning" class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.targetWorktreeHasChanges', { branch: baseBranch, sourceBranch: workflow?.branch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="app-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !mergeTargetDirtyWarning }"><h2 class="app-dialog__title">{{ mergeDialogTitle }}</h2><span v-if="mergeTargetDirtyWarning" class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.targetWorktreeHasChanges', { branch: baseBranch, sourceBranch: workflow?.branch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div v-if="!mergeTargetDirtyWarning && mergeOperation.status === 'confirming'" class="git-workflow-control__dialog-form">
       <div class="git-workflow-control__merge-strategy" role="radiogroup" :aria-label="$t('surface.gitWorkflowControl.mergeStrategy')">
         <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'merge' }">
@@ -326,18 +326,18 @@
       <template #icon><GitMergeIcon /></template>
     </GitOperationFeedback>
     <template #footer>
-      <div v-if="mergeTargetDirtyWarning" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
-      <div v-else-if="mergeOperation.status === 'confirming'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ $t('surface.gitWorkflowControl.merge') }}</button><button class="claw-button claw-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ $t('surface.gitWorkflowControl.mergeAndPush') }}</button></div>
-      <div v-else-if="mergeOperationRunning" class="claw-dialog__footer"><button class="claw-button claw-button--secondary" type="button" @click="runMergeInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
-      <div v-else-if="mergeOperation.status === 'warning'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
-      <div v-else-if="mergeOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.retry') }}</button></div>
+      <div v-if="mergeTargetDirtyWarning" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
+      <div v-else-if="mergeOperation.status === 'confirming'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ $t('surface.gitWorkflowControl.merge') }}</button><button class="app-button app-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ $t('surface.gitWorkflowControl.mergeAndPush') }}</button></div>
+      <div v-else-if="mergeOperationRunning" class="app-dialog__footer"><button class="app-button app-button--secondary" type="button" @click="runMergeInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
+      <div v-else-if="mergeOperation.status === 'warning'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
+      <div v-else-if="mergeOperation.status === 'error'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 
   <el-dialog
     v-if="updateDialogOpen"
     v-model="updateDialogOpen"
-    class="claw-dialog git-workflow-control__dialog"
+    class="app-dialog git-workflow-control__dialog"
     :class="{ 'git-workflow-control__dialog--transient': updateOperation.status === 'success' }"
     width="min(560px, calc(100vw - 32px))"
     :teleported="false"
@@ -346,7 +346,7 @@
     :close-on-press-escape="!updateOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="claw-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !updateOperationConfirming }"><h2 class="claw-dialog__title">{{ updateDialogTitle }}</h2><template v-if="updateOperation.status === 'confirmingDirty'"><span class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.commitYourChangesFirst') }}</span><span class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.updatingWithUncommittedChangesCanCauseConflicts', { branch: baseBranch }) }}</span></template><span v-else-if="updateOperation.status === 'confirmingRequired'" class="claw-dialog__subtitle">{{ $t('surface.gitWorkflowControl.branchMustIncludeLatestChanges', { branch: baseBranch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="app-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !updateOperationConfirming }"><h2 class="app-dialog__title">{{ updateDialogTitle }}</h2><template v-if="updateOperation.status === 'confirmingDirty'"><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.commitYourChangesFirst') }}</span><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.updatingWithUncommittedChangesCanCauseConflicts', { branch: baseBranch }) }}</span></template><span v-else-if="updateOperation.status === 'confirmingRequired'" class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.branchMustIncludeLatestChanges', { branch: baseBranch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <GitOperationFeedback
       v-if="!updateOperationConfirming"
       :status="updateFeedbackStatus"
@@ -356,10 +356,10 @@
       <template #icon><RefreshIcon /></template>
     </GitOperationFeedback>
     <template #footer>
-      <div v-if="updateOperation.status === 'confirmingDirty'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--secondary" type="button" @click="updateFromBase(true)">{{ $t('surface.gitWorkflowControl.updateAnyway') }}</button><button class="claw-button claw-button--primary" type="button" @click="commitBeforeUpdate">{{ $t('surface.gitWorkflowControl.commitFirst') }}</button></div>
-      <div v-else-if="updateOperation.status === 'confirmingRequired'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="claw-button claw-button--primary" type="button" @click="updateFromBase(false)">{{ $t('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch }) }}</button></div>
-      <div v-else-if="updateOperation.status === 'conflicts'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
-      <div v-else-if="updateOperation.status === 'error'" class="claw-dialog__footer"><button class="claw-button claw-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="claw-button claw-button--primary" type="button" @click="updateFromBase(Boolean(workflow?.files.length))">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
+      <div v-if="updateOperation.status === 'confirmingDirty'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--secondary" type="button" @click="updateFromBase(true)">{{ $t('surface.gitWorkflowControl.updateAnyway') }}</button><button class="app-button app-button--primary" type="button" @click="commitBeforeUpdate">{{ $t('surface.gitWorkflowControl.commitFirst') }}</button></div>
+      <div v-else-if="updateOperation.status === 'confirmingRequired'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--primary" type="button" @click="updateFromBase(false)">{{ $t('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch }) }}</button></div>
+      <div v-else-if="updateOperation.status === 'conflicts'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
+      <div v-else-if="updateOperation.status === 'error'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="updateFromBase(Boolean(workflow?.files.length))">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
 </template>
@@ -368,9 +368,9 @@
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, MainToRendererEvent } from '@workspace/core/contracts';
 import { AlertTriangleIcon, ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, RefreshIcon, SparklesIcon } from '../shared/icons/app-icons';
-import { codexClawApi } from '../platform-api';
+import { appApi } from '../platform-api';
 import { localizedErrorMessage } from '../i18n/errors';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -659,7 +659,7 @@ watch(mergeStrategy, (strategy) => {
 
 onMounted(() => {
   document.addEventListener('click', closeMenu);
-  unsubscribeMainEvents = codexClawApi?.onEvent(handleMainEvent) ?? null;
+  unsubscribeMainEvents = appApi?.onEvent(handleMainEvent) ?? null;
   void loadWorkflow({ reset: true });
 });
 onBeforeUnmount(() => {
@@ -1310,7 +1310,7 @@ function handleMainEvent(event: MainToRendererEvent): void {
   min-width: 0;
 }
 
-.git-workflow-control__dialog-header .claw-dialog__title {
+.git-workflow-control__dialog-header .app-dialog__title {
   flex: 0 0 auto;
   white-space: nowrap;
 }

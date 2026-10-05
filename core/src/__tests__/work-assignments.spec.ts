@@ -25,11 +25,11 @@ describe('work assignments', () => {
     };
     const agent = assignedAgent();
 
-    expect(workItemAssignmentKey(item)).toBe('github:nbonamy/codex-claw#12');
+    expect(workItemAssignmentKey(item)).toBe('github:nbonamy/agent-workspace#12');
     expect(isSameWorkItem(assignment, item)).toBe(true);
     expect(findAssignedAgentForWorkItem([agent], assignments, item)).toBe(agent);
     expect(assignedAgentsByWorkItemKey([agent], assignments)).toStrictEqual({
-      'github:nbonamy/codex-claw#12': agent,
+      'github:nbonamy/agent-workspace#12': agent,
     });
   });
 
@@ -50,12 +50,12 @@ describe('work assignments', () => {
   it('sanitizes assignable work item payloads before they cross the main-process boundary', () => {
     expect(sanitizeWorkItemAssignmentSource(workItem(12))).toStrictEqual({
       provider: 'github',
-      id: 'nbonamy/codex-claw#12',
-      sourceId: 'nbonamy/codex-claw',
-      sourceName: 'nbonamy/codex-claw',
+      id: 'nbonamy/agent-workspace#12',
+      sourceId: 'nbonamy/agent-workspace',
+      sourceName: 'nbonamy/agent-workspace',
       number: 12,
       title: 'Fix cockpit drag target',
-      url: 'https://github.com/nbonamy/codex-claw/issues/12',
+      url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     });
     expect(sanitizeWorkItemAssignmentSource({
       ...workItem(12),
@@ -71,12 +71,12 @@ describe('work assignments', () => {
 function workItem(number: number): WorkItem {
   return {
     provider: 'github',
-    id: `nbonamy/codex-claw#${number}`,
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: `nbonamy/agent-workspace#${number}`,
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number,
     title: 'Fix cockpit drag target',
-    url: `https://github.com/nbonamy/codex-claw/issues/${number}`,
+    url: `https://github.com/nbonamy/agent-workspace/issues/${number}`,
     state: 'open',
     labels: [],
     authorName: 'nbonamy',
@@ -88,10 +88,10 @@ function workItem(number: number): WorkItem {
 function assignedAgent(): Agent {
   return {
     id: 'agent-dina',
-    teamId: 'team-codex-claw',
+    teamId: 'team-app',
     name: 'Dina',
     avatar: 'DI',
-    folder: '~/src/codex-claw',
+    folder: '~/src/agent-workspace',
     backend: 'codex',
     backendDefaults: { kind: 'codex' },
     status: { type: 'idle' },

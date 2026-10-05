@@ -132,7 +132,7 @@ describe('listAgentFolderFiles', () => {
 });
 
 async function createTempFolder(): Promise<string> {
-  const folder = await mkdtemp(path.join(tmpdir(), 'codex-claw-agent-files-'));
+  const folder = await mkdtemp(path.join(tmpdir(), 'agent-workspace-agent-files-'));
   tempFolders.push(folder);
   return folder;
 }

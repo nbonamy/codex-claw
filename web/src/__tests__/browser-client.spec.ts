@@ -1,18 +1,19 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
-import { createClawBrowserClient } from '../browser-client';
+import { createAppBrowserClient } from '../browser-client';
 
-describe('Claw browser client', () => {
+describe(`${product.name} browser client`, () => {
   it('waits for readiness, correlates operations, and emits backend events', async () => {
     const socket = new FakeBrowserSocket();
-    const api = createClawBrowserClient({ createSocket: () => socket as unknown as WebSocket });
+    const api = createAppBrowserClient({ createSocket: () => socket as unknown as WebSocket });
     const listener = vi.fn();
     api.onEvent(listener);
     queueMicrotask(() => socket.receive({ version: 1, type: 'ready', userId: 'local-single-user' }));
 
-    const pending = api.createTeam({ name: 'Claw' });
+    const pending = api.createTeam({ name: `${product.name}` });
     await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
     const request = JSON.parse(socket.sent[0]!);
-    expect(request).toMatchObject({ operation: 'createTeam', args: [{ name: 'Claw' }] });
+    expect(request).toMatchObject({ operation: 'createTeam', args: [{ name: `${product.name}` }] });
 
     socket.receive({ version: 1, type: 'response', id: request.id, ok: true, result: { teams: [] } });
     await expect(pending).resolves.toEqual({ teams: [] });
@@ -40,7 +41,7 @@ describe('Claw browser client', () => {
 
   it('supports host no-op subscriptions, errors, binary responses, and unsubscription', async () => {
     const socket = new FakeBrowserSocket();
-    const api = createClawBrowserClient({ createSocket: () => socket as unknown as WebSocket });
+    const api = createAppBrowserClient({ createSocket: () => socket as unknown as WebSocket });
     const listener = vi.fn();
     const unsubscribe = api.onEvent(listener);
     const unsubscribeCommand = api.onAppCommand(vi.fn());
@@ -51,7 +52,7 @@ describe('Claw browser client', () => {
     expect(unsubscribeUpdate()).toBeUndefined();
     socket.receive({ version: 1, type: 'ready', userId: 'local-single-user' });
 
-    const failed = api.createTeam({ name: 'Claw' });
+    const failed = api.createTeam({ name: `${product.name}` });
     await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
     const failedRequest = JSON.parse(socket.sent[0]!);
     socket.receiveBytes({
@@ -80,7 +81,7 @@ describe('Claw browser client', () => {
 
   it('drops malformed web events without disturbing pending responses or later events', async () => {
     const socket = new FakeBrowserSocket();
-    const api = createClawBrowserClient({ createSocket: () => socket as unknown as WebSocket });
+    const api = createAppBrowserClient({ createSocket: () => socket as unknown as WebSocket });
     const listener = vi.fn();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const secret = 'secret-event-value';
@@ -106,7 +107,7 @@ describe('Claw browser client', () => {
     socket.receive({ version: 1, type: 'event', event: malformedEvents[0] });
     socket.receive({ version: 1, type: 'ready', userId: 'local-single-user' });
 
-    const pending = api.createTeam({ name: 'Claw' });
+    const pending = api.createTeam({ name: `${product.name}` });
     await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
     const request = JSON.parse(socket.sent[0]!);
     for (const event of malformedEvents.slice(1)) {
@@ -137,37 +138,37 @@ describe('Claw browser client', () => {
 
   it('rejects pending and connecting requests when the socket disconnects', async () => {
     const connectedSocket = new FakeBrowserSocket();
-    const connectedApi = createClawBrowserClient({ createSocket: () => connectedSocket as unknown as WebSocket });
+    const connectedApi = createAppBrowserClient({ createSocket: () => connectedSocket as unknown as WebSocket });
     const pending = connectedApi.getSnapshot();
     connectedSocket.receive({ version: 1, type: 'ready', userId: 'local-single-user' });
     await vi.waitFor(() => expect(connectedSocket.sent).toHaveLength(1));
-    const pendingRejection = expect(pending).rejects.toThrow('Claw web socket disconnected.');
+    const pendingRejection = expect(pending).rejects.toThrow(`${product.name} web socket disconnected.`);
     connectedSocket.disconnect();
     await pendingRejection;
 
     const connectingSocket = new FakeBrowserSocket();
-    const connectingApi = createClawBrowserClient({ createSocket: () => connectingSocket as unknown as WebSocket });
+    const connectingApi = createAppBrowserClient({ createSocket: () => connectingSocket as unknown as WebSocket });
     const connecting = connectingApi.getSnapshot();
-    const connectingRejection = expect(connecting).rejects.toThrow('Claw web socket disconnected.');
+    const connectingRejection = expect(connecting).rejects.toThrow(`${product.name} web socket disconnected.`);
     connectingSocket.disconnect();
     await connectingRejection;
   });
 
   it('times out requests and rejects malformed handshake frames', async () => {
     const timeoutSocket = new FakeBrowserSocket();
-    const timeoutApi = createClawBrowserClient({
+    const timeoutApi = createAppBrowserClient({
       createSocket: () => timeoutSocket as unknown as WebSocket,
       requestTimeoutMs: 1,
     });
     const timedOut = timeoutApi.getSnapshot();
     timeoutSocket.receive({ version: 1, type: 'ready', userId: 'local-single-user' });
-    await expect(timedOut).rejects.toThrow('Claw web request timed out: getSnapshot');
+    await expect(timedOut).rejects.toThrow(`${product.name} web request timed out: getSnapshot`);
 
     const malformedSocket = new FakeBrowserSocket();
-    const malformedApi = createClawBrowserClient({ createSocket: () => malformedSocket as unknown as WebSocket });
+    const malformedApi = createAppBrowserClient({ createSocket: () => malformedSocket as unknown as WebSocket });
     const malformed = malformedApi.getSnapshot();
     const malformedRejection = expect(malformed).rejects.toThrow(
-      'Claw WebSocket messages must contain text or UTF-8 bytes.',
+      `${product.name} WebSocket messages must contain text or UTF-8 bytes.`,
     );
     malformedSocket.receiveRaw(new Blob(['not supported']));
     await malformedRejection;

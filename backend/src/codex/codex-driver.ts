@@ -1,4 +1,4 @@
-import { clientResponseFromAgentResponse } from '@codex-claw/core/agent-request';
+import { clientResponseFromAgentResponse } from '@workspace/core/agent-request';
 import type {
   Agent,
   ApprovalPreset,
@@ -18,9 +18,9 @@ import type {
   DevicePairingSession,
   DevicePairingStatus,
   PairedDevice
-} from '@codex-claw/core/contracts';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendCodeReviewInput, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendConversationReplacementResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
+} from '@workspace/core/contracts';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendCodeReviewInput, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendSendResult, BackendConversationReplacementResult, BackendTextGenerationInput, BackendTextGenerationResult, BackendTurnActionResult } from '@workspace/core/backend-driver';
 import type { CodexSurfaceAgentAdapter } from './codex-surface-adapter';
 
 type CodexPromptCommand = { type: 'review'; prompt: string };
@@ -40,7 +40,7 @@ export class CodexBackendDriver implements AgentBackendDriver {
     return this.sessionManager.getAuthentication();
   }
 
-  async authenticate(request: import('@codex-claw/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@codex-claw/core/contracts/provider-setup').ProviderAuthentication> {
+  async authenticate(request: import('@workspace/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@workspace/core/contracts/provider-setup').ProviderAuthentication> {
     const state = await (request.action === 'logout' ? this.logout()
       : request.action === 'cancel' ? this.cancelChatGptLogin(request.loginId) : this.getAuthentication());
     return { kind: 'codex', connected: request.action !== 'logout' && Boolean(state.account || !state.requiresOpenaiAuth), state };
@@ -314,7 +314,7 @@ export class CodexBackendDriver implements AgentBackendDriver {
     };
   }
 
-  async respondToAgentRequest(response: import('@codex-claw/core/agent-request').AgentRequestResponse): Promise<void> {
+  async respondToAgentRequest(response: import('@workspace/core/agent-request').AgentRequestResponse): Promise<void> {
     await this.sessionManager.respondToClientRequest({
       ...clientResponseFromAgentResponse(response),
       ...(response.agentId ? { agentId: response.agentId } : {}),

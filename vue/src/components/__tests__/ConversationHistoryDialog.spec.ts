@@ -1,12 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Agent, ConversationSummary } from '@codex-claw/core/contracts';
+import type { Agent, ConversationSummary } from '@workspace/core/contracts';
 import ConversationHistoryDialog from '../ConversationHistoryDialog.vue';
 
 const agent: Agent = {
   id: 'agent-dina',
   name: 'Dina',
-  folder: '~/src/codex-claw',
+  folder: '~/src/agent-workspace',
   backend: 'codex',
   backendDefaults: { kind: 'codex' },
   backendSession: { kind: 'codex', threadId: 'thread-current' },
@@ -57,8 +57,8 @@ describe('ConversationHistoryDialog', () => {
     });
     await flushPromises();
 
-    expect(wrapper.get('.conversation-history-dialog').classes()).toContain('claw-dialog--compact');
-    expect(wrapper.find('.claw-dialog__title').exists()).toBe(false);
+    expect(wrapper.get('.conversation-history-dialog').classes()).toContain('app-dialog--compact');
+    expect(wrapper.find('.app-dialog__title').exists()).toBe(false);
     expect(wrapper.get('.el-dialog__header [aria-label="Filter sessions"]').attributes('placeholder')).toBe('Filter sessions');
 
     const rows = wrapper.findAll('.conversation-history-dialog__row');

@@ -1,17 +1,18 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserAnnotation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels } from '@codex-claw/core/ipc';
-import { createMission, type MissionStage } from '@codex-claw/core/missions';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserAnnotation, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@workspace/core/contracts';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { ipcChannels } from '@workspace/core/ipc';
+import { createMission, type MissionStage } from '@workspace/core/missions';
 import type { OpenInProvider } from '../open-in';
 import { setMainWindowSend, createBackendClient } from './app-controller-test-harness';
 
 describe('AppController', () => {
 
-  it('routes the Debug message fixture to the active agent through clawd', async () => {
+  it('routes the Debug message fixture to the active agent through daemon', async () => {
     const request = vi.fn().mockResolvedValue({ recipientId: 'agent-dina' });
     const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }));
     const options = (controller as unknown as {
@@ -50,7 +51,7 @@ describe('AppController', () => {
     );
   });
 
-  it('routes Review fixtures through clawd and opens the real Review pane', async () => {
+  it('routes Review fixtures through daemon and opens the real Review pane', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockResolvedValue(snapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
@@ -79,7 +80,7 @@ describe('AppController', () => {
     ));
   });
 
-  it('populates Visualize through clawd and opens the real Visualize pane', async () => {
+  it('populates Visualize through daemon and opens the real Visualize pane', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockResolvedValue(snapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
@@ -107,7 +108,7 @@ describe('AppController', () => {
     const focus = vi.fn();
     setDeepLinkWindow(controller, { send, show, focus });
 
-    expect(controller.openDeepLink('codex-claw://new?prompt=Measure%20this')).toBe(true);
+    expect(controller.openDeepLink(`${product.protocolScheme}://new?prompt=Measure%20this`)).toBe(true);
     expect(controller.openDeepLink('https://example.com')).toBe(false);
     expect(send).not.toHaveBeenCalled();
     expect(show).toHaveBeenCalledOnce();
@@ -171,7 +172,7 @@ describe('AppController', () => {
     const controller = new AppController(createInitialSnapshot(), null);
     setMainWindowSend(controller, vi.fn());
     const state: BrowserState = {
-      url: 'file:///Users/nbonamy/src/codex-claw/README.md',
+      url: 'file:///Users/nbonamy/src/agent-workspace/README.md',
       title: 'README.md',
       canGoBack: false,
       canGoForward: false,
@@ -187,7 +188,7 @@ describe('AppController', () => {
       'agent-dina',
       'primary',
       state.url,
-      '~/src/codex-claw',
+      '~/src/agent-workspace',
       42,
     );
   });

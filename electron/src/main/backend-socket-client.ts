@@ -1,22 +1,22 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import net, { type Socket } from 'node:net';
-import type { ClawBackendEvent, ClawBackendHealth } from '@codex-claw/core/backend-protocol/rpc';
+import type { AppBackendEvent, AppBackendHealth } from '@workspace/core/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
 import { logMain, warnMain } from './log';
 import { BackendRpcSession } from './backend-rpc-session';
 
-export type ClawBackendSocketClientOptions = {
+export type AppBackendSocketClientOptions = {
   connectSocket?: typeof net.createConnection;
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   socketPath: string;
 };
 
-export class ClawBackendSocketClient {
+export class AppBackendSocketClient {
   private readonly connectSocket: typeof net.createConnection;
   private readonly rpc: BackendRpcSession;
   private socket: Socket | null = null;
 
-  constructor(private readonly options: ClawBackendSocketClientOptions) {
+  constructor(private readonly options: AppBackendSocketClientOptions) {
     this.connectSocket = options.connectSocket ?? net.createConnection;
     this.rpc = new BackendRpcSession({
       requestHandlers: options.requestHandlers ?? createRuntimeClientRequestHandlers(),
@@ -30,9 +30,9 @@ export class ClawBackendSocketClient {
 
     const socket = this.connectSocket(this.options.socketPath);
     this.socket = socket;
-    logMain('clawd', 'connecting to backend socket');
+    logMain('daemon', 'connecting to backend socket');
     socket.on('data', (chunk) => this.rpc.receive(chunk));
-    socket.once('close', () => this.handleDisconnect(socket, new Error('clawd socket closed.')));
+    socket.once('close', () => this.handleDisconnect(socket, new Error('daemon socket closed.')));
     socket.once('error', (error) => this.handleDisconnect(socket, error));
 
     await new Promise<void>((resolve, reject) => {
@@ -40,22 +40,22 @@ export class ClawBackendSocketClient {
       socket.once('error', reject);
     });
     this.rpc.connected((message) => socket.write(message));
-    logMain('clawd', 'backend socket connected');
+    logMain('daemon', 'backend socket connected');
   }
 
-  async health(): Promise<ClawBackendHealth> {
-    return this.request<ClawBackendHealth>(backendMethods.backendHealthGet);
+  async health(): Promise<AppBackendHealth> {
+    return this.request<AppBackendHealth>(backendMethods.backendHealthGet);
   }
 
   async request<Result>(method: string, params?: unknown): Promise<Result> {
     if (!this.socket) {
-      throw new Error('clawd socket is not connected.');
+      throw new Error('daemon socket is not connected.');
     }
 
     return this.rpc.request(method, params);
   }
 
-  onEvent(listener: (event: ClawBackendEvent) => void): () => void {
+  onEvent(listener: (event: AppBackendEvent) => void): () => void {
     return this.rpc.onEvent(listener);
   }
 
@@ -66,7 +66,7 @@ export class ClawBackendSocketClient {
   async close(): Promise<void> {
     const socket = this.socket;
     this.socket = null;
-    this.rpc.close(new Error('clawd socket client closed.'));
+    this.rpc.close(new Error('daemon socket client closed.'));
     if (!socket || socket.destroyed) {
       return;
     }
@@ -81,6 +81,6 @@ export class ClawBackendSocketClient {
     if (this.socket !== socket) return;
     this.socket = null;
     this.rpc.disconnected(error);
-    warnMain('clawd', 'backend socket disconnected', { detail: error.message });
+    warnMain('daemon', 'backend socket disconnected', { detail: error.message });
   }
 }

@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog whats-new-dialog"
+    class="app-dialog whats-new-dialog"
     :model-value="visible"
     :teleported="false"
     width="680px"
@@ -9,7 +9,7 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-dialog__header whats-new-dialog__header">
+      <div class="app-dialog__header whats-new-dialog__header">
         <div class="whats-new-dialog__heading">
           <el-select
             v-model="selectedVersion"
@@ -25,11 +25,11 @@
               :value="release.version"
             />
           </el-select>
-          <h2 class="claw-dialog__title">{{ $t('surface.whatsNewDialog.whatSNewInCodexClaw') }}</h2>
-          <p class="claw-dialog__subtitle">{{ $t('surface.whatsNewDialog.released') }} {{ formattedReleaseDate }}</p>
+          <h2 class="app-dialog__title">{{ $t('surface.whatsNewDialog.whatSNewInApp') }}</h2>
+          <p class="app-dialog__subtitle">{{ $t('surface.whatsNewDialog.released') }} {{ formattedReleaseDate }}</p>
         </div>
         <button
-          class="claw-dialog__icon-button"
+          class="app-dialog__icon-button"
           type="button"
           :aria-label="$t('surface.whatsNewDialog.closeWhatSNew')"
           @click="emit('close')"

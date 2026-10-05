@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { config, DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import type {
   CodexComposerMenuSelectableItem,
@@ -9,18 +10,18 @@ import { nextTick, reactive } from 'vue';
 import { ElRadio, ElRadioGroup } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
-import type { CodexClawApi, RendererMessage } from '@codex-claw/core/contracts';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { defaultBackendCommands } from '@workspace/core/backend-commands';
+import type { AppApi, RendererMessage } from '@workspace/core/contracts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setFirstRunOnboardingStage } from '../../onboarding-session';
 import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtures';
-import { encodeAppErrorDescriptor } from '@codex-claw/core/app-error';
-import { createClaudeConversationReplica } from '@codex-claw/core/claude-conversation-replica';
+import { encodeAppErrorDescriptor } from '@workspace/core/app-error';
+import { createClaudeConversationReplica } from '@workspace/core/claude-conversation-replica';
 
 import {
   conversationControllerActions,
@@ -53,7 +54,7 @@ afterEach(() => {
   window.localStorage.removeItem('cockpitGlobalScope:github');
   window.sessionStorage.clear();
   document.body.innerHTML = '';
-  delete window.codexClaw;
+  delete window.app;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
 
@@ -72,7 +73,7 @@ describe('AppShell authentication and conversation', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend, installed: true, connected: true, checking: false }];
     const state = backend === 'claude'
-      ? { loggedIn: false, configDirectory: '/claw/claude-home' }
+      ? { loggedIn: false, configDirectory: '/app/claude-home' }
       : { account: null, requiresOpenaiAuth: true, login: { status: 'idle', error: null } };
     const disconnectProvider = vi.fn().mockRejectedValueOnce(new Error("Error invoking remote method 'provider:disconnect': Error: Sign-out failed"))
       .mockResolvedValue({ kind: backend, connected: false, state });
@@ -82,7 +83,7 @@ describe('AppShell authentication and conversation', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-    window.codexClaw = { disconnectProvider, setProviderEnabled, startCodexChatGptLogin, getClaudeAuthentication } as unknown as CodexClawApi;
+    window.app = { disconnectProvider, setProviderEnabled, startCodexChatGptLogin, getClaudeAuthentication } as unknown as AppApi;
     const components = config.global.components;
     config.global.components = { ...components, ElRadio, ElRadioGroup };
     const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
@@ -107,11 +108,11 @@ describe('AppShell authentication and conversation', () => {
       if (backend === 'claude') {
         const commands = wrapper.findAll('.claude-login-command');
         expect(commands).toHaveLength(2);
-        expect(commands[0]!.text()).toContain("CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --claudeai");
+        expect(commands[0]!.text()).toContain("CLAUDE_CONFIG_DIR='/app/claude-home' claude auth login --claudeai");
         await commands[0]!.get('button').trigger('click');
-        expect(writeText).toHaveBeenLastCalledWith("CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --claudeai");
+        expect(writeText).toHaveBeenLastCalledWith("CLAUDE_CONFIG_DIR='/app/claude-home' claude auth login --claudeai");
         await commands[1]!.get('button').trigger('click');
-        expect(writeText).toHaveBeenLastCalledWith("CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --console");
+        expect(writeText).toHaveBeenLastCalledWith("CLAUDE_CONFIG_DIR='/app/claude-home' claude auth login --console");
       } else {
         expect(startCodexChatGptLogin).toHaveBeenCalledOnce();
         expect(wrapper.get('.settings-view').text()).toContain('Cancel sign-in');
@@ -383,12 +384,12 @@ describe('AppShell authentication and conversation', () => {
     let resolveConnections!: (value: []) => void;
     const getCodexAuthentication = vi.fn();
     const getClaudeAuthentication = vi.fn();
-    window.codexClaw = {
+    window.app = {
       getCodexAuthentication, getClaudeAuthentication,
       getProviderConnections: vi.fn().mockReturnValue(new Promise((resolve) => {
         resolveConnections = resolve;
       })),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
 
     const wrapper = mountShell();
     await nextTick();
@@ -415,7 +416,7 @@ describe('AppShell authentication and conversation', () => {
       } },
     }];
     const getCodexAuthentication = vi.fn();
-    window.codexClaw = { getCodexAuthentication } as Partial<CodexClawApi> as CodexClawApi;
+    window.app = { getCodexAuthentication } as Partial<AppApi> as AppApi;
     const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
     await flushPromises();
     await wrapper.get('.settings-menu').findAll('[role="menuitem"]').find(item => item.text().startsWith('Settings'))!.trigger('click');
@@ -427,7 +428,7 @@ describe('AppShell authentication and conversation', () => {
   it('saves a skills-only change from Settings for an engine that already has chats', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
-    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: true };
+    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/app/codex-home', locked: true };
     const configureProviderSetup = vi.fn().mockResolvedValue({ ...setup, shareSkills: false });
     setElectronTestClient({ getProviderSetup: vi.fn().mockResolvedValue([setup]), configureProviderSetup });
     const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: true, stubRightWorkspacePanel: true, stubTeamRail: false });
@@ -438,7 +439,7 @@ describe('AppShell authentication and conversation', () => {
     await flushPromises();
     const dialog = wrapper.getComponent({ name: 'ProviderSetupDialog' });
     await dialog.get('input[type="checkbox"]').setValue(false);
-    await dialog.get('.claw-button--primary').trigger('click');
+    await dialog.get('.app-button--primary').trigger('click');
     await flushPromises();
     expect(configureProviderSetup).toHaveBeenCalledExactlyOnceWith('codex', { isolated: true, shareSkills: false });
     expect(wrapper.find('.provider-setup__acknowledgment').exists()).toBe(false);
@@ -447,7 +448,7 @@ describe('AppShell authentication and conversation', () => {
   it('routes a confirmed Settings setup switch with the exact agent list', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
-    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: true, affectedAgentIds: snapshot.agents.map(agent => agent.id) };
+    const setup = { backend: 'codex' as const, installed: true, isolated: true, shareSkills: true, homePath: '/app/codex-home', locked: true, affectedAgentIds: snapshot.agents.map(agent => agent.id) };
     const configureProviderSetup = vi.fn()
       .mockRejectedValueOnce(new Error(`Error invoking remote method 'provider:setup:configure': ${encodeAppErrorDescriptor({ kind: 'appError', code: 'engineSetup.agentsBusy' }, 'diagnostic fallback')}`))
       .mockResolvedValue({ ...setup, isolated: false, locked: false, affectedAgentIds: [] });
@@ -465,15 +466,15 @@ describe('AppShell authentication and conversation', () => {
     // Real controls own exclusive selection and the acknowledgment gate.
     expect(dialog.findAll('input[type="radio"]')).toHaveLength(2);
     await dialog.findAll('input[type="radio"]')[1]!.setValue();
-    await dialog.get('.claw-button--primary').trigger('click');
+    await dialog.get('.app-button--primary').trigger('click');
     expect(configureProviderSetup).not.toHaveBeenCalled();
     await dialog.get('input[type="checkbox"]').setValue(true);
-    await dialog.get('.claw-button--primary').trigger('click');
+    await dialog.get('.app-button--primary').trigger('click');
     await flushPromises();
     expect(configureProviderSetup).toHaveBeenCalledWith('codex', { isolated: false, shareSkills: true, removeAgentIds: setup.affectedAgentIds });
     expect(dialog.get('[role="alert"]').text()).toBe('Wait for this engine’s agents to finish before changing their setup.');
     expect(dialog.text()).not.toContain('Error invoking remote method');
-    await dialog.get('.claw-button--primary').trigger('click');
+    await dialog.get('.app-button--primary').trigger('click');
     await flushPromises();
     expect(wrapper.find('.provider-setup__acknowledgment').exists()).toBe(false);
   });
@@ -493,11 +494,11 @@ describe('AppShell authentication and conversation', () => {
         requiresOpenaiAuth: true,
         login: { status: 'idle', error: null },
       });
-    window.codexClaw = {
+    window.app = {
       getCodexAuthentication,
       startCodexChatGptLogin: vi.fn().mockResolvedValue(undefined),
       updateSettings: vi.fn().mockResolvedValue(snapshot),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
 
     const wrapper = mountShell({ snapshot });
     await flushPromises();
@@ -545,13 +546,13 @@ describe('AppShell authentication and conversation', () => {
 
   it('shows the same celebrated completion after GitHub is skipped', async () => {
     setFirstRunOnboardingStage('github');
-    window.codexClaw = {
+    window.app = {
       getCodexAuthentication: vi.fn().mockResolvedValue({
         account: { type: 'chatgpt' },
         requiresOpenaiAuth: true,
         login: { status: 'idle', error: null },
       }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
 
     const wrapper = mountShell();
     await flushPromises();
@@ -565,25 +566,25 @@ describe('AppShell authentication and conversation', () => {
   });
 
   it('keeps provider selection pending across a reload even after Codex signs in', async () => {
-    window.codexClaw = {
+    window.app = {
       getCodexAuthentication: vi.fn().mockResolvedValue({
         account: null,
         requiresOpenaiAuth: true,
         login: { status: 'idle', error: null },
       }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
 
     const signedOutShell = mountShell({ snapshot: createEmptySnapshot() });
     await flushPromises();
     signedOutShell.unmount();
 
-    window.codexClaw = {
+    window.app = {
       getCodexAuthentication: vi.fn().mockResolvedValue({
         account: { type: 'chatgpt' },
         requiresOpenaiAuth: true,
         login: { status: 'idle', error: null },
       }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
 
     const reloadedSnapshot = createEmptySnapshot();
     reloadedSnapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
@@ -600,10 +601,10 @@ describe('AppShell authentication and conversation', () => {
     snapshot.agents = [];
     snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
     snapshot.general.claudeCodeEnabled = false;
-    window.codexClaw = {
+    window.app = {
       getCodexAuthentication: vi.fn().mockResolvedValue({ account: null, requiresOpenaiAuth: true, login: { status: 'idle', error: null } }),
       getClaudeAuthentication: vi.fn().mockResolvedValue({ loggedIn: true, configDirectory: null }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ snapshot });
     await flushPromises();
     expect(wrapper.findAll('.codex-login__detection')[1]!.text()).toContain('Connected');
@@ -620,14 +621,14 @@ describe('AppShell authentication and conversation', () => {
       .mockReturnValueOnce(new Promise(resolve => { finishClaudeCheck = resolve; }))
       .mockResolvedValue({ loggedIn: true, configDirectory: '/tmp/private-claude-home' });
     const updateSettings = vi.fn().mockResolvedValue(snapshot);
-    window.codexClaw = { getCodexAuthentication, getClaudeAuthentication, updateSettings } as Partial<CodexClawApi> as CodexClawApi;
+    window.app = { getCodexAuthentication, getClaudeAuthentication, updateSettings } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ snapshot });
     await flushPromises();
     expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
     await wrapper.get('.codex-login__providers').findAll('.el-button')[1]!.trigger('click');
     expect(wrapper.findAll('.claude-login-command').map(command => command.text())).toStrictEqual([
-      "CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --claudeai",
-      "CLAUDE_CONFIG_DIR='/claw/claude-home' claude auth login --console",
+      "CLAUDE_CONFIG_DIR='/app/claude-home' claude auth login --claudeai",
+      "CLAUDE_CONFIG_DIR='/app/claude-home' claude auth login --console",
     ]);
     finishClaudeCheck({ loggedIn: false, configDirectory: '/tmp/private-claude-home' });
     await flushPromises();
@@ -663,15 +664,15 @@ describe('AppShell authentication and conversation', () => {
   it.each([false, true])('installs an undetected provider and preserves a locked home (%s)', async (locked) => {
     const snapshot = createInitialSnapshot();
     snapshot.agents = [];
-    const setup = { backend: 'claude' as const, installed: false, isolated: true, shareSkills: true, locked, homePath: '/claw/claude-home' };
+    const setup = { backend: 'claude' as const, installed: false, isolated: true, shareSkills: true, locked, homePath: '/app/claude-home' };
     const configureProviderSetup = vi.fn().mockResolvedValue(setup);
     const installProvider = vi.fn().mockResolvedValue({ ...setup, installed: true });
     const getClaudeAuthentication = vi.fn().mockResolvedValue({ loggedIn: true, configDirectory: setup.homePath });
     const getCodexAuthentication = vi.fn();
-    window.codexClaw = {
-      getProviderSetup: vi.fn().mockResolvedValue([setup, { ...setup, backend: 'codex', homePath: '/claw/codex-home' }]),
+    window.app = {
+      getProviderSetup: vi.fn().mockResolvedValue([setup, { ...setup, backend: 'codex', homePath: '/app/codex-home' }]),
       configureProviderSetup, installProvider, getClaudeAuthentication, getCodexAuthentication,
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ snapshot });
     await flushPromises();
     expect(getCodexAuthentication).not.toHaveBeenCalled();
@@ -694,18 +695,18 @@ describe('AppShell authentication and conversation', () => {
   it.each(['codex', 'claude'] as const)('recognizes existing %s authentication after separation is disabled', async backend => {
     const snapshot = createInitialSnapshot();
     snapshot.agents = [];
-    const setups = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, isolated: true, shareSkills: true, locked: false, homePath: `/claw/${backend}-home` }));
+    const setups = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, isolated: true, shareSkills: true, locked: false, homePath: `/app/${backend}-home` }));
     const configureProviderSetup = vi.fn().mockResolvedValue({ ...setups.find(setup => setup.backend === backend), isolated: false, homePath: `/existing/${backend}` });
     const startCodexChatGptLogin = vi.fn();
     let finishAuthentication!: () => void;
     const authenticationReady = new Promise<void>(resolve => { finishAuthentication = resolve; });
-    window.codexClaw = {
+    window.app = {
       getProviderSetup: vi.fn().mockResolvedValue(setups), configureProviderSetup, startCodexChatGptLogin,
       getCodexAuthentication: vi.fn()
         .mockImplementation(async () => { await authenticationReady; return { account: { type: 'chatgpt' }, requiresOpenaiAuth: true, login: { status: 'idle', error: null } }; }),
       getClaudeAuthentication: vi.fn()
         .mockImplementation(async () => { await authenticationReady; return { loggedIn: true, configDirectory: '/existing/claude' }; }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mount(AppShell, {
       props: { snapshot, activeAgent: null, isLoading: false, isSending: false },
       global: { components: { ElRadio, ElRadioGroup } },
@@ -715,7 +716,7 @@ describe('AppShell authentication and conversation', () => {
     await wrapper.findAll('.codex-login__detection button')[index]!.trigger('click');
     const dialog = new DOMWrapper(document.body).get('[role="dialog"]');
     await dialog.get('input[type="radio"][value="false"]').setValue();
-    await dialog.get('.claw-form-dialog__footer .claw-button--primary').trigger('click');
+    await dialog.get('.app-form-dialog__footer .app-button--primary').trigger('click');
     await flushPromises();
     expect(configureProviderSetup).toHaveBeenCalledWith(backend, { isolated: false, shareSkills: true });
     expect(wrapper.findAll('.codex-login__detection > span').map(status => status.text())).toStrictEqual(
@@ -732,7 +733,7 @@ describe('AppShell authentication and conversation', () => {
     expect(startCodexChatGptLogin).not.toHaveBeenCalled();
   });
 
-  it('keeps the workspace visible while reporting automatic clawd reconnection', () => {
+  it('keeps the workspace visible while reporting automatic daemon reconnection', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(AppShell, {
       props: {
@@ -756,7 +757,7 @@ describe('AppShell authentication and conversation', () => {
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected, enabled: false, checking: false }];
     const setProviderEnabled = vi.fn().mockResolvedValue([{ ...snapshot.providerConnections[0], enabled: true }]);
     const startCodexChatGptLogin = vi.fn().mockResolvedValue(undefined);
-    window.codexClaw = { setProviderEnabled, startCodexChatGptLogin, updateSettings: vi.fn().mockResolvedValue(snapshot) } as Partial<CodexClawApi> as CodexClawApi;
+    window.app = { setProviderEnabled, startCodexChatGptLogin, updateSettings: vi.fn().mockResolvedValue(snapshot) } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ snapshot });
     await flushPromises();
 
@@ -785,7 +786,7 @@ describe('AppShell authentication and conversation', () => {
       requiresOpenaiAuth: true,
       login: { status: 'cancelled', error: null },
     });
-    window.codexClaw = {
+    window.app = {
       getCodexAuthentication: vi.fn().mockResolvedValue({
         account: null,
         requiresOpenaiAuth: true,
@@ -793,7 +794,7 @@ describe('AppShell authentication and conversation', () => {
       }),
       cancelCodexChatGptLogin,
       startCodexChatGptLogin: vi.fn().mockResolvedValue(undefined),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ snapshot: createEmptySnapshot() });
     await flushPromises();
 
@@ -828,9 +829,9 @@ describe('AppShell authentication and conversation', () => {
       },
     });
 
-    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe('Codex Claw');
+    expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(`${product.name}`);
     expect(wrapper.text()).toContain('Sessions');
-    expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
+    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Ready to get going');
     expect(wrapper.text()).toContain('Chat with Dina');
@@ -1409,12 +1410,12 @@ describe('AppShell authentication and conversation', () => {
       items: [{
         id: 'agent-dina',
         value: 'agent:agent-dina',
-        label: 'Dina · codex-claw',
+        label: 'Dina · agent-workspace',
         payload: { agentId: 'agent-dina' },
       }, {
         id: 'agent-jesse',
         value: 'agent:agent-jesse',
-        label: 'Jesse · codex-claw',
+        label: 'Jesse · agent-workspace',
         payload: { agentId: 'agent-jesse' },
       }],
     }]);

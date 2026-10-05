@@ -2,7 +2,7 @@
   <SettingsSection>
     <SettingsRow :title="title ?? $t('engineConnection.title')" :error="error">
       <template #control>
-        <button v-if="pending" class="claw-button claw-button--tertiary" type="button" aria-busy="true" :disabled="busy" @click="emit('cancel')">{{ $t('auth.cancel') }}</button>
+        <button v-if="pending" class="app-button app-button--tertiary" type="button" aria-busy="true" :disabled="busy" @click="emit('cancel')">{{ $t('auth.cancel') }}</button>
         <el-button v-else-if="connected" :disabled="busy || saving" @click="emit('disconnect')">{{ $t('engineConnection.disconnect') }}</el-button>
         <el-button v-else :disabled="busy || saving" @click="emit('connect')">
           {{ $t('engineConnection.connect') }}
@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { ProviderAuthentication } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderAuthentication } from '@workspace/core/contracts/provider-setup';
 import { ElMessageBox } from 'element-plus';
 import { useI18n } from 'vue-i18n';
 import SettingsRow from './SettingsRow.vue';

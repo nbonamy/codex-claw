@@ -1,8 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission } from '@codex-claw/core/missions';
-import type { AgentGitWorkflow, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission } from '@workspace/core/missions';
+import type { AgentGitWorkflow, OpenInApplicationCatalog } from '@workspace/core/contracts';
 import MissionShipBoard from '../MissionShipBoard.vue';
 
 describe('MissionShipBoard', () => {

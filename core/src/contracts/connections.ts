@@ -27,7 +27,7 @@ export type RemoteConnection = {
   port?: number;
   identityFile?: string;
   status: RemoteConnectionStatus;
-  clawdVersion?: string;
+  daemonVersion?: string;
   codexVersion?: string;
   detail?: string;
   sourceFolderPath?: string;

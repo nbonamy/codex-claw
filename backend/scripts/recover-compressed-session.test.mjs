@@ -1,4 +1,10 @@
 import { expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import product from '../../core/src/product.json' with { type: 'json' };
 import {
   agentRecovery,
   parseRecoveryArguments,
@@ -59,10 +65,61 @@ it('rejects an ambiguous folder instead of changing multiple agents', () => {
     .toThrow(/Expected exactly one Codex agent.*found 2/);
 });
 
+it.skipIf(process.platform === 'win32').each([
+  `/Applications/${product.name}.app/Contents/MacOS/${product.name}`,
+  `/usr/local/bin/node /Applications/${product.name}.app/Contents/Resources/daemon/daemon.mjs serve`,
+])('refuses recovery without writing state while a packaged process is active: %s', async (command) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'session-recovery-'));
+  try {
+    const stateDirectory = path.join(root, 'current');
+    const archiveDirectory = path.join(root, 'archive');
+    const archiveHome = path.join(archiveDirectory, product.homeDirectory);
+    const bin = path.join(root, 'bin');
+    await Promise.all([stateDirectory, archiveHome, bin].map((folder) => mkdir(folder, { recursive: true })));
+    const statePath = path.join(stateDirectory, 'roster.json');
+    const current = roster('thread-current');
+    // If the stop guard regresses, fail closed before any real provider can start.
+    const settings = { data: { settings: { codexBinaryPath: path.join(root, 'missing-provider-runtime') } } };
+    await writeFile(statePath, JSON.stringify(current));
+    await writeFile(path.join(stateDirectory, 'settings.json'), JSON.stringify(settings));
+    await writeFile(path.join(archiveHome, 'roster.json'), JSON.stringify(roster('thread-recovered')));
+    const backupPath = path.join(root, 'backup.tar');
+    const archive = spawnSync('tar', ['-cf', backupPath, '-C', archiveDirectory, product.homeDirectory], { encoding: 'utf8' });
+    expect(archive.status, archive.stderr).toBe(0);
+    await writeFile(path.join(bin, 'ps'), '#!/bin/sh\nprintf "%s\\n" "$APP_TEST_PS_OUTPUT"\n', { mode: 0o700 });
+
+    const result = spawnSync(process.execPath, [
+      fileURLToPath(new URL('./recover-compressed-session.mjs', import.meta.url)),
+      backupPath,
+      '/tmp/repo',
+    ], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      env: {
+        ...process.env,
+        HOME: root,
+        PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+        APP_HOME: stateDirectory,
+        APP_STATE_PATH: statePath,
+        APP_CODEX_HOME: path.join(root, 'codex-home'),
+        APP_TEST_PS_OUTPUT: `123 ${command}`,
+      },
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`${product.name} is still running.`);
+    expect(await readFile(statePath, 'utf8')).toBe(JSON.stringify(current));
+    expect((await readdir(stateDirectory)).sort()).toEqual(['roster.json', 'settings.json']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function roster(threadId) {
   return {
     schemaVersion: 1,
-    writtenBy: 'clawd test',
+    writtenBy: 'daemon test',
     data: {
       agents: [{
         id: 'agent-1',

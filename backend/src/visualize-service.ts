@@ -1,17 +1,18 @@
-import { editCanvas, isCanvasDocument, selectedCanvasElements, type CanvasEdit, type SaveCanvasInput } from '@codex-claw/core/visualize-canvas';
+import { product } from '@workspace/core/product';
+import { editCanvas, isCanvasDocument, selectedCanvasElements, type CanvasEdit, type SaveCanvasInput } from '@workspace/core/visualize-canvas';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import type { Agent, AppSnapshot, BackendConversationRef } from '@codex-claw/core/contracts';
+import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
+import type { Agent, AppSnapshot, BackendConversationRef } from '@workspace/core/contracts';
 import type {
   Visualization,
   VisualizationAsset,
   VisualizationContent,
   VisualizeSession,
-} from '@codex-claw/core/visualize';
-import { cloneVisualizeSession, visualizationRepositoryRoot, visualizationSuggestionLimits } from '@codex-claw/core/visualize';
-import { createEntityId } from '@codex-claw/core/ids';
+} from '@workspace/core/visualize';
+import { cloneVisualizeSession, visualizationRepositoryRoot, visualizationSuggestionLimits } from '@workspace/core/visualize';
+import { createEntityId } from '@workspace/core/ids';
 
 const MAX_VISUALIZATION_SOURCE_BYTES = 250_000;
 const MAX_GENERATED_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -67,7 +68,7 @@ export class VisualizeService {
 
   developerInstructions(): string {
     return [
-      'Codex Claw exposes Visualize MCP tools for the current conversation, but they work only while its Visualize pane is open.',
+      `${product.name} exposes Visualize MCP tools for the current conversation, but they work only while its Visualize pane is open.`,
       'Use them for Visualize requests to publish diagrams and suggestions, and keep chat secondary. Tool availability alone does not mean Visualize mode is active.',
       'Use list-visualizations to discover the current selection and get-visualization before replacing an existing visualization. Use add-visualization when the user asks for a new one.',
       SUPPORTED_MERMAID_GUIDANCE,
@@ -427,7 +428,7 @@ export class VisualizeService {
     const target = await realpath(path.isAbsolute(candidatePath) ? candidatePath : path.join(root, candidatePath));
     const relative = path.relative(root, target);
     if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-      throw new Error('Generated image must be inside the Codex Claw generated-images folder.');
+      throw new Error(`Generated image must be inside the ${product.name} generated-images folder.`);
     }
     const details = await stat(target);
     if (!details.isFile()) throw new Error('Generated image path is not a file.');
@@ -449,12 +450,12 @@ export class VisualizeService {
 
 export function initialVisualizePrompt(): string {
   const instructions = [
-    'Enter Codex Claw Visualize mode for this conversation.',
-    'Review the current conversation and call codex_claw.suggest-visualizations exactly once with 1 to 4 visualizations that would materially help the user.',
+    `Enter ${product.name} Visualize mode for this conversation.`,
+    'Review the current conversation and call workspace.suggest-visualizations exactly once with 1 to 4 visualizations that would materially help the user.',
     `Keep every title under ${visualizationSuggestionLimits.title} characters and every description to one short sentence under ${visualizationSuggestionLimits.description} characters.`,
     'Use only the current conversation and existing Visualize context. Do not browse, search the repository, inspect files, run commands, or do background research to choose suggestions.',
     'Do not provide the suggestions only as prose. The Visualize pane is the source of truth.',
-    'When asked to generate a suggestion or add a visualization, use Mermaid or SVG, or use image generation and then register its saved path with codex_claw.add-visualization.',
+    'When asked to generate a suggestion or add a visualization, use Mermaid or SVG, or use image generation and then register its saved path with workspace.add-visualization.',
     SUPPORTED_MERMAID_GUIDANCE,
     'For static diagrams use get-visualization before replace-visualization. Once a canvas exists, read-visualization-canvas and edit-visualization-canvas are authoritative; preserve user edits and never replace or reimport its source.',
   ].join(' ');
@@ -465,10 +466,10 @@ export function directVisualizationPrompt(direction: string): string {
   const instructions = [
     `Create one visualization for this request: ${contextJson(direction)}.`,
     'Use the current conversation and request as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research; make the best visualization the existing context supports.',
-    'Do not suggest visualizations first and do not call codex_claw.suggest-visualizations.',
+    'Do not suggest visualizations first and do not call workspace.suggest-visualizations.',
     'Choose Mermaid, SVG, or image generation based on what communicates it best.',
     SUPPORTED_MERMAID_GUIDANCE,
-    'Publish the finished result with codex_claw.add-visualization without a suggestion ID. Keep chat commentary brief because the Visualize pane is the primary output.',
+    'Publish the finished result with workspace.add-visualization without a suggestion ID. Keep chat commentary brief because the Visualize pane is the primary output.',
   ].join(' ');
   return injectedPrompt(`Visualize ${direction}.`, instructions);
 }
@@ -482,7 +483,7 @@ export function generateVisualizationSuggestionPrompt(session: VisualizeSession,
     'Use the current conversation and suggestion as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research; make the best visualization the existing context supports.',
     'Choose Mermaid, SVG, or image generation based on what communicates it best.',
     SUPPORTED_MERMAID_GUIDANCE,
-    'Publish the finished result with codex_claw.add-visualization and pass this suggestion ID. Keep chat commentary brief because the Visualize pane is the primary output.',
+    'Publish the finished result with workspace.add-visualization and pass this suggestion ID. Keep chat commentary brief because the Visualize pane is the primary output.',
   ].join(' ');
   return injectedPrompt(`Generate the “${suggestion.title}” visualization.`, instructions);
 }

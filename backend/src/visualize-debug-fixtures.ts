@@ -1,6 +1,6 @@
-import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import type { Agent } from '@codex-claw/core/contracts';
-import type { VisualizeDebugScenario, VisualizeSession } from '@codex-claw/core/visualize';
+import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
+import type { Agent } from '@workspace/core/contracts';
+import type { VisualizeDebugScenario, VisualizeSession } from '@workspace/core/visualize';
 
 export function createVisualizeDebugFixture(
   agent: Agent,

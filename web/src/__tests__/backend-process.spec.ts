@@ -1,20 +1,21 @@
+import { product } from '@workspace/core/product';
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
 
 vi.mock('node:child_process', () => ({ spawn: spawnMock }));
 
-import { ClawWebBackendProcess } from '../server/backend-process';
+import { AppWebBackendProcess } from '../server/backend-process';
 
-describe('Claw web backend process', () => {
-  it('starts clawd, resolves requests, forwards events, and handles client requests', async () => {
+describe(`${product.name} web backend process`, () => {
+  it('starts daemon, resolves requests, forwards events, and handles client requests', async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValueOnce(child);
-    const backend = new ClawWebBackendProcess({
+    const backend = new AppWebBackendProcess({
       command: 'node',
-      args: ['clawd.mjs', '--stdio'],
+      args: ['daemon.mjs', '--stdio'],
       cwd: '/repo',
       env: { CUSTOM: 'yes' },
     });
@@ -24,9 +25,9 @@ describe('Claw web backend process', () => {
     const starting = backend.start();
     const health = child.writtenMessage(0);
     expect(health).toMatchObject({ id: 1, method: backendMethods.backendHealthGet });
-    expect(spawnMock).toHaveBeenCalledWith('node', ['clawd.mjs', '--stdio'], expect.objectContaining({
+    expect(spawnMock).toHaveBeenCalledWith('node', ['daemon.mjs', '--stdio'], expect.objectContaining({
       cwd: '/repo',
-      env: expect.objectContaining({ CUSTOM: 'yes', CODEX_CLAW_HOST: 'web' }),
+      env: expect.objectContaining({ CUSTOM: 'yes', APP_HOST: 'web' }),
       stdio: 'pipe',
     }));
     child.send({ jsonrpc: '2.0', id: health.id, result: { ok: true } });
@@ -55,7 +56,7 @@ describe('Claw web backend process', () => {
     child.send({ jsonrpc: '2.0', id: 'server-1', method: 'client/native/doThing' });
     expect(child.writtenMessage(2)).toMatchObject({
       id: 'server-1',
-      error: { code: -32601, message: "Client method 'client/native/doThing' is unavailable in Claw Web." },
+      error: { code: -32601, message: `Client method 'client/native/doThing' is unavailable in ${product.name} Web.` },
     });
 
     await backend.close();
@@ -65,7 +66,7 @@ describe('Claw web backend process', () => {
   it('ignores malformed backend events and remains usable for later notifications', async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValueOnce(child);
-    const backend = new ClawWebBackendProcess({ command: 'clawd', args: [] });
+    const backend = new AppWebBackendProcess({ command: 'daemon', args: [] });
     const listener = vi.fn();
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const secret = 'secret-event-value';
@@ -111,7 +112,7 @@ describe('Claw web backend process', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ seq: 3 }));
     const malformedWarnings = stderr.mock.calls
       .map(([value]) => String(value))
-      .filter((value) => value.includes('Ignored malformed clawd event notification'));
+      .filter((value) => value.includes('Ignored malformed daemon event notification'));
     expect(malformedWarnings).toHaveLength(3);
     expect(malformedWarnings).toEqual(expect.arrayContaining([
       expect.stringContaining('$.payload.type'),
@@ -127,7 +128,7 @@ describe('Claw web backend process', () => {
   it('rejects backend errors, pending requests on exit, and requests while stopped', async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValueOnce(child);
-    const backend = new ClawWebBackendProcess({ command: 'clawd', args: [] });
+    const backend = new AppWebBackendProcess({ command: 'daemon', args: [] });
     const starting = backend.start();
     child.send({ jsonrpc: '2.0', id: 1, result: { ok: true } });
     await starting;
@@ -138,8 +139,8 @@ describe('Claw web backend process', () => {
 
     const pending = backend.request(backendMethods.snapshotGet);
     child.emit('exit', 7, null);
-    await expect(pending).rejects.toThrow('clawd exited (code=7, signal=null).');
-    await expect(backend.request('thing/stopped')).rejects.toThrow('Claw web backend is not running.');
+    await expect(pending).rejects.toThrow('daemon exited (code=7, signal=null).');
+    await expect(backend.request('thing/stopped')).rejects.toThrow(`${product.name} web backend is not running.`);
     await backend.close();
   });
 
@@ -147,7 +148,7 @@ describe('Claw web backend process', () => {
     vi.useFakeTimers();
     const child = new FakeChild();
     spawnMock.mockReturnValueOnce(child);
-    const backend = new ClawWebBackendProcess({ command: 'clawd', args: [] });
+    const backend = new AppWebBackendProcess({ command: 'daemon', args: [] });
     const starting = backend.start();
     child.send({ jsonrpc: '2.0', id: 1, result: { ok: true } });
     await starting;
@@ -157,11 +158,11 @@ describe('Claw web backend process', () => {
     child.send({ jsonrpc: '2.0', method: 'other/event', params: {} });
     child.send({ jsonrpc: '2.0', id: 999, result: 'ignored' });
     const pending = backend.request(backendMethods.settingsUpdate);
-    const rejection = expect(pending).rejects.toThrow(`clawd request timed out: ${backendMethods.settingsUpdate}`);
+    const rejection = expect(pending).rejects.toThrow(`daemon request timed out: ${backendMethods.settingsUpdate}`);
     await vi.advanceTimersByTimeAsync(10_000);
     await rejection;
     expect(stderr).toHaveBeenCalledTimes(2);
-    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Ignored invalid clawd response'));
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Ignored invalid daemon response'));
     stderr.mockRestore();
     vi.useRealTimers();
     await backend.close();
@@ -170,7 +171,7 @@ describe('Claw web backend process', () => {
   it('rejects startup when the child process errors', async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValueOnce(child);
-    const backend = new ClawWebBackendProcess({ command: 'missing', args: [] });
+    const backend = new AppWebBackendProcess({ command: 'missing', args: [] });
     const starting = backend.start();
     child.emit('error', new Error('spawn failed'));
     await expect(starting).rejects.toThrow('spawn failed');

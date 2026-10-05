@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MissionTicket } from '@codex-claw/core/missions';
+import type { MissionTicket } from '@workspace/core/missions';
 import MissionTicketBoard from '../MissionTicketBoard.vue';
 
 const tickets: MissionTicket[] = [

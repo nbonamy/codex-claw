@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { lstat, mkdir, readlink, symlink, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import type { ProviderHomeSettings } from '@codex-claw/core/contracts/provider-setup';
-import { resolveRuntimeExecutable } from '@codex-claw/core/runtime-discovery';
+import type { ProviderHomeSettings } from '@workspace/core/contracts/provider-setup';
+import { resolveRuntimeExecutable } from '@workspace/core/runtime-discovery';
 import { remoteClaudeInstallCommand } from '../connections/remote-claude-install';
 import { installProviderCli, providerHomePaths, type ProviderLifecycle } from '../provider-lifecycle';
 
@@ -15,12 +16,12 @@ export function createClaudeLifecycle(): ProviderLifecycle {
       const homePath = preserve ? path.resolve(configured || paths.existing) : paths.isolated;
       return { homePath, isolated: homePath === paths.isolated, shareSkills: !preserve };
     },
-    installed: () => Boolean(resolveRuntimeExecutable(process.env.CODEX_CLAW_CLAUDE_COMMAND || 'claude')),
+    installed: () => Boolean(resolveRuntimeExecutable(process.env.APP_CLAUDE_COMMAND || 'claude')),
     async prepareHome(home, configuring) {
       const requestedSharing = home.shareSkills;
       await prepareClaudeHome(home, paths.existing);
       if (configuring && requestedSharing && !home.shareSkills) {
-        throw new Error('This Claw home already has private skills. They were kept; disable skill sharing to continue.');
+        throw new Error(`This ${product.name} home already has private skills. They were kept; disable skill sharing to continue.`);
       }
     },
     applyHome: home => { process.env.CLAUDE_CONFIG_DIR = home.homePath; },

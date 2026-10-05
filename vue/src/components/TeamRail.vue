@@ -135,9 +135,9 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@codex-claw/core/contracts';
-import { defaultTeamColor } from '@codex-claw/core/team-colors';
-import { teamInitials } from '@codex-claw/core/team-manager';
+import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@workspace/core/contracts';
+import { defaultTeamColor } from '@workspace/core/team-colors';
+import { teamInitials } from '@workspace/core/team-manager';
 import { AutomationIcon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';

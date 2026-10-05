@@ -1,5 +1,5 @@
-import { createClawRpcError, createClawRpcNotification, createClawRpcRequest, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawRpcResponse, parseClawRpcMessage, type ClawRpcId, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
-import { appErrorDescriptor } from '@codex-claw/core/app-error';
+import { createAppRpcError, createAppRpcNotification, createAppRpcRequest, appRpcErrorCodes, isAppRpcNotification, isAppRpcRequest, isAppRpcResponse, parseAppRpcMessage, type AppRpcId, type AppRpcMessage, type AppRpcResponse } from '@workspace/core/backend-protocol/rpc';
+import { appErrorDescriptor } from '@workspace/core/app-error';
 import type { Readable, Writable } from 'node:stream';
 
 export type StdioRpcServerOptions = {
@@ -9,12 +9,12 @@ export type StdioRpcServerOptions = {
   onOutputBackpressure?(details: { frameBytes: number; writableLength: number }): void;
   onOutputDrain?(details: { writableLength: number }): void;
   onOutputOverflow?(details: OutputFrameDetails & { bufferedBytes: number; frameBytes: number }): void;
-  onMessage(message: ClawRpcMessage): ClawRpcResponse | undefined | Promise<ClawRpcResponse | undefined>;
+  onMessage(message: AppRpcMessage): AppRpcResponse | undefined | Promise<AppRpcResponse | undefined>;
 };
 
 type OutputFrameDetails = {
   eventType?: string;
-  id?: ClawRpcId | null;
+  id?: AppRpcId | null;
   kind: 'notification' | 'request' | 'response';
   method?: string;
 };
@@ -34,7 +34,7 @@ type PendingRequest = {
 type QueuedFrame = {
   frame: string;
   bytes: number;
-  message: ClawRpcMessage;
+  message: AppRpcMessage;
 };
 
 const DEFAULT_MAX_BUFFERED_OUTPUT_BYTES = 128 * 1024 * 1024;
@@ -42,7 +42,7 @@ const DEFAULT_MAX_BUFFERED_OUTPUT_BYTES = 128 * 1024 * 1024;
 export class StdioRpcPeer {
   private buffer = '';
   private nextRequestId = 1;
-  private readonly pending = new Map<ClawRpcId, PendingRequest>();
+  private readonly pending = new Map<AppRpcId, PendingRequest>();
   private outputBackpressured = false;
   private readonly outputQueue: QueuedFrame[] = [];
   private outputQueueBytes = 0;
@@ -79,7 +79,7 @@ export class StdioRpcPeer {
 
   request<Result>(method: string, params?: unknown): Promise<Result> {
     const id = `backend-${this.nextRequestId++}`;
-    const message = createClawRpcRequest(id, method, params);
+    const message = createAppRpcRequest(id, method, params);
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
@@ -100,7 +100,7 @@ export class StdioRpcPeer {
   }
 
   notify(method: string, params?: unknown): void {
-    this.write(createClawRpcNotification(method, params));
+    this.write(createAppRpcNotification(method, params));
   }
 
   private readonly onData = (chunk: Buffer | string) => {
@@ -130,19 +130,19 @@ export class StdioRpcPeer {
   private async handleLineAsync(line: string): Promise<void> {
     try {
       const parsed = JSON.parse(line) as unknown;
-      const message = parseClawRpcMessage(parsed);
-      if (isClawRpcResponse(message)) {
+      const message = parseAppRpcMessage(parsed);
+      if (isAppRpcResponse(message)) {
         this.handleResponse(message);
         return;
       }
 
-      let response: ClawRpcResponse | undefined;
+      let response: AppRpcResponse | undefined;
       try {
         response = await this.options.onMessage(message);
       } catch (error) {
-        response = createClawRpcError(
+        response = createAppRpcError(
           'id' in message ? message.id : null,
-          clawRpcErrorCodes.internalError,
+          appRpcErrorCodes.internalError,
           error instanceof Error ? error.message : String(error),
           appErrorDescriptor(error) ?? undefined,
         );
@@ -152,12 +152,12 @@ export class StdioRpcPeer {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid JSON-RPC message.';
-      const response = createClawRpcError(null, lineLooksLikeJson(line) ? clawRpcErrorCodes.invalidRequest : clawRpcErrorCodes.parseError, message);
+      const response = createAppRpcError(null, lineLooksLikeJson(line) ? appRpcErrorCodes.invalidRequest : appRpcErrorCodes.parseError, message);
       this.write(response);
     }
   }
 
-  private handleResponse(response: ClawRpcResponse): void {
+  private handleResponse(response: AppRpcResponse): void {
     if (response.id === null) {
       return;
     }
@@ -177,7 +177,7 @@ export class StdioRpcPeer {
     pending.resolve(response.result);
   }
 
-  private write(message: ClawRpcMessage, responseMethod?: string): void {
+  private write(message: AppRpcMessage, responseMethod?: string): void {
     const frame = `${JSON.stringify(message)}\n`;
     const bytes = Buffer.byteLength(frame);
     const maxBufferedBytes = this.options.maxBufferedOutputBytes ?? DEFAULT_MAX_BUFFERED_OUTPUT_BYTES;
@@ -218,11 +218,11 @@ export class StdioRpcPeer {
     this.outputBackpressured = false;
   }
 
-  private enqueueOutput(message: ClawRpcMessage, frame: string, responseMethod?: string): void {
+  private enqueueOutput(message: AppRpcMessage, frame: string, responseMethod?: string): void {
     const bytes = Buffer.byteLength(frame);
-    if (isClawRpcNotification(message) && message.method === 'backend/event/notify') {
+    if (isAppRpcNotification(message) && message.method === 'backend/event/notify') {
       const existingSnapshotIndex = this.outputQueue.findIndex((queued) => (
-        isClawRpcNotification(queued.message) &&
+        isAppRpcNotification(queued.message) &&
         queued.message.method === 'backend/event/notify' &&
         isSnapshotUpdatedNotification(queued.message) &&
         isSnapshotUpdatedNotification(message)
@@ -241,15 +241,15 @@ export class StdioRpcPeer {
         this.reportOutputOverflow(message, bytes, responseMethod);
       }
       // Notifications are replayable state/event signals; dropping a new one
-      // keeps clawd alive and prevents an unbounded Node writable buffer. RPC
+      // keeps daemon alive and prevents an unbounded Node writable buffer. RPC
       // responses must remain ordered and are allowed to exceed the soft cap.
-      if (isClawRpcNotification(message)) return;
+      if (isAppRpcNotification(message)) return;
     }
     this.outputQueue.push({ frame, bytes, message });
     this.outputQueueBytes += bytes;
   }
 
-  private reportOutputOverflow(message: ClawRpcMessage, frameBytes: number, responseMethod?: string): void {
+  private reportOutputOverflow(message: AppRpcMessage, frameBytes: number, responseMethod?: string): void {
     this.options.onOutputOverflow?.({
       bufferedBytes: this.outputQueueBytes,
       frameBytes,
@@ -258,8 +258,8 @@ export class StdioRpcPeer {
   }
 }
 
-function outputFrameDetails(message: ClawRpcMessage, responseMethod?: string): OutputFrameDetails {
-  if (isClawRpcNotification(message)) {
+function outputFrameDetails(message: AppRpcMessage, responseMethod?: string): OutputFrameDetails {
+  if (isAppRpcNotification(message)) {
     const params = message.params;
     return {
       kind: 'notification',
@@ -269,10 +269,10 @@ function outputFrameDetails(message: ClawRpcMessage, responseMethod?: string): O
         : {}),
     };
   }
-  if (isClawRpcRequest(message)) {
+  if (isAppRpcRequest(message)) {
     return { kind: 'request', id: message.id, method: message.method };
   }
-  if (isClawRpcResponse(message)) {
+  if (isAppRpcResponse(message)) {
     return {
       kind: 'response',
       id: message.id,
@@ -282,8 +282,8 @@ function outputFrameDetails(message: ClawRpcMessage, responseMethod?: string): O
   return { kind: 'response' };
 }
 
-function isSnapshotUpdatedNotification(message: ClawRpcMessage): boolean {
-  if (!isClawRpcNotification(message) || message.method !== 'backend/event/notify') {
+function isSnapshotUpdatedNotification(message: AppRpcMessage): boolean {
+  if (!isAppRpcNotification(message) || message.method !== 'backend/event/notify') {
     return false;
   }
   const params = message.params;

@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TeamRail from '../TeamRail.vue';
-import type { AccountRateLimits, AgentBackend, RemoteConnection, Team } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, AgentBackend, RemoteConnection, Team } from '@workspace/core/contracts';
 import { setElectronTestClient } from '../../test/client';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
@@ -25,8 +26,8 @@ const teams: Team[] = [
     agentIds: ['agent-dina'],
   },
   {
-    id: 'team-claw',
-    name: 'Codex Claw',
+    id: 'team-app',
+    name: `${product.name}`,
     color: '#1B4FB2',
     agentIds: [],
   },
@@ -46,14 +47,14 @@ describe('TeamRail', () => {
   it('renders teams and marks the active team', () => {
     const wrapper = mountRail({
       teams,
-      activeTeamId: 'team-claw',
+      activeTeamId: 'team-app',
     });
 
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Backlog"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').text()).toBe('SK');
-    expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
-    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
+    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect((wrapper.get('[aria-label="Skwad"]').element as HTMLButtonElement).style.backgroundColor).toBe('rgb(70, 168, 87)');
     expect(wrapper.find('.team-rail__window-controls').exists()).toBe(false);
@@ -69,12 +70,12 @@ describe('TeamRail', () => {
   it('marks when the adjacent agent sidebar is expanded', () => {
     const expanded = mountRail({
       teams,
-      activeTeamId: 'team-claw',
+      activeTeamId: 'team-app',
       agentSidebarExpanded: true,
     });
     const collapsed = mountRail({
       teams,
-      activeTeamId: 'team-claw',
+      activeTeamId: 'team-app',
       agentSidebarExpanded: false,
     });
 
@@ -85,26 +86,26 @@ describe('TeamRail', () => {
   it('shows a corner indicator on teams containing unread agents', () => {
     const wrapper = mountRail({
       teams,
-      activeTeamId: 'team-claw',
-      unreadTeamIds: ['team-sk', 'team-claw'],
+      activeTeamId: 'team-app',
+      unreadTeamIds: ['team-sk', 'team-app'],
     });
 
     const unreadTeam = wrapper.get('[aria-label="Skwad, unread activity"]');
     expect(unreadTeam.classes()).toContain('team-rail__team--unread');
     expect(unreadTeam.get('.team-rail__unread-indicator').attributes('aria-hidden')).toBe('true');
-    expect(wrapper.get('[aria-label="Codex Claw"]').find('.team-rail__unread-indicator').exists()).toBe(false);
+    expect(wrapper.get(`[aria-label="${product.name}"]`).find('.team-rail__unread-indicator').exists()).toBe(false);
   });
 
   it('reuses the corner dot for working activity with unread taking precedence', () => {
     const wrapper = mountRail({
       teams,
-      activeTeamId: 'team-claw',
+      activeTeamId: 'team-app',
       unreadTeamIds: ['team-sk'],
-      workingTeamIds: ['team-sk', 'team-claw'],
+      workingTeamIds: ['team-sk', 'team-app'],
     });
 
     const workingUnread = wrapper.get('[aria-label="Skwad, agents working, unread activity"]');
-    const activeWorking = wrapper.get('[aria-label="Codex Claw, agents working"]');
+    const activeWorking = wrapper.get(`[aria-label="${product.name}, agents working"]`);
     expect(workingUnread.get('.team-rail__unread-indicator').classes())
       .not.toContain('team-rail__unread-indicator--working');
     expect(workingUnread.findAll('.team-rail__unread-indicator')).toHaveLength(1);
@@ -113,7 +114,7 @@ describe('TeamRail', () => {
 
     const workingOnly = mountRail({
       teams,
-      activeTeamId: 'team-claw',
+      activeTeamId: 'team-app',
       workingTeamIds: ['team-sk'],
     }).get('[aria-label="Skwad, agents working"]');
     expect(workingOnly.get('.team-rail__unread-indicator').classes())
@@ -126,7 +127,7 @@ describe('TeamRail', () => {
       activeTeamId: null,
     });
 
-    expect(wrapper.get('[aria-label="Codex Claw"]').text()).toBe('CC');
+    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
   });
 
   it('falls back to the default team color when none is set', () => {
@@ -149,10 +150,10 @@ describe('TeamRail', () => {
       activeTeamId: 'team-sk',
     });
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('click');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('click');
     await wrapper.get('[aria-label="Create team"]').trigger('click');
 
-    expect(wrapper.emitted('select-team')).toStrictEqual([['team-claw']]);
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-app']]);
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
   });
 
@@ -280,17 +281,17 @@ describe('TeamRail', () => {
     });
     const buttons = wrapper.findAll('.team-rail__team');
     const skwadButton = buttons[0];
-    const clawButton = buttons[1];
+    const appButton = buttons[1];
     expect(skwadButton.attributes('draggable')).toBe('true');
-    mockRect(clawButton.element, { top: 100, height: 44 });
+    mockRect(appButton.element, { top: 100, height: 44 });
 
     skwadButton.element.dispatchEvent(dragEvent('dragstart', 0));
-    clawButton.element.dispatchEvent(dragEvent('dragover', 132));
+    appButton.element.dispatchEvent(dragEvent('dragover', 132));
     await nextTick();
 
-    expect(clawButton.classes()).toContain('list-reorder-drag--drop-after');
+    expect(appButton.classes()).toContain('list-reorder-drag--drop-after');
 
-    clawButton.element.dispatchEvent(dragEvent('drop', 132));
+    appButton.element.dispatchEvent(dragEvent('drop', 132));
     await nextTick();
 
     expect(wrapper.emitted('reorder-teams')).toStrictEqual([[
@@ -351,7 +352,7 @@ describe('TeamRail', () => {
       activeTeamId: 'team-sk',
     });
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu', {
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu', {
       clientX: 42,
       clientY: 64,
     });
@@ -359,7 +360,7 @@ describe('TeamRail', () => {
     expect(wrapper.find('[aria-label="Team actions"]').exists()).toBe(true);
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Team')?.trigger('click');
 
-    expect(wrapper.emitted('edit-team')).toStrictEqual([['team-claw']]);
+    expect(wrapper.emitted('edit-team')).toStrictEqual([['team-app']]);
   });
 
   it('confirms before closing the context-clicked team', async () => {
@@ -372,20 +373,20 @@ describe('TeamRail', () => {
       return 'confirm' as never;
     });
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Close Team')?.trigger('click');
     await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
-      'Agents, missions and quick chats will be removed from Codex Claw. Mission worktrees will not be deleted.',
-      'Close Codex Claw?',
+      `Agents, missions and quick chats will be removed from ${product.name}. Mission worktrees will not be deleted.`,
+      `Close ${product.name}?`,
       {
         cancelButtonText: 'Cancel',
         confirmButtonText: 'Close Team',
         type: 'warning',
       },
     );
-    expect(wrapper.emitted('close-team')).toStrictEqual([['team-claw']]);
+    expect(wrapper.emitted('close-team')).toStrictEqual([['team-app']]);
   });
 
   it('disconnects a remote team immediately without deleting it remotely', async () => {
@@ -403,12 +404,12 @@ describe('TeamRail', () => {
     });
     const confirm = vi.spyOn(ElMessageBox, 'confirm');
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Disconnect')?.trigger('click');
     await flushPromises();
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(wrapper.emitted('disconnect-team')).toStrictEqual([['team-claw']]);
+    expect(wrapper.emitted('disconnect-team')).toStrictEqual([['team-app']]);
     expect(wrapper.emitted('close-team')).toBeUndefined();
   });
 
@@ -426,26 +427,26 @@ describe('TeamRail', () => {
       activeTeamId: 'team-sk',
       remoteConnections: [remoteConnection],
       loadRemoteTeams: vi.fn().mockResolvedValue([
-        { id: 'team-remote', name: 'Codex Claw', agentIds: [] },
+        { id: 'team-remote', name: `${product.name}`, agentIds: [] },
         { id: 'team-other', name: 'Other', agentIds: [] },
       ]),
     });
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Delete Team')?.trigger('click');
     await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
       'Agents, missions and quick chats will be deleted on the remote backend. Mission worktrees will not be deleted.',
-      'Delete Codex Claw?',
+      `Delete ${product.name}?`,
       {
         cancelButtonText: 'Cancel',
         confirmButtonText: 'Delete Team',
         type: 'warning',
       },
     );
-    expect(wrapper.emitted('close-team')).toStrictEqual([['team-claw']]);
+    expect(wrapper.emitted('close-team')).toStrictEqual([['team-app']]);
     expect(wrapper.emitted('disconnect-team')).toBeUndefined();
   });
 
@@ -519,7 +520,7 @@ describe('TeamRail', () => {
       activeTeamId: 'team-sk',
     });
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
     await wrapper.get('.team-context-menu').trigger('click');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(wrapper.find('.team-context-menu').exists()).toBe(true);
@@ -528,7 +529,7 @@ describe('TeamRail', () => {
     await nextTick();
     expect(wrapper.find('.team-context-menu').exists()).toBe(false);
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await nextTick();
     expect(wrapper.find('.team-context-menu').exists()).toBe(false);
@@ -541,7 +542,7 @@ describe('TeamRail', () => {
     });
     vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancel'));
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Close Team')?.trigger('click');
 
     expect(wrapper.emitted('close-team')).toBeUndefined();

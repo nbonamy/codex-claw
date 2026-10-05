@@ -27,7 +27,7 @@ function createService(options: {
     onStatusChanged: (status) => statuses.push(status),
     platform: options.platform ?? 'darwin',
     setIntervalFn,
-    updateBaseUrl: 'https://codex-claw.nabocorp.com/desktop/releases',
+    updateBaseUrl: 'https://updates.example.test/releases',
   });
 
   return { service, statuses, updater, setIntervalFn };
@@ -36,10 +36,10 @@ function createService(options: {
 describe('desktop auto-update', () => {
   it('resolves the platform and architecture feed URL', () => {
     expect(resolveDesktopUpdateFeedUrl(
-      'https://codex-claw.nabocorp.com/desktop/releases/',
+      'https://updates.example.test/releases/',
       'darwin',
       'arm64',
-    )).toBe('https://codex-claw.nabocorp.com/desktop/releases/darwin/arm64/RELEASES.json');
+    )).toBe('https://updates.example.test/releases/darwin/arm64/RELEASES.json');
   });
 
   it('rejects non-https feeds', () => {
@@ -66,7 +66,7 @@ describe('desktop auto-update', () => {
 
     expect(updater.setFeedURL).toHaveBeenCalledWith({
       serverType: 'json',
-      url: 'https://codex-claw.nabocorp.com/desktop/releases/darwin/arm64/RELEASES.json',
+      url: 'https://updates.example.test/releases/darwin/arm64/RELEASES.json',
     });
     expect(updater.checkForUpdates).toHaveBeenCalledOnce();
     expect(setIntervalFn).toHaveBeenCalledWith(expect.any(Function), 60 * 60 * 1000);

@@ -22,11 +22,11 @@ afterEach(() => {
 
 describe('local SDK build', () => {
   it('builds root-overridden SDK packages and refreshes their installed artifacts', () => {
-    const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'codex-claw-build-sdk-'));
+    const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'agent-workspace-build-sdk-'));
     temporaryDirectories.push(fixtureRoot);
-    const clawRoot = path.join(fixtureRoot, 'codex-claw');
+    const appRoot = path.join(fixtureRoot, 'agent-workspace');
     const sdkRoot = path.join(fixtureRoot, 'codex-app-sdk');
-    const scriptDirectory = path.join(clawRoot, 'scripts');
+    const scriptDirectory = path.join(appRoot, 'scripts');
     const fakeBinDirectory = path.join(fixtureRoot, 'bin');
     mkdirSync(scriptDirectory, { recursive: true });
     mkdirSync(fakeBinDirectory, { recursive: true });
@@ -40,7 +40,7 @@ describe('local SDK build', () => {
       ['vue', '@codex-app-sdk/vue'],
       ['web', '@codex-app-sdk/web'],
     ] as const;
-    writeFileSync(path.join(clawRoot, 'package.json'), JSON.stringify({
+    writeFileSync(path.join(appRoot, 'package.json'), JSON.stringify({
       overrides: Object.fromEntries(packages.map(([, packageName]) => {
         const packageSlug = packageName.split('/').at(-1)!;
         return [packageName, `file:../codex-app-sdk/packages/${packageSlug}`];
@@ -48,7 +48,7 @@ describe('local SDK build', () => {
     }));
     for (const [workspace, packageName] of packages) {
       const packageSlug = packageName.split('/').at(-1)!;
-      const workspacePackagePath = path.join(clawRoot, workspace, 'package.json');
+      const workspacePackagePath = path.join(appRoot, workspace, 'package.json');
       mkdirSync(path.dirname(workspacePackagePath), { recursive: true });
       const workspacePackage = existsSync(workspacePackagePath)
         ? JSON.parse(readFileSync(workspacePackagePath, 'utf8')) as { dependencies?: Record<string, string> }
@@ -66,7 +66,7 @@ describe('local SDK build', () => {
       writeFileSync(path.join(sourcePackage, 'README.md'), `${packageName} fresh readme`);
       writeFileSync(path.join(sourcePackage, 'dist', 'index.js'), `${packageName} fresh build`);
 
-      const installedPackage = path.join(clawRoot, 'node_modules', '@codex-app-sdk', packageSlug);
+      const installedPackage = path.join(appRoot, 'node_modules', '@codex-app-sdk', packageSlug);
       mkdirSync(path.join(installedPackage, 'dist'), { recursive: true });
       writeFileSync(path.join(installedPackage, 'package.json'), JSON.stringify({ name: packageName }));
       writeFileSync(path.join(installedPackage, 'dist', 'index.js'), `${packageName} stale build`);
@@ -81,7 +81,7 @@ describe('local SDK build', () => {
     chmodSync(npmExecutable, 0o755);
 
     const result = spawnSync(process.execPath, [fixtureScript], {
-      cwd: clawRoot,
+      cwd: appRoot,
       encoding: 'utf8',
       env: {
         ...process.env,
@@ -92,7 +92,7 @@ describe('local SDK build', () => {
     expect(result.status, result.stderr).toBe(0);
     for (const [, packageName] of packages) {
       const packageSlug = packageName.split('/').at(-1)!;
-      const installedPackage = path.join(clawRoot, 'node_modules', '@codex-app-sdk', packageSlug);
+      const installedPackage = path.join(appRoot, 'node_modules', '@codex-app-sdk', packageSlug);
       expect(readFileSync(path.join(installedPackage, 'dist', 'index.js'), 'utf8')).toBe(
         `${packageName} fresh build`,
       );

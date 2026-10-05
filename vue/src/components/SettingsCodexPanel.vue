@@ -26,7 +26,7 @@
     </SettingsSection>
 
     <SettingsSection
-      v-if="clawHostCapabilities.nativeFileDialogs"
+      v-if="appHostCapabilities.nativeFileDialogs"
       :title="$t('surface.settingsCodexPanel.runtime')"
       title-id="settings-codex-runtime-title"
     >
@@ -65,14 +65,14 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { AppGeneralSettings, UpdateSettingsInput } from '@codex-claw/core/contracts';
-import { clawHostCapabilities, clawPlatformActions } from '../platform-api';
+import type { AppGeneralSettings, UpdateSettingsInput } from '@workspace/core/contracts';
+import { appHostCapabilities, appPlatformActions } from '../platform-api';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
 import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
 import SettingsEngineSetupRow from './SettingsEngineSetupRow.vue';
-import type { ProviderAuthentication } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderAuthentication } from '@workspace/core/contracts/provider-setup';
 
 const emit = defineEmits<{ connect: []; disconnect: []; cancel: []; customize: [] }>();
 
@@ -103,7 +103,7 @@ async function launch(): Promise<void> {
   launchError.value = null;
   launching.value = true;
   try {
-    const launchApp = props.launchChatGptApp ?? clawPlatformActions.launchChatGpt;
+    const launchApp = props.launchChatGptApp ?? appPlatformActions.launchChatGpt;
     await launchApp();
   } catch (error) {
     launchError.value = error instanceof Error ? error.message : String(error);

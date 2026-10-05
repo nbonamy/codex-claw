@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 /**
  * @vitest-environment jsdom
  */
@@ -36,7 +37,7 @@ describe('UpdateAvailableBadge', () => {
 
     const button = wrapper.get('button');
     expect(button.text()).toBe('Update available');
-    expect(button.attributes('title')).toBe('Update 0.4.0 available. Restart Codex Claw to install.');
+    expect(button.attributes('title')).toBe(`Update 0.4.0 available. Restart ${product.name} to install.`);
 
     await button.trigger('click');
 

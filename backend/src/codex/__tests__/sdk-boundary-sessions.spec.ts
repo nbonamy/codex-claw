@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codexSdkFixture, sdkAgent, sdkSnapshot, sdkSummary } from './sdk-surface-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
 const completion = { status: 'completed' as const, error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null };
 
-describe('Codex SDK → Claw session policy', () => {
+describe(`Codex SDK → ${product.name} session policy`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
   const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });

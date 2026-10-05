@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AgentGitPullRequest } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { Agent, AgentGitPullRequest } from '@workspace/core/contracts';
 import { PullRequestMonitor } from '../pull-request-monitor';
 
 describe('PullRequestMonitor', () => {
@@ -106,7 +106,7 @@ describe('PullRequestMonitor', () => {
 function trackedAgent(id: string): Agent {
   return {
     id,
-    teamId: 'team-claw',
+    teamId: 'team-app',
     name: id,
     folder: `/src/${id}`,
     backend: 'codex',

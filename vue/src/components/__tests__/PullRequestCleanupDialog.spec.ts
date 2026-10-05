@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 import PullRequestCleanupDialog from '../PullRequestCleanupDialog.vue';
 
 const agent: Agent = {
@@ -44,8 +44,8 @@ describe('PullRequestCleanupDialog', () => {
     expect(wrapper.text()).toContain('PR #7 was merged');
     expect(wrapper.text()).toContain('close this agent and remove its worktree and local branch');
 
-    await wrapper.get('.claw-button--tertiary').trigger('click');
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--tertiary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
     expect(wrapper.emitted('confirm')).toStrictEqual([[]]);
 

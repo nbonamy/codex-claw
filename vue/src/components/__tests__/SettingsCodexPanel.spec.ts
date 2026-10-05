@@ -1,13 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CodexClawApi } from '@codex-claw/core/contracts';
-import { defaultGeneralSettings } from '@codex-claw/core/settings';
-import { configureClawClient } from '../../platform-api';
+import type { AppApi } from '@workspace/core/contracts';
+import { defaultGeneralSettings } from '@workspace/core/settings';
+import { configureAppClient } from '../../platform-api';
 import SettingsCodexPanel from '../SettingsCodexPanel.vue';
 
 describe('SettingsCodexPanel', () => {
   beforeEach(() => {
-    configureClawClient({ api: {} as CodexClawApi, platform: 'desktop' });
+    configureAppClient({ api: {} as AppApi, platform: 'desktop' });
   });
 
   afterEach(() => {

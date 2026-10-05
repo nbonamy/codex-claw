@@ -1,5 +1,5 @@
-import type { Agent } from '@codex-claw/core/contracts';
-import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
+import type { Agent } from '@workspace/core/contracts';
+import type { ThreadFlagResponse } from '@workspace/core/thread-flags';
 import { WORKTREE_DELEGATION_PROMPT } from './worktree-delegation';
 
 export class AgentThreadFlagService {

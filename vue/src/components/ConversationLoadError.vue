@@ -12,7 +12,7 @@
       <p>{{ $t('surface.conversationPane.historyLoadFailedReason') }}</p>
     </div>
     <button
-      class="claw-button claw-button--secondary"
+      class="app-button app-button--secondary"
       type="button"
       :disabled="loading"
       @click="emit('retry')"

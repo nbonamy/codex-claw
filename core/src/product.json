@@ -1,0 +1,14 @@
+{
+  "name": "Korus",
+  "slug": "korus",
+  "homeDirectory": ".korus",
+  "appId": "com.nabocorp.korus",
+  "protocolScheme": "korus",
+  "mcpServerName": "workspace",
+  "repository": "nbonamy/codex-claw",
+  "repositoryUrl": "https://github.com/nbonamy/codex-claw",
+  "websiteUrl": "https://codex-claw.nabocorp.com",
+  "updateBaseUrl": "https://codex-claw.nabocorp.com/desktop/releases",
+  "deploymentRoot": "/var/www/codex-claw",
+  "downloadFileName": "codex-claw-macos-arm64.dmg"
+}

@@ -7,8 +7,8 @@
   </section>
 </template>
 <script setup lang="ts">
-import { workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
-import type { WorkItem } from '@codex-claw/core/contracts';
+import { workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
+import type { WorkItem } from '@workspace/core/contracts';
 defineProps<{ item: WorkItem }>();
 </script>
 <style scoped>

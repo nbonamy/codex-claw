@@ -20,14 +20,14 @@ describe('RepositoryIconPicker', () => {
   it('selects and clears a repository icon', async () => {
     const wrapper = mountPicker();
 
-    await wrapper.get('[aria-label="Change icon for codex-claw"]').trigger('click');
+    await wrapper.get('[aria-label="Change icon for agent-workspace"]').trigger('click');
     expect(wrapper.get('.agent-avatar-picker__title').text()).toBe('Repository icon');
     const preset = wrapper.findAll('.agent-avatar-picker__preset').find((button) => button.text() === '🦞')!;
     await preset.trigger('click');
     expect(wrapper.emitted('update:modelValue')).toStrictEqual([['🦞']]);
 
     await wrapper.setProps({ modelValue: '🦞' });
-    await wrapper.get('[aria-label="Change icon for codex-claw"]').trigger('click');
+    await wrapper.get('[aria-label="Change icon for agent-workspace"]').trigger('click');
     const reset = wrapper.findAll('.agent-avatar-picker__preset')[0]!;
     expect(reset.attributes('aria-label')).toBe('Use default repository icon');
     await reset.trigger('click');
@@ -48,7 +48,7 @@ describe('RepositoryIconPicker', () => {
   it('accepts one custom grapheme and rejects multiple characters', async () => {
     const wrapper = mountPicker();
 
-    await wrapper.get('[aria-label="Change icon for codex-claw"]').trigger('click');
+    await wrapper.get('[aria-label="Change icon for agent-workspace"]').trigger('click');
     const input = wrapper.get('[aria-label="Custom repository icon"]');
     const apply = wrapper.get('[aria-label="Use custom repository icon"]');
     await input.setValue('AB');
@@ -72,7 +72,7 @@ describe('RepositoryIconPicker', () => {
     vi.stubGlobal('FileReader', TestFileReader);
     const wrapper = mountPicker();
 
-    await wrapper.get('[aria-label="Change icon for codex-claw"]').trigger('click');
+    await wrapper.get('[aria-label="Change icon for agent-workspace"]').trigger('click');
     const input = wrapper.get('input[type="file"]');
     Object.defineProperty(input.element, 'files', {
       configurable: true,
@@ -90,7 +90,7 @@ function mountPicker(props: Partial<{ expanded: boolean; modelValue?: string }> 
   return mount(RepositoryIconPicker, {
     attachTo: document.body,
     props: {
-      label: 'codex-claw',
+      label: 'agent-workspace',
       ...props,
     },
     global: {

@@ -1,5 +1,6 @@
+import { product } from '@workspace/core/product';
 const delegationInstructions = [
-  'Delegate this task to a new Codex Claw co-agent in a dedicated worktree, not an engine-native subagent.',
+  `Delegate this task to a new ${product.name} co-agent in a dedicated worktree, not an engine-native subagent.`,
   'Use the current conversation to write a self-contained handoff with the task, decisions, relevant context, constraints, and acceptance criteria.',
   'Include guidance to commit frequently at coherent, reviewable milestones, keeping each behavior change and its tests together. Keep commits local; pushing or merging requires explicit user approval.',
   'Choose an appropriate branch name and use the create-agent tool with createWorktree set to true, a concise user-visible task as prompt, and the full handoff as instructions.',

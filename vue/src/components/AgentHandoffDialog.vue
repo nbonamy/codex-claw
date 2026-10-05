@@ -1,6 +1,6 @@
 <template>
   <FormDialog class="agent-handoff-dialog" width="480px" :model-value="true" :title="t('handoff.submit')" @update:model-value="close">
-    <form id="agent-handoff-form" class="claw-form-dialog agent-handoff-form" @submit.prevent="submitHandoff">
+    <form id="agent-handoff-form" class="app-form-dialog agent-handoff-form" @submit.prevent="submitHandoff">
       <div class="agent-handoff-form__destination">
         <FormDialogField :label="t('handoff.engine')">
           <BackendSelector v-model="backend" :team-id="agent.teamId" :disabled="busy" />
@@ -16,20 +16,20 @@
       <FormDialogField :label="t('handoff.instructions')" label-for="handoff-instructions">
         <el-input id="handoff-instructions" v-model="instructions" type="textarea" :rows="3" :maxlength="4000" :disabled="busy" :placeholder="t('handoff.optional')" />
       </FormDialogField>
-      <p class="claw-form-dialog__help agent-handoff-form__workspace" :title="agent.folder ?? undefined">{{ agent.folder }}</p>
-      <p class="claw-form-dialog__help">{{ t('handoff.permissions') }}</p>
+      <p class="app-form-dialog__help agent-handoff-form__workspace" :title="agent.folder ?? undefined">{{ agent.folder }}</p>
+      <p class="app-form-dialog__help">{{ t('handoff.permissions') }}</p>
       <el-alert v-if="blocker || error" :title="error || blocker || ''" type="error" :closable="false" />
       <p v-if="busy" role="status">{{ t('handoff.preparing') }}</p>
       <details v-if="agent.handoff?.note">
         <summary>{{ t('handoff.savedNote') }}</summary>
         <p v-if="agent.handoff.error">{{ agent.handoff.error }}</p>
         <pre class="handoff-note">{{ agent.handoff.note }}</pre>
-        <button class="claw-button claw-button--tertiary" type="button" @click="openSource">{{ t('handoff.source') }}</button>
+        <button class="app-button app-button--tertiary" type="button" @click="openSource">{{ t('handoff.source') }}</button>
       </details>
     </form>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ busy ? t('handoff.hide') : t('handoff.cancel') }}</button>
-      <button class="claw-button claw-button--primary" type="submit" form="agent-handoff-form" :disabled="busy || !!blocker || !backend || loadingModels">{{ t('handoff.submit') }}</button>
+      <button class="app-button app-button--tertiary" type="button" @click="close">{{ busy ? t('handoff.hide') : t('handoff.cancel') }}</button>
+      <button class="app-button app-button--primary" type="submit" form="agent-handoff-form" :disabled="busy || !!blocker || !backend || loadingModels">{{ t('handoff.submit') }}</button>
     </template>
   </FormDialog>
   <AutomationExecutionConversationOverlay v-if="sourceVisible" :agent-name="agent.handoff?.sourceTitle ?? ''" :ticket="t('handoff.source')" :messages="sourceMessages" :loading="sourceLoading" :error="sourceError" @close="sourceVisible = false" />
@@ -38,9 +38,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentBackend, BackendConversationRef, BackendModelOption, RendererMessage } from '@codex-claw/core/contracts';
-import type { AgentHandoffInput } from '@codex-claw/core/agent-handoff';
-import { backendDisplayName } from '@codex-claw/core/backend-driver';
+import type { Agent, AgentBackend, BackendConversationRef, BackendModelOption, RendererMessage } from '@workspace/core/contracts';
+import type { AgentHandoffInput } from '@workspace/core/agent-handoff';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import BackendSelector from './BackendSelector.vue';
@@ -113,11 +113,11 @@ async function openSource() {
   padding: var(--space-8) var(--space-10) var(--space-6);
 }
 
-.agent-handoff-dialog .claw-form-dialog__header {
+.agent-handoff-dialog .app-form-dialog__header {
   margin: 0;
 }
 
-.agent-handoff-dialog .claw-dialog__title {
+.agent-handoff-dialog .app-dialog__title {
   font-size: var(--font-size-16);
   line-height: var(--line-height-22);
 }

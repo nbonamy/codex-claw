@@ -10,13 +10,13 @@ export function initializeMainLogging(): void {
   }
 
   log.initialize({ preload: false, spyRendererConsole: false });
-  const configuredLevel = process.env.CODEX_CLAW_LOG_LEVEL?.trim().toLowerCase();
+  const configuredLevel = process.env.APP_LOG_LEVEL?.trim().toLowerCase();
   if (log.transports.file) {
     log.transports.file.level = configuredLevel === 'debug' ? 'debug' : 'info';
     log.transports.file.maxSize = 5 * 1024 * 1024;
   }
   initialized = true;
-  log.info('[codex-claw:startup] logging initialized', { logFile: log.transports.file?.getFile().path });
+  log.info('[agent-workspace:startup] logging initialized', { logFile: log.transports.file?.getFile().path });
 }
 
 export function installProcessErrorLogging(): void {
@@ -74,7 +74,7 @@ function write(level: 'debug' | 'info' | 'warn' | 'error', area: string, message
 
   initializeMainLogging();
   const suffix = details ? ` ${safeJson(details)}` : '';
-  log[level](`[codex-claw:${area}] ${redactText(message)}${suffix}`);
+  log[level](`[agent-workspace:${area}] ${redactText(message)}${suffix}`);
 }
 
 function safeJson(details: Record<string, unknown>): string {

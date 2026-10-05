@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import type { BackendConnectionState } from '@codex-claw/core/contracts';
+import type { BackendConnectionState } from '@workspace/core/contracts';
 import { computed } from 'vue';
 import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';
@@ -25,10 +25,10 @@ const props = defineProps<{
 }>();
 
 const connectionStatusLabel = computed(() => {
-  if (props.connectionState.status === 'connecting') return translate('surface.appShell.connectingToClawd');
+  if (props.connectionState.status === 'connecting') return translate('surface.appShell.connectingToDaemon');
   if (props.connectionState.status === 'reconnecting')
-    return translate('surface.appShell.reconnectingToClawdAgentsKeepWorkingInTheBackground');
-  return translate('surface.appShell.clawdIsUnavailableReconnectionWillContinueAutomatically');
+    return translate('surface.appShell.reconnectingToDaemonAgentsKeepWorkingInTheBackground');
+  return translate('surface.appShell.daemonIsUnavailableReconnectionWillContinueAutomatically');
 });
 const connectionStatusDetail = computed(() => localizedText(props.connectionState.detail, translate));
 </script>

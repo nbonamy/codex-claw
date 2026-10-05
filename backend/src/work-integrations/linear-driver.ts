@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import type { WorkProviderSettings } from '@codex-claw/core/contracts';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import type { WorkProviderSettings } from '@workspace/core/contracts';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
 import { linearAssignedItems, linearGlobalItems, linearItems, linearSources } from './linear-backlog';
 
@@ -18,7 +19,7 @@ type Attempt = {
   result: WorkProviderDeviceTokenResult;
 };
 
-/** Credentials and the short-lived loopback callback belong to clawd. */
+/** Credentials and the short-lived loopback callback belong to daemon. */
 export class LinearWorkProviderDriver implements WorkProviderDriver {
   readonly provider = 'linear' as const;
   private attempt?: Attempt;
@@ -36,7 +37,7 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
     if (!clientId || !settings.oauthCallbackUri) throw new Error('Linear OAuth is not configured for this build.');
     const callback = new URL(settings.oauthCallbackUri);
     if (callback.protocol !== 'http:' || callback.hostname !== '127.0.0.1' || !callback.port || callback.username || callback.password || callback.search || callback.hash) {
-      throw new Error('Linear callback must be an http://127.0.0.1:PORT/path URL registered with Linear. Open authorization on the same computer as Claw.');
+      throw new Error(`Linear callback must be an http://127.0.0.1:PORT/path URL registered with Linear. Open authorization on the same computer as ${product.name}.`);
     }
     const attempt: Attempt = {
       id: randomBytes(32).toString('base64url'),
@@ -61,13 +62,13 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
           return;
         }
         if (this.attempt !== attempt || !attempt.state || url.searchParams.get('state') !== attempt.state || Date.now() >= attempt.expiresAt) {
-          response.writeHead(400).end('Authorization expired or invalid. Start again in Claw.');
+          response.writeHead(400).end(`Authorization expired or invalid. Start again in ${product.name}.`);
           return;
         }
         attempt.state = null; // Consume before any asynchronous exchange; replays cannot race it.
         void this.exchangeCallback(attempt, url).then(() => {
           response.writeHead(attempt.result.status === 'success' ? 200 : 400).end(
-            attempt.result.status === 'success' ? 'Authorization received. Return to Claw to finish connecting.' : 'Authorization failed or cancelled. Return to Claw and try again.',
+            attempt.result.status === 'success' ? `Authorization received. Return to ${product.name} to finish connecting.` : `Authorization failed or cancelled. Return to ${product.name} and try again.`,
           );
           this.closeListener(attempt);
         });
@@ -96,7 +97,7 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
     attempt.timer = setTimeout(() => {
       attempt.state = null;
       attempt.abort.abort();
-      attempt.result = { status: 'error', code: 'expired', message: 'Linear authorization expired. Check that the browser runs on the same computer as Claw and retry.' };
+      attempt.result = { status: 'error', code: 'expired', message: `Linear authorization expired. Check that the browser runs on the same computer as ${product.name} and retry.` };
       this.closeListener(attempt);
     }, Math.max(0, attempt.expiresAt - Date.now()));
     attempt.timer.unref();

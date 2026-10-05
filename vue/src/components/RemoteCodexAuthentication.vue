@@ -21,7 +21,7 @@
     <template v-else-if="authentication || error">
       <span v-if="!authentication" :title="error">{{ $t('surface.remoteCodexAuth.unavailable') }}</span>
       <span v-else>{{ $t('surface.remoteCodexAuth.signInRequired') }}</span>
-      <button class="claw-button claw-button--secondary" type="button" :disabled="busy" :aria-busy="busy" @click="authentication ? start() : refresh()">
+      <button class="app-button app-button--secondary" type="button" :disabled="busy" :aria-busy="busy" @click="authentication ? start() : refresh()">
         {{ $t(authentication ? 'surface.remoteCodexAuth.connect' : 'surface.remoteCodexAuth.retry') }}
       </button>
     </template>
@@ -33,7 +33,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { CheckIcon, CopyIcon } from '../shared/icons/app-icons';
-import type { RemoteConnection } from '@codex-claw/core/contracts';
+import type { RemoteConnection } from '@workspace/core/contracts';
 import { useRemoteCodexAuthentication, type RemoteCodexAuthApi } from './use-remote-codex-authentication';
 
 const props = defineProps<{ connection: RemoteConnection; api?: RemoteCodexAuthApi }>();

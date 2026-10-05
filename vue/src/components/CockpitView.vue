@@ -10,7 +10,7 @@
         placement="bottom-end"
         trigger="click"
         :width="188"
-        popper-class="claw-popover agent-cockpit__mode-popover"
+        popper-class="app-popover agent-cockpit__mode-popover"
       >
         <template #reference>
           <button
@@ -54,7 +54,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Agent, CockpitAgentViewMode, Team } from '@codex-claw/core/contracts';
+import type { Agent, CockpitAgentViewMode, Team } from '@workspace/core/contracts';
 import { ChevronDown } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';

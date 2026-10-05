@@ -1,14 +1,14 @@
-import { mountClawVueApp } from '@codex-claw/vue/bootstrap';
-import { createClawBrowserClient } from '../browser-client';
+import { mountAppVueApp } from '@workspace/vue/bootstrap';
+import { createAppBrowserClient } from '../browser-client';
 
-const clientId = localStorage.getItem('claw-client-id') ?? crypto.randomUUID();
-localStorage.setItem('claw-client-id', clientId);
+const clientId = localStorage.getItem('app-client-id') ?? crypto.randomUUID();
+localStorage.setItem('app-client-id', clientId);
 
-const api = createClawBrowserClient({
-  createSocket: () => new WebSocket(webSocketUrl('/claw')),
+const api = createAppBrowserClient({
+  createSocket: () => new WebSocket(webSocketUrl('/app')),
 });
 
-mountClawVueApp({
+mountAppVueApp({
   client: {
     api,
     platform: 'web',

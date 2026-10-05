@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { enabledAgentBackends } from '@codex-claw/core/agent-backends';
+import { enabledAgentBackends } from '@workspace/core/agent-backends';
 import type {
   Agent,
   AppSnapshot,
@@ -101,7 +101,7 @@ import type {
   ReorderTeamsInput,
   SourceBranch,
   Team,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { computed, toRefs } from 'vue';
 import AgentSidebar from './AgentSidebar.vue';
 import TeamRail from './TeamRail.vue';

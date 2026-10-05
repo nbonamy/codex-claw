@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import type {
@@ -6,9 +7,9 @@ import type {
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, CreateAgentInput, SourceRepository, Team, WorkItem, WorkSource } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import type { Agent, CreateAgentInput, SourceRepository, Team, WorkItem, WorkSource } from '@workspace/core/contracts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 import { setElectronTestClient } from '../../test/client';
 
@@ -40,7 +41,7 @@ afterEach(() => {
   window.localStorage.removeItem('cockpitGlobalScope:github');
   window.sessionStorage.clear();
   document.body.innerHTML = '';
-  delete window.codexClaw;
+  delete window.app;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
 
@@ -69,31 +70,31 @@ describe('AppShell work routing', () => {
       ...agent,
       workspace: {
         kind: 'git' as const,
-        folder: '/Users/nbonamy/src/codex-claw',
-        repositoryName: 'codex-claw',
-        repositoryRoot: '/Users/nbonamy/src/codex-claw',
+        folder: '/Users/nbonamy/src/agent-workspace',
+        repositoryName: 'agent-workspace',
+        repositoryRoot: '/Users/nbonamy/src/agent-workspace',
         branch: 'main',
         isLinkedWorktree: false,
-        primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+        primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace',
         updatedAt: '2026-08-28T00:00:00.000Z',
       },
     }));
     const sourceRepository: SourceRepository = {
-      name: 'codex-claw',
-      path: '/Users/nbonamy/src/codex-claw',
-      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      name: 'agent-workspace',
+      path: '/Users/nbonamy/src/agent-workspace',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/agent-workspace' }],
     };
     const githubRepository: WorkSource = {
       provider: 'github',
-      id: 'nbonamy/codex-claw',
+      id: 'nbonamy/agent-workspace',
       owner: 'nbonamy',
-      name: 'codex-claw',
-      fullName: 'nbonamy/codex-claw',
-      url: 'https://github.com/nbonamy/codex-claw',
+      name: 'agent-workspace',
+      fullName: 'nbonamy/agent-workspace',
+      url: 'https://github.com/nbonamy/agent-workspace',
       isPrivate: true,
     };
     const issue = workItem({
-      id: 'github:nbonamy/codex-claw#24',
+      id: 'github:nbonamy/agent-workspace#24',
       sourceId: githubRepository.id,
       sourceName: githubRepository.fullName,
       number: 24,
@@ -101,10 +102,10 @@ describe('AppShell work routing', () => {
     });
     const preparedAgent: Agent = {
       id: 'agent-prepared-issue',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       name: 'prepared-issue',
       avatar: '🤖',
-      folder: '/Users/nbonamy/src/codex-claw-fix-gh-24',
+      folder: '/Users/nbonamy/src/agent-workspace-fix-gh-24',
       backend: 'codex',
       backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
@@ -112,13 +113,13 @@ describe('AppShell work routing', () => {
       updatedAt: '2026-08-28T00:00:00.000Z',
     };
     const listSourceBranches = vi.fn().mockResolvedValue([
-      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
+      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/agent-workspace' },
       { name: 'feat/work-routing', isDefault: false },
     ]);
     const loadWorkItems = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([issue]);
     const createSourceWorktree = vi.fn().mockResolvedValue({
       name: 'work-routing',
-      path: '/Users/nbonamy/src/codex-claw-work-routing',
+      path: '/Users/nbonamy/src/agent-workspace-work-routing',
     });
     const createAgent = vi.fn().mockResolvedValue(preparedAgent);
     const createAgentGitBranch = vi.fn().mockResolvedValue({});
@@ -138,33 +139,33 @@ describe('AppShell work routing', () => {
 
     sidebar.vm.$emit('create-agent-on-branch', {
       agentId: 'agent-dina',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/Users/nbonamy/src/codex-claw',
-      branch: { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
+      branch: { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/agent-workspace' },
     });
     await flushPromises();
     expect(listSourceBranches).not.toHaveBeenCalled();
     expect(createSourceWorktree).not.toHaveBeenCalled();
     expect(createAgent).toHaveBeenCalledWith({
       name: null,
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
-      sourceRepositoryName: 'codex-claw',
-      teamId: 'team-codex-claw',
+      sourceRepositoryName: 'agent-workspace',
+      teamId: 'team-app',
     });
     listSourceBranches.mockClear();
     createAgent.mockClear();
 
     sidebar.vm.$emit('create-agent-from-repository', {
       agentId: 'agent-dina',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
     });
     await flushPromises();
 
     const sourceDialog = wrapper.getComponent({ name: 'RepositorySessionSourceDialog' });
-    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', undefined);
-    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, {
+    expect(listSourceBranches).toHaveBeenCalledWith('/Users/nbonamy/src/agent-workspace', undefined);
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace', undefined, {
       kind: 'all',
       state: 'open',
     });
@@ -202,7 +203,7 @@ describe('AppShell work routing', () => {
     });
     await flushPromises();
     expect(createSourceWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'fix/gh-24',
     });
     expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({
@@ -215,43 +216,43 @@ describe('AppShell work routing', () => {
     sourceDialog.vm.$emit('select-branch', { name: 'feat/work-routing', isDefault: false });
     await flushPromises();
     expect(createSourceWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feat/work-routing',
     });
     expect(createAgent).toHaveBeenCalledWith({
       name: null,
-      folder: '/Users/nbonamy/src/codex-claw-work-routing',
+      folder: '/Users/nbonamy/src/agent-workspace-work-routing',
       backend: 'codex',
-      sourceRepositoryName: 'codex-claw',
-      teamId: 'team-codex-claw',
+      sourceRepositoryName: 'agent-workspace',
+      teamId: 'team-app',
     });
     expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('visible')).toBe(false);
 
     createAgent.mockClear();
     sidebar.vm.$emit('create-agent-worktree-in-repository', {
       agentId: 'agent-dina',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
     });
     await flushPromises();
     const worktreeDialog = wrapper.getComponent({ name: 'NewSourceWorktreeDialog' });
     expect(worktreeDialog.props('visible')).toBe(true);
     expect(worktreeDialog.props('branches')).toStrictEqual([
-      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/codex-claw' },
+      { name: 'main', isDefault: true, worktreePath: '/Users/nbonamy/src/agent-workspace' },
       { name: 'feat/work-routing', isDefault: false },
     ]);
-    expect(listSourceBranches).toHaveBeenLastCalledWith('/Users/nbonamy/src/codex-claw', undefined);
+    expect(listSourceBranches).toHaveBeenLastCalledWith('/Users/nbonamy/src/agent-workspace', undefined);
     await worktreeDialog.vm.$emit('created', {
       name: 'feature-session',
-      path: '/Users/nbonamy/src/codex-claw-feature-session',
+      path: '/Users/nbonamy/src/agent-workspace-feature-session',
     });
     await flushPromises();
     expect(createAgent).toHaveBeenCalledWith({
       name: null,
-      folder: '/Users/nbonamy/src/codex-claw-feature-session',
+      folder: '/Users/nbonamy/src/agent-workspace-feature-session',
       backend: 'codex',
-      sourceRepositoryName: 'codex-claw',
-      teamId: 'team-codex-claw',
+      sourceRepositoryName: 'agent-workspace',
+      teamId: 'team-app',
     });
   });
 
@@ -263,7 +264,7 @@ describe('AppShell work routing', () => {
     wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('create-quick-chat');
     await flushPromises();
 
-    expect(createQuickChat).toHaveBeenCalledWith({ teamId: 'team-codex-claw', backend: 'codex' });
+    expect(createQuickChat).toHaveBeenCalledWith({ teamId: 'team-app', backend: 'codex' });
   });
 
   it('creates a new Git project and opens an agent in it', async () => {
@@ -279,7 +280,7 @@ describe('AppShell work routing', () => {
     dialog.vm.$emit('create', 'fresh-project', 'claude');
     await flushPromises();
 
-    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-codex-claw', backend: 'claude' });
+    expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-app', backend: 'claude' });
     expect(dialog.props('visible')).toBe(false);
   });
 
@@ -292,7 +293,7 @@ describe('AppShell work routing', () => {
     await flushPromises();
     const dialog = wrapper.getComponent({ name: 'NewProjectDialog' });
     await dialog.get('#new-project-name').setValue('fresh-project');
-    await dialog.get('.claw-button--primary').trigger('click');
+    await dialog.get('.app-button--primary').trigger('click');
     await flushPromises();
 
     expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-remote', backend: 'codex' });
@@ -493,22 +494,22 @@ describe('AppShell work routing', () => {
       workRepositoriesByProvider: {
         github: [{
           provider: 'github',
-          id: 'nbonamy/codex-claw',
+          id: 'nbonamy/agent-workspace',
           owner: 'nbonamy',
-          name: 'codex-claw',
-          fullName: 'nbonamy/codex-claw',
-          url: 'https://github.com/nbonamy/codex-claw',
+          name: 'agent-workspace',
+          fullName: 'nbonamy/agent-workspace',
+          url: 'https://github.com/nbonamy/agent-workspace',
           isPrivate: true,
         }],
       },
       workItemsByRepository: {
-        'github:nbonamy/codex-claw': [workItem()],
+        'github:nbonamy/agent-workspace': [workItem()],
       },
     });
 
     await wrapper.get('[aria-label="Backlog"]').trigger('click');
     const backlog = wrapper.findComponent({ name: 'BacklogView' });
-    backlog.vm.$emit('select-work-repository', 'nbonamy/codex-claw');
+    backlog.vm.$emit('select-work-repository', 'nbonamy/agent-workspace');
     backlog.vm.$emit('select-work-assignee', 'nbonamy');
     backlog.vm.$emit('select-work-tag', 'bug');
     await flushPromises();
@@ -516,7 +517,7 @@ describe('AppShell work routing', () => {
     expect(configureWorkBacklog).toHaveBeenNthCalledWith(1, {
       provider: 'github',
       configuration: {
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
         assigneeLogin: null,
         tagName: null,
       },
@@ -524,7 +525,7 @@ describe('AppShell work routing', () => {
     expect(configureWorkBacklog).toHaveBeenNthCalledWith(2, {
       provider: 'github',
       configuration: {
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
         assigneeLogin: 'nbonamy',
         tagName: null,
       },
@@ -532,12 +533,12 @@ describe('AppShell work routing', () => {
     expect(configureWorkBacklog).toHaveBeenNthCalledWith(3, {
       provider: 'github',
       configuration: {
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
         assigneeLogin: 'nbonamy',
         tagName: 'bug',
       },
     });
-    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace');
   });
 
   it('confirms before assigning an already assigned cockpit work item to another agent', async () => {
@@ -605,7 +606,7 @@ describe('AppShell work routing', () => {
         },
     });
 
-    expect(wrapper.text()).toContain('Welcome to Codex Claw');
+    expect(wrapper.text()).toContain(`Welcome to ${product.name}`);
     expect(wrapper.text()).toContain('Choose a source to start a session');
     expect(wrapper.find('.agent-header').exists()).toBe(false);
     expect(wrapper.find('.agent-sidebar').exists()).toBe(true);
@@ -666,18 +667,18 @@ describe('AppShell work routing', () => {
     const createAgent = vi.fn().mockResolvedValue(createdAgent);
     const createSourceWorktree = vi.fn().mockResolvedValue({
       name: 'fix-gh-12',
-      path: '/Users/nbonamy/src/codex-claw-fix-gh-12',
+      path: '/Users/nbonamy/src/agent-workspace-fix-gh-12',
     });
     const wrapper = mountShell({
       snapshot,
       createAgent,
       createSourceWorktree,
       createTeam,
-      listSourceWorktrees: vi.fn().mockResolvedValue([{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }]),
+      listSourceWorktrees: vi.fn().mockResolvedValue([{ name: 'main', path: '/Users/nbonamy/src/agent-workspace' }]),
       sourceRepositories: [{
-        name: 'codex-claw',
-        path: '/Users/nbonamy/src/codex-claw',
-        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+        name: 'agent-workspace',
+        path: '/Users/nbonamy/src/agent-workspace',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/agent-workspace' }],
       }],
     });
 
@@ -690,7 +691,7 @@ describe('AppShell work routing', () => {
     expect(agentDialog.props()).toMatchObject({
       initialAgentName: '',
       initialNewWorktreeBranchName: 'fix/gh-12',
-      initialSourceRepositoryName: 'codex-claw',
+      initialSourceRepositoryName: 'agent-workspace',
     });
 
     const clientNavigationSelectTeam = agentDialog.findAllComponents({ name: 'ElSelect' }).find((select) => (
@@ -700,11 +701,11 @@ describe('AppShell work routing', () => {
     await nextTick();
     expect(agentDialog.get<HTMLInputElement>('[aria-label="New team name"]').element.value).toBe('GitHub #12');
     expect(agentDialog.getComponent({ name: 'NewSourceWorktreeDialog' }).props('visible')).toBe(false);
-    await agentDialog.find('.claw-dialog__footer .claw-button--primary').trigger('click');
+    await agentDialog.find('.app-dialog__footer .app-button--primary').trigger('click');
     await flushPromises();
 
     expect(createSourceWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'fix/gh-12',
     });
     expect(createTeam).toHaveBeenCalledWith({
@@ -713,9 +714,9 @@ describe('AppShell work routing', () => {
     });
     expect(createAgent).toHaveBeenCalledWith({
       name: null,
-      folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
+      folder: '/Users/nbonamy/src/agent-workspace-fix-gh-12',
       backend: 'codex',
-      sourceRepositoryName: 'codex-claw',
+      sourceRepositoryName: 'agent-workspace',
       teamId: 'team-github-12',
     });
     expect(wrapper.emitted('assign-work-item')).toStrictEqual([[{
@@ -727,10 +728,10 @@ describe('AppShell work routing', () => {
   it('launches selected Cockpit work in automatic named worktrees and the selected team', async () => {
     const snapshot = createInitialSnapshot();
     const first = workItem();
-    const second = { ...workItem(), id: 'nbonamy/codex-claw#13', number: 13, title: 'Second issue' };
+    const second = { ...workItem(), id: 'nbonamy/agent-workspace#13', number: 13, title: 'Second issue' };
     const createSourceWorktree = vi.fn().mockImplementation(async ({ branchName }: { branchName: string }) => ({
       name: branchName.replace('/', '-'),
-      path: `/Users/nbonamy/src/codex-claw-${branchName.replace('/', '-')}`,
+      path: `/Users/nbonamy/src/agent-workspace-${branchName.replace('/', '-')}`,
     }));
     const createAgent = vi.fn().mockImplementation(async (input: CreateAgentInput) => ({
       id: `agent-${input.name}`,
@@ -751,9 +752,9 @@ describe('AppShell work routing', () => {
       createAgent,
       createSourceWorktree,
       sourceRepositories: [{
-        name: 'codex-claw',
-        path: '/Users/nbonamy/src/codex-claw',
-        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+        name: 'agent-workspace',
+        path: '/Users/nbonamy/src/agent-workspace',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/agent-workspace' }],
       }],
     });
 
@@ -761,29 +762,29 @@ describe('AppShell work routing', () => {
     const startWorkItemsAction = wrapper.findComponent({ name: 'BacklogView' }).props('startWorkItemsAction') as (input: {
       action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend'];
     }) => Promise<void>;
-    await startWorkItemsAction({ action: 'fix', items: [first, second], teamId: 'team-codex-claw', backend: 'claude' });
+    await startWorkItemsAction({ action: 'fix', items: [first, second], teamId: 'team-app', backend: 'claude' });
 
     expect(createSourceWorktree).toHaveBeenNthCalledWith(1, {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'fix/gh-12',
     });
     expect(createSourceWorktree).toHaveBeenNthCalledWith(2, {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'fix/gh-13',
     });
     expect(createAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({
       backend: 'claude',
       name: null,
-      folder: '/Users/nbonamy/src/codex-claw-fix-gh-12',
-      sourceRepositoryName: 'codex-claw',
-      teamId: 'team-codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace-fix-gh-12',
+      sourceRepositoryName: 'agent-workspace',
+      teamId: 'team-app',
     }));
     expect(createAgent).toHaveBeenNthCalledWith(2, expect.objectContaining({
       backend: 'claude',
       name: null,
-      folder: '/Users/nbonamy/src/codex-claw-fix-gh-13',
-      sourceRepositoryName: 'codex-claw',
-      teamId: 'team-codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace-fix-gh-13',
+      sourceRepositoryName: 'agent-workspace',
+      teamId: 'team-app',
     }));
     expect(assignWorkItemAction).toHaveBeenCalledTimes(2);
     expect(assignWorkItemAction.mock.calls[0]?.[0].prompt).toContain('Fix this GitHub issue');
@@ -792,7 +793,7 @@ describe('AppShell work routing', () => {
   it('resolves globally listed pull request branches only when selected work starts', async () => {
     const snapshot = createInitialSnapshot();
     const listedItem = workItem({
-      id: 'nbonamy/codex-claw#38',
+      id: 'nbonamy/agent-workspace#38',
       kind: 'pullRequest',
       number: 38,
       title: 'Paginate the Cockpit backlog',
@@ -801,14 +802,14 @@ describe('AppShell work routing', () => {
     const loadWorkItems = vi.fn().mockResolvedValue([resolvedItem]);
     const createSourceWorktree = vi.fn().mockResolvedValue({
       name: 'feature-paginated-cockpit',
-      path: '/Users/nbonamy/src/codex-claw-feature-paginated-cockpit',
+      path: '/Users/nbonamy/src/agent-workspace-feature-paginated-cockpit',
     });
     const createAgent = vi.fn().mockResolvedValue({
       id: 'agent-pr-38',
-      teamId: 'team-codex-claw',
-      name: 'codex-claw - gh-38',
+      teamId: 'team-app',
+      name: 'agent-workspace - gh-38',
       avatar: '🤖',
-      folder: '/Users/nbonamy/src/codex-claw-feature-paginated-cockpit',
+      folder: '/Users/nbonamy/src/agent-workspace-feature-paginated-cockpit',
       backend: 'codex',
       backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
@@ -823,9 +824,9 @@ describe('AppShell work routing', () => {
       createSourceWorktree,
       loadWorkItems,
       sourceRepositories: [{
-        name: 'codex-claw',
-        path: '/Users/nbonamy/src/codex-claw',
-        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+        name: 'agent-workspace',
+        path: '/Users/nbonamy/src/agent-workspace',
+        worktrees: [{ name: 'main', path: '/Users/nbonamy/src/agent-workspace' }],
       }],
     });
 
@@ -833,14 +834,14 @@ describe('AppShell work routing', () => {
     const startWorkItemsAction = wrapper.findComponent({ name: 'BacklogView' }).props('startWorkItemsAction') as (input: {
       action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string;
     }) => Promise<void>;
-    await startWorkItemsAction({ action: 'fix', items: [listedItem], teamId: 'team-codex-claw' });
+    await startWorkItemsAction({ action: 'fix', items: [listedItem], teamId: 'team-app' });
 
-    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, {
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace', undefined, {
       kind: 'pullRequest',
       state: 'all',
     });
     expect(createSourceWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/paginated-cockpit',
     });
     expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({ item: resolvedItem }));
@@ -898,15 +899,15 @@ describe('AppShell work routing', () => {
     expect(wrapper.find('.agent-sidebar').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Settings menu"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Settings menu"]').classes()).toContain('settings-menu__trigger--active');
-    expect(wrapper.get('[aria-label="Codex Claw"]').attributes('aria-pressed')).toBe('false');
-    expect(wrapper.get('[aria-label="Codex Claw"]').classes()).not.toContain('team-rail__team--active');
+    expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('false');
+    expect(wrapper.get(`[aria-label="${product.name}"]`).classes()).not.toContain('team-rail__team--active');
     expect(wrapper.text()).toContain('Accessibility');
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Theme');
 
     await wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Appearance')?.trigger('click');
     expect(wrapper.text()).toContain('Theme');
-    expect(wrapper.text()).toContain('Codex Claw Light');
+    expect(wrapper.text()).toContain(`${product.name} Light`);
 
     await wrapper.get('[aria-label="Cockpit"]').trigger('click');
     expect(wrapper.find('.settings-view').exists()).toBe(false);
@@ -916,7 +917,7 @@ describe('AppShell work routing', () => {
       return label.exists() && label.text() === 'Settings';
     })?.trigger('click');
     expect(wrapper.text()).toContain('Theme');
-    expect(wrapper.text()).toContain('Codex Claw Light');
+    expect(wrapper.text()).toContain(`${product.name} Light`);
 
     await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'github-dark');
     await wrapper.findAll('button').find((button) => button.text() === 'Quit')?.trigger('click');
@@ -933,7 +934,7 @@ describe('AppShell work routing', () => {
       updateTeam,
     });
 
-    await wrapper.get('[aria-label="Codex Claw"]').trigger('contextmenu');
+    await wrapper.get(`[aria-label="${product.name}"]`).trigger('contextmenu');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text() === 'Edit Team')?.trigger('click');
 
     expect(wrapper.text()).toContain('Edit Team');
@@ -942,7 +943,7 @@ describe('AppShell work routing', () => {
     await wrapper.findAll('button').find((button) => button.text() === 'Save')?.trigger('click');
 
     expect(updateTeam).toHaveBeenCalledWith({
-      id: 'team-codex-claw',
+      id: 'team-app',
       name: 'Skwad Core',
       color: '#46A857',
     });
@@ -965,7 +966,7 @@ describe('AppShell work routing', () => {
     await flushPromises();
 
     expect(confirm).toHaveBeenCalledWith(
-      'Agents, missions and quick chats will be removed from Codex Claw. Mission worktrees will not be deleted.',
+      `Agents, missions and quick chats will be removed from ${product.name}. Mission worktrees will not be deleted.`,
       'Close Skwad?',
       {
         cancelButtonText: 'Cancel',

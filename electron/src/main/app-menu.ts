@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { clipboard, Menu, MenuItem, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
-import type { AppCommand, DesktopUpdateStatus } from '@codex-claw/core/contracts';
-import type { VisualizeDebugScenario } from '@codex-claw/core/visualize';
-import type { MissionReviewDebugState, MissionStage } from '@codex-claw/core/missions';
-import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
+import type { AppCommand, DesktopUpdateStatus } from '@workspace/core/contracts';
+import type { VisualizeDebugScenario } from '@workspace/core/visualize';
+import type { MissionReviewDebugState, MissionStage } from '@workspace/core/missions';
+import type { ThreadFlagId } from '@workspace/core/thread-flags';
 import { cycleTeamsAccelerator } from './app-shortcuts';
 import { detectPngRetinaPixelRatio, readClipboardPngBuffer } from './clipboard-image';
 import { sendAppCommand } from './ipc-events';
@@ -34,7 +35,7 @@ export type AppMenuCallbacks = {
 };
 
 type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'>>;
-const editMenuId = 'claw-edit-menu';
+const editMenuId = 'app-edit-menu';
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
   const { checkForUpdates, installUpdate, ...menuOptions } = options;
@@ -66,7 +67,7 @@ export function buildAppMenuTemplate(
   platform: NodeJS.Platform = process.platform,
 ): MenuItemConstructorOptions[] {
   return [
-    ...(platform === 'darwin' ? [buildCodexClawMenu(callbacks, options)] : []),
+    ...(platform === 'darwin' ? [buildAppMenu(callbacks, options)] : []),
     buildFileMenu(callbacks),
     buildEditMenu(),
     buildViewMenu(callbacks, options),
@@ -149,10 +150,10 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
       },
       { type: 'separator' },
       {
-        label: 'Open Codex Claw Website',
+        label: `Open ${product.name} Website`,
         click: () => callbacks.sendAppCommand({
           type: 'open-browser',
-          url: 'https://codex-claw.nabocorp.com',
+          url: product.websiteUrl,
         }),
       },
     ],
@@ -312,7 +313,7 @@ function debugImageAnnotationMenuItem(callbacks: AppMenuCallbacks): MenuItemCons
   };
 }
 
-function buildCodexClawMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {
+function buildAppMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): MenuItemConstructorOptions {
   return {
     label: mainT('menu.app'),
     submenu: [

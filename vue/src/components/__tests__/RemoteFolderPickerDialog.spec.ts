@@ -28,9 +28,9 @@ describe('RemoteFolderPickerDialog', () => {
     await wrapper.setProps({ visible: true });
     await flushPromises();
 
-    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
-      ['claw-button', 'claw-button--tertiary'],
-      ['claw-button', 'claw-button--primary'],
+    expect(wrapper.findAll('.app-dialog__footer .app-button').map((button) => button.classes())).toStrictEqual([
+      ['app-button', 'app-button--tertiary'],
+      ['app-button', 'app-button--primary'],
     ]);
     expect(listSourceFolders).toHaveBeenCalledWith({
       path: '/srv/repos',
@@ -50,7 +50,7 @@ describe('RemoteFolderPickerDialog', () => {
     await flushPromises();
     expect(listSourceFolders).toHaveBeenLastCalledWith({ path: '/srv/repos', remoteConnectionId: 'connection-1' });
 
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
     expect(wrapper.emitted('select')).toStrictEqual([['/srv/repos']]);
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });

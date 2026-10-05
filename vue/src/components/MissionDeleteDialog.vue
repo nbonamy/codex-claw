@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog mission-delete-dialog"
+    class="app-dialog mission-delete-dialog"
     :model-value="visible"
     :teleported="false"
     width="560px"
@@ -9,8 +9,8 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">{{ t('missions.deleteTitle', { mission: mission?.outcome }) }}</h2>
+      <div class="app-form-dialog__header">
+        <h2 class="app-dialog__title">{{ t('missions.deleteTitle', { mission: mission?.outcome }) }}</h2>
       </div>
     </template>
 
@@ -33,13 +33,13 @@
     </div>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')">
+      <div class="app-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="emit('close')">
           {{ t('common.cancel') }}
         </button>
         <button
           v-if="worktrees.length"
-          class="claw-button claw-button--secondary"
+          class="app-button app-button--secondary"
           type="button"
           :disabled="busy"
           @click="emit('confirm', false)"
@@ -47,7 +47,7 @@
           {{ t('missions.keepWorktrees') }}
         </button>
         <button
-          class="claw-button mission-delete-dialog__delete"
+          class="app-button mission-delete-dialog__delete"
           type="button"
           :aria-busy="busy"
           :disabled="busy"
@@ -63,8 +63,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Mission } from '@codex-claw/core/missions';
-import type { MissionWorkspace } from '@codex-claw/core/mission-execution';
+import type { Mission } from '@workspace/core/missions';
+import type { MissionWorkspace } from '@workspace/core/mission-execution';
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{

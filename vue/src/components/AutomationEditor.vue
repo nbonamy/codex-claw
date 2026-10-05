@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
+import { workProviderDefinition, workProviderKinds } from '@workspace/core/work-providers';
 import type {
   Automation,
   AutomationWorkSourceTarget,
@@ -133,14 +133,14 @@ import type {
   WorkIntegrationConnection,
   WorkSource,
   WorkProviderKind,
-} from '@codex-claw/core/contracts';
-import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
+} from '@workspace/core/contracts';
+import { canonicalGitRemoteIdentity } from '@workspace/core/git-remote';
 import { computed, reactive, ref, watch } from 'vue';
 import { translate } from '../i18n';
 import VoiceTextarea from '../shared/VoiceTextarea.vue';
 import BackendSelector from './BackendSelector.vue';
 import BacklogSourceSelector from './BacklogSourceSelector.vue';
-import { workProviderLabel } from '@codex-claw/core/work-item-prompts';
+import { workProviderLabel } from '@workspace/core/work-item-prompts';
 import { useBackendChoices } from './backend-selection';
 
 const props = withDefaults(
@@ -182,7 +182,7 @@ const scheduleOptions = [
 ];
 
 const form = reactive({
-  backend: props.automation ? props.automation.backend ?? 'codex' : undefined as import('@codex-claw/core/contracts').AgentBackend | undefined,
+  backend: props.automation ? props.automation.backend ?? 'codex' : undefined as import('@workspace/core/contracts').AgentBackend | undefined,
   enabled: props.automation?.enabled ?? true,
   repositoryIds: props.automation?.repositories.map(repositoryValue) ?? [],
   teamId: props.automation?.teamId ?? props.teams[0]?.id ?? '',

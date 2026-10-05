@@ -61,7 +61,7 @@
           placement="bottom-end"
           trigger="click"
           :width="280"
-          popper-class="claw-popover repository-backlog__filters-popover"
+          popper-class="app-popover repository-backlog__filters-popover"
         >
           <template #reference>
             <button
@@ -116,7 +116,7 @@
 
             <footer>
               <span v-if="defaultsSaved">{{ t('repositoryBacklog.defaultsSaved') }}</span>
-              <button class="claw-button claw-button--tertiary" type="button" @click="saveFilterDefaults">
+              <button class="app-button app-button--tertiary" type="button" @click="saveFilterDefaults">
                 <IconDeviceFloppy aria-hidden="true" />
                 {{ t('repositoryBacklog.saveDefaults') }}
               </button>
@@ -200,7 +200,7 @@
       placement="bottom-end"
       :width="selectedAssignment ? 220 : 340"
       :teleported="true"
-      popper-class="claw-popover repository-backlog__start-popover"
+      popper-class="app-popover repository-backlog__start-popover"
       @update:visible="setStartWorkVisible"
     >
       <div
@@ -242,7 +242,7 @@
     </el-popover>
 
     <el-dialog
-      class="claw-dialog repository-backlog__clear-dialog"
+      class="app-dialog repository-backlog__clear-dialog"
       :model-value="pendingClearAssignment !== null"
       :teleported="false"
       width="440px"
@@ -251,19 +251,19 @@
       @update:model-value="onClearDialogVisibilityChanged"
     >
       <template #header>
-        <div class="claw-form-dialog__header">
-          <h2 class="claw-dialog__title">{{ t('repositoryBacklog.clearAssignmentTitle') }}</h2>
+        <div class="app-form-dialog__header">
+          <h2 class="app-dialog__title">{{ t('repositoryBacklog.clearAssignmentTitle') }}</h2>
         </div>
       </template>
       <p class="repository-backlog__clear-copy">
         {{ t('repositoryBacklog.clearAssignmentPrompt', { name: pendingClearAssignment?.agent.name ?? '' }) }}
       </p>
       <template #footer>
-        <div class="claw-dialog__footer">
-          <button class="claw-button claw-button--tertiary" type="button" @click="confirmClearAssignment(false)">
+        <div class="app-dialog__footer">
+          <button class="app-button app-button--tertiary" type="button" @click="confirmClearAssignment(false)">
             {{ t('repositoryBacklog.keepAgent') }}
           </button>
-          <button class="claw-button claw-button--primary" type="button" @click="confirmClearAssignment(true)">
+          <button class="app-button app-button--primary" type="button" @click="confirmClearAssignment(true)">
             {{ t('repositoryBacklog.closeAgent') }}
           </button>
         </div>
@@ -273,8 +273,8 @@
 </template>
 
 <script setup lang="ts">
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
-import { workItemBranchName, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
+import { workProviderDefinition } from '@workspace/core/work-providers';
+import { workItemBranchName, workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
 import { computed, h, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -292,9 +292,9 @@ import {
   IconX,
 } from '@tabler/icons-vue';
 import { GitHubIcon } from '../shared/icons/app-icons';
-import type { Agent, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import type { Agent, WorkBacklogAssignment, WorkItem } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import type { RepositoryWorkStartInput } from './right-workspace';
@@ -307,7 +307,7 @@ import { useWorkSourceBacklog } from './use-work-source-backlog';
 defineOptions({ name: 'RepositoryBacklogPanel' });
 
 const props = defineProps<{
-  location?: import('@codex-claw/core/contracts').AutomationLocation;
+  location?: import('@workspace/core/contracts').AutomationLocation;
   agent: Agent;
   agents: readonly Agent[];
   assignments: Record<string, WorkBacklogAssignment>;
@@ -984,7 +984,7 @@ function relativeLuminance(rgb: number[]): number {
   font-size: var(--font-size-11);
 }
 
-.repository-backlog__filter-menu > footer .claw-button {
+.repository-backlog__filter-menu > footer .app-button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);

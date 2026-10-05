@@ -27,7 +27,7 @@
             </div>
             <button
               v-else-if="viewedStage === 'implementation' && mission.stage === 'implementation' && implementationReady"
-              class="claw-button claw-button--primary"
+              class="app-button app-button--primary"
               type="button"
               :aria-busy="busy"
               :disabled="busy || !executeMission || debugFixture"
@@ -38,7 +38,7 @@
             </button>
             <button
               v-else-if="viewedStage === mission.stage && mission.stage !== 'implementation' && activeRun?.proposal"
-              class="claw-button claw-button--primary"
+              class="app-button app-button--primary"
               type="button"
               :aria-busy="busy"
               :disabled="busy"
@@ -121,7 +121,7 @@
             <p>{{ t(conversationAgentId ? 'missions.keepWorkingInConversation' : 'missions.missionLeadStarting') }}</p>
             <button
               v-if="!initialRequirements && mission.execution && !activeRun && mission.status !== 'completed'"
-              class="claw-button claw-button--primary"
+              class="app-button app-button--primary"
               type="button"
               :aria-busy="busy"
               :disabled="busy || !executeMission"
@@ -148,10 +148,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import type { Mission, MissionArtifacts, MissionReviewFinding, MissionStage } from '@codex-claw/core/missions';
-import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput, type MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
+import type { Agent, OpenInApplicationCatalog } from '@workspace/core/contracts';
+import type { Mission, MissionArtifacts, MissionReviewFinding, MissionStage } from '@workspace/core/missions';
+import { missionWorkflow } from '@workspace/core/mission-workflows';
+import { pendingMissionRun, type MissionArtifactReadResult, type MissionExecutionInput, type MissionImplementationStartProgress } from '@workspace/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, FileTextIcon, MessageCircleIcon, PlayerPlayIcon } from '../shared/icons/app-icons';
 import MarkdownPanel from './MarkdownPanel.vue';
 import MissionConversationRail from './MissionConversationRail.vue';

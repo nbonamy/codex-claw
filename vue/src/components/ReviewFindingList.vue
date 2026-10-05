@@ -25,7 +25,7 @@
         <div v-if="selectable || clarifiable" class="review-finding__quick-actions">
           <button
             v-if="clarifiable"
-            class="claw-button claw-button--tertiary review-finding__quick-action"
+            class="app-button app-button--tertiary review-finding__quick-action"
             type="button"
             :aria-label="clarifyLabel || $t('surface.codeReviewPanel.clarify')"
             :title="clarifyLabel || $t('surface.codeReviewPanel.clarify')"
@@ -70,7 +70,7 @@
 </template>
 
 <script lang="ts">
-import type { CodeReviewLocation, CodeReviewPriority } from '@codex-claw/core/code-review';
+import type { CodeReviewLocation, CodeReviewPriority } from '@workspace/core/code-review';
 export type ReviewFindingListItem = {
   id: string;
   priority: CodeReviewPriority;

@@ -2,13 +2,13 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 import { listClaudeSkills } from '../skills';
 
 let tempRoot = '';
 
 beforeEach(async () => {
-  tempRoot = await mkdtemp(path.join(tmpdir(), 'codex-claw-claude-skills-'));
+  tempRoot = await mkdtemp(path.join(tmpdir(), 'agent-workspace-claude-skills-'));
 });
 
 afterEach(async () => {

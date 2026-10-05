@@ -1,12 +1,15 @@
-import { mountClawVueApp } from '@codex-claw/vue/bootstrap';
+import { product } from '@workspace/core/product';
+import { mountAppVueApp } from '@workspace/vue/bootstrap';
 
-if (!window.codexClaw) {
-  throw new Error('Codex Claw preload API is unavailable.');
+document.title = product.name;
+
+if (!window.app) {
+  throw new Error(`${product.name} preload API is unavailable.`);
 }
 
-mountClawVueApp({
+mountAppVueApp({
   client: {
-    api: window.codexClaw,
+    api: window.app,
     platform: 'desktop',
   },
 });

@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { ElPopover } from 'element-plus';
 import { describe, expect, it } from 'vitest';
@@ -38,7 +39,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -71,7 +72,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents: [closedAgent],
         activeAgentId: closedAgent.id,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover, ElTooltip: ElTooltipStub } },
     });
@@ -91,8 +92,8 @@ describe('AgentSidebar actions', () => {
       props: {
         agents: [...id8Agents, agents[1]!],
         activeAgentId: 'agent-dina',
-        teamId: 'team-codex-claw',
-        teamName: 'Codex Claw',
+        teamId: 'team-app',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -117,7 +118,7 @@ describe('AgentSidebar actions', () => {
 
     expect(wrapper.emitted('reorder-agents')).toStrictEqual([[
       {
-        teamId: 'team-codex-claw',
+        teamId: 'team-app',
         agentId: 'agent-abby',
         beforeAgentId: 'agent-dina',
       },
@@ -129,8 +130,8 @@ describe('AgentSidebar actions', () => {
       props: {
         agents: [...id8Agents, agents[1]!],
         activeAgentId: 'agent-dina',
-        teamId: 'team-codex-claw',
-        teamName: 'Codex Claw',
+        teamId: 'team-app',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -156,8 +157,8 @@ describe('AgentSidebar actions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamId: 'team-codex-claw',
-        teamName: 'Codex Claw',
+        teamId: 'team-app',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -182,7 +183,7 @@ describe('AgentSidebar actions', () => {
 
     expect(wrapper.emitted('reorder-repositories')).toStrictEqual([[
       {
-        teamId: 'team-codex-claw',
+        teamId: 'team-app',
         repositoryRoot: '~/src/multi-llm-ts',
         beforeRepositoryRoot: '~/src/id8',
       },
@@ -194,7 +195,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents: id8Agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -216,7 +217,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents,
         activeAgentId: 'agent-jesse',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -236,7 +237,7 @@ describe('AgentSidebar actions', () => {
           { ...agents[0], id: 'error', status: { type: 'error', message: 'failed' } },
         ],
         activeAgentId: 'working',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -255,7 +256,7 @@ describe('AgentSidebar actions', () => {
           { ...agents[0], statusText: 'Running tests' },
         ],
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -276,7 +277,7 @@ describe('AgentSidebar actions', () => {
           { ...agents[0]!, id: 'agent-chat', name: null, folder: null, workspace: undefined, sessionKind: 'quickChat' },
         ],
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -304,7 +305,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -321,7 +322,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -337,7 +338,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -389,10 +390,10 @@ describe('AgentSidebar actions', () => {
   it('opens an agent folder from the context menu application list', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
-        agents: agents.map((agent) => ({ ...agent, teamId: 'team-codex-claw' })),
+        agents: agents.map((agent) => ({ ...agent, teamId: 'team-app' })),
         activeAgentId: 'agent-dina',
         teams,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
         openInCatalog: {
           defaultApplication: 'vscode',
           applications: [
@@ -420,7 +421,7 @@ describe('AgentSidebar actions', () => {
           backendSession: { kind: 'codex', threadId: 'thread-dina' },
         }],
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -441,7 +442,7 @@ describe('AgentSidebar actions', () => {
       props: {
         agents: [{ ...agents[0]!, backendSession: { kind: 'codex', threadId: 'thread-dina' } }],
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });

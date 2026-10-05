@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ElMenu, ElMenuItem, ElMessageBox, ElSwitch } from 'element-plus';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import App from '../App.vue';
 import { installBackendFixture } from '../test/backend-fixture';
 

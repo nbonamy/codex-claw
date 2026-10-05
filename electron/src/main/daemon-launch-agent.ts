@@ -1,22 +1,23 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { product } from '@workspace/core/product';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { ClawdDaemonStatus } from '@codex-claw/core/contracts';
-import { runtimeClawdCommand, runtimeClawdHome, runtimeClawdServeCommand, runtimeClawdSocketPath, type RuntimeClawdConfigDeps, type RuntimeClawdCommand } from './runtime-config';
+import type { DaemonStatus } from '@workspace/core/contracts';
+import { runtimeDaemonCommand, runtimeDaemonHome, runtimeDaemonServeCommand, runtimeDaemonSocketPath, type RuntimeDaemonConfigDeps, type RuntimeDaemonCommand } from './runtime-config';
 
 const execFile = promisify(execFileCallback);
-const launchAgentLabel = 'com.nabocorp.codex-claw.clawd';
+const launchAgentLabel = `${product.appId}.daemon`;
 
 type ExecFileResult = {
   stdout?: string | Buffer;
 };
 type ExecFile = (file: string, args: string[]) => Promise<ExecFileResult>;
 
-export type DaemonLaunchAgentDependencies = RuntimeClawdConfigDeps & {
+export type DaemonLaunchAgentDependencies = RuntimeDaemonConfigDeps & {
   access?: typeof access;
   connectSocket?: typeof net.createConnection;
   execFile?: ExecFile;
@@ -29,19 +30,19 @@ export type DaemonLaunchAgentDependencies = RuntimeClawdConfigDeps & {
 };
 
 type ResolvedLaunchAgent = {
-  command: RuntimeClawdCommand | null;
+  command: RuntimeDaemonCommand | null;
   homeDir: string;
   launchAgentPath: string;
   logDir: string;
   socketPath: string;
 };
 
-export async function getClawdDaemonStatus(
+export async function getDaemonStatus(
   dependencies: DaemonLaunchAgentDependencies = {},
-): Promise<ClawdDaemonStatus> {
+): Promise<DaemonStatus> {
   const resolved = resolveLaunchAgent(dependencies);
   const installed = await pathExists(resolved.launchAgentPath, dependencies);
-  const health = await probeClawdSocket(resolved.socketPath, dependencies);
+  const health = await probeDaemonSocket(resolved.socketPath, dependencies);
   const command = resolved.command;
   const platformSupported = isSupportedPlatform(dependencies);
   const supported = platformSupported && Boolean(command);
@@ -58,26 +59,26 @@ export async function getClawdDaemonStatus(
   };
 }
 
-export async function setClawdDaemonEnabled(
+export async function setDaemonEnabled(
   enabled: boolean,
   dependencies: DaemonLaunchAgentDependencies = {},
-): Promise<ClawdDaemonStatus> {
+): Promise<DaemonStatus> {
   if (enabled) {
-    return installClawdDaemon(dependencies);
+    return installDaemon(dependencies);
   }
 
-  return uninstallClawdDaemon(dependencies);
+  return uninstallDaemon(dependencies);
 }
 
-export async function installClawdDaemon(
+export async function installDaemon(
   dependencies: DaemonLaunchAgentDependencies = {},
-): Promise<ClawdDaemonStatus> {
+): Promise<DaemonStatus> {
   const resolved = resolveLaunchAgent(dependencies);
   if (!isSupportedPlatform(dependencies)) {
-    throw new Error('clawd background daemon installation is only supported on macOS.');
+    throw new Error('daemon background daemon installation is only supported on macOS.');
   }
   if (!resolved.command) {
-    throw new Error('No clawd runtime is available to install as a background daemon.');
+    throw new Error('No daemon runtime is available to install as a background daemon.');
   }
 
   await (dependencies.mkdir ?? mkdir)(path.dirname(resolved.launchAgentPath), { recursive: true });
@@ -87,30 +88,30 @@ export async function installClawdDaemon(
   await launchctl(['bootout', launchctlDomain(dependencies), resolved.launchAgentPath], dependencies).catch(() => undefined);
   await launchctl(['bootstrap', launchctlDomain(dependencies), resolved.launchAgentPath], dependencies);
   await launchctl(['kickstart', '-k', launchctlServiceTarget(dependencies)], dependencies);
-  return getClawdDaemonStatus(dependencies);
+  return getDaemonStatus(dependencies);
 }
 
-export async function refreshClawdDaemon(
+export async function refreshDaemon(
   dependencies: DaemonLaunchAgentDependencies = {},
-): Promise<ClawdDaemonStatus> {
-  return installClawdDaemon(dependencies);
+): Promise<DaemonStatus> {
+  return installDaemon(dependencies);
 }
 
-export async function getResolvedClawdVersion(
+export async function getResolvedDaemonVersion(
   dependencies: DaemonLaunchAgentDependencies = {},
 ): Promise<string | null> {
-  const command = runtimeClawdCommand(dependencies);
+  const command = runtimeDaemonCommand(dependencies);
   if (!command) {
     return null;
   }
 
   const result = await (dependencies.execFile ?? execFile)(command.command, versionArgsFromRuntimeArgs(command.args));
-  return parseClawdVersion(result.stdout);
+  return parseDaemonVersion(result.stdout);
 }
 
-async function uninstallClawdDaemon(
+async function uninstallDaemon(
   dependencies: DaemonLaunchAgentDependencies = {},
-): Promise<ClawdDaemonStatus> {
+): Promise<DaemonStatus> {
   const resolved = resolveLaunchAgent(dependencies);
   if (isSupportedPlatform(dependencies)) {
     await launchctl(['bootout', launchctlDomain(dependencies), resolved.launchAgentPath], dependencies).catch(() => undefined);
@@ -120,28 +121,28 @@ async function uninstallClawdDaemon(
       throw error;
     }
   });
-  return getClawdDaemonStatus(dependencies);
+  return getDaemonStatus(dependencies);
 }
 
 function resolveLaunchAgent(dependencies: DaemonLaunchAgentDependencies): ResolvedLaunchAgent {
   const userHome = (dependencies.homedir ?? homedir)();
   return {
-    command: runtimeClawdServeCommand(dependencies),
-    homeDir: runtimeClawdHome(dependencies),
+    command: runtimeDaemonServeCommand(dependencies),
+    homeDir: runtimeDaemonHome(dependencies),
     launchAgentPath: path.join(userHome, 'Library', 'LaunchAgents', `${launchAgentLabel}.plist`),
-    logDir: path.join(userHome, 'Library', 'Logs', 'Codex Claw'),
-    socketPath: runtimeClawdSocketPath(dependencies),
+    logDir: path.join(userHome, 'Library', 'Logs', `${product.name}`),
+    socketPath: runtimeDaemonSocketPath(dependencies),
   };
 }
 
 function launchAgentPlist(resolved: ResolvedLaunchAgent): string {
   if (!resolved.command) {
-    throw new Error('Cannot build a LaunchAgent plist without a clawd command.');
+    throw new Error('Cannot build a LaunchAgent plist without a daemon command.');
   }
 
   const env = {
     ...resolved.command.env,
-    CODEX_CLAW_HOME: resolved.homeDir,
+    APP_HOME: resolved.homeDir,
   };
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -165,9 +166,9 @@ ${plistStringDictionary(env)}
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>${escapeXml(path.join(resolved.logDir, 'clawd.out.log'))}</string>
+  <string>${escapeXml(path.join(resolved.logDir, 'daemon.out.log'))}</string>
   <key>StandardErrorPath</key>
-  <string>${escapeXml(path.join(resolved.logDir, 'clawd.err.log'))}</string>
+  <string>${escapeXml(path.join(resolved.logDir, 'daemon.err.log'))}</string>
 </dict>
 </plist>
 `;
@@ -223,15 +224,15 @@ function isSupportedPlatform(dependencies: DaemonLaunchAgentDependencies): boole
 }
 
 function statusDetail(options: {
-  command: RuntimeClawdCommand | null;
-  health: ClawdHealthProbe;
+  command: RuntimeDaemonCommand | null;
+  health: DaemonHealthProbe;
   platformSupported: boolean;
 }): string | undefined {
   if (!options.platformSupported) {
     return 'Background daemon installation is only supported on macOS.';
   }
   if (!options.command) {
-    return 'No packaged clawd runtime was found.';
+    return 'No packaged daemon runtime was found.';
   }
   if (!options.health.ok && options.health.error) {
     return options.health.error;
@@ -239,23 +240,23 @@ function statusDetail(options: {
   return undefined;
 }
 
-type ClawdHealthProbe = {
+type DaemonHealthProbe = {
   ok: boolean;
   error?: string;
   version?: string;
   pid?: number;
 };
 
-function probeClawdSocket(
+function probeDaemonSocket(
   socketPath: string,
   dependencies: DaemonLaunchAgentDependencies,
-): Promise<ClawdHealthProbe> {
+): Promise<DaemonHealthProbe> {
   return new Promise((resolve) => {
     const socket = (dependencies.connectSocket ?? net.createConnection)(socketPath);
     let buffer = '';
     let done = false;
 
-    const finish = (result: ClawdHealthProbe) => {
+    const finish = (result: DaemonHealthProbe) => {
       if (done) {
         return;
       }
@@ -287,7 +288,7 @@ function probeClawdSocket(
         finish({ ok: false, error: error instanceof Error ? error.message : 'Invalid daemon health response.' });
       }
     });
-    socket.once('timeout', () => finish({ ok: false, error: 'clawd daemon health check timed out.' }));
+    socket.once('timeout', () => finish({ ok: false, error: 'daemon daemon health check timed out.' }));
     socket.once('error', (error) => finish({ ok: false, error: error.message }));
   });
 }
@@ -305,8 +306,8 @@ function versionArgsFromRuntimeArgs(args: string[]): string[] {
   return [...args, '--version'];
 }
 
-function parseClawdVersion(stdout: string | Buffer | undefined): string | null {
+function parseDaemonVersion(stdout: string | Buffer | undefined): string | null {
   const output = stdout?.toString().trim() ?? '';
-  const match = /^clawd\s+(.+)$/u.exec(output);
+  const match = /^daemon\s+(.+)$/u.exec(output);
   return match?.[1]?.trim() || null;
 }

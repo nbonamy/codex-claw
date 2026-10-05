@@ -1,12 +1,12 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { mkdir, unlink } from 'node:fs/promises';
 import net, { type Server, type Socket } from 'node:net';
 import path from 'node:path';
-import type { ClawBackendEvent, ClawRpcMessage, ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
+import type { AppBackendEvent, AppRpcMessage, AppRpcResponse } from '@workspace/core/backend-protocol/rpc';
 import { StdioRpcPeer } from './stdio';
 
 export type LocalSocketRpcServerOptions = {
-  onMessage(message: ClawRpcMessage): ClawRpcResponse | undefined | Promise<ClawRpcResponse | undefined>;
+  onMessage(message: AppRpcMessage): AppRpcResponse | undefined | Promise<AppRpcResponse | undefined>;
   socketPath: string;
 };
 
@@ -52,7 +52,7 @@ export class LocalSocketRpcServer {
     });
   }
 
-  broadcastEvent(event: ClawBackendEvent): void {
+  broadcastEvent(event: AppBackendEvent): void {
     for (const peer of this.peers) {
       peer.notify(backendMethods.backendEventNotify, event);
     }
@@ -88,7 +88,7 @@ export class LocalSocketRpcServer {
 async function removeStaleSocket(socketPath: string): Promise<void> {
   const isActive = await canConnect(socketPath);
   if (isActive) {
-    throw new Error(`clawd socket is already in use: ${socketPath}`);
+    throw new Error(`daemon socket is already in use: ${socketPath}`);
   }
 
   await unlink(socketPath).catch((error: NodeJS.ErrnoException) => {

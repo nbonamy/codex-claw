@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -71,7 +72,7 @@ function resolveDarwinBinaryPaths(
     path.extname(normalizedBuildPath) === '.app'
       ? path.join(normalizedBuildPath, 'Contents', 'Resources')
       : null,
-    path.join(normalizedBuildPath, 'Codex Claw.app', 'Contents', 'Resources'),
+    path.join(normalizedBuildPath, `${product.name}.app`, 'Contents', 'Resources'),
     path.join(normalizedBuildPath, 'Electron.app', 'Contents', 'Resources'),
     path.join(normalizedBuildPath, 'Contents', 'Resources'),
   ].filter((candidate): candidate is string => Boolean(candidate));
@@ -88,11 +89,11 @@ function resolveDarwinBinaryPaths(
   ]);
   const computerUseAppPaths = resourcePaths.map((resourcePath) => ({
     label: 'Computer Use helper app',
-    path: path.join(resourcePath, 'Codex Claw Computer Use.app'),
+    path: path.join(resourcePath, `${product.name} Computer Use.app`),
   }));
   const ttsHelperPaths = resourcePaths.map((resourcePath) => ({
     label: 'TTS helper',
-    path: path.join(resourcePath, 'codex-claw-tts-helper'),
+    path: path.join(resourcePath, 'app-tts-helper'),
   }));
 
   const appleSpeechHelper = binaryPaths.find((binary) => existsSync(binary.path)) ?? binaryPaths[0];

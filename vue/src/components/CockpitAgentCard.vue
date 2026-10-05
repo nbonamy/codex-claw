@@ -66,8 +66,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, WorkItem } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
+import type { Agent, WorkItem } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
 import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { FolderRootIcon, SendIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';

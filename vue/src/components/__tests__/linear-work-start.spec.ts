@@ -1,16 +1,16 @@
 import { computed, defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { WorkItem } from '@codex-claw/core/contracts';
-import { configureClawClient } from '../../platform-api';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { WorkItem } from '@workspace/core/contracts';
+import { configureAppClient } from '../../platform-api';
 import { createClientApiMock } from '../../test/client-api-mock';
 import { backendChoicesKey } from '../backend-selection';
 import { useWorkItemRouting } from '../use-work-item-routing';
 import { useRepositorySession } from '../use-repository-session';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
 
-afterEach(() => configureClawClient());
+afterEach(() => configureAppClient());
 
 describe('Linear issue to repository session', () => {
   it('starts through the rendered picker with the current repository and remote host, then hands off the exact issue', async () => {
@@ -22,7 +22,7 @@ describe('Linear issue to repository session', () => {
       sourceName: 'Engineering', title: 'Fix login', body: 'Steps to reproduce', url: 'https://linear.app/acme/issue/ENG-12',
       state: 'open', labels: [], createdAt: '', updatedAt: '' };
     const { api } = createClientApiMock();
-    configureClawClient({ platform: 'desktop', api });
+    configureAppClient({ platform: 'desktop', api });
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected' }];
     api.getAutomationSnapshot.mockResolvedValue(snapshot);
     api.listWorkSources.mockResolvedValue([{ provider: 'linear', id: 'linear:team', name: 'Engineering', fullName: 'Engineering', owner: 'ENG', url: 'https://linear.app', isPrivate: true }]);
@@ -57,7 +57,7 @@ describe('Linear issue to repository session', () => {
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:team');
     await flushPromises();
     await wrapper.get('.repository-session-source-dialog__result').trigger('click');
-    await wrapper.get('.work-item-assignment-picker .claw-button--primary').trigger('click');
+    await wrapper.get('.work-item-assignment-picker .app-button--primary').trigger('click');
     await flushPromises();
     expect(createWorktree).toHaveBeenCalledWith({ repoPath: '/remote/code', branchName: 'fix/eng-12', remoteConnectionId: 'remote-code' });
     expect(createAgent).toHaveBeenCalledWith({ name: null, folder: '/remote/code-eng-12', backend: 'codex', sourceRepositoryName: 'code', teamId: team.id });

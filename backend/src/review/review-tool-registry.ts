@@ -2,7 +2,7 @@ import type {
   CodeReviewFinding,
   CodeReviewFindingInput,
   CodeReviewFindingUpdateInput,
-} from '@codex-claw/core/code-review';
+} from '@workspace/core/code-review';
 
 export type ReviewToolHandlers = {
   reportFinding(input: CodeReviewFindingInput): Promise<CodeReviewFinding> | CodeReviewFinding;

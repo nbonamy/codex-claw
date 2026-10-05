@@ -1,3 +1,4 @@
+import product from '../core/src/product.json' with { type: 'json' };
 import { execFile as execFileCallback } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -5,7 +6,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 const execFile = promisify(execFileCallback);
-const launchAgentLabel = 'com.nabocorp.codex-claw.clawd';
+const launchAgentLabel = `${product.appId}.daemon`;
 const launchAgentPath = path.join(homedir(), 'Library', 'LaunchAgents', `${launchAgentLabel}.plist`);
 const launchctlDomain = `gui/${process.getuid?.() ?? 501}`;
 const launchctlTarget = `${launchctlDomain}/${launchAgentLabel}`;
@@ -13,12 +14,12 @@ const launchctlTarget = `${launchctlDomain}/${launchAgentLabel}`;
 const command = process.argv[2];
 
 if (command !== 'start' && command !== 'stop') {
-  process.stderr.write('Usage: npm run clawd:start | npm run clawd:stop\n');
+  process.stderr.write('Usage: npm run daemon:start | npm run daemon:stop\n');
   process.exit(1);
 }
 
 if (process.platform !== 'darwin') {
-  process.stderr.write('clawd LaunchAgent control is only supported on macOS.\n');
+  process.stderr.write('daemon LaunchAgent control is only supported on macOS.\n');
   process.exit(1);
 }
 

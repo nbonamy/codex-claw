@@ -5,12 +5,12 @@
     :title="dialogTitle"
     @update:model-value="onVisibilityChanged"
   >
-    <form class="claw-form-dialog" @submit.prevent="submit">
+    <form class="app-form-dialog" @submit.prevent="submit">
       <FormDialogField
         :label="$t('surface.teamDialog.connection')"
         label-for="team-dialog-connection"
       >
-        <div class="claw-form-dialog__control">
+        <div class="app-form-dialog__control">
           <el-select
             id="team-dialog-connection"
             v-model="connectionSelection"
@@ -35,7 +35,7 @@
         :label="$t('surface.teamDialog.remoteTeam')"
         label-for="team-dialog-remote-team"
       >
-        <div class="claw-form-dialog__control">
+        <div class="app-form-dialog__control">
           <el-select
             id="team-dialog-remote-team"
             v-model="remoteTeamSelection"
@@ -60,11 +60,11 @@
         :label="$t('surface.teamDialog.name')"
         label-for="team-dialog-name"
       >
-        <div class="claw-form-dialog__control claw-form-dialog__input-control">
+        <div class="app-form-dialog__control app-form-dialog__input-control">
           <input
             id="team-dialog-name"
             v-model="name"
-            class="claw-form-dialog__text-input"
+            class="app-form-dialog__text-input"
             type="text"
             :placeholder="$t('surface.teamDialog.enterTeamName')"
             autofocus
@@ -108,9 +108,9 @@
     </form>
 
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.teamDialog.cancel') }}</button>
+      <button class="app-button app-button--tertiary" type="button" @click="close">{{ $t('surface.teamDialog.cancel') }}</button>
       <button
-        class="claw-button claw-button--primary"
+        class="app-button app-button--primary"
         type="button"
         :aria-busy="submitting"
         :disabled="submitting || !canSave"
@@ -125,8 +125,8 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
-import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/core/contracts';
-import { defaultTeamColor, teamColors } from '@codex-claw/core/team-colors';
+import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@workspace/core/contracts';
+import { defaultTeamColor, teamColors } from '@workspace/core/team-colors';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import { CheckIcon } from '../shared/icons/app-icons';

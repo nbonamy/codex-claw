@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appErrorCodes } from '@codex-claw/core/app-error';
+import { appErrorCodes } from '@workspace/core/app-error';
 import { messages } from '../i18n/messages';
 
 describe('i18n contract', () => {

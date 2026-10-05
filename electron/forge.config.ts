@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDMG, MakerDMGConfig } from '@electron-forge/maker-dmg';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -11,23 +12,24 @@ import {
   signDarwinBinaries,
 } from './build/sign-binaries';
 import { copyPackagedNativeDependencies } from './build/package-native-dependencies';
+import { desktopMetadata } from './build/product-metadata';
 
 import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
 
 // macOS signing/notarization is release-only. Agents should set
-// CODEX_CLAW_SKIP_SIGNING=1 for local package/build verification.
-const skipMacSigning = Boolean(process.env.TEST) || process.env.CODEX_CLAW_SKIP_SIGNING === '1';
+// APP_SKIP_SIGNING=1 for local package/build verification.
+const skipMacSigning = Boolean(process.env.TEST) || process.env.APP_SKIP_SIGNING === '1';
 const appleSpeechHelperPath = path.resolve(
   __dirname,
   '../node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli',
 );
 const extraResource = [
   appleSpeechHelperPath,
-  'resources/clawd',
+  'resources/daemon',
   'resources/codex',
-  ...(process.platform === 'darwin' ? ['.computer-use/Codex Claw Computer Use.app'] : []),
-  ...(process.platform === 'darwin' ? ['.tts/codex-claw-tts-helper'] : []),
+  ...(process.platform === 'darwin' ? [`.computer-use/${product.name} Computer Use.app`] : []),
+  ...(process.platform === 'darwin' ? ['.tts/app-tts-helper'] : []),
 ];
 
 // osx special configuration
@@ -43,7 +45,7 @@ const dmgOptions: MakerDMGConfig = {
   //   }
   // }
 }
-const updateBaseUrl = process.env.CODEX_CLAW_UPDATE_BASE_URL ?? 'https://codex-claw.nabocorp.com/desktop/releases';
+const updateBaseUrl = process.env.APP_UPDATE_BASE_URL ?? product.updateBaseUrl;
 const updateManifestBaseUrl = `${updateBaseUrl.replace(/\/+$/, '')}/darwin/arm64`;
 
 if (isDarwin && !skipMacSigning) {
@@ -70,10 +72,11 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: 'assets/icon',
-    appBundleId: 'com.nabocorp.codex-claw',
-    executableName: 'codex-claw',
+    name: product.name,
+    appBundleId: product.appId,
+    executableName: product.name,
     extraResource,
-    extendInfo: 'build/Info.plist',
+    extendInfo: desktopMetadata,
     ...osxPackagerConfig,
     afterCopyExtraResources: [
       (buildPath: string, _electronVersion: string, platform: string, arch: string, callback: (error?: Error) => void) => {

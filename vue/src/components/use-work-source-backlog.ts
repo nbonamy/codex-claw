@@ -1,9 +1,9 @@
-import type { AutomationLocation, WorkItem, WorkItemQuery, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
+import type { AutomationLocation, WorkItem, WorkItemQuery, WorkProviderKind, WorkSource } from '@workspace/core/contracts';
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue';
 import { useBacklogConnections, useBacklogProviders } from './backlog-providers';
-import { codexClawApi } from '../platform-api';
+import { appApi } from '../platform-api';
 import { AsyncCatalogCache } from '../async-catalog-cache';
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workProviderDefinition } from '@workspace/core/work-providers';
 
 /** All providers share browsing, cache ownership and stale-response protection. */
 export function useWorkSourceBacklog(options: {
@@ -45,8 +45,8 @@ export function useWorkSourceBacklog(options: {
     if (!enabled() || !providers.value.includes(selectedProvider)) return;
     status.value = 'loading';
     const entry = catalogs.load(`${selectedProvider}:${locationKey.value}`, request, async () => {
-      if (!codexClawApi?.listWorkSources) throw new Error('Backlog browsing is unavailable.');
-      return codexClawApi.listWorkSources(selectedProvider, location());
+      if (!appApi?.listWorkSources) throw new Error('Backlog browsing is unavailable.');
+      return appApi.listWorkSources(selectedProvider, location());
     });
     await entry.promise;
     if (request !== revision) return;
@@ -69,8 +69,8 @@ export function useWorkSourceBacklog(options: {
     const selectedProvider = provider.value;
     if (!enabled() || !id || !providers.value.includes(selectedProvider)) return;
     const entry = issueCatalogs.load(`${selectedProvider}:${locationKey.value}:${id}`, request, async () => {
-      if (!codexClawApi?.listWorkItems) throw new Error('Backlog browsing is unavailable.');
-      return codexClawApi.listWorkItems(selectedProvider, id, location(), options.query);
+      if (!appApi?.listWorkItems) throw new Error('Backlog browsing is unavailable.');
+      return appApi.listWorkItems(selectedProvider, id, location(), options.query);
     });
     await entry.promise;
     if (request !== revision) return;

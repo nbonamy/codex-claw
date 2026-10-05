@@ -14,14 +14,14 @@ vi.mock('node:child_process', () => ({
     },
   }),
 }));
-vi.mock('@codex-claw/core/runtime-discovery', () => ({ withDiscoveredRuntimePath: (env: unknown) => env }));
+vi.mock('@workspace/core/runtime-discovery', () => ({ withDiscoveredRuntimePath: (env: unknown) => env }));
 
 beforeEach(() => { cli.error = null; cli.calls.mockClear(); });
 
 describe('local Claude authentication', () => {
-  it.each(['/tmp/claw-auth-home', path.join(homedir(), '.claude')])('logs out through the CLI in the selected home: %s', async (directory) => {
+  it.each(['/tmp/app-auth-home', path.join(homedir(), '.claude')])('logs out through the CLI in the selected home: %s', async (directory) => {
     vi.stubEnv('CLAUDE_CONFIG_DIR', directory);
-    vi.stubEnv('CODEX_CLAW_CLAUDE_COMMAND', '/custom/bin/claude');
+    vi.stubEnv('APP_CLAUDE_COMMAND', '/custom/bin/claude');
     cli.stdout = 'Logged out';
     const driver = new ClaudeBackendDriver();
     try {
@@ -53,11 +53,11 @@ describe('local Claude authentication', () => {
   });
 
   it.each([true, false])('returns only login state and the configured home, loggedIn=%s', async (loggedIn) => {
-    vi.stubEnv('CLAUDE_CONFIG_DIR', '/tmp/claw-auth-home');
+    vi.stubEnv('CLAUDE_CONFIG_DIR', '/tmp/app-auth-home');
     cli.stdout = JSON.stringify({ loggedIn, email: 'private', accessToken: 'private' });
     if (!loggedIn) cli.error = { code: 1 };
-    await expect(getLocalClaudeAuthentication()).resolves.toStrictEqual({ loggedIn, configDirectory: '/tmp/claw-auth-home' });
-    expect(cli.calls).toHaveBeenCalledWith(expect.any(String), ['auth', 'status', '--json'], expect.objectContaining({ env: { CLAUDE_CONFIG_DIR: '/tmp/claw-auth-home' } }));
+    await expect(getLocalClaudeAuthentication()).resolves.toStrictEqual({ loggedIn, configDirectory: '/tmp/app-auth-home' });
+    expect(cli.calls).toHaveBeenCalledWith(expect.any(String), ['auth', 'status', '--json'], expect.objectContaining({ env: { CLAUDE_CONFIG_DIR: '/tmp/app-auth-home' } }));
     vi.unstubAllEnvs();
   });
 
@@ -66,10 +66,10 @@ describe('local Claude authentication', () => {
     { metadata: { authMethod: 'claude.ai', email: null, subscriptionType: null }, account: { type: 'subscription' } },
     { metadata: { authMethod: 'api_key', email: 'private' }, account: { type: 'apiKey' } },
   ])('exposes safe account metadata for $metadata.authMethod without credentials or organization details', async ({ metadata, account }) => {
-    vi.stubEnv('CLAUDE_CONFIG_DIR', '/tmp/claw-auth-home');
+    vi.stubEnv('CLAUDE_CONFIG_DIR', '/tmp/app-auth-home');
     cli.stdout = JSON.stringify({ loggedIn: true, ...metadata, accessToken: 'secret', orgId: 'private' });
     try {
-      await expect(getLocalClaudeAuthentication()).resolves.toStrictEqual({ loggedIn: true, configDirectory: '/tmp/claw-auth-home', account });
+      await expect(getLocalClaudeAuthentication()).resolves.toStrictEqual({ loggedIn: true, configDirectory: '/tmp/app-auth-home', account });
     } finally { vi.unstubAllEnvs(); }
   });
 

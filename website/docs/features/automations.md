@@ -15,7 +15,7 @@ Linear sources and their code-repository mappings are implemented on main for th
 Before creating an automation:
 
 1. Connect [GitHub or Linear](../providers/#connect-github-or-linear) in **Settings → Integrations**.
-2. Add the code repositories to Claw so each has a configured local clone. GitHub sources must match those clones. For Linear, choose a code repository separately for each team or project you want to watch.
+2. Add the code repositories to Korus so each has a configured local clone. GitHub sources must match those clones. For Linear, choose a code repository separately for each team or project you want to watch.
 3. Create the destination team and connect the provider you want its agents to use. See [Providers](../providers/).
 
 For a remote automation, these prerequisites apply on the selected remote host. A clone or integration connection on your Mac does not supply the remote host's setup.
@@ -58,9 +58,9 @@ New automations are enabled by default. Leaving **Selection prompt** empty selec
 
 The play button runs an enabled automation immediately. Use **View logs** to inspect its executions, created agents, status, and errors. The conversation action on an execution opens its recorded agent conversation.
 
-Each selected item gets an agent in the destination team and a repository worktree. Items already assigned in Claw are skipped, including a Linear issue encountered through both a team and a project source, so another scheduled check does not create a second assignment for them.
+Each selected item gets an agent in the destination team and a repository worktree. Items already assigned in Korus are skipped, including a Linear issue encountered through both a team and a project source, so another scheduled check does not create a second assignment for them.
 
-An execution with no matches updates the last execution time without creating agents or a log entry. When agents finish their assigned work, the execution can become **Completed**. That is Claw's local work status; it does not by itself confirm that a Linear or GitHub issue was closed, a pull request merged, or changes deployed.
+An execution with no matches updates the last execution time without creating agents or a log entry. When agents finish their assigned work, the execution can become **Completed**. That is Korus's local work status; it does not by itself confirm that a Linear or GitHub issue was closed, a pull request merged, or changes deployed.
 
 ## Review delivery
 
@@ -75,7 +75,7 @@ Use the automation's action menu to edit or delete it. Switching it off stops fu
 | No source choices | The selected integration is connected on this host and your account can access the source. GitHub repositories also need a configured clone. Try **Refresh** or **Retry**. |
 | Save is unavailable | Select a source, a team, and an available coding engine. Map every Linear source to a configured code repository and resolve any source-loading error. |
 | Play button is unavailable | The automation is switched on. |
-| No new agents | Items are open, match the selection prompt, and have no existing Claw assignment. |
+| No new agents | Items are open, match the selection prompt, and have no existing Korus assignment. |
 | Failed execution | Open its logs; check integration authorization, coding-engine connection, and the saved clone/worktree error shown. Repair an unavailable repository mapping before retrying. |
 
 Schedules run on the host that owns the automation. That host must remain running and able to reach the backlog service and selected coding engine. A disconnected integration or invalid code-repository mapping prevents new work from starting.

@@ -1,26 +1,26 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, expect, it, vi } from 'vitest';
 import { defineComponent, h, reactive } from 'vue';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { WorkItem } from '@codex-claw/core/contracts';
-import { mockWorkProvider as provider, mockWorkSource, mockWorkItem, registerMockWorkProvider } from '@codex-claw/core/__tests__/fixtures/mock-work-provider';
-import { configureClawClient } from '../../platform-api';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { WorkItem } from '@workspace/core/contracts';
+import { mockWorkProvider as provider, mockWorkSource, mockWorkItem, registerMockWorkProvider } from '@workspace/core/__tests__/fixtures/mock-work-provider';
+import { configureAppClient } from '../../platform-api';
 import { createClientApiMock } from '../../test/client-api-mock';
 import { backlogConnectionsKey } from '../backlog-providers';
 import RepositorySessionSourceDialog from '../RepositorySessionSourceDialog.vue';
 import SettingsIntegrationsPanel from '../SettingsIntegrationsPanel.vue';
 import BacklogView from '../BacklogView.vue';
 import { useCockpitBacklog } from '../use-cockpit-backlog';
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workProviderDefinition } from '@workspace/core/work-providers';
 
 let unregister: (() => void) | undefined;
-afterEach(() => { unregister?.(); configureClawClient(); });
+afterEach(() => { unregister?.(); configureAppClient(); });
 
 it('keeps a repository-bound picker empty until its explicit source is available', async () => {
   unregister = registerMockWorkProvider();
   workProviderDefinition(provider).repositoryBacked = true;
   const { api } = createClientApiMock();
-  configureClawClient({ platform: 'desktop', api });
+  configureAppClient({ platform: 'desktop', api });
   const wanted = { ...mockWorkSource, id: 'wanted' };
   const other = { ...mockWorkSource, id: 'other' };
   api.listWorkSources.mockResolvedValue([other, wanted]);
@@ -50,7 +50,7 @@ it('connects, browses and selects a third provider without numeric issues or cod
   settings.unmount();
 
   const { api } = createClientApiMock();
-  configureClawClient({ platform: 'desktop', api });
+  configureAppClient({ platform: 'desktop', api });
   api.listWorkSources.mockResolvedValue([mockWorkSource]);
   const item = mockWorkItem;
   const closed = { ...item, id: 'task:closed', title: 'Already resolved', state: 'closed' as const };
@@ -69,7 +69,7 @@ it('connects, browses and selects a third provider without numeric issues or cod
   await picker.get('.repository-session-source-dialog__result').trigger('click');
   expect(picker.get('.work-item-detail').text()).toContain(item.body!);
   expect(picker.get<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/task-blue');
-  await picker.get('.work-item-assignment-picker .claw-button--primary').trigger('click');
+  await picker.get('.work-item-assignment-picker .app-button--primary').trigger('click');
   const selection = picker.emitted('start-work-item')![0]![0] as { item: WorkItem; isCurrent: () => boolean };
   expect(selection.item).toEqual(item);
   expect(selection.isCurrent()).toBe(true);

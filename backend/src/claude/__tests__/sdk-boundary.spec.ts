@@ -1,14 +1,15 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
+import type { Agent } from '@workspace/core/contracts';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/events';
 import { ClaudeBackendDriver } from '../claude-driver';
 import { ClaudeAgentSdkTransport } from '../agent-sdk-transport';
 import { createQueryHarness } from './sdk-query-fixture';
-import { ClawBackendServer } from '../../server';
+import { AppBackendServer } from '../../server';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { createTestSnapshot } from '../../__tests__/server-test-fixtures';
 
-vi.mock('@codex-claw/core/runtime-discovery', () => ({
+vi.mock('@workspace/core/runtime-discovery', () => ({
   withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
 }));
 
@@ -16,8 +17,8 @@ function agent(id = 'claude-a'): Agent {
   return { id, name: id, folder: '/tmp/project', teamId: 'team-test', backend: 'claude', status: { type: 'idle' }, createdAt: '', updatedAt: '' };
 }
 
-describe('Claude Agent SDK → Claw backend', () => {
-  const servers: ClawBackendServer[] = [];
+describe(`Claude Agent SDK → ${product.name} backend`, () => {
+  const servers: AppBackendServer[] = [];
   function setup() {
     const sdk = createQueryHarness();
     const driver = new ClaudeBackendDriver(new ClaudeAgentSdkTransport({ createQuery: sdk.createQuery }));
@@ -25,8 +26,8 @@ describe('Claude Agent SDK → Claw backend', () => {
     snapshot.general.claudeCodeEnabled = true;
     snapshot.agents = [agent(), agent('claude-b')];
     snapshot.teams[0]!.agentIds = snapshot.agents.map((item) => item.id);
-    const events: ClawBackendEvent[] = [];
-    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot,
+    const events: AppBackendEvent[] = [];
+    const server = new AppBackendServer({ version: 'test', pid: 1, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['claude', driver]])), onEvent: (event) => events.push(event),
     });
     servers.push(server);

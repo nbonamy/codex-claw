@@ -1,48 +1,48 @@
-import { isWorkProviderKind } from '@codex-claw/core/work-providers';
+import { isWorkProviderKind } from '@workspace/core/work-providers';
 import { readWorktreeHead } from './git-worktrees';
 import type { DurableTaskService } from './agents/durable-task-service';
 import { ProviderConnections } from './provider-connections';
 import { backendCodexHomeDir } from './state';
-import { isProviderConnection, type ProviderAuthentication } from '@codex-claw/core/contracts/provider-setup';
+import { isProviderConnection, type ProviderAuthentication } from '@workspace/core/contracts/provider-setup';
 import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
 import { createVisualizeDebugFixture } from './visualize-debug-fixtures';
 import { FileMissionSkillStore } from './mission-skill-store';
-import { featureStages, type DeleteMissionInput, type Mission, type MissionReviewDebugState, type MissionStage } from '@codex-claw/core/missions';
-import type { MissionExecutionInput, MissionResultInput } from '@codex-claw/core/mission-execution';
+import { featureStages, type DeleteMissionInput, type Mission, type MissionReviewDebugState, type MissionStage } from '@workspace/core/missions';
+import type { MissionExecutionInput, MissionResultInput } from '@workspace/core/mission-execution';
 import { MissionService } from './mission-service';
 import { FileMissionArtifactStore, type MissionArtifactStorage } from './mission-artifact-store';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import path from 'node:path';
 import os from 'node:os';
 import { mkdir, rm } from 'node:fs/promises';
-import { createEntityId } from '@codex-claw/core/ids';
-import { resolveAgentBackend } from '@codex-claw/core/agent-backends';
-import { createClawRpcError, createClawRpcResult, clawRpcErrorCodes, isClawRpcNotification, isClawRpcRequest, isClawSnapshotGetResult, type ClawRpcMessage, type ClawRpcResponse } from '@codex-claw/core/backend-protocol/rpc';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
-import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { AddSshConnectionInput, Agent, AgentGitDiffTarget, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, BackendConversationRef, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, BackendPublishedEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@codex-claw/core/contracts';
-import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@codex-claw/core/contracts';
-import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
-import { backendDisplayName } from '@codex-claw/core/backend-driver';
-import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendConversationReplacementResult } from '@codex-claw/core/backend-driver';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, restartAgentConversation, resumeAgentConversationInSnapshot, updateAgentFromInput } from '@codex-claw/core/agent-manager';
-import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@codex-claw/core/automation-manager';
-import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
+import { createEntityId } from '@workspace/core/ids';
+import { resolveAgentBackend } from '@workspace/core/agent-backends';
+import { createAppRpcError, createAppRpcResult, appRpcErrorCodes, isAppRpcNotification, isAppRpcRequest, isAppSnapshotGetResult, type AppRpcMessage, type AppRpcResponse } from '@workspace/core/backend-protocol/rpc';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import { applyMainEventToSnapshot } from '@workspace/core/snapshot';
+import { decodeAppSnapshot, isAppSnapshot } from '@workspace/core/snapshot-guards';
+import type { AddSshConnectionInput, Agent, AgentGitDiffTarget, AgentHistoryLoadResult, AgentStatus, AppPluginStatus, AppSnapshot, BackendConversationRef, CloneSourceRepositoryInput, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingStatus, DuplicateAgentOptions, BackendPublishedEvent, MoveAgentToTeamInput, OpenInApplication, RemoteConnection, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SendPromptOptions, SetCodexResourceSharingInput, SourceBranch, SourceRepository, SourceWorktree, SystemPermissionsStatus, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput } from '@workspace/core/contracts';
+import type { WorkBacklogConfigurationInput, WorkProviderKind } from '@workspace/core/contracts';
+import { isAgentGitDiffTarget } from '@workspace/core/snapshot-guard-collections';
+import { backendDisplayName } from '@workspace/core/backend-driver';
+import type { AgentBackendDriver, BackendApprovalPresetResult, BackendConversationForkResult, BackendConversationResumeResult, BackendEvent, BackendGoalResult, BackendPermissionModeResult, BackendSendResult, BackendConversationReplacementResult } from '@workspace/core/backend-driver';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
+import { assignWorkItemToAgentInSnapshot, attachForkedAgentInSnapshot, closeAgentInSnapshot, createForkedAgentDraft, createQuickChatInSnapshot, duplicateAgentInSnapshot, moveAgentToTeamInSnapshot, removeWorkItemAssignmentFromSnapshot, restartAgentConversation, resumeAgentConversationInSnapshot, updateAgentFromInput } from '@workspace/core/agent-manager';
+import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot, deleteAutomationFromSnapshot, updateAutomationInSnapshot } from '@workspace/core/automation-manager';
+import { updateSettingsInSnapshot } from '@workspace/core/settings';
 import { readEngineInstructions, saveEngineInstructions } from './engine-instructions';
-import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { closeTeamInSnapshot, createTeamInSnapshot, updateTeamInSnapshot } from '@codex-claw/core/team-manager';
-import { teamColors } from '@codex-claw/core/team-colors';
-import { sanitizeWorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
-import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@codex-claw/core/approval-presets';
-import { formatConversationTitle } from '@codex-claw/core/conversation-title';
-import { agentFolder, requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { closeTeamInSnapshot, createTeamInSnapshot, updateTeamInSnapshot } from '@workspace/core/team-manager';
+import { teamColors } from '@workspace/core/team-colors';
+import { sanitizeWorkItemAssignmentSource } from '@workspace/core/work-assignments';
+import { approvalBackendDefaultsWithPreset, isApprovalPreset } from '@workspace/core/approval-presets';
+import { formatConversationTitle } from '@workspace/core/conversation-title';
+import { agentFolder, requireAgentFolder } from '@workspace/core/agent-folder';
 import { BackendDriverRpc } from './driver-rpc';
 import { ClientPreferencesService } from './client-preferences-service';
-import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
-import { RemoteClawdClientManager } from './connections/remote-clawd-client';
+import { projectClientSnapshot, splitSettingsInput } from '@workspace/core/client-preferences';
+import { RemoteDaemonClientManager } from './connections/remote-daemon-client';
 import { RemoteTeamService } from './connections/remote-team-service';
 import { SshConnectionService } from './connections/ssh-connections';
 import type { AutomationRunner } from './automations/runner';
@@ -55,43 +55,43 @@ import { AgentGitWorkflowService, parseAgentGitRequest } from './git/agent-git-w
 import { AgentPromptManager } from './agents/agent-prompt-manager';
 import { AgentHandoffService } from './agents/agent-handoff-service';
 import { requestHandoffNote } from './agents/handoff-note';
-import { handoffInProgress, type AgentHandoffInput } from '@codex-claw/core/agent-handoff';
-import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
+import { handoffInProgress, type AgentHandoffInput } from '@workspace/core/agent-handoff';
+import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
 import { AgentPlanReviewService } from './agents/agent-plan-review-service';
 import { AgentThreadFlagService } from './agents/agent-thread-flag-service';
-import type { PlanReviewResponse } from '@codex-claw/core/plan-review';
-import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
-import { agentConversationId, planReviewFromEvent } from '@codex-claw/core/plan-review';
-import { isAgentRequestResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
+import type { PlanReviewResponse } from '@workspace/core/plan-review';
+import type { ThreadFlagId, ThreadFlagResponse } from '@workspace/core/thread-flags';
+import { agentConversationId, planReviewFromEvent } from '@workspace/core/plan-review';
+import { isAgentRequestResponse, type AgentRequestResponse } from '@workspace/core/agent-request';
 import { AgentWorkspaceService } from './agents/agent-workspace-service';
 import { AgentConversationService } from './agents/agent-conversation-service';
 import { DelegatedWorkReportService, type DelegatedWorkReportPort } from './agents/delegated-work-report-service';
 import { SubagentIdentityService } from './agents/subagent-identity-service';
 import { AgentRequestRegistry } from './agent-requests/agent-request-registry';
-import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
-import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewStartInput, type CodeReviewFinding, type CodeReviewSession } from '@codex-claw/core/code-review';
+import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
+import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
+import { isCodeReviewDecisionInput, isCodeReviewDiscussionInput, isCodeReviewStartInput, type CodeReviewFinding, type CodeReviewSession } from '@workspace/core/code-review';
 import { CodeReviewService, type CodeReviewToolPort } from './review/code-review-service';
 import { AgentCreationService } from './agents/agent-creation-service';
 import { ProjectCreationService, type CreatedProject } from './projects/project-creation-service';
 import { VisualizeService, directVisualizationPrompt, generateVisualizationSuggestionPrompt, initialVisualizePrompt } from './visualize-service';
-import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@codex-claw/core/visualize';
+import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@workspace/core/visualize';
 
-export type ClawBackendServerOptions = {
+export type AppBackendServerOptions = {
   tasks?: DurableTaskService;
   providerSetup?: import('./provider-setup').ProviderSetup;
   version: string;
   pid?: number;
   snapshot?: AppSnapshot;
   driverRpc?: BackendDriverRpc;
-  onEvent?: (event: ClawBackendEvent) => void;
+  onEvent?: (event: AppBackendEvent) => void;
   onBackendEventApplied?: (event: BackendPublishedEvent) => void;
   saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   workIntegrations?: WorkIntegrationManager;
   automationRunner?: Pick<AutomationRunner, 'runAll' | 'runAutomation'>;
   systemPermissions?: SystemPermissionsPort;
   sshConnections?: SshConnectionService;
-  remoteClients?: RemoteClawdClientManager;
+  remoteClients?: RemoteDaemonClientManager;
   sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   configureCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
   inspectCodexResourceSharing?: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
@@ -132,7 +132,7 @@ type BackendHandle =
     request<Result>(method: string, params: unknown, localHandler: () => Promise<Result> | Result): Promise<Result>;
   };
 
-export class ClawBackendServer {
+export class AppBackendServer {
   private readonly tasks?: DurableTaskService;
 
   async sendTaskPrompt(agent: Agent, prompt: string): Promise<BackendSendResult> {
@@ -152,14 +152,14 @@ export class ClawBackendServer {
   private remoteControlStatus: DevicePairingStatus = { status: 'disabled' };
   private remoteControlStatusLoaded = false;
   private readonly driverRpc?: BackendDriverRpc;
-  private readonly onEvent?: (event: ClawBackendEvent) => void;
+  private readonly onEvent?: (event: AppBackendEvent) => void;
   private readonly onBackendEventApplied?: (event: BackendPublishedEvent) => void;
   private readonly saveSnapshot?: (snapshot: AppSnapshot) => Promise<void>;
   private readonly workIntegrations?: WorkIntegrationManager;
   private readonly automationRunner?: Pick<AutomationRunner, 'runAll' | 'runAutomation'>;
   private readonly systemPermissions: SystemPermissionsPort;
   private readonly sshConnections: SshConnectionService;
-  private readonly remoteClients: RemoteClawdClientManager;
+  private readonly remoteClients: RemoteDaemonClientManager;
   private readonly sendAgentMessage?: (fromAgentId: string, toAgentId: string, content: string) => void;
   private readonly configureCodexResourceSharing: (input: SetCodexResourceSharingInput) => Promise<void>;
   private readonly inspectCodexResourceSharing: (enabled: boolean) => Promise<CodexResourceSharingStatus>;
@@ -189,7 +189,7 @@ export class ClawBackendServer {
   private readonly providerSetup?: import('./provider-setup').ProviderSetup;
   private readonly providerConnections?: ProviderConnections;
 
-  constructor(options: ClawBackendServerOptions) {
+  constructor(options: AppBackendServerOptions) {
     this.tasks = options.tasks;
     this.providerSetup = options.providerSetup;
     this.version = options.version;
@@ -242,7 +242,7 @@ export class ClawBackendServer {
     this.automationRunner = options.automationRunner;
     this.systemPermissions = options.systemPermissions ?? createUnsupportedSystemPermissionsPort();
     this.sshConnections = options.sshConnections ?? new SshConnectionService();
-    this.remoteClients = options.remoteClients ?? new RemoteClawdClientManager();
+    this.remoteClients = options.remoteClients ?? new RemoteDaemonClientManager();
     this.sendAgentMessage = options.sendAgentMessage;
     this.configureCodexResourceSharing = options.configureCodexResourceSharing ?? (options.providerSetup
       ? input => options.providerSetup!.setResourceSharing('codex', input) : setCodexResourceSharing);
@@ -282,12 +282,12 @@ export class ClawBackendServer {
     });
     this.visualize = options.visualizeService ?? new VisualizeService({
       snapshot: this.snapshot,
-      generatedImagesRoot: path.join(os.tmpdir(), 'codex-claw-generated-images'),
+      generatedImagesRoot: path.join(os.tmpdir(), 'agent-workspace-generated-images'),
       persist: async () => { await this.persistSnapshotOnly(); },
       publish: () => { void this.emitProjectedSnapshot(); },
     });
     const ensureMissionHome = options.ensureMissionHome ?? (async (missionId: string) => {
-      const home = path.join(os.tmpdir(), 'codex-claw-missions', missionId);
+      const home = path.join(os.tmpdir(), 'agent-workspace-missions', missionId);
       await mkdir(path.join(home, 'artifacts'), { recursive: true, mode: 0o700 });
       return home;
     });
@@ -431,7 +431,7 @@ export class ClawBackendServer {
             cwd: requireAgentFolder(agent),
             reviewMcpServerUrl,
             ...(reviewerSession ? { reviewerSession } : {}),
-          }) as import('@codex-claw/core/backend-driver').BackendCodeReviewResult;
+          }) as import('@workspace/core/backend-driver').BackendCodeReviewResult;
         },
         resetReviewer: async (agent) => {
           await this.disposeAndReleaseReviewConversation(agent);
@@ -472,7 +472,7 @@ export class ClawBackendServer {
     }, payload => this.applyAndEmitBackendEvent({ agentId: caller.id, type: 'agentCreation.progress', payload }));
   }
 
-  async upsertMissionTicket(agentId: string, input: import('@codex-claw/core/mission-execution').MissionTicketDraftInput) {
+  async upsertMissionTicket(agentId: string, input: import('@workspace/core/mission-execution').MissionTicketDraftInput) {
     return this.missionExecution.upsertTicket(agentId, input);
   }
 
@@ -480,19 +480,19 @@ export class ClawBackendServer {
     return this.missionExecution.listArtifacts(agentId);
   }
 
-  readMissionArtifact(agentId: string, stage: import('@codex-claw/core/missions').MissionStage) {
+  readMissionArtifact(agentId: string, stage: import('@workspace/core/missions').MissionStage) {
     return this.missionExecution.readArtifact(agentId, stage);
   }
 
-  writeMissionArtifact(agentId: string, input: import('@codex-claw/core/mission-execution').MissionArtifactWriteInput) {
+  writeMissionArtifact(agentId: string, input: import('@workspace/core/mission-execution').MissionArtifactWriteInput) {
     return this.missionExecution.writeArtifact(agentId, input);
   }
 
-  reportMissionReviewFinding(agentId: string, input: import('@codex-claw/core/mission-execution').MissionReviewFindingInput) {
+  reportMissionReviewFinding(agentId: string, input: import('@workspace/core/mission-execution').MissionReviewFindingInput) {
     return this.missionExecution.reportReviewFinding(agentId, input);
   }
 
-  updateMissionReviewFinding(agentId: string, input: import('@codex-claw/core/mission-execution').MissionReviewFindingUpdateInput) {
+  updateMissionReviewFinding(agentId: string, input: import('@workspace/core/mission-execution').MissionReviewFindingUpdateInput) {
     return this.missionExecution.updateReviewFinding(agentId, input);
   }
 
@@ -596,20 +596,20 @@ export class ClawBackendServer {
     await this.persistAndEmitSnapshot();
   }
 
-  async handleMessage(message: ClawRpcMessage): Promise<ClawRpcResponse | undefined> {
-    if (!isClawRpcRequest(message)) return this.dispatchMessage(message);
+  async handleMessage(message: AppRpcMessage): Promise<AppRpcResponse | undefined> {
+    if (!isAppRpcRequest(message)) return this.dispatchMessage(message);
     if (this.providerSetup?.isChanging() && ![backendMethods.snapshotGet, backendMethods.providerSetupGet].some(method => method === message.method)) {
-      return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Engine setup is changing. Try again when it finishes.');
+      return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'Engine setup is changing. Try again when it finishes.');
     }
     const params = isRecord(message.params) ? { ...message.params } : undefined;
     const clientId = typeof params?._clientId === 'string' ? params._clientId : 'desktop';
-    if (!clientId.trim() || clientId.length > 200) return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid client identity.');
+    if (!clientId.trim() || clientId.length > 200) return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'Invalid client identity.');
     if (params) delete params._clientId;
     const request = { ...message, params: params && Object.keys(params).length ? params : undefined };
     const preferences = this.clientPreferences;
     if (preferences.supports(message.method)) {
-      try { return createClawRpcResult(message.id, await preferences.update(clientId, message.method, params ?? {})); }
-      catch (error) { return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error)); }
+      try { return createAppRpcResult(message.id, await preferences.update(clientId, message.method, params ?? {})); }
+      catch (error) { return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error)); }
     }
     const startsIndependentReview = message.method === backendMethods.agentCodeReviewStart
       && isRecord(params?.input)
@@ -627,7 +627,7 @@ export class ClawBackendServer {
       const input = isRecord(params?.input) ? params.input : {};
       const teamId = input.teamId ?? projectClientSnapshot(before, clientId).activeTeamId;
       if (typeof teamId !== 'string' || !before.teams.some((team) => team.id === teamId)) {
-        return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'A valid target team is required.');
+        return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'A valid target team is required.');
       }
       request.params = { ...params, input: { ...input, teamId } };
     }
@@ -645,7 +645,7 @@ export class ClawBackendServer {
           const requested = input.backend === 'codex' || input.backend === 'claude' ? input.backend : agent?.backend;
           await this.requireConnectedEngine(requested);
         } catch (error) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error));
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error));
         }
       }
     }
@@ -667,18 +667,18 @@ export class ClawBackendServer {
         return { ...response, result: await preferences.update(clientId, backendMethods.clientNavigationSelectAgent, { agentId: reviewTargetAgentId }) };
       }
       if (isAppSnapshot(response.result)) return { ...response, result: projectClientSnapshot(response.result, clientId) };
-      if (isClawSnapshotGetResult(response.result)) return { ...response, result: { ...response.result, snapshot: projectClientSnapshot(response.result.snapshot, clientId) } };
+      if (isAppSnapshotGetResult(response.result)) return { ...response, result: { ...response.result, snapshot: projectClientSnapshot(response.result.snapshot, clientId) } };
     }
     return response;
   }
 
-  private async dispatchMessage(message: ClawRpcMessage, onCreated: (id: string) => void = () => undefined): Promise<ClawRpcResponse | undefined> {
-    if (isClawRpcNotification(message)) {
+  private async dispatchMessage(message: AppRpcMessage, onCreated: (id: string) => void = () => undefined): Promise<AppRpcResponse | undefined> {
+    if (isAppRpcNotification(message)) {
       return undefined;
     }
 
-    if (!isClawRpcRequest(message)) {
-      return createClawRpcError(null, clawRpcErrorCodes.invalidRequest, 'Backend received a JSON-RPC response where a request was expected.');
+    if (!isAppRpcRequest(message)) {
+      return createAppRpcError(null, appRpcErrorCodes.invalidRequest, 'Backend received a JSON-RPC response where a request was expected.');
     }
 
     const agentGitRequest = parseAgentGitRequest(message.method, message.params);
@@ -694,29 +694,29 @@ export class ClawBackendServer {
 
     switch (message.method) {
       case backendMethods.backendHealthGet:
-        return createClawRpcResult(message.id, {
+        return createAppRpcResult(message.id, {
           ok: true,
-          name: 'clawd',
+          name: 'daemon',
           version: this.version,
           pid: this.pid,
         });
       case backendMethods.snapshotGet:
         const snapshot = await this.remoteTeams.clientSnapshot();
-        return createClawRpcResult(message.id, {
+        return createAppRpcResult(message.id, {
           snapshot,
           lastEventSeq: this.lastEventSeq,
           clientState: this.clientStateFromSnapshot(snapshot),
         });
       case backendMethods.clientStateGet:
-        return createClawRpcResult(message.id, this.clientStateFromSnapshot(await this.remoteTeams.clientSnapshot()));
+        return createAppRpcResult(message.id, this.clientStateFromSnapshot(await this.remoteTeams.clientSnapshot()));
       case backendMethods.debugAgentMessageSend: {
         const agentId = requireAgentId(message.params);
         const recipient = this.snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!recipient) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
         if (!this.sendAgentMessage) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Agent messaging is not configured.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Agent messaging is not configured.');
         }
 
         const sender = this.snapshot.agents.find((candidate) => (
@@ -727,7 +727,7 @@ export class ClawBackendServer {
           recipient.id,
           'Reply with a brief confirmation that the Debug menu message arrived.',
         );
-        return createClawRpcResult(message.id, {
+        return createAppRpcResult(message.id, {
           recipientId: recipient.id,
           senderId: sender.id,
         });
@@ -736,12 +736,12 @@ export class ClawBackendServer {
         const agentId = requireAgentId(message.params);
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
 
         if (agent.plan) {
           delete agent.plan;
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+          return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
 
         const turnId = `debug-plan-${Date.now()}`;
@@ -759,13 +759,13 @@ export class ClawBackendServer {
           turnId,
           updatedAt: new Date().toISOString(),
         };
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugPlanReadyForReviewInject: {
         const agentId = requireAgentId(message.params);
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
 
         const markdown = [
@@ -805,18 +805,18 @@ export class ClawBackendServer {
             markdown,
           },
         });
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugMissionStageSet: {
         const params = requireRecord(message.params);
         const missionId = requireString(params.missionId, 'missionId');
         const stage = params.stage;
         if (typeof stage !== 'string' || !featureStages.includes(stage as MissionStage)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'stage must be a supported Mission stage');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'stage must be a supported Mission stage');
         }
         const reviewState = params.reviewState;
         if (reviewState !== undefined && (stage !== 'review' || !['identified', 'remediated'].includes(reviewState as string))) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'reviewState must be identified or remediated for Review');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'reviewState must be identified or remediated for Review');
         }
         const mission = this.snapshot.missions?.find(candidate => candidate.id === missionId);
         for (const workerId of new Set(mission?.execution?.runs.flatMap(run => run.workerId ? [run.workerId] : []) ?? [])) {
@@ -826,7 +826,7 @@ export class ClawBackendServer {
           }
         }
         applyMissionDebugFixture(this.snapshot, missionId, stage as MissionStage, undefined, reviewState as MissionReviewDebugState | undefined);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugCodeReviewSet: {
         const params = requireRecord(message.params);
@@ -834,24 +834,24 @@ export class ClawBackendServer {
         const scenario = debugCodeReviewScenario(params.scenario);
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
         agent.codeReview = createDebugCodeReviewSession(agent, scenario);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugVisualizePopulate: {
         const params = requireRecord(message.params);
         const agentId = requireString(params.agentId, 'agentId');
         const scenario = params.scenario ?? 'complete';
         if (typeof scenario !== 'string' || !visualizeDebugScenarios.includes(scenario as VisualizeDebugScenario)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'scenario must be a supported Visualize debug scenario');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'scenario must be a supported Visualize debug scenario');
         }
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
         agent.visualize = createVisualizeDebugFixture(agent, new Date().toISOString(), scenario as VisualizeDebugScenario);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.debugThreadFlagSet: {
         const params = requireRecord(message.params);
@@ -859,39 +859,39 @@ export class ClawBackendServer {
         const id = debugThreadFlagId(params.id);
         const value = params.value;
         if (typeof value !== 'boolean') {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'value must be a boolean');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'value must be a boolean');
         }
         const agent = this.snapshot.agents.find((candidate) => candidate.id === agentId);
         if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
         }
         const threadFlags = { ...agent.threadFlags };
         if (value) threadFlags[id] = true;
         else delete threadFlags[id];
         agent.threadFlags = Object.keys(threadFlags).length > 0 ? threadFlags : undefined;
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.systemPermissionsGet:
-        return createClawRpcResult(message.id, await this.systemPermissions.getStatus());
+        return createAppRpcResult(message.id, await this.systemPermissions.getStatus());
       case backendMethods.systemPermissionsAccessibilityOpen:
-        return createClawRpcResult(message.id, await this.systemPermissions.openAccessibilitySettings());
+        return createAppRpcResult(message.id, await this.systemPermissions.openAccessibilitySettings());
       case backendMethods.systemPermissionsScreenRecordingOpen:
-        return createClawRpcResult(message.id, await this.systemPermissions.openScreenRecordingSettings());
+        return createAppRpcResult(message.id, await this.systemPermissions.openScreenRecordingSettings());
       case backendMethods.remoteControlStatusGet:
       case backendMethods.remoteControlEnable:
       case backendMethods.remoteControlDisable:
         {
           const status = await this.requireDriverRpc().handle(message.method, message.params) as DevicePairingStatus;
           this.publishRemoteControlStatus(status);
-          return createClawRpcResult(message.id, status);
+          return createAppRpcResult(message.id, status);
         }
       case backendMethods.remoteControlPairingStart:
       case backendMethods.remoteControlPairingCheck:
       case backendMethods.remoteControlClientsList:
       case backendMethods.remoteControlClientRevoke:
-        return createClawRpcResult(message.id, await this.requireDriverRpc().handle(message.method, message.params));
+        return createAppRpcResult(message.id, await this.requireDriverRpc().handle(message.method, message.params));
       case backendMethods.connectionsSshHostsList:
-        return createClawRpcResult(message.id, await this.sshConnections.listHostCandidates());
+        return createAppRpcResult(message.id, await this.sshConnections.listHostCandidates());
       case backendMethods.connectionsSshCreate: {
         const input = requireAddSshConnectionInput(message.params);
         const connection = await this.sshConnections.createConnection(input);
@@ -899,22 +899,22 @@ export class ClawBackendServer {
           ...this.snapshot.remoteConnections.connections.filter((candidate) => candidate.host !== connection.host),
           connection,
         ];
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.connectionsRuntimeInspect:
       case backendMethods.connectionsRuntimeSync: {
         const connectionId = requireConnectionId(message.params);
         const connection = this.snapshot.remoteConnections.connections.find((candidate) => candidate.id === connectionId);
         if (!connection) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
         }
         if (message.method === backendMethods.connectionsRuntimeInspect) {
           const inspected = await this.sshConnections.inspectVersions(connection);
           // Do not replace a connection edited or deleted while SSH was probing.
           this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.map((candidate) => (
-            candidate === connection ? { ...candidate, clawdVersion: inspected.clawdVersion, codexVersion: inspected.codexVersion, detail: inspected.detail } : candidate
+            candidate === connection ? { ...candidate, daemonVersion: inspected.daemonVersion, codexVersion: inspected.codexVersion, detail: inspected.detail } : candidate
           ));
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+          return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         await this.remoteClients.closeConnection(connectionId);
         const checked = await this.sshConnections.checkConnection(connection);
@@ -928,7 +928,7 @@ export class ClawBackendServer {
           );
           this.remoteTeams.rememberSnapshot(connectionId, remoteSnapshot);
         }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.connectionsUpdate: {
         const { connectionId, input } = requireUpdateRemoteConnectionInput(message.params);
@@ -947,14 +947,14 @@ export class ClawBackendServer {
             ? remoteConnectionWithSourceFolder(candidate, sourceFolderPath)
             : candidate
         ));
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.connectionsDelete: {
         const connectionId = requireConnectionId(message.params);
         await this.remoteClients.closeConnection(connectionId);
         this.deleteTeamsForRemoteConnection(connectionId);
         this.snapshot.remoteConnections.connections = this.snapshot.remoteConnections.connections.filter((candidate) => candidate.id !== connectionId);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.agentRequestRespond: {
         const response = requireAgentRequestResponse(message.params);
@@ -978,7 +978,7 @@ export class ClawBackendServer {
           { backend: owner.backend, response: targetedResponse },
           () => this.requireDriverRpc().handle(backendMethods.driverAgentRequestRespond, { backend: owner.backend, response: targetedResponse }),
         ); });
-        return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
+        return createAppRpcResult(message.id, await this.remoteTeams.clientSnapshot());
       }
       case backendMethods.agentCreate: {
         const input = requireAgentCreateInput(message.params);
@@ -992,7 +992,7 @@ export class ClawBackendServer {
           });
           this.remoteTeams.adoptCreatedAgentSnapshot(remoteTeamPointer, remoteSnapshot);
           if (remoteSnapshot.activeAgentId) onCreated(remoteSnapshot.activeAgentId);
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+          return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         await this.validateAgentInput(input, null);
         const createdAgent = this.agentCreation.create(input, { select: false });
@@ -1001,7 +1001,7 @@ export class ClawBackendServer {
         await this.agentWorkspaces.refreshIdentity(createdAgent.id);
         const snapshot = await this.persistAndEmitSnapshot();
         await this.agentWorkspaces.refreshGitStatus(createdAgent.id);
-        return createClawRpcResult(message.id, snapshot);
+        return createAppRpcResult(message.id, snapshot);
       }
       case backendMethods.projectCreate: {
         const input = requireProjectCreateInput(message.params);
@@ -1012,29 +1012,29 @@ export class ClawBackendServer {
           });
           this.remoteTeams.adoptCreatedAgentSnapshot(remoteTeamPointer, remoteSnapshot);
           if (remoteSnapshot.activeAgentId) onCreated(remoteSnapshot.activeAgentId);
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+          return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         const team = this.snapshot.teams.find(candidate => candidate.id === input.teamId);
         if (!team) throw new Error(`Team not found: ${input.teamId}`);
         const created = await this.projectCreation.create({ ...input, teamId: team.id, backend: resolveAgentBackend(this.snapshot, input.backend) });
         onCreated(created.agent.id);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.missionExecute: {
         const input = requireRecord(message.params).input as MissionExecutionInput;
         await this.missionExecution.execute(input);
-        return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
+        return createAppRpcResult(message.id, await this.remoteTeams.clientSnapshot());
       }
       case backendMethods.missionArtifactRead: {
         const params = requireRecord(message.params);
         if (typeof params.missionId !== 'string' || typeof params.stage !== 'string') throw new Error('Invalid mission artifact request.');
-        return createClawRpcResult(message.id, await this.missionExecution.readArtifactForMission(
+        return createAppRpcResult(message.id, await this.missionExecution.readArtifactForMission(
           params.missionId,
-          params.stage as import('@codex-claw/core/missions').MissionStage,
+          params.stage as import('@workspace/core/missions').MissionStage,
         ));
       }
       case backendMethods.missionCreate: {
-        const input = requireRecord(message.params).input as import('@codex-claw/core/missions').CreateMissionInput;
+        const input = requireRecord(message.params).input as import('@workspace/core/missions').CreateMissionInput;
         const previousIds = new Set(this.snapshot.missions?.map(mission => mission.id));
         await this.missions.mutate('create', input);
         const mission = this.snapshot.missions?.find(candidate => !previousIds.has(candidate.id));
@@ -1047,21 +1047,21 @@ export class ClawBackendServer {
         });
         const snapshot = await this.remoteTeams.clientSnapshot();
         this.emitSnapshotUpdated(snapshot);
-        return createClawRpcResult(message.id, snapshot);
+        return createAppRpcResult(message.id, snapshot);
       }
       case backendMethods.missionUpdate: {
         const input = isRecord(message.params) ? message.params.input : undefined;
         await this.missions.mutate('update', input);
         const snapshot = await this.remoteTeams.clientSnapshot();
         this.emitSnapshotUpdated(snapshot);
-        return createClawRpcResult(message.id, snapshot);
+        return createAppRpcResult(message.id, snapshot);
       }
       case backendMethods.missionDelete: {
         const input = requireRecord(message.params).input as DeleteMissionInput;
         await this.deleteMission(input);
         const snapshot = await this.remoteTeams.clientSnapshot();
         this.emitSnapshotUpdated(snapshot);
-        return createClawRpcResult(message.id, snapshot);
+        return createAppRpcResult(message.id, snapshot);
       }
       case backendMethods.agentQuickChatCreate: {
         const input = requireQuickChatCreateInput(message.params);
@@ -1072,12 +1072,12 @@ export class ClawBackendServer {
           });
           this.remoteTeams.adoptCreatedAgentSnapshot(remoteTeamPointer, remoteSnapshot);
           if (remoteSnapshot.activeAgentId) onCreated(remoteSnapshot.activeAgentId);
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+          return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         const createdAgentId = createEntityId('agent');
         createQuickChatInSnapshot(this.snapshot, input, undefined, createdAgentId, { select: false });
         onCreated(createdAgentId);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.agentUpdate: {
         const input = requireAgentUpdateInput(message.params);
@@ -1170,7 +1170,7 @@ export class ClawBackendServer {
         const replacement = this.snapshot.agents.find(agent => agent.handoff?.sourceAgentId === agentId && agent.handoff.operationId === operationId);
         if (replacement && replacement.id !== agentId) {
           await this.agentHandoffs.run(agentId, input);
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+          return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
         if (!this.localAgentForId(agentId)) {
           const projected = await this.remoteTeams.clientSnapshot();
@@ -1189,22 +1189,22 @@ export class ClawBackendServer {
         const input = requireMoveAgentInput(message.params);
         const route = await this.locationForAgentId(input.agentId);
         if (route?.kind === 'remote') {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Remote agents cannot be moved between teams from the local pointer.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Remote agents cannot be moved between teams from the local pointer.');
         }
         const movingAgent = this.snapshot.agents.find((candidate) => candidate.id === input.agentId);
         const targetTeam = this.snapshot.teams.find((candidate) => candidate.id === input.teamId) ?? null;
         if (!movingAgent || !targetTeam) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent or team not found: ${input.agentId} -> ${input.teamId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent or team not found: ${input.agentId} -> ${input.teamId}`);
         }
         if (handoffInProgress(movingAgent)) throw new Error('Wait for the handoff to finish.');
         if (this.remoteTeams.pointerForTeam(targetTeam)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Agents cannot be moved between backend locations.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Agents cannot be moved between backend locations.');
         }
         const agent = moveAgentToTeamInSnapshot(this.snapshot, input.agentId, input.teamId);
         if (!agent) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Agent or team not found: ${input.agentId} -> ${input.teamId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Agent or team not found: ${input.agentId} -> ${input.teamId}`);
         }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
 
 
@@ -1305,7 +1305,7 @@ export class ClawBackendServer {
         const input = requireRecordParam(message.params, 'input');
         const open = input.open;
         if (typeof open !== 'boolean') {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'open must be a boolean');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'open must be a boolean');
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, {
           agentId,
@@ -1355,7 +1355,7 @@ export class ClawBackendServer {
       }
       case backendMethods.agentVisualizationCanvasSave: {
         const agentId = requireStringParam(message.params, 'agentId');
-        const input = requireRecordParam(message.params, 'input') as unknown as import('@codex-claw/core/visualize-canvas').SaveCanvasInput;
+        const input = requireRecordParam(message.params, 'input') as unknown as import('@workspace/core/visualize-canvas').SaveCanvasInput;
         return this.routeAgentResultRequest(message.id, agentId, message.method, { agentId, input },
           () => this.visualize.saveCanvas(agentId, input));
       }
@@ -1388,7 +1388,7 @@ export class ClawBackendServer {
         const agentId = requireStringParam(message.params, 'agentId');
         const input = requireRecordParam(message.params, 'input');
         if (!isCodeReviewStartInput(input)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review start input.');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'Invalid code review start input.');
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
           const session = this.requireCodeReviews().start(agent, input);
@@ -1400,7 +1400,7 @@ export class ClawBackendServer {
         const agentId = requireStringParam(message.params, 'agentId');
         const input = requireRecordParam(message.params, 'input');
         if (!isCodeReviewDecisionInput(input)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review decision input.');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'Invalid code review decision input.');
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
           this.requireCodeReviews().decide(agent, input);
@@ -1411,7 +1411,7 @@ export class ClawBackendServer {
         const agentId = requireStringParam(message.params, 'agentId');
         const input = requireRecordParam(message.params, 'input');
         if (!isCodeReviewDiscussionInput(input)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Invalid code review discussion input.');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'Invalid code review discussion input.');
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, input }, async (agent) => {
           this.requireCodeReviews().discuss(agent, input);
@@ -1464,21 +1464,21 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         const ref = params.ref;
         if (!isBackendConversationRef(ref)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Invalid conversation reference.');
         }
         const remoteConnectionId = automationLocationRemoteConnectionId(params);
         if (remoteConnectionId) {
-          return createClawRpcResult(message.id, await this.remoteTeams.request(remoteConnectionId, backendMethods.agentConversationMessagesGet, { ref, agentId }));
+          return createAppRpcResult(message.id, await this.remoteTeams.request(remoteConnectionId, backendMethods.agentConversationMessagesGet, { ref, agentId }));
         }
         const route = await this.locationForAgentId(agentId);
         if (route?.kind === 'remote') {
-          return createClawRpcResult(message.id, await this.remoteTeams.request(route.connectionId, backendMethods.agentConversationMessagesGet, { ref, agentId }));
+          return createAppRpcResult(message.id, await this.remoteTeams.request(route.connectionId, backendMethods.agentConversationMessagesGet, { ref, agentId }));
         }
         if (!this.agentConversations.isStoredConversationRef(ref, agentId)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Conversation reference is not available.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Conversation reference is not available.');
         }
         if (!route) {
-          return createClawRpcResult(message.id, await this.requireDriverRpc().handle(backendMethods.driverConversationMessagesGet, { ref, agentId }));
+          return createAppRpcResult(message.id, await this.requireDriverRpc().handle(backendMethods.driverConversationMessagesGet, { ref, agentId }));
         }
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentConversationMessagesGet, { ref, agentId }, (agent) => {
           if (!this.agentConversations.isStoredConversationRef(ref, agentId)) {
@@ -1492,7 +1492,7 @@ export class ClawBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         const item = sanitizeWorkItemAssignmentSource(params.item);
         if (!item) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid work item assignment.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Invalid work item assignment.');
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentWorkItemAssign, { agentId, item }, async () => {
           const agent = assignWorkItemToAgentInSnapshot(this.snapshot, agentId, item);
@@ -1506,7 +1506,7 @@ export class ClawBackendServer {
         const params = requireRecord(message.params);
         const item = sanitizeWorkItemAssignmentSource(params.item);
         if (!item) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid work item assignment.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Invalid work item assignment.');
         }
         const remoteOwner = await this.remoteTeams.workItemAssignmentOwner(item);
         if (remoteOwner) {
@@ -1516,12 +1516,12 @@ export class ClawBackendServer {
             { item },
           );
           this.remoteTeams.rememberSnapshot(remoteOwner.connectionId, remoteSnapshot);
-          return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
+          return createAppRpcResult(message.id, await this.remoteTeams.clientSnapshot());
         }
         if (removeWorkItemAssignmentFromSnapshot(this.snapshot, item)) {
-          return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+          return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
         }
-        return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
+        return createAppRpcResult(message.id, await this.remoteTeams.clientSnapshot());
       }
       case backendMethods.agentConversationReset: {
         const agentId = requireAgentId(message.params);
@@ -1554,7 +1554,7 @@ export class ClawBackendServer {
         const target = params.target as ConversationResumeTarget | undefined;
         const ref = target?.ref;
         if (!target || !isBackendConversationRef(ref) || (target.storageState !== 'active' && target.storageState !== 'archived')) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Invalid conversation reference.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Invalid conversation reference.');
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentConversationResume, { agentId, target }, async (agent) => {
           await this.reconcileConversationsOnce();
@@ -1860,7 +1860,7 @@ export class ClawBackendServer {
         const turnId = requireString(params.turnId, 'turnId');
         const content = requireString(params.content, 'content').trim();
         if (!content) {
-          return createClawRpcResult(message.id, await this.remoteTeams.clientSnapshot());
+          return createAppRpcResult(message.id, await this.remoteTeams.clientSnapshot());
         }
         return this.routeAgentSnapshotRequest(message.id, agentId, backendMethods.agentTurnEdit, { agentId, turnId, content }, async () => {
           const snapshot = await this.agentConversations.editTurn(agentId, turnId, content);
@@ -1893,7 +1893,7 @@ export class ClawBackendServer {
         if (message.method === backendMethods.teamConnect
           ? !input.remoteConnectionId || !input.remoteTeamId
           : Boolean(input.remoteTeamId)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams,
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams,
             'Use team/connect with a connection and existing team ID, or team/create without an existing team ID.');
         }
         validateTeamInput(input);
@@ -1904,7 +1904,7 @@ export class ClawBackendServer {
           try {
             remoteTeam = await this.remoteTeams.resolveTeamForPointerInput(input);
           } catch (error) {
-            return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+            return createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
           }
           const team = createTeamInSnapshot(this.snapshot, {
             name: remoteTeam.name,
@@ -1916,7 +1916,7 @@ export class ClawBackendServer {
         } else {
           onCreated(createTeamInSnapshot(this.snapshot, input, undefined, { select: false }).id);
         }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.teamUpdate: {
         const input = requireTeamUpdateInput(message.params);
@@ -1924,13 +1924,13 @@ export class ClawBackendServer {
         this.remoteTeams.validateConnection(input.remoteConnectionId);
         const existingTeam = this.snapshot.teams.find((candidate) => candidate.id === input.id) ?? null;
         if (!existingTeam) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Team not found: ${input.id}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Team not found: ${input.id}`);
         }
         const existingConnectionId = existingTeam.remoteConnectionId?.trim() ?? '';
         const nextConnectionId = input.remoteConnectionId?.trim() ?? '';
         const connectionChanged = existingConnectionId !== nextConnectionId;
         if (connectionChanged && await this.remoteTeams.teamHasAgents(existingTeam)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Team connection cannot be changed while it has agents.');
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Team connection cannot be changed while it has agents.');
         }
 
         const pointer = this.remoteTeams.pointerForTeam(existingTeam);
@@ -1940,7 +1940,7 @@ export class ClawBackendServer {
           try {
             remoteTeam = await this.remoteTeams.resolveTeamForPointerInput(input);
           } catch (error) {
-            return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+            return createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
           }
           updateInput = {
             ...input,
@@ -1965,9 +1965,9 @@ export class ClawBackendServer {
         try {
           updateTeamInSnapshot(this.snapshot, updateInput);
         } catch (error) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
         }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
 
       case backendMethods.teamDelete: {
@@ -2010,10 +2010,10 @@ export class ClawBackendServer {
         }
         const team = closeTeamInSnapshot(this.snapshot, teamId);
         if (!team) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Team not found: ${teamId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Team not found: ${teamId}`);
         }
         for (const agentId of team.agentIds) this.agentRequests.clearAgent(agentId);
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.teamDisconnect: {
         const teamId = requireTeamId(message.params);
@@ -2023,9 +2023,9 @@ export class ClawBackendServer {
         }
         const team = closeTeamInSnapshot(this.snapshot, teamId);
         if (!team) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Team not found: ${teamId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Team not found: ${teamId}`);
         }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
 
       case backendMethods.settingsUpdate: {
@@ -2039,22 +2039,22 @@ export class ClawBackendServer {
           this.providerConnections?.invalidate('codex');
           await this.providerConnections?.refresh();
         }
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.engineInstructionsRead: {
         const { engine } = requireRecord(message.params);
         if (engine !== 'codex' && engine !== 'claude') throw new Error('Unknown instruction engine.');
-        return createClawRpcResult(message.id, await readEngineInstructions(engine, this.snapshot.general.providerHomes));
+        return createAppRpcResult(message.id, await readEngineInstructions(engine, this.snapshot.general.providerHomes));
       }
       case backendMethods.engineInstructionsSave: {
         const input = requireRecord(requireRecord(message.params).input);
         if (input.engine !== 'codex' && input.engine !== 'claude') throw new Error('Unknown instruction engine.');
         if (typeof input.text !== 'string') throw new Error('Invalid instruction text.');
         await saveEngineInstructions({ engine: input.engine, text: input.text, all: input.all as boolean | undefined, confirmed: input.confirmed === true }, this.snapshot.general.providerHomes);
-        return createClawRpcResult(message.id, null);
+        return createAppRpcResult(message.id, null);
       }
       case backendMethods.settingsCodexResourceSharingGet:
-        return createClawRpcResult(
+        return createAppRpcResult(
           message.id,
           await this.inspectCodexResourceSharing(this.snapshot.general.providerHomes?.codex?.shareSkills !== false),
         );
@@ -2067,15 +2067,15 @@ export class ClawBackendServer {
         await this.configureCodexResourceSharing(input);
         const home = this.snapshot.general.providerHomes?.codex ?? { isolated: true, homePath: backendCodexHomeDir() };
         this.snapshot.general.providerHomes = { ...this.snapshot.general.providerHomes, codex: { ...home, shareSkills: input.enabled } };
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.settingsPluginStatusGet:
-        return createClawRpcResult(message.id, await this.inspectPluginStatus());
+        return createAppRpcResult(message.id, await this.inspectPluginStatus());
       case backendMethods.providerSetupGet: {
         const connectionId = requireOptionalConnectionId(message.params);
-        if (connectionId) return createClawRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method));
+        if (connectionId) return createAppRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method));
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
-        return createClawRpcResult(message.id, this.providerSetup.list());
+        return createAppRpcResult(message.id, this.providerSetup.list());
       }
       case backendMethods.providerDisconnect: {
         const backend = requireAgentBackend(requireRecord(message.params).backend);
@@ -2097,22 +2097,22 @@ export class ClawBackendServer {
           const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
           if (connection) connection.providerConnections = providers;
           this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
-          return createClawRpcResult(message.id, providers);
+          return createAppRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
         updateSettingsInSnapshot(this.snapshot, { general: { providerEnabled: { ...this.snapshot.general.providerEnabled, [input.backend]: input.enabled } } });
         this.providerConnections.updateEnabled();
         await this.persistAndEmitSnapshot();
-        return createClawRpcResult(message.id, this.providerConnections.list());
+        return createAppRpcResult(message.id, this.providerConnections.list());
       }
       case backendMethods.providerUsageGet: {
         const backend = requireRecord(message.params).backend;
         if (backend !== 'codex' && backend !== 'claude') throw new Error('Unknown provider.');
-        if (!this.snapshot.providerConnections?.some(item => item.backend === backend && item.installed && item.connected && item.enabled !== false)) return createClawRpcResult(message.id, null);
-        const result = await this.requireDriverRpc().handle(backendMethods.driverAccountRateLimitsGet, { backend }) as { supported: boolean; rateLimits?: import('@codex-claw/core/contracts').AccountRateLimits | null };
+        if (!this.snapshot.providerConnections?.some(item => item.backend === backend && item.installed && item.connected && item.enabled !== false)) return createAppRpcResult(message.id, null);
+        const result = await this.requireDriverRpc().handle(backendMethods.driverAccountRateLimitsGet, { backend }) as { supported: boolean; rateLimits?: import('@workspace/core/contracts').AccountRateLimits | null };
         const limits = result.supported ? result.rateLimits ?? null : this.snapshot.backendAccountRateLimits?.[backend] ?? (backend === 'codex' ? this.snapshot.accountRateLimits : undefined) ?? null;
         if (limits) this.applyAndEmitBackendEvent({ type: 'account.rateLimitsUpdated', backend, payload: { rateLimits: limits } });
-        return createClawRpcResult(message.id, limits);
+        return createAppRpcResult(message.id, limits);
       }
       case backendMethods.providerConnectionsGet: {
         const connectionId = requireOptionalConnectionId(message.params);
@@ -2124,17 +2124,17 @@ export class ClawBackendServer {
           const connection = this.snapshot.remoteConnections.connections.find(item => item.id === connectionId);
           if (connection) connection.providerConnections = providers;
           this.emitSnapshotUpdated(this.remoteTeams.clientSnapshotFromKnownRemotes());
-          return createClawRpcResult(message.id, providers);
+          return createAppRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
-        return createClawRpcResult(message.id, await this.providerConnections.refresh());
+        return createAppRpcResult(message.id, await this.providerConnections.refresh());
       }
       case backendMethods.providerSetupConfigure:
       case backendMethods.providerInstall: {
         const connectionId = requireOptionalConnectionId(message.params);
         if (connectionId && message.method === backendMethods.providerInstall) {
           const input = requireRecord(message.params);
-          return createClawRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method, { backend: input.backend }));
+          return createAppRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method, { backend: input.backend }));
         }
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         const input = requireRecord(message.params);
@@ -2155,38 +2155,38 @@ export class ClawBackendServer {
         this.providerConnections?.invalidate(input.backend);
         await this.providerConnections?.refresh();
         await this.persistAndEmitSnapshot();
-        return createClawRpcResult(message.id, result);
+        return createAppRpcResult(message.id, result);
       }
       case backendMethods.claudeAuthenticationGet: {
         if (!isRecord(message.params) || message.params.connectionId === undefined) {
           const auth = await this.authenticateProvider('claude');
           await this.observeAuthentication(auth);
-          return createClawRpcResult(message.id, auth.state);
+          return createAppRpcResult(message.id, auth.state);
         }
         const connectionId = requireConnectionId(message.params);
         const connection = this.snapshot.remoteConnections.connections.find((candidate) => candidate.id === connectionId);
         if (!connection) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Remote connection not found: ${connectionId}`);
         }
         if (connection.status !== 'ready') {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, `Remote connection is not ready: ${connection.name}`);
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, `Remote connection is not ready: ${connection.name}`);
         }
-        return createClawRpcResult(message.id, await this.remoteTeams.request(connectionId, backendMethods.claudeAuthenticationGet));
+        return createAppRpcResult(message.id, await this.remoteTeams.request(connectionId, backendMethods.claudeAuthenticationGet));
       }
       case backendMethods.codexAuthenticationGet:
       case backendMethods.codexLoginCancel:
       case backendMethods.codexChatGptDeviceCodeLoginStart: {
         if (isRecord(message.params) && message.params.remoteConnectionId !== undefined
           && (typeof message.params.remoteConnectionId !== 'string' || !message.params.remoteConnectionId.trim())) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'remoteConnectionId must be a non-empty string.');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'remoteConnectionId must be a non-empty string.');
         }
         const remoteConnectionId = requireOptionalConnectionId(message.params);
         const loginId = isRecord(message.params) ? message.params.loginId : undefined;
         if (loginId !== undefined && (typeof loginId !== 'string' || !loginId.trim())) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'loginId must be a non-empty string.');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'loginId must be a non-empty string.');
         }
         if (remoteConnectionId && message.method === backendMethods.codexLoginCancel && !loginId) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.invalidParams, 'Remote cancellation requires a loginId.');
+          return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'Remote cancellation requires a loginId.');
         }
         const params = loginId ? { loginId } : undefined;
         return this.respondInLocation(message.id,
@@ -2201,14 +2201,14 @@ export class ClawBackendServer {
           });
       }
       case backendMethods.codexChatGptLoginStart:
-        return createClawRpcResult(
+        return createAppRpcResult(
           message.id,
           await this.requireDriverRpc().handle(backendMethods.driverCodexChatGptLoginStart, undefined),
         );
       case backendMethods.codexLogout: {
         const auth = await this.authenticateProvider('codex', 'logout');
         await this.observeAuthentication(auth);
-        return createClawRpcResult(message.id, auth.state);
+        return createAppRpcResult(message.id, auth.state);
       }
       case backendMethods.sourceRepositoriesList: {
         return this.respondInLocation(
@@ -2250,9 +2250,9 @@ export class ClawBackendServer {
             this.addRecentSourceRepository(repository.name);
             await this.persistAndEmitSnapshot();
           }
-          return createClawRpcResult(message.id, repository);
+          return createAppRpcResult(message.id, repository);
         } catch (error) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
         }
       }
       case backendMethods.sourceRepositoryCreate: {
@@ -2265,9 +2265,9 @@ export class ClawBackendServer {
             { input: { name: input.name } },
             () => this.createLocalSourceRepository(input.name),
           );
-          return createClawRpcResult(message.id, repository);
+          return createAppRpcResult(message.id, repository);
         } catch (error) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
         }
       }
       case backendMethods.sourceFoldersList: {
@@ -2334,21 +2334,21 @@ export class ClawBackendServer {
             this.addRecentSourceRepository(path.basename(input.repoPath));
             await this.persistAndEmitSnapshot();
           }
-          return createClawRpcResult(message.id, worktree);
+          return createAppRpcResult(message.id, worktree);
         } catch (error) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
         }
       }
       case backendMethods.workProviderConnect:
-        return createClawRpcResult(message.id, await this.requireWorkIntegrations().connect(requireWorkProvider(message.params)));
+        return createAppRpcResult(message.id, await this.requireWorkIntegrations().connect(requireWorkProvider(message.params)));
       case backendMethods.workProviderAuthorizationPoll:
-        return createClawRpcResult(message.id, await this.requireWorkIntegrations().pollAuthorization(requireWorkProvider(message.params)));
+        return createAppRpcResult(message.id, await this.requireWorkIntegrations().pollAuthorization(requireWorkProvider(message.params)));
       case backendMethods.workProviderConnectionsReload: {
         await this.requireWorkIntegrations().hydrateConnections();
-        return createClawRpcResult(message.id, await this.persistAndEmitSnapshot());
+        return createAppRpcResult(message.id, await this.persistAndEmitSnapshot());
       }
       case backendMethods.workProviderDisconnect:
-        return createClawRpcResult(message.id, await this.requireWorkIntegrations().disconnect(requireWorkProvider(message.params)));
+        return createAppRpcResult(message.id, await this.requireWorkIntegrations().disconnect(requireWorkProvider(message.params)));
       case backendMethods.workProviderSourcesList: {
         return this.respondInLocation(
           message.id,
@@ -2416,13 +2416,13 @@ export class ClawBackendServer {
       case backendMethods.snapshotAutomationsGet: {
         const location = this.automationLocationFromParams(message.params);
         if (location.kind === 'local') {
-          return createClawRpcResult(message.id, this.snapshot);
+          return createAppRpcResult(message.id, this.snapshot);
         }
         const remoteSnapshotResult = await this.remoteTeams.request(location.connectionId, backendMethods.snapshotGet);
-        if (!isClawSnapshotGetResult(remoteSnapshotResult)) {
-          return createClawRpcError(message.id, clawRpcErrorCodes.internalError, 'Remote automation snapshot is invalid.');
+        if (!isAppSnapshotGetResult(remoteSnapshotResult)) {
+          return createAppRpcError(message.id, appRpcErrorCodes.internalError, 'Remote automation snapshot is invalid.');
         }
-        return createClawRpcResult(message.id, remoteSnapshotResult.snapshot);
+        return createAppRpcResult(message.id, remoteSnapshotResult.snapshot);
       }
       case backendMethods.automationCreate: {
         const input = requireAutomationCreateInput(message.params);
@@ -2527,13 +2527,13 @@ export class ClawBackendServer {
           try {
             const result = await this.driverRpc.handle(message.method, message.params);
             if (result !== undefined) {
-              return createClawRpcResult(message.id, result);
+              return createAppRpcResult(message.id, result);
             }
           } catch (error) {
-            return createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+            return createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
           }
         }
-        return createClawRpcError(message.id, clawRpcErrorCodes.methodNotFound, `Unknown backend method: ${message.method}`);
+        return createAppRpcError(message.id, appRpcErrorCodes.methodNotFound, `Unknown backend method: ${message.method}`);
     }
   }
 
@@ -2609,22 +2609,22 @@ export class ClawBackendServer {
   }
 
   private async routeAgentSnapshotRequest(
-    messageId: ClawRpcResponse['id'],
+    messageId: AppRpcResponse['id'],
     agentId: string,
     method: string,
     params: unknown,
     localHandler: (agent: Agent) => Promise<AppSnapshot> | AppSnapshot,
     onCreated?: (id: string) => void,
-  ): Promise<ClawRpcResponse> {
+  ): Promise<AppRpcResponse> {
     const route = await this.locationForAgentId(agentId);
     if (!route) {
-      return createClawRpcError(messageId, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+      return createAppRpcError(messageId, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
     }
     if (route.kind === 'local') {
       if (handoffInProgress(route.agent) && method !== backendMethods.agentHandoff && method !== backendMethods.agentInterrupt) {
         throw new Error('Wait for the handoff to finish.');
       }
-      return createClawRpcResult(messageId, await localHandler(route.agent));
+      return createAppRpcResult(messageId, await localHandler(route.agent));
     }
     const result = await this.backendHandleForAgentLocation(route).request<AppSnapshot>(method, params, () => localHandler(route.agent));
     const decodedSnapshot = decodeAppSnapshot(result);
@@ -2632,24 +2632,24 @@ export class ClawBackendServer {
       this.remoteTeams.rememberSnapshot(route.connectionId, decodedSnapshot.value);
       if (decodedSnapshot.value.activeAgentId) onCreated?.(decodedSnapshot.value.activeAgentId);
     }
-    return createClawRpcResult(messageId, await this.remoteTeams.clientSnapshot());
+    return createAppRpcResult(messageId, await this.remoteTeams.clientSnapshot());
   }
 
   private async routeAgentResultRequest<Result>(
-    messageId: ClawRpcResponse['id'],
+    messageId: AppRpcResponse['id'],
     agentId: string,
     method: string,
     params: unknown,
     localHandler: (agent: Agent) => Promise<Result> | Result,
-  ): Promise<ClawRpcResponse> {
+  ): Promise<AppRpcResponse> {
     const route = await this.locationForAgentId(agentId);
     if (!route) {
-      return createClawRpcError(messageId, clawRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
+      return createAppRpcError(messageId, appRpcErrorCodes.internalError, `Agent not found: ${agentId}`);
     }
     if (route.kind === 'local') {
-      return createClawRpcResult(messageId, await localHandler(route.agent));
+      return createAppRpcResult(messageId, await localHandler(route.agent));
     }
-    return createClawRpcResult(messageId, await this.backendHandleForAgentLocation(route).request<Result>(method, params, () => localHandler(route.agent)));
+    return createAppRpcResult(messageId, await this.backendHandleForAgentLocation(route).request<Result>(method, params, () => localHandler(route.agent)));
   }
 
   private locationFromRemoteConnectionId(remoteConnectionId: string | null | undefined): BackendLocation {
@@ -2692,20 +2692,20 @@ export class ClawBackendServer {
   }
 
   private async respondInLocation<Result>(
-    messageId: ClawRpcResponse['id'],
+    messageId: AppRpcResponse['id'],
     location: BackendLocation,
     remoteMethod: string,
     remoteParams: unknown,
     localHandler: () => Promise<Result> | Result,
-  ): Promise<ClawRpcResponse> {
+  ): Promise<AppRpcResponse> {
     try {
-      return createClawRpcResult(messageId, await this.requestInLocation(location, remoteMethod, remoteParams, localHandler));
+      return createAppRpcResult(messageId, await this.requestInLocation(location, remoteMethod, remoteParams, localHandler));
     } catch (error) {
-      return createClawRpcError(messageId, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
+      return createAppRpcError(messageId, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error));
     }
   }
 
-  private forwardRemoteBackendEvent(connectionId: string, event: ClawBackendEvent): void {
+  private forwardRemoteBackendEvent(connectionId: string, event: AppBackendEvent): void {
     // The account menu describes local engines, not accounts on SSH hosts.
     if (event.type === 'account.rateLimitsUpdated') return;
     // Catalog broadcasts belong to one host. Scope them to its projected agents
@@ -2780,7 +2780,7 @@ export class ClawBackendServer {
   }
 
   private emitSnapshotUpdated(snapshot: AppSnapshot): void {
-    const event: ClawBackendEvent = {
+    const event: AppBackendEvent = {
       seq: this.nextEventSeq(),
       type: 'snapshot.updated',
       payload: snapshot,
@@ -3097,7 +3097,7 @@ function requireWorkProvider(params: unknown): WorkProviderKind {
   return provider;
 }
 
-function workItemQuery(value: unknown): import('@codex-claw/core/contracts').WorkItemQuery | undefined {
+function workItemQuery(value: unknown): import('@workspace/core/contracts').WorkItemQuery | undefined {
   if (value === undefined) return undefined;
   const query = requireRecord(value);
   const kind = query.kind;
@@ -3114,7 +3114,7 @@ function workItemQuery(value: unknown): import('@codex-claw/core/contracts').Wor
   };
 }
 
-function globalWorkItemQuery(value: unknown): import('@codex-claw/core/contracts').GlobalWorkItemQuery | undefined {
+function globalWorkItemQuery(value: unknown): import('@workspace/core/contracts').GlobalWorkItemQuery | undefined {
   if (value === undefined) return undefined;
   const query = requireRecord(value);
   const base = workItemQuery(query) ?? {};

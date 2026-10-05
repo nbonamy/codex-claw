@@ -23,15 +23,15 @@
       </span>
     </el-option>
   </el-select>
-  <button v-else-if="choices.length === 0" class="claw-button claw-button--tertiary" type="button" @click="connectEngine">{{ t('engineConnection.required') }}</button>
+  <button v-else-if="choices.length === 0" class="app-button app-button--tertiary" type="button" @click="connectEngine">{{ t('engineConnection.required') }}</button>
 </template>
 
 <script setup lang="ts">
 import { watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { AgentBackend } from '@codex-claw/core/contracts';
+import type { AgentBackend } from '@workspace/core/contracts';
 import { useBackendChoices, useConnectEngine, useRememberBackend } from './backend-selection';
-import { backendDisplayName } from '@codex-claw/core/backend-driver';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 import BackendIcon from './BackendIcon.vue';
 
 const props = withDefaults(defineProps<{

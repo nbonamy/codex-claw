@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, CodexClawApi } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppSnapshot, AppApi } from '@workspace/core/contracts';
 import { createAgentHistoryState } from '../agent-history-state';
 import { stubElectronTestWindow } from '../test/client';
 import { deferred } from './app-state-test-harness';
@@ -15,7 +15,7 @@ describe('createAgentHistoryState', () => {
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
     stubElectronTestWindow({
-      codexClaw: { loadConversationHistory } satisfies Partial<CodexClawApi>,
+      app: { loadConversationHistory } satisfies Partial<AppApi>,
     });
     const state = createAgentHistoryState({
       adoptSnapshot: vi.fn(),

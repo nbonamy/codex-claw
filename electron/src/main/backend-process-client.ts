@@ -1,19 +1,19 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { watch } from 'node:fs';
-import type { ClawBackendEvent, ClawBackendHealth } from '@codex-claw/core/backend-protocol/rpc';
+import type { AppBackendEvent, AppBackendHealth } from '@workspace/core/backend-protocol/rpc';
 import { logMain, warnMain } from './log';
 import { BackendRpcSession } from './backend-rpc-session';
 
-export type ClawBackendProcessCommand = {
+export type AppBackendProcessCommand = {
   command: string;
   args: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
 };
 
-export type ClawBackendProcessClientOptions = {
-  command: ClawBackendProcessCommand;
+export type AppBackendProcessClientOptions = {
+  command: AppBackendProcessCommand;
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   spawnProcess?: typeof spawn;
   watchFile?: string | null;
@@ -25,8 +25,8 @@ export type WatchBackendFile = (filePath: string, listener: () => void) => { clo
 // Allow the SDK's 12s EOF shutdown plus bounded signal escalation to finish.
 const BACKEND_SHUTDOWN_TIMEOUT_MS = 15_000;
 
-export class ClawBackendProcessClient {
-  private readonly command: ClawBackendProcessCommand;
+export class AppBackendProcessClient {
+  private readonly command: AppBackendProcessCommand;
   private readonly spawnProcess: typeof spawn;
   private readonly watchFile: string | null;
   private readonly watchFileSystem: WatchBackendFile;
@@ -35,7 +35,7 @@ export class ClawBackendProcessClient {
   private watcher: { close(): void } | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
 
-  constructor(options: ClawBackendProcessClientOptions) {
+  constructor(options: AppBackendProcessClientOptions) {
     this.command = options.command;
     this.spawnProcess = options.spawnProcess ?? spawn;
     this.watchFile = options.watchFile ?? null;
@@ -56,33 +56,33 @@ export class ClawBackendProcessClient {
       stdio: 'pipe',
     });
 
-    logMain('clawd', 'starting backend process', { command: this.command.command });
+    logMain('daemon', 'starting backend process', { command: this.command.command });
 
     this.process = child;
     child.stdout.on('data', (chunk) => this.rpc.receive(chunk));
     child.stderr.on('data', (chunk) => {
-      warnMain('clawd', '', { detail: chunk.toString().trim() });
+      warnMain('daemon', '', { detail: chunk.toString().trim() });
     });
-    child.once('exit', (code, signal) => this.handleDisconnect(child, new Error(`clawd exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`)));
+    child.once('exit', (code, signal) => this.handleDisconnect(child, new Error(`daemon exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`)));
     child.once('error', (error) => this.handleDisconnect(child, error));
 
     this.startWatcher();
     this.rpc.connected((message) => child.stdin.write(message));
-    logMain('clawd', 'backend process started', { pid: child.pid ?? null });
+    logMain('daemon', 'backend process started', { pid: child.pid ?? null });
   }
 
-  async health(): Promise<ClawBackendHealth> {
-    return this.request<ClawBackendHealth>(backendMethods.backendHealthGet);
+  async health(): Promise<AppBackendHealth> {
+    return this.request<AppBackendHealth>(backendMethods.backendHealthGet);
   }
 
   async request<Result>(method: string, params?: unknown): Promise<Result> {
     if (!this.process) {
-      throw new Error('clawd is not running.');
+      throw new Error('daemon is not running.');
     }
     return this.rpc.request(method, params);
   }
 
-  onEvent(listener: (event: ClawBackendEvent) => void): () => void {
+  onEvent(listener: (event: AppBackendEvent) => void): () => void {
     return this.rpc.onEvent(listener);
   }
 
@@ -94,7 +94,7 @@ export class ClawBackendProcessClient {
     this.stopWatcher();
     const child = this.process;
     this.process = null;
-    this.rpc.close(new Error('clawd client closed.'));
+    this.rpc.close(new Error('daemon client closed.'));
 
     if (!child || child.killed) {
       return;
@@ -117,7 +117,7 @@ export class ClawBackendProcessClient {
         this.scheduleRestart();
       });
     } catch (error) {
-      warnMain('clawd', 'failed to watch backend bundle', {
+      warnMain('daemon', 'failed to watch backend bundle', {
         detail: error instanceof Error ? error.message : String(error),
         path: this.watchFile,
       });
@@ -150,8 +150,8 @@ export class ClawBackendProcessClient {
       return;
     }
 
-    warnMain('clawd', 'restarting backend process after bundle change');
-    this.rpc.close(new Error('clawd restarted.'));
+    warnMain('daemon', 'restarting backend process after bundle change');
+    this.rpc.close(new Error('daemon restarted.'));
     this.process = null;
 
     await new Promise<void>((resolve) => {
@@ -167,6 +167,6 @@ export class ClawBackendProcessClient {
     if (this.process !== child) return;
     this.process = null;
     this.rpc.disconnected(error);
-    warnMain('clawd', 'backend process disconnected', { detail: error.message });
+    warnMain('daemon', 'backend process disconnected', { detail: error.message });
   }
 }

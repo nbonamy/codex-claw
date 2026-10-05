@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels } from '@codex-claw/core/ipc';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AddSshConnectionInput, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConversationRef, BrowserState, ClientRequestResponse, CloneSourceRepositoryInput, CodexAuthentication, CodexChatGptLogin, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, ClientState, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, PairedDevice, RendererMessage, RendererSendPromptOptions, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@workspace/core/contracts';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { ipcChannels } from '@workspace/core/ipc';
 import type { OpenInProvider } from '../open-in';
 import { emitBackendEvent, setMainWindowSend, currentSnapshot, fakeAppLifecycle, createBackendClient } from './app-controller-test-harness';
 
@@ -14,7 +14,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     const backendClient = {
       start: vi.fn().mockResolvedValue(undefined),
-      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'daemon', version: '0.1.0', pid: 123 }),
       request: vi.fn().mockResolvedValue({}),
       onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
@@ -29,7 +29,7 @@ describe('AppController', () => {
     expect(backendClient.close).toHaveBeenCalledOnce();
   });
 
-  it('runs startup daemon maintenance before connecting to clawd', async () => {
+  it('runs startup daemon maintenance before connecting to daemon', async () => {
     const order: string[] = [];
     const backendClient = createBackendClient();
     backendClient.start = vi.fn().mockImplementation(async () => {
@@ -46,7 +46,7 @@ describe('AppController', () => {
     expect(order).toStrictEqual(['maintenance', 'backend-start']);
   });
 
-  it('subscribes to clawd events before hydrating its startup snapshot', async () => {
+  it('subscribes to daemon events before hydrating its startup snapshot', async () => {
     const initialSnapshot = createInitialSnapshot();
     const backendSnapshot = createInitialSnapshot();
     backendSnapshot.agents[0]!.status = { type: 'working' };
@@ -54,10 +54,10 @@ describe('AppController', () => {
       sourceFolderPath: '/Users/nbonamy/src',
       shouldPreventDisplaySleep: false,
     };
-    let emitBackendEvent: ((event: ClawBackendEvent) => void) | null = null;
+    let emitBackendEvent: ((event: AppBackendEvent) => void) | null = null;
     const backendClient: NonNullable<ConstructorParameters<typeof AppController>[1]> = {
       start: vi.fn().mockResolvedValue(undefined),
-      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'daemon', version: '0.1.0', pid: 123 }),
       request: <Result,>(method: string): Promise<Result> => {
         if (method === 'snapshot/get') {
           emitBackendEvent?.({

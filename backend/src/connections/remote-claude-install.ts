@@ -1,4 +1,4 @@
-// Let Anthropic own the native CLI, launcher, and background updates. Claw only
+// Let Anthropic own the native CLI, launcher, and background updates. App only
 // ensures the CLI is present; authentication remains local to the remote user.
 export function remoteClaudeInstallCommand(): string {
   return `set -eu

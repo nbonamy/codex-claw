@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, type MissionArtifacts } from '@codex-claw/core/missions';
-import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission, type MissionArtifacts } from '@workspace/core/missions';
+import type { MissionExecutionInput } from '@workspace/core/mission-execution';
 import { MissionService } from '../mission-service';
 import { MissionExecutionService } from '../mission-execution-service';
 import { FileMissionSkillStore } from '../mission-skill-store';
@@ -15,7 +15,7 @@ import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state
 const exec = promisify(execFile);
 
 it('keeps one orchestrator through shaping, reuses repository workers, respects ticket dependencies, and restores accepted evidence', async () => {
-  const folder = await mkdtemp(join(tmpdir(), 'claw-mission-workflow-'));
+  const folder = await mkdtemp(join(tmpdir(), 'app-mission-workflow-'));
   const repo = join(folder, 'repo');
   await exec('git', ['init', repo]);
   const git = (cwd: string, args: string[]) => exec('git', args, { cwd });

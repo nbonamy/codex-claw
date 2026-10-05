@@ -1,12 +1,13 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { captureAppshot } from '../appshots';
 import type { ComputerUseOptions } from '../computer-use-tools';
 
 const helperOptions: ComputerUseOptions = {
-  appPath: '/Applications/Codex Claw.app',
+  appPath: `/Applications/${product.name}.app`,
   isPackaged: true,
   platform: 'darwin',
-  resourcesPath: '/Applications/Codex Claw.app/Contents/Resources',
+  resourcesPath: `/Applications/${product.name}.app/Contents/Resources`,
 };
 
 describe('captureAppshot', () => {

@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import {
   shouldPreserveUpstreamCodexSignature,
@@ -7,22 +8,22 @@ import {
 describe('shouldPreserveUpstreamCodexSignature', () => {
   it('excludes only the bundled upstream Codex executables from Electron re-signing', () => {
     expect(shouldPreserveUpstreamCodexSignature(
-      '/build/Codex Claw.app/Contents/Resources/codex/codex',
+      `/build/${product.name}.app/Contents/Resources/codex/codex`,
     )).toBe(true);
     expect(shouldPreserveUpstreamCodexSignature(
       'Contents/Resources/codex/codex',
     )).toBe(true);
     expect(shouldPreserveUpstreamCodexSignature(
-      '/build/Codex Claw.app/Contents/Resources/codex/codex-code-mode-host',
+      `/build/${product.name}.app/Contents/Resources/codex/codex-code-mode-host`,
     )).toBe(true);
     expect(shouldPreserveUpstreamCodexSignature(
       'Contents/Resources/codex/codex-code-mode-host',
     )).toBe(true);
     expect(shouldPreserveUpstreamCodexSignature(
-      '/build/Codex Claw.app/Contents/Resources/codex/codex-helper',
+      `/build/${product.name}.app/Contents/Resources/codex/codex-helper`,
     )).toBe(false);
     expect(shouldPreserveUpstreamCodexSignature(
-      '/build/Codex Claw.app/Contents/MacOS/codex',
+      `/build/${product.name}.app/Contents/MacOS/codex`,
     )).toBe(false);
   });
 });
@@ -35,7 +36,7 @@ describe('signDarwinBinaries', () => {
     };
     const execFileSync = vi.fn();
 
-    signDarwinBinaries('/build/Codex Claw.app/Contents/Resources/app', 'arm64', {
+    signDarwinBinaries(`/build/${product.name}.app/Contents/Resources/app`, 'arm64', {
       env: {},
       execFileSync,
       logger,
@@ -48,15 +49,15 @@ describe('signDarwinBinaries', () => {
   it('signs the nested helpers from the extraResource location after resources are copied', () => {
     const execFileSync = vi.fn();
 
-    signDarwinBinaries('/build/Codex Claw.app', 'arm64', {
+    signDarwinBinaries(`/build/${product.name}.app`, 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: 'Developer ID Application: Codex Claw',
+        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: (filePath) => [
-        '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
-        '/build/Codex Claw.app/Contents/Resources/Codex Claw Computer Use.app',
-        '/build/Codex Claw.app/Contents/Resources/codex-claw-tts-helper',
+        `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
+        `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
+        `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -70,8 +71,8 @@ describe('signDarwinBinaries', () => {
       '--options',
       'runtime',
       '--sign',
-      'Developer ID Application: Codex Claw',
-      '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
+      `Developer ID Application: ${product.name}`,
+      `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
     ], {
       stdio: 'inherit',
     });
@@ -81,8 +82,8 @@ describe('signDarwinBinaries', () => {
       '--options',
       'runtime',
       '--sign',
-      'Developer ID Application: Codex Claw',
-      '/build/Codex Claw.app/Contents/Resources/Codex Claw Computer Use.app',
+      `Developer ID Application: ${product.name}`,
+      `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
     ], {
       stdio: 'inherit',
     });
@@ -92,8 +93,8 @@ describe('signDarwinBinaries', () => {
       '--options',
       'runtime',
       '--sign',
-      'Developer ID Application: Codex Claw',
-      '/build/Codex Claw.app/Contents/Resources/codex-claw-tts-helper',
+      `Developer ID Application: ${product.name}`,
+      `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
     ], {
       stdio: 'inherit',
     });
@@ -103,15 +104,15 @@ describe('signDarwinBinaries', () => {
   it('supports the afterCopy app directory path used by older signing hooks', () => {
     const execFileSync = vi.fn();
 
-    signDarwinBinaries('/build/Codex Claw.app/Contents/Resources/app', 'arm64', {
+    signDarwinBinaries(`/build/${product.name}.app/Contents/Resources/app`, 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: 'Developer ID Application: Codex Claw',
+        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: (filePath) => [
-        '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
-        '/build/Codex Claw.app/Contents/Resources/Codex Claw Computer Use.app',
-        '/build/Codex Claw.app/Contents/Resources/codex-claw-tts-helper',
+        `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
+        `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
+        `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -125,8 +126,8 @@ describe('signDarwinBinaries', () => {
       '--options',
       'runtime',
       '--sign',
-      'Developer ID Application: Codex Claw',
-      '/build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli',
+      `Developer ID Application: ${product.name}`,
+      `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
     ], {
       stdio: 'inherit',
     });
@@ -138,13 +139,13 @@ describe('signDarwinBinaries', () => {
 
     signDarwinBinaries('/var/folders/electron-packager/tmp-123', 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: 'Developer ID Application: Codex Claw',
+        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: (filePath) => [
         '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/apple-speechanalyzer-cli',
-        '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/Codex Claw Computer Use.app',
-        '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/codex-claw-tts-helper',
+        `/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/${product.name} Computer Use.app`,
+        '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/app-tts-helper',
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -158,7 +159,7 @@ describe('signDarwinBinaries', () => {
       '--options',
       'runtime',
       '--sign',
-      'Developer ID Application: Codex Claw',
+      `Developer ID Application: ${product.name}`,
       '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/apple-speechanalyzer-cli',
     ], {
       stdio: 'inherit',
@@ -173,14 +174,14 @@ describe('signDarwinBinaries', () => {
     };
     const execFileSync = vi.fn();
 
-    expect(() => signDarwinBinaries('/build/Codex Claw.app/Contents/Resources/app', 'arm64', {
+    expect(() => signDarwinBinaries(`/build/${product.name}.app/Contents/Resources/app`, 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: 'Developer ID Application: Codex Claw',
+        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: () => false,
       logger,
-    })).toThrow('Apple speech helper not found for signing: /build/Codex Claw.app/Contents/Resources/apple-speechanalyzer-cli');
+    })).toThrow(`Apple speech helper not found for signing: /build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`);
 
     expect(execFileSync).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalled();

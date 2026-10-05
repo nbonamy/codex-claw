@@ -1,11 +1,12 @@
-import type { Agent, AppPluginSettings } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { defaultPluginSettings } from '@codex-claw/core/settings';
+import { product } from '@workspace/core/product';
+import type { Agent, AppPluginSettings } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { defaultPluginSettings } from '@workspace/core/settings';
 import {
   collaborationInstructionsEnd,
   collaborationInstructionsStart,
   formatCollaborationMessageEnvelope,
-} from '@codex-claw/core/collaboration-message-envelope';
+} from '@workspace/core/collaboration-message-envelope';
 
 export type MessageInfo = {
   from: string;
@@ -19,7 +20,7 @@ export type AgentEffectInstructionSettings = {
   developerInstructions?: string;
 };
 
-export const CHECK_INBOX_PROMPT = 'Manual recovery: check your unread Codex Claw agent messages.';
+export const CHECK_INBOX_PROMPT = `Manual recovery: check your unread ${product.name} agent messages.`;
 
 const COLLABORATION_BOUNDARY = [
   'Do not proactively message other agents.',
@@ -54,31 +55,31 @@ export function agentMessagesPrompt(messages: MessageInfo[]): string {
   ].join('\n');
 }
 
-export function codexClawDeveloperInstructions(
+export function appDeveloperInstructions(
   agent: Agent,
   settings: AppPluginSettings = defaultPluginSettings,
   effects: AgentEffectInstructionSettings = {},
 ): string {
   const isQuickChat = agent.sessionKind === 'quickChat';
   const workspaceIdentity = isQuickChat
-    ? `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)}. This is a workspace-free Quick chat and has no project folder.`
+    ? `Your ${product.name} agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)}. This is a workspace-free Quick chat and has no project folder.`
     : agent.folder
-      ? `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)} and your folder is ${agent.folder}.`
-      : `Your Codex Claw agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)}. No project folder is configured.`;
+      ? `Your ${product.name} agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)} and your folder is ${agent.folder}.`
+      : `Your ${product.name} agent ID is ${agent.id}. Your agent name is ${agentDisplayName(agent)}. No project folder is configured.`;
   const browserInstructions = agent.folder
-    ? 'Use browser-open with an HTTP, HTTPS, or workspace-local file URL to open the Codex Claw in-app browser for your agent. File URLs must resolve inside your agent folder. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent\'s browser pane.'
-    : 'Use browser-open with an HTTP or HTTPS URL to open the Codex Claw in-app browser for your agent. Workspace-local file URLs are unavailable without a project folder. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent\'s browser pane.';
+    ? `Use browser-open with an HTTP, HTTPS, or workspace-local file URL to open the ${product.name} in-app browser for your agent. File URLs must resolve inside your agent folder. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent's browser pane.`
+    : `Use browser-open with an HTTP or HTTPS URL to open the ${product.name} in-app browser for your agent. Workspace-local file URLs are unavailable without a project folder. Then use browser-get-dom to inspect the page and CSS-selected elements, browser-screenshot for visual state, browser-click/browser-type/browser-scroll for interactions, and browser-console-logs for debugging. These tools only control your agent's browser pane.`;
   const delegationSuggestionInstruction = agent.delegatedByAgentId
     ? 'This agent is already a delegated co-agent. Carry out its assigned work in the current folder; reserve further co-agent delegation for an explicit user request.'
     : 'Select the delegate_to_worktree flag in finish_turn only when the next step should be delegated to a dedicated worktree/co-agent instead of being implemented in the current turn. Never select it and then continue implementing the work yourself.';
   const instructions = [
-    'You are part of a team of agents collaborating in Codex Claw.',
+    `You are part of a team of agents collaborating in ${product.name}.`,
     workspaceIdentity,
-    'Use the codex_claw MCP server for agent collaboration.',
-    'Codex Claw infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.',
+    'Use the workspace MCP server for agent collaboration.',
+    `${product.name} infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.`,
     'At the beginning of every user task, call set-status exactly once as your very first action, with a short status and announcement containing phase start plus one short, natural acknowledgment. Call set-status again only when the work changes direction and omit announcement. Never announce intermediate progress or reasoning, transcripts, command output, code, secrets, or the full answer. Announcements are best-effort; do not wait for speech or retry a rejected announcement. Do not call set-status with an empty status at final handoff. Do not change status or announce for informational teammate messages or coordination closure.',
-    `Claw delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
-    `Terminology: a subagent is a Codex or Claude Code native child agent inside the current Claw agent session; use the engine's native subagent mechanism when the user explicitly asks for subagents. A co-agent is a separate Codex Claw agent visible in the team; use create-agent when the user explicitly asks for a co-agent, Claw agent, or teammate. If a request to delegate, parallelize, or use another agent does not make that distinction clear, ask whether the user wants native subagents or Claw co-agents before acting. For repository co-agent work, make a single create-agent call with createWorktree: true, a branchName, a concise user-visible prompt, and self-contained instructions containing the full handoff; Claw wraps instructions in <context>, creates the worktree, and starts the co-agent. Use your folder as repoPath for the current repository or call list-repos to find another configured repository. ${delegationSuggestionInstruction}`,
+    `${product.name} delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
+    `Terminology: a subagent is a Codex or Claude Code native child agent inside the current ${product.name} agent session; use the engine's native subagent mechanism when the user explicitly asks for subagents. A co-agent is a separate ${product.name} agent visible in the team; use create-agent when the user explicitly asks for a co-agent, ${product.name} agent, or teammate. If a request to delegate, parallelize, or use another agent does not make that distinction clear, ask whether the user wants native subagents or ${product.name} co-agents before acting. For repository co-agent work, make a single create-agent call with createWorktree: true, a branchName, a concise user-visible prompt, and self-contained instructions containing the full handoff; ${product.name} wraps instructions in <context>, creates the worktree, and starts the co-agent. Use your folder as repoPath for the current repository or call list-repos to find another configured repository. ${delegationSuggestionInstruction}`,
     ...(isQuickChat ? ['When the user explicitly asks to turn this Quick Chat into a new project, use create-project with a single folder name and a self-contained handoff prompt. The new project agent owns the follow-up work.'] : []),
     'Call finish_turn exactly once as the last tool action of every substantive user turn, immediately before the final response. It clears status and may include one optional finish announcement, one optional celebration, and one optional proposed-action flag in the same call. Use the announcement only for a genuine completion. Pass a flag only when proposing a new next action; that flag replaces any existing proposal, while omitting flag leaves an existing proposal untouched. At every substantive turn handoff, assess review readiness: select ready_for_review when the intended uncommitted diff is complete, validated, and ready for user review before commit or push. Do not wait for the user to ask for review. A new user prompt automatically clears earlier review readiness; do not spend a tool call clearing it. Reassess the resulting diff and propose review again when it remains the relevant next step, even if this turn made no code changes. Omit the flag when work is incomplete, no reviewable diff remains, the user deferred review, or the user requested explicit $cp or immediate commit/push.',
     'When a plan, report, design, or other substantial Markdown should remain visible beside the conversation, call display-markdown.',
@@ -91,18 +92,18 @@ export function codexClawDeveloperInstructions(
   }
   if (settings.computerUseEnabled) {
     instructions.push(
-      'For macOS GUI automation in this Codex Claw session, use only the codex_claw MCP Computer Use tools. Before the first Computer Use action, call computer-use-guide and follow the returned instructions.',
+      `For macOS GUI automation in this ${product.name} session, use only the workspace MCP Computer Use tools. Before the first Computer Use action, call computer-use-guide and follow the returned instructions.`,
       'Do not load or use Codex\'s built-in computer-use skill or sky.* methods; they control a different host.',
     );
   } else {
-    instructions.push('Computer Use is disabled for this Codex Claw session. Do not attempt macOS GUI automation or use computer-use tools.');
+    instructions.push(`Computer Use is disabled for this ${product.name} session. Do not attempt macOS GUI automation or use computer-use tools.`);
   }
   if (settings.chromeEnabled) {
     instructions.push(
-      'When the user explicitly asks for Chrome, an external browser, existing Chrome tabs, or Chrome login state, use the bundled chrome:control-chrome skill. Do not substitute the Claw in-app browser tools for an explicit Chrome request. The Chrome skill owns its host bridge and browser safety checks; do not invoke its raw bridge manually.',
+      `When the user explicitly asks for Chrome, an external browser, existing Chrome tabs, or Chrome login state, use the bundled chrome:control-chrome skill. Do not substitute the ${product.name} in-app browser tools for an explicit Chrome request. The Chrome skill owns its host bridge and browser safety checks; do not invoke its raw bridge manually.`,
     );
   } else {
-    instructions.push('Chrome integration is disabled for this Codex Claw session. Do not attempt to use the Chrome plugin.');
+    instructions.push(`Chrome integration is disabled for this ${product.name} session. Do not attempt to use the Chrome plugin.`);
   }
   return [instructions.join(' '), effects.developerInstructions?.trim()].filter(Boolean).join('\n\n');
 }

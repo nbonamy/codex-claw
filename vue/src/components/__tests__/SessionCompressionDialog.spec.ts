@@ -12,7 +12,7 @@ describe('SessionCompressionDialog', () => {
 
     wrapper.findComponent({ name: 'ElCheckbox' }).vm.$emit('update:modelValue', true);
     await wrapper.vm.$nextTick();
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
 
     expect(wrapper.emitted('confirm')).toStrictEqual([[true]]);
   });
@@ -23,7 +23,7 @@ describe('SessionCompressionDialog', () => {
     expect(wrapper.text()).toContain('Summarizing session…');
     expect(wrapper.text()).toContain('Extracting key decisions, completed work, and next steps');
     expect(wrapper.text()).not.toContain('thread');
-    expect(wrapper.find('.claw-dialog__footer').exists()).toBe(false);
+    expect(wrapper.find('.app-dialog__footer').exists()).toBe(false);
   });
 });
 

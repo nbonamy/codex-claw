@@ -8,12 +8,12 @@ import type {
   TurnGitDiff
 } from '../contracts';
 import { createInitialSnapshot } from '../snapshot';
-import { isClawSnapshotGetResult, type ClawBackendEvent } from '../backend-protocol/rpc';
+import { isAppSnapshotGetResult, type AppBackendEvent } from '../backend-protocol/rpc';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
 describe('backend protocol guards', () => {
-  it('recognizes complete snapshot/get results from clawd', () => {
-    expect(isClawSnapshotGetResult({
+  it('recognizes complete snapshot/get results from daemon', () => {
+    expect(isAppSnapshotGetResult({
       snapshot: createInitialSnapshot(),
       lastEventSeq: 17,
       clientState: {
@@ -29,7 +29,7 @@ describe('backend protocol guards', () => {
       teams: [],
       agents: [],
     })).toBe(false);
-    expect(isClawSnapshotGetResult({
+    expect(isAppSnapshotGetResult({
       snapshot: {
         teams: [],
         agents: [],
@@ -48,7 +48,7 @@ describe('backend protocol guards', () => {
       planMode: 'automatic',
     } as never;
 
-    expect(isClawSnapshotGetResult({
+    expect(isAppSnapshotGetResult({
       snapshot,
       lastEventSeq: 17,
       clientState: {
@@ -69,18 +69,18 @@ describe('backend protocol guards', () => {
       shouldPreventDisplaySleep: false,
       shouldPreventDisplaySleepForRemoteAccess: 'yes',
     })).toBe(false);
-    expect(isClawSnapshotGetResult({
+    expect(isAppSnapshotGetResult({
       snapshot: createInitialSnapshot(),
       lastEventSeq: 17,
     })).toBe(false);
   });
 
-  it('preserves typed payloads through the clawd event envelope', () => {
-    type AnnotationEvent = Extract<ClawBackendEvent, { type: 'browser.annotationCreated' }>;
+  it('preserves typed payloads through the daemon event envelope', () => {
+    type AnnotationEvent = Extract<AppBackendEvent, { type: 'browser.annotationCreated' }>;
 
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'client.connectionChanged' }>>()
+    expectTypeOf<Extract<AppBackendEvent, { type: 'client.connectionChanged' }>>()
       .toEqualTypeOf<never>();
-    type SnapshotUpdatedEvent = Extract<ClawBackendEvent, { type: 'snapshot.updated' }>;
+    type SnapshotUpdatedEvent = Extract<AppBackendEvent, { type: 'snapshot.updated' }>;
     expectTypeOf<SnapshotUpdatedEvent['payload']>().toEqualTypeOf<AppSnapshot>();
     expectTypeOf<Pick<SnapshotUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{
@@ -91,7 +91,7 @@ describe('backend protocol guards', () => {
       }>();
     expectTypeOf<SnapshotUpdatedEvent['snapshot']>().toEqualTypeOf<AppSnapshot | undefined>();
     expectTypeOf<AnnotationEvent['payload']>().toEqualTypeOf<BrowserAnnotation>();
-    type SubagentStatusEvent = Extract<ClawBackendEvent, { type: 'subagent.statusChanged' }>;
+    type SubagentStatusEvent = Extract<AppBackendEvent, { type: 'subagent.statusChanged' }>;
     expectTypeOf<SubagentStatusEvent['payload']>().toEqualTypeOf<SubagentStatusChange>();
     expectTypeOf<Pick<SubagentStatusEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{
@@ -100,20 +100,20 @@ describe('backend protocol guards', () => {
         threadId?: string;
         turnId?: string;
       }>();
-    type DiffUpdatedEvent = Extract<ClawBackendEvent, { type: 'conversation.turnDiffUpdated' }>;
+    type DiffUpdatedEvent = Extract<AppBackendEvent, { type: 'conversation.turnDiffUpdated' }>;
     expectTypeOf<DiffUpdatedEvent['payload']>()
       .toEqualTypeOf<Omit<TurnGitDiff, 'agentId' | 'turnId' | 'updatedAt'>>();
     expectTypeOf<Pick<DiffUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{ agentId: string; backend: AgentBackend; threadId?: string; turnId: string }>();
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'workspace.fileActivityDetected' }>['payload']>()
+    expectTypeOf<Extract<AppBackendEvent, { type: 'workspace.fileActivityDetected' }>['payload']>()
       .toEqualTypeOf<Omit<AgentFileActivity, 'agentId' | 'turnId' | 'occurredAt'>>();
-    type GitStatusUpdatedEvent = Extract<ClawBackendEvent, { type: 'git.statusUpdated' }>;
+    type GitStatusUpdatedEvent = Extract<AppBackendEvent, { type: 'git.statusUpdated' }>;
     expectTypeOf<GitStatusUpdatedEvent['payload']>().toEqualTypeOf<AgentGitStatus>();
     expectTypeOf<Pick<GitStatusUpdatedEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{ agentId: string; backend?: AgentBackend; threadId?: string; turnId?: string }>();
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'agentRequest.created' }>['payload']>()
+    expectTypeOf<Extract<AppBackendEvent, { type: 'agentRequest.created' }>['payload']>()
       .toEqualTypeOf<{ request: import('../agent-request').AgentRequest }>();
-    expectTypeOf<Extract<ClawBackendEvent, { type: 'agentRequest.resolved' }>['payload']>()
+    expectTypeOf<Extract<AppBackendEvent, { type: 'agentRequest.resolved' }>['payload']>()
       .toEqualTypeOf<{
         id: string; outcome: import('../agent-request').AgentRequestOutcome;
       }>();

@@ -1,3 +1,4 @@
+import { product } from './product';
 import type { Agent, AppSnapshot } from './contracts';
 import { defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
 import { seedTeamId } from './seed-ids';
@@ -119,8 +120,8 @@ export function createDefaultRemoteConnectionsState(): AppSnapshot['remoteConnec
 function createDefaultTeam(): AppSnapshot['teams'][number] {
   return {
     id: seedTeamId,
-    name: 'Codex Claw',
-    avatar: 'CC',
+    name: product.name,
+    avatar: product.name.slice(0, 2).toUpperCase(),
     color: defaultTeamColor,
     agentIds: [],
   };
@@ -133,7 +134,7 @@ function createSeedAgents(): Agent[] {
       teamId: seedTeamId,
       name: 'Dina',
       avatar: 'DI',
-      folder: '~/src/codex-claw',
+      folder: '~/src/agent-workspace',
       backend: 'codex',
       backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
@@ -145,7 +146,7 @@ function createSeedAgents(): Agent[] {
       teamId: seedTeamId,
       name: 'Jesse',
       avatar: 'JE',
-      folder: '~/src/codex-claw',
+      folder: '~/src/agent-workspace',
       backend: 'codex',
       backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },

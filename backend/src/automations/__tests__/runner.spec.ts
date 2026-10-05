@@ -1,7 +1,7 @@
-import { createAutomationInSnapshot } from '@codex-claw/core/automation-manager';
-import type { Automation, WorkItem } from '@codex-claw/core/contracts';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { createAutomationInSnapshot } from '@workspace/core/automation-manager';
+import type { Automation, WorkItem } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AutomationRunner, automationIsDue, matchingAutomationItems } from '../runner';
 
@@ -97,8 +97,8 @@ describe('AutomationRunner', () => {
     createAutomationInSnapshot(
       snapshot,
       {
-        repositories: [repository('nbonamy/codex-claw', '/src/codex-claw'), repository('nbonamy/witsy', '/src/witsy')],
-        teamId: 'team-codex-claw',
+        repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace'), repository('nbonamy/witsy', '/src/witsy')],
+        teamId: 'team-app',
         backend: 'claude',
         selectionPrompt: 'Only actionable bugs.',
         assignmentPrompt: 'Run the focused tests.',
@@ -137,7 +137,7 @@ describe('AutomationRunner', () => {
 
     expect(listItems).toHaveBeenCalledTimes(2);
     expect(createWorktree).toHaveBeenCalledWith({
-      repoPath: '/src/codex-claw',
+      repoPath: '/src/agent-workspace',
       branchName: 'automation/github-12',
       reuseExisting: true,
     });
@@ -149,8 +149,8 @@ describe('AutomationRunner', () => {
     expect(snapshot.agents.filter((agent) => agent.name?.startsWith('GitHub #'))).toHaveLength(2);
     expect(snapshot.agents.find((agent) => agent.name === 'GitHub #12')).toMatchObject({
       backend: 'claude',
-      folder: '/src/codex-claw-automation-github-12',
-      teamId: 'team-codex-claw',
+      folder: '/src/agent-workspace-automation-github-12',
+      teamId: 'team-app',
     });
     expect(snapshot.workBacklog.assignments[workItemAssignmentKey(items[0]!)].status).toBe('inProgress');
     expect(snapshot.automations[0]).toMatchObject({
@@ -315,7 +315,7 @@ describe('automation scheduling and matching', () => {
   });
 
   it('matches open items for one repository target', () => {
-    const target = repository('nbonamy/codex-claw', '/src/codex-claw');
+    const target = repository('nbonamy/agent-workspace', '/src/agent-workspace');
     const closed = { ...workItem(13), state: 'closed' as const };
     expect(matchingAutomationItems([workItem(12), workItem(14, 'nbonamy/witsy'), closed], target).map((item) => item.number)).toStrictEqual(
       [12],
@@ -329,8 +329,8 @@ function snapshotWithAutomation(overrides: Partial<Automation> = {}) {
   createAutomationInSnapshot(
     snapshot,
     {
-      repositories: [repository('nbonamy/codex-claw', '/src/codex-claw')],
-      teamId: 'team-codex-claw',
+      repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace')],
+      teamId: 'team-app',
       schedule: { intervalMinutes: 60 },
     },
     '2026-06-09T10:00:00.000Z',
@@ -348,7 +348,7 @@ function repository(repositoryId: string, executionRepositoryPath: string) {
   return { provider: 'github' as const, sourceId: repositoryId, executionRepositoryPath };
 }
 
-function workItem(number: number, repositoryId = 'nbonamy/codex-claw'): WorkItem {
+function workItem(number: number, repositoryId = 'nbonamy/agent-workspace'): WorkItem {
   return {
     provider: 'github',
     id: `${repositoryId}#${number}`,

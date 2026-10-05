@@ -28,7 +28,7 @@ The thumbnail strip switches among generated visualizations. Use **Save PNG** to
 3. Write a concrete comment and choose **Add annotation**.
 4. Submit the annotation from the composer. You can send it without additional text, or include a broader instruction.
 
-For example, annotate a service with “Split the validation step out of this service and show the error path.” Claw sends the selected elements and comment, allowing the agent to edit that part while preserving unrelated shapes and your manual edits.
+For example, annotate a service with “Split the validation step out of this service and show the error path.” Korus sends the selected elements and comment, allowing the agent to edit that part while preserving unrelated shapes and your manual edits.
 
 Keep the Visualize pane open while working on the visualization so the agent can access its current selection and canvas state.
 

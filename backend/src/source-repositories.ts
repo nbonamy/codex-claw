@@ -1,8 +1,8 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
-import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
+import type { SourceRepository, SourceWorktree } from '@workspace/core/contracts';
+import { canonicalGitRemoteIdentity } from '@workspace/core/git-remote';
 
 export function sourceFolderCandidates(): string[] {
   return [

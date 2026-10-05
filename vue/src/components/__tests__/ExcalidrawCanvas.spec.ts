@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CanvasDocument, SaveCanvasInput } from '@codex-claw/core/visualize-canvas';
-import type { Visualization } from '@codex-claw/core/visualize';
+import type { CanvasDocument, SaveCanvasInput } from '@workspace/core/visualize-canvas';
+import type { Visualization } from '@workspace/core/visualize';
 import type { CanvasScene } from '../excalidraw-editor';
 import ExcalidrawCanvas from '../ExcalidrawCanvas.vue';
 const editor = vi.hoisted(() => ({

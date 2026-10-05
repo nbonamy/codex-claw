@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
+import { createEmptySnapshot } from '@workspace/core/snapshot';
+import type { Agent, BackendPublishedEvent, RendererMessage } from '@workspace/core/contracts';
 import { DelegatedWorkReportService } from '../delegated-work-report-service';
 
 describe('DelegatedWorkReportService', () => {
@@ -96,7 +97,7 @@ describe('DelegatedWorkReportService', () => {
     expect(sendMessage).toHaveBeenCalledWith(parent.id, worker.id, expect.stringMatching(/Pull request #42 was created from `fix\/resume`: Fix resume instructions.*https:\/\/github.com\/openai\/codex\/pull\/42.*informational update.*Do not make changes or reply/s));
   });
 
-  it('tells the worker when Claw is taking over a direct merge', async () => {
+  it(`tells the worker when ${product.name} is taking over a direct merge`, async () => {
     const snapshot = createEmptySnapshot();
     const parent = agent('agent-main', 'main');
     const worker = { ...agent('agent-worker', 'feature'), delegatedByAgentId: parent.id };

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { encodeAppErrorDescriptor } from '@codex-claw/core/app-error';
+import { encodeAppErrorDescriptor } from '@workspace/core/app-error';
 import { localizedErrorMessage } from '../i18n/errors';
 
 describe('localizedErrorMessage', () => {

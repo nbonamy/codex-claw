@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import WhatsNewDialog from '../WhatsNewDialog.vue';
@@ -44,7 +45,7 @@ describe('WhatsNewDialog', () => {
     });
 
     expect(wrapper.text()).toContain('Version 9.9.0');
-    expect(wrapper.text()).toContain('What’s new in Codex Claw');
+    expect(wrapper.text()).toContain(`What’s new in ${product.name}`);
     expect(wrapper.get('h3').text()).toBe('Current release fixture');
     expect(wrapper.text()).toContain('Stable current release copy');
 

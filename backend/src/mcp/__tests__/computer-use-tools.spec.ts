@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z, type ZodType } from 'zod';
@@ -74,14 +75,14 @@ describe('Computer Use MCP tools', () => {
 
   it('exposes v2 observation, keyboard, mouse, and scrolling arguments', () => {
     const stateSchema = normalizedInputSchema('computer-use-get-app-state');
-    expect(stateSchema.safeParse({ app: 'Claw', window_id: 1, disableDiff: true, includeScreenshot: false }).success).toBe(true);
-    expect(stateSchema.safeParse({ app: 'Claw', window_id: 0 }).success).toBe(false);
-    expect(stateSchema.safeParse({ app: 'Claw' }).success).toBe(false);
-    expect(stateSchema.safeParse({ app: 'Claw', accessibilityScope: 'menu_bar' }).success).toBe(true);
+    expect(stateSchema.safeParse({ app: product.name, window_id: 1, disableDiff: true, includeScreenshot: false }).success).toBe(true);
+    expect(stateSchema.safeParse({ app: product.name, window_id: 0 }).success).toBe(false);
+    expect(stateSchema.safeParse({ app: product.name }).success).toBe(false);
+    expect(stateSchema.safeParse({ app: product.name, accessibilityScope: 'menu_bar' }).success).toBe(true);
 
     const screenshotSchema = normalizedInputSchema('computer-use-screenshot');
-    expect(screenshotSchema.safeParse({ app: 'Claw', window_id: 1 }).success).toBe(true);
-    expect(screenshotSchema.safeParse({ app: 'Claw' }).success).toBe(false);
+    expect(screenshotSchema.safeParse({ app: product.name, window_id: 1 }).success).toBe(true);
+    expect(screenshotSchema.safeParse({ app: product.name }).success).toBe(false);
     expect(screenshotSchema.safeParse({ scope: 'screen', displayId: 1 }).success).toBe(true);
 
     const clickSchema = inputShape('computer-use-click');
@@ -164,23 +165,23 @@ describe('Computer Use MCP tools', () => {
 
   it.each([
     ['computer-use-list-apps', {}, 'list_apps'],
-    ['computer-use-list-windows', { app: 'Claw' }, 'list_windows'],
+    ['computer-use-list-windows', { app: product.name }, 'list_windows'],
     ['computer-use-request-screen-recording', {}, 'request_screen_capture'],
-    ['computer-use-find-apps', { app: 'Claw' }, 'find_apps'],
-    ['computer-use-launch-app', { path: '/Applications/Claw.app' }, 'launch_app'],
+    ['computer-use-find-apps', { app: product.name }, 'find_apps'],
+    ['computer-use-launch-app', { path: `/Applications/${product.name}.app` }, 'launch_app'],
     ['computer-use-focus-app', { pid: 42, window_id: 7 }, 'focus_app'],
-    ['computer-use-get-app-state', { app: 'Claw', accessibilityScope: 'menu_bar', maxDepth: 12 }, 'get_app_state'],
-    ['computer-use-get-app-state', { app: 'Claw', window_id: 7, maxDepth: 12 }, 'get_app_state'],
-    ['computer-use-click', { app: 'Claw', window_id: 7, selector: { role: 'AXButton', title: 'Cancel' } }, 'click'],
-    ['computer-use-dismiss', { app: 'Claw', window_id: 7, accessibilityScope: 'menu_bar' }, 'dismiss'],
-    ['computer-use-press-key', { app: 'Claw', window_id: 7, key: 'Super_L+v' }, 'press_key'],
-    ['computer-use-type-text', { app: 'Claw', window_id: 7, text: 'hello' }, 'type_text'],
-    ['computer-use-paste', { app: 'Claw', window_id: 7, text: '# Hello', format: 'md' }, 'paste'],
+    ['computer-use-get-app-state', { app: product.name, accessibilityScope: 'menu_bar', maxDepth: 12 }, 'get_app_state'],
+    ['computer-use-get-app-state', { app: product.name, window_id: 7, maxDepth: 12 }, 'get_app_state'],
+    ['computer-use-click', { app: product.name, window_id: 7, selector: { role: 'AXButton', title: 'Cancel' } }, 'click'],
+    ['computer-use-dismiss', { app: product.name, window_id: 7, accessibilityScope: 'menu_bar' }, 'dismiss'],
+    ['computer-use-press-key', { app: product.name, window_id: 7, key: 'Super_L+v' }, 'press_key'],
+    ['computer-use-type-text', { app: product.name, window_id: 7, text: 'hello' }, 'type_text'],
+    ['computer-use-paste', { app: product.name, window_id: 7, text: '# Hello', format: 'md' }, 'paste'],
     ['computer-use-set-value', { window_id: 7, element_index: 7, value: 'hello' }, 'set_value'],
-    ['computer-use-select-text', { app: 'Claw', window_id: 7, element_index: 7, text: 'hello', selection_type: 'cursor_after' }, 'select_text'],
-    ['computer-use-scroll', { app: 'Claw', window_id: 7, direction: 'down', pages: 2 }, 'scroll'],
-    ['computer-use-drag', { app: 'Claw', window_id: 7, from_x: 10, from_y: 20, to_x: 30, to_y: 40 }, 'drag'],
-    ['computer-use-perform-secondary-action', { app: 'Claw', window_id: 7, element_index: 7, action: 'AXShowMenu' }, 'perform_secondary_action'],
+    ['computer-use-select-text', { app: product.name, window_id: 7, element_index: 7, text: 'hello', selection_type: 'cursor_after' }, 'select_text'],
+    ['computer-use-scroll', { app: product.name, window_id: 7, direction: 'down', pages: 2 }, 'scroll'],
+    ['computer-use-drag', { app: product.name, window_id: 7, from_x: 10, from_y: 20, to_x: 30, to_y: 40 }, 'drag'],
+    ['computer-use-perform-secondary-action', { app: product.name, window_id: 7, element_index: 7, action: 'AXShowMenu' }, 'perform_secondary_action'],
   ])('passes %s arguments through to command execution', async (tool, arguments_, command) => {
     vi.mocked(computerUse.execute).mockResolvedValue({ value: 'done' });
 
@@ -190,11 +191,11 @@ describe('Computer Use MCP tools', () => {
   });
 
   it('rejects missing window IDs before application observation or mutation side effects', async () => {
-    await expect(handlers.get('computer-use-get-app-state')?.({ app: 'Claw' })).resolves.toStrictEqual({
+    await expect(handlers.get('computer-use-get-app-state')?.({ app: product.name })).resolves.toStrictEqual({
       content: [{ type: 'text', text: 'invalid_request: window_id must be a positive integer returned by computer-use-list-windows.' }],
       isError: true,
     });
-    await expect(handlers.get('computer-use-click')?.({ app: 'Claw', element_index: 2 })).resolves.toMatchObject({
+    await expect(handlers.get('computer-use-click')?.({ app: product.name, element_index: 2 })).resolves.toMatchObject({
       isError: true,
     });
 
@@ -203,10 +204,10 @@ describe('Computer Use MCP tools', () => {
 
   it('keeps app-wide menu observations and full-screen screenshots exempt from window targeting', async () => {
     vi.mocked(computerUse.execute).mockResolvedValue({ ok: true, result: { text: 'menu' } });
-    await handlers.get('computer-use-get-app-state')?.({ app: 'Claw', accessibilityScope: 'menu_bar' });
+    await handlers.get('computer-use-get-app-state')?.({ app: product.name, accessibilityScope: 'menu_bar' });
     expect(computerUse.execute).toHaveBeenLastCalledWith({
       command: 'get_app_state',
-      arguments: { app: 'Claw', accessibilityScope: 'menu_bar' },
+      arguments: { app: product.name, accessibilityScope: 'menu_bar' },
     });
 
     vi.mocked(computerUse.execute).mockResolvedValue({ ok: true, result: { scope: 'screen' } });
@@ -285,7 +286,7 @@ describe('Computer Use MCP tools', () => {
     vi.mocked(computerUse.execute).mockResolvedValue({
       ok: true,
       result: {
-        app: { bundleIdentifier: 'com.example.Claw', localizedName: 'Claw', pid: 42 },
+        app: { bundleIdentifier: `com.example.${product.name}`, localizedName: product.name, pid: 42 },
         window_id: 7,
         stateKind: 'diff',
         stateRevision: 3,
@@ -305,13 +306,13 @@ describe('Computer Use MCP tools', () => {
       },
     });
 
-    await expect(handlers.get('computer-use-get-app-state')?.({ app: 'Claw', window_id: 7 })).resolves.toStrictEqual({
+    await expect(handlers.get('computer-use-get-app-state')?.({ app: product.name, window_id: 7 })).resolves.toStrictEqual({
       content: [
         { type: 'text', text: '~ 7 AXButton "Save"' },
         { type: 'image', data: 'cG5n', mimeType: 'image/png' },
       ],
       structuredContent: {
-        app: { bundleIdentifier: 'com.example.Claw', localizedName: 'Claw', pid: 42 },
+        app: { bundleIdentifier: `com.example.${product.name}`, localizedName: product.name, pid: 42 },
         window_id: 7,
         stateKind: 'diff',
         stateRevision: 3,
@@ -347,14 +348,14 @@ describe('Computer Use MCP tools', () => {
         window_id: 7,
         stateKind: 'full',
         stateRevision: 1,
-        text: '1 AXApplication "Claw"',
+        text: `1 AXApplication "${product.name}"`,
         screenshot: null,
         screenshotError: { code: 'screen_capture_not_granted', message: 'Screen Recording is not granted.' },
       },
     });
 
-    await expect(handlers.get('computer-use-get-app-state')?.({ app: 'Claw', window_id: 7 })).resolves.toStrictEqual({
-      content: [{ type: 'text', text: '1 AXApplication "Claw"' }],
+    await expect(handlers.get('computer-use-get-app-state')?.({ app: product.name, window_id: 7 })).resolves.toStrictEqual({
+      content: [{ type: 'text', text: `1 AXApplication "${product.name}"` }],
       structuredContent: {
         window_id: 7,
         stateKind: 'full',
@@ -378,12 +379,12 @@ describe('Computer Use MCP tools', () => {
   it('unwraps helper success envelopes for both structured content and readable text', async () => {
     vi.mocked(computerUse.execute).mockResolvedValue({
       ok: true,
-      result: { apps: [{ name: 'Claw' }] },
+      result: { apps: [{ name: product.name }] },
     });
 
     await expect(handlers.get('computer-use-list-apps')?.({})).resolves.toStrictEqual({
       content: [{ type: 'text', text: STRUCTURED_TOOL_RESULT_NOTICE }],
-      structuredContent: { apps: [{ name: 'Claw' }] },
+      structuredContent: { apps: [{ name: product.name }] },
       isError: false,
     });
   });
@@ -391,10 +392,10 @@ describe('Computer Use MCP tools', () => {
   it('returns the exact window discovery result for subsequent targeted calls', async () => {
     const result = {
       success: true,
-      app: { localizedName: 'Claw', pid: 42 },
+      app: { localizedName: product.name, pid: 42 },
       windows: [{
         window_id: 7,
-        title: 'Codex Claw',
+        title: product.name,
         frame: { x: 100, y: 200, width: 800, height: 600 },
         is_key: true,
         is_minimized: false,
@@ -402,7 +403,7 @@ describe('Computer Use MCP tools', () => {
     };
     vi.mocked(computerUse.execute).mockResolvedValue({ ok: true, result });
 
-    await expect(handlers.get('computer-use-list-windows')?.({ app: 'Claw' })).resolves.toStrictEqual({
+    await expect(handlers.get('computer-use-list-windows')?.({ app: product.name })).resolves.toStrictEqual({
       content: [{ type: 'text', text: STRUCTURED_TOOL_RESULT_NOTICE }],
       structuredContent: result,
       isError: false,

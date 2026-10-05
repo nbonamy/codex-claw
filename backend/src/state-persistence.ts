@@ -1,22 +1,22 @@
-import { isWorkProviderKind, workProviderKinds } from '@codex-claw/core/work-providers';
-import { isAgentHandoff } from '@codex-claw/core/agent-handoff';
-import { isMission } from '@codex-claw/core/missions';
-import { isThreadFlags } from '@codex-claw/core/thread-flags';
+import { isWorkProviderKind, workProviderKinds } from '@workspace/core/work-providers';
+import { isAgentHandoff } from '@workspace/core/agent-handoff';
+import { isMission } from '@workspace/core/missions';
+import { isThreadFlags } from '@workspace/core/thread-flags';
 import { backendCodexHomeDir } from './state';
-import { isPlanReview } from '@codex-claw/core/plan-review';
-import { sanitizeClientPreferences } from '@codex-claw/core/client-preferences';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationWorkSourceTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@codex-claw/core/contracts';
-import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
-import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@codex-claw/core/codex-approval-presets';
-import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@codex-claw/core/settings';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { sanitizeWorkItemAssignmentSource, workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { defaultTeamColor } from '@codex-claw/core/team-colors';
-import { appText } from '@codex-claw/core/app-text';
-import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@codex-claw/core/subagent-values';
-import { cloneCodeReviewSession, isCodeReviewSession } from '@codex-claw/core/code-review';
-import { isAgentGitDiffTarget } from '@codex-claw/core/snapshot-guard-collections';
-import { cloneVisualizeSession, isVisualization, isVisualizeSession, visualizationRepositoryRoot, type RepositoryVisualizations, type Visualization, type VisualizeSession } from '@codex-claw/core/visualize';
+import { isPlanReview } from '@workspace/core/plan-review';
+import { sanitizeClientPreferences } from '@workspace/core/client-preferences';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationWorkSourceTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@workspace/core/contracts';
+import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
+import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@workspace/core/codex-approval-presets';
+import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@workspace/core/settings';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import { sanitizeWorkItemAssignmentSource, workItemAssignmentKey } from '@workspace/core/work-assignments';
+import { defaultTeamColor } from '@workspace/core/team-colors';
+import { appText } from '@workspace/core/app-text';
+import { isSubagentActivityKind, isSubagentOperationKind, isSubagentOperationLifecycle, isSubagentOperationStatus, isSubagentStatus } from '@workspace/core/subagent-values';
+import { cloneCodeReviewSession, isCodeReviewSession } from '@workspace/core/code-review';
+import { isAgentGitDiffTarget } from '@workspace/core/snapshot-guard-collections';
+import { cloneVisualizeSession, isVisualization, isVisualizeSession, visualizationRepositoryRoot, type RepositoryVisualizations, type Visualization, type VisualizeSession } from '@workspace/core/visualize';
 
 export type PersistedState = {
   missions?: AppSnapshot['missions'];
@@ -62,9 +62,9 @@ export type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' 
   workspace?: AgentWorkspaceIdentity;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;
-  planReview?: import('@codex-claw/core/plan-review').PlanReview;
-  codeReview?: import('@codex-claw/core/code-review').CodeReviewSession;
-  threadFlags?: import('@codex-claw/core/thread-flags').ThreadFlags;
+  planReview?: import('@workspace/core/plan-review').PlanReview;
+  codeReview?: import('@workspace/core/code-review').CodeReviewSession;
+  threadFlags?: import('@workspace/core/thread-flags').ThreadFlags;
   goal?: ThreadGoal;
   visualize?: Omit<VisualizeSession, 'visualizations'> & { visualizations?: Visualization[] };
   statusText?: string;
@@ -1235,7 +1235,7 @@ function localRemoteTeamPointerIds(teams: Team[]): Set<string> {
     if (!isRemoteTeamPointer(team)) {
       continue;
     }
-    // `remoteTeamId` is owned by another clawd and can collide with local team ids.
+    // `remoteTeamId` is owned by another daemon and can collide with local team ids.
     // Only the local pointer team's id participates in local state repair/migration.
     ids.add(team.id);
   }

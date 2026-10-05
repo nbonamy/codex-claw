@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
 import test from "node:test";
 import { JSDOM } from "jsdom";
+import product from "../core/src/product.json" with { type: "json" };
 
 const artifact = new URL("../dist/website/", import.meta.url);
-const origin = "https://codex-claw.nabocorp.com";
+const origin = product.websiteUrl;
 
 async function files(directory, prefix = "") {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -35,6 +36,11 @@ test("the built website has reachable documentation pages, anchors, and assets",
 
   try {
     const landing = documents.get("index.html").window.document;
+    assert.ok(landing.title.startsWith(product.name));
+    assert.ok(
+      landing.querySelector(".brand").textContent.includes(product.name),
+    );
+    assert.ok(!landing.documentElement.outerHTML.includes("__PRODUCT_NAME__"));
     assert.ok(
       landing.querySelector('a[href="/docs/"]'),
       "Landing page links to the docs",

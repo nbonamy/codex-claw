@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ClawdDaemonStatus, SystemPermissionsStatus } from '@codex-claw/core/contracts';
-import { defaultGeneralSettings } from '@codex-claw/core/settings';
+import type { DaemonStatus, SystemPermissionsStatus } from '@workspace/core/contracts';
+import { defaultGeneralSettings } from '@workspace/core/settings';
 import { setElectronTestClient } from '../../test/client';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
@@ -96,7 +97,7 @@ describe('SettingsGeneralPanel', () => {
       general: { spokenAnnouncementsOnlyForDictatedPrompts: false },
     });
 
-    const focusedOnlyRow = rows.find((candidate) => candidate.text().includes('Only speak while Codex Claw is focused'))!;
+    const focusedOnlyRow = rows.find((candidate) => candidate.text().includes(`Only speak while ${product.name} is focused`))!;
     expect(focusedOnlyRow.text()).toContain('Silence acknowledgments');
     expect(focusedOnlyRow.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
     await focusedOnlyRow.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
@@ -189,7 +190,7 @@ describe('SettingsGeneralPanel', () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Keep Codex Claw ready in the background');
+    expect(wrapper.text()).toContain(`Keep ${product.name} ready in the background`);
     expect(wrapper.text()).toContain('Off');
 
     const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
@@ -205,8 +206,8 @@ describe('SettingsGeneralPanel', () => {
 
     expect(wrapper.text()).not.toContain('Installing...');
     expect(confirm).toHaveBeenCalledWith(
-      'Codex Claw needs to restart to connect to the background agent.',
-      'Restart Codex Claw?',
+      `${product.name} needs to restart to connect to the background agent.`,
+      `Restart ${product.name}?`,
       expect.objectContaining({
         cancelButtonText: 'Later',
         confirmButtonText: 'Restart now',
@@ -295,15 +296,15 @@ describe('SettingsGeneralPanel', () => {
     const wrapper = mountPanel({
       daemonStatus: daemonStatus({
         supported: false,
-        detail: 'No packaged clawd runtime was found.',
+        detail: 'No packaged daemon runtime was found.',
       }),
-      daemonStatusError: 'No packaged clawd runtime was found.',
+      daemonStatusError: 'No packaged daemon runtime was found.',
     });
 
     await flushPromises();
 
     expect(wrapper.text()).toContain('Unavailable');
-    expect(wrapper.text()).toContain('No packaged clawd runtime was found.');
+    expect(wrapper.text()).toContain('No packaged daemon runtime was found.');
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1].props('disabled')).toBe(true);
   });
 
@@ -337,7 +338,7 @@ describe('SettingsGeneralPanel', () => {
       sourceFolder: {
         path: '~/src',
         initialized: true,
-        recentRepoNames: ['codex-claw'],
+        recentRepoNames: ['agent-workspace'],
       },
     };
     await wrapper.setProps(configuredSourceFolder as never);
@@ -405,7 +406,7 @@ describe('SettingsGeneralPanel', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Screen Recording');
-    expect(wrapper.text()).toContain('Required for Appshots to capture the frontmost window.');
+    expect(wrapper.text()).toContain('Required for screenshots to capture the frontmost window.');
 
     const grantButtons = wrapper.findAll('button').filter((button) => button.text() === 'Grant');
     await grantButtons.at(-1)?.trigger('click');
@@ -459,13 +460,13 @@ function permissionStatus(
   };
 }
 
-function daemonStatus(overrides: Partial<ClawdDaemonStatus> = {}): ClawdDaemonStatus {
+function daemonStatus(overrides: Partial<DaemonStatus> = {}): DaemonStatus {
   return {
     supported: true,
     installed: false,
     running: false,
-    socketPath: '/Users/nicolas/.codex-claw/clawd.sock',
-    launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
+    socketPath: '/Users/nicolas/.agent-workspace/daemon.sock',
+    launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.nabocorp.agent-workspace.daemon.plist',
     ...overrides,
   };
 }

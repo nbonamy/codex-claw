@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import backendPackage from '../../package.json';
 
 export const storeSchemaVersion = 1;
-const storeWrittenBy = `clawd ${backendPackage.version}`;
+const storeWrittenBy = `daemon ${backendPackage.version}`;
 
 export class StoreFormatError extends Error {
   constructor(message: string) {
@@ -34,7 +35,7 @@ export function parseStoreFile(file: string, text: string, supportedVersion = st
   const schemaVersion = parsed.schemaVersion as number;
   const writtenBy = typeof parsed.writtenBy === 'string' ? parsed.writtenBy : undefined;
   if (schemaVersion > supportedVersion) {
-    throw new StoreFormatError(`${file} uses schema ${schemaVersion}${writtenBy ? ` written by ${writtenBy}` : ''}; this build (${storeWrittenBy}) supports up to schema ${supportedVersion}. Update Codex Claw; this build will not rewrite the file.`);
+    throw new StoreFormatError(`${file} uses schema ${schemaVersion}${writtenBy ? ` written by ${writtenBy}` : ''}; this build (${storeWrittenBy}) supports up to schema ${supportedVersion}. Update ${product.name}; this build will not rewrite the file.`);
   }
   return { schemaVersion, ...(writtenBy ? { writtenBy } : {}), data: parsed.data };
 }

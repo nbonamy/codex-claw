@@ -1,10 +1,10 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
-import { decodeAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, RemoteConnection, Team } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey, type WorkItemAssignmentSource } from '@codex-claw/core/work-assignments';
-import type { RemoteClawdClientManager } from './remote-clawd-client';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { isAppSnapshotGetResult, type AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
+import { applyMainEventToSnapshot } from '@workspace/core/snapshot';
+import { decodeAppSnapshot } from '@workspace/core/snapshot-guards';
+import type { Agent, AppSnapshot, CreateAgentInput, CreateTeamInput, RemoteConnection, Team } from '@workspace/core/contracts';
+import { workItemAssignmentKey, type WorkItemAssignmentSource } from '@workspace/core/work-assignments';
+import type { RemoteDaemonClientManager } from './remote-daemon-client';
 
 export type RemoteTeamPointer = {
   connectionId: string;
@@ -15,13 +15,13 @@ export type RemoteTeamPointer = {
 export type RemoteAgentOwner = RemoteTeamPointer & { agent: Agent };
 
 export type RemoteTeamServiceOptions = {
-  clients: RemoteClawdClientManager;
+  clients: RemoteDaemonClientManager;
   getSnapshot: () => AppSnapshot;
-  onForwardedEvent: (connectionId: string, event: ClawBackendEvent) => void;
+  onForwardedEvent: (connectionId: string, event: AppBackendEvent) => void;
   onProjectedSnapshotChanged: () => void;
 };
 
-/** Owns remote clawd snapshot caching, team projection, and remote ownership lookup. */
+/** Owns remote daemon snapshot caching, team projection, and remote ownership lookup. */
 export class RemoteTeamService {
   private readonly snapshots = new Map<string, AppSnapshot>();
 
@@ -83,7 +83,7 @@ export class RemoteTeamService {
 
   async snapshot(connectionId: string): Promise<AppSnapshot> {
     const result = await this.remoteRequest(connectionId, backendMethods.snapshotGet);
-    if (!isClawSnapshotGetResult(result)) throw new Error('Remote snapshot is invalid.');
+    if (!isAppSnapshotGetResult(result)) throw new Error('Remote snapshot is invalid.');
     this.rememberSnapshot(connectionId, result.snapshot);
     return result.snapshot;
   }
@@ -200,7 +200,7 @@ export class RemoteTeamService {
     return connection;
   }
 
-  private applyEvent(connectionId: string, event: ClawBackendEvent): void {
+  private applyEvent(connectionId: string, event: AppBackendEvent): void {
     const decodedSnapshot = decodeSnapshotFromRemoteEvent(event);
     if (decodedSnapshot) {
       this.rememberSnapshot(connectionId, decodedSnapshot.value);
@@ -215,7 +215,7 @@ export class RemoteTeamService {
     if (this.shouldForwardEvent(connectionId, event)) this.options.onForwardedEvent(connectionId, event);
   }
 
-  private shouldForwardEvent(connectionId: string, event: ClawBackendEvent): boolean {
+  private shouldForwardEvent(connectionId: string, event: AppBackendEvent): boolean {
     const agentId = event.agentId;
     if (!agentId) return this.hasTeamPointer(connectionId);
     const remoteSnapshot = this.snapshots.get(connectionId);
@@ -234,7 +234,7 @@ export class RemoteTeamService {
   }
 }
 
-function decodeSnapshotFromRemoteEvent(event: ClawBackendEvent) {
+function decodeSnapshotFromRemoteEvent(event: AppBackendEvent) {
   const sideChannelSnapshot = decodeAppSnapshot(event.snapshot);
   if (sideChannelSnapshot) return sideChannelSnapshot;
   if (event.type !== 'snapshot.updated') return null;

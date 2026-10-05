@@ -3,8 +3,8 @@ import { ElMessage } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import GitWorkflowControl from '../GitWorkflowControl.vue';
-import type { Agent, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@codex-claw/core/contracts';
-import { encodeAppErrorDescriptor } from '@codex-claw/core/app-error';
+import type { Agent, AgentGitStatus, AgentGitWorkflow, MainToRendererEvent } from '@workspace/core/contracts';
+import { encodeAppErrorDescriptor } from '@workspace/core/app-error';
 import { stubElectronTestWindow } from '../../test/client';
 import '../../styles/base.css';
 
@@ -28,7 +28,7 @@ describe('GitWorkflowControl', () => {
     const actions = merge.findAll('.git-workflow-control__delivery-action');
     expect(actions.map(action => action.text())).toStrictEqual(['Merge', 'Create PR']);
     expect(actions.every(action => action.find('svg').exists())).toBe(true);
-    expect(actions.every(action => action.classes().includes('claw-button--neutral'))).toBe(true);
+    expect(actions.every(action => action.classes().includes('app-button--neutral'))).toBe(true);
     expect(actions.map(action => {
       return [getComputedStyle(action.element).color, getComputedStyle(action.get('svg').element).color];
     })).toStrictEqual([
@@ -57,10 +57,10 @@ describe('GitWorkflowControl', () => {
     await wrapper.get('.git-workflow-control__primary').trigger('click');
     expect(wrapper.find('[role="dialog"]').attributes('aria-labelledby')).toBeDefined();
     expect(wrapper.text()).toContain('Commit and push');
-    expect(wrapper.findAll('.claw-dialog__footer .claw-button:not(.claw-button--tertiary)').every((button) => button.attributes('disabled') !== undefined)).toBe(true);
-    expect(wrapper.findAll('.claw-dialog__footer .claw-button--tertiary').map((button) => button.text())).toStrictEqual(['Cancel']);
-    expect(submitButton(wrapper, 'Commit').classes()).toContain('claw-button--secondary');
-    expect(submitButton(wrapper, 'Commit and push').classes()).toContain('claw-button--primary');
+    expect(wrapper.findAll('.app-dialog__footer .app-button:not(.app-button--tertiary)').every((button) => button.attributes('disabled') !== undefined)).toBe(true);
+    expect(wrapper.findAll('.app-dialog__footer .app-button--tertiary').map((button) => button.text())).toStrictEqual(['Cancel']);
+    expect(submitButton(wrapper, 'Commit').classes()).toContain('app-button--secondary');
+    expect(submitButton(wrapper, 'Commit and push').classes()).toContain('app-button--primary');
     expect(wrapper.findAll('.git-workflow-control__scope-row')).toHaveLength(3);
     expect(wrapper.findAll('.git-workflow-control__stats')[0]?.text()).toContain('+4');
     expect(wrapper.findAll('.git-workflow-control__stats')[0]?.text()).toContain('−1');
@@ -792,7 +792,7 @@ describe('GitWorkflowControl', () => {
   it('shows handoff preparation before Git delivery begins', async () => {
     let listener: ((event: MainToRendererEvent) => void) | undefined;
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         onEvent: vi.fn((nextListener) => {
           listener = nextListener;
           return () => undefined;
@@ -1073,7 +1073,7 @@ describe('GitWorkflowControl', () => {
 });
 
 function submitButton(wrapper: ReturnType<typeof mountControl>, label: string) {
-  const button = wrapper.findAll('.claw-dialog__footer .claw-button').find((candidate) => candidate.text() === label);
+  const button = wrapper.findAll('.app-dialog__footer .app-button').find((candidate) => candidate.text() === label);
   if (!button) throw new Error(`Submit button not found: ${label}`);
   return button;
 }

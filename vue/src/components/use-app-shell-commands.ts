@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import type {
   Agent,
   AppCommand,
@@ -5,13 +6,13 @@ import type {
   RemoteConnection,
   SidePanelMarkdownRequest,
   Team,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { getCodexNativeRendererApi, type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
-import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
 import { ElMessage } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { translate } from '../i18n';
-import { codexClawApi, clawHostCapabilities } from '../platform-api';
+import { appApi, appHostCapabilities } from '../platform-api';
 import { useConfetti } from '../shared/confetti/use-confetti';
 import { confirmCloseTeam } from './team-close-confirmation';
 import { imageDataUrlArrayBuffer } from './image-annotation';
@@ -177,7 +178,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       event.key.toLowerCase() === 'b' &&
       currentAgent.value
     ) {
-      if (!clawHostCapabilities.embeddedBrowser) return;
+      if (!appHostCapabilities.embeddedBrowser) return;
       event.preventDefault();
       options.actions.openRightWorkspaceTab('browser');
       return;
@@ -252,13 +253,13 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     resetQuickAgentShortcuts();
 
     if (command.type === 'appshot-failed') {
-      if (!clawHostCapabilities.appshots) return;
+      if (!appHostCapabilities.appshots) return;
       ElMessage.error(command.message);
       return;
     }
 
     if (command.type === 'attach-appshot') {
-      if (!clawHostCapabilities.appshots) return;
+      if (!appHostCapabilities.appshots) return;
       void attachAppshot(command);
       return;
     }
@@ -295,7 +296,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     }
 
     if (command.type === 'open-browser' && command.agentId && command.url) {
-      if (!clawHostCapabilities.embeddedBrowser) return;
+      if (!appHostCapabilities.embeddedBrowser) return;
       options.actions.openBrowser(command);
       return;
     }
@@ -330,7 +331,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
         content: [
           '# Debug Markdown',
           '',
-          'Opened from the Codex Claw Debug menu.',
+          `Opened from the ${product.name} Debug menu.`,
           '',
           '## Rendering fixtures',
           '',
@@ -417,7 +418,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     }
 
     if (command.type === 'quit') {
-      if (!clawHostCapabilities.appLifecycle) return;
+      if (!appHostCapabilities.appLifecycle) return;
       void options.actions.quit();
       return;
     }
@@ -438,7 +439,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     }
 
     if (command.type === 'open-browser') {
-      if (!clawHostCapabilities.embeddedBrowser) return;
+      if (!appHostCapabilities.embeddedBrowser) return;
       if (isAgentWorkspaceVisible.value && currentAgent.value) {
         options.actions.openBrowser(command);
       }
@@ -668,7 +669,7 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
       window.addEventListener('keyup', handleShellKeyup);
       window.addEventListener('blur', resetQuickAgentShortcuts);
     }
-    unsubscribeAppCommand = codexClawApi?.onAppCommand?.(handleAppCommand) ?? null;
+    unsubscribeAppCommand = appApi?.onAppCommand?.(handleAppCommand) ?? null;
   });
 
   onBeforeUnmount(() => {

@@ -44,7 +44,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconX as XIcon } from '@tabler/icons-vue';
-import type { SavedPromptDraft } from '@codex-claw/core/contracts';
+import type { SavedPromptDraft } from '@workspace/core/contracts';
 
 const props = defineProps<{ drafts: readonly SavedPromptDraft[] }>();
 const emit = defineEmits<{

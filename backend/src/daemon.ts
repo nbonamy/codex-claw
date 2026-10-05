@@ -1,25 +1,27 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { product } from '@workspace/core/product';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { pathToFileURL } from 'node:url';
 import net from 'node:net';
 import type { Readable, Writable } from 'node:stream';
-import { createClawdRuntime, type ClawdRuntime, type ClawdRuntimeOptions } from './runtime';
+import { createDaemonRuntime, type DaemonRuntime, type DaemonRuntimeOptions } from './runtime';
 import { backendSocketPath } from './state';
 import { LocalSocketRpcServer } from './socket-server';
 import { StdioRpcPeer } from './stdio';
 import { debugMain, flushBackendLogs, logMain, warnMain } from './log';
 import backendPackage from '../package.json';
 
-export const CLAWD_VERSION = backendPackage.version;
+export const DAEMON_VERSION = backendPackage.version;
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (argv.includes('--state-dir')) {
-    process.stderr.write('Unsupported option: --state-dir. Set CODEX_CLAW_HOME to override ~/.codex-claw.\n');
+    process.stderr.write(`Unsupported option: --state-dir. Set APP_HOME to override ~/${product.homeDirectory}.
+`);
     process.exitCode = 1;
     return;
   }
 
   if (argv.includes('--version')) {
-    process.stdout.write(`clawd ${CLAWD_VERSION}\n`);
+    process.stdout.write(`daemon ${DAEMON_VERSION}\n`);
     return;
   }
 
@@ -38,7 +40,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  process.stderr.write('Usage: clawd --stdio | serve | connect | --version\nSet CODEX_CLAW_HOME to override ~/.codex-claw.\n');
+  process.stderr.write(`Usage: daemon --stdio | serve | connect | --version
+Set APP_HOME to override ~/${product.homeDirectory}.
+`);
   process.exitCode = 1;
 }
 
@@ -74,7 +78,7 @@ export async function connectToDaemon(options: ConnectToDaemonOptions = {}): Pro
 
   if (!connected) {
     socket.destroy();
-    stderr.write(`clawd daemon socket unavailable: ${connectErrorMessage}\n`);
+    stderr.write(`daemon daemon socket unavailable: ${connectErrorMessage}\n`);
     return 1;
   }
 
@@ -102,7 +106,7 @@ export async function connectToDaemon(options: ConnectToDaemonOptions = {}): Pro
 }
 
 async function runStdio(): Promise<void> {
-  let runtime: ClawdRuntime;
+  let runtime: DaemonRuntime;
   const stdio = new StdioRpcPeer({
     input: process.stdin,
     output: process.stdout,
@@ -111,8 +115,8 @@ async function runStdio(): Promise<void> {
     onOutputOverflow: (details) => warnMain('stdio', 'output buffer limit exceeded', details),
     onMessage: (message) => runtime.server.handleMessage(message),
   });
-  runtime = await createClawdRuntime({
-    version: CLAWD_VERSION,
+  runtime = await createDaemonRuntime({
+    version: DAEMON_VERSION,
     features: runtimeFeatures(),
     requestClient: (method, params) => stdio.request(method, params),
     emitEvent: (event) => stdio.notify(backendMethods.backendEventNotify, event),
@@ -147,8 +151,8 @@ async function runStdio(): Promise<void> {
 
 async function serve(): Promise<void> {
   let socketServer: LocalSocketRpcServer | null = null;
-  const runtime = await createClawdRuntime({
-    version: CLAWD_VERSION,
+  const runtime = await createDaemonRuntime({
+    version: DAEMON_VERSION,
     features: runtimeFeatures(),
     requestClient: (method, params) => {
       if (!socketServer) {
@@ -185,8 +189,8 @@ async function serve(): Promise<void> {
   });
 }
 
-function runtimeFeatures(): ClawdRuntimeOptions['features'] {
-  return process.env.CODEX_CLAW_HOST === 'web'
+function runtimeFeatures(): DaemonRuntimeOptions['features'] {
+  return process.env.APP_HOST === 'web'
     ? { computerUse: false, embeddedBrowser: false }
     : undefined;
 }

@@ -2,14 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOST="${CODEX_CLAW_WEBSITE_HOST:-joshua}"
-REMOTE_ROOT="${CODEX_CLAW_WEBSITE_ROOT:-/var/www/codex-claw}"
-NGINX_CONFIG="${CODEX_CLAW_NGINX_CONFIG:-/etc/nginx/sites-available/codex-claw.nabocorp.com.conf}"
+HOST="${APP_WEBSITE_HOST:-joshua}"
+REMOTE_ROOT="${APP_WEBSITE_ROOT:-/var/www/codex-claw}"
+NGINX_CONFIG="${APP_NGINX_CONFIG:-/etc/nginx/sites-available/codex-claw.nabocorp.com.conf}"
 NGINX_BOOTSTRAP_CONFIG="/etc/nginx/sites-available/codex-claw.nabocorp.com.bootstrap.conf"
 
 npm --prefix "$ROOT_DIR/.." run build:website
 
-echo "Deploying Codex Claw website to ${HOST}:${REMOTE_ROOT}"
+echo "Deploying website to ${HOST}:${REMOTE_ROOT}"
 ssh "$HOST" "sudo mkdir -p '$REMOTE_ROOT/site' && sudo chown -R \"\$(id -un):\$(id -gn)\" '$REMOTE_ROOT'"
 tar -czf - -C "$ROOT_DIR/../dist/website" . | ssh "$HOST" "tar -xzf - -C '$REMOTE_ROOT/site'"
 if ! ssh "$HOST" "test -f /etc/letsencrypt/live/codex-claw.nabocorp.com/fullchain.pem"; then

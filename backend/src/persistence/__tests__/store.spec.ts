@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from '
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import type { Visualization } from '@codex-claw/core/visualize';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import type { Visualization } from '@workspace/core/visualize';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../../state-persistence';
 import { AppStateStore } from '../store';
 import { StoreFormatError } from '../store-format';
@@ -12,7 +12,7 @@ import { StoreFormatError } from '../store-format';
 const visualization = (id: string): Visualization => ({ id, title: id, content: { kind: 'mermaid', source: 'flowchart LR; A --> B' }, createdAt: '2026-09-21T12:00:00.000Z', updatedAt: '2026-09-21T12:00:00.000Z' });
 
 let home = '';
-beforeEach(async () => { home = await mkdtemp(path.join(os.tmpdir(), 'claw-store-')); });
+beforeEach(async () => { home = await mkdtemp(path.join(os.tmpdir(), 'app-store-')); });
 afterEach(async () => { await rm(home, { recursive: true, force: true }); });
 
 const file = (...segments: string[]) => path.join(home, ...segments);
@@ -21,7 +21,7 @@ const readJson = async (...segments: string[]) => JSON.parse(await readFile(file
 
 function snapshotWithVisualizations(): AppSnapshot {
   const snapshot = createInitialSnapshot();
-  snapshot.repositoryVisualizations = { '/projects/claw': [visualization('visualization-a'), visualization('visualization-b')] };
+  snapshot.repositoryVisualizations = { '/projects/app': [visualization('visualization-a'), visualization('visualization-b')] };
   return snapshot;
 }
 
@@ -37,7 +37,7 @@ describe('AppStateStore', () => {
     expect((await readJson('roster.json')).schemaVersion).toBe(1);
     expect((await readJson('settings.json')).schemaVersion).toBe(1);
     const [directory] = await readdir(file('visualizations'));
-    expect(directory).toMatch(/^claw-[0-9a-f]{8}$/);
+    expect(directory).toMatch(/^app-[0-9a-f]{8}$/);
     expect((await readdir(file('visualizations', directory!))).sort()).toStrictEqual(['visualization-a.json', 'visualization-b.json']);
   });
 
@@ -54,7 +54,7 @@ describe('AppStateStore', () => {
     expect(restored).toStrictEqual(expected);
     expect(restored.general.providerApprovalDefaults).toStrictEqual({ codex: 'ask-for-approval', claude: 'acceptEdits' });
     expect((await readJson('settings.json')).schemaVersion).toBe(1);
-    expect(restored.repositoryVisualizations?.['/projects/claw']?.map((item) => item.id)).toStrictEqual(['visualization-a', 'visualization-b']);
+    expect(restored.repositoryVisualizations?.['/projects/app']?.map((item) => item.id)).toStrictEqual(['visualization-a', 'visualization-b']);
   });
 
   it('rewrites only the files whose content changed', async () => {
@@ -79,7 +79,7 @@ describe('AppStateStore', () => {
     await store.save(snapshot);
     const [directory] = await readdir(file('visualizations'));
 
-    snapshot.repositoryVisualizations = { '/projects/claw': [visualization('visualization-b')] };
+    snapshot.repositoryVisualizations = { '/projects/app': [visualization('visualization-b')] };
     await store.save(snapshot);
     expect(await readdir(file('visualizations', directory!))).toStrictEqual(['visualization-b.json']);
 
@@ -102,10 +102,10 @@ describe('AppStateStore', () => {
 
   it('refuses a roster written by a newer build and leaves it untouched', async () => {
     await new AppStateStore(home).save(createInitialSnapshot());
-    const newer = JSON.stringify({ schemaVersion: 2, writtenBy: 'clawd 9.9.9', data: {} });
+    const newer = JSON.stringify({ schemaVersion: 2, writtenBy: 'daemon 9.9.9', data: {} });
     await writeFile(file('roster.json'), newer);
 
-    await expect(new AppStateStore(home).load()).rejects.toThrowError(/clawd 9\.9\.9/);
+    await expect(new AppStateStore(home).load()).rejects.toThrowError(/daemon 9\.9\.9/);
     expect(await readFile(file('roster.json'), 'utf8')).toBe(newer);
   });
 
@@ -139,7 +139,7 @@ describe('AppStateStore', () => {
     const restored = await store.load();
     await store.save(restored);
 
-    expect(restored.repositoryVisualizations?.['/projects/claw']?.map((item) => item.id)).toStrictEqual(['visualization-b']);
+    expect(restored.repositoryVisualizations?.['/projects/app']?.map((item) => item.id)).toStrictEqual(['visualization-b']);
     expect(logs.join('\n')).toContain('visualization-a.json');
     expect(await readFile(damaged, 'utf8')).toBe('half a file');
   });
@@ -181,7 +181,7 @@ describe('migrating the legacy state.json', () => {
     expect(migrated.agents[0]!.statusText).toBe('Done');
     expect(migrated.agents[0]).not.toHaveProperty('plan');
     expect(migrated.clientPreferences).toBeUndefined();
-    expect(migrated.repositoryVisualizations?.['/projects/claw']).toHaveLength(2);
+    expect(migrated.repositoryVisualizations?.['/projects/app']).toHaveLength(2);
     expect(await new AppStateStore(home).load()).toStrictEqual(migrated);
   });
 
@@ -218,7 +218,7 @@ describe('migrating the legacy state.json', () => {
 
     const migrated = await new AppStateStore(home).load();
 
-    expect(migrated.repositoryVisualizations?.['/projects/claw']).toHaveLength(2);
+    expect(migrated.repositoryVisualizations?.['/projects/app']).toHaveLength(2);
     const archived = (await readdir(file('backups'))).find((name) => name.startsWith('layout-before-migration-'));
     expect(archived).toBeDefined();
     expect(await readFile(file('backups', archived!, 'roster.json'), 'utf8')).toContain('partial');

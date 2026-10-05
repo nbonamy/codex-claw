@@ -1,4 +1,4 @@
-import type { Visualization } from '@codex-claw/core/visualize';
+import type { Visualization } from '@workspace/core/visualize';
 
 export function visualizationRenderKey(visualization: Visualization): string {
   const content = visualization.content;

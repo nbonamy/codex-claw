@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexConversationEvent, SurfaceMessage } from '@codex-app-sdk/core/surface';
 import { codexSdkFixture, sdkAgent, sdkSummary } from './sdk-surface-fixture';
@@ -11,7 +12,7 @@ function message(id: string): SurfaceMessage {
   return { id, turnId: id, role: 'assistant', status: 'complete', createdAt: metadata.occurredAt, parts: [{ type: 'text', text: id }] };
 }
 
-describe('Codex SDK → Claw subagent ownership', () => {
+describe(`Codex SDK → ${product.name} subagent ownership`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
   const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });

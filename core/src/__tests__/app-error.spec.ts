@@ -38,6 +38,6 @@ describe('app error descriptors', () => {
   });
 
   it('ignores malformed encoded descriptors', () => {
-    expect(decodeAppErrorDescriptor('codex-claw-app-error:not-json broken')).toBeNull();
+    expect(decodeAppErrorDescriptor('agent-workspace-app-error:not-json broken')).toBeNull();
   });
 });

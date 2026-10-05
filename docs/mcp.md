@@ -28,15 +28,15 @@ agent removal; undelivered results are never pruned. See `architecture.md` for
 recovery and retention limits.
 
 
-Codex Claw owns local MCP endpoints for agent-to-agent collaboration and for
+Korus owns local MCP endpoints for agent-to-agent collaboration and for
 credentialed access to provider-hosted MCP servers. These are app surfaces,
-not Codex-specific protocols. Codex and Claude receive the same Claw-owned
+not Codex-specific protocols. Codex and Claude receive the same Korus-owned
 endpoints through their session-local configuration; each backend translates
 only that configuration into its native launch contract.
 
 ## Boundary
 
-`clawd` owns the MCP server, collaboration state, and backend-owned tool
+`daemon` owns the MCP server, collaboration state, and backend-owned tool
 effects. Electron main does not start this HTTP server; it only receives
 app-owned backend events for desktop effects such as displaying Markdown in the
 side panel. The renderer never talks to MCP directly.
@@ -48,12 +48,12 @@ Backend responsibilities:
   Codex, Claude, or renderer state;
 - obtain provider credentials from the existing work integration and refresh
   them before an upstream request or once after an upstream `401`;
-- expose only tools backed by real Claw product behavior;
+- expose only tools backed by real Korus product behavior;
 - keep message inboxes and connection state;
 - enforce team visibility;
 - notify the right agent when inbox work arrives;
 - translate status updates into app-owned `agent.updated` events.
-- route Computer Use requests to the connected desktop client; `clawd` never spawns the native helper itself.
+- route Computer Use requests to the connected desktop client; `daemon` never spawns the native helper itself.
 
 Electron main responsibilities:
 
@@ -78,7 +78,7 @@ loopback address:
 http://127.0.0.1:<port>/mcp
 ```
 
-The port is ephemeral by default. The server starts inside `clawd` before
+The port is ephemeral by default. The server starts inside `daemon` before
 backend drivers are constructed so Codex and Claude sessions receive a valid
 backend-owned MCP URL. Keep the server loopback-only unless we explicitly
 design a remote-control product surface.
@@ -97,12 +97,12 @@ Auxiliary endpoints:
   HTTP MCP endpoint when that provider is installed and connected.
 
 `GET /mcp` and `DELETE /mcp` are rejected because the current implementation is
-stateless per HTTP request while Claw's process-local coordinator owns the
+stateless per HTTP request while Korus's process-local coordinator owns the
 collaboration state.
 
 Provider endpoints preserve Streamable HTTP methods, session headers, response
 content types, and response bodies. They replace any caller authorization with
-a current Claw-owned provider credential. The upstream token never appears in
+a current Korus-owned provider credential. The upstream token never appears in
 backend session config, MCP tool input/output, renderer state, or logs.
 
 ## Hosted MCP Gateway
@@ -115,8 +115,8 @@ reverse MCP proxy:
 
 ```text
 Codex or Claude
-  -> agent-scoped Claw loopback MCP URL
-  -> clawd hosted MCP gateway
+  -> agent-scoped Korus loopback MCP URL
+  -> daemon hosted MCP gateway
   -> current credential from WorkIntegrationManager
   -> provider-hosted MCP server
 ```
@@ -128,7 +128,7 @@ named `github` or `linear`, preserving the upstream tool names and schemas under
 the backend's normal MCP namespace. Disconnecting an integration disables its
 entry for future session configuration; an already-running session keeps its
 local URL but calls fail until that integration is reconnected. Each request
-requires a known Claw agent identity, as on the collaboration endpoint.
+requires a known Korus agent identity, as on the collaboration endpoint.
 
 Linear reuses the integration's OAuth `read,write` grant for issue reads,
 creation, updates and comments. There is no additional login or API-key setting
@@ -136,23 +136,23 @@ for MCP. The official [Linear MCP endpoint](https://linear.app/docs/mcp) accepts
 the existing OAuth bearer credential; its catalog remains upstream-owned.
 GitHub code and pull-request tools continue using the separate GitHub endpoint.
 
-Claw also launches its Codex app-server with
+Korus also launches its Codex app-server with
 `plugins."github@openai-curated-remote".enabled=false` and
 `plugins."linear@openai-curated-remote".enabled=false`. These process-local
 overrides prevent globally installed provider plugins from contributing duplicate
-tool surfaces inside Claw. They do not edit the shared Codex config or disable
+tool surfaces inside Korus. They do not edit the shared Codex config or disable
 plugins in ChatGPT and other Codex clients.
 
-For each Codex thread, Claw disables the ChatGPT GitHub connector only when the
-same thread receives Claw's authenticated `github` MCP proxy. If Claw has no
+For each Codex thread, Korus disables the ChatGPT GitHub connector only when the
+same thread receives Korus's authenticated `github` MCP proxy. If Korus has no
 usable GitHub integration, it leaves the ChatGPT connector enabled as a
-fallback so the model can still access GitHub even though Claw-specific GitHub
+fallback so the model can still access GitHub even though Korus-specific GitHub
 features are unavailable. The choice is session-local and never changes the
 user's shared Codex or ChatGPT configuration.
 
 `WorkIntegrationManager` is the runtime credential authority. The gateway asks it
 for an authorization header on every upstream request, so the ordinary expiry
-check and concurrent refresh de-duplication apply to both Claw's product
+check and concurrent refresh de-duplication apply to both Korus's product
 features and MCP calls for the same provider. If the upstream rejects a credential with `401`,
 the gateway asks the manager to rotate it and retries that request exactly once.
 Refresh failure marks only that provider's shared connection as requiring
@@ -160,7 +160,7 @@ reconnection. Caller Authorization is replaced, never used as a fallback.
 
 Do not configure a provider's remote URL or bearer token directly in Codex,
 Claude, or user-global MCP settings. That would expose a rotating secret to the
-harness, split credential ownership, and make Claw unable to refresh an active
+harness, split credential ownership, and make Korus unable to refresh an active
 session safely. Future Apps should add catalog/install state and provider auth
 adapters behind this gateway; they should not add provider-specific transcript,
 tool-schema, or API wrappers to the renderer.
@@ -171,14 +171,14 @@ Backends should receive the MCP server through request-local or session-local
 configuration. Do not mutate a user's global tool configuration as part of the
 normal app path.
 
-For Codex, `clawd` starts `codex app-server` with only process-wide feature
-overrides, then passes the Claw MCP server through each agent's
+For Codex, `daemon` starts `codex app-server` with only process-wide feature
+overrides, then passes the Korus MCP server through each agent's
 `thread/start.config` or `thread/resume.config`:
 
 ```json
 {
-  "mcp_servers.codex_claw.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
-  "mcp_servers.codex_claw.default_tools_approval_mode": "approve"
+  "mcp_servers.workspace.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
+  "mcp_servers.workspace.default_tools_approval_mode": "approve"
 }
 ```
 
@@ -191,7 +191,7 @@ When both integrations are connected, the same extension also adds:
 }
 ```
 
-Only `codex_claw` collaboration tools receive Claw's automatic approval mode.
+Only `workspace` collaboration tools receive Korus's automatic approval mode.
 Hosted provider tools keep the backend's normal approval behavior.
 
 The agent id in the MCP URL is the app's session-local caller identity. Tool
@@ -200,8 +200,8 @@ own `agentId` or `from`. The same unique ID is also injected into the agent's
 developer instructions and returned by `list-agents`, so agents can coordinate
 precisely.
 
-The scoped `mcp_servers.codex_claw.default_tools_approval_mode = "approve"`
-override authorizes only Claw's own collaboration tools; it does not authorize
+The scoped `mcp_servers.workspace.default_tools_approval_mode = "approve"`
+override authorizes only Korus's own collaboration tools; it does not authorize
 all Codex shell/file operations and does not mutate the user's global MCP
 config.
 
@@ -212,7 +212,7 @@ HTTP or HTTPS URL, opens that agent's Browser workspace without changing the
 user's selected agent, and waits for its sandboxed page to load. The agent can
 then use `browser-get-dom`,
 `browser-screenshot`, `browser-click`, `browser-type`, `browser-scroll`, and
-`browser-console-logs`. `clawd` routes opening through `client/browser/open`
+`browser-console-logs`. `daemon` routes opening through `client/browser/open`
 and page operations through `client/browser/execute`; Electron main performs
 the operations against its sandboxed `WebContentsView`. Browser instances are
 addressed by agent id and browser id; today's UI uses one stable `primary`
@@ -224,29 +224,29 @@ page-script access.
 
 ## Computer Use
 
-Computer Use is a local macOS capability exposed through the same Claw MCP
+Computer Use is a local macOS capability exposed through the same Korus MCP
 server. The shared native helper lives in `~/src/computer-use/macos`; Codex
-Claw packages its own signed `Codex Claw Computer Use.app` copy. The release
+Korus packages its own signed `Korus Computer Use.app` copy. The release
 artifact and checksum are pinned in `computer-use-release.json`; local helper
 development remains available through `npm run build:computer-use:local`.
-Claw and the bundled helper move together on the v2 contract; there is no v1
+Korus and the bundled helper move together on the v2 contract; there is no v1
 compatibility layer or protocol negotiation. The version returned by status is
 diagnostic only.
 
 Computer Use tools are omitted from an agent's MCP server unless the user
 enables Computer Use in Settings -> Plugins. Chrome is a separate bundled
-ChatGPT plugin: it is not reimplemented as a Claw MCP server. When enabled in
-ChatGPT using Claw's shared `CODEX_HOME`, the `chrome:control-chrome` skill is
-available to agents that have Chrome enabled in Claw settings.
+ChatGPT plugin: it is not reimplemented as a Korus MCP server. When enabled in
+ChatGPT using Korus's shared `CODEX_HOME`, the `chrome:control-chrome` skill is
+available to agents that have Chrome enabled in Korus settings.
 
-When Claw launches Codex app-server, it disables that child process's
+When Korus launches Codex app-server, it disables that child process's
 `node_repl` MCP server unless Chrome is enabled in Settings -> Plugins. This
-keeps the raw host bridge out of the default Claw session while allowing the
+keeps the raw host bridge out of the default Korus session while allowing the
 bundled Chrome skill to use it when explicitly enabled; it does not change the
 user's global MCP configuration.
 
 ```text
-agent -> codex_claw MCP -> clawd -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility
+agent -> workspace MCP -> daemon -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility
 ```
 
 Tools are `computer-use-guide`, `computer-use-status`, `computer-use-request-accessibility`,
@@ -364,25 +364,25 @@ afterward. `computer-use-stop` closes the session immediately; inactivity
 closes it automatically, so the next interaction must begin with a fresh app
 observation.
 
-For Claude, `clawd` passes the same request-scoped agent URL through the Claude
+For Claude, `daemon` passes the same request-scoped agent URL through the Claude
 CLI instead of mutating global Claude Code config:
 
 ```bash
 claude -p "<prompt>" \
-  --mcp-config '{"mcpServers":{"codex_claw":{"type":"http","url":"http://127.0.0.1:<port>/mcp?agentId=<agent-id>"}}}' \
-  --allowed-tools 'mcp__codex_claw__*' \
-  --append-system-prompt "<Codex Claw developer instructions>"
+  --mcp-config '{"mcpServers":{"workspace":{"type":"http","url":"http://127.0.0.1:<port>/mcp?agentId=<agent-id>"}}}' \
+  --allowed-tools 'mcp__workspace__*' \
+  --append-system-prompt "<Korus developer instructions>"
 ```
 
-The `--allowed-tools` pattern authorizes only tools from the `codex_claw` MCP
+The `--allowed-tools` pattern authorizes only tools from the `workspace` MCP
 server. Connected hosted servers are added to `mcpServers`, but are not added to
 that allowlist, so their normal permission flow remains intact.
 
-`clawd` also adds developer instructions that give the backend agent its Claw
+`daemon` also adds developer instructions that give the backend agent its Korus
 agent ID/name/folder and advertise the product workflows models do not reliably
 discover from schemas alone. The instructions distinguish engine-native
 subagents, which remain inside the current Codex or Claude Code session, from
-Claw co-agents, which are separate team agents created with `create-agent`.
+Korus co-agents, which are separate team agents created with `create-agent`.
 Explicit subagent and co-agent requests use the corresponding mechanism;
 ambiguous requests to delegate, parallelize, or use another agent require a
 clarifying question. The same instructions cover `display-markdown`, meaningful
@@ -457,10 +457,10 @@ Input:
 The operation always clears `agent.statusText` and emits one `agent.updated`
 event. Passing `flag` replaces the current proposal; omitting it leaves an
 existing proposal untouched. A new user prompt clears `ready_for_review`
-automatically, without clearing other proposed actions. Claw renders a
+automatically, without clearing other proposed actions. Korus renders a
 proposal as a compact composer-shelf action. Activating delegation submits an
 app-owned prompt through the existing worktree/co-agent workflow. Activating
-review readiness opens Claw's review setup after the backend accepts and clears
+review readiness opens Korus's review setup after the backend accepts and clears
 the flag. A failed action leaves its flag available for retry. The user can
 dismiss either flag.
 
@@ -496,7 +496,7 @@ Effects:
   available;
 - otherwise exposes it in the recipient's visible prompt queue and sends it as
   the next prompt after the active turn completes;
-- `clawd` owns that same queue for user and teammate prompts; renderer actions
+- `daemon` owns that same queue for user and teammate prompts; renderer actions
   request steer/delete mutations and only reflect confirmed snapshot changes;
 - returns the resolved recipient ID and display name so tool activity uses a
   human-friendly label even when the caller addressed an agent by UUID.
@@ -530,7 +530,7 @@ Visible agents without an active MCP session are skipped internally.
 
 ### `create-agent`
 
-Creates a Claw co-agent in the caller's team without selecting it. The tool can
+Creates a Korus co-agent in the caller's team without selecting it. The tool can
 also create an isolated worktree and start the co-agent with initial
 instructions as one backend-owned operation. It is distinct from the native
 subagent mechanism owned by Codex or Claude Code.
@@ -547,13 +547,13 @@ Input:
   cross-backend creation uses that backend's defaults instead;
 - `prompt`: optional concise initial request shown to the user. The tool stays
   pending until the new agent accepts this prompt;
-- `instructions`: optional full handoff, requiring a nonempty `prompt`. Claw
+- `instructions`: optional full handoff, requiring a nonempty `prompt`. Korus
   prepends these instructions inside `<context>` and leaves the visible request
   outside it. Existing prompt-only calls are unchanged. This is presentation
   separation, not secret storage or a separate system-instruction channel:
   both parts remain in the provider transcript.
 
-`clawd` emits transient `agentCreation.progress` events around worktree
+`daemon` emits transient `agentCreation.progress` events around worktree
 creation, agent creation, and initial-prompt handoff. The renderer shows the
 staged preparation dialog only when the calling agent is still active, so
 background delegation never interrupts an unrelated conversation.
@@ -575,7 +575,7 @@ names what needs recovery.
 
 ### `display-markdown`
 
-Displays Markdown in Codex Claw's right side panel.
+Displays Markdown in Korus's right side panel.
 
 Input:
 
@@ -629,7 +629,7 @@ When a recipient receives a direct or broadcast message:
   message body directly;
 - the delivery prompt is also appended to the recipient's visible conversation
   as a user message, just like a normal prompt from the renderer;
-- the renderer recognizes Claw's delivery envelope, labels the bubble with the
+- the renderer recognizes Korus's delivery envelope, labels the bubble with the
   sender name, and shows only the teammate-authored body; the complete envelope
   still reaches the backend agent and remains recoverable from hydrated thread
   history;
@@ -641,7 +641,7 @@ instruction. Messages use a versioned, JSON-encoded envelope with stable marker
 lines, followed by separately delimited delivery guidance:
 
 ```text
-<<<CODEX_CLAW_AGENT_MESSAGES_V1>>>
+<<<APP_AGENT_MESSAGES_V1>>>
 {
   "version": 1,
   "messages": [
@@ -653,7 +653,7 @@ lines, followed by separately delimited delivery guidance:
     }
   ]
 }
-<<<END_CODEX_CLAW_AGENT_MESSAGES_V1>>>
+<<<END_APP_AGENT_MESSAGES_V1>>>
 ```
 
 The renderer reads only the delimited envelope, so delivery-instruction wording
@@ -666,7 +666,7 @@ is no separate renderer-side command path.
 ## Approval Flow
 
 Codex may ask the app-server client to approve MCP tool calls through
-`mcpServer/elicitation/request`. Claw does not auto-accept these requests.
+`mcpServer/elicitation/request`. Korus does not auto-accept these requests.
 Electron main translates the Codex elicitation into an app-owned
 `confirm_tool` client request, emits `approval.requested`, and keeps the
 JSON-RPC request pending until the renderer answers.
@@ -702,7 +702,7 @@ Each review session receives a dedicated MCP URL whose tool surface adds
 from the durable review session ID and remains stable across app restarts,
 inspection, clarification, remediation, and later rounds because the provider
 conversation may retain its initial MCP configuration. The reviewer can change
-findings while the review is open, even after an inspection turn ends. Claw
+findings while the review is open, even after an inspection turn ends. Korus
 closes the context when the user finishes or discards the review.
 `update_finding` may also move an actively remediated finding to `fixed`.
 `delete_finding` removes a finding from every round of the review. These are
@@ -733,10 +733,10 @@ visible IDs, names, and folders so the agent can recover cleanly.
 - Replace, rather than forward, any client-supplied `Authorization` header at
   the hosted MCP boundary.
 - Do not expose filesystem, worktree, panel, or process-control tools until
-  Claw owns those product capabilities. `display-markdown` is allowed because
-  Claw now owns a constrained Markdown side panel and agent-folder-limited file
+  Korus owns those product capabilities. `display-markdown` is allowed because
+  Korus now owns a constrained Markdown side panel and agent-folder-limited file
   preview path.
-- Advertise only tools backed by real Claw product capabilities.
+- Advertise only tools backed by real Korus product capabilities.
 - Do not let renderer code call MCP directly.
 - Prefer request-local backend configuration over global user config mutation.
 
@@ -764,7 +764,7 @@ Potential tools are intentionally not exposed yet:
 - markdown or artifact panel display;
 - file or git actions.
 
-Add them only when Claw has the matching product capability and a tested
+Add them only when Korus has the matching product capability and a tested
 main-process implementation.
 
 ### Visualize tools
@@ -791,7 +791,7 @@ Mermaid content is limited to the diagram families rendered by
 SVG for other visualization types, and unsupported Mermaid input is rejected
 before it can enter durable state.
 
-Generated-image inputs must resolve inside Claw's generated-images root and
+Generated-image inputs must resolve inside Korus's generated-images root and
 are capped at 10 MiB. The app snapshot stores only the relative asset path,
 MIME type, and alt text; clients load bytes through
 `agent/visualize/asset/get`. Renderer SVG sanitization and generated-image
@@ -820,7 +820,7 @@ creates the isolated worktree later, when code work begins.
 `list-mission-artifacts` and `read-mission-artifact` let any assigned Mission
 worker discover and consume the canonical Markdown created by earlier stages.
 `write-mission-artifact` writes only the caller's assigned stage under the
-Claw-owned Mission home. Existing files use an expected revision so concurrent
+Korus-owned Mission home. Existing files use an expected revision so concurrent
 or stale agents cannot silently overwrite each other.
 
 `upsert-mission-ticket` accepts writes only from the current Tickets-stage orchestrator.

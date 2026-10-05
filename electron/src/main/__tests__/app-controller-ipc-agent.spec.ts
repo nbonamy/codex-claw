@@ -1,12 +1,13 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, ConversationSummary, AutomationLocation, RendererMessage, RendererSendPromptOptions } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, ConversationSummary, AutomationLocation, RendererMessage, RendererSendPromptOptions } from '@workspace/core/contracts';
 import { currentSnapshot, createBackendClient } from './app-controller-test-harness';
 
 describe('AppController', () => {
 
-  it('routes agent restart through clawd', async () => {
+  it('routes agent restart through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
     const backendSnapshot = {
@@ -23,7 +24,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/conversation/reset', { agentId: 'agent-dina' });
   });
 
-  it('routes lazy provider history hydration through clawd', async () => {
+  it('routes lazy provider history hydration through daemon', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = structuredClone(snapshot);
     const request = vi.fn().mockResolvedValue(backendSnapshot);
@@ -37,7 +38,7 @@ describe('AppController', () => {
     expect(currentSnapshot(controller)).toStrictEqual(backendSnapshot);
   });
 
-  it('routes agent goal mutations through clawd', async () => {
+  it('routes agent goal mutations through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const goalSnapshot = {
@@ -75,7 +76,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(2, 'agent/goal/clear', { agentId: 'agent-dina' });
   });
 
-  it('routes approval preset updates through clawd', async () => {
+  it('routes approval preset updates through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
@@ -102,7 +103,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/approvalPreset/update', { agentId: 'agent-dina', preset: 'approve-for-me' });
   });
 
-  it('routes permission mode updates through their separate clawd method', async () => {
+  it('routes permission mode updates through their separate daemon method', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0] = {
@@ -119,7 +120,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/permissionMode/update', { agentId: 'agent-dina', mode: 'acceptEdits' });
   });
 
-  it('routes active-turn steering through clawd', async () => {
+  it('routes active-turn steering through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
@@ -160,7 +161,7 @@ describe('AppController', () => {
     })).rejects.toThrow('Attachment reference is invalid or expired');
   });
 
-  it('routes queued prompt mutations through clawd', async () => {
+  it('routes queued prompt mutations through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const request = vi.fn().mockResolvedValue(snapshot);
@@ -180,7 +181,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(3, 'agent/queuedPrompt/delete', { agentId: 'agent-dina', promptId: 'prompt-2' });
   });
 
-  it('routes interruption through clawd', async () => {
+  it('routes interruption through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
     snapshot.sourceFolder.initialized = true;
@@ -201,7 +202,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/interrupt', { agentId: 'agent-dina' });
   });
 
-  it('routes prompts through clawd by agent id', async () => {
+  it('routes prompts through daemon by agent id', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backend = 'claude';
     snapshot.agents[0].backendDefaults = { kind: 'claude' };
@@ -225,9 +226,9 @@ describe('AppController', () => {
     });
   });
 
-  it('reads historical conversation messages through clawd', async () => {
+  it('reads historical conversation messages through daemon', async () => {
     const snapshot = createInitialSnapshot();
-    const generatedImageUrl = 'file:///Users/nbonamy/.codex-claw/codex-home/generated_images/thread/history.png';
+    const generatedImageUrl = `file:///Users/nbonamy/${product.homeDirectory}/codex-home/generated_images/thread/history.png`;
     const messages: RendererMessage[] = [
       {
         id: 'user-thread-dina-user-1',
@@ -257,7 +258,7 @@ describe('AppController', () => {
     const loaded = await readConversationMessages(controller, { backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
     expect(loaded[0]).toStrictEqual(messages[0]);
     const media = loaded[1]?.parts.find((part) => part.type === 'media');
-    expect(media?.type === 'media' ? media.media.url : null).toMatch(/^codex-claw-media:\/\/generated\//);
+    expect(media?.type === 'media' ? media.media.url : null).toMatch(/^agent-workspace-media:\/\/generated\//);
     expect(media?.type === 'media' ? media.media.url : null).not.toBe(generatedImageUrl);
     expect(request).toHaveBeenCalledWith('agent/conversation/messages/get', {
       ref: { backend: 'codex', threadId: 'thread-dina' },
@@ -265,7 +266,7 @@ describe('AppController', () => {
     });
   });
 
-  it('lists agent conversations through clawd', async () => {
+  it('lists agent conversations through daemon', async () => {
     const snapshot = createInitialSnapshot();
     const conversations: ConversationSummary[] = [{
       id: 'thread-dina',
@@ -284,7 +285,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/conversations/list', { agentId: 'agent-dina', input: undefined });
   });
 
-  it('routes agent conversation resume through clawd', async () => {
+  it('routes agent conversation resume through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-old' };
     const backendSnapshot = {
@@ -302,7 +303,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', target });
   });
 
-  it('lets clawd validate busy agent conversation resume', async () => {
+  it('lets daemon validate busy agent conversation resume', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].status = { type: 'working' };
     const request = vi.fn().mockRejectedValue(new Error('Agent must be idle before resuming a conversation.'));
@@ -315,7 +316,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/conversation/resume', { agentId: 'agent-dina', target });
   });
 
-  it('lets clawd reject unrecorded historical conversation refs', async () => {
+  it('lets daemon reject unrecorded historical conversation refs', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockRejectedValue(new Error('Conversation reference is not available.'));
     const controller = new AppController(snapshot, createBackendClient({ request }));
@@ -329,7 +330,7 @@ describe('AppController', () => {
     });
   });
 
-  it('lets clawd reject invalid historical conversation refs', async () => {
+  it('lets daemon reject invalid historical conversation refs', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockRejectedValue(new Error('Invalid conversation reference.'));
     const controller = new AppController(snapshot, createBackendClient({ request }));
@@ -343,10 +344,10 @@ describe('AppController', () => {
     });
   });
 
-  it('routes agent file listing and previews through clawd', async () => {
+  it('routes agent file listing and previews through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
-    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
+    snapshot.agents[0].folder = '/Users/nbonamy/src/agent-workspace';
     const files: AgentFileSearchItem[] = [{ name: 'README.md', path: 'README.md' }];
     const readResult: AgentFilePreviewResult = { path: 'README.md', size: 10, kind: 'text', content: '# Read me\n' };
     const request = vi.fn()
@@ -367,7 +368,7 @@ describe('AppController', () => {
     });
   });
 
-  it('routes Codex turn deletion through clawd', async () => {
+  it('routes Codex turn deletion through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     snapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-dina' };
@@ -454,7 +455,7 @@ async function listAgentConversations(
 async function resumeAgentConversation(
   controller: AppController,
   agentId: string,
-  target: import('@codex-claw/core/contracts').ConversationResumeTarget,
+  target: import('@workspace/core/contracts').ConversationResumeTarget,
 ): Promise<AppSnapshot> {
   return (controller as unknown as {
     resumeAgentConversation(agentId: string, target: unknown): Promise<AppSnapshot>;

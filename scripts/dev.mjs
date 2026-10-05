@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const backendBundle = path.join(rootDir, 'backend/dist/clawd.mjs');
+const backendBundle = path.join(rootDir, 'backend/dist/daemon.mjs');
 const children = new Set();
 let shuttingDown = false;
 
@@ -14,14 +14,14 @@ process.env.CODEX_APP_SDK_SOURCE = '1';
 
 if (process.argv.includes('--help')) {
   console.log('Usage: npm run dev');
-  console.log('Builds clawd once, watches backend output, then starts Electron without restarting clawd on bundle changes.');
+  console.log('Builds daemon once, watches backend output, then starts Electron without restarting daemon on bundle changes.');
   process.exit(0);
 }
 
 await run('npm', ['run', 'build:codex']);
 await run('npm', ['run', 'build:computer-use']);
 await run('npm', ['run', 'build:tts']);
-await run('npm', ['run', 'build', '-w', '@codex-claw/backend']);
+await run('npm', ['run', 'build', '-w', '@workspace/backend']);
 
 const backendWatch = start('npm', ['run', 'dev:backend'], {
   cwd: rootDir,
@@ -34,12 +34,12 @@ const electronDev = start('npm', ['run', 'start:electron'], {
   cwd: rootDir,
   name: 'electron',
   env: {
-    CODEX_CLAW_BACKEND_MODE: 'bundled',
-    CODEX_CLAW_BACKEND_COMMAND: process.execPath,
-    CODEX_CLAW_BACKEND_ARGS: `${backendBundle},--stdio`,
-    CODEX_CLAW_BACKEND_WATCH_FILE: '',
-    CODEX_CLAW_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
-    CODEX_CLAW_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex'),
+    APP_BACKEND_MODE: 'bundled',
+    APP_BACKEND_COMMAND: process.execPath,
+    APP_BACKEND_ARGS: `${backendBundle},--stdio`,
+    APP_BACKEND_WATCH_FILE: '',
+    APP_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
+    APP_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex'),
     CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', '@codex-app-sdk', 'backend', 'assets'),
   },
 });

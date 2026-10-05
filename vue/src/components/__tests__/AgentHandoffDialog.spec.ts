@@ -1,7 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils';
 import { computed } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 import AgentHandoffDialog from '../AgentHandoffDialog.vue';
 import { backendChoicesKey } from '../backend-selection';
 

@@ -154,77 +154,77 @@ describe('agent git service parsers', () => {
   it('reports the primary repository name for a linked worktree', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'status') return { stdout: '## test\n' };
-      if (args[0] === 'rev-parse') return { stdout: '/Users/nbonamy/src/codex-claw-git-fixture/.git\n' };
-      if (args[0] === 'remote') return { stdout: 'origin\tgit@github.com:nbonamy/codex-claw-git-fixture.git (fetch)\n' };
+      if (args[0] === 'rev-parse') return { stdout: '/Users/nbonamy/src/agent-workspace-git-fixture/.git\n' };
+      if (args[0] === 'remote') return { stdout: 'origin\tgit@github.com:nbonamy/agent-workspace-git-fixture.git (fetch)\n' };
       return { stdout: '' };
     });
     const service = new AgentGitService(() => new Date(), runGit);
 
-    await expect(service.status('/Users/nbonamy/src/codex-claw-git-fixture-test')).resolves.toMatchObject({
-      repository: 'codex-claw-git-fixture',
-      githubRepository: 'nbonamy/codex-claw-git-fixture',
+    await expect(service.status('/Users/nbonamy/src/agent-workspace-git-fixture-test')).resolves.toMatchObject({
+      repository: 'agent-workspace-git-fixture',
+      githubRepository: 'nbonamy/agent-workspace-git-fixture',
       branch: 'test',
     });
   });
 
   it('resolves lightweight workspace identity for a primary checkout', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/codex-claw\n' };
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/agent-workspace\n' };
       if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '.git\n' };
       if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
       throw new Error(`Unexpected git command: ${args.join(' ')}`);
     });
     const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
 
-    await expect(service.identity('/src/codex-claw')).resolves.toStrictEqual({
+    await expect(service.identity('/src/agent-workspace')).resolves.toStrictEqual({
       kind: 'git',
-      folder: '/src/codex-claw',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/src/codex-claw',
+      folder: '/src/agent-workspace',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/src/agent-workspace',
       branch: 'main',
       isLinkedWorktree: false,
-      primaryWorktreeRoot: '/src/codex-claw',
+      primaryWorktreeRoot: '/src/agent-workspace',
       updatedAt: '2026-08-27T12:00:00.000Z',
     });
   });
 
   it('resolves linked worktree and detached workspace identity', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/codex-claw-feature\n' };
-      if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '/src/codex-claw/.git\n' };
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/agent-workspace-feature\n' };
+      if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '/src/agent-workspace/.git\n' };
       if (args[0] === 'symbolic-ref') throw new Error('detached HEAD');
-      if (args[0] === 'remote' && args[1] === 'get-url') return { stdout: 'git@github.com:nbonamy/codex-claw.git\n' };
+      if (args[0] === 'remote' && args[1] === 'get-url') return { stdout: 'git@github.com:nbonamy/agent-workspace.git\n' };
       throw new Error(`Unexpected git command: ${args.join(' ')}`);
     });
     const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
 
-    await expect(service.identity('/src/codex-claw-feature')).resolves.toStrictEqual({
+    await expect(service.identity('/src/agent-workspace-feature')).resolves.toStrictEqual({
       kind: 'git',
-      folder: '/src/codex-claw-feature',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/src/codex-claw-feature',
+      folder: '/src/agent-workspace-feature',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/src/agent-workspace-feature',
       branch: null,
       isLinkedWorktree: true,
-      primaryWorktreeRoot: '/src/codex-claw',
-      originUrl: 'github.com:nbonamy/codex-claw.git',
+      primaryWorktreeRoot: '/src/agent-workspace',
+      originUrl: 'github.com:nbonamy/agent-workspace.git',
       updatedAt: '2026-08-27T12:00:00.000Z',
     });
   });
 
   it('removes credentials from the persisted workspace origin', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/codex-claw\n' };
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/agent-workspace\n' };
       if (args[0] === 'rev-parse' && args[1] === '--git-common-dir') return { stdout: '.git\n' };
       if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
       if (args[0] === 'remote' && args[1] === 'get-url') {
-        return { stdout: 'https://oauth2:secret@github.com/openai/codex-claw.git?token=secret\n' };
+        return { stdout: 'https://oauth2:secret@github.com/openai/agent-workspace.git?token=secret\n' };
       }
       throw new Error(`Unexpected git command: ${args.join(' ')}`);
     });
     const service = new AgentGitService(() => new Date('2026-08-27T12:00:00.000Z'), runGit);
 
-    await expect(service.identity('/src/codex-claw')).resolves.toMatchObject({
-      originUrl: 'https://github.com/openai/codex-claw.git',
+    await expect(service.identity('/src/agent-workspace')).resolves.toMatchObject({
+      originUrl: 'https://github.com/openai/agent-workspace.git',
     });
   });
 
@@ -419,7 +419,7 @@ describe('agent git service parsers', () => {
       if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
       if (args.includes('@{upstream}')) return { stdout: '' };
       if (args[0] === 'remote' && args[1] === undefined) return { stdout: 'origin\n' };
-      if (args[0] === 'remote') return { stdout: 'git@github.com:nbonamy/codex-claw.git\n' };
+      if (args[0] === 'remote') return { stdout: 'git@github.com:nbonamy/agent-workspace.git\n' };
       if (args[0] === 'status') return { stdout: ' M src/a.ts\0?? src/new.ts\0' };
       if (args.includes('--no-index')) return { stdout: '2\t0\tsrc/new.ts\n' };
       if (args[0] === 'diff' && args[1] === '--cached') return { stdout: '4\t1\tsrc/a.ts\n' };
@@ -429,7 +429,7 @@ describe('agent git service parsers', () => {
     const service = new AgentGitService(() => new Date(), runGit);
 
     await expect(service.workflow('/repo')).resolves.toMatchObject({
-      repository: 'nbonamy/codex-claw', branch: 'feature', remote: 'origin', detached: false,
+      repository: 'nbonamy/agent-workspace', branch: 'feature', remote: 'origin', detached: false,
       isLinkedWorktree: false,
       unstagedFiles: ['src/a.ts', 'src/new.ts'], stagedFiles: [],
       stagedAddedLines: 4, stagedRemovedLines: 1,

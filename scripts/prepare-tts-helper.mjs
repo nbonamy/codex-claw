@@ -12,12 +12,12 @@ if (process.platform !== 'darwin') {
 
 const packageDir = path.join(rootDir, 'native', 'tts-helper');
 const destinationDir = path.join(rootDir, 'electron', '.tts');
-const destination = path.join(destinationDir, 'codex-claw-tts-helper');
+const destination = path.join(destinationDir, 'app-tts-helper');
 const buildResult = spawnSync('swift', [
   'build',
   '--package-path', packageDir,
   '--configuration', 'release',
-  '--product', 'codex-claw-tts-helper',
+  '--product', 'app-tts-helper',
 ], { stdio: 'inherit' });
 
 if (buildResult.error) throw buildResult.error;
@@ -37,6 +37,6 @@ const binaryDir = result.stdout.trim().split('\n').at(-1);
 if (!binaryDir) throw new Error('Swift did not report the TTS helper output directory.');
 
 fs.mkdirSync(destinationDir, { recursive: true });
-fs.copyFileSync(path.join(binaryDir, 'codex-claw-tts-helper'), destination);
+fs.copyFileSync(path.join(binaryDir, 'app-tts-helper'), destination);
 fs.chmodSync(destination, 0o755);
 console.log(`Prepared ${destination}`);

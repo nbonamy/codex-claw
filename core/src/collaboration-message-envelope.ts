@@ -1,7 +1,7 @@
-export const collaborationMessageEnvelopeStart = '<<<CODEX_CLAW_AGENT_MESSAGES_V1>>>';
-export const collaborationMessageEnvelopeEnd = '<<<END_CODEX_CLAW_AGENT_MESSAGES_V1>>>';
-export const collaborationInstructionsStart = '<<<CODEX_CLAW_DELIVERY_INSTRUCTIONS>>>';
-export const collaborationInstructionsEnd = '<<<END_CODEX_CLAW_DELIVERY_INSTRUCTIONS>>>';
+export const collaborationMessageEnvelopeStart = '<<<APP_AGENT_MESSAGES_V1>>>';
+export const collaborationMessageEnvelopeEnd = '<<<END_APP_AGENT_MESSAGES_V1>>>';
+export const collaborationInstructionsStart = '<<<APP_DELIVERY_INSTRUCTIONS>>>';
+export const collaborationInstructionsEnd = '<<<END_APP_DELIVERY_INSTRUCTIONS>>>';
 
 export type CollaborationMessageEnvelopeEntry = {
   senderName: string;

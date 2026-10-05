@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AppSnapshot, SystemPermissionsStatus } from '@codex-claw/core/contracts';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ClawBackendServer } from '../server';
+import type { AppSnapshot, SystemPermissionsStatus } from '@workspace/core/contracts';
+import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import type { AgentGitService } from '../git/agent-git-service';
-import { createMission } from '@codex-claw/core/missions';
+import { createMission } from '@workspace/core/missions';
 import {
   createTestSnapshot,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
   it('backfills missing workspace identity before returning the startup snapshot', async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -37,7 +37,7 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-08-27T12:00:00.000Z',
     });
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       saveSnapshot,
@@ -65,14 +65,14 @@ describe('ClawBackendServer', () => {
   });
 
   it('responds to backend health requests', async () => {
-    const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
+    const server = new AppBackendServer({ version: 'test-version', pid: 123 });
 
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 'health-1', method: 'backend/health/get' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
       id: 'health-1',
       result: {
         ok: true,
-        name: 'clawd',
+        name: 'daemon',
         version: 'test-version',
         pid: 123,
       },
@@ -81,7 +81,7 @@ describe('ClawBackendServer', () => {
 
   it('reads plugin status through the runtime-owned inspector', async () => {
     const inspectPluginStatus = vi.fn().mockResolvedValue({ chromeEnabled: true });
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       inspectPluginStatus,
     });
@@ -99,7 +99,7 @@ describe('ClawBackendServer', () => {
   });
 
   it('rejects malformed mutation payloads at the backend protocol boundary', async () => {
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot: createTestSnapshot(),
@@ -169,7 +169,7 @@ describe('ClawBackendServer', () => {
       },
     ];
     const sendAgentMessage = vi.fn();
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       sendAgentMessage,
@@ -199,7 +199,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -207,7 +207,7 @@ describe('ClawBackendServer', () => {
     }];
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -253,7 +253,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       plan: {
@@ -269,7 +269,7 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const server = new ClawBackendServer({ version: 'test-version', snapshot });
+    const server = new AppBackendServer({ version: 'test-version', snapshot });
 
     const result = await server.handleMessage({
       jsonrpc: '2.0',
@@ -288,7 +288,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -296,7 +296,7 @@ describe('ClawBackendServer', () => {
     }];
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     const events: unknown[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -330,7 +330,7 @@ describe('ClawBackendServer', () => {
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.activeAgentId = 'agent-dina';
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({ version: 'test-version', snapshot, saveSnapshot });
+    const server = new AppBackendServer({ version: 'test-version', snapshot, saveSnapshot });
 
     const reviewing = await server.handleMessage({
       jsonrpc: '2.0', id: 'debug-reviewing', method: backendMethods.debugCodeReviewSet,
@@ -387,7 +387,7 @@ describe('ClawBackendServer', () => {
     }];
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.activeAgentId = 'agent-dina';
-    const server = new ClawBackendServer({ version: 'test-version', snapshot });
+    const server = new AppBackendServer({ version: 'test-version', snapshot });
 
     const set = await server.handleMessage({
       jsonrpc: '2.0', id: 'debug-thread-flag-set', method: backendMethods.debugThreadFlagSet,
@@ -427,7 +427,7 @@ describe('ClawBackendServer', () => {
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.activeAgentId = 'agent-dina';
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({ version: 'test-version', snapshot, saveSnapshot });
+    const server = new AppBackendServer({ version: 'test-version', snapshot, saveSnapshot });
 
     const result = await server.handleMessage({
       jsonrpc: '2.0', id: 'debug-visualize', method: backendMethods.debugVisualizePopulate,
@@ -466,7 +466,7 @@ describe('ClawBackendServer', () => {
       skills: [], feedback: '', startedAt: '2026-09-19T00:00:00.000Z',
     });
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({ version: 'test-version', snapshot, saveSnapshot });
+    const server = new AppBackendServer({ version: 'test-version', snapshot, saveSnapshot });
 
     const result = await server.handleMessage({
       jsonrpc: '2.0', id: 'debug-mission-stage', method: backendMethods.debugMissionStageSet,
@@ -519,7 +519,7 @@ describe('ClawBackendServer', () => {
       openAccessibilitySettings: vi.fn().mockResolvedValue(openedStatus),
       openScreenRecordingSettings: vi.fn().mockResolvedValue(screenRecordingStatus),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       systemPermissions,
@@ -546,7 +546,7 @@ describe('ClawBackendServer', () => {
   });
 
   it('returns a non-desktop system permission status when no host port is configured', async () => {
-    const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
+    const server = new AppBackendServer({ version: 'test-version', pid: 123 });
 
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 'permissions', method: 'system/permissions/get' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
@@ -568,7 +568,7 @@ describe('ClawBackendServer', () => {
   it('routes device pairing requests through the Codex driver RPC boundary', async () => {
     const status = { status: 'connected', environmentId: 'environment-1' };
     const handle = vi.fn().mockResolvedValue(status);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       driverRpc: {
@@ -593,7 +593,7 @@ describe('ClawBackendServer', () => {
   });
 
   it('returns an app snapshot with the backend event sequence', async () => {
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot: {
@@ -634,13 +634,13 @@ describe('ClawBackendServer', () => {
     snapshot.agents = [{
       id: 'agent-dina',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'working' },
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:00.000Z',
     }];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -682,7 +682,7 @@ describe('ClawBackendServer', () => {
       installationId: 'installation-1',
       environmentId: 'environment-1',
     } : undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -713,7 +713,7 @@ describe('ClawBackendServer', () => {
     snapshot.sourceFolder = { path: '', initialized: false, recentRepoNames: [] };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const handle = vi.fn().mockResolvedValue('/Users/nbonamy/src');
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -744,7 +744,7 @@ describe('ClawBackendServer', () => {
   });
 
   it('returns method-not-found errors for unknown methods', async () => {
-    const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
+    const server = new AppBackendServer({ version: 'test-version', pid: 123 });
 
     await expect(server.handleMessage({ jsonrpc: '2.0', id: 'missing', method: 'nope' })).resolves.toStrictEqual({
       jsonrpc: '2.0',
@@ -757,7 +757,7 @@ describe('ClawBackendServer', () => {
   });
 
   it('does not accept legacy backend method names', async () => {
-    const server = new ClawBackendServer({ version: 'test-version', pid: 123 });
+    const server = new AppBackendServer({ version: 'test-version', pid: 123 });
 
     for (const method of ['agent/listFiles']) {
       await expect(server.handleMessage({ jsonrpc: '2.0', id: method, method })).resolves.toStrictEqual({
@@ -778,7 +778,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       backendSession: { kind: 'codex', threadId: 'thread-test' },
@@ -802,7 +802,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const driverRpc = new BackendDriverRpc(new Map([['codex', driver]]));
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,

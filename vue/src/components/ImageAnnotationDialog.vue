@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog image-annotation-dialog"
+    class="app-dialog image-annotation-dialog"
     :model-value="visible"
     :show-close="false"
     :teleported="false"
@@ -13,9 +13,9 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-dialog__header image-annotation-dialog__header">
+      <div class="app-dialog__header image-annotation-dialog__header">
         <div class="image-annotation-dialog__header-main">
-          <h2 class="claw-dialog__title">{{ title }}</h2>
+          <h2 class="app-dialog__title">{{ title }}</h2>
           <div class="image-annotation-dialog__toolbar" role="toolbar" :aria-label="$t('surface.imageAnnotationDialog.imageAnnotationTools')">
             <el-tooltip
               v-for="item in tools"
@@ -182,17 +182,17 @@
     </div>
 
     <template #footer>
-      <div class="claw-dialog__footer image-annotation-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="saving" @click="emit('close')">{{ $t('surface.imageAnnotationDialog.cancel') }}</button>
+      <div class="app-dialog__footer image-annotation-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" :disabled="saving" @click="emit('close')">{{ $t('surface.imageAnnotationDialog.cancel') }}</button>
         <button
-          class="claw-button claw-button--secondary"
+          class="app-button app-button--secondary"
           type="button"
           :aria-label="$t('surface.imageAnnotationDialog.clearImageAnnotations')"
           :disabled="annotations.length === 0 || saving"
           @click="clearAnnotations"
         >{{ $t('surface.imageAnnotationDialog.clear') }}</button>
         <button
-          class="claw-button claw-button--primary image-annotation-dialog__save"
+          class="app-button app-button--primary image-annotation-dialog__save"
           type="button"
           :aria-label="$t('surface.imageAnnotationDialog.saveImageAnnotations')"
           :aria-busy="saving"

@@ -50,7 +50,7 @@
 
     <div class="plan-review-footer__actions">
       <button
-        class="claw-button claw-button--tertiary plan-review-footer__button plan-review-footer__button--cancel"
+        class="app-button app-button--tertiary plan-review-footer__button plan-review-footer__button--cancel"
         type="button"
         :disabled="disabled"
         @click="emit('cancel')"
@@ -59,7 +59,7 @@
       </button>
       <button
         v-if="comments.length"
-        class="claw-button claw-button--secondary plan-review-footer__button"
+        class="app-button app-button--secondary plan-review-footer__button"
         type="button"
         :disabled="disabled"
         @click="emit('clear')"
@@ -68,7 +68,7 @@
       </button>
       <button
         v-else
-        class="claw-button claw-button--primary plan-review-footer__button plan-review-footer__button--primary"
+        class="app-button app-button--primary plan-review-footer__button plan-review-footer__button--primary"
         type="button"
         :disabled="disabled"
         @click="emit('confirm')"

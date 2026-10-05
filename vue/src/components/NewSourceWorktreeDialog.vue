@@ -5,7 +5,7 @@
     :title="$t('surface.newSourceWorktreeDialog.newWorktree')"
     @update:model-value="onVisibilityChanged"
   >
-    <form class="claw-form-dialog" @submit.prevent="create()">
+    <form class="app-form-dialog" @submit.prevent="create()">
       <WorktreeReusePrompt
         v-if="existingWorktree"
         :branch="existingWorktree.name"
@@ -17,7 +17,7 @@
           :label="$t('surface.newSourceWorktreeDialog.startFrom')"
           label-for="new-source-worktree-base-branch"
         >
-          <div class="claw-form-dialog__control">
+          <div class="app-form-dialog__control">
             <el-select
               id="new-source-worktree-base-branch"
               v-model="baseBranch"
@@ -41,11 +41,11 @@
           :label="$t('surface.newSourceWorktreeDialog.branch')"
           label-for="new-source-worktree-branch"
         >
-          <div class="claw-form-dialog__control claw-form-dialog__input-control">
+          <div class="app-form-dialog__control app-form-dialog__input-control">
             <input
               id="new-source-worktree-branch"
               v-model="branchName"
-              class="claw-form-dialog__text-input new-source-worktree-dialog__branch-input"
+              class="app-form-dialog__text-input new-source-worktree-dialog__branch-input"
               type="text"
               :placeholder="$t('repositories.worktree.branchPlaceholder')"
             />
@@ -57,10 +57,10 @@
           :label="$t('surface.newSourceWorktreeDialog.folder')"
           label-for="new-source-worktree-folder"
         >
-          <div class="claw-form-dialog__control claw-form-dialog__input-control new-source-worktree-dialog__folder-control">
+          <div class="app-form-dialog__control app-form-dialog__input-control new-source-worktree-dialog__folder-control">
             <input
               id="new-source-worktree-folder"
-              class="claw-form-dialog__text-input new-source-worktree-dialog__folder-input"
+              class="app-form-dialog__text-input new-source-worktree-dialog__folder-input"
               type="text"
               readonly
               :value="destinationPath"
@@ -86,11 +86,11 @@
       <BackendSelector v-model="backend" :disabled="creating" />
     </template>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="backOrClose">
+      <button class="app-button app-button--tertiary" type="button" @click="backOrClose">
         {{ existingWorktree ? $t('common.back') : $t('surface.newSourceWorktreeDialog.cancel') }}
       </button>
       <button
-        class="claw-button claw-button--primary"
+        class="app-button app-button--primary"
         type="button"
         :aria-busy="creating"
         :disabled="creating || (!existingWorktree && !canCreate)"
@@ -106,7 +106,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { AgentCreationProgress, CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@codex-claw/core/contracts';
+import type { AgentCreationProgress, CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@workspace/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
@@ -115,7 +115,7 @@ import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
-const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend');
+const backend = defineModel<import('@workspace/core/contracts').AgentBackend>('backend');
 useNewAgentBackend(backend, backendChoices);
 
 const props = withDefaults(defineProps<{

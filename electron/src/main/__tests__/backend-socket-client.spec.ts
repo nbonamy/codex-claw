@@ -1,15 +1,15 @@
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
-import { ClawBackendSocketClient } from '../backend-socket-client';
+import { AppBackendSocketClient } from '../backend-socket-client';
 
-describe('ClawBackendSocketClient', () => {
+describe('AppBackendSocketClient', () => {
   it('rejects pending requests on close and bounds shutdown when the socket never acknowledges it', async () => {
     vi.useFakeTimers();
     try {
       const socket = createFakeSocket();
       socket.end.mockImplementation(() => socket);
       const connectSocket = vi.fn().mockReturnValue(socket);
-      const client = new ClawBackendSocketClient({ socketPath: '/test/clawd.sock', connectSocket });
+      const client = new AppBackendSocketClient({ socketPath: '/test/daemon.sock', connectSocket });
       const starting = client.start();
       socket.emit('connect');
       await starting;
@@ -36,8 +36,8 @@ describe('ClawBackendSocketClient', () => {
   it('rejects failed connections and ignores late close events from a replaced socket', async () => {
     const first = createFakeSocket();
     const second = createFakeSocket();
-    const client = new ClawBackendSocketClient({
-      socketPath: '/test/clawd.sock',
+    const client = new AppBackendSocketClient({
+      socketPath: '/test/daemon.sock',
       connectSocket: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
     });
     const listener = vi.fn();
@@ -57,8 +57,8 @@ describe('ClawBackendSocketClient', () => {
 
   it('sends backend health over the socket and resolves the response', async () => {
     const socket = createFakeSocket();
-    const client = new ClawBackendSocketClient({
-      socketPath: '/tmp/clawd.sock',
+    const client = new AppBackendSocketClient({
+      socketPath: '/tmp/daemon.sock',
       connectSocket: vi.fn().mockReturnValue(socket),
     });
 
@@ -72,7 +72,7 @@ describe('ClawBackendSocketClient', () => {
       id: request.id,
       result: {
         ok: true,
-        name: 'clawd',
+        name: 'daemon',
         version: '0.1.0',
         pid: 123,
       },
@@ -80,7 +80,7 @@ describe('ClawBackendSocketClient', () => {
 
     await expect(healthPromise).resolves.toStrictEqual({
       ok: true,
-      name: 'clawd',
+      name: 'daemon',
       version: '0.1.0',
       pid: 123,
     });
@@ -88,8 +88,8 @@ describe('ClawBackendSocketClient', () => {
 
   it('emits backend event notifications from the socket', async () => {
     const socket = createFakeSocket();
-    const client = new ClawBackendSocketClient({
-      socketPath: '/tmp/clawd.sock',
+    const client = new AppBackendSocketClient({
+      socketPath: '/tmp/daemon.sock',
       connectSocket: vi.fn().mockReturnValue(socket),
     });
     const listener = vi.fn();
@@ -120,8 +120,8 @@ describe('ClawBackendSocketClient', () => {
   it('handles backend-initiated client requests over the socket', async () => {
     const socket = createFakeSocket();
     const openExternal = vi.fn().mockResolvedValue(true);
-    const client = new ClawBackendSocketClient({
-      socketPath: '/tmp/clawd.sock',
+    const client = new AppBackendSocketClient({
+      socketPath: '/tmp/daemon.sock',
       connectSocket: vi.fn().mockReturnValue(socket),
       requestHandlers: {
         'client/external/open': openExternal,
@@ -153,7 +153,7 @@ describe('ClawBackendSocketClient', () => {
     const connectSocket = vi.fn()
       .mockReturnValueOnce(firstSocket)
       .mockReturnValueOnce(secondSocket);
-    const client = new ClawBackendSocketClient({ socketPath: '/tmp/clawd.sock', connectSocket });
+    const client = new AppBackendSocketClient({ socketPath: '/tmp/daemon.sock', connectSocket });
     const connectionListener = vi.fn();
     client.onConnectionState(connectionListener);
 

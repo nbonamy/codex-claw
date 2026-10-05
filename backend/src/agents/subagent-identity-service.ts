@@ -1,5 +1,5 @@
-import type { Agent, AppSnapshot, ConversationSummary } from '@codex-claw/core/contracts';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
+import type { Agent, AppSnapshot, ConversationSummary } from '@workspace/core/contracts';
+import type { BackendEvent } from '@workspace/core/backend-driver';
 
 export type SubagentIdentityServiceOptions = {
   applyEvent: (event: BackendEvent) => void;

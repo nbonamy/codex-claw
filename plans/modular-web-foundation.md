@@ -2,24 +2,24 @@
 
 ## Goal
 
-Split Codex Claw into platform-neutral core, reusable Vue UI, Electron host,
+Split Korus into platform-neutral core, reusable Vue UI, Electron host,
 and web host layers while preserving the existing desktop behavior. Keep
-`clawd` as the authoritative backend and add a local single-user web host.
+`daemon` as the authoritative backend and add a local single-user web host.
 
 ## Architecture
 
-- `@codex-claw/core`: framework-neutral contracts, reducers, selectors,
+- `@workspace/core`: framework-neutral contracts, reducers, selectors,
   protocol types, and client/host ports. It must not import Vue, Electron,
   Node filesystem APIs, or browser globals.
-- `@codex-claw/vue`: the reusable Claw Vue application, components, styles,
+- `@workspace/vue`: the reusable Korus Vue application, components, styles,
   themes, i18n, and Vue state adapter. It receives platform services through
   typed injection rather than reading Electron globals.
-- `@codex-claw/electron`: Electron main, preload, native capability adapters,
+- `@workspace/electron`: Electron main, preload, native capability adapters,
   and the desktop composition root.
-- `@codex-claw/web`: browser composition root and Claw web transport. It may
-  use `@codex-app-sdk/web` for Codex surfaces but must also preserve Claw's
+- `@workspace/web`: browser composition root and Korus web transport. It may
+  use `@codex-app-sdk/web` for Codex surfaces but must also preserve Korus's
   product-level backend contract.
-- `@codex-claw/backend`: the existing Node `clawd` runtime. It remains the
+- `@workspace/backend`: the existing Node `daemon` runtime. It remains the
   authority for teams, agents, persistence, credentials, files, git, and agent
   execution.
 
@@ -38,7 +38,7 @@ Commit checkpoint: `chore: extract claw core package`
 
 - Move the renderer application, components, styles, i18n, and component tests
   into a dedicated Vue workspace.
-- Replace direct `window.codexClaw` access with a typed application bootstrap
+- Replace direct `window.app` access with a typed application bootstrap
   dependency supplied by the host.
 - Keep capability-dependent controls explicit so unsupported web features can
   be hidden or replaced without platform checks throughout the component tree.
@@ -57,7 +57,7 @@ Commit checkpoint: `chore: recompose electron claw app`
 ### Phase 4: Web foundation
 
 - Add a web workspace with a browser composition root.
-- Add a Claw-specific WebSocket transport for product requests/events; do not
+- Add a Korus-specific WebSocket transport for product requests/events; do not
   expose raw local sockets or filesystem authority to the browser.
 - Integrate the SDK web transport at the agent conversation boundary where the
   SDK surface contract applies.
@@ -88,11 +88,11 @@ Commit checkpoint: `feat: add claw web foundation`
 ## Learnings
 
 - Keep product transport and provider surfaces separate. The SDK web package
-  supplies portable browser/Node WebSocket ports, while Claw still needs its
+  supplies portable browser/Node WebSocket ports, while Korus still needs its
   own allowlisted product protocol for teams, agents, files, loops, and
   settings.
 - Capability flags are insufficient for security-sensitive features when they
-  only hide UI. The web host also configures `clawd` so Computer Use and the
+  only hide UI. The web host also configures `daemon` so Computer Use and the
   embedded desktop browser are not registered as agent tools.
 - The SDK already owns transcription discovery and composer visibility. A
-  second Claw flag would duplicate state and eventually drift.
+  second Korus flag would duplicate state and eventually drift.

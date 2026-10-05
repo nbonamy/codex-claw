@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog mission-ticket-dialog"
+    class="app-dialog mission-ticket-dialog"
     :model-value="modelValue"
     :show-close="false"
     :close-on-click-modal="false"
@@ -132,7 +132,7 @@
 <script setup lang="ts">
 import { ref, useSlots, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { MissionTicket } from "@codex-claw/core/missions";
+import type { MissionTicket } from "@workspace/core/missions";
 import { ExternalLinkIcon, Trash2Icon, X } from "../shared/icons/app-icons";
 import AnnotationPopup, {
   type AnnotationPopupAnchor,

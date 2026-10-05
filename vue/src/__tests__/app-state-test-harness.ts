@@ -1,14 +1,14 @@
-import type { WorkItem } from '@codex-claw/core/contracts';
+import type { WorkItem } from '@workspace/core/contracts';
 
 export function workItem(): WorkItem {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw#12',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace#12',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix cockpit drag target',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     authorName: 'nbonamy',
     body: 'Make issue assignment feel obvious.',

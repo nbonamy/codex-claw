@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SubagentPanel from '../SubagentPanel.vue';
-import type { AgentSubagentTree, RendererMessage } from '@codex-claw/core/contracts';
+import type { AgentSubagentTree, RendererMessage } from '@workspace/core/contracts';
 import { i18n } from '../../i18n';
 
 const tree: AgentSubagentTree = {
@@ -98,26 +98,26 @@ describe('SubagentPanel', () => {
         type: 'tool',
         id: 'call-set-status',
         kind: 'mcp',
-        title: 'codex_claw.set-status',
+        title: 'workspace.set-status',
         status: 'completed',
         input: { status: 'Reviewing changes' },
-        metadata: { server: 'codex_claw', tool: 'set-status' },
+        metadata: { server: 'workspace', tool: 'set-status' },
       }, {
         type: 'tool',
         id: 'call-finish-turn',
         kind: 'mcp',
-        title: 'codex_claw.finish_turn',
+        title: 'workspace.finish_turn',
         status: 'completed',
         input: {},
-        metadata: { server: 'codex_claw', tool: 'finish_turn' },
+        metadata: { server: 'workspace', tool: 'finish_turn' },
       }, {
         type: 'tool',
         id: 'call-report-finding',
         kind: 'mcp',
-        title: 'codex_claw.report_finding',
+        title: 'workspace.report_finding',
         status: 'completed',
         input: { title: 'Keep this visible' },
-        metadata: { server: 'codex_claw', tool: 'report_finding' },
+        metadata: { server: 'workspace', tool: 'report_finding' },
       }, {
         type: 'tool',
         id: 'call-other-finish-turn',
@@ -138,12 +138,12 @@ describe('SubagentPanel', () => {
     expect(wrapper.text()).not.toContain('Finished turn');
     expect(wrapper.text()).toContain('Reported finding');
     expect(wrapper.text()).toContain('github.finish_turn');
-    expect(wrapper.text()).not.toContain('codex_claw.set-status');
+    expect(wrapper.text()).not.toContain('workspace.set-status');
   });
 
   it('hides transport details and recovers from a transient conversation loading error', async () => {
     const loadMessages = vi.fn()
-      .mockRejectedValueOnce(new Error("Error invoking remote method 'conversation:messages:read': Error: clawd request timed out: agent/conversation/messages/get"))
+      .mockRejectedValueOnce(new Error("Error invoking remote method 'conversation:messages:read': Error: daemon request timed out: agent/conversation/messages/get"))
       .mockResolvedValue(messages);
     const wrapper = mount(SubagentPanel, {
       props: {

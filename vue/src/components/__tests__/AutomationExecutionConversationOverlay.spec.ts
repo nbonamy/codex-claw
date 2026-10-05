@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { RendererMessage } from '@codex-claw/core/contracts';
+import type { RendererMessage } from '@workspace/core/contracts';
 import { i18n } from '../../i18n';
 import AutomationExecutionConversationOverlay from '../AutomationExecutionConversationOverlay.vue';
 
@@ -26,7 +26,7 @@ describe('AutomationExecutionConversationOverlay', () => {
       props: {
         agentName: 'Dina',
         messages,
-        ticket: 'github:nbonamy/codex-claw#12',
+        ticket: 'github:nbonamy/agent-workspace#12',
       },
       global: {
         plugins: [i18n],
@@ -35,7 +35,7 @@ describe('AutomationExecutionConversationOverlay', () => {
 
     expect(wrapper.attributes('role')).toBe('dialog');
     expect(wrapper.find('.automation-execution-conversation-overlay__scrim').exists()).toBe(true);
-    expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
+    expect(wrapper.text()).toContain('github:nbonamy/agent-workspace#12');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Please fix the cockpit issue.');
     expect(wrapper.text()).toContain('The cockpit issue is fixed.');
@@ -59,26 +59,26 @@ describe('AutomationExecutionConversationOverlay', () => {
             type: 'tool',
             id: 'browser-screenshot',
             kind: 'mcp',
-            title: 'codex_claw.browser-screenshot',
+            title: 'workspace.browser-screenshot',
             status: 'completed',
-            metadata: { server: 'codex_claw', tool: 'browser-screenshot' },
+            metadata: { server: 'workspace', tool: 'browser-screenshot' },
           }, {
             type: 'tool',
             id: 'set-status',
             kind: 'mcp',
-            title: 'codex_claw.set-status',
+            title: 'workspace.set-status',
             status: 'completed',
-            metadata: { server: 'codex_claw', tool: 'set-status' },
+            metadata: { server: 'workspace', tool: 'set-status' },
           }, {
             type: 'tool',
             id: 'finish-turn',
             kind: 'mcp',
-            title: 'codex_claw.finish_turn',
+            title: 'workspace.finish_turn',
             status: 'completed',
-            metadata: { server: 'codex_claw', tool: 'finish_turn' },
+            metadata: { server: 'workspace', tool: 'finish_turn' },
           }],
         }],
-        ticket: 'github:nbonamy/codex-claw#12',
+        ticket: 'github:nbonamy/agent-workspace#12',
       },
       global: { plugins: [i18n] },
     });

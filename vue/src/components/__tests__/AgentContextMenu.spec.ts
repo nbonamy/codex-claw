@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgentContextMenu from '../AgentContextMenu.vue';
 import { ViewportShortIcon } from '../../shared/icons/app-icons';
-import type { Team } from '@codex-claw/core/contracts';
+import type { Team } from '@workspace/core/contracts';
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 

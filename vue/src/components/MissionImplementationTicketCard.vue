@@ -42,7 +42,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { MissionTicket } from '@codex-claw/core/missions';
+import type { MissionTicket } from '@workspace/core/missions';
 import { FileTextIcon, MessageCircleIcon } from '../shared/icons/app-icons';
 import {
   implementationTicketStatus,

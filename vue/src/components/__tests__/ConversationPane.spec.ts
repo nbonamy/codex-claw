@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import {
   createCodexConversationPaneController,
@@ -8,8 +9,8 @@ import {
 } from '@codex-app-sdk/vue';
 import { computed, defineComponent, h, nextTick, provide, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, RendererMessage, SavedPromptDraft, ThreadPlan } from '@codex-claw/core/contracts';
-import { formatCollaborationMessageEnvelope } from '@codex-claw/core/collaboration-message-envelope';
+import type { Agent, RendererMessage, SavedPromptDraft, ThreadPlan } from '@workspace/core/contracts';
+import { formatCollaborationMessageEnvelope } from '@workspace/core/collaboration-message-envelope';
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import type { VisualizationAnnotation } from '../use-visualization-annotations';
@@ -553,7 +554,7 @@ describe('ConversationPane', () => {
     expect(wrapper.get('.agent-mention--menu').find('svg').exists()).toBe(true);
   });
 
-  it('falls back to SDK translations for SDK actions Claw has not overridden', () => {
+  it(`falls back to SDK translations for SDK actions ${product.name} has not overridden`, () => {
     const controller = createCodexConversationPaneController({
       state: {
         identity: {
@@ -615,7 +616,7 @@ describe('ConversationPane', () => {
           type: 'tool',
           id: 'call-finish-turn',
           kind: 'mcp',
-          title: 'codex_claw.finish_turn',
+          title: 'workspace.finish_turn',
           status: 'completed',
           input: { flag: 'ready_for_review' },
         }],
@@ -624,11 +625,11 @@ describe('ConversationPane', () => {
     });
 
     expect(wrapper.text()).not.toContain('Finished turn');
-    expect(wrapper.text()).not.toContain('codex_claw.finish_turn');
+    expect(wrapper.text()).not.toContain('workspace.finish_turn');
     expect(wrapper.find('.chat-message--assistant').exists()).toBe(false);
   });
 
-  it('keeps working feedback visible while a Claw status tool is hidden', () => {
+  it(`keeps working feedback visible while a ${product.name} status tool is hidden`, () => {
     const controller = createCodexConversationPaneController({
       state: {
         identity: {
@@ -642,8 +643,8 @@ describe('ConversationPane', () => {
           }, {
             id: 'status-tool', role: 'assistant', status: 'streaming',
             turnId: 'turn-status', createdAt: '2026-06-05T00:00:01.000Z',
-            parts: [{ type: 'tool', id: 'call-status', kind: 'mcp', title: 'codex_claw.set-status',
-              status: 'running', metadata: { server: 'codex_claw', tool: 'set-status' } }],
+            parts: [{ type: 'tool', id: 'call-status', kind: 'mcp', title: 'workspace.set-status',
+              status: 'running', metadata: { server: 'workspace', tool: 'set-status' } }],
           }],
         },
         composer: { placeholder: 'Ask for follow-up changes' },
@@ -653,7 +654,7 @@ describe('ConversationPane', () => {
     const wrapper = mountPane({ controller, agent });
 
     expect(wrapper.get('.chat-message__thinking').text()).toBe('Working');
-    expect(wrapper.text()).not.toContain('codex_claw.set-status');
+    expect(wrapper.text()).not.toContain('workspace.set-status');
     expect(wrapper.find('.chat-tool-call').exists()).toBe(false);
   });
 
@@ -661,8 +662,8 @@ describe('ConversationPane', () => {
     const taskMessages: RendererMessage[] = [{
       id: 'message-task-tool', agentId: agent.id, role: 'assistant', status: 'streaming',
       createdAt: '2026-10-04T00:00:00.000Z',
-      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'codex_claw.wait-tasks',
-        status: 'running', metadata: { server: 'codex_claw', tool: 'wait-tasks' },
+      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'workspace.wait-tasks',
+        status: 'running', metadata: { server: 'workspace', tool: 'wait-tasks' },
         input: { taskIds: ['task-private-id'], timeoutMs: 30000 } }],
     }];
     const wrapper = mountPane({ controller: controllerFor(taskMessages), agent });
@@ -671,12 +672,12 @@ describe('ConversationPane', () => {
 
     await wrapper.setProps({ controller: controllerFor([{
       ...taskMessages[0]!, status: 'complete',
-      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'codex_claw.wait-tasks',
-        status: 'completed', metadata: { server: 'codex_claw', tool: 'wait-tasks' },
+      parts: [{ type: 'tool', id: 'call-wait', kind: 'mcp', title: 'workspace.wait-tasks',
+        status: 'completed', metadata: { server: 'workspace', tool: 'wait-tasks' },
         output: { timedOut: true, tasks: [{ id: 'task-private-id', state: 'running' }] } }],
     }]) });
     expect(wrapper.get('.chat-tool-call').text()).toContain('Checked delegated tasks');
-    expect(wrapper.get('.chat-tool-call').text()).not.toMatch(/codex_claw|task-private-id|Completed/);
+    expect(wrapper.get('.chat-tool-call').text()).not.toMatch(/workspace|task-private-id|Completed/);
   });
 
   it('renders review tool activity as finding actions instead of raw MCP names', () => {
@@ -691,17 +692,17 @@ describe('ConversationPane', () => {
           type: 'tool',
           id: 'call-report-finding',
           kind: 'mcp',
-          title: 'codex_claw.report_finding',
+          title: 'workspace.report_finding',
           status: 'completed',
           input: { title: 'Keep tool copy product-facing' },
-          metadata: { server: 'codex_claw', tool: 'report_finding' },
+          metadata: { server: 'workspace', tool: 'report_finding' },
         }],
       }]),
       agent,
     });
 
     expect(wrapper.text()).toContain('Reported finding');
-    expect(wrapper.text()).not.toContain('codex_claw.report_finding');
+    expect(wrapper.text()).not.toContain('workspace.report_finding');
     expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
   });
 
@@ -720,17 +721,17 @@ describe('ConversationPane', () => {
           type: 'tool',
           id: `call-delete-${status}`,
           kind: 'mcp',
-          title: 'codex_claw.delete_finding',
+          title: 'workspace.delete_finding',
           status,
           input: { findingId: 'finding-1' },
-          metadata: { server: 'codex_claw', tool: 'delete_finding' },
+          metadata: { server: 'workspace', tool: 'delete_finding' },
         }],
       }]),
       agent,
     });
 
     expect(wrapper.get('.chat-tool-call').text()).toContain(title);
-    expect(wrapper.text()).not.toContain('codex_claw.delete_finding');
+    expect(wrapper.text()).not.toContain('workspace.delete_finding');
     expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
   });
 
@@ -840,7 +841,7 @@ function mountPane(props: {
   attachmentAnnotationCounts?: Readonly<Record<string, number>>;
   textAnnotations?: readonly ChatTextAnnotation[];
   visualizationAnnotations?: readonly VisualizationAnnotation[];
-  reviewFinding?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
+  reviewFinding?: import('@workspace/core/code-review').CodeReviewFinding | null;
   plan?: ThreadPlan | null;
   planVisible?: boolean;
   historyLoadFailed?: boolean;

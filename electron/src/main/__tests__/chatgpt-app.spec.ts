@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { launchChatGptApp } from '../chatgpt-app';
 
 describe('launchChatGptApp', () => {
-  it('opens the application from /Applications with Claw isolated Codex home', async () => {
+  it(`opens the application from /Applications with ${product.name} isolated Codex home`, async () => {
     const execFile = vi.fn().mockImplementation(async (command: string) => {
       if (command === '/usr/bin/pgrep') {
         throw Object.assign(new Error('No matching process'), { code: 1 });
@@ -13,7 +14,7 @@ describe('launchChatGptApp', () => {
     const existsSync = vi.fn().mockReturnValue(true);
 
     await expect(launchChatGptApp({}, {
-      clawHome: '/Users/nico/.codex-claw',
+      appHome: `/Users/nico/${product.homeDirectory}`,
       execFile,
       existsSync,
       platform: 'darwin',
@@ -24,7 +25,7 @@ describe('launchChatGptApp', () => {
     expect(execFile).toHaveBeenCalledWith('/usr/bin/open', [
       '-n',
       '--env',
-      `CODEX_HOME=${path.join('/Users/nico/.codex-claw', 'codex-home')}`,
+      `CODEX_HOME=${path.join(`/Users/nico/${product.homeDirectory}`, 'codex-home')}`,
       '-a',
       '/Applications/ChatGPT.app',
     ]);
@@ -55,7 +56,7 @@ describe('launchChatGptApp', () => {
     });
 
     await expect(launchChatGptApp({ quitRunning: true }, {
-      clawHome: '/Users/nico/.codex-claw',
+      appHome: `/Users/nico/${product.homeDirectory}`,
       execFile,
       existsSync: () => true,
       platform: 'darwin',
@@ -70,7 +71,7 @@ describe('launchChatGptApp', () => {
     expect(execFile).toHaveBeenNthCalledWith(4, '/usr/bin/open', [
       '-n',
       '--env',
-      `CODEX_HOME=${path.join('/Users/nico/.codex-claw', 'codex-home')}`,
+      `CODEX_HOME=${path.join(`/Users/nico/${product.homeDirectory}`, 'codex-home')}`,
       '-a',
       '/Applications/ChatGPT.app',
     ]);

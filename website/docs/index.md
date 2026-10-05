@@ -1,20 +1,20 @@
 ---
-title: Claw documentation
-description: Install Codex Claw, connect your coding agents, and take software work from an idea to a reviewed change.
+title: Korus documentation
+description: Install Korus, connect your coding agents, and take software work from an idea to a reviewed change.
 ---
 
-# Claw documentation
+# Korus documentation
 
 <p class="docs-lead">Set up your coding agents, coordinate the work, and review the results in one workspace.</p>
 
-Codex Claw is a desktop workspace for agentic software engineering. Keep conversations, repositories, browser previews, plans, and diffs together as you move from an idea to delivery.
+Korus is a desktop workspace for agentic software engineering. Keep conversations, repositories, browser previews, plans, and diffs together as you move from an idea to delivery.
 
 ::: info Release availability
 The published app is 0.25.2. This guide also covers changes implemented on main for the intended 0.26.0 release, including Linear, delegation commands, and additional Claude conversation controls. Those sections are marked as upcoming; they do not indicate that 0.26.0 has shipped.
 :::
 
 <div class="docs-grid">
-  <a class="docs-card" href="./getting-started/quickstart.html"><strong>Quickstart →</strong><span>Install Claw and take your first task through to a reviewed diff.</span></a>
+  <a class="docs-card" href="./getting-started/quickstart.html"><strong>Quickstart →</strong><span>Install Korus and take your first task through to a reviewed diff.</span></a>
   <a class="docs-card" href="./providers/"><strong>Provider guides →</strong><span>Connect Codex or Claude Code and choose an engine for your agents.</span></a>
   <a class="docs-card" href="./workflows/parallel-agents.html"><strong>Work with agents →</strong><span>Coordinate parallel work, isolate changes, and review the outcome.</span></a>
   <a class="docs-card" href="./troubleshooting/"><strong>Troubleshooting →</strong><span>Find the next step when setup, a conversation, or a workflow gets stuck.</span></a>
@@ -28,7 +28,7 @@ Follow the [quickstart](./getting-started/quickstart) or the longer [first-task 
 
 ## Build a team
 
-Give each agent a clear responsibility and a working folder. Agents can share status and send messages through Claw's collaboration tools. Separate worktrees let multiple agents change the same repository independently.
+Give each agent a clear responsibility and a working folder. Agents can share status and send messages through Korus's collaboration tools. Separate worktrees let multiple agents change the same repository independently.
 
 Read [core concepts](./getting-started/core-concepts), [parallel agents](./workflows/parallel-agents), and [worktrees](./workflows/worktrees).
 
@@ -38,10 +38,10 @@ Use a [Mission](./workflows/missions) to move through Requirements, Tickets, Imp
 
 ## Choose your engine
 
-Claw provides the workspace around your coding agent. Your selected provider supplies model access, account authentication, and usage limits. See the [provider guides](./providers/) for setup.
+Korus provides the workspace around your coding agent. Your selected provider supplies model access, account authentication, and usage limits. See the [provider guides](./providers/) for setup.
 
 For issue-driven work, connect [GitHub or Linear](./providers/#connect-github-or-linear), [browse the backlog](./features/workspace#browse-and-start-backlog-work), and choose the code repository where the agent should work. Use [automations](./features/automations) for recurring intake.
 
 ::: tip Looking for developer documentation?
-This guide covers using Claw. Architecture, protocol, frontend, and testing notes live in the repository's `docs/` directory.
+This guide covers using Korus. Architecture, protocol, frontend, and testing notes live in the repository's `docs/` directory.
 :::

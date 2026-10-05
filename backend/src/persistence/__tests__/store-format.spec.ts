@@ -5,13 +5,13 @@ import { StoreFormatError, parseStoreFile, serializeStoreFile, storeSchemaVersio
 describe('store file format', () => {
   it('round-trips data through the versioned envelope and names the writer', () => {
     const envelope = parseStoreFile('roster.json', serializeStoreFile({ hello: 'world' }));
-    expect(envelope).toStrictEqual({ schemaVersion: storeSchemaVersion, writtenBy: expect.stringMatching(/^clawd \d/), data: { hello: 'world' } });
+    expect(envelope).toStrictEqual({ schemaVersion: storeSchemaVersion, writtenBy: expect.stringMatching(/^daemon \d/), data: { hello: 'world' } });
   });
 
   it('refuses a file written by a newer schema and says who wrote it', () => {
-    const newer = JSON.stringify({ schemaVersion: storeSchemaVersion + 1, writtenBy: 'clawd 9.9.9', data: {} });
+    const newer = JSON.stringify({ schemaVersion: storeSchemaVersion + 1, writtenBy: 'daemon 9.9.9', data: {} });
     expect(() => parseStoreFile('roster.json', newer)).toThrowError(StoreFormatError);
-    expect(() => parseStoreFile('roster.json', newer)).toThrowError(/clawd 9\.9\.9/);
+    expect(() => parseStoreFile('roster.json', newer)).toThrowError(/daemon 9\.9\.9/);
   });
 
   it.each([

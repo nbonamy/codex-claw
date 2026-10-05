@@ -8,7 +8,7 @@ it('copies each displayed login command and reports clipboard failures', async (
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   try {
     const wrapper = mount(LocalClaudeAuthenticationDialog, {
-      props: { modelValue: true, configDirectory: '/claw/claude-home', loading: false, error: null },
+      props: { modelValue: true, configDirectory: '/app/claude-home', loading: false, error: null },
       global: { stubs: { teleport: true } },
     });
     await flushPromises();

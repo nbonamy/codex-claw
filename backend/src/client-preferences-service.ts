@@ -1,9 +1,9 @@
-import type { AppSnapshot,UpdateSettingsInput } from '@codex-claw/core/contracts';
-import { projectClientSnapshot,splitSettingsInput,type ClientPreferences } from '@codex-claw/core/client-preferences';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { selectAgent,reorderAgentInTeam,reorderRepositoryInTeam,updateAgentOpenInApplication } from '@codex-claw/core/agent-manager';
-import { selectTeam,reorderTeamInSnapshot } from '@codex-claw/core/team-manager';
-import { updateSettingsInSnapshot } from '@codex-claw/core/settings';
+import type { AppSnapshot,UpdateSettingsInput } from '@workspace/core/contracts';
+import { projectClientSnapshot,splitSettingsInput,type ClientPreferences } from '@workspace/core/client-preferences';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { selectAgent,reorderAgentInTeam,reorderRepositoryInTeam,updateAgentOpenInApplication } from '@workspace/core/agent-manager';
+import { selectTeam,reorderTeamInSnapshot } from '@workspace/core/team-manager';
+import { updateSettingsInSnapshot } from '@workspace/core/settings';
 
 const methods: Set<string> = new Set([
   backendMethods.clientNavigationSelectAgent, backendMethods.clientNavigationSelectTeam,
@@ -57,7 +57,7 @@ export class ClientPreferencesService {
     } else if (method === backendMethods.clientAgentExternalApplicationUpdate) {
       const application = string(params.application);
       if (!['vscode', 'finder', 'terminal', 'iterm2', 'ghostty', 'xcode', 'android-studio', 'jetbrains'].includes(application)) throw new Error('Invalid external application.');
-      if (!updateAgentOpenInApplication(snapshot, string(params.agentId), application as NonNullable<import('@codex-claw/core/contracts').Agent['openInApplication']>)) throw new Error('Agent not found.');
+      if (!updateAgentOpenInApplication(snapshot, string(params.agentId), application as NonNullable<import('@workspace/core/contracts').Agent['openInApplication']>)) throw new Error('Agent not found.');
     } else {
       const split = splitSettingsInput((input ?? {}) as UpdateSettingsInput);
       if (Object.keys(split.policy).length) throw new Error('Backend policies must be updated through settings/update.');

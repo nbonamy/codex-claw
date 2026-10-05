@@ -1,9 +1,9 @@
 ---
-name: codex-claw-dod
-description: Use before handoff, commit, push, or declaring Codex Claw work ready. Verify scope, tests, typecheck/lint, documentation, and worktree hygiene with proportional evidence.
+name: app-dod
+description: Use before handoff, commit, push, or declaring Korus work ready. Verify scope, tests, typecheck/lint, documentation, and worktree hygiene with proportional evidence.
 ---
 
-# Codex Claw Definition Of Done
+# Korus Definition Of Done
 
 Gather the smallest evidence that proves the change is ready. Add broader gates
 only when the change crosses a boundary.

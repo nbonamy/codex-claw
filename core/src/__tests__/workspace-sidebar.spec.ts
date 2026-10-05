@@ -9,8 +9,8 @@ const projectSidebar = (input: Omit<Parameters<typeof projectWorkspaceSidebar>[0
 describe('workspace sidebar projection', () => {
   it('groups primary checkouts and linked worktrees beneath the canonical repository', () => {
     const agents = [
-      gitAgent('agent-main', 'Main conversation', '/src/codex-claw', 'main', false),
-      gitAgent('agent-feature', 'Implement routing', '/src/codex-claw-routing', 'feat/routing', true),
+      gitAgent('agent-main', 'Main conversation', '/src/agent-workspace', 'main', false),
+      gitAgent('agent-feature', 'Implement routing', '/src/agent-workspace-routing', 'feat/routing', true),
     ];
 
     expect(projectSidebar({
@@ -18,18 +18,18 @@ describe('workspace sidebar projection', () => {
       activeAgentId: 'agent-feature',
       unreadAgentIds: ['agent-main'],
     })).toStrictEqual([{
-      id: 'git:/src/codex-claw',
+      id: 'git:/src/agent-workspace',
       kind: 'repository',
-      label: 'codex-claw',
-      repositoryRoot: '/src/codex-claw',
-      repositoryKey: '/src/codex-claw',
+      label: 'agent-workspace',
+      repositoryRoot: '/src/agent-workspace',
+      repositoryKey: '/src/agent-workspace',
       sessions: [{
         agentId: 'agent-main',
         customName: 'Main conversation',
         conversationTitle: null,
         displayTitle: 'Main conversation',
         branch: 'main',
-        folder: '/src/codex-claw',
+        folder: '/src/agent-workspace',
         isLinkedWorktree: false,
         kind: 'main',
         isActive: false,
@@ -42,7 +42,7 @@ describe('workspace sidebar projection', () => {
         conversationTitle: null,
         displayTitle: 'Implement routing',
         branch: 'feat/routing',
-        folder: '/src/codex-claw-routing',
+        folder: '/src/agent-workspace-routing',
         isLinkedWorktree: true,
         kind: 'worktree',
         isActive: true,
@@ -165,8 +165,8 @@ describe('workspace sidebar projection', () => {
     expect(projectSidebar({ agents: [first, second], activeAgentId: null })[0]?.sessions.map(({ displayTitle }) => displayTitle))
       .toStrictEqual(['Fix tests · feat/one', 'Fix tests · feat/two']);
     expect(projectAgentMentionLabels([first, second], 'Quick chats')).toStrictEqual([
-      { agentId: 'agent-one', label: 'Fix tests · feat/one · codex-claw/feat/one' },
-      { agentId: 'agent-two', label: 'Fix tests · feat/two · codex-claw/feat/two' },
+      { agentId: 'agent-one', label: 'Fix tests · feat/one · agent-workspace/feat/one' },
+      { agentId: 'agent-two', label: 'Fix tests · feat/two · agent-workspace/feat/two' },
     ]);
   });
 
@@ -188,28 +188,28 @@ describe('workspace sidebar projection', () => {
   });
 
   it('removes the repository prefix from an unnamed agent branch', () => {
-    const agent = gitAgent('agent-unnamed', null, '/src/codex-claw-work-routing', 'codex-claw-work-routing', true);
+    const agent = gitAgent('agent-unnamed', null, '/src/agent-workspace-work-routing', 'agent-workspace-work-routing', true);
 
     expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0])
       .toMatchObject({ displayTitle: 'work-routing' });
   });
 
   it('uses the Git origin as the stable repository preference key', () => {
-    const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
-    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
+    const agent = gitAgent('agent-origin', 'Origin', '/src/agent-workspace-worktree', 'feat/icons', true);
+    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/agent-workspace.git';
 
     expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]).toMatchObject({
-      repositoryRoot: '/src/codex-claw',
-      repositoryKey: 'remote:github.com/nbonamy/codex-claw',
+      repositoryRoot: '/src/agent-workspace',
+      repositoryKey: 'remote:github.com/nbonamy/agent-workspace',
     });
   });
 
   it('resolves agent identity from the repository icon catalog', () => {
-    const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
-    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
+    const agent = gitAgent('agent-origin', 'Origin', '/src/agent-workspace-worktree', 'feat/icons', true);
+    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/agent-workspace.git';
 
     expect(repositoryIconForAgent(agent, {
-      'remote:github.com/nbonamy/codex-claw': '🦞',
+      'remote:github.com/nbonamy/agent-workspace': '🦞',
     })).toBe('🦞');
     expect(repositoryIconForAgent(agent, {})).toBeUndefined();
     expect(repositoryIconForAgent(baseAgent('agent-folder', 'Folder', '/src/folder'), {
@@ -218,10 +218,10 @@ describe('workspace sidebar projection', () => {
   });
 
   it('falls back to persisted repository roots when migrating icon keys', () => {
-    const agent = gitAgent('agent-origin', 'Origin', '/src/codex-claw-worktree', 'feat/icons', true);
-    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/codex-claw.git';
+    const agent = gitAgent('agent-origin', 'Origin', '/src/agent-workspace-worktree', 'feat/icons', true);
+    if (agent.workspace?.kind === 'git') agent.workspace.originUrl = 'git@github.com:nbonamy/agent-workspace.git';
 
-    expect(repositoryIconForAgent(agent, { '/src/codex-claw': '🧠' })).toBe('🧠');
+    expect(repositoryIconForAgent(agent, { '/src/agent-workspace': '🧠' })).toBe('🧠');
   });
 });
 
@@ -244,7 +244,7 @@ function gitAgent(
   folder: string,
   branch: string,
   linked: boolean,
-  primaryWorktreeRoot = '/src/codex-claw',
+  primaryWorktreeRoot = '/src/agent-workspace',
 ): Agent {
   const agent = baseAgent(id, name, folder);
   agent.status = id === 'agent-feature' ? { type: 'working' } : { type: 'idle' };

@@ -1,6 +1,7 @@
 import type { CodexChatMessage } from '@codex-app-sdk/vue';
-import type { RendererMessage } from '@codex-claw/core/contracts';
-import { parseCollaborationMessageEnvelope } from '@codex-claw/core/collaboration-message-envelope';
+import type { RendererMessage } from '@workspace/core/contracts';
+import { parseCollaborationMessageEnvelope } from '@workspace/core/collaboration-message-envelope';
+import { product } from '@workspace/core/product';
 
 export type CollaborationMessagePresentation = {
   content: string;
@@ -85,7 +86,8 @@ function parseLegacySingleMessage(content: string): CollaborationMessagePresenta
 function parseLegacyMultipleMessages(content: string): CollaborationMessagePresentation | null {
   const body = legacyEnvelopeBody(content);
   if (!body) return null;
-  const heading = /^You received (\d+) messages from other Codex Claw agents\.\r?\n\r?\n/.exec(body);
+  const productName = product.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const heading = new RegExp(`^You received (\\d+) messages from other ${productName} agents\\.\\r?\\n\\r?\\n`).exec(body);
   if (!heading) return null;
 
   const expectedCount = Number(heading[1]);

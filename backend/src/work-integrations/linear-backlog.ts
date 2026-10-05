@@ -1,5 +1,5 @@
-import type { GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkSource } from '@codex-claw/core/contracts';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import type { GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkSource } from '@workspace/core/contracts';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
 
 type RecordValue = Record<string, unknown>;
 function record(value: unknown): RecordValue {

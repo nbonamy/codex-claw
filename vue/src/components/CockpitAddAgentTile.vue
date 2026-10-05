@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { WorkItem } from '@codex-claw/core/contracts';
+import type { WorkItem } from '@workspace/core/contracts';
 import NewAgentButton from './NewAgentButton.vue';
 
 const props = defineProps<{

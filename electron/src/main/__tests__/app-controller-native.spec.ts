@@ -1,8 +1,10 @@
+import { product } from '@workspace/core/product';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, CodexAuthentication, CodexChatGptLogin, SetCodexResourceSharingInput, UpdateSettingsInput } from '@codex-claw/core/contracts';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppSnapshot, CodexAuthentication, CodexChatGptLogin, SetCodexResourceSharingInput, UpdateSettingsInput } from '@workspace/core/contracts';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import type { OpenInProvider } from '../open-in';
 import { callPrivate, currentSnapshot, fakeAppLifecycle, createBackendClient, updateSettings } from './app-controller-test-harness';
 
@@ -71,7 +73,7 @@ describe('AppController', () => {
     expect(spokenAnnouncements.queueWithCompletion).toHaveBeenCalledWith({
       agentId: 'settings-preview:bf_emma',
       phase: 'start',
-      text: 'Codex Claw is on it—sharp claws, clean code.',
+      text: `${product.name} is ready. Let's build something.`,
       voice: 'bf_emma',
     });
     finishPreview();
@@ -124,7 +126,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...snapshot,
-      general: { ...snapshot.general, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } } },
+      general: { ...snapshot.general, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/app/codex-home" } } },
     };
     const request = vi.fn().mockResolvedValue(backendSnapshot);
     const lifecycle: string[] = [];
@@ -136,15 +138,15 @@ describe('AppController', () => {
       supported: true,
       installed: true,
       running: true,
-      socketPath: '/tmp/clawd.sock',
-      launchAgentPath: '/tmp/clawd.plist',
+      socketPath: '/tmp/daemon.sock',
+      launchAgentPath: '/tmp/daemon.plist',
     });
     const daemonRefresher = vi.fn().mockResolvedValue({
       supported: true,
       installed: true,
       running: true,
-      socketPath: '/tmp/clawd.sock',
-      launchAgentPath: '/tmp/clawd.plist',
+      socketPath: '/tmp/daemon.sock',
+      launchAgentPath: '/tmp/daemon.plist',
     });
     const backendClient = createBackendClient({ request, close });
     const controller = new AppController(
@@ -198,7 +200,7 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...snapshot,
-      general: { ...snapshot.general, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } } },
+      general: { ...snapshot.general, providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/app/codex-home" } } },
     };
     const request = vi.fn(async (method: string) => (
       method === backendMethods.settingsCodexResourceSharingGet
@@ -323,7 +325,7 @@ describe('AppController', () => {
 
   it('opens local project paths and persists the selected application per agent', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
+    snapshot.agents[0].folder = path.resolve(__dirname, '../../../..');
     const updatedSnapshot = structuredClone(snapshot);
     updatedSnapshot.agents[0].openInApplication = 'vscode';
     const request = vi.fn().mockResolvedValue(updatedSnapshot);
@@ -336,7 +338,7 @@ describe('AppController', () => {
 
     await expect(openAgentPath(controller, 'agent-dina', 'vscode', 'README.md')).resolves.toBe(updatedSnapshot);
 
-    expect(open).toHaveBeenCalledWith('vscode', '/Users/nbonamy/src/codex-claw/README.md');
+    expect(open).toHaveBeenCalledWith('vscode', path.join(snapshot.agents[0].folder, 'README.md'));
     expect(request).toHaveBeenCalledWith(backendMethods.clientAgentExternalApplicationUpdate, {
       agentId: 'agent-dina',
       application: 'vscode',
@@ -346,7 +348,7 @@ describe('AppController', () => {
 
   it('rejects Open In for remote agents and files outside the project', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0].folder = '/Users/nbonamy/src/codex-claw';
+    snapshot.agents[0].folder = path.resolve(__dirname, '../../../..');
     const open = vi.fn();
     const controller = new AppController(snapshot, createBackendClient());
     (controller as unknown as { openInProvider: OpenInProvider }).openInProvider = {

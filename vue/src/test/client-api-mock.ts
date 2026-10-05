@@ -1,8 +1,8 @@
 import { vi, type Mock } from 'vitest';
-import type { AppSnapshot, CodexClawApi, RendererSnapshotState } from '@codex-claw/core/contracts';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { AppSnapshot, AppApi, RendererSnapshotState } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 
-type Api = Required<CodexClawApi>;
+type Api = Required<AppApi>;
 type ApiMocks = { [K in keyof Api]: Mock<Api[K]> };
 
 function unscripted<K extends keyof Api>(method: K): Mock<Api[K]> {
@@ -229,14 +229,14 @@ export function createClientApiMock(
   api.listAgentConversations.mockResolvedValue([]);
   api.readConversationMessages.mockResolvedValue([]);
   api.getRemoteControlStatus.mockResolvedValue({ status: 'disabled' });
-  api.getDaemonStatus.mockResolvedValue({ supported: true, installed: false, running: false, socketPath: '/test/clawd.sock' });
+  api.getDaemonStatus.mockResolvedValue({ supported: true, installed: false, running: false, socketPath: '/test/daemon.sock' });
   api.getPluginStatus.mockResolvedValue({ chromeEnabled: false });
   api.getCodexResourceSharingStatus.mockResolvedValue({ enabled: false, migrationRequired: false });
   api.getCodexAuthentication.mockResolvedValue({ account: null, requiresOpenaiAuth: false, login: { status: 'idle', error: null } });
   api.getClaudeAuthentication.mockResolvedValue({ loggedIn: false });
   api.getProviderConnections.mockResolvedValue(snapshot.providerConnections ?? []);
   api.getProviderUsage.mockImplementation(async backend => snapshot.backendAccountRateLimits?.[backend] ?? (backend === 'codex' ? snapshot.accountRateLimits : undefined) ?? null);
-  api.getProviderSetup.mockResolvedValue(['codex', 'claude'].map(backend => ({ backend, installed: true, isolated: true, shareSkills: true, locked: false, homePath: `/claw/${backend}-home` })) as Awaited<ReturnType<CodexClawApi['getProviderSetup']>>);
+  api.getProviderSetup.mockResolvedValue(['codex', 'claude'].map(backend => ({ backend, installed: true, isolated: true, shareSkills: true, locked: false, homePath: `/app/${backend}-home` })) as Awaited<ReturnType<AppApi['getProviderSetup']>>);
   api.getSystemPermissions.mockResolvedValue({ platform: 'darwin', accessibility: { required: true, trusted: true }, screenRecording: { required: true, trusted: true } });
   api.getUpdateStatus.mockResolvedValue({ state: 'idle' });
   api.getOpenInApplications.mockResolvedValue({ defaultApplication: 'vscode', applications: [] });

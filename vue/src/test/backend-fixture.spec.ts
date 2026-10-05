@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { installBackendFixture } from './backend-fixture';
 import { useAppState } from '../app-state';
 import { createClientApiMock } from './client-api-mock';

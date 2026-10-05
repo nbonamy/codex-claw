@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import path from 'node:path';
-import type { Agent, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@codex-claw/core/contracts';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import type { Agent, AppSnapshot, BackendConversationRef, RendererMessage, SourceWorktree, SystemPermissionsStatus, ThreadGoal, WorkItem } from '@workspace/core/contracts';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 
 export function createTestSnapshot(): AppSnapshot {
   return {
@@ -69,7 +70,7 @@ export function createTestSnapshot(): AppSnapshot {
       recentRepoNames: [],
     },
     theme: {
-      id: 'codex-claw-light',
+      id: 'app-light',
       mode: 'system',
       uiFontSize: 14,
       chatFontSize: 15,
@@ -88,7 +89,7 @@ export function readyRemoteConnection(): AppSnapshot['remoteConnections']['conne
     transport: {
       type: 'ssh-stdio',
       command: 'ssh',
-      args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+      args: ['devbox', `node ~/${product.homeDirectory}/daemon.mjs --stdio`],
     },
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',
@@ -100,7 +101,7 @@ export function createRemoteAgent(): AppSnapshot['agents'][number] {
     id: 'agent-remote',
     teamId: 'team-remote',
     name: 'Dina',
-    folder: '/home/mnmt/src/codex-claw',
+    folder: '/home/mnmt/src/agent-workspace',
     backend: 'codex',
     status: { type: 'idle' },
     createdAt: '2026-06-14T10:00:00.000Z',
@@ -139,12 +140,12 @@ export function createRemoteTeamSnapshot(agents: AppSnapshot['agents'] = []): Ap
 export function createWorkItem(): WorkItem {
   return {
     provider: 'github',
-    id: 'github:nbonamy/codex-claw#12',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'github:nbonamy/agent-workspace#12',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix bug',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     labels: [],
     createdAt: '2026-06-13T00:00:00.000Z',

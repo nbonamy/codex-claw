@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ClawBackendServer } from '../server';
+import { AppBackendServer } from '../server';
 import { getLocalClaudeAuthentication, logoutLocalClaude } from '../claude/authentication';
 import { ClaudeBackendDriver } from '../claude/claude-driver';
 import { createTestSnapshot, readyRemoteConnection } from './server-test-fixtures';
-import { normalizeGeneralSettings } from '@codex-claw/core/settings';
+import { normalizeGeneralSettings } from '@workspace/core/settings';
 
 vi.mock('../claude/authentication', () => ({ getLocalClaudeAuthentication: vi.fn(), logoutLocalClaude: vi.fn() }));
 
@@ -15,10 +15,10 @@ describe('connected engine admission', () => {
       ? new ClaudeBackendDriver().authenticate(params)
       : { kind: 'codex', connected: true, state: { account: { type: 'apiKey' }, requiresOpenaiAuth: false, login: { status: 'idle', error: null } } }), onEvent: vi.fn(() => () => undefined), close: vi.fn() };
     let saved = snapshot.general;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot, driverRpc: driverRpc as never,
       saveSnapshot: async value => { saved = structuredClone(value.general); },
-      providerSetup: { isChanging: () => false, list: () => [{ backend: 'claude', installed: true, homePath: '/claw/claude' }, { backend: 'codex', installed: true, homePath: '/claw/codex' }] } as never,
+      providerSetup: { isChanging: () => false, list: () => [{ backend: 'claude', installed: true, homePath: '/app/claude' }, { backend: 'codex', installed: true, homePath: '/app/codex' }] } as never,
     });
     try {
       await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'agent/quickChat/create', params: { input: { teamId: 'team-test' } } });
@@ -56,7 +56,7 @@ describe('connected engine admission', () => {
     snapshot.remoteConnections.connections = [connection];
     const providers = [{ backend: 'claude', installed: true, connected: true, enabled: false, checking: false }];
     const clients = { request: vi.fn().mockResolvedValue(providers), close: vi.fn() };
-    const server = new ClawBackendServer({ version: 'test', snapshot, remoteClients: clients as never });
+    const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: clients as never });
     try {
       await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/enabled/set', params: { backend: 'claude', enabled: false, remoteConnectionId: connection.id } });
       expect(clients.request).toHaveBeenCalledWith(connection, 'provider/enabled/set', expect.objectContaining({ backend: 'claude', enabled: false }), expect.any(Function));
@@ -71,10 +71,10 @@ describe('connected engine admission', () => {
     const driverRpc = { handle: vi.fn((_method, params) => new ClaudeBackendDriver().authenticate(params)), onEvent: vi.fn(() => () => undefined), close: vi.fn() };
     const providerSetup = { isChanging: () => false, list: () => [
       { backend: 'codex', installed: false, homePath: '/absent' },
-      { backend: 'claude', installed: true, homePath: '/claw/claude' },
+      { backend: 'claude', installed: true, homePath: '/app/claude' },
     ] };
     vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true });
-    const server = new ClawBackendServer({ version: 'test', snapshot, providerSetup: providerSetup as never, driverRpc: driverRpc as never });
+    const server = new AppBackendServer({ version: 'test', snapshot, providerSetup: providerSetup as never, driverRpc: driverRpc as never });
     try {
       const created = await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'agent/quickChat/create', params: { input: { teamId: 'team-test' } } });
       expect(created).toMatchObject({ result: { agents: [expect.objectContaining({ backend: 'claude' })] } });
@@ -103,7 +103,7 @@ describe('connected engine admission', () => {
     const localConnections = structuredClone(snapshot.providerConnections);
     const result = { kind: backend, connected: false, state: {} };
     const clients = { request: vi.fn().mockResolvedValue(result), close: vi.fn() };
-    const server = new ClawBackendServer({ version: 'test', snapshot, remoteClients: clients as never });
+    const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: clients as never });
     try {
       await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/disconnect', params: { backend, remoteConnectionId: connection.id } }))
         .resolves.toMatchObject({ result });
@@ -117,7 +117,7 @@ describe('connected engine admission', () => {
     const connection = readyRemoteConnection();
     snapshot.remoteConnections.connections = [connection];
     const clients = { request: vi.fn().mockResolvedValue({ installed: true }), close: vi.fn() };
-    const server = new ClawBackendServer({ version: 'test', snapshot, remoteClients: clients as never });
+    const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: clients as never });
     try {
       await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/connections/get', params: { remoteConnectionId: connection.id } }))
         .rejects.toThrow('Update the remote runtime');

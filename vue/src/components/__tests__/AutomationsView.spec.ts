@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElButton, ElDialog, ElInput, ElMessageBox, ElOption, ElPopover, ElSelect, ElSwitch } from 'element-plus';
 import { defineComponent } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type {
   AppSnapshot,
   BackendConversationRef,
@@ -14,7 +15,7 @@ import type {
   SourceRepository,
   WorkSource,
   WorkProviderKind,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import AutomationsView from '../AutomationsView.vue';
 
 const AutomationEditorStub = defineComponent({
@@ -34,7 +35,7 @@ describe('AutomationsView', () => {
     const remote = createInitialSnapshot();
     remote.providerConnections = [{ backend: 'claude', connected: true, installed: true, checking: false }];
     remote.workBacklog.connections = [{ provider: 'linear', status: 'connected' }];
-    const target = { provider: 'linear' as const, sourceId: 'linear:eng:login', executionRepositoryPath: '/home/nicolas/src/codex-claw' };
+    const target = { provider: 'linear' as const, sourceId: 'linear:eng:login', executionRepositoryPath: '/home/nicolas/src/agent-workspace' };
     const saved = automation({ name: 'Engineering / Login', backend: 'claude', repositories: [target] });
     let failCatalog = true;
     const loadWorkRepositories = vi.fn(async (provider: WorkProviderKind) => {
@@ -59,7 +60,7 @@ describe('AutomationsView', () => {
     await wrapper.findAll('button').find(button => button.text() === 'Retry')!.trigger('click'); await flushPromises();
     expect(wrapper.text()).not.toContain('Linear access failed');
     await choose('Team / project', 'Engineering / Login');
-    await choose('Code repository for Engineering / Login', 'codex-claw');
+    await choose('Code repository for Engineering / Login', 'agent-workspace');
     await wrapper.get('form').trigger('submit'); await flushPromises();
     expect(createAutomation).toHaveBeenCalledWith(expect.objectContaining({ backend: 'claude', repositories: [target] }), { kind: 'remote', remoteConnectionId: 'connection-devbox' });
     await wrapper.get('[aria-label="Engineering / Login actions"]').trigger('click'); await flushPromises();
@@ -103,11 +104,11 @@ describe('AutomationsView', () => {
       repositories: [
         {
           provider: 'github',
-          sourceId: 'nbonamy/codex-claw',
-          executionRepositoryPath: '/src/codex-claw',
+          sourceId: 'nbonamy/agent-workspace',
+          executionRepositoryPath: '/src/agent-workspace',
         },
       ],
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       schedule: { intervalMinutes: 60 },
     });
     await flushPromises();
@@ -116,11 +117,11 @@ describe('AutomationsView', () => {
       repositories: [
         {
           provider: 'github',
-          sourceId: 'nbonamy/codex-claw',
-          executionRepositoryPath: '/src/codex-claw',
+          sourceId: 'nbonamy/agent-workspace',
+          executionRepositoryPath: '/src/agent-workspace',
         },
       ],
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       schedule: { intervalMinutes: 60 },
     });
   });
@@ -206,7 +207,7 @@ describe('AutomationsView', () => {
         {
           provider: 'github',
           sourceId: 'nbonamy/remote',
-          executionRepositoryPath: '/home/nicolas/src/codex-claw',
+          executionRepositoryPath: '/home/nicolas/src/agent-workspace',
         },
       ],
       teamId: 'team-remote',
@@ -270,11 +271,11 @@ describe('AutomationsView', () => {
       repositories: [
         {
           provider: 'github',
-          sourceId: 'nbonamy/codex-claw',
+          sourceId: 'nbonamy/agent-workspace',
           executionRepositoryPath: '/tmp/fresh-agent',
         },
       ],
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       schedule: { intervalMinutes: 60 },
     });
     await flushPromises();
@@ -352,7 +353,7 @@ describe('AutomationsView', () => {
     });
 
     expect(wrapper.text()).toContain('GitHub bugs');
-    expect(wrapper.text()).toContain('Codex Claw · nbonamy/codex-claw · Every hour');
+    expect(wrapper.text()).toContain(`${product.name} · nbonamy/agent-workspace · Every hour`);
     expect(wrapper.text()).toContain('Jun 9');
     expect(wrapper.text()).toContain('1 execution');
     expect(wrapper.text()).not.toContain('Every few minutes');
@@ -398,9 +399,9 @@ describe('AutomationsView', () => {
                 {
                   agentId: 'agent-dina',
                   agentName: 'Dina',
-                  workItemId: 'github:nbonamy/codex-claw#12',
+                  workItemId: 'github:nbonamy/agent-workspace#12',
                   workItemTitle: 'Fix cockpit',
-                  workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+                  workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
                   conversationRef: {
                     backend: 'codex',
                     threadId: 'thread-dina',
@@ -429,19 +430,19 @@ describe('AutomationsView', () => {
 
     expect(wrapper.text()).toContain('2 executions');
     expect(wrapper.text()).not.toContain('Dina');
-    expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
+    expect(wrapper.text()).toContain('github:nbonamy/agent-workspace#12');
     expect(wrapper.text()).not.toContain('Fix cockpit');
     expect(wrapper.text()).toContain('1m');
-    expect(wrapper.find('a[href="https://github.com/nbonamy/codex-claw/issues/12"]').exists()).toBe(true);
+    expect(wrapper.find('a[href="https://github.com/nbonamy/agent-workspace/issues/12"]').exists()).toBe(true);
     expect(wrapper.text().indexOf('Completed')).toBeLessThan(wrapper.text().indexOf('Failed'));
     expect(wrapper.text()).not.toContain('No ticket');
 
-    await wrapper.get('[aria-label="View conversation for github:nbonamy/codex-claw#12"]').trigger('click');
+    await wrapper.get('[aria-label="View conversation for github:nbonamy/agent-workspace#12"]').trigger('click');
     await flushPromises();
 
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
     expect(wrapper.find('.automation-execution-conversation-overlay').exists()).toBe(true);
-    expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
+    expect(wrapper.text()).toContain('github:nbonamy/agent-workspace#12');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('Please fix the cockpit issue.');
     expect(wrapper.text()).toContain('The cockpit issue is fixed.');
@@ -470,9 +471,9 @@ describe('AutomationsView', () => {
                 {
                   agentId: 'agent-dina',
                   agentName: 'Dina',
-                  workItemId: 'github:nbonamy/codex-claw#12',
+                  workItemId: 'github:nbonamy/agent-workspace#12',
                   workItemTitle: 'Fix cockpit',
-                  workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+                  workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
                   conversationRef: {
                     backend: 'codex',
                     threadId: 'thread-dina',
@@ -486,7 +487,7 @@ describe('AutomationsView', () => {
     });
 
     await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
-    await wrapper.get('[aria-label="Delete execution for github:nbonamy/codex-claw#12"]').trigger('click');
+    await wrapper.get('[aria-label="Delete execution for github:nbonamy/agent-workspace#12"]').trigger('click');
     await flushPromises();
 
     expect(ElMessageBox.confirm).toHaveBeenCalledWith('This execution will be removed from the automation history.', 'Delete execution?', {
@@ -572,7 +573,7 @@ describe('AutomationsView', () => {
       ],
     });
 
-    expect(wrapper.text()).toContain('Codex Claw · nbonamy/codex-claw · Every hour');
+    expect(wrapper.text()).toContain(`${product.name} · nbonamy/agent-workspace · Every hour`);
     expect(wrapper.text()).toContain('Unknown');
   });
 });
@@ -660,11 +661,11 @@ function automation(overrides: Partial<Automation> = {}): Automation {
     repositories: [
       {
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       },
     ],
-    teamId: 'team-codex-claw',
+    teamId: 'team-app',
     schedule: { intervalMinutes: 60 },
     executionLog: [],
     createdAt: '2026-06-09T10:00:00.000Z',
@@ -676,11 +677,11 @@ function automation(overrides: Partial<Automation> = {}): Automation {
 function repository(overrides: Partial<WorkSource> = {}): WorkSource {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace',
     owner: 'nbonamy',
-    name: 'codex-claw',
-    fullName: 'nbonamy/codex-claw',
-    url: 'https://github.com/nbonamy/codex-claw',
+    name: 'agent-workspace',
+    fullName: 'nbonamy/agent-workspace',
+    url: 'https://github.com/nbonamy/agent-workspace',
     isPrivate: true,
     ...overrides,
   };
@@ -688,13 +689,13 @@ function repository(overrides: Partial<WorkSource> = {}): WorkSource {
 
 function remoteSourceRepository(): SourceRepository {
   return {
-    name: 'codex-claw',
-    path: '/home/nicolas/src/codex-claw',
-    remoteIdentity: 'github.com/nbonamy/codex-claw',
+    name: 'agent-workspace',
+    path: '/home/nicolas/src/agent-workspace',
+    remoteIdentity: 'github.com/nbonamy/agent-workspace',
     worktrees: [
       {
         name: 'main',
-        path: '/home/nicolas/src/codex-claw',
+        path: '/home/nicolas/src/agent-workspace',
       },
     ],
   };
@@ -711,7 +712,7 @@ function readyRemoteConnection(): RemoteConnection {
     transport: {
       type: 'ssh-stdio',
       command: 'ssh',
-      args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+      args: ['devbox', 'node ~/.agent-workspace/daemon.mjs --stdio'],
     },
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',

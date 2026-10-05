@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AutomationExecutionStatus } from '@codex-claw/core/contracts';
+import type { AutomationExecutionStatus } from '@workspace/core/contracts';
 import { EyeIcon, Trash2Icon } from '../shared/icons/app-icons';
 
 defineProps<{

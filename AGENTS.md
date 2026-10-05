@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository is **Codex Claw**, an Electron desktop app for coordinating
+This repository is **Korus**, an Electron desktop app for coordinating
 teams of coding agents with native conversation and artifact rendering.
 
 - Electron + Electron Forge desktop app.
@@ -25,12 +25,18 @@ Core product surfaces:
 
 ## Architecture
 
+`core/src/product.json` owns product branding and external identity. Keep
+implementation identifiers, package names, filenames, and CSS brand-neutral;
+read product metadata for visible names, instructions, paths, and packaging.
+Authored documentation may use the product name. Existing repository and
+website URLs remain unchanged until their infrastructure is renamed.
+
 Preserve the product and process boundaries:
 
 - Electron main is the desktop adapter. It owns windows, preload IPC, native
   dialogs, app lifecycle, packaged resource resolution, and the stdio client
-  used to reach `clawd`.
-- `clawd` owns backend process lifecycle beyond the Electron-to-backend stdio
+  used to reach `daemon`.
+- `daemon` owns backend process lifecycle beyond the Electron-to-backend stdio
   process, backend drivers, provider protocols, approvals, server requests,
   app persistence, backend-owned filesystem access, git, automations, and agent
   runtime state.
@@ -43,24 +49,24 @@ Preserve the product and process boundaries:
   an app-owned routing envelope.
 - Provider conversations stay provider-owned end to end. For Codex,
   `codex-app-sdk` owns the conversation snapshot/reducer, optimistic messages,
-  history, turn mutations, queues, and generic conversation UI. Claw stores the
+  history, turn mutations, queues, and generic conversation UI. Korus stores the
   thread reference, transports SDK snapshots/events, invokes SDK operations,
-  and adds Claw-specific coordination metadata. When generic Codex conversation
+  and adds Korus-specific coordination metadata. When generic Codex conversation
   behavior is missing or wrong, fix it in the SDK and consume that fix here.
 - Codex-specific product policy belongs in the Codex driver/adapter; generic
-  Codex conversation behavior belongs in `codex-app-sdk`, not in Claw
+  Codex conversation behavior belongs in `codex-app-sdk`, not in Korus
   renderer state or wrappers.
-- Backend-dependent Claw product features must enter through app-owned
+- Backend-dependent Korus product features must enter through app-owned
   contracts and the backend protocol first. Add or extend an optional driver
-  method or capability behind `clawd`, route Electron through
-  `ClawBackendClient`, and keep renderer components free of Codex/Claude
+  method or capability behind `daemon`, route Electron through
+  `BackendClient`, and keep renderer components free of Codex/Claude
   protocol branches.
-- `RendererMessage` remains an app-owned DTO where Claw explicitly needs one,
+- `RendererMessage` remains an app-owned DTO where Korus explicitly needs one,
   including the normalized Claude host and cross-provider historical reads. It
   is not a live Codex transcript model.
-- Future provider support should arrive through provider hosts behind `clawd`,
+- Future provider support should arrive through provider hosts behind `daemon`,
   app-owned capability seams, and provider-owned conversation replicas—not a
-  new global Claw transcript reducer.
+  new global Korus transcript reducer.
 - Theme support must use semantic tokens and CSS variables. Do not hard-code
   product colors inside components.
 
@@ -82,26 +88,25 @@ changes; specify feature behavior in tests:
 - `docs/agent-provider-selection.md`: draft for provider choice across manual
   agent creation, delegation, projects, Missions, and independent review.
 - `docs/codex.md`: read before changing Codex conversation state, rendering,
-  actions, history, or transport; it defines the SDK/Claw ownership boundary,
+  actions, history, or transport; it defines the SDK/Korus ownership boundary,
   lifecycle, generated types, and test fixtures.
 - `docs/claude.md`: Claude Code websocket/SDK protocol research, support
   strategy, and remaining Claude-driver questions.
 - [Claude capability audit](docs/research/claude-capabilities.md): read before adding
   Claude steering, forks, goals, turn mutations, or context controls; distinguishes
-  SDK contracts, Claw integration gaps, and runtime evidence.
+  SDK contracts, Korus integration gaps, and runtime evidence.
 - `docs/research/synara.md`: competitive analysis for Synara comparisons and
   provider-neutral workflow decisions; dated source evidence, not a roadmap.
 - `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
   tools, inbox state, backend enablement, security, and tests.
-- `docs/custom-tools.md`: use when adding or presenting a `codex_claw` MCP tool,
+- `docs/custom-tools.md`: use when adding or presenting a `workspace` MCP tool,
   including agent status, structured results, lifecycle titles, and tests.
 - `docs/backend-architecture.md`: architecture record and implementation
   slicing for extracting the backend core into a separate TypeScript process.
 - `docs/protocol.md`: app-owned JSON-RPC backend protocol between clients,
-  `clawd`, and client callbacks implemented by Electron today.
+  `daemon`, and client callbacks implemented by Electron today.
 - `docs/architecture.md`: product model, process architecture, IPC,
   backend seam, persistence, and open architecture decisions.
-- `plans/codex-claw.md`: current product progression and commit checkpoints.
 - `docs/codex.png`: visual reference for the target shell.
 - `website/README.md`: read before changing the public VitePress guide in
   `website/docs/` or the website build and deployment. Public user guides are
@@ -145,17 +150,17 @@ from source code.
 Electron packaging signs and notarizes macOS builds by default. This can take a
 long time and should be reserved for explicit release/signing work. For normal
 agent verification that needs Forge packaging, set
-`CODEX_CLAW_SKIP_SIGNING=1` so Forge skips macOS app signing, notarization, and
+`APP_SKIP_SIGNING=1` so Forge skips macOS app signing, notarization, and
 bundled helper signing:
 
 ```bash
-CODEX_CLAW_SKIP_SIGNING=1 npm run package
-CODEX_CLAW_SKIP_SIGNING=1 npm run build
+APP_SKIP_SIGNING=1 npm run package
+APP_SKIP_SIGNING=1 npm run build
 ```
 
 When scripts exist, run the relevant focused tests while iterating and the
 relevant build/test gate before handoff. Do not invent server/API integration
-gates for this project; Codex Claw is a desktop app.
+gates for this project; Korus is a desktop app.
 
 ## Project Skills
 
@@ -163,22 +168,22 @@ Repo-local Codex skills live in `.agents/skills/`. When a task clearly matches
 one of those areas, read the relevant `.agents/skills/<name>/SKILL.md` before
 editing.
 
-Use `codex-claw-dod` before handing off, committing, pushing, or calling Codex
-Claw work done.
+Use `app-dod` before handing off, committing, pushing, or calling this
+application's work done.
 
 Never update `CHANGELOG.md` during ordinary implementation, review, handoff,
 commit, or push work. Curate it only when Nicolas explicitly invokes
 `update-changelog` or `prepare-release`.
 
-- `codex-claw-dod`: Definition of Done checklist for scope, architecture,
+- `app-dod`: Definition of Done checklist for scope, architecture,
   tests, coverage, security, UX, docs, worktree hygiene, and handoff.
-- `codex-claw-frontend-dev`: Vue, Element Plus, app shell, chat rendering,
+- `app-frontend-dev`: Vue, Element Plus, app shell, chat rendering,
   artifact panes, design tokens, themes, and frontend tests.
-- `codex-claw-live-preview`: isolated, parallel-safe, branch-faithful web
-  previews with seeded state for interactively dogfooding any Claw feature.
-- `codex-claw-testing-coverage`: Vitest, component isolation, IPC contracts,
+- `app-live-preview`: isolated, parallel-safe, branch-faithful web
+  previews with seeded state for interactively dogfooding any Korus feature.
+- `app-testing-coverage`: Vitest, component isolation, IPC contracts,
   fake Codex transports, coverage triage, and verification gates.
-- `update-changelog`: release-time audit of Claw and SDK histories, curated
+- `update-changelog`: release-time audit of Korus and SDK histories, curated
   Unreleased notes, and an evidence-backed semantic-version recommendation.
 - `prepare-release`: invokes `update-changelog`, confirms the recommended
   version, freezes release artifacts, and creates the local provenance tag.

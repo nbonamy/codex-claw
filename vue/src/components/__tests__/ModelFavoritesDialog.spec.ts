@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { BackendModelOption, ModelFavorite } from '@codex-claw/core/contracts';
+import type { BackendModelOption, ModelFavorite } from '@workspace/core/contracts';
 import ModelFavoritesDialog from '../ModelFavoritesDialog.vue';
 
 const favorites: ModelFavorite[] = [{
@@ -40,7 +40,7 @@ describe('ModelFavoritesDialog', () => {
   it('shows only reorder and delete controls and emits deletion immediately', async () => {
     const wrapper = mountDialog();
 
-    expect(wrapper.get('.claw-dialog__title').text()).toBe('Model favorites');
+    expect(wrapper.get('.app-dialog__title').text()).toBe('Model favorites');
     expect(wrapper.text()).toContain('Drag favorites to reorder.');
     expect(wrapper.text()).toContain('GPT-5.6 Terra');
     expect(wrapper.text()).toContain('Medium · Fast');
@@ -72,7 +72,7 @@ describe('ModelFavoritesDialog', () => {
   it('closes without adding another action to the dialog', async () => {
     const wrapper = mountDialog();
 
-    await wrapper.get('.claw-dialog__footer .claw-button').trigger('click');
+    await wrapper.get('.app-dialog__footer .app-button').trigger('click');
 
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });

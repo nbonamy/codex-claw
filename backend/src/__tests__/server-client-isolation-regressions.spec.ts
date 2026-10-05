@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
-import type { ClawRpcRequest } from '@codex-claw/core/backend-protocol/rpc';
-import { ClawBackendServer } from '../server';
+import type { BackendEvent } from '@workspace/core/backend-driver';
+import type { AppRpcRequest } from '@workspace/core/backend-protocol/rpc';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { createTestSnapshot, createRemoteAgent, createRemoteTeamSnapshot, readyRemoteConnection } from './server-test-fixtures';
 
 describe('client isolation regressions', () => {
   it.each(['agent/quickChat/create', 'agent/create'])('resolves omitted teams from each client before routing %s locally or remotely', async (method) => {
     const remoteSnapshot = createRemoteTeamSnapshot();
-    const daemon = new ClawBackendServer({ version: 'test', snapshot: remoteSnapshot, driverRpc: new BackendDriverRpc(new Map()) });
+    const daemon = new AppBackendServer({ version: 'test', snapshot: remoteSnapshot, driverRpc: new BackendDriverRpc(new Map()) });
     const snapshot = createTestSnapshot();
     const connection = readyRemoteConnection();
     snapshot.remoteConnections.connections = [connection];
@@ -17,11 +17,11 @@ describe('client isolation regressions', () => {
       { id: 'pointer', name: 'Devbox', agentIds: [], remoteConnectionId: connection.id, remoteTeamId: 'team-remote' },
     );
     const request = vi.fn(async (_connection: unknown, method: string, params: unknown) => {
-      const result = await daemon.handleMessage({ jsonrpc: '2.0', id: 1, method, params } as ClawRpcRequest);
+      const result = await daemon.handleMessage({ jsonrpc: '2.0', id: 1, method, params } as AppRpcRequest);
       if (result && 'result' in result) return result.result;
       throw new Error(JSON.stringify(result));
     });
-    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map()), remoteClients: { request, close: vi.fn() } as never });
+    const server = new AppBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map()), remoteClients: { request, close: vi.fn() } as never });
     try {
       await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'client/navigation/selectTeam', params: { _clientId: 'remote-client', teamId: 'pointer' } });
       await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'client/navigation/selectTeam', params: { _clientId: 'local-client', teamId: 'local-other' } });
@@ -45,7 +45,7 @@ describe('client isolation regressions', () => {
     const snapshot = createTestSnapshot();
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
-    const server = new ClawBackendServer({ version: 'test', snapshot, saveSnapshot: () => gate });
+    const server = new AppBackendServer({ version: 'test', snapshot, saveSnapshot: () => gate });
     try {
       const calls = ['A', 'B'].map((client) => server.handleMessage({
         jsonrpc: '2.0', id: client, method,
@@ -70,7 +70,7 @@ describe('client isolation regressions', () => {
     const handle = vi.fn(async () => {
       emit({ type: 'agentRequest.resolved', agentId: agent.id, backend: 'codex', conversationId: 'conversation', payload: { id: '0', outcome: { kind: 'cancelled' } } });
     });
-    const daemon = new ClawBackendServer({ version: 'test', snapshot: remoteSnapshot, driverRpc: {
+    const daemon = new AppBackendServer({ version: 'test', snapshot: remoteSnapshot, driverRpc: {
       onEvent: (listener: typeof emit) => { emit = listener; return () => undefined; }, handle, close: vi.fn(),
     } as never });
     emit({ type: 'agentRequest.created', agentId: agent.id, backend: 'codex', payload: { request: {
@@ -81,11 +81,11 @@ describe('client isolation regressions', () => {
     snapshot.remoteConnections.connections = [connection];
     snapshot.teams.push({ id: 'pointer', name: 'Devbox', agentIds: [], remoteConnectionId: connection.id, remoteTeamId: 'team-remote' });
     const request = vi.fn(async (_connection: unknown, method: string, params: unknown) => {
-      const response = await daemon.handleMessage({ jsonrpc: '2.0', id: 1, method, params } as ClawRpcRequest);
+      const response = await daemon.handleMessage({ jsonrpc: '2.0', id: 1, method, params } as AppRpcRequest);
       if (response && 'result' in response) return response.result;
       throw new Error(JSON.stringify(response));
     });
-    const controller = new ClawBackendServer({ version: 'test', snapshot, remoteClients: { request, close: vi.fn() } as never });
+    const controller = new AppBackendServer({ version: 'test', snapshot, remoteClients: { request, close: vi.fn() } as never });
     try {
       await controller.handleMessage({ jsonrpc: '2.0', id: 1, method: 'client/navigation/selectTeam', params: { _clientId: 'B', teamId: 'team-test' } });
       const before = structuredClone(snapshot.clientPreferences);

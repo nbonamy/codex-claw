@@ -1,27 +1,27 @@
-import type { CodexClawApi } from '@codex-claw/core/contracts';
-import { configureClawClient } from '../platform-api';
+import type { AppApi } from '@workspace/core/contracts';
+import { configureAppClient } from '../platform-api';
 import { createClientApiMock } from './client-api-mock';
 
 let disposeClient = () => {};
-let assignClient: ((api?: Partial<CodexClawApi>) => void) | undefined;
+let assignClient: ((api?: Partial<AppApi>) => void) | undefined;
 
-export function configureElectronTestClient(overrides?: Partial<CodexClawApi>): CodexClawApi | undefined {
+export function configureElectronTestClient(overrides?: Partial<AppApi>): AppApi | undefined {
   disposeClient();
   disposeClient = () => {};
   if (!overrides) {
-    configureClawClient(undefined);
+    configureAppClient(undefined);
     return undefined;
   }
   const mock = createClientApiMock();
   const api = Object.assign(mock.api, overrides);
   disposeClient = mock.dispose;
-  configureClawClient({ api, platform: 'desktop' });
+  configureAppClient({ api, platform: 'desktop' });
   return api;
 }
 
 export function installElectronTestClientAccessor(): void {
-  const existing = window.codexClaw;
-  let api: CodexClawApi | undefined;
+  const existing = window.app;
+  let api: AppApi | undefined;
   let initialized = false;
   const initialize = () => {
     if (!initialized) {
@@ -34,26 +34,26 @@ export function installElectronTestClientAccessor(): void {
     api = configureElectronTestClient(value);
     initialized = true;
   };
-  Object.defineProperty(window, 'codexClaw', {
+  Object.defineProperty(window, 'app', {
     configurable: true,
     get: initialize,
     set: assignClient,
   });
 }
 
-export function setElectronTestClient(api?: Partial<CodexClawApi>): void {
+export function setElectronTestClient(api?: Partial<AppApi>): void {
   if (!assignClient) installElectronTestClientAccessor();
   assignClient!(api);
 }
 
-export function stubElectronTestWindow(value: { codexClaw?: Partial<CodexClawApi> }): void {
-  setElectronTestClient(value.codexClaw);
+export function stubElectronTestWindow(value: { app?: Partial<AppApi> }): void {
+  setElectronTestClient(value.app);
 }
 
 /** Only for legacy/missing-method compatibility tests, never normal UI integration. */
-export function stubLegacyElectronTestWindow(value: { codexClaw: Partial<CodexClawApi> }): void {
-  setElectronTestClient(value.codexClaw);
-  for (const key of Object.keys(window.codexClaw!)) {
-    if (!(key in value.codexClaw)) Reflect.deleteProperty(window.codexClaw!, key);
+export function stubLegacyElectronTestWindow(value: { app: Partial<AppApi> }): void {
+  setElectronTestClient(value.app);
+  for (const key of Object.keys(window.app!)) {
+    if (!(key in value.app)) Reflect.deleteProperty(window.app!, key);
   }
 }

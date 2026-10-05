@@ -43,8 +43,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitDiff, AgentGitDiffTarget, AgentGitStatus, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import type { Mission } from '@codex-claw/core/missions';
+import type { Agent, AgentGitDiff, AgentGitDiffTarget, AgentGitStatus, OpenInApplicationCatalog } from '@workspace/core/contracts';
+import type { Mission } from '@workspace/core/missions';
 import { RefreshIcon } from '../shared/icons/app-icons';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';

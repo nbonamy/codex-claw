@@ -1,16 +1,16 @@
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import * as mainLog from '../log';
-import { ClawBackendProcessClient } from '../backend-process-client';
+import { AppBackendProcessClient } from '../backend-process-client';
 
-describe('ClawBackendProcessClient', () => {
+describe('AppBackendProcessClient', () => {
   it('waits for provider history flush before finishing shutdown', async () => {
     vi.useFakeTimers();
     const child = createFakeChildProcess();
     child.kill.mockImplementation(() => true);
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
     await client.start();
@@ -31,8 +31,8 @@ describe('ClawBackendProcessClient', () => {
   it('sends backend health over stdio and resolves the response', async () => {
     const child = createFakeChildProcess();
     const spawnProcess = vi.fn().mockReturnValue(child);
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess,
     });
 
@@ -44,7 +44,7 @@ describe('ClawBackendProcessClient', () => {
       id: request.id,
       result: {
         ok: true,
-        name: 'clawd',
+        name: 'daemon',
         version: '0.1.0',
         pid: 123,
       },
@@ -52,11 +52,11 @@ describe('ClawBackendProcessClient', () => {
 
     await expect(healthPromise).resolves.toStrictEqual({
       ok: true,
-      name: 'clawd',
+      name: 'daemon',
       version: '0.1.0',
       pid: 123,
     });
-    expect(spawnProcess).toHaveBeenCalledWith('node', ['backend/dist/clawd.mjs', '--stdio'], {
+    expect(spawnProcess).toHaveBeenCalledWith('node', ['backend/dist/daemon.mjs', '--stdio'], {
       cwd: undefined,
       stdio: 'pipe',
     });
@@ -72,8 +72,8 @@ describe('ClawBackendProcessClient', () => {
   ])('accepts a successful delayed response for %s', async (method) => {
     vi.useFakeTimers();
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
 
@@ -88,8 +88,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('rejects requests without an explicit timeout policy before sending them', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
 
@@ -101,12 +101,12 @@ describe('ClawBackendProcessClient', () => {
   it('passes configured backend environment to the spawned process', async () => {
     const child = createFakeChildProcess();
     const spawnProcess = vi.fn().mockReturnValue(child);
-    const client = new ClawBackendProcessClient({
+    const client = new AppBackendProcessClient({
       command: {
         command: 'node',
-        args: ['backend/dist/clawd.mjs', '--stdio'],
+        args: ['backend/dist/daemon.mjs', '--stdio'],
         env: {
-          CODEX_CLAW_ASSETS_PATH: '/app/resources',
+          APP_ASSETS_PATH: '/app/resources',
         },
       },
       spawnProcess,
@@ -114,10 +114,10 @@ describe('ClawBackendProcessClient', () => {
 
     await client.start();
 
-    expect(spawnProcess).toHaveBeenCalledWith('node', ['backend/dist/clawd.mjs', '--stdio'], {
+    expect(spawnProcess).toHaveBeenCalledWith('node', ['backend/dist/daemon.mjs', '--stdio'], {
       cwd: undefined,
       env: expect.objectContaining({
-        CODEX_CLAW_ASSETS_PATH: '/app/resources',
+        APP_ASSETS_PATH: '/app/resources',
       }),
       stdio: 'pipe',
     });
@@ -125,8 +125,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('emits backend event notifications from stdio', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
     const listener = vi.fn();
@@ -158,8 +158,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('ignores malformed backend events without interrupting later notifications', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
     const listener = vi.fn();
@@ -213,13 +213,13 @@ describe('ClawBackendProcessClient', () => {
     );
     expect(malformedWarnings).toHaveLength(3);
     expect(malformedWarnings).toEqual(expect.arrayContaining([
-      expect.arrayContaining(['clawd', 'ignored malformed backend event notification', {
+      expect.arrayContaining(['daemon', 'ignored malformed backend event notification', {
         detail: expect.stringContaining('$.payload.type'),
       }]),
-      expect.arrayContaining(['clawd', 'ignored malformed backend event notification', {
+      expect.arrayContaining(['daemon', 'ignored malformed backend event notification', {
         detail: expect.stringContaining('$.seq'),
       }]),
-      expect.arrayContaining(['clawd', 'ignored malformed backend event notification', {
+      expect.arrayContaining(['daemon', 'ignored malformed backend event notification', {
         detail: expect.stringContaining('$.type'),
       }]),
     ]));
@@ -228,8 +228,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('ignores legacy backend event notification names', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
     const listener = vi.fn();
@@ -252,8 +252,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('keeps resolving requests when notifications arrive before responses', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
     const listener = vi.fn();
@@ -278,7 +278,7 @@ describe('ClawBackendProcessClient', () => {
       id: request.id,
       result: {
         ok: true,
-        name: 'clawd',
+        name: 'daemon',
         version: '0.1.0',
         pid: 123,
       },
@@ -290,8 +290,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('preserves malformed JSON and JSON-RPC framing behavior', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
     const warn = vi.spyOn(mainLog, 'warnMain');
@@ -304,7 +304,7 @@ describe('ClawBackendProcessClient', () => {
     child.stdout.write(`${JSON.stringify({
       jsonrpc: '2.0',
       id: request.id,
-      result: { ok: true, name: 'clawd', version: '0.1.0', pid: 123 },
+      result: { ok: true, name: 'daemon', version: '0.1.0', pid: 123 },
     })}\n`);
 
     await expect(healthPromise).resolves.toMatchObject({ ok: true });
@@ -314,7 +314,7 @@ describe('ClawBackendProcessClient', () => {
     expect(parseWarnings).toHaveLength(2);
     expect(parseWarnings).toEqual(expect.arrayContaining([
       expect.arrayContaining([
-        'clawd',
+        'daemon',
         'failed to parse backend response',
         expect.objectContaining({ bytes: expect.any(Number) }),
       ]),
@@ -324,8 +324,8 @@ describe('ClawBackendProcessClient', () => {
   it('handles backend-initiated client requests over stdio', async () => {
     const child = createFakeChildProcess();
     const openExternal = vi.fn().mockResolvedValue(true);
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       requestHandlers: {
         'client/external/open': openExternal,
       },
@@ -351,8 +351,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('returns JSON-RPC errors for unknown backend-initiated client requests', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
 
@@ -377,8 +377,8 @@ describe('ClawBackendProcessClient', () => {
 
   it('rejects pending requests when the process exits', async () => {
     const child = createFakeChildProcess();
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess: vi.fn().mockReturnValue(child),
     });
 
@@ -386,7 +386,7 @@ describe('ClawBackendProcessClient', () => {
     const requestPromise = client.health();
     child.emit('exit', 1, null);
 
-    await expect(requestPromise).rejects.toThrow('clawd exited before responding');
+    await expect(requestPromise).rejects.toThrow('daemon exited before responding');
   });
 
   it('reports unexpected exits and starts a fresh process on reconnect', async () => {
@@ -395,8 +395,8 @@ describe('ClawBackendProcessClient', () => {
     const spawnProcess = vi.fn()
       .mockReturnValueOnce(firstChild)
       .mockReturnValueOnce(secondChild);
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess,
     });
     const connectionListener = vi.fn();
@@ -425,15 +425,15 @@ describe('ClawBackendProcessClient', () => {
       watchListenerRef.current = listener;
       return watcher;
     });
-    const client = new ClawBackendProcessClient({
-      command: { command: 'node', args: ['backend/dist/clawd.mjs', '--stdio'] },
+    const client = new AppBackendProcessClient({
+      command: { command: 'node', args: ['backend/dist/daemon.mjs', '--stdio'] },
       spawnProcess,
-      watchFile: '/repo/backend/dist/clawd.mjs',
+      watchFile: '/repo/backend/dist/daemon.mjs',
       watchFileSystem,
     });
 
     await client.start();
-    expect(watchFileSystem).toHaveBeenCalledWith('/repo/backend/dist/clawd.mjs', expect.any(Function));
+    expect(watchFileSystem).toHaveBeenCalledWith('/repo/backend/dist/daemon.mjs', expect.any(Function));
     watchListenerRef.current?.();
     await vi.advanceTimersByTimeAsync(100);
 

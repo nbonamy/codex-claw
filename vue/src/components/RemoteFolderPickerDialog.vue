@@ -4,7 +4,7 @@
     :title="title"
     width="560px"
     append-to-body
-    class="claw-dialog remote-folder-picker-dialog"
+    class="app-dialog remote-folder-picker-dialog"
     @update:model-value="onVisibilityChanged"
   >
     <div class="remote-folder-picker-dialog__content">
@@ -66,10 +66,10 @@
     </div>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.remoteFolderPickerDialog.cancel') }}</button>
+      <div class="app-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" @click="close">{{ $t('surface.remoteFolderPickerDialog.cancel') }}</button>
         <button
-          class="claw-button claw-button--primary"
+          class="app-button app-button--primary"
           type="button"
           :disabled="!folderPath.trim()"
           @click="selectFolder"
@@ -82,7 +82,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
-import type { SourceFolderListing, SourceFolderListInput } from '@codex-claw/core/contracts';
+import type { SourceFolderListing, SourceFolderListInput } from '@workspace/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{

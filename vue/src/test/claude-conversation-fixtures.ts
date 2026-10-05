@@ -1,4 +1,4 @@
-import type { ClaudeConversationSnapshot, RendererMessage } from '@codex-claw/core/contracts';
+import type { ClaudeConversationSnapshot, RendererMessage } from '@workspace/core/contracts';
 
 export function claudeConversationSnapshot(
   messages: RendererMessage[] = [],

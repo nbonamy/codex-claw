@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ElMessageBox, ElSwitch } from 'element-plus';
@@ -10,7 +11,7 @@ describe('SettingsEngineConnectionRow', () => {
   });
 
   it.each([
-    ["Error invoking remote method 'provider:enabled:set': Error: Cannot disable the last engine. Enable another one first.", 'To turn this engine off, first connect or enable another one.', 'Claw needs an active engine'],
+    ["Error invoking remote method 'provider:enabled:set': Error: Cannot disable the last engine. Enable another one first.", 'To turn this engine off, first connect or enable another one.', `${product.name} needs an active engine`],
     ["Error invoking remote method 'provider:enabled:set': Error: transport unavailable", 'Could not update engine status. Please try again.', 'Engine status unchanged'],
   ])('shows a clean dismissible dialog for %s and keeps the engine enabled', async (error, message, title) => {
     const wrapper = mount(SettingsEngineConnectionRow, { global: { components: { ElSwitch }, stubs: { transition: false } }, props: { connected: true, enabled: true, setEnabled: vi.fn().mockRejectedValue(new Error(error)) } });

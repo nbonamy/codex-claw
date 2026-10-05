@@ -1,4 +1,4 @@
-import type { SpokenAnnouncementRequest } from '@codex-claw/core/contracts';
+import type { SpokenAnnouncementRequest } from '@workspace/core/contracts';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
@@ -189,13 +189,13 @@ describe('NativeSpokenAnnouncementEngine', () => {
       isPackaged: false,
       platform: 'darwin',
       resourcesPath: '/unused',
-    })).toBe('/repo/electron/.tts/codex-claw-tts-helper');
+    })).toBe('/repo/electron/.tts/app-tts-helper');
     expect(resolveSpokenAnnouncementHelperPath({
       appPath: '/unused',
       isPackaged: true,
       platform: 'darwin',
       resourcesPath: '/App/Contents/Resources',
-    })).toBe('/App/Contents/Resources/codex-claw-tts-helper');
+    })).toBe('/App/Contents/Resources/app-tts-helper');
   });
 
   it('writes one bounded JSON request and settles once on helper exit', () => {
@@ -285,7 +285,7 @@ describe('NativeSpokenAnnouncementEngine', () => {
 
   it('settles when the default helper spawn cannot launch', async () => {
     const engine = new NativeSpokenAnnouncementEngine({
-      appPath: '/definitely-missing-codex-claw',
+      appPath: '/definitely-missing-agent-workspace',
       isPackaged: false,
       platform: 'darwin',
       resourcesPath: '/unused',

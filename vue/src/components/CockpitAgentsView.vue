@@ -82,9 +82,9 @@
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import type { Agent, AgentStatus, CockpitAgentViewMode, Team } from '@codex-claw/core/contracts';
-import { defaultTeamColor } from '@codex-claw/core/team-colors';
-import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
+import type { Agent, AgentStatus, CockpitAgentViewMode, Team } from '@workspace/core/contracts';
+import { defaultTeamColor } from '@workspace/core/team-colors';
+import { repositoryIconForAgent } from '@workspace/core/workspace-sidebar';
 import AgentContextMenu from './AgentContextMenu.vue';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import CockpitAddAgentTile from './CockpitAddAgentTile.vue';

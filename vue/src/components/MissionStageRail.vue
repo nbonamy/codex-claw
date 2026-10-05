@@ -37,9 +37,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Mission, MissionStage } from '@codex-claw/core/missions';
-import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { pendingMissionRun } from '@codex-claw/core/mission-execution';
+import type { Mission, MissionStage } from '@workspace/core/missions';
+import { missionWorkflow } from '@workspace/core/mission-workflows';
+import { pendingMissionRun } from '@workspace/core/mission-execution';
 import { CheckIcon, TargetArrowIcon } from '../shared/icons/app-icons';
 
 const props = defineProps<{ mission: Mission; viewedStage: MissionStage }>();

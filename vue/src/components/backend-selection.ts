@@ -1,7 +1,7 @@
 import { computed, inject, provide, ref, watch, type ComputedRef, type InjectionKey, type Ref } from 'vue';
-import { enabledAgentBackends, providerConnectionsForTeam } from '@codex-claw/core/agent-backends';
-import type { AgentBackend, AppSnapshot } from '@codex-claw/core/contracts';
-import type { ProviderConnection } from '@codex-claw/core/contracts/provider-setup';
+import { enabledAgentBackends, providerConnectionsForTeam } from '@workspace/core/agent-backends';
+import type { AgentBackend, AppSnapshot } from '@workspace/core/contracts';
+import type { ProviderConnection } from '@workspace/core/contracts/provider-setup';
 
 export const backendChoicesKey: InjectionKey<ComputedRef<AgentBackend[]>> = Symbol('backendChoices');
 type BackendSwitch = ReturnType<typeof provideBackendSwitch>;
@@ -10,7 +10,7 @@ const backendSnapshotKey: InjectionKey<() => AppSnapshot> = Symbol('backendSnaps
 const connectEngineKey: InjectionKey<() => void> = Symbol('connectEngine');
 const backendHostKey: InjectionKey<() => { host: string; connections: ProviderConnection[] } | null> = Symbol('backendHost');
 const remembered = ref<Record<string, AgentBackend>>({});
-const preferenceKey = 'codexClaw:preferredEngines';
+const preferenceKey = 'app:preferredEngines';
 
 export function provideBackendSwitch(update: (id: string, backend: AgentBackend) => Promise<void>) {
   const busy = ref(false);

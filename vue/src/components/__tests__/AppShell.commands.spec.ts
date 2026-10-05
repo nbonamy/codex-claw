@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { flushPromises } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import type {
@@ -6,9 +7,9 @@ import type {
 } from '@codex-app-sdk/vue';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
-import type { AppCommand, CodexClawApi, Team } from '@codex-claw/core/contracts';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import { defaultBackendCommands } from '@workspace/core/backend-commands';
+import type { AppCommand, AppApi, Team } from '@workspace/core/contracts';
 import { useConfetti } from '../../shared/confetti/use-confetti';
 import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 
@@ -41,7 +42,7 @@ afterEach(() => {
   window.localStorage.removeItem('cockpitGlobalScope:github');
   window.sessionStorage.clear();
   document.body.innerHTML = '';
-  delete window.codexClaw;
+  delete window.app;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
 
@@ -49,7 +50,7 @@ describe('AppShell dialogs and commands', () => {
   it.each([
     { backend: 'codex' as const, command: 'delegate' },
     { backend: 'claude' as const, command: 'worktree' },
-  ])('submits /$command as a Claw command for $backend', async ({ backend, command }) => {
+  ])(`submits /$command as a ${product.name} command for $backend`, async ({ backend, command }) => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backend = backend;
     snapshot.agents[0]!.backendDefaults = { kind: backend };
@@ -185,13 +186,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('opens the populated Visualize pane from the native debug command', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return vi.fn();
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.visualize = {
       id: 'debug-visualize',
@@ -291,12 +292,12 @@ describe('AppShell dialogs and commands', () => {
 
   it('disconnects the only remote team when Delete Team is invoked from the app menu', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     snapshot.teams[0] = {
       ...snapshot.teams[0]!,
@@ -331,7 +332,7 @@ describe('AppShell dialogs and commands', () => {
       'Cannot delete team',
       { cancelButtonText: 'Cancel', confirmButtonText: 'Yes', type: 'info' },
     );
-    expect(wrapper.emitted('disconnect-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('disconnect-team')).toStrictEqual([['team-app']]);
     expect(wrapper.emitted('close-team')).toBeUndefined();
     wrapper.unmount();
   });
@@ -364,13 +365,13 @@ describe('AppShell dialogs and commands', () => {
       observe() {}
       disconnect() {}
     });
-    window.codexClaw = {
+    window.app = {
       browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
       browserSetBounds: vi.fn().mockResolvedValue(undefined),
       browserSetVisible: vi.fn().mockResolvedValue(undefined),
       browserClose: vi.fn().mockResolvedValue(undefined),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     snapshot.teams.push({
       id: 'team-skwad',
@@ -485,13 +486,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('compacts the active session from the native shortcut and a targeted agent from its menu', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
     snapshot.agents[1]!.backendSession = { kind: 'codex', threadId: 'thread-jesse' };
@@ -509,13 +510,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('forks and opens conversation history for the active agent from native Agent commands', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.backendSession = { kind: 'codex', threadId: 'thread-dina' };
     const wrapper = mountShell({ snapshot });
@@ -530,13 +531,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('saves and opens drafts from native Edit menu commands', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountRealShell({
       stubAgentWorkspace: false,
@@ -559,13 +560,13 @@ describe('AppShell dialogs and commands', () => {
   it('reveals delayed Command-number hints and switches to the numbered agent', async () => {
     vi.useFakeTimers();
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ realAgentSidebar: true });
     await flushPromises();
     try {
@@ -627,14 +628,14 @@ describe('AppShell dialogs and commands', () => {
       listener = nextListener;
       return unsubscribe;
     });
-    window.codexClaw = {
+    window.app = {
       onAppCommand,
       browserOpen: vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false }),
       browserSetBounds: vi.fn().mockResolvedValue(undefined),
       browserSetVisible: vi.fn().mockResolvedValue(undefined),
       browserClose: vi.fn().mockResolvedValue(undefined),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
     const snapshot = createInitialSnapshot();
     snapshot.general.agentListCompact = true;
@@ -687,14 +688,14 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.emitted('close-agent')).toStrictEqual([['agent-dina']]);
     expect(confirm).toHaveBeenCalledWith(
       expect.stringContaining('missions and quick chats will be removed'),
-      'Close Codex Claw?',
+      `Close ${product.name}?`,
       {
         cancelButtonText: 'Cancel',
         confirmButtonText: 'Close Team',
         type: 'warning',
       },
     );
-    expect(wrapper.emitted('close-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('close-team')).toStrictEqual([['team-app']]);
     expect(quit).toHaveBeenCalledOnce();
     expect(wrapper.emitted('duplicate-agent')).toStrictEqual([['agent-dina']]);
     expect(wrapper.emitted('restart-agent')).toStrictEqual([['agent-dina']]);
@@ -710,7 +711,7 @@ describe('AppShell dialogs and commands', () => {
     const snapshot = createInitialSnapshot();
     snapshot.general.repositoryIcons = {
       '/src/existing': '🦞',
-      '/src/codex-claw': '🧪',
+      '/src/agent-workspace': '🧪',
     };
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountShell({ snapshot, updateSettings });
@@ -718,11 +719,11 @@ describe('AppShell dialogs and commands', () => {
 
     expect(sidebar.props('repositoryIcons')).toStrictEqual({
       '/src/existing': '🦞',
-      '/src/codex-claw': '🧪',
+      '/src/agent-workspace': '🧪',
     });
     sidebar.vm.$emit('update-repository-icon', {
-      repositoryKey: 'remote:github.com/nbonamy/codex-claw',
-      repositoryRoot: '/src/codex-claw',
+      repositoryKey: 'remote:github.com/nbonamy/agent-workspace',
+      repositoryRoot: '/src/agent-workspace',
       icon: '🚀',
     });
     await flushPromises();
@@ -731,7 +732,7 @@ describe('AppShell dialogs and commands', () => {
       general: {
         repositoryIcons: {
           '/src/existing': '🦞',
-          'remote:github.com/nbonamy/codex-claw': '🚀',
+          'remote:github.com/nbonamy/agent-workspace': '🚀',
         },
       },
     });
@@ -744,12 +745,12 @@ describe('AppShell dialogs and commands', () => {
     const wrapper = mountShell({ snapshot, updateSettings });
 
     wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('update-collapsed-repositories', [
-      'remote:github.com/nbonamy/codex-claw',
+      'remote:github.com/nbonamy/agent-workspace',
     ]);
     await flushPromises();
 
     expect(updateSettings).toHaveBeenCalledWith({
-      general: { collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'] },
+      general: { collapsedRepositoryKeys: ['remote:github.com/nbonamy/agent-workspace'] },
     });
   });
 
@@ -759,13 +760,13 @@ describe('AppShell dialogs and commands', () => {
       disconnect() {}
     });
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountRealShell();
 
     useConfetti().clear();
@@ -799,7 +800,7 @@ describe('AppShell dialogs and commands', () => {
     await nextTick();
 
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toStrictEqual(['Debug Markdown']);
-    expect(wrapper.get('.markdown-panel').text()).toContain('Opened from the Codex Claw Debug menu.');
+    expect(wrapper.get('.markdown-panel').text()).toContain(`Opened from the ${product.name} Debug menu.`);
 
     listener({ type: 'debug-approval-request' });
     await nextTick();
@@ -863,10 +864,10 @@ describe('AppShell dialogs and commands', () => {
       listener = nextListener;
       return () => undefined;
     });
-    window.codexClaw = {
+    window.app = {
       onAppCommand,
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell();
     await nextTick();
     expect(onAppCommand).toHaveBeenCalledOnce();
@@ -886,7 +887,7 @@ describe('AppShell dialogs and commands', () => {
         branchName: 'debug/worktree-preview',
       },
     });
-    expect(wrapper.text()).toContain('Building an isolated home in codex-claw');
+    expect(wrapper.text()).toContain('Building an isolated home in agent-workspace');
 
     await vi.advanceTimersByTimeAsync(1_200);
     expect(dialog.props('operation')).toMatchObject({
@@ -908,18 +909,18 @@ describe('AppShell dialogs and commands', () => {
   it('routes Debug Git progress previews to the active agent workflow control', async () => {
     vi.useFakeTimers();
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     snapshot.agentGitStatuses[agent.id] = {
       folder: agent.folder!,
-      repository: 'codex-claw',
+      repository: 'agent-workspace',
       branch: 'feature/debug-progress',
       ahead: 1,
       behind: 0,
@@ -943,15 +944,15 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.text()).toContain('Run in background');
   });
 
-  it('attaches an Appshot command to the active agent composer', async () => {
+  it('attaches a screenshot command to the active agent composer', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const attachment: CodexNativeAttachment = {
       id: 'appshot-image',
       type: 'image',
@@ -977,7 +978,7 @@ describe('AppShell dialogs and commands', () => {
       type: 'attach-appshot',
       imageDataUrl: 'data:image/png;base64,YXBw',
       appName: 'Electron',
-      windowTitle: 'Codex Claw',
+      windowTitle: `${product.name}`,
       accessibilityText: 'Visible and offscreen text',
     });
     await flushPromises();
@@ -995,13 +996,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('selects a deep-linked agent and submits its prompt by default', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
 
@@ -1026,13 +1027,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('opens Settings from the native app command', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell();
 
     listener({ type: 'open-settings' });
@@ -1043,13 +1044,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('toggles spoken acknowledgment mute from the native app command', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     snapshot.general.spokenAnnouncementsEnabled = true;
     snapshot.general.spokenAnnouncementsMuted = true;
@@ -1066,13 +1067,13 @@ describe('AppShell dialogs and commands', () => {
 
   it('prefills a deep-linked agent composer when submission is disabled', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
 
@@ -1111,7 +1112,7 @@ describe('AppShell dialogs and commands', () => {
       canGoBack: false,
       canGoForward: false,
     });
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
@@ -1121,7 +1122,7 @@ describe('AppShell dialogs and commands', () => {
       browserSetVisible: vi.fn().mockResolvedValue(undefined),
       browserClose: vi.fn().mockResolvedValue(undefined),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     const wrapper = mountRealShell({ snapshot });
 
@@ -1158,12 +1159,12 @@ describe('AppShell dialogs and commands', () => {
 
   it('ignores active-agent app commands when no agent or team can handle them', () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createEmptySnapshot();
     snapshot.teams = [];
     snapshot.activeTeamId = null;
@@ -1201,12 +1202,12 @@ describe('AppShell dialogs and commands', () => {
 
   it('does not fire app commands while a dialog is open', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
       }),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const snapshot = createInitialSnapshot();
     const wrapper = mountShell({ snapshot });
 

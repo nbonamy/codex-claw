@@ -1,12 +1,13 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { BackendConversationRef } from '@codex-claw/core/contracts';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ClawBackendServer } from '../server';
+import type { BackendConversationRef } from '@workspace/core/contracts';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import type { AgentGitService } from '../git/agent-git-service';
 import {
@@ -15,10 +16,10 @@ import {
   createTextMessage,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('owns agent CRUD and layout mutations', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-'));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-agent-'));
     const snapshot = createTestSnapshot();
     snapshot.sourceFolder = {
       path: '/Users/nbonamy/src',
@@ -27,7 +28,7 @@ describe('ClawBackendServer', () => {
     };
     snapshot.teams.push({ id: 'team-other', name: 'Other Team', agentIds: [] });
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -40,13 +41,13 @@ describe('ClawBackendServer', () => {
         jsonrpc: '2.0',
         id: 'create-agent',
         method: 'agent/create',
-        params: { input: { name: 'Dina', folder: tempDir, backend: 'codex', sourceRepositoryName: 'codex-claw', teamId: 'team-test' } },
+        params: { input: { name: 'Dina', folder: tempDir, backend: 'codex', sourceRepositoryName: 'agent-workspace', teamId: 'team-test' } },
       })).resolves.toMatchObject({
         result: {
           activeAgentId: expect.stringContaining('agent-'),
           agents: [{ name: 'Dina', folder: tempDir }],
           sourceFolder: {
-            recentRepoNames: ['codex-claw', 'id8'],
+            recentRepoNames: ['agent-workspace', 'id8'],
           },
         },
       });
@@ -148,11 +149,11 @@ describe('ClawBackendServer', () => {
     const createdAt = '2026-06-05T00:00:00.000Z';
     snapshot.agents = [
       {
-        id: 'agent-claw-main',
+        id: 'agent-app-main',
         teamId: 'team-test',
-        name: 'Claw main',
-        folder: '/src/codex-claw',
-        workspace: gitWorkspace('/src/codex-claw', 'codex-claw', 'main'),
+        name: `${product.name} main`,
+        folder: '/src/agent-workspace',
+        workspace: gitWorkspace('/src/agent-workspace', 'agent-workspace', 'main'),
         backend: 'codex',
         backendDefaults: { kind: 'codex' },
         status: { type: 'idle' },
@@ -172,14 +173,14 @@ describe('ClawBackendServer', () => {
         updatedAt: createdAt,
       },
       {
-        id: 'agent-claw-worktree',
+        id: 'agent-app-worktree',
         teamId: 'team-test',
-        name: 'Claw worktree',
-        folder: '/src/codex-claw.worktrees/drag-drop',
+        name: `${product.name} worktree`,
+        folder: '/src/agent-workspace.worktrees/drag-drop',
         workspace: {
-          ...gitWorkspace('/src/codex-claw', 'codex-claw', 'feat/drag-drop'),
-          folder: '/src/codex-claw.worktrees/drag-drop',
-          repositoryRoot: '/src/codex-claw.worktrees/drag-drop',
+          ...gitWorkspace('/src/agent-workspace', 'agent-workspace', 'feat/drag-drop'),
+          folder: '/src/agent-workspace.worktrees/drag-drop',
+          repositoryRoot: '/src/agent-workspace.worktrees/drag-drop',
           isLinkedWorktree: true,
         },
         backend: 'codex',
@@ -191,7 +192,7 @@ describe('ClawBackendServer', () => {
     ];
     snapshot.teams[0]!.agentIds = snapshot.agents.map((agent) => agent.id);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -207,7 +208,7 @@ describe('ClawBackendServer', () => {
         params: {
           input: {
             teamId: 'team-test',
-            repositoryRoot: '/src/codex-claw',
+            repositoryRoot: '/src/agent-workspace',
             beforeRepositoryRoot: null,
           },
         },
@@ -215,8 +216,8 @@ describe('ClawBackendServer', () => {
 
       expect(snapshot.clientPreferences?.desktop?.agentOrderByTeam?.['team-test']).toStrictEqual([
         'agent-id8',
-        'agent-claw-main',
-        'agent-claw-worktree',
+        'agent-app-main',
+        'agent-app-worktree',
       ]);
       expect(saveSnapshot).toHaveBeenCalledOnce();
     } finally {
@@ -255,7 +256,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       saveSnapshot,
@@ -307,7 +308,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({ version: 'test', snapshot, saveSnapshot: vi.fn().mockResolvedValue(undefined), driverRpc: new BackendDriverRpc(new Map([['codex', driver]])) });
+    const server = new AppBackendServer({ version: 'test', snapshot, saveSnapshot: vi.fn().mockResolvedValue(undefined), driverRpc: new BackendDriverRpc(new Map([['codex', driver]])) });
     try {
       await server.handleMessage({ jsonrpc: '2.0', id: 'close-chat', method: backendMethods.agentDelete, params: { agentId: agent.id } });
 
@@ -327,7 +328,7 @@ describe('ClawBackendServer', () => {
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     const agent = snapshot.agents[0]!;
     const deleteLinkedWorktree = vi.fn();
-    const server = new ClawBackendServer({ version: 'test', snapshot, agentGitService: { deleteLinkedWorktree } as unknown as AgentGitService });
+    const server = new AppBackendServer({ version: 'test', snapshot, agentGitService: { deleteLinkedWorktree } as unknown as AgentGitService });
     try {
       await expect(server.handleMessage({ jsonrpc: '2.0', id: 'invalid-discard', method: backendMethods.agentDelete, params: { agentId: agent.id, input } })).rejects.toThrow();
       expect(snapshot.agents).toContain(agent);
@@ -351,7 +352,7 @@ describe('ClawBackendServer', () => {
     snapshot.activeAgentId = 'agent-dina';
     const validateLinkedWorktreeDeletion = vi.fn();
     const deleteLinkedWorktree = vi.fn();
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
@@ -400,7 +401,7 @@ describe('ClawBackendServer', () => {
     }];
     const validateLinkedWorktreeDeletion = vi.fn();
     const deleteLinkedWorktree = vi.fn();
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
@@ -446,7 +447,7 @@ describe('ClawBackendServer', () => {
     ];
     snapshot.activeAgentId = 'agent-dina';
     const deleteLinkedWorktree = vi.fn();
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       agentGitService: { deleteLinkedWorktree } as unknown as AgentGitService,
@@ -465,8 +466,8 @@ describe('ClawBackendServer', () => {
   });
 
   it('owns agent file listing and reads by resolving agent folders internally', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-agent-files-'));
-    const externalTempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-external-file-'));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-agent-files-'));
+    const externalTempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-external-file-'));
     const externalFile = path.join(externalTempDir, 'outside.md');
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
@@ -480,7 +481,7 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -552,7 +553,7 @@ describe('ClawBackendServer', () => {
   });
 
   it('previews absolute files from a quick chat without a project workspace', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-quick-chat-file-'));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-quick-chat-file-'));
     const filePath = path.join(tempDir, 'MEMORY.md');
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-quick-chat'];
@@ -567,7 +568,7 @@ describe('ClawBackendServer', () => {
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       driverRpc: new BackendDriverRpc(new Map()),
@@ -602,7 +603,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-root' },
       status: { type: 'idle' },
@@ -663,8 +664,8 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-06-13T00:00:00.000Z',
       repositories: [{
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       }],
       teamId: 'team-test',
       schedule: { intervalMinutes: 60 },
@@ -677,9 +678,9 @@ describe('ClawBackendServer', () => {
         createdAgents: [{
           agentId: 'agent-dina',
           agentName: 'Dina',
-          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemId: 'github:nbonamy/agent-workspace#12',
           workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
           conversationRef: { backend: 'codex', threadId: 'thread-dina' },
         }],
       }],
@@ -749,7 +750,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,

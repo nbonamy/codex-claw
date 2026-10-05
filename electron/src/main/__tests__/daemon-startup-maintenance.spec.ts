@@ -1,13 +1,14 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
-import type { ClawdDaemonStatus } from '@codex-claw/core/contracts';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
-import { ensureCurrentClawdDaemonForStartup } from '../daemon-startup-maintenance';
+import type { DaemonStatus } from '@workspace/core/contracts';
+import { createEmptySnapshot } from '@workspace/core/snapshot';
+import { ensureCurrentDaemonForStartup } from '../daemon-startup-maintenance';
 
 describe('daemon startup maintenance', () => {
   it('restarts a stale idle daemon before startup connects to it', async () => {
     const refreshDaemon = vi.fn().mockResolvedValue(daemonStatus({ version: '0.2.0', pid: 456 }));
 
-    await ensureCurrentClawdDaemonForStartup({
+    await ensureCurrentDaemonForStartup({
       createSnapshotClient: () => snapshotClient(idleSnapshot()),
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus({ version: '0.1.0', pid: 123 })),
       getPackagedVersion: vi.fn().mockResolvedValue('0.2.0'),
@@ -21,7 +22,7 @@ describe('daemon startup maintenance', () => {
   it('does not restart when the running daemon matches the packaged version', async () => {
     const refreshDaemon = vi.fn();
 
-    await ensureCurrentClawdDaemonForStartup({
+    await ensureCurrentDaemonForStartup({
       createSnapshotClient: () => snapshotClient(idleSnapshot()),
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus({ version: '0.2.0' })),
       getPackagedVersion: vi.fn().mockResolvedValue('0.2.0'),
@@ -36,7 +37,7 @@ describe('daemon startup maintenance', () => {
     const getPackagedVersion = vi.fn();
     const refreshDaemon = vi.fn();
 
-    await ensureCurrentClawdDaemonForStartup({
+    await ensureCurrentDaemonForStartup({
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus({ running: false, version: undefined })),
       getPackagedVersion,
       refreshDaemon,
@@ -50,7 +51,7 @@ describe('daemon startup maintenance', () => {
     const refreshDaemon = vi.fn().mockResolvedValue(daemonStatus({ version: '0.2.0', pid: 456 }));
     const showMessageBox = vi.fn().mockResolvedValue({ response: 1 });
 
-    await ensureCurrentClawdDaemonForStartup({
+    await ensureCurrentDaemonForStartup({
       createSnapshotClient: () => snapshotClient(activeAgentSnapshot()),
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus({ version: '0.1.0', pid: 123 })),
       getPackagedVersion: vi.fn().mockResolvedValue('0.2.0'),
@@ -60,7 +61,7 @@ describe('daemon startup maintenance', () => {
 
     expect(showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
       buttons: ['Continue with old backend', 'Restart backend now'],
-      message: 'Codex Claw updated. The background backend must restart to use the latest version. Active agents or automations are running.',
+      message: `${product.name} updated. The background backend must restart to use the latest version. Active agents or automations are running.`,
     }));
     expect(refreshDaemon).toHaveBeenCalledOnce();
   });
@@ -68,7 +69,7 @@ describe('daemon startup maintenance', () => {
   it('keeps active stale daemons running when the user chooses to continue', async () => {
     const refreshDaemon = vi.fn();
 
-    await ensureCurrentClawdDaemonForStartup({
+    await ensureCurrentDaemonForStartup({
       createSnapshotClient: () => snapshotClient(activeAutomationSnapshot()),
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus({ version: '0.1.0', pid: 123 })),
       getPackagedVersion: vi.fn().mockResolvedValue('0.2.0'),
@@ -82,7 +83,7 @@ describe('daemon startup maintenance', () => {
   it('skips daemon maintenance when the packaged version cannot be resolved', async () => {
     const refreshDaemon = vi.fn();
 
-    await ensureCurrentClawdDaemonForStartup({
+    await ensureCurrentDaemonForStartup({
       createSnapshotClient: () => snapshotClient(idleSnapshot()),
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus({ version: '0.1.0' })),
       getPackagedVersion: vi.fn().mockResolvedValue(null),
@@ -93,13 +94,13 @@ describe('daemon startup maintenance', () => {
   });
 });
 
-function daemonStatus(overrides: Partial<ClawdDaemonStatus> = {}): ClawdDaemonStatus {
+function daemonStatus(overrides: Partial<DaemonStatus> = {}): DaemonStatus {
   return {
     supported: true,
     installed: true,
     running: true,
-    socketPath: '/Users/nicolas/.codex-claw/clawd.sock',
-    launchAgentPath: '/Users/nicolas/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist',
+    socketPath: `/Users/nicolas/${product.homeDirectory}/daemon.sock`,
+    launchAgentPath: `/Users/nicolas/Library/LaunchAgents/${product.appId}.daemon.plist`,
     version: '0.1.0',
     pid: 123,
     ...overrides,
@@ -149,10 +150,10 @@ function activeAutomationSnapshot() {
     enabled: true,
     repositories: [{
       provider: 'github',
-      sourceId: 'nabocorp/codex-claw',
-      executionRepositoryPath: '/Users/nicolas/src/codex-claw',
+      sourceId: 'nabocorp/agent-workspace',
+      executionRepositoryPath: '/Users/nicolas/src/agent-workspace',
     }],
-    teamId: 'team-codex-claw',
+    teamId: 'team-app',
     schedule: { intervalMinutes: 60 },
     executionLog: [{
       id: 'execution-1',

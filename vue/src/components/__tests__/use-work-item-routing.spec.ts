@@ -1,13 +1,13 @@
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AppSnapshot, SourceRepository, WorkItem } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { Agent, AppSnapshot, SourceRepository, WorkItem } from '@workspace/core/contracts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { describe, expect, it, vi } from 'vitest';
 import { useWorkItemRouting } from '../use-work-item-routing';
 
 describe('useWorkItemRouting', () => {
   it('does not start an agent after preparation fails, reassignment is cancelled, or selection changes', async () => {
     const listedItem = item({ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12' });
-    const repository = { name: 'claw', path: '/code/claw', worktrees: [] };
+    const repository = { name: 'agent-workspace', path: '/code/app', worktrees: [] };
     const cancelled = createHarness({ item: listedItem, assignedToCurrentAgent: true, confirmReassignment: false });
     await expect(cancelled.routing.createIsolatedAgent(listedItem, cancelled.teamId, { repository })).rejects.toThrow();
     expect(cancelled.createWorktree).not.toHaveBeenCalled();
@@ -36,8 +36,8 @@ describe('useWorkItemRouting', () => {
   it('starts Linear work in the explicit repository on the selected host and preserves full issue identity', async () => {
     const listedItem = item({ provider: 'linear', id: 'linear:eng-uuid', identifier: 'ENG-12', sourceName: 'Engineering', sourceId: 'linear:team' });
     const harness = createHarness({ item: listedItem, remoteConnectionId: 'remote-dev' });
-    await harness.routing.startMany({ action: 'fix', items: [listedItem], teamId: harness.teamId, repository: { name: 'codex-claw', path: '/workspace/codex-claw', worktrees: [] } });
-    expect(harness.createWorktree).toHaveBeenCalledWith({ repoPath: '/workspace/codex-claw', branchName: 'fix/eng-12', remoteConnectionId: 'remote-dev' });
+    await harness.routing.startMany({ action: 'fix', items: [listedItem], teamId: harness.teamId, repository: { name: 'agent-workspace', path: '/workspace/agent-workspace', worktrees: [] } });
+    expect(harness.createWorktree).toHaveBeenCalledWith({ repoPath: '/workspace/agent-workspace', branchName: 'fix/eng-12', remoteConnectionId: 'remote-dev' });
     expect(harness.assign).toHaveBeenCalledWith({ agentId: harness.createdAgent.id, item: listedItem, prompt: expect.stringContaining('Issue: ENG-12') });
     await expect(harness.routing.createIsolatedAgent(listedItem, harness.teamId)).rejects.toThrow();
     expect(harness.createAgent).toHaveBeenCalledOnce();
@@ -71,14 +71,14 @@ describe('useWorkItemRouting', () => {
       state: 'all',
     });
     expect(harness.createWorktree).toHaveBeenCalledWith({
-      repoPath: '/workspace/codex-claw',
+      repoPath: '/workspace/agent-workspace',
       branchName: 'feature/fix-routing',
       remoteConnectionId: 'remote-dev',
     });
     expect(harness.createAgent).toHaveBeenCalledWith({
       name: null,
-      folder: '/workspace/codex-claw-feature',
-      sourceRepositoryName: 'codex-claw',
+      folder: '/workspace/agent-workspace-feature',
+      sourceRepositoryName: 'agent-workspace',
       teamId: harness.teamId,
     });
     expect(result).toStrictEqual({ agent: harness.createdAgent, item: resolvedItem });
@@ -90,7 +90,7 @@ describe('useWorkItemRouting', () => {
     await harness.routing.createIsolatedAgent(harness.item, harness.teamId, { reuseExisting: true });
 
     expect(harness.createWorktree).toHaveBeenCalledWith({
-      repoPath: '/workspace/codex-claw',
+      repoPath: '/workspace/agent-workspace',
       branchName: 'fix/gh-12',
       reuseExisting: true,
     });
@@ -133,7 +133,7 @@ function createHarness(input: {
   const snapshot = createInitialSnapshot();
   const team = snapshot.teams[0]!;
   const agent = snapshot.agents[0]!;
-  agent.workspace = { kind: 'git', folder: '/workspace/codex-claw', repositoryName: 'codex-claw', repositoryRoot: '/workspace/codex-claw', primaryWorktreeRoot: '/workspace/codex-claw', branch: 'main', isLinkedWorktree: false, updatedAt: 'now' };
+  agent.workspace = { kind: 'git', folder: '/workspace/agent-workspace', repositoryName: 'agent-workspace', repositoryRoot: '/workspace/agent-workspace', primaryWorktreeRoot: '/workspace/agent-workspace', branch: 'main', isLinkedWorktree: false, updatedAt: 'now' };
   const listedItem = input.item ?? item();
   if (input.remoteConnectionId) team.remoteConnectionId = input.remoteConnectionId;
   if (input.assignedToCurrentAgent) {
@@ -150,11 +150,11 @@ function createHarness(input: {
   const createdAgent: Agent = {
     ...agent,
     id: 'agent-created',
-    folder: '/workspace/codex-claw-feature',
+    folder: '/workspace/agent-workspace-feature',
   };
   const sourceRepositories: SourceRepository[] = [{
-    name: 'codex-claw',
-    path: '/workspace/codex-claw',
+    name: 'agent-workspace',
+    path: '/workspace/agent-workspace',
     worktrees: [],
   }];
   const assign = vi.fn(async () => undefined);
@@ -163,7 +163,7 @@ function createHarness(input: {
   const createBranch = vi.fn(async () => undefined);
   const createWorktree = vi.fn(async () => ({
     name: 'feature/fix-routing',
-    path: '/workspace/codex-claw-feature',
+    path: '/workspace/agent-workspace-feature',
   }));
   const duplicateAgent = vi.fn(async () => createdAgent);
   const loadItems = vi.fn(async () => input.loadItemsResult);
@@ -224,12 +224,12 @@ function createHarness(input: {
 function item(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw#12',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace#12',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix cockpit drag target',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     labels: [],
     createdAt: '2026-09-02T10:00:00.000Z',

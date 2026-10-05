@@ -5,12 +5,12 @@ document is final unless it is marked as an agreed direction.
 
 ## Why This Needs A Product Model
 
-An agent in Codex Claw is attached to a folder. That simple rule makes the
+An agent in Korus is attached to a folder. That simple rule makes the
 conversation understandable, but it also means two agents can be attached to
 the same Git checkout and mutate the same files, index, branch, and build
 outputs.
 
-Claw currently exposes isolation choices in several different places:
+Korus currently exposes isolation choices in several different places:
 
 - repository session creation can reuse a checkout or create a worktree;
 - backlog assignment can continue in an existing agent or create an isolated
@@ -19,7 +19,7 @@ Claw currently exposes isolation choices in several different places:
 - automations and MCP tools can create agents.
 
 These are all presentations of one product question: **when should work share
-a checkout, and when should Claw require or recommend isolation?** Designing
+a checkout, and when should Korus require or recommend isolation?** Designing
 each warning or dialog independently will produce inconsistent policy.
 
 ## Vocabulary
@@ -55,7 +55,7 @@ same checkout.
 | Matching paths on different hosts | Separate | Separate | No shared-checkout warning |
 
 Linked worktrees still share repository objects and refs, so they are not
-perfect process isolation. They are, however, the intended Claw isolation
+perfect process isolation. They are, however, the intended Korus isolation
 boundary for concurrent coding work.
 
 ## Current Behavior
@@ -67,7 +67,7 @@ boundary for concurrent coding work.
 ## Agreed Direction: Explicit Shared-Checkout Creation
 
 When an explicit, user-driven action would create another agent in a checkout
-already used by any open agent, Claw should warn before creating it. The check
+already used by any open agent, Korus should warn before creating it. The check
 must include agents in every team on the same execution location and should
 not depend on whether those agents are currently working or idle.
 
@@ -94,7 +94,7 @@ persistent consequence visible and requires only one selection before
 continuing.
 
 Suppression must be reversible in Settings. A global setting should control
-whether Claw warns when agents share a checkout, and repository exceptions
+whether Korus warns when agents share a checkout, and repository exceptions
 need a discoverable reset mechanism.
 
 ## Creation Surfaces Requiring A Decision
@@ -155,7 +155,7 @@ exceptions is insufficient product behavior.
 
 ## Architecture Direction
 
-Isolation assessment belongs behind `clawd`, because it owns agent state,
+Isolation assessment belongs behind `daemon`, because it owns agent state,
 remote locations, filesystem identity, Git state, persistence, MCP, and
 automations. Renderer components should receive an app-owned assessment and
 present it; they should not infer canonical checkout identity from path strings
@@ -187,7 +187,7 @@ remote clients, or a race can bypass.
 5. What isolation contract should automations enforce?
 6. What should `create-agent` MCP do when its target checkout is already in
    use?
-7. Should Claw offer navigation to the existing agent as an alternative to
+7. Should Korus offer navigation to the existing agent as an alternative to
     creating another one?
 
 ## Next Step

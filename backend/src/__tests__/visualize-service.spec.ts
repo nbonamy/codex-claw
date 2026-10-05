@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { AppStateStore } from '../persistence/store';
 import { VisualizeService, generateVisualizationSuggestionPrompt } from '../visualize-service';
 
@@ -17,12 +18,12 @@ describe('VisualizeService', () => {
   it('shares repository diagrams across a worktree and main agent while keeping pane state separate', async () => {
     const snapshot = createInitialSnapshot();
     const [worker, main] = snapshot.agents;
-    worker.folder = '/projects/claw-feature';
-    worker.workspace = { kind: 'git', folder: worker.folder, repositoryName: 'claw', repositoryRoot: worker.folder,
-      branch: 'feature', isLinkedWorktree: true, primaryWorktreeRoot: '/projects/claw', updatedAt: worker.updatedAt };
-    main.folder = '/projects/claw';
-    main.workspace = { kind: 'git', folder: main.folder, repositoryName: 'claw', repositoryRoot: main.folder,
-      branch: 'main', isLinkedWorktree: false, primaryWorktreeRoot: '/projects/claw', updatedAt: main.updatedAt };
+    worker.folder = '/projects/app-feature';
+    worker.workspace = { kind: 'git', folder: worker.folder, repositoryName: 'app', repositoryRoot: worker.folder,
+      branch: 'feature', isLinkedWorktree: true, primaryWorktreeRoot: '/projects/app', updatedAt: worker.updatedAt };
+    main.folder = '/projects/app';
+    main.workspace = { kind: 'git', folder: main.folder, repositoryName: 'app', repositoryRoot: main.folder,
+      branch: 'main', isLinkedWorktree: false, primaryWorktreeRoot: '/projects/app', updatedAt: main.updatedAt };
     const service = new VisualizeService({ snapshot, generatedImagesRoot: os.tmpdir(), persist: async () => undefined, publish: () => undefined });
 
     await service.enter(worker.id);
@@ -30,7 +31,7 @@ describe('VisualizeService', () => {
     expect((await service.enter(main.id)).created).toBe(false);
 
     expect(service.list(main.id).visualizations).toStrictEqual([{ id: visualizationId, title: 'Shared map', kind: 'mermaid', selected: true }]);
-    expect(snapshot.repositoryVisualizations?.['/projects/claw']).toStrictEqual(worker.visualize?.visualizations);
+    expect(snapshot.repositoryVisualizations?.['/projects/app']).toStrictEqual(worker.visualize?.visualizations);
     expect(main.visualize?.id).not.toBe(worker.visualize?.id);
     const source = JSON.stringify(service.get(main.id, visualizationId).visualization.content);
     const document = { elements: [], files: {}, selectedElementIds: [], preview: '' };
@@ -48,7 +49,7 @@ describe('VisualizeService', () => {
   });
 
   it('persists user-edited canvases and assets, rejects stale batches and preserves untouched edits across reload', async () => {
-    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'claw-canvas-'));
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'app-canvas-'));
     const persistence = new AppStateStore(temporaryDirectory);
     const snapshot = createInitialSnapshot();
     const agentId = snapshot.agents[0].id;
@@ -104,7 +105,7 @@ describe('VisualizeService', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
     agent.backendSession = { kind: 'codex', threadId: 'thread-visualize' };
-    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualize-'));
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-visualize-'));
     const generatedImagesRoot = path.join(temporaryDirectory, 'generated_images');
     await mkdir(generatedImagesRoot);
     await writeFile(path.join(generatedImagesRoot, 'system.png'), Buffer.from('visualization'));
@@ -262,7 +263,7 @@ describe('VisualizeService', () => {
 
   it('rejects invalid replacement suggestions and generated images outside the owned folder', async () => {
     const snapshot = createInitialSnapshot();
-    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualize-'));
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-visualize-'));
     const generatedImagesRoot = path.join(temporaryDirectory, 'generated_images');
     await mkdir(generatedImagesRoot);
     const outside = path.join(temporaryDirectory, 'outside.png');
@@ -290,7 +291,7 @@ describe('VisualizeService', () => {
     await expect(service.add(snapshot.agents[0].id, {
       title: 'Outside',
       content: { kind: 'image', generatedImagePath: outside, alt: 'Outside image' },
-    })).rejects.toThrow('inside the Codex Claw generated-images folder');
+    })).rejects.toThrow(`inside the ${product.name} generated-images folder`);
   });
 
   it('rejects Mermaid diagram families the renderer cannot display', async () => {
@@ -343,7 +344,7 @@ describe('VisualizeService', () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
     agent.backendSession = { kind: 'codex', threadId: 'thread-visualize' };
-    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualize-'));
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-visualize-'));
     const generatedImagesRoot = path.join(temporaryDirectory, 'generated_images');
     await mkdir(generatedImagesRoot);
     const service = new VisualizeService({

@@ -1,20 +1,20 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import {
-  decodeClawBackendEvent,
-  type ClawBackendEvent,
-} from '@codex-claw/core/backend-protocol/events';
+  decodeAppBackendEvent,
+  type AppBackendEvent,
+} from '@workspace/core/backend-protocol/events';
 import {
-  createClawRpcError,
-  createClawRpcResult,
-  clawRpcErrorCodes,
-  isClawRpcNotification,
-  isClawRpcRequest,
-  isClawRpcResponse,
-  parseClawRpcMessage,
-  type ClawRpcId,
-  type ClawRpcRequest,
-  type ClawRpcResponse,
-} from '@codex-claw/core/backend-protocol/rpc';
+  createAppRpcError,
+  createAppRpcResult,
+  appRpcErrorCodes,
+  isAppRpcNotification,
+  isAppRpcRequest,
+  isAppRpcResponse,
+  parseAppRpcMessage,
+  type AppRpcId,
+  type AppRpcRequest,
+  type AppRpcResponse,
+} from '@workspace/core/backend-protocol/rpc';
 import { warnMain } from './log';
 import { backendRequestTimeoutMs } from './backend-request-timeout';
 
@@ -31,8 +31,8 @@ export type BackendRpcSessionOptions = {
 /** Owns JSON-RPC framing and request lifecycle independently of the active transport. */
 export class BackendRpcSession {
   private readonly requestHandlers: Record<string, (params: unknown) => unknown | Promise<unknown>>;
-  private readonly pending = new Map<ClawRpcId, PendingRequest>();
-  private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
+  private readonly pending = new Map<AppRpcId, PendingRequest>();
+  private readonly eventListeners = new Set<(event: AppBackendEvent) => void>();
   private readonly connectionStateListeners = new Set<(state: 'connected' | 'disconnected', error?: Error) => void>();
   private buffer = '';
   private nextRequestId = 1;
@@ -74,7 +74,7 @@ export class BackendRpcSession {
   }
 
   request<Result>(method: string, params?: unknown): Promise<Result> {
-    if (!this.write) throw new Error('clawd is not connected.');
+    if (!this.write) throw new Error('daemon is not connected.');
 
     const requestTimeoutMs = backendRequestTimeoutMs(method);
     const id = this.nextRequestId++;
@@ -84,8 +84,8 @@ export class BackendRpcSession {
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
-        warnMain('clawd', 'request timed out', { method, id });
-        reject(new Error(`clawd request timed out: ${method}`));
+        warnMain('daemon', 'request timed out', { method, id });
+        reject(new Error(`daemon request timed out: ${method}`));
       }, requestTimeoutMs);
       this.pending.set(id, {
         resolve: (value) => resolve(value as Result),
@@ -98,7 +98,7 @@ export class BackendRpcSession {
     return result;
   }
 
-  onEvent(listener: (event: ClawBackendEvent) => void): () => void {
+  onEvent(listener: (event: AppBackendEvent) => void): () => void {
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
   }
@@ -109,41 +109,41 @@ export class BackendRpcSession {
   }
 
   private handleLine(line: string): void {
-    let response: ClawRpcResponse;
+    let response: AppRpcResponse;
     try {
-      const message = parseClawRpcMessage(JSON.parse(line));
-      if (isClawRpcNotification(message)) {
+      const message = parseAppRpcMessage(JSON.parse(line));
+      if (isAppRpcNotification(message)) {
         this.handleNotification(message);
         return;
       }
-      if (isClawRpcRequest(message)) {
+      if (isAppRpcRequest(message)) {
         void this.handleRequest(message);
         return;
       }
-      if (!isClawRpcResponse(message)) {
-        warnMain('clawd', 'ignored non-response message from backend', { line });
+      if (!isAppRpcResponse(message)) {
+        warnMain('daemon', 'ignored non-response message from backend', { line });
         return;
       }
       response = message;
     } catch (error) {
-      warnMain('clawd', 'failed to parse backend response', {
+      warnMain('daemon', 'failed to parse backend response', {
         detail: error instanceof Error ? error.message : 'Invalid backend response.',
         bytes: line.length,
       });
-      response = createClawRpcError(
+      response = createAppRpcError(
         null,
-        clawRpcErrorCodes.parseError,
+        appRpcErrorCodes.parseError,
         error instanceof Error ? error.message : 'Invalid backend response.',
       );
     }
 
     if (response.id === null) {
-      warnMain('clawd', 'backend response without request id', { response });
+      warnMain('daemon', 'backend response without request id', { response });
       return;
     }
     const pending = this.pending.get(response.id);
     if (!pending) {
-      warnMain('clawd', 'backend response for unknown request id', { id: response.id });
+      warnMain('daemon', 'backend response for unknown request id', { id: response.id });
       return;
     }
 
@@ -156,39 +156,39 @@ export class BackendRpcSession {
     pending.resolve(response.result);
   }
 
-  private async handleRequest(message: ClawRpcRequest): Promise<void> {
+  private async handleRequest(message: AppRpcRequest): Promise<void> {
     const handler = this.requestHandlers[message.method];
     if (!handler) {
-      this.writeResponse(createClawRpcError(
+      this.writeResponse(createAppRpcError(
         message.id,
-        clawRpcErrorCodes.methodNotFound,
+        appRpcErrorCodes.methodNotFound,
         `Unknown client method: ${message.method}`,
       ));
       return;
     }
 
     try {
-      this.writeResponse(createClawRpcResult(message.id, await handler(message.params)));
+      this.writeResponse(createAppRpcResult(message.id, await handler(message.params)));
     } catch (error) {
-      this.writeResponse(createClawRpcError(
+      this.writeResponse(createAppRpcError(
         message.id,
-        clawRpcErrorCodes.internalError,
+        appRpcErrorCodes.internalError,
         error instanceof Error ? error.message : String(error),
       ));
     }
   }
 
-  private handleNotification(message: ReturnType<typeof parseClawRpcMessage>): void {
-    if (!isClawRpcNotification(message)) return;
+  private handleNotification(message: ReturnType<typeof parseAppRpcMessage>): void {
+    if (!isAppRpcNotification(message)) return;
     if (message.method !== backendMethods.backendEventNotify) {
-      warnMain('clawd', 'ignored unknown backend notification', { method: message.method });
+      warnMain('daemon', 'ignored unknown backend notification', { method: message.method });
       return;
     }
-    let event: ClawBackendEvent;
+    let event: AppBackendEvent;
     try {
-      event = decodeClawBackendEvent(message.params);
+      event = decodeAppBackendEvent(message.params);
     } catch (error) {
-      warnMain('clawd', 'ignored malformed backend event notification', {
+      warnMain('daemon', 'ignored malformed backend event notification', {
         detail: error instanceof Error ? error.message : 'Invalid backend event notification.',
       });
       return;
@@ -208,7 +208,7 @@ export class BackendRpcSession {
     for (const listener of this.connectionStateListeners) listener(state, error);
   }
 
-  private writeResponse(response: ClawRpcResponse): void {
+  private writeResponse(response: AppRpcResponse): void {
     this.write?.(`${JSON.stringify(response)}\n`);
   }
 }

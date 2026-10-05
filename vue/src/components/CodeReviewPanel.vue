@@ -91,7 +91,7 @@
           </fieldset>
         </div>
         <button
-          class="claw-button claw-button--primary code-review-panel__start"
+          class="app-button app-button--primary code-review-panel__start"
           type="button"
           :disabled="busy"
           @click="startSelectedReview"
@@ -199,7 +199,7 @@
         <template v-if="session.status === 'ready'">
           <span>{{ footerMessage }}</span>
           <button
-            class="claw-button claw-button--primary"
+            class="app-button app-button--primary"
             type="button"
             :disabled="busy"
             @click="submitRound"
@@ -209,7 +209,7 @@
         </template>
         <template v-else-if="session.status === 'readyToFinish'">
           <button
-            class="claw-button claw-button--secondary"
+            class="app-button app-button--secondary"
             type="button"
             :disabled="busy"
             @click="run(() => finishReview(agent.id, session!.id))"
@@ -217,7 +217,7 @@
             {{ $t('surface.codeReviewPanel.finishReview') }}
           </button>
           <button
-            class="claw-button claw-button--primary"
+            class="app-button app-button--primary"
             type="button"
             :disabled="busy"
             @click="run(() => reviewAgain(agent.id, session!.id))"
@@ -228,7 +228,7 @@
         <template v-else-if="session.status === 'finished'">
           <span>{{ $t('surface.codeReviewPanel.reviewFinished') }}</span>
           <button
-            class="claw-button claw-button--primary"
+            class="app-button app-button--primary"
             type="button"
             :disabled="busy"
             @click="retryReview"
@@ -239,7 +239,7 @@
         <template v-else-if="session.status === 'failed'">
           <span>{{ $t('surface.codeReviewPanel.reviewStopped') }}</span>
           <button
-            class="claw-button claw-button--primary"
+            class="app-button app-button--primary"
             type="button"
             :disabled="busy"
             @click="retryReview"
@@ -274,8 +274,8 @@ import {
   type CodeReviewFinding,
   type CodeReviewStartInput,
   type CodeReviewThreadMode,
-} from "@codex-claw/core/code-review";
-import type { Agent, AgentGitStatus, AppSnapshot } from "@codex-claw/core/contracts";
+} from "@workspace/core/code-review";
+import type { Agent, AgentGitStatus, AppSnapshot } from "@workspace/core/contracts";
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices } from './backend-selection';
@@ -286,7 +286,7 @@ const props = defineProps<{
   startReview: (agentId: string, input: CodeReviewStartInput) => Promise<AppSnapshot>;
   decideFinding: (
     agentId: string,
-    input: import("@codex-claw/core/code-review").CodeReviewDecisionInput,
+    input: import("@workspace/core/code-review").CodeReviewDecisionInput,
   ) => Promise<AppSnapshot>;
   submitReviewRound: (
     agentId: string,

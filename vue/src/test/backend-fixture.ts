@@ -1,5 +1,5 @@
 import { afterEach } from 'vitest';
-import type { AppSnapshot, MainToRendererEvent, RendererSnapshotState } from '@codex-claw/core/contracts';
+import type { AppSnapshot, MainToRendererEvent, RendererSnapshotState } from '@workspace/core/contracts';
 import { setElectronTestClient } from './client';
 import { createClientApiMock } from './client-api-mock';
 

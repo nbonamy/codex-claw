@@ -5,11 +5,11 @@
     :model-value="visible"
     :show-close="false"
     append-to-body
-    class="claw-dialog"
+    class="app-dialog"
     :title="$t('surface.codexResourceSharingMigrationDialog.shareSkillsAndPluginsWithChatGPT')"
     width="460px"
   >
-    <p class="codex-resource-sharing-migration-dialog__copy"> {{ $t('surface.codexResourceSharingMigrationDialog.codexClawCanUseTheSkillsAndPluginsInstalledInChatGPTMigr') }} <code>{{ $t('surface.codexResourceSharingMigrationDialog.codex') }}</code>.
+    <p class="codex-resource-sharing-migration-dialog__copy"> {{ $t('surface.codexResourceSharingMigrationDialog.appCanUseTheSkillsAndPluginsInstalledInChatGPTMigr') }} <code>{{ $t('surface.codexResourceSharingMigrationDialog.codex') }}</code>.
     </p>
     <p
       v-if="blocked"
@@ -17,15 +17,15 @@
       role="status"
     > {{ $t('surface.codexResourceSharingMigrationDialog.migrationCannotRunWhileChatsAreActiveWaitForThemToFinish') }} </p>
     <template #footer>
-      <div class="claw-dialog__footer">
+      <div class="app-dialog__footer">
         <button
-          class="claw-button claw-button--tertiary"
+          class="app-button app-button--tertiary"
           type="button"
           :disabled="pending"
           @click="$emit('decline')"
         > {{ $t('surface.codexResourceSharingMigrationDialog.keepIsolated') }} </button>
         <button
-          class="claw-button claw-button--primary"
+          class="app-button app-button--primary"
           type="button"
           :aria-busy="pending"
           :disabled="blocked || pending"

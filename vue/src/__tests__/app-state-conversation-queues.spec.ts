@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, CodexClawApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkSource } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import { claudeBackendCapabilities } from '@workspace/core/backend-capabilities';
+import type { AppSnapshot, BackendApprovalRequest, BackendConversationRef, AppApi, ConversationSummary, DevicePairingSession, MainToRendererEvent, RendererMessage, SourceRepository, WorkItem, WorkSource } from '@workspace/core/contracts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
+import { workItemAssignmentPrompt } from '@workspace/core/work-item-prompts';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow } from '../test/client';
-import { configureClawClient } from '../platform-api';
+import { configureAppClient } from '../platform-api';
 import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
 import { deferred } from './app-state-test-harness';
 
@@ -22,13 +22,13 @@ describe('useAppState', () => {
   it('shows and removes backend-owned teammate prompts in the target agent queue', async () => {
     const listeners: Array<(event: MainToRendererEvent) => void> = [];
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(createInitialSnapshot()),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     await state.loadSnapshot();
@@ -84,14 +84,14 @@ describe('useAppState', () => {
     queuedSnapshot.queuedPrompts = [{ id: 'prompt-files', agentId: 'agent-dina', text: 'review these files', createdAt: '2026-06-05T00:00:01.000Z', options: { attachments: backendAttachments } }];
     const sendPrompt = vi.fn().mockResolvedValue(queuedSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
         onEvent: vi.fn((nextListener) => {
           listeners.push(nextListener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -113,11 +113,11 @@ describe('useAppState', () => {
     const sendPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
     const attachments = [{ type: 'image' as const, reference: 'electron-attachment:screenshot' }];
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -135,14 +135,14 @@ describe('useAppState', () => {
     const sendPrompt = vi.fn().mockReturnValue(pendingSend.promise);
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
         onEvent: vi.fn((nextListener) => {
           listeners.push(nextListener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -166,14 +166,14 @@ describe('useAppState', () => {
     const sendPrompt = vi.fn().mockRejectedValue(new Error('backend unavailable'));
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
         onEvent: vi.fn((nextListener) => {
           listeners.push(nextListener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -200,14 +200,14 @@ describe('useAppState', () => {
     });
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         steerPrompt,
         updateQueuedPrompt,
         steerQueuedPrompt,
         sendPrompt: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -247,7 +247,7 @@ describe('useAppState', () => {
     const sendPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
     const steerPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
     const steerQueuedPrompt = vi.fn().mockResolvedValue(remoteSnapshot);
-    stubElectronTestWindow({ codexClaw: {
+    stubElectronTestWindow({ app: {
       getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot), sendPrompt, steerPrompt, steerQueuedPrompt,
     } });
     const state = useAppState();
@@ -271,11 +271,11 @@ describe('useAppState', () => {
     const interruptAgent = vi.fn().mockResolvedValue(interruptedSnapshot);
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         interruptAgent,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -293,11 +293,11 @@ describe('useAppState', () => {
     const deleteQueuedPrompt = vi.fn().mockResolvedValue({ ...remoteSnapshot, queuedPrompts: [] });
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         deleteQueuedPrompt,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -334,12 +334,12 @@ describe('useAppState', () => {
     });
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectAgent,
         sendPrompt,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -365,11 +365,11 @@ describe('useAppState', () => {
     const base = createInitialSnapshot();
     const selectAgent = vi.fn((agentId: string) => Promise.resolve({ ...base, activeAgentId: agentId }));
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(base),
         selectAgent,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -432,11 +432,11 @@ describe('useAppState', () => {
       { id: 'jesse-queue', agentId: 'agent-jesse', text: 'Jesse next', createdAt: '2026-06-05T00:00:02.000Z' },
     ];
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(base),
         selectAgent: vi.fn((agentId: string) => Promise.resolve({ ...base, activeAgentId: agentId })),
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -454,11 +454,11 @@ describe('useAppState', () => {
     const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -484,11 +484,11 @@ describe('useAppState', () => {
     const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         sendPrompt,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();

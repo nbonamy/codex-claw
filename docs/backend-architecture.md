@@ -10,18 +10,18 @@ payloads; historical extraction checkpoints below describe the migration's
 earlier state. The [semantic audit](../plans/backend-semantics-audit.md) records
 the complete baseline-to-current mapping.
 
-This document is the architecture record for extracting most of Codex Claw's
+This document is the architecture record for extracting most of Korus's
 Electron main process into a separate TypeScript backend process, tentatively
-still called `clawd`.
+still called `daemon`.
 
-`clawd` is not a replacement for Codex app-server. It is the Codex Claw product
+`daemon` is not a replacement for Codex app-server. It is the Korus product
 backend: the app-owned process that orchestrates Codex app-server, Claude Code,
-Claw MCP, git, file previews, backlog automations, work integrations, and persistent
+Korus MCP, git, file previews, backlog automations, work integrations, and persistent
 team state behind one app-owned protocol.
 
 ## Decision Summary
 
-Build `clawd` as a pure TypeScript/Node backend core with an app-owned protocol.
+Build `daemon` as a pure TypeScript/Node backend core with an app-owned protocol.
 Electron main should become a desktop adapter: it owns windows, menus, native
 dialogs, preload IPC, and local desktop helpers, while the backend owns product
 state, backend driver orchestration, agent runtime state, MCP collaboration,
@@ -60,32 +60,32 @@ Current implementation checkpoint:
 
 - The repo is split into `core`, `backend`, `vue`, `electron`, and `web`
   workspaces. The web package follows the SDK web sample shape: one Express
-  server owns static hosting, HTTP upgrades, the Claw WebSocket adapter, and a
-  dedicated stdio `clawd` child.
+  server owns static hosting, HTTP upgrades, the Korus WebSocket adapter, and a
+  dedicated stdio `daemon` child.
 - The initial web identity is fixed and server-owned, the listener defaults to
   localhost, and the browser protocol is an explicit allowlist over app-owned
   backend methods. The web host is intentionally local and single-user.
-- Web-launched `clawd` processes receive a host feature profile. Computer Use
+- Web-launched `daemon` processes receive a host feature profile. Computer Use
   and embedded-browser MCP tools are removed from that runtime rather than
   being hidden only in the renderer.
-- `clawd --stdio` speaks app-owned JSON-RPC over newline-delimited stdio.
-- `clawd serve` speaks the same app-owned JSON-RPC over the local
-  `~/.codex-claw/clawd.sock` Unix socket for a single-host always-on daemon.
-- Electron main starts `clawd` through `ClawBackendProcessClient` and reaches
+- `daemon --stdio` speaks app-owned JSON-RPC over newline-delimited stdio.
+- `daemon serve` speaks the same app-owned JSON-RPC over the local
+  `~/.korus/daemon.sock` Unix socket for a single-host always-on daemon.
+- Electron main starts `daemon` through `AppBackendProcessClient` and reaches
   backend features through app-owned RPC methods. In
-  `CODEX_CLAW_BACKEND_MODE=auto`, Electron first tries the local daemon socket
+  `APP_BACKEND_MODE=auto`, Electron first tries the local daemon socket
   and falls back to the bundled stdio process.
 - Settings > General exposes a macOS background-backend switch. Enabling it
   installs a per-user LaunchAgent at
-  `~/Library/LaunchAgents/com.nabocorp.codex-claw.clawd.plist`, starts
-  `clawd serve`, and lets future app launches connect to the existing daemon.
+  `~/Library/LaunchAgents/com.nabocorp.korus.daemon.plist`, starts
+  `daemon serve`, and lets future app launches connect to the existing daemon.
   Disabling it unloads the LaunchAgent and removes the plist.
 - Codex and Claude provider drivers now live under `backend/src`; Electron main
   must not import provider drivers, provider transports, provider SDKs, or raw
   provider protocol modules.
-- `clawd` currently serves health, shared-contract snapshot loading/saving, the
+- `daemon` currently serves health, shared-contract snapshot loading/saving, the
   `AgentBackendDriver` RPC surface, sequenced `backend/event/notify` notifications,
-  the Claw MCP HTTP server used by agent collaboration tools, source repository
+  the Korus MCP HTTP server used by agent collaboration tools, source repository
   discovery, git worktree creation, agent file listing/previewing, GitHub work
   integrations, and system permission API calls.
 - Backend-event wire ingress is validated by the Core-owned typed decoder before
@@ -94,20 +94,20 @@ Current implementation checkpoint:
   without closing the transport or disturbing pending RPC requests; JSON and
   JSON-RPC framing errors keep their existing transport-specific policy.
 - The stdio transport is now bidirectional JSON-RPC: Electron main can request
-  backend work, and `clawd` can request client-owned effects. Runtime client
+  backend work, and `daemon` can request client-owned effects. Runtime client
   handlers include `client/external/open` for backend-owned work integrations
   and `client/systemPermissions/*` for native permission prompts/settings.
-- Work integration token types now live in `core`, and `clawd` owns token
+- Work integration token types now live in `core`, and `daemon` owns token
   persistence through a backend token-store port. The current runtime uses an
-  owner-readable JSON file under `~/.codex-claw`, so desktop and future clients
+  owner-readable JSON file under `~/.korus`, so desktop and future clients
   do not read or write provider tokens.
-- `clawd` now owns the GitHub work integration manager/driver and exposes
+- `daemon` now owns the GitHub work integration manager/driver and exposes
   `workProvider/*` JSON-RPC methods. Electron proxies the existing renderer IPC
-  work-provider calls to `clawd`.
+  work-provider calls to `daemon`.
 - Electron main no longer owns the MCP HTTP server. Desktop-facing MCP effects,
   such as displaying Markdown in the side panel, flow back to Electron as
   app-owned backend events.
-- `clawd` persists allowlisted typed thread flags authored through MCP.
+- `daemon` persists allowlisted typed thread flags authored through MCP.
   Clients receive them in app snapshots and respond through app-owned methods;
   executing `delegate_to_worktree` reuses the normal prompt and co-agent
   creation paths, while `ready_for_review` remains presentation-independent
@@ -120,10 +120,10 @@ Current implementation checkpoint:
   window/menu/shortcut lifecycle, file/folder/save dialogs, URL opening,
   Electron `safeStorage`, native system-permission prompts/settings, packaged
   resource path resolution, power-save blocker execution, and renderer IPC
-  fanout. `clawd` derives the minimal `ClientState` that tells Electron which
+  fanout. `daemon` derives the minimal `ClientState` that tells Electron which
   source folder path to use as a dialog default and whether display sleep should
   be prevented.
-- `clawd` owns durable snapshot loading and saving. Electron retains only
+- `daemon` owns durable snapshot loading and saving. Electron retains only
   transcript-free snapshot metadata for menus and native effects.
   `snapshot/get` also returns a transcript-free snapshot (`messages: []`) so
   reconnect synchronization stays bounded; the renderer restores the selected
@@ -134,62 +134,62 @@ Current implementation checkpoint:
   they do not perform direct product-state updates. Desktop-native state is
   fetched from `client/state/get` or received on backend events instead of
   being recomputed from agent statuses in Electron.
-- `clawd` now owns automation CRUD, manual automation runs, and the automation
-  runner. A reusable runtime scheduler is composed in `createClawdRuntime` and
+- `daemon` now owns automation CRUD, manual automation runs, and the automation
+  runner. A reusable runtime scheduler is composed in `createKorusdRuntime` and
   runs independent registered tasks without overlap; automation scans and
   pull-request monitoring are its first task modules. Domain modules do not
   self-register global timers. Electron proxies automation IPC to backend RPC
   and adopts the returned snapshot.
-- `clawd` now owns team create/update/reorder/close/select mutations. Electron
+- `daemon` now owns team create/update/reorder/close/select mutations. Electron
   proxies team IPC to backend RPC and adopts the returned snapshot; renderer
   selection controls also wait for backend snapshots instead of mutating active
   team/agent ids locally.
-- `clawd` now owns settings updates. Electron adopts the returned snapshot and
+- `daemon` now owns settings updates. Electron adopts the returned snapshot and
   applies desktop-only reactions such as power-save blocker changes. Renderer
   settings controls send update requests and adopt the backend snapshot instead
   of applying shared product reducers locally.
-- `clawd` now owns the app-facing system permission API. Electron supplies the
+- `daemon` now owns the app-facing system permission API. Electron supplies the
   native macOS Accessibility status/open-settings implementation as a desktop
   host callback; non-desktop clients can call the same backend methods without
   reading local client state.
-- `clawd` now owns source-folder auto-detection, source repository discovery,
+- `daemon` now owns source-folder auto-detection, source repository discovery,
   explicit `git worktree list`, worktree destination suggestions and defaults,
   settings updates, and recent-repository bookkeeping when agents or worktrees
   are created from source repositories. Electron still owns native folder/save
   dialogs, but the dialog default path is a backend suggestion instead of a
   desktop-side path policy.
-- `clawd` now owns agent create/update/duplicate/move/reorder/close/select and
+- `daemon` now owns agent create/update/duplicate/move/reorder/close/select and
   folder update mutations. Electron still performs desktop folder picking, then
   forwards the selected folder to the backend. Generic location-scoped
   operations resolve a `BackendLocation` before requesting local drivers or a
-  remote `clawd`; agent-scoped requests resolve an `AgentLocation` so projected
-  remote-team agents are forwarded to the owning remote `clawd` and projected
+  remote `daemon`; agent-scoped requests resolve an `AgentLocation` so projected
+  remote-team agents are forwarded to the owning remote `daemon` and projected
   back into the local pointer snapshot for clients.
-- `clawd` now owns agent file preview authority: clients request file lists and
+- `daemon` now owns agent file preview authority: clients request file lists and
   previews by agent id only, and the backend resolves the folder from its
   snapshot before touching storage. A mobile or web client uses the same
   backend RPC over its transport; it never reads local workspace files. If a
   transcript contains an absolute or `file://` path inside the agent folder,
   the client normalizes it to an agent-relative preview path. An explicitly
-  clicked absolute path outside that folder remains absolute and `clawd` reads
+  clicked absolute path outside that folder remains absolute and `daemon` reads
   it on the agent's local or remote host. Relative traversal is resolved from
   the agent folder and may also address files elsewhere on that host.
-- `clawd` now owns work item assignment and unassignment mutations. Electron
+- `daemon` now owns work item assignment and unassignment mutations. Electron
   forwards the item payload and adopts the backend snapshot instead of changing
   `workBacklog.assignments` locally.
-- `clawd` now owns agent restart and conversation resume snapshot mutations.
+- `daemon` now owns agent restart and conversation resume snapshot mutations.
   Electron forwards restart/resume requests and adopts the returned snapshot;
   provider-only session controls use `driver/*` RPC methods behind the backend
   boundary.
-- `clawd` now owns goal set/clear and approval-preset session mutations,
+- `daemon` now owns goal set/clear and approval-preset session mutations,
   including backend-session updates, goal events, and Codex approval defaults.
-- `clawd` now owns active-turn steering and interruption session mutations.
+- `daemon` now owns active-turn steering and interruption session mutations.
   Electron forwards steer/interrupt requests and adopts the returned snapshot;
   provider-only steer/interrupt calls use `driver/*` RPC methods.
-- `clawd` now owns prompt dispatch and delete/edit/retry turn orchestration.
+- `daemon` now owns prompt dispatch and delete/edit/retry turn orchestration.
   Electron forwards stable agent/turn ids and adopts the returned snapshot.
 - Queued prompt admission, draining, retry scheduling, and timer cleanup live
-  in `AgentPromptManager`; `ClawBackendServer` routes the protocol methods and
+  in `AgentPromptManager`; `AppBackendServer` routes the protocol methods and
   backend events into that service rather than owning its lifecycle state.
 - Normal agents created through the app protocol, MCP delegation, and the
   independent-review workflow share `AgentCreationService`; each caller adapts
@@ -202,44 +202,44 @@ Current implementation checkpoint:
   `AgentWorkspaceService`.
   `AgentGitWorkflowService` owns the app-level Git workflow from validation
   through staging, commits, pushes, pull requests, merge handoffs, and cleanup;
-  `ClawBackendServer` only resolves local/remote ownership and routes the typed
+  `AppBackendServer` only resolves local/remote ownership and routes the typed
   agent-Git request into that service. Electron registers the matching IPC
   routes as a single thin adapter instead of duplicating workflow methods in
   `AppController`.
   `SubagentIdentityService` owns non-overlapping Codex subagent identity
-  backfills. `RemoteTeamService` owns remote clawd snapshot caching, remote-team
+  backfills. `RemoteTeamService` owns remote daemon snapshot caching, remote-team
   projection, and remote agent/work-assignment ownership lookup. The server
   supplies ports and callbacks while those services own their mutable workflow
   state.
-- `clawd` now owns derived side-panel requests for plans and current-turn diffs.
+- `daemon` now owns derived side-panel requests for plans and current-turn diffs.
   Electron fans out backend events but no longer synthesizes `sidePanel.*`
   events from plan or diff events.
-- `clawd` owns authoritative snapshot event application and durable persistence.
+- `daemon` owns authoritative snapshot event application and durable persistence.
   Backend notifications carry sequenced app-owned deltas rather than repeating
   the full snapshot for every streaming update. Electron and renderer maintain
   volatile replicas by replaying the same events through the shared reducer.
-- `clawd` owns agent file listing/preview authority. Client-facing
+- `daemon` owns agent file listing/preview authority. Client-facing
   `agent/files/list` and `agent/file/preview` take an `agentId`; Electron does not
   send workspace roots or request raw file reads. Provider-specific file preview
-  access remains a backend-internal capability after `clawd` resolves the agent
+  access remains a backend-internal capability after `daemon` resolves the agent
   folder from backend state.
-- `clawd` owns provider metadata and conversation-history reads. Electron asks
+- `daemon` owns provider metadata and conversation-history reads. Electron asks
   for models, skills, conversation lists, and automation-created conversation
   messages by agent/ref ids; backend resolves agents and validates stored
   conversation refs before calling provider drivers.
-- `clawd` owns Git diff reads. Electron and web forward `agent/git/diff/get`;
+- `daemon` owns Git diff reads. Electron and web forward `agent/git/diff/get`;
   the backend resolves the agent and returns Git-service data or a stored turn
   diff, without presentation side effects. The client owns opening a review,
   loading/error state and stale-response protection. Automatic turn diffs remain
   domain data updates rather than instructions to open a pane.
-- `clawd` owns persisted-session hydration on agent selection and git-status
+- `daemon` owns persisted-session hydration on agent selection and git-status
   refreshes after agent create/update/select and provider turn/diff/completion
   events. Electron receives the resulting snapshot/events instead of calling
   provider drivers for status or history hydration.
-- `clawd` owns client request ownership and response routing. Electron forwards
+- `daemon` owns client request ownership and response routing. Electron forwards
   renderer approval/user-input responses as `agent/request/respond`; the backend
   remembers which provider emitted the request and dispatches to that provider.
-- `clawd` owns the optional `set-status` start acknowledgment and `finish_turn`
+- `daemon` owns the optional `set-status` start acknowledgment and `finish_turn`
   completion effects, plus persisted settings checks.
   Electron rechecks volatile selected-agent and foreground eligibility, cancels
   queued playback when those conditions change, and owns the serialized audio
@@ -272,7 +272,7 @@ Current implementation checkpoint:
 - Do not rewrite the renderer around daemon protocol details.
 - Do not expose a LAN-accessible unauthenticated HTTP server.
 - Do not require a local Node.js installation for normal packaged desktop use.
-- Do not turn Claw into a lowest-common-denominator provider app. Codex and
+- Do not turn Korus into a lowest-common-denominator provider app. Codex and
   Claude can keep different capabilities behind the same app-owned seams.
 - Do not move native desktop-only UX into the daemon. Native file dialogs,
   window management, menus, shortcuts, notifications, and OS-specific UI
@@ -286,7 +286,7 @@ become a small npm workspace monorepo, not the Electron app package.
 Recommended top-level shape:
 
 ```text
-codex-claw/
+example-project/
   package.json
   package-lock.json
   tsconfig.base.json
@@ -323,36 +323,36 @@ Root `package.json` should be private and orchestration-only:
 
 ```json
 {
-  "name": "codex-claw",
+  "name": "agent-workspace",
   "private": true,
   "workspaces": ["core", "backend", "vue", "electron", "web"],
   "scripts": {
     "dev": "npm run dev:electron",
-    "dev:backend": "npm run dev -w @codex-claw/backend",
-    "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
+    "dev:backend": "npm run dev -w @workspace/backend",
+    "dev:backend:run": "npm run dev:run -w @workspace/backend",
     "dev:electron": "node scripts/dev.mjs",
-    "dev:web": "npm run dev -w @codex-claw/web",
+    "dev:web": "npm run dev -w @workspace/web",
     "build": "npm run build:electron",
     "build:electron": "node scripts/build.mjs",
-    "build:web": "npm run build -w @codex-claw/web",
-    "start:electron": "npm run start -w @codex-claw/electron",
-    "start:web": "npm run start -w @codex-claw/web",
+    "build:web": "npm run build -w @workspace/web",
+    "start:electron": "npm run start -w @workspace/electron",
+    "start:web": "npm run start -w @workspace/web",
     "typecheck": "npm run typecheck -ws",
     "lint": "npm run lint -ws",
     "test": "npm run test -ws",
     "package": "npm run package:electron",
-    "package:electron": "npm run package -w @codex-claw/electron"
+    "package:electron": "npm run package -w @workspace/electron"
   }
 }
 ```
 
 Workspace package names:
 
-- `@codex-claw/core`
-- `@codex-claw/backend`
-- `@codex-claw/vue`
-- `@codex-claw/electron`
-- `@codex-claw/web`
+- `@workspace/core`
+- `@workspace/backend`
+- `@workspace/vue`
+- `@workspace/electron`
+- `@workspace/web`
 
 Package ownership:
 
@@ -360,20 +360,20 @@ Package ownership:
   `RendererMessage`, IPC-facing DTOs, IDs, pure reducers, and pure helpers used
   by both backend and Electron. It must not import Electron, Vue, filesystem,
   child process, Codex app-server, Claude, or MCP implementation modules.
-- `backend` contains `clawd`, Codex/Claude drivers, MCP collaboration, automations,
+- `backend` contains `daemon`, Codex/Claude drivers, MCP collaboration, automations,
   git/files/source discovery, persistence, work integrations, and backend
-  protocol server/client implementations. It depends on `@codex-claw/core`.
+  protocol server/client implementations. It depends on `@workspace/core`.
 - `vue` contains the reusable product shell, components, styles, i18n, and
-  renderer state adapter. It depends on `@codex-claw/core` and receives host
+  renderer state adapter. It depends on `@workspace/core` and receives host
   APIs at bootstrap.
 - `electron` contains Electron Forge config, main, preload, desktop adapters,
   native dialogs, packaged resources, app icons, and release packaging. It
-  depends on `@codex-claw/core` and `@codex-claw/vue`; it should talk to the
+  depends on `@workspace/core` and `@workspace/vue`; it should talk to the
   backend through the app-owned backend protocol/client rather than importing
   backend internals.
 - `web` contains the browser composition root and the Express-owned product
   WebSocket bridge. It depends on core, Vue, and the SDK web transport ports,
-  and starts a built `clawd` artifact rather than importing backend internals.
+  and starts a built `daemon` artifact rather than importing backend internals.
 
 Dependency rules:
 
@@ -381,11 +381,11 @@ Dependency rules:
 - `backend` may depend on `core`, never on a host or UI package.
 - `vue` may depend on `core`, never on a host package.
 - `electron` and `web` may depend on `core` and `vue`, but should not depend on `backend` at the
-  source-code level. In development it may spawn `backend`'s built `clawd`
+  source-code level. In development it may spawn `backend`'s built `daemon`
   artifact, and in release it may package the backend executable or bundled
   script as a resource.
 - Cross-package imports should use package names such as
-  `@codex-claw/core`, not deep relative paths across workspace boundaries.
+  `@workspace/core`, not deep relative paths across workspace boundaries.
 - TypeScript should use a root `tsconfig.base.json` plus package-level
   `tsconfig.json` files. Package references are useful once the first move is
   stable, but the first reorg can keep build wiring simple if needed.
@@ -421,7 +421,7 @@ bridge.
   security hardening measure and note that disabling this fuse breaks
   `child_process.fork`, recommending utility processes instead. Source:
   <https://www.electronjs.org/docs/latest/tutorial/fuses>.
-- Codex Claw currently disables `FuseV1Options.RunAsNode` in
+- Korus currently disables `FuseV1Options.RunAsNode` in
   `forge.config.ts`, so the existing packaged app deliberately does not support
   using the Electron executable as a Node runtime.
 
@@ -432,10 +432,10 @@ flowchart LR
   Renderer["Renderer: Vue UI"]
   Preload["Preload: typed bridge"]
   Main["Electron main: desktop adapter"]
-  Client["ClawBackendClient"]
-  Backend["clawd: backend process"]
+  Client["BackendClient"]
+  Backend["daemon: backend process"]
   Store["State store"]
-  MCP["Claw MCP server"]
+  MCP["Korus MCP server"]
   Codex["Codex app-server"]
   Claude["Claude Code"]
   Git["Git, files, worktrees"]
@@ -463,8 +463,8 @@ renderer.
 - Browser windows, menus, app lifecycle, shortcuts, and renderer event fanout.
 - Native file/folder/save dialogs. Local folder picking stays desktop-native;
   remote folder browsing must become a backend-powered product surface.
-- Claw-specific OS prompts, notifications, and native system permission
-  prompts/settings. The app-facing permission API belongs to `clawd`; Electron
+- Korus-specific OS prompts, notifications, and native system permission
+  prompts/settings. The app-facing permission API belongs to `daemon`; Electron
   implements only the client callback.
 - The SDK native IPC bridge for product-neutral clipboard, safe external-link,
   attachment-ingestion, and transcription behavior. The SDK owns its packaged
@@ -475,7 +475,7 @@ renderer.
   main decides whether to use Electron `powerSaveBlocker` while the app UI is
   alive.
 
-### Moves To `clawd`
+### Moves To `daemon`
 
 - Durable product state: teams, agents, automations, work backlog,
   source folder settings, backend sessions, backend defaults, goals, plans, and
@@ -486,16 +486,16 @@ renderer.
 - Backend drivers and protocol adapters for Codex, Claude, and future coding
   backends.
 - Codex app-server and Claude process lifecycle.
-- Claw MCP server and agent-to-agent collaboration state. This server must run
-  inside `clawd` so Codex/Claude sessions receive a backend-owned MCP URL.
+- Korus MCP server and agent-to-agent collaboration state. This server must run
+  inside `daemon` so Codex/Claude sessions receive a backend-owned MCP URL.
 - File search/read, git status/diff/worktree listing/worktree creation, source repository
   discovery, artifact readback, markdown side-panel requests, and any future
   backend-location-owned filesystem behavior. Current code already routes
   source discovery, `git worktree list`, worktree creation, agent file
   listing/previewing, GitHub work integrations, system permission API calls, and
-  other backend-location-owned operations through `clawd`.
+  other backend-location-owned operations through `daemon`.
 - Renderer file previews and MCP `display-markdown` path reads share one
-  ownership rule: clients ask `clawd` for content, and Electron does not read
+  ownership rule: clients ask `daemon` for content, and Electron does not read
   backend-host files on behalf of product features. Renderer previews accept
   paths outside the agent folder; `display-markdown` remains confined to the
   caller agent folder. This keeps both contracts valid for a mobile client
@@ -507,57 +507,57 @@ renderer.
 - Work-provider drivers where possible, with desktop-only services injected
   through ports.
 - Durable snapshot persistence now uses the backend serializer/parser in
-  `backend/src/state-persistence.ts`. `clawd` persists backend-owned snapshot
+  `backend/src/state-persistence.ts`. `daemon` persists backend-owned snapshot
   events under its backend home; Electron never writes the durable state file.
 
 The rule is simple: if the operation acts on a repository, agent, backend
-session, work item, transcript, or backend-owned path, it belongs in `clawd`.
+session, work item, transcript, or backend-owned path, it belongs in `daemon`.
 If it asks the local desktop to show UI or use an OS affordance, it belongs in
 Electron main.
 
 ## Protocol
 
-Use JSON-RPC 2.0-compatible envelopes for the Claw backend protocol:
+Use JSON-RPC 2.0-compatible envelopes for the Korus backend protocol:
 
 ```ts
-type ClawRpcId = string | number;
+type AppRpcId = string | number;
 
-type ClawRpcRequest = {
+type AppRpcRequest = {
   jsonrpc: "2.0";
-  id: ClawRpcId;
+  id: AppRpcId;
   method: string;
   params?: unknown;
 };
 
-type ClawRpcNotification = {
+type AppRpcNotification = {
   jsonrpc: "2.0";
   method: string;
   params?: unknown;
 };
 
-type ClawRpcResponse =
-  | { jsonrpc: "2.0"; id: ClawRpcId; result: unknown }
-  | { jsonrpc: "2.0"; id: ClawRpcId; error: ClawRpcError };
+type AppRpcResponse =
+  | { jsonrpc: "2.0"; id: AppRpcId; result: unknown }
+  | { jsonrpc: "2.0"; id: AppRpcId; error: AppRpcError };
 ```
 
-Codex app-server omits the `jsonrpc` field, but Claw does not need to copy that
+Codex app-server omits the `jsonrpc` field, but Korus does not need to copy that
 quirk. Using real JSON-RPC 2.0 keeps the protocol boring, toolable, and
 transport-independent.
 
-The connection is duplex. Electron main sends UI requests to `clawd`, `clawd`
-sends responses and app events, and `clawd` may also send JSON-RPC requests to
+The connection is duplex. Electron main sends UI requests to `daemon`, `daemon`
+sends responses and app events, and `daemon` may also send JSON-RPC requests to
 Electron main for desktop-owned effects such as folder pickers, open-external,
 secret lookup, or user confirmation. Those requests still use app-owned
 methods; they must not be raw Codex server requests. The first implemented
 client callback method is `client/external/open`.
 
-`clawd` method names use the path-style convention
+`daemon` method names use the path-style convention
 `resource[/subresource]/verb`, with values centralized in
 `core/src/backend-protocol/methods.ts`. This is a breaking dev protocol
 surface: old method names are not aliased, so stale local and remote daemons
 must be restarted or synced after a rename.
 
-Initial request methods should mirror today's `CodexClawApi` surface, but with
+Initial request methods should mirror today's `AppApi` surface, but with
 names that describe backend ownership:
 
 - `snapshot/get`
@@ -574,7 +574,7 @@ names that describe backend ownership:
   `automation/execution/delete`
 - `source/repositories/list`, `source/worktrees/list`,
   `source/worktree/path/suggest`, `source/worktree/create`
-- `agent/files/list`, `agent/file/preview` using agent ids only. `clawd` resolves
+- `agent/files/list`, `agent/file/preview` using agent ids only. `daemon` resolves
   the workspace root from its snapshot so desktop, mobile, and future web
   clients never transmit local filesystem roots as read authority.
 - `git/status`, `git/diff`
@@ -595,7 +595,7 @@ events, but it should not re-number backend events.
 Every event should include enough routing metadata for multiple UI clients:
 
 ```ts
-type ClawBackendEvent = {
+type AppBackendEvent = {
   seq: number;
   type: MainToRendererEvent["type"];
   agentId?: string;
@@ -621,12 +621,12 @@ Unix socket, a Windows named pipe, or SSH. Define the transport as bytes or
 messages plus lifecycle:
 
 ```ts
-type ClawTransport = {
+type AppTransport = {
   start(): Promise<void>;
-  send(message: ClawRpcRequest | ClawRpcNotification | ClawRpcResponse): void;
+  send(message: AppRpcRequest | AppRpcNotification | AppRpcResponse): void;
   close(): Promise<void>;
   onMessage(
-    listener: (message: ClawRpcRequest | ClawRpcNotification | ClawRpcResponse) => void,
+    listener: (message: AppRpcRequest | AppRpcNotification | AppRpcResponse) => void,
   ): () => void;
   onClose(listener: (error?: Error) => void): () => void;
 };
@@ -639,7 +639,7 @@ Initial transports:
 - `stdio`: newline-delimited JSON-RPC messages over stdin/stdout. This is the
   first real daemon transport and the one to keep compatible with SSH.
 - `localSocket`: newline-delimited JSON-RPC messages over
-  `~/.codex-claw/clawd.sock`. This supports a single-host always-on backend
+  `~/.korus/daemon.sock`. This supports a single-host always-on backend
   while keeping the protocol identical to stdio.
 - `electronMessagePort`: optional packaged-app transport if we choose Electron
   `utilityProcess` instead of a real executable for the first local split.
@@ -656,8 +656,8 @@ The developer experience should use one command, but under the hood it should
 run three cooperating loops:
 
 1. Electron Forge/Vite for Electron main, preload, and renderer.
-2. A backend bundler/watch step that emits a Node-runnable `clawd` bundle.
-3. A small supervisor that starts `clawd --stdio`, restarts it when the backend
+2. A backend bundler/watch step that emits a Node-runnable `daemon` bundle.
+3. A small supervisor that starts `daemon --stdio`, restarts it when the backend
    bundle changes, and lets Electron main reconnect.
 
 Target commands:
@@ -666,10 +666,10 @@ Target commands:
 {
   "scripts": {
     "dev": "npm run dev:electron",
-    "dev:backend": "npm run dev -w @codex-claw/backend",
-    "dev:backend:run": "npm run dev:run -w @codex-claw/backend",
+    "dev:backend": "npm run dev -w @workspace/backend",
+    "dev:backend:run": "npm run dev:run -w @workspace/backend",
     "dev:electron": "node scripts/dev.mjs",
-    "start:electron": "npm run start -w @codex-claw/electron"
+    "start:electron": "npm run start -w @workspace/electron"
   }
 }
 ```
@@ -684,32 +684,32 @@ The exact script names can change, but the shape should stay:
 - `start:electron` runs only the `electron` workspace's Electron Forge/Vite
   flow, for cases where the backend is already managed separately.
 - `dev:backend` watches `backend/src` and `core/src`, then writes a bundled
-  file such as `backend/dist/clawd-dev.mjs`.
-- `dev:backend:run` supervises `node backend/dist/clawd-dev.mjs --stdio`.
+  file such as `backend/dist/daemon-dev.mjs`.
+- `dev:backend:run` supervises `node backend/dist/daemon-dev.mjs --stdio`.
 - Electron main receives the dev backend command from config or environment,
-  for example `CODEX_CLAW_BACKEND_COMMAND=node` and
-  `CODEX_CLAW_BACKEND_ARGS=../backend/dist/clawd-dev.mjs,--stdio`.
-- `clawd` reads and writes state under `~/.codex-claw` by default. The only
-  supported state-home override is `CODEX_CLAW_HOME`.
-- Every local `clawd` launch derives Codex app-server `CODEX_HOME` as
-  `$CODEX_CLAW_HOME/codex-home` (default
-  `~/.codex-claw/codex-home`) and ignores an inherited normal Codex home.
-- Before creating backend drivers, `clawd` initializes missing `skills` and
+  for example `APP_BACKEND_COMMAND=node` and
+  `APP_BACKEND_ARGS=../backend/dist/daemon-dev.mjs,--stdio`.
+- `daemon` reads and writes state under `~/.korus` by default. The only
+  supported state-home override is `APP_HOME`.
+- Every local `daemon` launch derives Codex app-server `CODEX_HOME` as
+  `$APP_HOME/codex-home` (default
+  `~/.korus/codex-home`) and ignores an inherited normal Codex home.
+- Before creating backend drivers, `daemon` initializes missing `skills` and
   `plugins` entries from the persisted sharing setting. Sharing is on by
   default and a fresh home links those entries to `~/.codex`. Existing
   non-linked entries are preserved and reported to the renderer as a pending
   migration so the user can migrate or persist the isolated setup explicitly.
   Later changes can create fresh isolated directories or copy the current user
   resources. Folder-changing actions are rejected while chats are active
-  because restarting `clawd` also closes its Codex app-server processes.
+  because restarting `daemon` also closes its Codex app-server processes.
   Electron closes hosted Browser panes before that restart, and the client then
   reloads only its renderer from the synchronized backend snapshot so cached
   conversations, SDK controllers, and event sequence cursors cannot outlive the
   backend instance.
-- Electron supplies every local `clawd` launch with the pinned Codex executable
-  copied into desktop resources. SSH sync uploads `clawd.mjs` and installs the
-  pinned Codex release under `~/.codex-claw/codex/<version>/bin`; remote
-  `clawd` launches that managed binary unless its Settings path overrides it.
+- Electron supplies every local `daemon` launch with the pinned Codex executable
+  copied into desktop resources. SSH sync uploads `daemon.mjs` and installs the
+  pinned Codex release under `~/.korus/codex/<version>/bin`; remote
+  `daemon` launches that managed binary unless its Settings path overrides it.
 
 Hot reload semantics:
 
@@ -731,43 +731,43 @@ Hot reload semantics:
 Daemon development:
 
 ```bash
-npm run build -w @codex-claw/backend
+npm run build -w @workspace/backend
 npm run dev:backend:serve
-CODEX_CLAW_BACKEND_MODE=existing npm run start:electron
+APP_BACKEND_MODE=existing npm run start:electron
 ```
 
-`CODEX_CLAW_BACKEND_MODE=auto` is the desktop default: connect to the local
+`APP_BACKEND_MODE=auto` is the desktop default: connect to the local
 daemon if it is running, otherwise start the bundled stdio backend.
 
 For packaged macOS builds, Settings > General can install the background daemon
 automatically for the current user. In dev, the same installer is available only
-when `CODEX_CLAW_BACKEND_COMMAND` points at a usable clawd runtime; otherwise
+when `APP_BACKEND_COMMAND` points at a usable daemon runtime; otherwise
 the Settings switch reports that no packaged runtime is available.
 
-`clawd` writes its canonical durable operational log as structured JSONL to
-`$CODEX_CLAW_HOME/logs/clawd.log` (default `~/.codex-claw/logs/clawd.log`).
+`daemon` writes its canonical durable operational log as structured JSONL to
+`$APP_HOME/logs/daemon.log` (default `~/.korus/logs/daemon.log`).
 The log is produced through the backend logger, supports `trace`, `debug`,
 `info`, `warn`, `error`, `fatal`, and `silent` levels via
-`CODEX_CLAW_LOG_LEVEL`, and rotates by size. Defaults are 5 MiB per file and
-five retained archives; `CODEX_CLAW_LOG_MAX_BYTES` and
-`CODEX_CLAW_LOG_MAX_FILES` can override those values.
+`APP_LOG_LEVEL`, and rotates by size. Defaults are 5 MiB per file and
+five retained archives; `APP_LOG_MAX_BYTES` and
+`APP_LOG_MAX_FILES` can override those values.
 
-Because `clawd --stdio` reserves stdout for JSON-RPC, console-side logs must
+Because `daemon --stdio` reserves stdout for JSON-RPC, console-side logs must
 only use stderr. The backend mirrors `warn` and above to stderr and writes lower
-levels only to the canonical log file. `CODEX_CLAW_LOG_STDERR_LEVEL` can raise
+levels only to the canonical log file. `APP_LOG_STDERR_LEVEL` can raise
 or lower the stderr mirror threshold independently from the file log threshold.
 When launched by the macOS LaunchAgent, launchd captures stdout and stderr to
-`~/Library/Logs/Codex Claw/clawd.out.log` and `clawd.err.log`; those files are
+`~/Library/Logs/Korus/daemon.out.log` and `daemon.err.log`; those files are
 secondary process-capture logs, not the primary operational log.
 
 Electron main writes its own operational log through `electron-log` in the
-platform's Codex Claw log directory. It records startup, window, backend
+platform's Korus log directory. It records startup, window, backend
 connection, request-timeout, event-sequence, and shutdown diagnostics. Main
 also receives renderer console messages from each window; messages are bounded,
 filtered for known browser noise, and redacted before they are written. The
 renderer remains free of filesystem access and does not own log persistence.
 
-On startup, packaged Electron resolves the current packaged `clawd --version`
+On startup, packaged Electron resolves the current packaged `daemon --version`
 and compares it with the running daemon's `backend/health/get.version`. If an
 installed daemon is stale and idle, Electron refreshes the LaunchAgent before
 connecting. If active agents or automation executions are running, Electron asks the
@@ -782,7 +782,7 @@ handoff from bundled stdio to the daemon should be a separate reconnect slice.
 The first extraction phase can run in-process and still use the current
 `electron-forge start` loop. As soon as the stdio process exists, local dev
 should use the separate process by default so process-boundary bugs show up
-early. Keep an escape hatch such as `CODEX_CLAW_BACKEND_MODE=in-process` for
+early. Keep an escape hatch such as `APP_BACKEND_MODE=in-process` for
 bisecting.
 
 ## Release Build And Runtime
@@ -798,10 +798,10 @@ Recommended build pipeline:
    npm run typecheck -ws
    ```
 
-2. Bundle `clawd` from TypeScript into a standalone Node script:
+2. Bundle `daemon` from TypeScript into a standalone Node script:
 
    ```bash
-   npm run build -w @codex-claw/backend
+   npm run build -w @workspace/backend
    ```
 
    The bundle should have no `electron` imports, should bundle normal
@@ -825,21 +825,21 @@ Recommended build pipeline:
 
    ```text
    electron/resources/
-     clawd/
+     daemon/
        node
-       clawd.mjs
-       clawd.mjs.map
+       daemon.mjs
+       daemon.mjs.map
    ```
 
    Development builds include only the current platform Node runtime. Future SEA
-   or native executables can replace `node + clawd.mjs` in the same resource
+   or native executables can replace `node + daemon.mjs` in the same resource
    directory.
 
 5. Package the Electron app with Forge. The current local verification command
    remains:
 
    ```bash
-   CODEX_CLAW_SKIP_SIGNING=1 npm run package
+   APP_SKIP_SIGNING=1 npm run package
    ```
 
    A real release build should sign and notarize the app and any helper
@@ -851,15 +851,15 @@ Packaged macOS builds use Electron's native `autoUpdater` with the Forge ZIP
 maker's JSON feed. The updater checks immediately at startup and every hour,
 then exposes status through the typed preload bridge and an
 "Update available" badge. Manual checks and install/relaunch are also available
-from the Codex Claw menu. Development builds and unsupported platforms report updates
+from the Korus menu. Development builds and unsupported platforms report updates
 as disabled.
 
 The feed is served at
 `https://codex-claw.nabocorp.com/desktop/releases/<platform>/<arch>/RELEASES.json`
-by default. Set `CODEX_CLAW_UPDATE_BASE_URL` for another HTTPS host. A release
+by default. Set `APP_UPDATE_BASE_URL` for another HTTPS host. A release
 publish uses `npm run publish:macos` after a signed `npm run make`; the script
 uploads the ZIP, manifest, and DMG through SSH using
-`CODEX_CLAW_UPDATE_PUBLISH_HOST` and `CODEX_CLAW_UPDATE_REMOTE_ROOT`.
+`APP_UPDATE_PUBLISH_HOST` and `APP_UPDATE_REMOTE_ROOT`.
 
 The release notes embedded in the renderer are generated from every released
 versioned section of `CHANGELOG.md` with `npm run release-notes:generate`. The
@@ -873,15 +873,15 @@ matching changelog section is missing; or when the committed JSON is stale.
 Runtime execution in a packaged app:
 
 1. Electron main resolves the packaged backend runtime under
-   `process.resourcesPath` and passes `CODEX_CLAW_ASSETS_PATH` to `clawd`.
+   `process.resourcesPath` and passes `APP_ASSETS_PATH` to `daemon`.
    The current interim TypeScript packaging copies the Node runtime to
-   `resources/clawd/node` and the backend bundle to `resources/clawd/clawd.mjs`;
+   `resources/daemon/node` and the backend bundle to `resources/daemon/daemon.mjs`;
    this can later be replaced by a SEA or native executable without changing
    renderer contracts.
 2. Main starts the backend with stdio:
 
    ```ts
-   spawn(nodePath, [clawdBundle, "--stdio"], {
+   spawn(nodePath, [daemonBundle, "--stdio"], {
      stdio: ["pipe", "pipe", "pipe"],
    });
    ```
@@ -890,7 +890,7 @@ Runtime execution in a packaged app:
    script and uses the message-port transport because utility processes cannot
    pipe stdin.
 4. Main sends the protocol initialize/health request, then `snapshot/get`.
-5. `clawd` owns Codex app-server, Claude Code, MCP, git/files, automations, and
+5. `daemon` owns Codex app-server, Claude Code, MCP, git/files, automations, and
    durable state.
 6. Electron main fans backend events to the renderer and owns desktop-only
    host callbacks such as dialogs, open-external, native permission prompts, and
@@ -906,17 +906,17 @@ Signing implications:
   unsigned builds can still run for development.
 - Linux: no signing requirement by default, but the packaged artifact still
   needs smoke tests.
-- Local `CODEX_CLAW_SKIP_SIGNING=1` builds should skip app/helper signing but
+- Local `APP_SKIP_SIGNING=1` builds should skip app/helper signing but
   still verify the backend runtime starts and answers `backend/health/get`.
 
 Minimum release smoke:
 
 ```bash
-CODEX_CLAW_SKIP_SIGNING=1 npm run package
-./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/node \
-  ./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd.mjs --version
-./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/node \
-  ./out/<platform>/Codex\ Claw.app/Contents/Resources/clawd/clawd.mjs --stdio
+APP_SKIP_SIGNING=1 npm run package
+./out/<platform>/Codex\ Korus.app/Contents/Resources/daemon/node \
+  ./out/<platform>/Codex\ Korus.app/Contents/Resources/daemon/daemon.mjs --version
+./out/<platform>/Codex\ Korus.app/Contents/Resources/daemon/node \
+  ./out/<platform>/Codex\ Korus.app/Contents/Resources/daemon/daemon.mjs --stdio
 ```
 
 The stdio smoke should send `backend/health/get` and expect a valid JSON-RPC
@@ -945,7 +945,7 @@ Cons:
 - The injected script cannot load filesystem dependencies at runtime, so the
   backend must be bundled into a standalone JavaScript file.
 - Native add-ons require special asset extraction and `process.dlopen()`, so
-  avoid native dependencies in `clawd`.
+  avoid native dependencies in `daemon`.
 - Current Node docs do not list macOS x64 as regular CI-covered SEA support.
 - Signing, notarization, helper binary updates, crash diagnostics, and
   platform smoke tests become release concerns.
@@ -959,7 +959,7 @@ runtime.
 This reuses the packaged Electron executable as the Node runtime:
 
 ```ts
-spawn(process.execPath, [clawdEntry, "--stdio"], {
+spawn(process.execPath, [daemonEntry, "--stdio"], {
   env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
 });
 ```
@@ -980,7 +980,7 @@ Cons:
   there too.
 
 Recommended use: only choose this if we explicitly accept the security tradeoff
-and add packaging tests that verify `clawd --version` through the packaged
+and add packaging tests that verify `daemon --version` through the packaged
 Electron executable on each platform.
 
 ### Option C: Electron `utilityProcess`
@@ -1007,13 +1007,13 @@ and future remote.
 
 ## State And Migration
 
-`clawd` owns the durable `AppSnapshot` and persists it as `roster.json`,
-`settings.json`, `tasks.json` and `visualizations/` under `~/.codex-claw` by default (see
+`daemon` owns the durable `AppSnapshot` and persists it as `roster.json`,
+`settings.json`, `tasks.json` and `visualizations/` under `~/.korus` by default (see
 `docs/architecture.md`, Persistence). It also stores work-integration tokens in
-`~/.codex-claw/provider-tokens.json`. Electron main
+`~/.korus/provider-tokens.json`. Electron main
 owns only desktop-window state plus a
 volatile renderer-facing snapshot cache. That cache is hydrated through
-`snapshot/get`, advanced only by sequenced clawd-authored app events through the
+`snapshot/get`, advanced only by sequenced daemon-authored app events through the
 shared reducer, and never written back to disk by Electron. Renderer code keeps
 UI-only state and the volatile product replica; neither Electron nor renderer
 owns durable product state.
@@ -1024,7 +1024,7 @@ overwritten by an older slow write, and a partial write cannot replace the last
 valid file.
 
 Active turns, pending approvals, and queued prompts live in the running
-`clawd` snapshot. Queue delivery removes an item only after backend acceptance;
+`daemon` snapshot. Queue delivery removes an item only after backend acceptance;
 transport failures retain the FIFO head, record the failure, and retry with
 bounded exponential backoff without appending duplicate user messages.
 
@@ -1036,25 +1036,25 @@ replayed. See `architecture.md` for retention and restart guarantees.
 
 Local migration path:
 
-1. `clawd` creates `~/.codex-claw` on startup and treats it as the backend
+1. `daemon` creates `~/.korus` on startup and treats it as the backend
    home.
-2. `clawd` loads the versioned store through `AppStateStore`, migrating a
-   legacy `~/.codex-claw/state.json` once (with a verified backup), and writes
+2. `daemon` loads the versioned store through `AppStateStore`, migrating a
+   legacy `~/.korus/state.json` once (with a verified backup), and writes
    backend-owned future changes using the same schema.
-3. `CODEX_CLAW_HOME` is the only supported alternate backend home, used for
+3. `APP_HOME` is the only supported alternate backend home, used for
    deliberate local isolation such as tests or one-off experiments.
 
 Remote migration path:
 
-- Local `clawd` remains the desktop app's connection and navigation control
+- Local `daemon` remains the desktop app's connection and navigation control
   plane. For a remote team it persists only a local pointer:
   `Team.remoteConnectionId` plus `Team.remoteTeamId`.
 - `Team.id` is the local pointer id. `Team.remoteTeamId` is foreign state owned
-  by the remote `clawd`; it must never be used for local team membership,
+  by the remote `daemon`; it must never be used for local team membership,
   local active-agent repair, local work-assignment cleanup, or persistence
-  migration. Remote daemons can use ids such as `team-codex-claw`, so
+  migration. Remote daemons can use ids such as `team-example-project`, so
   `remoteTeamId` can legitimately collide with a local team id.
-- The remote `clawd` owns the real remote team composition: agents, active
+- The remote `daemon` owns the real remote team composition: agents, active
   agent, backend sessions, messages, MCP-visible membership, source scanning,
   folder browsing, worktree creation, git status/diff, file previews, provider
   models/skills, conversations, prompts, approvals, steering, interruption,
@@ -1063,7 +1063,7 @@ Remote migration path:
   between local teams; a remote agent remains owned by its remote team. To use
   a different location, create or deploy an agent in that location.
 - `snapshot/get` returns a transcript-free projected client snapshot. Local
-  `clawd` overlays remote team metadata onto local remote-team pointers for the
+  `daemon` overlays remote team metadata onto local remote-team pointers for the
   UI, but it does not transfer conversation messages through synchronization
   snapshots or persist remote agents as local proxy agents.
 - Remote backend events are filtered through the same ownership boundary:
@@ -1072,29 +1072,29 @@ Remote migration path:
 - Generic location-scoped RPC handlers resolve an internal `BackendLocation`
   and then execute through a `BackendHandle`. Local handles use local
   drivers/state; remote handles forward the same app-owned method to the
-  selected remote `clawd`.
+  selected remote `daemon`.
 - Agent-scoped RPC handlers resolve an internal `AgentLocation` and then use
   the same backend-handle shape. Projected remote agents are found through the
   remote-team pointer and cached remote snapshot, then forwarded to the owning
-  remote `clawd`.
+  remote `daemon`.
 - Closing a remote team is destructive and forwards `team/delete` to the remote
   team before removing the local pointer. Disconnecting a remote team removes
   only the local pointer and leaves the remote team and agents running.
 - The Team dialog can create a new remote team or connect a local pointer to an
   existing remote team. Empty local teams can be edited into either kind of
   remote pointer; teams with agents keep their connection locked.
-- SSH connection settings can update the remote `clawd` source folder through
-  remote `settings/update`; local `clawd` mirrors the path on the connection
+- SSH connection settings can update the remote `daemon` source folder through
+  remote `settings/update`; local `daemon` mirrors the path on the connection
   record for settings UI defaults. Deleting a connection removes only local
   team pointers attached to that connection; remote teams, agents, messages, and
   automations keep running on the SSH host. One empty local fallback team is created
   only when every local team was remote-backed.
 - Automation management is also location-scoped, but independently selected in the
   Automations surface rather than inherited from the active team. The UI shows
-  `Automations > Local|<remote>`, and local `clawd` forwards automation snapshot, CRUD,
+  `Automations > Local|<remote>`, and local `daemon` forwards automation snapshot, CRUD,
   run, history, work-provider repository/item, and history conversation reads
   to the selected remote. Remote snapshots are returned to the UI without
-  replacing local `clawd`'s durable product snapshot.
+  replacing local `daemon`'s durable product snapshot.
 - Cross-location sync is a separate product problem and should not block the
   process extraction.
 
@@ -1115,19 +1115,19 @@ type AgentFolder = {
 };
 ```
 
-The first remote slices now persist SSH connection records in `clawd`, parse
+The first remote slices now persist SSH connection records in `daemon`, parse
 the backend host's `~/.ssh/config`, probe the selected host, install the
-bundled `clawd` script to `~/.codex-claw/clawd.mjs` when missing, and record
+bundled `daemon` script to `~/.korus/daemon.mjs` when missing, and record
 the stdio transport as
-`ssh <host> "node ~/.codex-claw/clawd.mjs connect || exec node ~/.codex-claw/clawd.mjs --stdio"`.
+`ssh <host> "node ~/.korus/daemon.mjs connect || exec node ~/.korus/daemon.mjs --stdio"`.
 The remote `connect` mode bridges SSH stdio to the remote host's
-`~/.codex-claw/clawd.sock` when an externally managed `clawd serve` daemon is
+`~/.korus/daemon.sock` when an externally managed `daemon serve` daemon is
 already running; otherwise the shell fallback keeps the previous one-shot
 `--stdio` behavior. Sync does not install, start, or restart the persistent
 remote daemon.
 Sync mirrors `provider-tokens.json` to the remote, then asks the remote
-`clawd` to run `workProvider/connections/reload`; it does not copy local
-state files. The remote `clawd` hydrates safe work-integration connection
+`daemon` to run `workProvider/connections/reload`; it does not copy local
+state files. The remote `daemon` hydrates safe work-integration connection
 metadata from those tokens during startup and on explicit reload, so remote
 automation management can see GitHub as connected while preserving the remote's own
 teams, agents, and automations.
@@ -1143,7 +1143,7 @@ clients later.
 
 ## Security Model
 
-`clawd` can read source trees, run coding backends, mutate git state, store
+`daemon` can read source trees, run coding backends, mutate git state, store
 tokens, manage MCP tools, and keep agents running. Treat it as a privileged
 local or remote control plane.
 
@@ -1152,23 +1152,23 @@ Rules:
 - No unauthenticated LAN server.
 - Prefer stdio, Unix sockets, named pipes, and SSH before TCP.
 - Bind any local HTTP transport to loopback only.
-- Keep local Unix sockets under a user-private `CODEX_CLAW_HOME` directory.
+- Keep local Unix sockets under a user-private `APP_HOME` directory.
   Add per-user tokens before named pipes, cross-user local access, or any
   network transport.
 - Do not expose raw provider protocols to the renderer or to unauthenticated
   local clients.
-- Keep backend capability checks in `clawd`, not only in renderer UI.
+- Keep backend capability checks in `daemon`, not only in renderer UI.
 - Redact prompts, tokens, OAuth codes, command secrets, and file contents from
   transport logs.
 - Use request timeouts and deterministic error responses so app-server or UI
   clients do not wait forever.
-- Keep the Claw MCP server loopback-only unless a remote-control product
+- Keep the Korus MCP server loopback-only unless a remote-control product
   surface is explicitly designed.
 
 Secret storage needs a real release-grade design decision. Electron
 `safeStorage` is tied to Electron, while a standalone backend should not import
 Electron. The first backend-owned slice is now in place for work integrations:
-`clawd` uses a token-store port backed by an owner-readable JSON file under the
+`daemon` uses a token-store port backed by an owner-readable JSON file under the
 backend state directory. The previous adjacent-key encryption was removed
 because the key lived beside the data and added no security boundary. A
 standalone daemon can later replace that implementation with a native keychain
@@ -1189,7 +1189,7 @@ Work:
 - Move platform-neutral contracts and pure helpers from `src/shared` into
   `core/src`.
 - Add backend core modules under `backend/src` with no `electron` imports.
-- Define a `ClawCore` interface shaped around app-owned requests and events.
+- Define a `AppCore` interface shaped around app-owned requests and events.
 - Move snapshot ownership, backend driver registry, MCP server ownership,
   automation runner/scheduler, source repository scanning, file/git services, and
   work-provider orchestration behind that interface incrementally.
@@ -1197,7 +1197,7 @@ Work:
   backend core.
 - Keep Electron main responsible for dialogs, open-external, app quit, native
   system permission callbacks, window state, and renderer IPC. Keep the
-  product-level system permission and transcription APIs in `clawd`.
+  product-level system permission and transcription APIs in `daemon`.
 
 Tests:
 
@@ -1248,9 +1248,9 @@ Goal: run the backend as a separate local process in development.
 
 Work:
 
-- Add `backend/src/clawd` entrypoint with `--stdio` and `--version`.
+- Add `backend/src/daemon` entrypoint with `--stdio` and `--version`.
 - Add newline-delimited JSON-RPC framing.
-- Add `ClawBackendProcessClient` in Electron main.
+- Add `AppBackendProcessClient` in Electron main.
 - Add startup, health, restart, close, and crash error propagation.
 - In development, spawn the compiled backend with the local Node runtime.
 
@@ -1262,9 +1262,9 @@ Tests:
 
 Commit checkpoints:
 
-- `feat: add clawd stdio entrypoint`
-- `feat: connect electron main to clawd over stdio`
-- `test: cover clawd process lifecycle`
+- `feat: add daemon stdio entrypoint`
+- `feat: connect electron main to daemon over stdio`
+- `test: cover daemon process lifecycle`
 
 ### Phase 4: Package Runtime Spike
 
@@ -1272,7 +1272,7 @@ Goal: decide the packaged local runtime with evidence.
 
 Work:
 
-- Bundle `clawd` into standalone JavaScript.
+- Bundle `daemon` into standalone JavaScript.
 - Spike Node SEA for macOS arm64 first, then the rest of the supported release
   matrix.
 - If SEA is not ready, spike `utilityProcess` as a temporary packaged transport
@@ -1281,16 +1281,16 @@ Work:
 
 Tests:
 
-- `clawd --version` smoke test for the chosen packaged runtime.
+- `daemon --version` smoke test for the chosen packaged runtime.
 - Packaged app starts backend, calls `snapshot/get`, and exits cleanly.
 - If using SEA, verify signing/notarization behavior for the helper binary.
 - If using `utilityProcess`, verify message-port transport and crash handling.
 
 Commit checkpoints:
 
-- `chore: bundle clawd for packaged runtime spike`
-- `feat: package clawd runtime`
-- `test: add packaged clawd smoke test`
+- `chore: bundle daemon for packaged runtime spike`
+- `feat: package daemon runtime`
+- `test: add packaged daemon smoke test`
 
 ### Phase 5: Local Always-On Daemon
 
@@ -1298,14 +1298,14 @@ Goal: let agents and automations keep running when the UI window is closed.
 
 Work:
 
-- Add `clawd serve`. Done for the Unix socket transport.
+- Add `daemon serve`. Done for the Unix socket transport.
 - Add Unix socket and Windows named-pipe transports. Unix socket is done;
   Windows named pipe remains.
 - Add per-user macOS LaunchAgent install/uninstall from Settings > General.
 - Add authenticated local connection handshake.
 - Add reconnect, daemon health, and stale-client cleanup.
-- Local `clawd` is per user for v1, with state and socket under
-  `CODEX_CLAW_HOME` or `~/.codex-claw`.
+- Local `daemon` is per user for v1, with state and socket under
+  `APP_HOME` or `~/.korus`.
 - Add remaining platform startup integrations after protocol stability.
 
 Tests:
@@ -1317,14 +1317,14 @@ Tests:
 
 Commit checkpoints:
 
-- `feat: add local clawd daemon transport`
-- `feat: add macos clawd launchagent installer`
-- `feat: reconnect electron main to clawd`
+- `feat: add local daemon daemon transport`
+- `feat: add macos daemon launchagent installer`
+- `feat: reconnect electron main to daemon`
 - `test: cover daemon auth and replay`
 
 ### Phase 6: Remote SSH Backend
 
-Goal: run `clawd` on another machine without exposing a raw network daemon.
+Goal: run `daemon` on another machine without exposing a raw network daemon.
 
 Work:
 
@@ -1340,7 +1340,7 @@ Work:
   those helpers when the semantics are not genuinely special.
 - Add remote folder browsing and repo selection.
 - Keep native folder picker local-only.
-- Decide how remote hosts get a Node runtime or standalone `clawd` binary; the
+- Decide how remote hosts get a Node runtime or standalone `daemon` binary; the
   first install slice copies bundled JavaScript and expects `node` on the
   remote host.
 
@@ -1354,7 +1354,7 @@ Tests:
 Commit checkpoints:
 
 - `feat: add backend locations`
-- `feat: connect remote clawd over ssh stdio`
+- `feat: connect remote daemon over ssh stdio`
 - `feat: make agent folders location aware`
 
 ## Testing Strategy
@@ -1370,7 +1370,7 @@ Required gates per slice:
   files.
 - `git diff --check` before handoff.
 - Packaged-runtime smoke tests only when packaging behavior changes. Use
-  `CODEX_CLAW_SKIP_SIGNING=1` for normal local package/build verification.
+  `APP_SKIP_SIGNING=1` for normal local package/build verification.
 
 Coverage areas:
 
@@ -1394,11 +1394,11 @@ and diff hygiene checks instead.
   builds too?
 - Is the product willing to enable Electron `RunAsNode`, or should that remain
   permanently disabled?
-- Is macOS x64 part of the supported packaged release matrix for `clawd`?
+- Is macOS x64 part of the supported packaged release matrix for `daemon`?
 - Should local state remain one app-wide backend location, or should we model
   locations before the first daemon lands?
 - Which standalone-daemon credential helper should back the work-integration
-  token-store port when `clawd` is launched without Electron?
+  token-store port when `daemon` is launched without Electron?
 - Should the backend event buffer be in-memory only at first, or persisted so
   UI reconnect after backend restart can replay recent activity?
 
@@ -1406,8 +1406,8 @@ and diff hygiene checks instead.
 
 Start with the workspace reorg, then Phase 1 and Phase 2. The reorg is the
 foundation: root becomes orchestration-only, `electron` stays the desktop
-client, `backend` becomes `clawd`, and `core` becomes the only compile-time
-contract bridge. Once Electron main talks to a `ClawBackendClient` and the
+client, `backend` becomes `daemon`, and `core` becomes the only compile-time
+contract bridge. Once Electron main talks to a `BackendClient` and the
 backend package has no Electron imports, add stdio in Phase 3 and run the
 packaging spike with real evidence.
 

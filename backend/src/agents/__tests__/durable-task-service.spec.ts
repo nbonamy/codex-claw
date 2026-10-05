@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createAgentFromInput } from '@codex-claw/core/agent-manager';
-import type { Agent, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
-import type { DelegatedTask } from '@codex-claw/core/delegated-task';
+import { createAgentFromInput } from '@workspace/core/agent-manager';
+import type { Agent, BackendPublishedEvent, RendererMessage } from '@workspace/core/contracts';
+import type { DelegatedTask } from '@workspace/core/delegated-task';
 import { DurableTaskService } from '../durable-task-service';
 
 const result = { summary: 'Implemented', evidence: ['Focused tests passed'], artifacts: ['src/change.ts'], caveats: ['No physical device check'] };
@@ -239,7 +240,7 @@ describe('durable assignment lifecycle', () => {
     await vi.waitFor(() => expect(f.disk()[0]!.state).toBe('completed'));
     const saved = f.disk();
     saved[0]!.delivery!.state = 'sending';
-    const readHistory = vi.fn(async () => [{ role: 'user', turnId: 'accepted-parent-turn', parts: [{ type: 'text', text: `Claw task results (${saved[0]!.delivery!.id}). Delivered result` }] }] as RendererMessage[]);
+    const readHistory = vi.fn(async () => [{ role: 'user', turnId: 'accepted-parent-turn', parts: [{ type: 'text', text: `${product.name} task results (${saved[0]!.delivery!.id}). Delivered result` }] }] as RendererMessage[]);
     const recovered = fixture(saved, readHistory);
     recovered.parent.backendSession = { kind: 'codex', threadId: 'parent-thread' };
     await recovered.service.recover();

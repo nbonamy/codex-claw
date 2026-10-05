@@ -1,6 +1,6 @@
-import type { AgentBackend, AppSnapshot, SetCodexResourceSharingInput } from '@codex-claw/core/contracts';
-import type { ProviderHomeSettings, ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
-import { backendDisplayName } from '@codex-claw/core/backend-driver';
+import type { AgentBackend, AppSnapshot, SetCodexResourceSharingInput } from '@workspace/core/contracts';
+import type { ProviderHomeSettings, ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 import { createProviderLifecycles, type ProviderLifecycle } from './provider-lifecycle';
 import { localProviderAgents, resetProviderRoster, validateProviderReset } from './provider-roster-reset';
 

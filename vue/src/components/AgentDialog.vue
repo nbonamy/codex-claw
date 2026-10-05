@@ -5,13 +5,13 @@
     :title="title"
     @update:model-value="onVisibilityChanged"
   >
-    <form class="claw-form-dialog" @submit.prevent="submit">
+    <form class="app-form-dialog" @submit.prevent="submit">
       <FormDialogField
         v-if="!isEditing"
         :label="$t('surface.agentDialog.repository')"
         label-for="agent-dialog-repository"
       >
-        <div class="claw-form-dialog__control">
+        <div class="app-form-dialog__control">
           <el-select
             id="agent-dialog-repository"
             v-model="repositoryControlValue"
@@ -38,7 +38,7 @@
         :label="$t('surface.agentDialog.workIn')"
         label-for="agent-dialog-worktree"
       >
-        <div class="claw-form-dialog__control">
+        <div class="app-form-dialog__control">
           <el-select
             id="agent-dialog-worktree"
             v-model="selectedSourceWorktreePath"
@@ -66,7 +66,7 @@
         label-for="agent-dialog-team"
       >
         <div class="agent-dialog__stacked-controls">
-          <div class="claw-form-dialog__control">
+          <div class="app-form-dialog__control">
             <el-select id="agent-dialog-team" v-model="clientNavigationSelectTeamion">
               <el-option
                 v-for="team in teams"
@@ -82,12 +82,12 @@
           </div>
           <div
             v-if="clientNavigationSelectTeamion === newTeamOptionId"
-            class="claw-form-dialog__control claw-form-dialog__input-control"
+            class="app-form-dialog__control app-form-dialog__input-control"
           >
             <input
               id="agent-dialog-new-team"
               v-model="newTeamName"
-              class="claw-form-dialog__text-input"
+              class="app-form-dialog__text-input"
               type="text"
               :aria-label="$t('surface.agentDialog.newTeamName')"
               :placeholder="$t('surface.agentDialog.enterTeamName')"
@@ -100,11 +100,11 @@
         :label="$t('surface.agentDialog.name')"
         label-for="agent-dialog-name"
       >
-        <div class="claw-form-dialog__control claw-form-dialog__input-control">
+        <div class="app-form-dialog__control app-form-dialog__input-control">
           <input
             id="agent-dialog-name"
             v-model="name"
-            class="claw-form-dialog__text-input"
+            class="app-form-dialog__text-input"
             type="text"
             :aria-label="$t('surface.agentDialog.agentName')"
             :placeholder="namePlaceholder"
@@ -145,17 +145,17 @@
       <BackendSelector id="agent-dialog-backend" v-model="backend" :team-id="selectedTeam?.id" :disabled="submitting" />
     </template>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
+      <button class="app-button app-button--tertiary" type="button" @click="close">{{ $t('surface.agentDialog.cancel') }}</button>
       <button
         v-if="isEditing"
-        class="claw-button claw-button--secondary"
+        class="app-button app-button--secondary"
         type="button"
         :aria-busy="submitting"
         :disabled="submitting"
         @click="clearAgentName"
       >{{ $t('surface.agentDialog.clear') }}</button>
       <button
-        class="claw-button claw-button--primary"
+        class="app-button app-button--primary"
         type="button"
         :aria-busy="submitting"
         :disabled="submitting || !canSave"
@@ -170,8 +170,8 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@codex-claw/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@workspace/core/contracts';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import BackendSelector from './BackendSelector.vue';

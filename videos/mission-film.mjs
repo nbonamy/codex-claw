@@ -1,3 +1,5 @@
+import "./product.mjs";
+
 const DURATION = 48;
 const STAGES = ["Requirements", "Tickets", "Implementation", "Review", "Ship"];
 const PROMPT =
@@ -95,7 +97,7 @@ function reviewFinding(priority, title, summary, file, state) {
       : state === "fixing"
         ? "● Fixing"
         : "☑ Selected";
-  return `<article class="finding ${state}" data-finding="${priority}"><div><span class="priority">${state === "fixed" ? "Fixed" : priority}</span><strong>${title}</strong></div><p>${summary}</p><footer><span>codex-claw · ${file}</span><b>${label}</b></footer></article>`;
+  return `<article class="finding ${state}" data-finding="${priority}"><div><span class="priority">${state === "fixed" ? "Fixed" : priority}</span><strong>${title}</strong></div><p>${summary}</p><footer><span>example-project · ${file}</span><b>${label}</b></footer></article>`;
 }
 
 function sceneVariant(scene, local) {
@@ -140,7 +142,7 @@ function sceneContent(scene, variant) {
           variant === "approved"
             ? action("✓ Accepted", true)
             : action("Approve and continue"),
-        artifact: `<div class="artifact-document"><p class="artifact-kicker">Proposed requirements · codex-claw</p><h4>Cloud-based agents</h4><p>Make remote coding sessions feel like part of the same repository workspace.</p><div class="divider"></div><h5>What we’re building</h5><ul><li>Connect a cloud agent endpoint for a team.</li><li>Start a remote session from repository context.</li><li>Show its status and artifacts beside local sessions.</li></ul><h5>Acceptance criteria</h5><ul><li>Reconnect does not create duplicate sessions.</li><li>Offline state is visible and recoverable.</li><li>Existing local sessions behave as before.</li></ul><div class="artifact-note">⊕ &nbsp; Select text to leave an inline comment.</div></div>`,
+        artifact: `<div class="artifact-document"><p class="artifact-kicker">Proposed requirements · example-project</p><h4>Cloud-based agents</h4><p>Make remote coding sessions feel like part of the same repository workspace.</p><div class="divider"></div><h5>What we’re building</h5><ul><li>Connect a cloud agent endpoint for a team.</li><li>Start a remote session from repository context.</li><li>Show its status and artifacts beside local sessions.</li></ul><h5>Acceptance criteria</h5><ul><li>Reconnect does not create duplicate sessions.</li><li>Offline state is visible and recoverable.</li><li>Existing local sessions behave as before.</li></ul><div class="artifact-note">⊕ &nbsp; Select text to leave an inline comment.</div></div>`,
         conversation: `${chatUser("Add support for cloud-based agents.")}${chatAgent("Here’s the Mission brief. I included repository context, reconnect behavior, and the local-session boundary.", "Mission brief ready for review")}`,
         role: "Requirements · shaping requirements",
       };
@@ -151,7 +153,7 @@ function sceneContent(scene, variant) {
           variant === "approved"
             ? action("✓ Accepted", true)
             : action("Approve and continue"),
-        artifact: `<p class="artifact-kicker">3 tickets · codex-claw</p><div class="ticket-grid">${ticket("01", "Connect cloud agent endpoint", "Add connection state and secure session metadata.")}${ticket("02", "Launch repository-bound sessions", "Start and restore remote work from repository context.")}${ticket("03", "Show progress and artifacts", "Surface remote status without changing local sessions.", false)}</div><div class="artifact-note">☷ &nbsp; Review the tickets or ask for changes in chat.</div>`,
+        artifact: `<p class="artifact-kicker">3 tickets · example-project</p><div class="ticket-grid">${ticket("01", "Connect cloud agent endpoint", "Add connection state and secure session metadata.")}${ticket("02", "Launch repository-bound sessions", "Start and restore remote work from repository context.")}${ticket("03", "Show progress and artifacts", "Surface remote status without changing local sessions.", false)}</div><div class="artifact-note">☷ &nbsp; Review the tickets or ask for changes in chat.</div>`,
         conversation: `${chatAgent("The brief is now an ordered backlog: connection, repository sessions, then visible progress and artifacts.", "3 tickets drafted")}${chatUser("Looks good. Protect the existing local flow.")}`,
         role: "Tickets · shaping tickets",
       };
@@ -176,9 +178,9 @@ function sceneContent(scene, variant) {
         action: complete
           ? action("Continue to Review")
           : `<span class="working-action">● &nbsp; Building ${activeTicket} of 3</span>`,
-        artifact: `<div class="implementation-summary"><div><strong>Execution</strong><span>${completeCount} of 3 tickets complete</span></div><div class="meter"><i id="implementation-progress-fill"></i></div></div><section class="repo-lane"><header><b>▣</b><strong>codex-claw</strong><span>⑂ mission/cloud-agents</span></header>${buildRow("01", "Connect cloud agent endpoint", status(1))}${buildRow("02", "Launch repository-bound sessions", status(2))}${buildRow("03", "Show progress and artifacts", status(3))}</section><div class="artifact-note">⑂ &nbsp; Dedicated worktree · mission/cloud-agents</div>`,
+        artifact: `<div class="implementation-summary"><div><strong>Execution</strong><span>${completeCount} of 3 tickets complete</span></div><div class="meter"><i id="implementation-progress-fill"></i></div></div><section class="repo-lane"><header><b>▣</b><strong>example-project</strong><span>⑂ mission/cloud-agents</span></header>${buildRow("01", "Connect cloud agent endpoint", status(1))}${buildRow("02", "Launch repository-bound sessions", status(2))}${buildRow("03", "Show progress and artifacts", status(3))}</section><div class="artifact-note">⑂ &nbsp; Dedicated worktree · mission/cloud-agents</div>`,
         conversation: `${chatAgent(complete ? "All three tickets are implemented. The focused tests pass; the changes are ready for Review." : variant === "ticket3" ? "Repository sessions are ready. I’m wiring status and artifacts into the workspace." : variant === "ticket2" ? "The endpoint connection is ready. Next I’m starting sessions from repository context." : "I’m building the cloud connection in the Mission worktree.", complete ? "Focused tests passed" : `Building ticket ${activeTicket} of 3`)}`,
-        role: "Builder · codex-claw",
+        role: "Builder · example-project",
       };
     }
     case "review": {
@@ -231,7 +233,7 @@ function sceneContent(scene, variant) {
       return {
         heading: "Repository delivery",
         action: "",
-        artifact: `<div class="ship-summary"><span>0 of 1 repositories delivered</span><div class="meter"><i></i></div></div><article class="ship-card"><header><span>⑂</span><div><strong>codex-claw</strong><small>mission/cloud-agents</small></div><em>Ready to ship</em></header><p>Commit the reviewed work, then create a pull request.</p><div class="ship-actions"><span>Open worktree</span><span>Create pull request →</span></div></article>`,
+        artifact: `<div class="ship-summary"><span>0 of 1 repositories delivered</span><div class="meter"><i></i></div></div><article class="ship-card"><header><span>⑂</span><div><strong>example-project</strong><small>mission/cloud-agents</small></div><em>Ready to ship</em></header><p>Commit the reviewed work, then create a pull request.</p><div class="ship-actions"><span>Open worktree</span><span>Create pull request →</span></div></article>`,
         conversation: `${chatAgent("The reviewed branch is ready. Create a pull request when you’re ready to hand it off.", "Review approved")}`,
         role: "Ship · repository handoff",
       };
@@ -455,7 +457,7 @@ export function createFilm(document, browserWindow = document.defaultView) {
     $("#artifact-body").innerHTML = content.artifact;
     $("#conversation-body").innerHTML = content.conversation;
     $("#conversation-name").textContent =
-      scene.name === "implementation" ? "codex-claw" : "Mission lead";
+      scene.name === "implementation" ? "example-project" : "Mission lead";
     $("#conversation-role").textContent = content.role;
     $("#film-footer-stage").textContent =
       `MISSION / ${STAGES[scene.stage].toUpperCase()}`;

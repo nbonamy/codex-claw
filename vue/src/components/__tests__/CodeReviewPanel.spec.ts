@@ -2,8 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { computed } from 'vue';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, AgentGitStatus, AppSnapshot } from '@codex-claw/core/contracts';
-import type { CodeReviewFinding, CodeReviewSession } from '@codex-claw/core/code-review';
+import type { Agent, AgentGitStatus, AppSnapshot } from '@workspace/core/contracts';
+import type { CodeReviewFinding, CodeReviewSession } from '@workspace/core/code-review';
 import { i18n } from '../../i18n';
 import CodeReviewPanel from '../CodeReviewPanel.vue';
 
@@ -95,7 +95,7 @@ describe('CodeReviewPanel', () => {
 
   it('offers branch scope when available and can review it in the current thread', async () => {
     const gitStatus: AgentGitStatus = {
-      folder: '/repo', repository: 'claw', branch: 'feature/review-setup',
+      folder: '/repo', repository: 'app', branch: 'feature/review-setup',
       ahead: 2, behind: 0, changedFiles: 3, addedLines: 24, removedLines: 4,
       hasUntracked: false, state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
       diffCatalog: {
@@ -130,7 +130,7 @@ describe('CodeReviewPanel', () => {
 
   it('defaults to the branch when there are commits but no uncommitted changes', async () => {
     const gitStatus: AgentGitStatus = {
-      folder: '/repo', repository: 'claw', branch: 'feature/review-setup',
+      folder: '/repo', repository: 'app', branch: 'feature/review-setup',
       ahead: 1, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
       hasUntracked: false, state: 'clean', updatedAt: '2026-09-19T10:00:00.000Z',
       diffCatalog: {
@@ -163,7 +163,7 @@ describe('CodeReviewPanel', () => {
 
   it('keeps unavailable branch and current-thread choices visible but disabled', () => {
     const gitStatus: AgentGitStatus = {
-      folder: '/repo', repository: 'claw', branch: 'feature/review-setup',
+      folder: '/repo', repository: 'app', branch: 'feature/review-setup',
       ahead: 0, behind: 0, changedFiles: 1, addedLines: 3, removedLines: 0,
       hasUntracked: false, state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
       diffCatalog: {
@@ -187,7 +187,7 @@ describe('CodeReviewPanel', () => {
 
   it('shows nothing to review when the working tree and branch are clean', () => {
     const gitStatus: AgentGitStatus = {
-      folder: '/repo', repository: 'claw', branch: 'main',
+      folder: '/repo', repository: 'app', branch: 'main',
       ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0,
       hasUntracked: false, state: 'clean', updatedAt: '2026-09-19T10:00:00.000Z',
       diffCatalog: {
@@ -320,7 +320,7 @@ describe('CodeReviewPanel', () => {
     await wrapper.setProps({ decideFinding: vi.fn().mockReturnValue(pendingDecision) });
 
     const findingCards = wrapper.findAll('.review-finding');
-    const footerAction = wrapper.get('.code-review-panel__footer .claw-button--primary');
+    const footerAction = wrapper.get('.code-review-panel__footer .app-button--primary');
     const secondaryClarify = findingCards[1]!.get('.review-finding__quick-action');
     await findingCards[0]!.get('.review-finding__selection').trigger('click');
 
@@ -389,7 +389,7 @@ describe('CodeReviewPanel', () => {
   it('submits selected findings through one remediation action without assignment', async () => {
     const selected = finding({ decision: { state: 'selected', decidedAt: 'now' } });
     const { wrapper, actions } = mountPanel(session([selected]));
-    const action = wrapper.get('.code-review-panel__footer .claw-button--primary');
+    const action = wrapper.get('.code-review-panel__footer .app-button--primary');
 
     expect(wrapper.find('.review-finding__assignment').exists()).toBe(false);
     expect(action.text()).toBe('Remediate selected findings');

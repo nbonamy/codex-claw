@@ -1,13 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import App from '../App.vue';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { installBackendFixture } from '../test/backend-fixture';
 import { codexConversationSnapshot } from '../test/codex-conversation-fixtures';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { approvalAgentRequest } from '@codex-claw/core/agent-request';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { approvalAgentRequest } from '@workspace/core/agent-request';
+import { clearFirstRunOnboardingStage } from '../onboarding-session';
 
-afterEach(() => { delete window.codexClaw; });
+beforeEach(clearFirstRunOnboardingStage);
+afterEach(() => { delete window.app; });
 
 describe('Unified backend → mounted application', () => {
   it('handles app-owned thread flag execution, dismissal, and review routing through the client seam', async () => {
@@ -116,6 +118,7 @@ describe('Unified backend → mounted application', () => {
 
   it('shows a normalized approval and removes it when the backend cancels the request', async () => {
     const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
     const agent = snapshot.agents[0]!;
     agent.backend = 'claude';
     agent.backendSession = undefined;
@@ -126,11 +129,11 @@ describe('Unified backend → mounted application', () => {
     const request = approvalAgentRequest({ id: 'permission', kind: 'permissions', conversationId: 'session', turnId: 'turn', itemId: 'item', title: 'Allow test workspace access', requestedPermissions: [{ kind: 'filesystem', access: 'write', path: '/tmp/project' }], allowedScopes: ['once'], canDeny: true });
     emit({ type: 'agentRequest.created', backend: 'claude', agentId: agent.id, payload: { request } });
     await flushPromises();
-    expect(wrapper.get('.codex-approval-prompt').text()).toContain('Allow test workspace access');
+    expect(wrapper.findAll('[role="status"]').some(element => element.text().includes('Allow test workspace access'))).toBe(true);
     emit({ type: 'agentRequest.resolved', backend: 'claude', agentId: agent.id, payload: { id: request.id, outcome: { kind: 'cancelled' } } });
     emit({ type: 'agent.statusChanged', agentId: agent.id, payload: { type: 'working' } });
     await flushPromises();
-    expect(wrapper.find('.codex-approval-prompt').exists()).toBe(false);
+    expect(wrapper.findAll('[role="status"]').some(element => element.text().includes('Allow test workspace access'))).toBe(false);
     expect(api.respondToClientRequest).not.toHaveBeenCalled();
   });
 

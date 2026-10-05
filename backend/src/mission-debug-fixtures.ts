@@ -1,6 +1,6 @@
-import type { Agent, AppSnapshot } from '@codex-claw/core/contracts';
-import { featureStages, type Mission, type MissionArtifacts, type MissionReviewDebugState, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
-import type { MissionRun } from '@codex-claw/core/mission-execution';
+import type { Agent, AppSnapshot } from '@workspace/core/contracts';
+import { featureStages, type Mission, type MissionArtifacts, type MissionReviewDebugState, type MissionStage, type MissionTicket } from '@workspace/core/missions';
+import type { MissionRun } from '@workspace/core/mission-execution';
 
 export function applyMissionDebugFixture(snapshot: AppSnapshot, missionId: string, stage: MissionStage, now = new Date().toISOString(), reviewState: MissionReviewDebugState = 'identified'): Mission {
   const mission = snapshot.missions?.find(candidate => candidate.id === missionId);

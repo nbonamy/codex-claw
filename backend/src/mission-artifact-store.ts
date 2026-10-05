@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { featureStages, type MissionStage } from '@codex-claw/core/missions';
+import { featureStages, type MissionStage } from '@workspace/core/missions';
 
 export type MissionArtifactStorage = {
   read(missionId: string, stage: MissionStage): Promise<string>;

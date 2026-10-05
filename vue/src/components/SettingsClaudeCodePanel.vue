@@ -13,7 +13,7 @@
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
 import SettingsEngineSetupRow from './SettingsEngineSetupRow.vue';
-import type { ProviderAuthentication, ProviderHomeSettings } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderAuthentication, ProviderHomeSettings } from '@workspace/core/contracts/provider-setup';
 
 withDefaults(defineProps<{ connected?: boolean; enabled?: boolean; authentication?: ProviderAuthentication; home?: ProviderHomeSettings; setEnabled?: (enabled: boolean) => unknown; busy?: boolean; error?: string | null }>(), { enabled: true });
 const emit = defineEmits<{ connect: []; disconnect: []; customize: [] }>();

@@ -91,9 +91,9 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { IconArrowLeft, IconArrowRight, IconCamera, IconCirclePlus, IconCrop, IconDeviceMobile, IconDotsVertical, IconMinus, IconPlus, IconRefresh, IconRotateClockwise, IconX, IconZoom } from '@tabler/icons-vue';
-import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type MainToRendererEvent } from '@codex-claw/core/contracts';
-import { browserGuestPartition } from '@codex-claw/core/browser-guest';
-import { clawClientPlatform, codexClawApi } from '../platform-api';
+import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type MainToRendererEvent } from '@workspace/core/contracts';
+import { browserGuestPartition } from '@workspace/core/browser-guest';
+import { appClientPlatform, appApi } from '../platform-api';
 import { ArrowUpRightIcon } from '../shared/icons/app-icons';
 import AnnotationSendButton from './AnnotationSendButton.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
@@ -174,7 +174,7 @@ watch(() => state.value.url, (url) => emit('url-change', url), { immediate: true
 
 onMounted(async () => {
   const initialRequestId = props.openRequestId;
-  unsubscribe = codexClawApi?.onEvent(handleEvent) ?? null;
+  unsubscribe = appApi?.onEvent(handleEvent) ?? null;
   resizeObserver = new ResizeObserver(() => {
     updateResponsiveDimensions();
     void syncBounds();
@@ -187,7 +187,7 @@ onMounted(async () => {
   try {
     const initialState = await openInitialContent();
     browserReady = true;
-    if (!props.visible) await codexClawApi?.browserSetVisible(props.agentId, props.browserId, false);
+    if (!props.visible) await appApi?.browserSetVisible(props.agentId, props.browserId, false);
     if (props.openRequestId !== initialRequestId) {
       if (props.visualization || !props.initialUrl) await runNavigation(openInitialContent);
       else {
@@ -217,12 +217,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleEscape);
   guestElement?.remove();
   guestElement = null;
-  void codexClawApi?.browserClose(props.agentId, props.browserId);
+  void appApi?.browserClose(props.agentId, props.browserId);
 });
 
 watch(() => props.visible, async (visible) => {
-  if (!codexClawApi || !browserReady) return;
-  await codexClawApi.browserSetVisible(props.agentId, props.browserId, visible);
+  if (!appApi || !browserReady) return;
+  await appApi.browserSetVisible(props.agentId, props.browserId, visible);
   if (visible) {
     await nextTick();
     await syncBounds();
@@ -258,7 +258,7 @@ async function openInitialContent(): Promise<BrowserState> {
 }
 
 async function ensureGuest(): Promise<number> {
-  if (clawClientPlatform !== 'desktop') throw new Error(translate('surface.browserPanel.browserIsUnavailable'));
+  if (appClientPlatform !== 'desktop') throw new Error(translate('surface.browserPanel.browserIsUnavailable'));
   const partition = browserGuestPartition(props.agentId, Boolean(props.visualization));
   if (guestElement && guestPartition === partition && guestWebContentsId != null) return guestWebContentsId;
   guestElement?.remove();
@@ -544,7 +544,7 @@ async function syncBounds(): Promise<void> {
     height: Math.max(0, Math.min(rect.bottom, viewportRect.bottom) - y),
   };
   if (deviceToolbarVisible.value) bounds.contentOffset = { x: x - rect.left, y: y - rect.top };
-  await codexClawApi?.browserSetBounds(props.agentId, props.browserId, bounds);
+  await appApi?.browserSetBounds(props.agentId, props.browserId, bounds);
 }
 
 function syncBoundsAfterWindowResize(): void {
@@ -575,8 +575,8 @@ async function sendAnnotations(): Promise<void> {
 }
 
 function requireBrowserApi() {
-  if (!codexClawApi) throw new Error(translate('surface.browserPanel.browserIsUnavailable'));
-  return codexClawApi;
+  if (!appApi) throw new Error(translate('surface.browserPanel.browserIsUnavailable'));
+  return appApi;
 }
 
 function annotationBatchPrompt(annotations: BrowserAnnotation[]): string {

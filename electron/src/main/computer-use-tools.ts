@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const helperAppName = 'Codex Claw Computer Use.app';
+const helperAppName = `${product.name} Computer Use.app`;
 const helperExecutableName = 'computer-use-pilot';
 const timeoutMs = 30_000;
 export const computerUseSessionTimeoutMs = 30_000;
@@ -153,7 +154,7 @@ export function isComputerUseCommand(value: unknown): value is ComputerUseComman
 function resolveComputerUsePilotPath(options: ComputerUseOptions): string | null {
   const candidates = [
     options.pilotPath,
-    process.env.CODEX_CLAW_COMPUTER_USE_PILOT_PATH,
+    process.env.APP_COMPUTER_USE_PILOT_PATH,
     options.isPackaged
       ? path.join(options.resourcesPath, helperAppName, 'Contents', 'MacOS', helperExecutableName)
       : undefined,

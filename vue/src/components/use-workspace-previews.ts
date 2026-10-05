@@ -6,7 +6,7 @@ import type {
   ConversationFileLink,
   SidePanelMarkdownRequest,
   SidePanelRequest,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { languageForFilePath } from '@codex-app-sdk/vue';
 import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';
@@ -25,7 +25,7 @@ export type WorkspacePreviewOptions = {
   closeTab: (agentId: string, tab: RightWorkspaceTab) => void;
   currentAgent: () => Agent | null;
   getSnapshot: () => AppSnapshot;
-  getAgentGitDiff: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
+  getAgentGitDiff: (agentId: string, target?: import('@workspace/core/contracts').AgentGitDiffTarget) => Promise<import('@workspace/core/contracts').AgentGitDiff>;
   openTab: (tab: RightWorkspaceTab, agentId?: string) => void;
   previewAgentFile: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
   downloadAgentFile: (agentId: string, filePath: string) => Promise<void>;
@@ -178,7 +178,7 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
     }
   }
 
-  async function openAgentGitDiff(agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<void> {
+  async function openAgentGitDiff(agentId: string, target?: import('@workspace/core/contracts').AgentGitDiffTarget): Promise<void> {
     const agent = agentForId(agentId);
     if (!agent?.folder) return;
 
@@ -293,7 +293,7 @@ function gitReviewPanel(
   folder: string,
   state: 'idle' | 'loading' | 'error',
   error: string | null,
-  target?: import('@codex-claw/core/contracts').AgentGitDiffTarget,
+  target?: import('@workspace/core/contracts').AgentGitDiffTarget,
 ): SidePanelGitDiffState {
   return {
     kind: 'gitDiff',

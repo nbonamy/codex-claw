@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import { mkdir, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { claudeTranscriptGoal, claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../transcript-history-adapter';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 
 describe('native Claude goal history', () => {
   it('distinguishes an active goal, native completion, explicit clear, and sidechain records', () => {
@@ -69,7 +70,7 @@ describe('claudeTranscriptToRendererMessages', () => {
         timestamp: '2026-06-06T22:33:43.200Z',
         message: {
           role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: '# Codex Claw' }],
+          content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: `# ${product.name}` }],
         },
       }),
       JSON.stringify({ type: 'last-prompt', lastPrompt: 'ignored' }),
@@ -111,8 +112,8 @@ describe('claudeTranscriptToRendererMessages', () => {
               path: '/workspace/project/README.md',
               cwd: '/workspace/project',
             },
-            output: '# Codex Claw',
-            body: '# Codex Claw',
+            output: `# ${product.name}`,
+            body: `# ${product.name}`,
             metadata: {
               provider: 'claude',
               itemType: 'tool_use',
@@ -255,7 +256,7 @@ describe('claudeTranscriptSettings', () => {
 
 describe('loadClaudeTranscriptHistory', () => {
   it.each(['/Users/nbonamy/src/id8', '/workspace/project.with_underscore', null])('loads a persisted Claude session with folder %s', async (folder) => {
-    const projectsRoot = path.join(tmpdir(), `codex-claw-claude-history-${Date.now()}-${folder ? 'project' : 'chat'}`);
+    const projectsRoot = path.join(tmpdir(), `agent-workspace-claude-history-${Date.now()}-${folder ? 'project' : 'chat'}`);
     const projectDirectory = path.join(projectsRoot, (folder ?? homedir()).replace(/[^a-zA-Z0-9]/g, '-'));
     await mkdir(projectDirectory, { recursive: true });
     await writeFile(path.join(projectDirectory, 'session-1.jsonl'), [
@@ -314,7 +315,7 @@ describe('loadClaudeTranscriptHistory', () => {
 
 describe('listClaudeTranscriptSummaries', () => {
   it('lists Claude project transcripts newest first with user-facing titles', async () => {
-    const projectsRoot = path.join(tmpdir(), `codex-claw-claude-list-${Date.now()}`);
+    const projectsRoot = path.join(tmpdir(), `agent-workspace-claude-list-${Date.now()}`);
     const projectDirectory = path.join(projectsRoot, '-Users-nbonamy-src-id8');
     await mkdir(projectDirectory, { recursive: true });
     await writeFile(path.join(projectDirectory, 'session-old.jsonl'), [

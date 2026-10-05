@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { lstat, mkdir, mkdtemp, readFile, readlink, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -9,9 +10,9 @@ describe('Codex resource sharing', () => {
   let paths: CodexResourceSharingPaths;
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'codex-claw-resource-sharing-'));
+    root = await mkdtemp(path.join(tmpdir(), 'agent-workspace-resource-sharing-'));
     paths = {
-      clawCodexHome: path.join(root, '.codex-claw', 'codex-home'),
+      appCodexHome: path.join(root, product.homeDirectory, 'codex-home'),
       userCodexHome: path.join(root, '.codex'),
     };
   });
@@ -20,18 +21,18 @@ describe('Codex resource sharing', () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it('replaces isolated Claw resources with links to the user Codex home', async () => {
-    await writeFile(path.join(await directory('clawCodexHome', 'skills'), 'claw-only.md'), 'old');
+  it(`replaces isolated ${product.name} resources with links to the user Codex home`, async () => {
+    await writeFile(path.join(await directory('appCodexHome', 'skills'), 'app-only.md'), 'old');
 
     await reconcileCodexResourceSharing(true, paths);
 
     await expectLink('skills');
     await expectLink('plugins');
-    await expect(readFile(path.join(paths.clawCodexHome, 'skills', 'claw-only.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readFile(path.join(paths.appCodexHome, 'skills', 'app-only.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('leaves existing isolated resources untouched and reports a migration', async () => {
-    const existingSkill = path.join(await directory('clawCodexHome', 'skills'), 'claw-only.md');
+    const existingSkill = path.join(await directory('appCodexHome', 'skills'), 'app-only.md');
     await writeFile(existingSkill, 'keep until the user decides');
 
     await initializeCodexResourceSharing(true, paths);
@@ -60,30 +61,30 @@ describe('Codex resource sharing', () => {
 
     await setCodexResourceSharing({ enabled: false, mode: 'fresh' }, paths);
 
-    expect((await lstat(path.join(paths.clawCodexHome, 'skills'))).isDirectory()).toBe(true);
-    expect((await lstat(path.join(paths.clawCodexHome, 'skills'))).isSymbolicLink()).toBe(false);
-    await expect(readFile(path.join(paths.clawCodexHome, 'skills', 'shared.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    expect((await lstat(path.join(paths.appCodexHome, 'skills'))).isDirectory()).toBe(true);
+    expect((await lstat(path.join(paths.appCodexHome, 'skills'))).isSymbolicLink()).toBe(false);
+    await expect(readFile(path.join(paths.appCodexHome, 'skills', 'shared.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     expect(await readFile(path.join(paths.userCodexHome, 'skills', 'shared.md'), 'utf8')).toBe('shared');
   });
 
-  it('copies user skills and plugins into isolated Claw directories', async () => {
+  it(`copies user skills and plugins into isolated ${product.name} directories`, async () => {
     await writeFile(path.join(await directory('userCodexHome', 'skills'), 'skill.md'), 'skill');
     await writeFile(path.join(await directory('userCodexHome', 'plugins'), 'plugin.json'), 'plugin');
     await reconcileCodexResourceSharing(true, paths);
 
     await setCodexResourceSharing({ enabled: false, mode: 'copy' }, paths);
 
-    expect(await readFile(path.join(paths.clawCodexHome, 'skills', 'skill.md'), 'utf8')).toBe('skill');
-    expect(await readFile(path.join(paths.clawCodexHome, 'plugins', 'plugin.json'), 'utf8')).toBe('plugin');
-    expect((await lstat(path.join(paths.clawCodexHome, 'skills'))).isSymbolicLink()).toBe(false);
+    expect(await readFile(path.join(paths.appCodexHome, 'skills', 'skill.md'), 'utf8')).toBe('skill');
+    expect(await readFile(path.join(paths.appCodexHome, 'plugins', 'plugin.json'), 'utf8')).toBe('plugin');
+    expect((await lstat(path.join(paths.appCodexHome, 'skills'))).isSymbolicLink()).toBe(false);
   });
 
   it('preserves existing isolated resources during startup reconciliation', async () => {
-    await writeFile(path.join(await directory('clawCodexHome', 'plugins'), 'claw.json'), 'keep');
+    await writeFile(path.join(await directory('appCodexHome', 'plugins'), 'app.json'), 'keep');
 
     await reconcileCodexResourceSharing(false, paths);
 
-    expect(await readFile(path.join(paths.clawCodexHome, 'plugins', 'claw.json'), 'utf8')).toBe('keep');
+    expect(await readFile(path.join(paths.appCodexHome, 'plugins', 'app.json'), 'utf8')).toBe('keep');
   });
 
   async function directory(home: keyof CodexResourceSharingPaths, name: 'skills' | 'plugins'): Promise<string> {
@@ -93,7 +94,7 @@ describe('Codex resource sharing', () => {
   }
 
   async function expectLink(name: 'skills' | 'plugins'): Promise<void> {
-    const linkPath = path.join(paths.clawCodexHome, name);
+    const linkPath = path.join(paths.appCodexHome, name);
     expect((await lstat(linkPath)).isSymbolicLink()).toBe(true);
     expect(path.resolve(path.dirname(linkPath), await readlink(linkPath))).toBe(path.join(paths.userCodexHome, name));
   }

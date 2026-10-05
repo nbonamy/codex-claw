@@ -1,4 +1,4 @@
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 import type { PersistedAgent } from '../state-persistence';
 
 type Policy = 'persisted' | 'derived' | 'runtime';

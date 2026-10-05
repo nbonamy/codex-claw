@@ -56,8 +56,8 @@ import type {
   Agent,
   SavedPromptDraft,
   ThreadPlan,
-} from '@codex-claw/core/contracts';
-import type { CodeReviewFinding } from '@codex-claw/core/code-review';
+} from '@workspace/core/contracts';
+import type { CodeReviewFinding } from '@workspace/core/code-review';
 import type {
   CodexConversationPaneActions,
   CodexComposerMentionGroup,

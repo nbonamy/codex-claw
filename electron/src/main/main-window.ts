@@ -1,7 +1,7 @@
 import { app, BrowserWindow, globalShortcut, screen, shell, type BrowserWindowConstructorOptions, type Rectangle } from 'electron';
 import { closeSync, fstatSync, mkdirSync, openSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { isBrowserGuestPartition } from '@codex-claw/core/browser-guest';
+import { isBrowserGuestPartition } from '@workspace/core/browser-guest';
 import {
   appCommandFromInput,
   cycleTeamsAccelerator,
@@ -89,7 +89,7 @@ export function createMainWindow(
   return window;
 }
 
-/** Reject every guest except Claw's blank browser host, then lock its privileges. */
+/** Reject every guest except App's blank browser host, then lock its privileges. */
 export function secureBrowserGuestAttachment(
   event: { preventDefault(): void },
   webPreferences: Electron.WebPreferences,

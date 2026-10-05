@@ -4,9 +4,9 @@ import { open } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BrowserAnnotation, BrowserBounds, BrowserState, BrowserViewportBounds } from '@codex-claw/core/contracts';
-import { browserGuestPartition } from '@codex-claw/core/browser-guest';
-export { safePartitionName } from '@codex-claw/core/browser-guest';
+import type { BrowserAnnotation, BrowserBounds, BrowserState, BrowserViewportBounds } from '@workspace/core/contracts';
+import { browserGuestPartition } from '@workspace/core/browser-guest';
+export { safePartitionName } from '@workspace/core/browser-guest';
 
 type BrowserPaneOptions = {
   onAnnotation(annotation: BrowserAnnotation): void;
@@ -320,7 +320,7 @@ export class BrowserPane {
     pane.annotationEnabled = false;
     this.finishAnnotationOverlay(pane, null);
     if (pane.webContents.isDestroyed()) return;
-    await pane.webContents.executeJavaScript('window.__codexClawCancelAnnotation?.()', true).catch(() => undefined);
+    await pane.webContents.executeJavaScript('window.__appCancelAnnotation?.()', true).catch(() => undefined);
   }
 
   private async openAnnotationOverlay(
@@ -606,7 +606,7 @@ function parseAnnotation(value: unknown, url: string): Omit<BrowserAnnotation, '
 
 function annotationCaptureScript(): string {
   return `(() => new Promise((resolve) => {
-    window.__codexClawCancelAnnotation?.();
+    window.__appCancelAnnotation?.();
     const style = document.createElement('style');
     style.textContent = '* { cursor: crosshair !important; }';
     document.documentElement.append(style);
@@ -635,7 +635,7 @@ function annotationCaptureScript(): string {
       document.removeEventListener('mouseup', onUp, true);
       style.remove();
       highlight.remove();
-      delete window.__codexClawCancelAnnotation;
+      delete window.__appCancelAnnotation;
     };
     const finish = (value) => { cleanup(); resolve(value); };
     const showHighlight = (rect) => {
@@ -663,7 +663,7 @@ function annotationCaptureScript(): string {
       const rect = element.getBoundingClientRect();
       finish({ kind: 'element', selector: selectorFor(element), label: (element.getAttribute('aria-label') || element.innerText || element.textContent || element.tagName).trim().slice(0, 160), rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } });
     };
-    window.__codexClawCancelAnnotation = () => finish(null);
+    window.__appCancelAnnotation = () => finish(null);
     document.addEventListener('mousemove', onMove, true);
     document.addEventListener('mousedown', onDown, true);
     document.addEventListener('mouseup', onUp, true);

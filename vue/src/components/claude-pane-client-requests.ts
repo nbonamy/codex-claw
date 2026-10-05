@@ -1,4 +1,4 @@
-import type { ClaudeConversationSnapshot } from '@codex-claw/core/contracts';
+import type { ClaudeConversationSnapshot } from '@workspace/core/contracts';
 import type { CodexSurfaceClientRequest } from '@codex-app-sdk/core/surface';
 
 /** Read-only presentation of Claude's existing normalized permission parts. */

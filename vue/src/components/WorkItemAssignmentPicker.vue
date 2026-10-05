@@ -4,10 +4,10 @@
       <WorktreeReusePrompt :branch="branchName" :path="existingWorktreePath" />
       <footer>
         <BackendSelector v-if="destination === 'new'" v-model="backend" size="small" />
-        <button class="claw-button claw-button--tertiary" type="button" @click="reuseAction = null">
+        <button class="app-button app-button--tertiary" type="button" @click="reuseAction = null">
           {{ t('common.cancel') }}
         </button>
-        <button class="claw-button claw-button--primary" type="button" @click="confirmReuse">
+        <button class="app-button app-button--primary" type="button" @click="confirmReuse">
           {{ t('worktreeReuse.action') }}
         </button>
       </footer>
@@ -80,13 +80,13 @@
 
       <footer>
         <BackendSelector v-if="destination === 'new'" v-model="backend" size="small" :disabled="busy" />
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="!canSubmit" @click="requestCustom">
+        <button class="app-button app-button--tertiary" type="button" :disabled="!canSubmit" @click="requestCustom">
           {{ t('repositoryBacklog.custom') }}
         </button>
-        <button class="claw-button claw-button--secondary" type="button" :disabled="!canSubmit" @click="requestSubmit(secondaryAction)">
+        <button class="app-button app-button--secondary" type="button" :disabled="!canSubmit" @click="requestSubmit(secondaryAction)">
           {{ item.kind === 'pullRequest' ? t('repositoryBacklog.addressFeedback') : t('repositoryBacklog.investigate') }}
         </button>
-        <button class="claw-button claw-button--primary" type="button" :disabled="!canSubmit" @click="requestSubmit(primaryAction)">
+        <button class="app-button app-button--primary" type="button" :disabled="!canSubmit" @click="requestSubmit(primaryAction)">
           {{ item.kind === 'pullRequest' ? t('repositoryBacklog.review') : t('repositoryBacklog.fix') }}
         </button>
       </footer>
@@ -98,12 +98,12 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconAlertTriangle, IconCopy, IconGitBranch, IconGitPullRequest, IconRobotFace } from '@tabler/icons-vue';
-import type { WorkItem } from '@codex-claw/core/contracts';
-import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
+import type { WorkItem } from '@workspace/core/contracts';
+import type { WorkItemAssignmentAction } from '@workspace/core/work-item-prompts';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
-const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend');
+const backend = defineModel<import('@workspace/core/contracts').AgentBackend>('backend');
 useNewAgentBackend(backend, useBackendChoices());
 
 export type WorkItemAssignmentDestination = 'existing' | 'new';
@@ -115,7 +115,7 @@ export type WorkItemAssignmentSession = {
 
 export type WorkItemAssignmentSelection = {
   isCurrent?: () => boolean;
-  backend?: import('@codex-claw/core/contracts').AgentBackend;
+  backend?: import('@workspace/core/contracts').AgentBackend;
   action: WorkItemAssignmentAction;
   agentId?: string;
   destination: WorkItemAssignmentDestination;

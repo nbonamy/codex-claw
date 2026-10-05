@@ -2,8 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { computed } from 'vue';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import type { Agent, WorkBacklogAssignment, WorkItem } from '@workspace/core/contracts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import CockpitWorkInbox from '../CockpitWorkInbox.vue';
 
 describe('CockpitWorkInbox', () => {
@@ -19,7 +19,7 @@ describe('CockpitWorkInbox', () => {
     await wrapper.get('.cockpit-inbox__start-work').trigger('click');
     await flushPromises();
     expect(listSourceRepositories).toHaveBeenCalledWith('remote-one');
-    const fix = wrapper.findAll('.claw-dialog__footer button').find(button => button.text() === 'Fix')!;
+    const fix = wrapper.findAll('.app-dialog__footer button').find(button => button.text() === 'Fix')!;
     await fix.trigger('click');
     expect(startWorkAction).not.toHaveBeenCalled();
     await wrapper.get('[aria-label="Code repository"] select').setValue(repository.path);
@@ -194,9 +194,9 @@ describe('CockpitWorkInbox', () => {
     const clientNavigationSelectTeam = wrapper.findAllComponents({ name: 'ElSelect' }).find(select => select.attributes('aria-label') === 'Team for new agents')!;
     expect(clientNavigationSelectTeam.props('modelValue')).toBe('team-one');
     await clientNavigationSelectTeam.vm.$emit('update:modelValue', 'team-two');
-    await wrapper.get('.claw-dialog__footer .backend-selector select').setValue('claude');
+    await wrapper.get('.app-dialog__footer .backend-selector select').setValue('claude');
 
-    await wrapper.findAll('.claw-dialog__footer button').find((button) => button.text() === 'Investigate')?.trigger('click');
+    await wrapper.findAll('.app-dialog__footer button').find((button) => button.text() === 'Investigate')?.trigger('click');
     expect(startWorkAction).toHaveBeenCalledWith({ action: 'investigate', items: [second], teamId: 'team-two', backend: 'claude' });
   });
 

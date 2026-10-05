@@ -36,9 +36,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitDiff, AgentGitDiffTarget, AgentGitStatus, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import type { Mission, MissionReviewFinding } from '@codex-claw/core/missions';
-import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import type { Agent, AgentGitDiff, AgentGitDiffTarget, AgentGitStatus, OpenInApplicationCatalog } from '@workspace/core/contracts';
+import type { Mission, MissionReviewFinding } from '@workspace/core/missions';
+import type { MissionExecutionInput } from '@workspace/core/mission-execution';
 import MarkdownPanel from './MarkdownPanel.vue';
 import MissionReviewChanges from './MissionReviewChanges.vue';
 import MissionReviewFindings from './MissionReviewFindings.vue';

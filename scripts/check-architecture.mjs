@@ -117,7 +117,7 @@ function forbiddenImport(area, file, specifier) {
   if (
     area === "electron-main" &&
     ([
-      "@codex-claw/backend",
+      "@workspace/backend",
       "@codex-app-sdk/backend",
       "@anthropic-ai/claude-agent-sdk",
     ].some((name) => isPackage(specifier, name)) ||
@@ -127,7 +127,7 @@ function forbiddenImport(area, file, specifier) {
           path.resolve(path.dirname(file), specifier),
         )))
   ) {
-    return "Electron main must use the clawd protocol, not backend implementations";
+    return "Electron main must use the daemon protocol, not backend implementations";
   }
   if (
     area === "preload" &&

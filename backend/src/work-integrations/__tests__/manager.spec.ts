@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, WorkItem, WorkSource } from '@codex-claw/core/contracts';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppSnapshot, WorkItem, WorkSource } from '@workspace/core/contracts';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
 import { WorkIntegrationManager } from '../manager';
 import { MemoryWorkIntegrationTokenStore } from '../memory-token-store';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from '../types';
@@ -239,12 +239,12 @@ describe('WorkIntegrationManager', () => {
 
     await Promise.all([
       manager.listSources('github'),
-      manager.listItems('github', 'nbonamy/codex-claw'),
+      manager.listItems('github', 'nbonamy/agent-workspace'),
     ]);
 
     expect(driver.refreshToken).toHaveBeenCalledOnce();
     expect(driver.listSources).toHaveBeenCalledWith(refreshedToken);
-    expect(driver.listItems).toHaveBeenCalledWith(refreshedToken, 'nbonamy/codex-claw');
+    expect(driver.listItems).toHaveBeenCalledWith(refreshedToken, 'nbonamy/agent-workspace');
     await expect(tokenStore.get('github')).resolves.toStrictEqual(refreshedToken);
   });
 
@@ -381,7 +381,7 @@ describe('WorkIntegrationManager', () => {
     });
 
     await expect(manager.listSources('github')).resolves.toStrictEqual([repository]);
-    await expect(manager.listItems('github', 'nbonamy/codex-claw')).resolves.toStrictEqual([item]);
+    await expect(manager.listItems('github', 'nbonamy/agent-workspace')).resolves.toStrictEqual([item]);
     await expect(manager.listGlobalItems('github', { assignment: 'viewer', cursor: '2' })).resolves.toStrictEqual({
       items: [item],
       totalItems: 1,
@@ -396,7 +396,7 @@ describe('WorkIntegrationManager', () => {
     await manager.configureBacklog({
       provider: 'github',
       configuration: {
-        sourceId: ' nbonamy/codex-claw ',
+        sourceId: ' nbonamy/agent-workspace ',
         assigneeLogin: ' nbonamy ',
         tagName: ' bug ',
       },
@@ -404,7 +404,7 @@ describe('WorkIntegrationManager', () => {
 
     expect(snapshot.workBacklog.providerConfigurations).toStrictEqual({
       github: {
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
         assigneeLogin: 'nbonamy',
         tagName: 'bug',
       },
@@ -414,7 +414,7 @@ describe('WorkIntegrationManager', () => {
     await manager.configureBacklog({
       provider: 'github',
       configuration: {
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
         assigneeLogin: null,
         tagName: null,
       },
@@ -422,7 +422,7 @@ describe('WorkIntegrationManager', () => {
 
     expect(snapshot.workBacklog.providerConfigurations).toStrictEqual({
       github: {
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
       },
     });
 
@@ -445,7 +445,7 @@ describe('WorkIntegrationManager', () => {
       accountLabel: 'nbonamy',
     }];
     snapshot.workBacklog.providerConfigurations.github = {
-      sourceId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
       tagName: 'bug',
     };
     const tokenStore = new MemoryWorkIntegrationTokenStore();
@@ -528,11 +528,11 @@ function fakeDriver(input: Partial<{
 function workRepository(): WorkSource {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace',
     owner: 'nbonamy',
-    name: 'codex-claw',
-    fullName: 'nbonamy/codex-claw',
-    url: 'https://github.com/nbonamy/codex-claw',
+    name: 'agent-workspace',
+    fullName: 'nbonamy/agent-workspace',
+    url: 'https://github.com/nbonamy/agent-workspace',
     isPrivate: true,
   };
 }
@@ -540,12 +540,12 @@ function workRepository(): WorkSource {
 function workItem(): WorkItem {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw#12',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace#12',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix cockpit drag target',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     labels: [],
     createdAt: '2026-06-09T12:00:00.000Z',

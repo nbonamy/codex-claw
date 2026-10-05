@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 import { AgentCreationService } from '../agents/agent-creation-service';
 import { AgentHandoffService } from '../agents/agent-handoff-service';
 import { createTestSnapshot } from './server-test-fixtures';

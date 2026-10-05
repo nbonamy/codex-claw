@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { access, copyFile, mkdir, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { SourceWorktree, WorktreeInitializationMode } from '@codex-claw/core/contracts';
+import type { SourceWorktree, WorktreeInitializationMode } from '@workspace/core/contracts';
 import {
   createGitWorktree,
   type GitWorktreeCreateInput,

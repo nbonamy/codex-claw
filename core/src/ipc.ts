@@ -1,4 +1,4 @@
-import type { AppCommand, CodexClawApi, MainToRendererEvent } from './contracts';
+import type { AppCommand, AppApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
   listAgentTasks: 'agent:tasks:list',
@@ -178,19 +178,19 @@ export const ipcChannels = {
   updateStatusChanged: 'app:update-status-changed',
 } as const;
 
-type CodexClawIpcRequestApi = Omit<CodexClawApi, 'onAppCommand' | 'onEvent' | 'onUpdateStatusChanged'>;
+type AppIpcRequestApi = Omit<AppApi, 'onAppCommand' | 'onEvent' | 'onUpdateStatusChanged'>;
 
 type IpcRequestFor<Method> = Method extends (...args: infer Arguments) => infer Result
   ? { args: Arguments; result: Awaited<Result> }
   : never;
 
-export type CodexClawIpcRequests = {
-  [Name in keyof CodexClawIpcRequestApi as Name extends keyof typeof ipcChannels
+export type AppIpcRequests = {
+  [Name in keyof AppIpcRequestApi as Name extends keyof typeof ipcChannels
     ? (typeof ipcChannels)[Name]
-    : never]: IpcRequestFor<CodexClawIpcRequestApi[Name]>;
+    : never]: IpcRequestFor<AppIpcRequestApi[Name]>;
 };
 
-export type CodexClawIpcEvents = {
+export type AppIpcEvents = {
   [ipcChannels.event]: MainToRendererEvent;
   [ipcChannels.appCommand]: AppCommand;
   [ipcChannels.updateStatusChanged]: import('./contracts').DesktopUpdateStatus;

@@ -10,7 +10,7 @@
       <SettingsRow
         as="label"
         :title="$t('surface.settingsAppearancePanel.mode')"
-        :description="$t('surface.settingsAppearancePanel.chooseHowCodexClawFollowsLightAndDarkAppearances')"
+        :description="$t('surface.settingsAppearancePanel.chooseHowAppFollowsLightAndDarkAppearances')"
       >
         <template #control>
           <el-segmented
@@ -92,7 +92,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed } from 'vue';
-import type { AppThemeSettings, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import type { AppThemeSettings, UpdateSettingsInput } from '@workspace/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
@@ -124,7 +124,7 @@ const diffPreview = [
   '@@ -29,5 +29,5 @@',
   ' export const appearance = {',
   "-  accent: 'blue',",
-  "+  accent: 'claw',",
+  "+  accent: 'app',",
   "   mode: 'system',",
   ' };',
 ].join('\n');

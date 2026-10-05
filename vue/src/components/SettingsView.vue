@@ -66,7 +66,7 @@
           :update-settings="updateSettings"
         />
         <SettingsAppshotsPanel
-          v-else-if="activeTab === 'appshots' && clawHostCapabilities.appshots"
+          v-else-if="activeTab === 'appshots' && appHostCapabilities.appshots"
           :settings="generalSettings.appshots"
           :update-settings="updateSettings"
         />
@@ -116,8 +116,8 @@
 </template>
 
 <script setup lang="ts">
-import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, ClawdDaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
-import { defaultGeneralSettings, defaultSourceFolderState } from '@codex-claw/core/settings';
+import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, DaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@workspace/core/contracts';
+import { defaultGeneralSettings, defaultSourceFolderState } from '@workspace/core/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsAppshotsPanel from './SettingsAppshotsPanel.vue';
 import SettingsClaudeCodePanel from './SettingsClaudeCodePanel.vue';
@@ -130,8 +130,8 @@ import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
 import SettingsPluginsPanel from './SettingsPluginsPanel.vue';
 import SettingsSidebar from './SettingsSidebar.vue';
 import type { SettingsTab } from './settings-tabs';
-import type { ProviderConnection } from '@codex-claw/core/contracts/provider-setup';
-import { clawHostCapabilities } from '../platform-api';
+import type { ProviderConnection } from '@workspace/core/contracts/provider-setup';
+import { appHostCapabilities } from '../platform-api';
 import appPackage from '../../package.json';
 
 const appVersion = appPackage.version;
@@ -155,7 +155,7 @@ withDefaults(defineProps<{
   settings: AppThemeSettings;
   generalSettings?: AppGeneralSettings;
   sourceFolder?: SourceFolderState;
-  daemonStatus?: ClawdDaemonStatus | null;
+  daemonStatus?: DaemonStatus | null;
   daemonStatusError?: string | null;
   chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;

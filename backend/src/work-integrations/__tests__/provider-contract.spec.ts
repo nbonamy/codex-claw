@@ -1,12 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { GlobalWorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
-import { createAutomationInSnapshot } from '@codex-claw/core/automation-manager';
-import { mockWorkProvider as provider, mockWorkSource, mockWorkItem, registerMockWorkProvider } from '@codex-claw/core/__tests__/fixtures/mock-work-provider';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { workBacklogAssignmentFromWorkItem } from '@codex-claw/core/work-assignments';
-import { workItemAssignmentPrompt, workItemBranchName } from '@codex-claw/core/work-item-prompts';
-import { ClawBackendServer } from '../../server';
+import type { GlobalWorkItemQuery, WorkProviderKind } from '@workspace/core/contracts';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
+import { createAutomationInSnapshot } from '@workspace/core/automation-manager';
+import { mockWorkProvider as provider, mockWorkSource, mockWorkItem, registerMockWorkProvider } from '@workspace/core/__tests__/fixtures/mock-work-provider';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { workBacklogAssignmentFromWorkItem } from '@workspace/core/work-assignments';
+import { workItemAssignmentPrompt, workItemBranchName } from '@workspace/core/work-item-prompts';
+import { AppBackendServer } from '../../server';
 import { WorkIntegrationManager } from '../manager';
 import type { WorkProviderDriver } from '../types';
 import { AutomationRunner } from '../../automations/runner';
@@ -33,7 +33,7 @@ it('routes a registered third source with opaque IDs through the protocol, assig
     drivers: [driver], getSnapshot: () => snapshot, saveSnapshot: async () => {},
     tokenStore: { canStoreTokens: () => true, get: getToken, set: async () => {}, delete: async () => {} },
   });
-  const server = new ClawBackendServer({ version: 'test', snapshot, workIntegrations: manager });
+  const server = new AppBackendServer({ version: 'test', snapshot, workIntegrations: manager });
   try {
     expect(await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'workProvider/sources/list', params: { provider } })).toMatchObject({ result: [source] });
     expect(await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'workProvider/items/list', params: { provider, sourceId: source.id, query: { state: 'all' } } })).toMatchObject({ result: [item] });

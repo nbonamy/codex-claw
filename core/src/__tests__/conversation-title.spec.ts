@@ -1,9 +1,10 @@
+import { product } from '../product';
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../contracts';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '../conversation-title';
 
 describe('conversation titles', () => {
-  it('uses the Claw agent name', () => {
+  it(`uses the ${product.name} agent name`, () => {
     expect(formatConversationTitle(agent())).toBe('Dina');
   });
 
@@ -47,10 +48,10 @@ describe('conversation titles', () => {
 function agent(): Agent {
   return {
     id: 'agent-dina',
-    teamId: 'team-claw',
+    teamId: 'team-app',
     name: 'Dina',
     avatar: 'DI',
-    folder: '/tmp/claw',
+    folder: '/tmp/app',
     backend: 'codex',
     backendDefaults: { kind: 'codex' },
     status: { type: 'idle' },

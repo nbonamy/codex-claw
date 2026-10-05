@@ -1,7 +1,7 @@
-import type { Agent, AppSnapshot, MainToRendererEvent } from '@codex-claw/core/contracts';
-import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
+import type { Agent, AppSnapshot, MainToRendererEvent } from '@workspace/core/contracts';
+import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
 import { computed, ref } from 'vue';
-import { clawHostCapabilities, codexClawApi } from './platform-api';
+import { appHostCapabilities, appApi } from './platform-api';
 
 export function createAgentUnreadState(options: { getSnapshot: () => AppSnapshot }) {
   const agentIds = ref(new Set<string>());
@@ -82,8 +82,8 @@ export function createAgentUnreadState(options: { getSnapshot: () => AppSnapshot
   }
 
   function syncDockBadge(): void {
-    if (clawHostCapabilities.dockBadge) {
-      void codexClawApi?.setDockBadgeCount?.(agentIds.value.size).catch(() => undefined);
+    if (appHostCapabilities.dockBadge) {
+      void appApi?.setDockBadgeCount?.(agentIds.value.size).catch(() => undefined);
     }
   }
 

@@ -1,3 +1,4 @@
+import product from '../core/src/product.json' with { type: 'json' };
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -8,8 +9,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 const DEFAULT_GITHUB_MCP_URL = 'https://api.githubcopilot.com/mcp/';
 
 export function providerTokensFilePath(env = process.env, home = homedir()) {
-  const configuredHome = env.CODEX_CLAW_HOME?.trim();
-  return path.join(configuredHome || path.join(home, '.codex-claw'), 'provider-tokens.json');
+  const configuredHome = env.APP_HOME?.trim();
+  return path.join(configuredHome || path.join(home, `${product.homeDirectory}`), 'provider-tokens.json');
 }
 
 export function githubAccessTokenFromFile(contents) {
@@ -77,7 +78,7 @@ export async function verifyGitHubMcpToken(options = {}) {
 }
 
 function createGitHubMcpConnection({ endpoint, accessToken }) {
-  const client = new Client({ name: 'codex-claw-github-token-probe', version: '1.0.0' });
+  const client = new Client({ name: 'agent-workspace-github-token-probe', version: '1.0.0' });
   const transport = new StreamableHTTPClientTransport(endpoint, {
     requestInit: { headers: githubMcpHeaders(accessToken) },
   });
@@ -92,7 +93,7 @@ async function main() {
   try {
     const result = await verifyGitHubMcpToken();
     const identity = result.login ? ` as ${result.login}` : '';
-    console.log(`GitHub MCP accepted the stored Claw credential${identity}.`);
+    console.log(`GitHub MCP accepted the stored ${product.name} credential${identity}.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`GitHub MCP credential check failed: ${redactGitHubCredentials(message)}`);

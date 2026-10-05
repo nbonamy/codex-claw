@@ -1,4 +1,4 @@
-# Open-source text-to-speech for Codex Claw
+# Open-source text-to-speech for Korus
 
 Research snapshot: 2026-09-02. This memo uses project-owned repositories,
 documentation, model cards, licenses, and release artifacts. Performance numbers
@@ -147,7 +147,7 @@ desktop app in 2026:
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **MeloTTS**         | CPU real-time and multilingual, but its official English checkpoint is about 208 MB and the project/model line has not materially advanced since 2024. Its Python/PyTorch frontend is less attractive than current ONNX/CoreML paths. | [repository](https://github.com/myshell-ai/MeloTTS), [English v3 files](https://huggingface.co/myshell-ai/MeloTTS-English-v3/tree/main)                           |
 | **StyleTTS2**       | Strong research model, but the reference path is research-oriented, English-centric, large, and uses a GPL phonemizer unless replaced. FluidAudio's available CoreML path is about 670 MB and has no streaming.                       | [repository](https://github.com/yl4579/StyleTTS2), [FluidAudio benchmark](https://github.com/FluidInference/FluidAudio/blob/main/Documentation/TTS/Benchmarks.md) |
-| **Coqui XTTS v2**   | The official checkpoint is about 1.86 GB and the Coqui Public Model License restricts use to non-commercial purposes. That is not a redistributable default for Claw.                                                                 | [model files](https://huggingface.co/coqui/XTTS-v2/tree/main), [license](https://huggingface.co/coqui/XTTS-v2/blob/main/LICENSE.txt)                              |
+| **Coqui XTTS v2**   | The official checkpoint is about 1.86 GB and the Coqui Public Model License restricts use to non-commercial purposes. That is not a redistributable default for Korus.                                                                 | [model files](https://huggingface.co/coqui/XTTS-v2/tree/main), [license](https://huggingface.co/coqui/XTTS-v2/blob/main/LICENSE.txt)                              |
 | **Parler-TTS Mini** | Apache-2.0 and supports streamed generation, but Mini is 880M parameters with roughly 3.5 GB of weights; the official model line dates to 2024.                                                                                       | [repository](https://github.com/huggingface/parler-tts), [Mini files/card](https://huggingface.co/parler-tts/parler-tts-mini-v1.1/tree/main)                      |
 | **Fish Speech**     | Capable, but current weights use the Fish Audio Research License; commercial use requires separate written permission. It also belongs to a much larger deployment class.                                                             | [repository and license](https://github.com/fishaudio/fish-speech)                                                                                                |
 | **F5-TTS**          | Code is MIT, but the official pretrained weights are CC-BY-NC because of their training data.                                                                                                                                         | [official inference/license note](https://github.com/SWivid/F5-TTS/blob/main/src/f5_tts/infer/SHARED.md)                                                          |
@@ -210,9 +210,9 @@ above must be handled deliberately.
 [TTS documentation](https://k2-fsa.github.io/sherpa/onnx/tts/index.html),
 [Node addon examples](https://github.com/k2-fsa/sherpa-onnx/blob/master/nodejs-addon-examples/README.md))
 
-## Proposed Codex Claw architecture
+## Proposed Korus architecture
 
-Codex Claw's existing process boundaries point to one design:
+Korus's existing process boundaries point to one design:
 
 ```text
 renderer playback/UI
@@ -223,7 +223,7 @@ Electron desktop adapter ── framed stdio ── signed Swift TTS helper
        │                                      ├─ KittenTTS/ONNX model
        │                                      └─ AVSpeechSynthesizer fallback
        ▼
-app-owned capability / clawd client callback when orchestration needs it
+app-owned capability / daemon client callback when orchestration needs it
 ```
 
 - Keep synthesis out of Vue and out of Electron's main thread. The renderer
@@ -251,7 +251,7 @@ app-owned capability / clawd client callback when orchestration needs it
 ### MCP surface
 
 Expose the product behavior as lifecycle-bound optional acknowledgments on
-`codex_claw.set-status` and `codex_claw.finish_turn`, not as an unrestricted
+`workspace.set-status` and `workspace.finish_turn`, not as an unrestricted
 general-purpose `tts` tool or a second standalone MCP call. The schemas
 communicate the actual intent:
 
@@ -275,7 +275,7 @@ finish_turn({
   default to the selected agent so the computer does not become a room full of
   overlapping voices.
 - Model the optional audio side after the transient celebration path:
-  MCP handling in `clawd`, app-owned client effect, native helper playback, and
+  MCP handling in `daemon`, app-owned client effect, native helper playback, and
   a bounded tool result. The same operation also updates `agent.statusText`.
 
 This aligns with the repository's documented ownership: Electron owns native
@@ -298,7 +298,7 @@ For each engine record:
   synthesis time, peak RSS, and sustained CPU/energy;
 - cancellation latency and whether chunk boundaries are audible;
 - pronunciation of short natural task cues, contractions, names such as Codex
-  Claw and GitHub, and occasional filenames or acronyms;
+  Korus and GitHub, and occasional filenames or acronyms;
 - blind preference and intelligibility across at least 50 representative 2–12
   word utterances;
 - overlap behavior when several agents start or finish close together;

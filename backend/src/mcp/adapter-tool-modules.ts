@@ -2,12 +2,12 @@ import { registerInAppBrowserTools, type InAppBrowserClient } from './browser-to
 import { registerComputerUseTools, type ComputerUseClient } from './computer-use-tools';
 import { registerReviewTools } from './review-tools';
 import type { ReviewToolRegistry } from '../review/review-tool-registry';
-import type { ClawMcpToolModuleProvider } from './tool-modules';
+import type { AppMcpToolModuleProvider } from './tool-modules';
 
 export function createComputerUseToolModuleProvider(
   client: ComputerUseClient | undefined,
   enabled: () => boolean,
-): ClawMcpToolModuleProvider {
+): AppMcpToolModuleProvider {
   return {
     id: 'computer-use',
     resolve: () => client && enabled() ? {
@@ -19,7 +19,7 @@ export function createComputerUseToolModuleProvider(
 
 export function createBrowserToolModuleProvider(
   client: InAppBrowserClient | undefined,
-): ClawMcpToolModuleProvider {
+): AppMcpToolModuleProvider {
   return {
     id: 'in-app-browser',
     resolve: ({ agentId }) => client ? {
@@ -31,7 +31,7 @@ export function createBrowserToolModuleProvider(
 
 export function createReviewToolModuleProvider(
   registry: ReviewToolRegistry | undefined,
-): ClawMcpToolModuleProvider {
+): AppMcpToolModuleProvider {
   return {
     id: 'review',
     resolve: ({ agentId, url }) => {

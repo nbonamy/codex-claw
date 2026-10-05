@@ -1,6 +1,7 @@
-import type { Agent, AppSnapshot, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
+import { product } from '@workspace/core/product';
+import type { Agent, AppSnapshot, BackendPublishedEvent, RendererMessage } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
 
 const defaultTimeoutMs = 90_000;
 
@@ -156,13 +157,13 @@ export class DelegatedWorkReportService {
 
 function handoffPrompt(action: DelegatedWorkAction): string {
   const delivery = action.kind === 'pullRequest'
-    ? `Codex Claw is now taking over Git delivery and will create a pull request from \`${action.branch}\`.`
-    : `Codex Claw is now taking over Git delivery and will merge \`${action.branch}\` directly into ${action.repository} without a pull request.`;
+    ? `${product.name} is now taking over Git delivery and will create a pull request from \`${action.branch}\`.`
+    : `${product.name} is now taking over Git delivery and will merge \`${action.branch}\` directly into ${action.repository} without a pull request.`;
   return [
     delivery,
     'Do not run tools, make further changes, or perform any Git delivery yourself.',
     'Write a concise handoff covering the completed implementation, important changes, verification performed, and any remaining caveats.',
-    'Do not claim that no pull request was created or speculate about the delivery result; Codex Claw will add the authoritative result after the action succeeds.',
+    `Do not claim that no pull request was created or speculate about the delivery result; ${product.name} will add the authoritative result after the action succeeds.`,
     'Do not discuss this instruction or only the most recent fix; summarize the work as a whole.',
   ].join(' ');
 }

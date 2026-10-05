@@ -1,20 +1,21 @@
+import { product } from '@workspace/core/product';
 
 import { translate } from './i18n';
 import { localizedErrorMessage } from './i18n/errors';
 import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import type { PlanReviewResolution } from '@codex-claw/core/plan-review';
-import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow } from '@codex-claw/core/contracts';
-import type { AgentCreationProgress, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
-import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
-import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, ClawdDaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@codex-claw/core/contracts';
-import { selectAgent as selectAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import { selectTeam as selectTeamInSnapshot } from '@codex-claw/core/team-manager';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
-import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
-import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
+import type { PlanReviewResolution } from '@workspace/core/plan-review';
+import type { AgentGitBranchInput, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow } from '@workspace/core/contracts';
+import type { AgentCreationProgress, WorkProviderKind, WorkSource } from '@workspace/core/contracts';
+import type { MissionImplementationStartProgress } from '@workspace/core/mission-execution';
+import type { AddSshConnectionInput, Agent, AgentFileActivity, AgentFilePreviewResult, ApprovalPreset, AppPluginStatus, AppSnapshot, BackendApprovalDecision, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, DaemonStatus, ClientRequestResponse, CodexResourceSharingStatus, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, RendererMessage, RendererSnapshotState, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkItem } from '@workspace/core/contracts';
+import { selectAgent as selectAgentInSnapshot } from '@workspace/core/agent-manager';
+import { selectTeam as selectTeamInSnapshot } from '@workspace/core/team-manager';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import { applyMainEventToSnapshot } from '@workspace/core/snapshot';
+import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { defaultBackendCommands } from '@workspace/core/backend-commands';
+import { approvalPresetFromDefaults } from '@workspace/core/approval-presets';
 import { type CodexComposerState, type CodexNativeAttachment } from '@codex-app-sdk/vue';
 import {
   createCodexConversationReplica,
@@ -24,20 +25,20 @@ import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import {
   createClaudeConversationReplica,
   type ClaudeConversationReplica,
-} from '@codex-claw/core/claude-conversation-replica';
-import type { ClaudeConversationSnapshot } from '@codex-claw/core/contracts';
-import { workItemAssignmentPrompt } from '@codex-claw/core/work-item-prompts';
-import { decodeAppSnapshot, isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import { appText } from '@codex-claw/core/app-text';
+} from '@workspace/core/claude-conversation-replica';
+import type { ClaudeConversationSnapshot } from '@workspace/core/contracts';
+import { workItemAssignmentPrompt } from '@workspace/core/work-item-prompts';
+import { decodeAppSnapshot, isAppSnapshot } from '@workspace/core/snapshot-guards';
+import { appText } from '@workspace/core/app-text';
 import { useConfetti } from './shared/confetti/use-confetti';
-import { clawHostCapabilities, codexClawApi } from './platform-api';
+import { appHostCapabilities, appApi } from './platform-api';
 import { createWorkProviderState, isRemoteAutomationLocation } from './work-provider-state';
 import { createAgentComposerState, type AgentComposerConfiguration } from './agent-composer-state';
 import { createAgentUnreadState } from './agent-unread-state';
 import { createAgentHistoryState } from './agent-history-state';
 import { createSourceRepositoryState } from './source-repository-state';
-import { workspaceSidebarRepositoryRootForAgent } from '@codex-claw/core/workspace-sidebar';
-import { isSnapshotEventOwnedBy, type RendererOnlySnapshotEvent } from '@codex-claw/core/snapshot-event-ownership';
+import { workspaceSidebarRepositoryRootForAgent } from '@workspace/core/workspace-sidebar';
+import { isSnapshotEventOwnedBy, type RendererOnlySnapshotEvent } from '@workspace/core/snapshot-event-ownership';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
 const isLoading = ref(false);
@@ -52,7 +53,7 @@ const openInApplications = ref<OpenInApplicationCatalog>({
   defaultApplication: 'finder',
   applications: [],
 });
-const daemonStatus = ref<ClawdDaemonStatus | null>(null);
+const daemonStatus = ref<DaemonStatus | null>(null);
 const daemonStatusError = ref<string | null>(null);
 const codexResourceSharingStatus = ref<CodexResourceSharingStatus>({ enabled: true, migrationRequired: false });
 const backendRestartInProgress = ref(false);
@@ -103,10 +104,10 @@ const {
 const agentComposer = createAgentComposerState({
   getSnapshot: () => snapshot.value,
   persistSelection: async (agentId, modelSelection) => {
-    const api = codexClawApi;
+    const api = appApi;
     if (!api?.updateAgent) throw new Error('Agent settings are unavailable.');
     const updated = await api.updateAgent({ id: agentId, modelSelection });
-    if (api === codexClawApi) adoptBackgroundSnapshot(updated);
+    if (api === appApi) adoptBackgroundSnapshot(updated);
   },
   onSelectionSaveError: (error) => ElMessage.error(error instanceof Error ? error.message : String(error)),
 });
@@ -222,111 +223,111 @@ export function useAppState() {
 
   async function respondToPlanReviewForAgent(agentId: string, resolution: PlanReviewResolution, feedback?: string): Promise<void> {
     const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-    if (!agent?.planReview || !codexClawApi) throw new Error('No pending plan review.');
-    adoptBackgroundSnapshot(await codexClawApi.respondToPlanReview(agent.id, {
+    if (!agent?.planReview || !appApi) throw new Error('No pending plan review.');
+    adoptBackgroundSnapshot(await appApi.respondToPlanReview(agent.id, {
       reviewId: agent.planReview.id, resolution, ...(feedback ? { feedback } : {}),
     }));
   }
 
-  async function respondToThreadFlag(response: import('@codex-claw/core/thread-flags').ThreadFlagResponse): Promise<void> {
+  async function respondToThreadFlag(response: import('@workspace/core/thread-flags').ThreadFlagResponse): Promise<void> {
     const agentId = snapshot.value.activeAgentId;
     if (agentId) await respondToThreadFlagForAgent(agentId, response);
   }
 
-  async function respondToThreadFlagForAgent(agentId: string, response: import('@codex-claw/core/thread-flags').ThreadFlagResponse): Promise<void> {
+  async function respondToThreadFlagForAgent(agentId: string, response: import('@workspace/core/thread-flags').ThreadFlagResponse): Promise<void> {
     const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-    if (!agent || agent.threadFlags?.[response.id] !== true || !codexClawApi) {
+    if (!agent || agent.threadFlags?.[response.id] !== true || !appApi) {
       throw new Error('No active thread flag.');
     }
-    adoptBackgroundSnapshot(await codexClawApi.respondToThreadFlag(agent.id, response));
+    adoptBackgroundSnapshot(await appApi.respondToThreadFlag(agent.id, response));
   }
 
-  async function startCodeReview(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.startCodeReview(agentId, input);
+  async function startCodeReview(agentId: string, input: import('@workspace/core/code-review').CodeReviewStartInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.startCodeReview(agentId, input);
     if (input.threadMode === 'independent') adoptNavigationSnapshot(next);
     else adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function startVisualize(agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.startVisualize(agentId, input);
+  async function startVisualize(agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.startVisualize(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function setVisualizeOpen(agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.setVisualizeOpen(agentId, input);
+  async function setVisualizeOpen(agentId: string, input: import('@workspace/core/visualize').SetVisualizeOpenInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.setVisualizeOpen(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function generateVisualizationSuggestion(agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.generateVisualizationSuggestion(agentId, input);
+  async function generateVisualizationSuggestion(agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.generateVisualizationSuggestion(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function selectVisualization(agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.selectVisualization(agentId, input);
+  async function selectVisualization(agentId: string, input: import('@workspace/core/visualize').SelectVisualizationInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.selectVisualization(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function deleteVisualization(agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.deleteVisualization(agentId, input);
+  async function deleteVisualization(agentId: string, input: import('@workspace/core/visualize').DeleteVisualizationInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.deleteVisualization(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function readVisualizationAsset(agentId: string, visualizationId: string): Promise<import('@codex-claw/core/visualize').VisualizationAsset> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    return codexClawApi.readVisualizationAsset(agentId, visualizationId);
+  async function readVisualizationAsset(agentId: string, visualizationId: string): Promise<import('@workspace/core/visualize').VisualizationAsset> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    return appApi.readVisualizationAsset(agentId, visualizationId);
   }
 
-  async function decideCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.decideCodeReviewFinding(agentId, input);
+  async function decideCodeReviewFinding(agentId: string, input: import('@workspace/core/code-review').CodeReviewDecisionInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.decideCodeReviewFinding(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
-  async function discussCodeReviewFinding(agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.discussCodeReviewFinding(agentId, input);
+  async function discussCodeReviewFinding(agentId: string, input: import('@workspace/core/code-review').CodeReviewDiscussionInput): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.discussCodeReviewFinding(agentId, input);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
   async function submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.submitCodeReviewRound(agentId, sessionId);
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.submitCodeReviewRound(agentId, sessionId);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
   async function finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.finishCodeReview(agentId, sessionId);
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.finishCodeReview(agentId, sessionId);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
   async function discardCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.discardCodeReview(agentId, sessionId);
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.discardCodeReview(agentId, sessionId);
     adoptBackgroundSnapshot(next);
     return next;
   }
 
   async function reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot> {
-    if (!codexClawApi) throw new Error('Codex Claw API is unavailable.');
-    const next = await codexClawApi.reviewCodeAgain(agentId, sessionId);
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.reviewCodeAgain(agentId, sessionId);
     adoptBackgroundSnapshot(next);
     return next;
   }
@@ -466,11 +467,11 @@ export function useAppState() {
   });
 
   async function loadSnapshot(): Promise<void> {
-    if (!codexClawApi) {
+    if (!appApi) {
       return;
     }
 
-    resetCatalogStateIfSourceChanged(codexClawApi);
+    resetCatalogStateIfSourceChanged(appApi);
     resetUnreadAgentIds();
     codexConversationFramesByAgentId.value = {};
     claudeConversationFramesByAgentId.value = {};
@@ -557,9 +558,9 @@ export function useAppState() {
   }
 
   async function readRendererSnapshotState(): Promise<RendererSnapshotState> {
-    if (codexClawApi?.getSnapshotState) return codexClawApi.getSnapshotState();
+    if (appApi?.getSnapshotState) return appApi.getSnapshotState();
     return {
-      snapshot: await codexClawApi!.getSnapshot(),
+      snapshot: await appApi!.getSnapshot(),
       lastBackendEventSeq: 0,
       connection: { status: 'connected' },
     };
@@ -571,7 +572,7 @@ export function useAppState() {
   }
 
   async function sendPromptToAgent(agentId: string, prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
-    if (!snapshot.value.agents.some((agent) => agent.id === agentId) || !codexClawApi) return;
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId) || !appApi) return;
 
     const parsedGoalCommand = parseGoalSlashCommand(prompt);
     if (parsedGoalCommand) {
@@ -601,7 +602,7 @@ export function useAppState() {
   }
 
   async function steerPromptToAgent(agentId: string, prompt: string, submissionOptions?: RendererSendPromptOptions): Promise<void> {
-    if (!snapshot.value.agents.some((agent) => agent.id === agentId) || !codexClawApi) return;
+    if (!snapshot.value.agents.some((agent) => agent.id === agentId) || !appApi) return;
 
     const trimmed = prompt.trim();
     if (!trimmed && !submissionOptions?.attachments?.length) {
@@ -613,15 +614,15 @@ export function useAppState() {
       return;
     }
 
-    if (!messageActionCapabilities(agentId).steerPrompt || !codexClawApi.steerPrompt) {
+    if (!messageActionCapabilities(agentId).steerPrompt || !appApi.steerPrompt) {
       await sendPromptForAgent(agentId, trimmed, submissionOptions);
       return;
     }
 
     const options = resolvedPromptOptions(agentId, trimmed, submissionOptions);
     adoptBackgroundSnapshot(options
-      ? await codexClawApi.steerPrompt(agentId, trimmed, options)
-      : await codexClawApi.steerPrompt(agentId, trimmed));
+      ? await appApi.steerPrompt(agentId, trimmed, options)
+      : await appApi.steerPrompt(agentId, trimmed));
   }
 
   async function interruptActiveAgent(): Promise<void> {
@@ -630,11 +631,11 @@ export function useAppState() {
   }
 
   async function interruptAgentById(agentId: string): Promise<void> {
-    if (!agentId || !codexClawApi?.interruptAgent || !isAgentSending(agentId)) {
+    if (!agentId || !appApi?.interruptAgent || !isAgentSending(agentId)) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.interruptAgent(agentId));
+    adoptBackgroundSnapshot(await appApi.interruptAgent(agentId));
   }
 
   async function deleteTurn(turnId: string): Promise<void> {
@@ -643,7 +644,7 @@ export function useAppState() {
   }
 
   async function deleteTurnForAgent(agentId: string, turnId: string): Promise<void> {
-    if (!agentId || !codexClawApi?.deleteTurn || isAgentSending(agentId)) {
+    if (!agentId || !appApi?.deleteTurn || isAgentSending(agentId)) {
       return;
     }
 
@@ -651,7 +652,7 @@ export function useAppState() {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.deleteTurn(agentId, turnId));
+    adoptBackgroundSnapshot(await appApi.deleteTurn(agentId, turnId));
   }
 
   async function editTurn(payload: { content: string; turnId: string }): Promise<void> {
@@ -661,7 +662,7 @@ export function useAppState() {
 
   async function editTurnForAgent(agentId: string, payload: { content: string; turnId: string }): Promise<void> {
     const trimmed = payload.content.trim();
-    if (!agentId || !trimmed || !codexClawApi?.editTurn || isAgentSending(agentId)) {
+    if (!agentId || !trimmed || !appApi?.editTurn || isAgentSending(agentId)) {
       return;
     }
 
@@ -671,7 +672,7 @@ export function useAppState() {
 
     markAgentSending(agentId, true);
     try {
-      adoptBackgroundSnapshot(await codexClawApi.editTurn(agentId, payload.turnId, trimmed));
+      adoptBackgroundSnapshot(await appApi.editTurn(agentId, payload.turnId, trimmed));
     } finally {
       markAgentSending(agentId, false);
     }
@@ -683,7 +684,7 @@ export function useAppState() {
   }
 
   async function retryTurnForAgent(agentId: string, turnId: string): Promise<void> {
-    if (!agentId || !codexClawApi?.retryTurn || isAgentSending(agentId)) {
+    if (!agentId || !appApi?.retryTurn || isAgentSending(agentId)) {
       return;
     }
 
@@ -693,7 +694,7 @@ export function useAppState() {
 
     markAgentSending(agentId, true);
     try {
-      adoptBackgroundSnapshot(await codexClawApi.retryTurn(agentId, turnId));
+      adoptBackgroundSnapshot(await appApi.retryTurn(agentId, turnId));
     } finally {
       markAgentSending(agentId, false);
     }
@@ -706,13 +707,13 @@ export function useAppState() {
 
   async function continueInterruptedTurnForAgent(agentId: string): Promise<void> {
     const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
-    if (agent?.backend !== 'codex' || !agent.backendSession || !codexClawApi?.continueInterruptedTurn || isAgentSending(agent.id)) {
+    if (agent?.backend !== 'codex' || !agent.backendSession || !appApi?.continueInterruptedTurn || isAgentSending(agent.id)) {
       return;
     }
 
     markAgentSending(agent.id, true);
     try {
-      adoptBackgroundSnapshot(await codexClawApi.continueInterruptedTurn(agent.id));
+      adoptBackgroundSnapshot(await appApi.continueInterruptedTurn(agent.id));
     } finally {
       markAgentSending(agent.id, false);
     }
@@ -724,10 +725,10 @@ export function useAppState() {
   }
 
   async function updateQueuedPromptForAgent(agentId: string, promptId: string, prompt: string): Promise<void> {
-    if (!agentId || !codexClawApi?.updateQueuedPrompt) {
+    if (!agentId || !appApi?.updateQueuedPrompt) {
       return;
     }
-    adoptBackgroundSnapshot(await codexClawApi.updateQueuedPrompt(agentId, promptId, prompt));
+    adoptBackgroundSnapshot(await appApi.updateQueuedPrompt(agentId, promptId, prompt));
   }
 
   async function steerQueuedPrompt(promptId: string, prompt?: string): Promise<void> {
@@ -736,10 +737,10 @@ export function useAppState() {
   }
 
   async function steerQueuedPromptForAgent(agentId: string, promptId: string, prompt?: string): Promise<void> {
-    if (!agentId || !messageActionCapabilities(agentId).steerPrompt || !codexClawApi?.steerQueuedPrompt) {
+    if (!agentId || !messageActionCapabilities(agentId).steerPrompt || !appApi?.steerQueuedPrompt) {
       return;
     }
-    adoptBackgroundSnapshot(await codexClawApi.steerQueuedPrompt(agentId, promptId, prompt));
+    adoptBackgroundSnapshot(await appApi.steerQueuedPrompt(agentId, promptId, prompt));
   }
 
   async function removeQueuedPrompt(promptId: string): Promise<void> {
@@ -748,8 +749,8 @@ export function useAppState() {
   }
 
   async function removeQueuedPromptForAgent(agentId: string, promptId: string): Promise<void> {
-    if (agentId && codexClawApi?.deleteQueuedPrompt) {
-      adoptBackgroundSnapshot(await codexClawApi.deleteQueuedPrompt(agentId, promptId));
+    if (agentId && appApi?.deleteQueuedPrompt) {
+      adoptBackgroundSnapshot(await appApi.deleteQueuedPrompt(agentId, promptId));
     }
   }
 
@@ -770,7 +771,7 @@ export function useAppState() {
     prompt: string,
     options?: RendererSendPromptOptions,
   ): Promise<void> {
-    const api = codexClawApi;
+    const api = appApi;
     if (!api) {
       return;
     }
@@ -789,7 +790,7 @@ export function useAppState() {
   async function sendAgentPrompt(agentId: string, prompt: string): Promise<void> {
     const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
     const trimmed = prompt.trim();
-    if (!agent || !trimmed || !codexClawApi) {
+    if (!agent || !trimmed || !appApi) {
       return;
     }
 
@@ -797,7 +798,7 @@ export function useAppState() {
   }
 
   async function selectAgent(agentId: string): Promise<void> {
-    if (!codexClawApi?.selectAgent || !snapshot.value.agents.some((agent) => agent.id === agentId)) {
+    if (!appApi?.selectAgent || !snapshot.value.agents.some((agent) => agent.id === agentId)) {
       return;
     }
 
@@ -813,93 +814,93 @@ export function useAppState() {
   }
 
   async function chooseAgentFolder(): Promise<string | null> {
-    return await codexClawApi?.chooseAgentFolder?.() ?? null;
+    return await appApi?.chooseAgentFolder?.() ?? null;
   }
 
   async function chooseCodexBinary(): Promise<string | null> {
-    return await codexClawApi?.chooseCodexBinary?.() ?? null;
+    return await appApi?.chooseCodexBinary?.() ?? null;
   }
 
   async function chooseSourceFolder(): Promise<string | null> {
-    return await codexClawApi?.chooseSourceFolder?.() ?? null;
+    return await appApi?.chooseSourceFolder?.() ?? null;
   }
 
   async function listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing> {
-    return await codexClawApi?.listSourceFolders?.(input) ?? { path: '', parentPath: null, entries: [] };
+    return await appApi?.listSourceFolders?.(input) ?? { path: '', parentPath: null, entries: [] };
   }
 
   async function suggestSourceWorktreePath(input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>): Promise<string> {
-    return await codexClawApi?.suggestSourceWorktreePath?.(input) ?? '';
+    return await appApi?.suggestSourceWorktreePath?.(input) ?? '';
   }
 
   async function chooseSourceWorktreeDestination(defaultPath: string): Promise<string | null> {
-    return await codexClawApi?.chooseSourceWorktreeDestination?.(defaultPath) ?? null;
+    return await appApi?.chooseSourceWorktreeDestination?.(defaultPath) ?? null;
   }
 
   async function previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult> {
-    if (!codexClawApi?.previewAgentFile) {
+    if (!appApi?.previewAgentFile) {
       throw new Error(translate('surface.app-state.filePreviewIsNotAvailable'));
     }
 
-    return codexClawApi.previewAgentFile(agentId, filePath);
+    return appApi.previewAgentFile(agentId, filePath);
   }
 
-  async function getAgentGitDiff(agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<import('@codex-claw/core/contracts').AgentGitDiff> {
-    if (!codexClawApi?.getAgentGitDiff) {
+  async function getAgentGitDiff(agentId: string, target?: import('@workspace/core/contracts').AgentGitDiffTarget): Promise<import('@workspace/core/contracts').AgentGitDiff> {
+    if (!appApi?.getAgentGitDiff) {
       throw new Error(translate('surface.app-state.gitDiffPreviewIsNotAvailable'));
     }
 
-    return codexClawApi.getAgentGitDiff(agentId, target ? { ...target } : undefined);
+    return appApi.getAgentGitDiff(agentId, target ? { ...target } : undefined);
   }
 
   async function getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.getAgentGitWorkflow) throw new Error(translate('surface.app-state.gitWorkflowIsNotAvailable'));
-    return codexClawApi.getAgentGitWorkflow(agentId);
+    if (!appApi?.getAgentGitWorkflow) throw new Error(translate('surface.app-state.gitWorkflowIsNotAvailable'));
+    return appApi.getAgentGitWorkflow(agentId);
   }
 
   async function generateAgentGitMessage(agentId: string, input: AgentGitMessageGenerationInput): Promise<AgentGitMessageGenerationResult> {
-    if (!codexClawApi?.generateAgentGitMessage) throw new Error(translate('surface.app-state.gitMessageGenerationIsNotAvailable'));
-    return codexClawApi.generateAgentGitMessage(agentId, input);
+    if (!appApi?.generateAgentGitMessage) throw new Error(translate('surface.app-state.gitMessageGenerationIsNotAvailable'));
+    return appApi.generateAgentGitMessage(agentId, input);
   }
 
   async function stageAgentGitFiles(agentId: string, input: AgentGitStageInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.stageAgentGitFiles) throw new Error(translate('surface.app-state.gitStagingIsNotAvailable'));
-    return codexClawApi.stageAgentGitFiles(agentId, input);
+    if (!appApi?.stageAgentGitFiles) throw new Error(translate('surface.app-state.gitStagingIsNotAvailable'));
+    return appApi.stageAgentGitFiles(agentId, input);
   }
 
   async function commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.commitAgentGitChanges) throw new Error(translate('surface.app-state.gitCommitIsNotAvailable'));
-    return codexClawApi.commitAgentGitChanges(agentId, input);
+    if (!appApi?.commitAgentGitChanges) throw new Error(translate('surface.app-state.gitCommitIsNotAvailable'));
+    return appApi.commitAgentGitChanges(agentId, input);
   }
 
   async function pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.pushAgentGitBranch) throw new Error(translate('surface.app-state.gitPushIsNotAvailable'));
-    return codexClawApi.pushAgentGitBranch(agentId, input);
+    if (!appApi?.pushAgentGitBranch) throw new Error(translate('surface.app-state.gitPushIsNotAvailable'));
+    return appApi.pushAgentGitBranch(agentId, input);
   }
 
   async function createAgentGitBranch(agentId: string, input: AgentGitBranchInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.createAgentGitBranch) throw new Error(translate('surface.app-state.gitBranchCreationIsNotAvailable'));
-    return codexClawApi.createAgentGitBranch(agentId, input);
+    if (!appApi?.createAgentGitBranch) throw new Error(translate('surface.app-state.gitBranchCreationIsNotAvailable'));
+    return appApi.createAgentGitBranch(agentId, input);
   }
 
   async function createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.createAgentGitPullRequest) throw new Error(translate('surface.app-state.pullRequestCreationIsNotAvailable'));
-    return codexClawApi.createAgentGitPullRequest(agentId, input);
+    if (!appApi?.createAgentGitPullRequest) throw new Error(translate('surface.app-state.pullRequestCreationIsNotAvailable'));
+    return appApi.createAgentGitPullRequest(agentId, input);
   }
 
-  async function mergeAgentGitBranch(agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput): Promise<AgentGitWorkflow> {
-    if (!codexClawApi?.mergeAgentGitBranch) throw new Error(translate('surface.app-state.gitMergeIsNotAvailable'));
-    return codexClawApi.mergeAgentGitBranch(agentId, input);
+  async function mergeAgentGitBranch(agentId: string, input: import('@workspace/core/contracts').AgentGitMergeInput): Promise<AgentGitWorkflow> {
+    if (!appApi?.mergeAgentGitBranch) throw new Error(translate('surface.app-state.gitMergeIsNotAvailable'));
+    return appApi.mergeAgentGitBranch(agentId, input);
   }
 
   async function updateAgentGitBranchFromBase(agentId: string, input: AgentGitUpdateFromBaseInput): Promise<AgentGitUpdateFromBaseResult> {
-    if (!codexClawApi?.updateAgentGitBranchFromBase) throw new Error(translate('surface.app-state.gitUpdateFromBaseIsNotAvailable'));
-    return codexClawApi.updateAgentGitBranchFromBase(agentId, input);
+    if (!appApi?.updateAgentGitBranchFromBase) throw new Error(translate('surface.app-state.gitUpdateFromBaseIsNotAvailable'));
+    return appApi.updateAgentGitBranchFromBase(agentId, input);
   }
 
   async function loadOpenInApplications(): Promise<void> {
-    if (!clawHostCapabilities.openInApplications || !codexClawApi?.getOpenInApplications) return;
-    openInApplications.value = await codexClawApi.getOpenInApplications();
+    if (!appHostCapabilities.openInApplications || !appApi?.getOpenInApplications) return;
+    openInApplications.value = await appApi.getOpenInApplications();
   }
 
   async function openAgentPath(
@@ -907,122 +908,122 @@ export function useAppState() {
     application: OpenInApplication,
     filePath?: string,
   ): Promise<void> {
-    if (!clawHostCapabilities.openInApplications || !codexClawApi?.openAgentPath) {
+    if (!appHostCapabilities.openInApplications || !appApi?.openAgentPath) {
       throw new Error(translate('surface.app-state.openInIsNotAvailable'));
     }
-    adoptNavigationSnapshot(await codexClawApi.openAgentPath(agentId, application, filePath));
+    adoptNavigationSnapshot(await appApi.openAgentPath(agentId, application, filePath));
   }
 
   async function createAgent(input: CreateAgentInput): Promise<Agent | null> {
-    if (!codexClawApi?.createAgent) {
+    if (!appApi?.createAgent) {
       return null;
     }
 
     const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
-    adoptNavigationSnapshot(await codexClawApi.createAgent(input));
+    adoptNavigationSnapshot(await appApi.createAgent(input));
     await loadActiveAgentCatalogs();
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
-  async function createProject(input: import('@codex-claw/core/contracts').CreateProjectInput): Promise<void> {
-    if (!codexClawApi?.createProject) throw new Error(translate('surface.app-state.repositoryCreationIsNotAvailable'));
-    adoptNavigationSnapshot(await codexClawApi.createProject(input));
+  async function createProject(input: import('@workspace/core/contracts').CreateProjectInput): Promise<void> {
+    if (!appApi?.createProject) throw new Error(translate('surface.app-state.repositoryCreationIsNotAvailable'));
+    adoptNavigationSnapshot(await appApi.createProject(input));
     await Promise.all([loadActiveAgentCatalogs(), sourceRepositoryState.load()]);
   }
 
-  async function executeMission(input: import('@codex-claw/core/mission-execution').MissionExecutionInput) {
-    if (!codexClawApi) throw new Error('Backend unavailable.');
-    adoptNavigationSnapshot(await codexClawApi.executeMission(input));
+  async function executeMission(input: import('@workspace/core/mission-execution').MissionExecutionInput) {
+    if (!appApi) throw new Error('Backend unavailable.');
+    adoptNavigationSnapshot(await appApi.executeMission(input));
   }
 
-  async function createMission(input: import('@codex-claw/core/missions').CreateMissionInput) {
-    if (!codexClawApi) throw new Error('Backend unavailable.');
+  async function createMission(input: import('@workspace/core/missions').CreateMissionInput) {
+    if (!appApi) throw new Error('Backend unavailable.');
     const previous = new Set(snapshot.value.missions?.map(m => m.id));
-    adoptNavigationSnapshot(await codexClawApi.createMission(input));
+    adoptNavigationSnapshot(await appApi.createMission(input));
     return snapshot.value.missions!.find(m => !previous.has(m.id))!;
   }
 
   async function selectMission(missionId: string | null): Promise<void> {
-    await codexClawApi?.selectMission(missionId);
+    await appApi?.selectMission(missionId);
   }
 
-  async function deleteMission(input: import('@codex-claw/core/missions').DeleteMissionInput) {
-    if (!codexClawApi) throw new Error('Missions unavailable.');
-    adoptNavigationSnapshot(await codexClawApi.deleteMission(input));
+  async function deleteMission(input: import('@workspace/core/missions').DeleteMissionInput) {
+    if (!appApi) throw new Error('Missions unavailable.');
+    adoptNavigationSnapshot(await appApi.deleteMission(input));
   }
 
-  async function readMissionArtifact(missionId: string, stage: import('@codex-claw/core/missions').MissionStage) {
-    if (!codexClawApi) throw new Error('Mission artifacts unavailable.');
-    return codexClawApi.readMissionArtifact(missionId, stage);
+  async function readMissionArtifact(missionId: string, stage: import('@workspace/core/missions').MissionStage) {
+    if (!appApi) throw new Error('Mission artifacts unavailable.');
+    return appApi.readMissionArtifact(missionId, stage);
   }
 
-  async function updateMission(input: import('@codex-claw/core/missions').UpdateMissionInput) {
-    if (!codexClawApi) throw new Error('Backend unavailable.');
-    adoptNavigationSnapshot(await codexClawApi.updateMission(input));
+  async function updateMission(input: import('@workspace/core/missions').UpdateMissionInput) {
+    if (!appApi) throw new Error('Backend unavailable.');
+    adoptNavigationSnapshot(await appApi.updateMission(input));
   }
 
   async function createQuickChat(input: CreateQuickChatInput): Promise<Agent | null> {
-    if (!codexClawApi?.createQuickChat) return null;
+    if (!appApi?.createQuickChat) return null;
 
     const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
-    adoptNavigationSnapshot(await codexClawApi.createQuickChat(input));
+    adoptNavigationSnapshot(await appApi.createQuickChat(input));
     await loadActiveAgentCatalogs();
     return snapshot.value.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? activeAgent.value;
   }
 
   async function createTeam(input: CreateTeamInput): Promise<Team | null> {
-    if (!codexClawApi?.createTeam) {
+    if (!appApi?.createTeam) {
       return null;
     }
 
     const previousTeamIds = new Set(snapshot.value.teams.map((team) => team.id));
-    adoptNavigationSnapshot(await codexClawApi.createTeam(input));
+    adoptNavigationSnapshot(await appApi.createTeam(input));
     await loadActiveAgentCatalogs();
     return snapshot.value.teams.find((team) => !previousTeamIds.has(team.id)) ?? null;
   }
 
   async function updateTeam(input: UpdateTeamInput): Promise<void> {
-    if (!codexClawApi?.updateTeam || !snapshot.value.teams.some((team) => team.id === input.id)) {
+    if (!appApi?.updateTeam || !snapshot.value.teams.some((team) => team.id === input.id)) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.updateTeam(input));
+    adoptBackgroundSnapshot(await appApi.updateTeam(input));
   }
 
   async function reorderTeams(input: ReorderTeamsInput): Promise<void> {
     if (
-      !codexClawApi?.reorderTeams ||
+      !appApi?.reorderTeams ||
       !snapshot.value.teams.some((team) => team.id === input.teamId) ||
       (input.beforeTeamId !== null && !snapshot.value.teams.some((team) => team.id === input.beforeTeamId))
     ) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.reorderTeams(input));
+    adoptBackgroundSnapshot(await appApi.reorderTeams(input));
   }
 
   async function closeTeam(teamId: string): Promise<void> {
     const team = snapshot.value.teams.find(candidate => candidate.id === teamId);
-    if (!codexClawApi?.closeTeam || !team || (snapshot.value.teams.length <= 1 && !team.remoteConnectionId)) {
+    if (!appApi?.closeTeam || !team || (snapshot.value.teams.length <= 1 && !team.remoteConnectionId)) {
       return;
     }
 
-    adoptNavigationSnapshot(await codexClawApi.closeTeam(teamId));
+    adoptNavigationSnapshot(await appApi.closeTeam(teamId));
     await loadActiveAgentCatalogs();
   }
 
   async function disconnectTeam(teamId: string): Promise<void> {
     const team = snapshot.value.teams.find(candidate => candidate.id === teamId);
-    if (!codexClawApi?.disconnectTeam || !team?.remoteConnectionId) {
+    if (!appApi?.disconnectTeam || !team?.remoteConnectionId) {
       return;
     }
 
-    adoptNavigationSnapshot(await codexClawApi.disconnectTeam(teamId));
+    adoptNavigationSnapshot(await appApi.disconnectTeam(teamId));
     await loadActiveAgentCatalogs();
   }
 
   async function selectTeam(teamId: string): Promise<void> {
-    if (!codexClawApi?.selectTeam || !snapshot.value.teams.some((team) => team.id === teamId)) {
+    if (!appApi?.selectTeam || !snapshot.value.teams.some((team) => team.id === teamId)) {
       return;
     }
 
@@ -1043,26 +1044,26 @@ export function useAppState() {
   }
 
   async function getAutomationSnapshot(location?: AutomationLocation): Promise<AppSnapshot> {
-    if (!codexClawApi?.getAutomationSnapshot || !isRemoteAutomationLocation(location)) {
+    if (!appApi?.getAutomationSnapshot || !isRemoteAutomationLocation(location)) {
       return snapshot.value;
     }
 
-    return codexClawApi.getAutomationSnapshot(location);
+    return appApi.getAutomationSnapshot(location);
   }
 
   async function listAutomationWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]> {
-    if (!codexClawApi?.listWorkSources) throw new Error('Backlog sources are unavailable.');
-    return codexClawApi.listWorkSources(provider, location);
+    if (!appApi?.listWorkSources) throw new Error('Backlog sources are unavailable.');
+    return appApi.listWorkSources(provider, location);
   }
 
   async function createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
-    if (!codexClawApi?.createAutomation) {
+    if (!appApi?.createAutomation) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.createAutomation(input, location)
-      : await codexClawApi.createAutomation(input);
+      ? await appApi.createAutomation(input, location)
+      : await appApi.createAutomation(input);
     if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
@@ -1071,15 +1072,15 @@ export function useAppState() {
 
   async function updateAutomation(input: UpdateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.updateAutomation ||
+      !appApi?.updateAutomation ||
       (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === input.id))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.updateAutomation(input, location)
-      : await codexClawApi.updateAutomation(input);
+      ? await appApi.updateAutomation(input, location)
+      : await appApi.updateAutomation(input);
     if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
@@ -1088,15 +1089,15 @@ export function useAppState() {
 
   async function runAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.runAutomation ||
+      !appApi?.runAutomation ||
       (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === automationId))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.runAutomation(automationId, location)
-      : await codexClawApi.runAutomation(automationId);
+      ? await appApi.runAutomation(automationId, location)
+      : await appApi.runAutomation(automationId);
     if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
@@ -1105,15 +1106,15 @@ export function useAppState() {
 
   async function deleteAutomation(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.deleteAutomation ||
+      !appApi?.deleteAutomation ||
       (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === automationId))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.deleteAutomation(automationId, location)
-      : await codexClawApi.deleteAutomation(automationId);
+      ? await appApi.deleteAutomation(automationId, location)
+      : await appApi.deleteAutomation(automationId);
     if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
@@ -1122,15 +1123,15 @@ export function useAppState() {
 
   async function clearAutomationHistory(automationId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.clearAutomationHistory ||
+      !appApi?.clearAutomationHistory ||
       (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => automation.id === automationId))
     ) {
       return;
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.clearAutomationHistory(automationId, location)
-      : await codexClawApi.clearAutomationHistory(automationId);
+      ? await appApi.clearAutomationHistory(automationId, location)
+      : await appApi.clearAutomationHistory(automationId);
     if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
@@ -1139,7 +1140,7 @@ export function useAppState() {
 
   async function deleteAutomationExecution(automationId: string, executionId: string, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (
-      !codexClawApi?.deleteAutomationExecution ||
+      !appApi?.deleteAutomationExecution ||
       (!isRemoteAutomationLocation(location) && !snapshot.value.automations.some((automation) => (
         automation.id === automationId &&
         automation.executionLog.some((entry) => entry.id === executionId)
@@ -1149,8 +1150,8 @@ export function useAppState() {
     }
 
     const nextSnapshot = location
-      ? await codexClawApi.deleteAutomationExecution(automationId, executionId, location)
-      : await codexClawApi.deleteAutomationExecution(automationId, executionId);
+      ? await appApi.deleteAutomationExecution(automationId, executionId, location)
+      : await appApi.deleteAutomationExecution(automationId, executionId);
     if (!isRemoteAutomationLocation(location)) {
       adoptBackgroundSnapshot(nextSnapshot);
     }
@@ -1158,29 +1159,29 @@ export function useAppState() {
   }
 
   async function readConversationMessages(ref: BackendConversationRef, agentId: string, location?: AutomationLocation): Promise<RendererMessage[]> {
-    if (!codexClawApi?.readConversationMessages) {
+    if (!appApi?.readConversationMessages) {
       return [];
     }
 
     return location
-      ? codexClawApi.readConversationMessages(plainConversationRef(ref), agentId, location)
-      : codexClawApi.readConversationMessages(plainConversationRef(ref), agentId);
+      ? appApi.readConversationMessages(plainConversationRef(ref), agentId, location)
+      : appApi.readConversationMessages(plainConversationRef(ref), agentId);
   }
 
   async function listAgentConversations(agentId: string, input?: ConversationListInput): Promise<ConversationSummary[]> {
-    if (!codexClawApi?.listAgentConversations) {
+    if (!appApi?.listAgentConversations) {
       return [];
     }
 
-    return codexClawApi.listAgentConversations(agentId, input);
+    return appApi.listAgentConversations(agentId, input);
   }
 
   async function resumeAgentConversation(agentId: string, target: ConversationResumeTarget): Promise<void> {
-    if (!codexClawApi?.resumeAgentConversation) {
+    if (!appApi?.resumeAgentConversation) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.resumeAgentConversation(agentId, {
+    adoptBackgroundSnapshot(await appApi.resumeAgentConversation(agentId, {
       ref: plainConversationRef(target.ref),
       storageState: target.storageState,
     }));
@@ -1190,46 +1191,46 @@ export function useAppState() {
   }
 
   async function compressAgentSession(agentId: string): Promise<void> {
-    if (!codexClawApi?.compressAgentSession) {
+    if (!appApi?.compressAgentSession) {
       throw new Error('Session compression is unavailable.');
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.compressAgentSession(agentId));
+    adoptBackgroundSnapshot(await appApi.compressAgentSession(agentId));
     resetAgentHistory(agentId);
     synchronizeComposerSelectionForAgent(agentId);
   }
 
   async function updateAgent(input: UpdateAgentInput): Promise<void> {
-    if (!codexClawApi?.updateAgent) {
+    if (!appApi?.updateAgent) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.updateAgent(input));
+    adoptBackgroundSnapshot(await appApi.updateAgent(input));
     if (input.backend) synchronizeComposerSelectionForAgent(input.id);
     await loadActiveAgentCatalogs(input.id);
   }
 
   async function updateSettings(input: UpdateSettingsInput): Promise<void> {
-    if (!codexClawApi?.updateSettings) {
+    if (!appApi?.updateSettings) {
       return;
     }
 
     const previousSourceFolderPath = snapshot.value.sourceFolder.path;
-    adoptBackgroundSnapshot(await codexClawApi.updateSettings(input));
+    adoptBackgroundSnapshot(await appApi.updateSettings(input));
     if (input.sourceFolder && snapshot.value.sourceFolder.path !== previousSourceFolderPath) {
       await loadSourceRepositories();
     }
   }
 
   async function setCodexResourceSharing(input: SetCodexResourceSharingInput): Promise<void> {
-    if (!codexClawApi?.setCodexResourceSharing) return;
+    if (!appApi?.setCodexResourceSharing) return;
     const restartsBackend = !(input.enabled === false && input.mode === 'keep');
     if (restartsBackend) backendRestartInProgress.value = true;
     try {
-      adoptBackgroundSnapshot(await codexClawApi.setCodexResourceSharing(input));
+      adoptBackgroundSnapshot(await appApi.setCodexResourceSharing(input));
       codexResourceSharingStatus.value = { enabled: input.enabled, migrationRequired: false };
       if (restartsBackend) {
-        const reload = codexClawApi.reloadRenderer?.();
+        const reload = appApi.reloadRenderer?.();
         if (reload) {
           void reload.catch(() => {
             backendRestartInProgress.value = false;
@@ -1245,112 +1246,112 @@ export function useAppState() {
   }
 
   async function loadCodexResourceSharingStatus(): Promise<void> {
-    if (!codexClawApi?.getCodexResourceSharingStatus) return;
-    codexResourceSharingStatus.value = await codexClawApi.getCodexResourceSharingStatus();
+    if (!appApi?.getCodexResourceSharingStatus) return;
+    codexResourceSharingStatus.value = await appApi.getCodexResourceSharingStatus();
   }
 
   async function getPluginStatus(): Promise<AppPluginStatus> {
-    return codexClawApi?.getPluginStatus?.() ?? { chromeEnabled: false };
+    return appApi?.getPluginStatus?.() ?? { chromeEnabled: false };
   }
 
   async function listSshHosts(): Promise<SshHostCandidate[]> {
-    if (!codexClawApi?.listSshHosts) {
+    if (!appApi?.listSshHosts) {
       return [];
     }
 
-    return codexClawApi.listSshHosts();
+    return appApi.listSshHosts();
   }
 
   async function addSshConnection(input: AddSshConnectionInput): Promise<void> {
-    if (!codexClawApi?.addSshConnection) {
+    if (!appApi?.addSshConnection) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.addSshConnection(input));
+    adoptBackgroundSnapshot(await appApi.addSshConnection(input));
   }
 
   async function checkRemoteConnection(connectionId: string, inspectOnly?: boolean): Promise<void> {
-    if (!codexClawApi?.checkRemoteConnection) {
+    if (!appApi?.checkRemoteConnection) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.checkRemoteConnection(connectionId, inspectOnly));
+    adoptBackgroundSnapshot(await appApi.checkRemoteConnection(connectionId, inspectOnly));
   }
 
   async function updateRemoteConnection(connectionId: string, input: UpdateRemoteConnectionInput): Promise<void> {
-    if (!codexClawApi?.updateRemoteConnection) {
+    if (!appApi?.updateRemoteConnection) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.updateRemoteConnection(connectionId, input));
+    adoptBackgroundSnapshot(await appApi.updateRemoteConnection(connectionId, input));
     await loadSourceRepositories();
   }
 
   async function removeRemoteConnection(connectionId: string): Promise<void> {
-    if (!codexClawApi?.removeRemoteConnection) {
+    if (!appApi?.removeRemoteConnection) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.removeRemoteConnection(connectionId));
+    adoptBackgroundSnapshot(await appApi.removeRemoteConnection(connectionId));
   }
 
   async function getRemoteControlStatus(): Promise<DevicePairingStatus> {
-    if (!codexClawApi?.getRemoteControlStatus) return { status: 'disabled' };
-    return codexClawApi.getRemoteControlStatus();
+    if (!appApi?.getRemoteControlStatus) return { status: 'disabled' };
+    return appApi.getRemoteControlStatus();
   }
 
   async function enableRemoteControl(): Promise<DevicePairingStatus> {
-    if (!codexClawApi?.enableRemoteControl) return { status: 'disabled' };
-    return codexClawApi.enableRemoteControl();
+    if (!appApi?.enableRemoteControl) return { status: 'disabled' };
+    return appApi.enableRemoteControl();
   }
 
   async function disableRemoteControl(): Promise<DevicePairingStatus> {
-    if (!codexClawApi?.disableRemoteControl) return { status: 'disabled' };
-    return codexClawApi.disableRemoteControl();
+    if (!appApi?.disableRemoteControl) return { status: 'disabled' };
+    return appApi.disableRemoteControl();
   }
 
   async function startDevicePairing(): Promise<DevicePairingSession> {
-    if (!codexClawApi?.startDevicePairing) throw new Error(translate('surface.app-state.devicePairingIsNotAvailable'));
-    return codexClawApi.startDevicePairing();
+    if (!appApi?.startDevicePairing) throw new Error(translate('surface.app-state.devicePairingIsNotAvailable'));
+    return appApi.startDevicePairing();
   }
 
   async function checkDevicePairing(session: DevicePairingSession): Promise<boolean> {
-    return codexClawApi?.checkDevicePairing?.(plainDevicePairingSession(session)) ?? false;
+    return appApi?.checkDevicePairing?.(plainDevicePairingSession(session)) ?? false;
   }
 
   async function listPairedDevices(environmentId: string): Promise<PairedDevice[]> {
-    return codexClawApi?.listPairedDevices?.(environmentId) ?? [];
+    return appApi?.listPairedDevices?.(environmentId) ?? [];
   }
 
   async function revokePairedDevice(environmentId: string, clientId: string): Promise<void> {
-    await codexClawApi?.revokePairedDevice?.(environmentId, clientId);
+    await appApi?.revokePairedDevice?.(environmentId, clientId);
   }
 
   async function loadDaemonStatus(): Promise<void> {
-    if (!clawHostCapabilities.daemonManagement || !codexClawApi?.getDaemonStatus) {
+    if (!appHostCapabilities.daemonManagement || !appApi?.getDaemonStatus) {
       return;
     }
 
     daemonStatusError.value = null;
     try {
-      daemonStatus.value = await codexClawApi.getDaemonStatus();
+      daemonStatus.value = await appApi.getDaemonStatus();
     } catch (error) {
       daemonStatusError.value = error instanceof Error ? error.message : String(error);
     }
   }
 
   async function setDaemonEnabled(enabled: boolean): Promise<void> {
-    if (!clawHostCapabilities.daemonManagement || !codexClawApi?.setDaemonEnabled) {
+    if (!appHostCapabilities.daemonManagement || !appApi?.setDaemonEnabled) {
       return;
     }
 
     daemonStatusError.value = null;
     try {
-      daemonStatus.value = await codexClawApi.setDaemonEnabled(enabled);
+      daemonStatus.value = await appApi.setDaemonEnabled(enabled);
     } catch (error) {
       daemonStatusError.value = error instanceof Error ? error.message : String(error);
       try {
-        const refreshed = await codexClawApi.getDaemonStatus?.();
+        const refreshed = await appApi.getDaemonStatus?.();
         daemonStatus.value = refreshed ?? daemonStatus.value;
       } catch {
         // Keep the action error visible; status refresh failure is secondary.
@@ -1359,40 +1360,40 @@ export function useAppState() {
   }
 
   async function quit(): Promise<void> {
-    if (clawHostCapabilities.appLifecycle) await codexClawApi?.quit?.();
+    if (appHostCapabilities.appLifecycle) await appApi?.quit?.();
   }
 
   async function restartApp(): Promise<void> {
-    if (clawHostCapabilities.appLifecycle) await codexClawApi?.restartApp?.();
+    if (appHostCapabilities.appLifecycle) await appApi?.restartApp?.();
   }
 
   async function assignWorkItemToAgent(payload: { agentId: string; item: WorkItem; prompt?: string }): Promise<void> {
-    if (!codexClawApi?.assignWorkItemToAgent) {
+    if (!appApi?.assignWorkItemToAgent) {
       return;
     }
 
     const item = cloneWorkItemForIpc(payload.item);
-    adoptBackgroundSnapshot(await codexClawApi.assignWorkItemToAgent(payload.agentId, item));
+    adoptBackgroundSnapshot(await appApi.assignWorkItemToAgent(payload.agentId, item));
     await sendAgentPrompt(payload.agentId, payload.prompt ?? workItemAssignmentPrompt(item));
   }
 
   async function removeWorkItemAssignment(item: WorkItem): Promise<void> {
-    if (!codexClawApi?.removeWorkItemAssignment) {
+    if (!appApi?.removeWorkItemAssignment) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.removeWorkItemAssignment(cloneWorkItemForIpc(item)));
+    adoptBackgroundSnapshot(await appApi.removeWorkItemAssignment(cloneWorkItemForIpc(item)));
   }
 
   async function duplicateAgent(agentId: string, options?: DuplicateAgentOptions): Promise<Agent | null> {
-    if (!codexClawApi?.duplicateAgent) {
+    if (!appApi?.duplicateAgent) {
       return null;
     }
 
     const previousAgentIds = new Set(snapshot.value.agents.map((agent) => agent.id));
     const nextSnapshot = options
-      ? await codexClawApi.duplicateAgent(agentId, options)
-      : await codexClawApi.duplicateAgent(agentId);
+      ? await appApi.duplicateAgent(agentId, options)
+      : await appApi.duplicateAgent(agentId);
     const duplicate = nextSnapshot.agents.find((agent) => !previousAgentIds.has(agent.id)) ?? null;
     if (options?.select === false) {
       adoptBackgroundSnapshot(nextSnapshot);
@@ -1404,21 +1405,21 @@ export function useAppState() {
   }
 
   async function forkAgent(agentId: string, turnId?: string): Promise<void> {
-    if (!codexClawApi?.forkAgent) {
+    if (!appApi?.forkAgent) {
       return;
     }
 
     const nextSnapshot = turnId === undefined
-      ? await codexClawApi.forkAgent(agentId)
-      : await codexClawApi.forkAgent(agentId, turnId);
+      ? await appApi.forkAgent(agentId)
+      : await appApi.forkAgent(agentId, turnId);
     adoptNavigationSnapshot(nextSnapshot);
     await loadActiveAgentCatalogs();
   }
 
-  async function handoffAgent(agentId: string, input: import('@codex-claw/core/agent-handoff').AgentHandoffInput): Promise<void> {
-    if (!codexClawApi?.handoffAgent) throw new Error('Handoff is unavailable on this host.');
+  async function handoffAgent(agentId: string, input: import('@workspace/core/agent-handoff').AgentHandoffInput): Promise<void> {
+    if (!appApi?.handoffAgent) throw new Error('Handoff is unavailable on this host.');
     try {
-      const next = await codexClawApi.handoffAgent(agentId, input);
+      const next = await appApi.handoffAgent(agentId, input);
       const target = next.agents.find(agent => agent.handoff?.operationId === input.operationId && agent.handoff.sourceAgentId === agentId);
       if (target) next.activeAgentId = target.id;
       adoptNavigationSnapshot(next);
@@ -1439,7 +1440,7 @@ export function useAppState() {
 
   async function moveAgentToTeam(input: MoveAgentToTeamInput): Promise<void> {
     if (
-      !codexClawApi?.moveAgentToTeam ||
+      !appApi?.moveAgentToTeam ||
       !snapshot.value.agents.some((agent) => agent.id === input.agentId) ||
       !snapshot.value.teams.some((team) => team.id === input.teamId)
     ) {
@@ -1447,7 +1448,7 @@ export function useAppState() {
     }
 
     try {
-      adoptNavigationSnapshot(await codexClawApi.moveAgentToTeam(input));
+      adoptNavigationSnapshot(await appApi.moveAgentToTeam(input));
     } catch (error) {
       ElMessage.error(localizedErrorMessage(error, translate));
     }
@@ -1456,14 +1457,14 @@ export function useAppState() {
   async function reorderAgents(input: ReorderAgentsInput): Promise<void> {
     const team = snapshot.value.teams.find((candidate) => candidate.id === input.teamId);
     if (
-      !codexClawApi?.reorderAgents ||
+      !appApi?.reorderAgents ||
       !team?.agentIds.includes(input.agentId) ||
       (input.beforeAgentId !== null && !team.agentIds.includes(input.beforeAgentId))
     ) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.reorderAgents(input));
+    adoptBackgroundSnapshot(await appApi.reorderAgents(input));
   }
 
   async function reorderRepositories(input: ReorderRepositoriesInput): Promise<void> {
@@ -1474,43 +1475,43 @@ export function useAppState() {
       return repositoryRoot ? [repositoryRoot] : [];
     }));
     if (
-      !codexClawApi?.reorderRepositories ||
+      !appApi?.reorderRepositories ||
       !repositoryRoots.has(input.repositoryRoot) ||
       (input.beforeRepositoryRoot !== null && !repositoryRoots.has(input.beforeRepositoryRoot))
     ) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.reorderRepositories(input));
+    adoptBackgroundSnapshot(await appApi.reorderRepositories(input));
   }
 
   async function restartAgent(agentId: string): Promise<void> {
-    if (!codexClawApi?.restartAgent) {
+    if (!appApi?.restartAgent) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.restartAgent(agentId));
+    adoptBackgroundSnapshot(await appApi.restartAgent(agentId));
     resetAgentHistory(agentId);
   }
 
-  async function closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<void> {
-    if (!codexClawApi?.closeAgent) {
+  async function closeAgent(agentId: string, input?: import('@workspace/core/contracts').AgentCloseInput): Promise<void> {
+    if (!appApi?.closeAgent) {
       return;
     }
 
     adoptNavigationSnapshot(await (input
-      ? codexClawApi.closeAgent(agentId, input)
-      : codexClawApi.closeAgent(agentId)));
+      ? appApi.closeAgent(agentId, input)
+      : appApi.closeAgent(agentId)));
     await loadActiveAgentCatalogs();
   }
 
   async function respondToClientRequest(response: ClientRequestResponse): Promise<void> {
-    if (!codexClawApi) {
+    if (!appApi) {
       return;
     }
 
     const agentId = response.agentId ?? snapshot.value.activeAgentId;
-    adoptBackgroundSnapshot(await codexClawApi.respondToClientRequest({ ...response, ...(agentId ? { agentId } : {}) }));
+    adoptBackgroundSnapshot(await appApi.respondToClientRequest({ ...response, ...(agentId ? { agentId } : {}) }));
     markClientRequestAnswered(response.id);
   }
 
@@ -1535,7 +1536,7 @@ export function useAppState() {
     if (
       !agentId ||
       !approval ||
-      !codexClawApi ||
+      !appApi ||
       (decision === 'deny' && approval.canDeny === false) ||
       (decision === 'approve' && approval.allowedScopes && !approval.allowedScopes.includes(scope))
     ) {
@@ -1567,12 +1568,12 @@ export function useAppState() {
       !agent ||
       !capabilities?.approvals ||
       !(capabilities.approvalPresets ?? []).includes(preset) ||
-      !codexClawApi?.setAgentApprovalPreset
+      !appApi?.setAgentApprovalPreset
     ) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.setAgentApprovalPreset(agent.id, preset));
+    adoptBackgroundSnapshot(await appApi.setAgentApprovalPreset(agent.id, preset));
   }
 
   async function setPermissionMode(mode: string): Promise<void> {
@@ -1586,12 +1587,12 @@ export function useAppState() {
     if (
       !agent ||
       !supportedModes.some((option) => option.id === mode) ||
-      !codexClawApi?.setAgentPermissionMode
+      !appApi?.setAgentPermissionMode
     ) {
       return;
     }
 
-    adoptBackgroundSnapshot(await codexClawApi.setAgentPermissionMode(agent.id, mode));
+    adoptBackgroundSnapshot(await appApi.setAgentPermissionMode(agent.id, mode));
   }
 
   return {
@@ -1922,7 +1923,7 @@ function parseGoalSlashCommand(prompt: string): GoalSlashCommand | null {
 }
 
 async function handleGoalSlashCommand(agentId: string, command: GoalSlashCommand): Promise<void> {
-  if (!codexClawApi) {
+  if (!appApi) {
     return;
   }
 
@@ -1932,7 +1933,7 @@ async function handleGoalSlashCommand(agentId: string, command: GoalSlashCommand
   }
 
   if (command.action === 'set') {
-    adoptBackgroundSnapshot(await codexClawApi.setAgentGoal(agentId, command.objective));
+    adoptBackgroundSnapshot(await appApi.setAgentGoal(agentId, command.objective));
   }
 }
 
@@ -1944,20 +1945,20 @@ async function clearActiveGoal(): Promise<void> {
 }
 
 async function clearGoalForAgent(agentId: string): Promise<void> {
-  if (!codexClawApi?.clearAgentGoal) {
+  if (!appApi?.clearAgentGoal) {
     return;
   }
 
-  adoptBackgroundSnapshot(await codexClawApi.clearAgentGoal(agentId));
+  adoptBackgroundSnapshot(await appApi.clearAgentGoal(agentId));
 }
 
 function subscribeToMainEvents(): void {
-  if (!codexClawApi || typeof codexClawApi.onEvent !== 'function') {
+  if (!appApi || typeof appApi.onEvent !== 'function') {
     return;
   }
 
   unsubscribeMainEvents?.();
-  unsubscribeMainEvents = codexClawApi.onEvent((event: MainToRendererEvent) => {
+  unsubscribeMainEvents = appApi.onEvent((event: MainToRendererEvent) => {
     if (bufferedMainEvents) {
       bufferedMainEvents.push(event);
       return;
@@ -2118,9 +2119,9 @@ function invalidateAndRecoverCodexConversation(agentId: string): void {
   const frames = { ...codexConversationFramesByAgentId.value };
   delete frames[agentId];
   codexConversationFramesByAgentId.value = frames;
-  if (recoveringCodexConversationAgentIds.has(agentId) || !codexClawApi?.loadConversationHistory) return;
+  if (recoveringCodexConversationAgentIds.has(agentId) || !appApi?.loadConversationHistory) return;
   recoveringCodexConversationAgentIds.add(agentId);
-  void codexClawApi.loadConversationHistory(agentId)
+  void appApi.loadConversationHistory(agentId)
     .then(adoptBackgroundSnapshot)
     .catch(() => undefined)
     .finally(() => recoveringCodexConversationAgentIds.delete(agentId));
@@ -2130,9 +2131,9 @@ function invalidateAndRecoverClaudeConversation(agentId: string): void {
   const frames = { ...claudeConversationFramesByAgentId.value };
   delete frames[agentId];
   claudeConversationFramesByAgentId.value = frames;
-  if (recoveringClaudeConversationAgentIds.has(agentId) || !codexClawApi?.loadConversationHistory) return;
+  if (recoveringClaudeConversationAgentIds.has(agentId) || !appApi?.loadConversationHistory) return;
   recoveringClaudeConversationAgentIds.add(agentId);
-  void codexClawApi.loadConversationHistory(agentId)
+  void appApi.loadConversationHistory(agentId)
     .then(adoptBackgroundSnapshot)
     .catch(() => undefined)
     .finally(() => recoveringClaudeConversationAgentIds.delete(agentId));
@@ -2324,9 +2325,9 @@ async function refreshTeamSelection(
   needsHistory: boolean,
 ): Promise<void> {
   try {
-    let nextSnapshot = await codexClawApi!.selectTeam(teamId);
-    if (selectedAgentId && codexClawApi?.loadConversationHistory) {
-      nextSnapshot = await codexClawApi.loadConversationHistory(selectedAgentId);
+    let nextSnapshot = await appApi!.selectTeam(teamId);
+    if (selectedAgentId && appApi?.loadConversationHistory) {
+      nextSnapshot = await appApi.loadConversationHistory(selectedAgentId);
       selectTeamInSnapshot(nextSnapshot, teamId);
     }
     if (requestId === agentSelectionRequestId) {
@@ -2346,9 +2347,9 @@ async function refreshTeamSelection(
 
 async function refreshAgentSelection(agentId: string, requestId: number, needsHistory = false): Promise<void> {
   try {
-    let nextSnapshot = await codexClawApi!.selectAgent(agentId);
-    if (codexClawApi?.loadConversationHistory) {
-      nextSnapshot = await codexClawApi.loadConversationHistory(agentId);
+    let nextSnapshot = await appApi!.selectAgent(agentId);
+    if (appApi?.loadConversationHistory) {
+      nextSnapshot = await appApi.loadConversationHistory(agentId);
     }
     if (requestId === agentSelectionRequestId) {
       adoptBackgroundSnapshot(nextSnapshot);

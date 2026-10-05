@@ -58,11 +58,11 @@ describe('ImageAnnotationDialog', () => {
     expect(dialog.props('width')).toBe('80vw');
     expect(dialog.attributes('style')).toContain('height: 80vh');
     expect(dialog.attributes('style')).toContain('margin-top: 10vh');
-    expect(header.get('.claw-dialog__title').text()).toBe('Annotate');
+    expect(header.get('.app-dialog__title').text()).toBe('Annotate');
     expect(header.get('.image-annotation-dialog__header-main').find('.image-annotation-dialog__toolbar').exists()).toBe(true);
     expect(header.get('.image-annotation-dialog__header-trailing').find('[aria-label="Image information"]').exists()).toBe(true);
     expect(header.find('[aria-label="Close image annotation"]').exists()).toBe(false);
-    expect(wrapper.find('.claw-dialog__subtitle').exists()).toBe(false);
+    expect(wrapper.find('.app-dialog__subtitle').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Drag to draw');
     expect(wrapper.text()).not.toContain('Choose a tool');
     expect(wrapper.get('[aria-label="Image information"]').text()).toContain('800×400px');
@@ -90,12 +90,12 @@ describe('ImageAnnotationDialog', () => {
     expect(wrapper.get('.image-annotation-dialog__comments').text()).toContain('Keep this saved comment.');
     expect(wrapper.get('.image-annotation-dialog__save-count').text()).toBe('1');
     expect(wrapper.get('[aria-label="Clear image annotations"]').attributes('disabled')).toBeUndefined();
-    expect(wrapper.findAll('.image-annotation-dialog__footer .claw-button').map((button) => button.text()))
+    expect(wrapper.findAll('.image-annotation-dialog__footer .app-button').map((button) => button.text()))
       .toStrictEqual(['Cancel', 'Clear', 'Save 1']);
-    expect(wrapper.findAll('.image-annotation-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
-      ['claw-button', 'claw-button--tertiary'],
-      ['claw-button', 'claw-button--secondary'],
-      ['claw-button', 'claw-button--primary', 'image-annotation-dialog__save'],
+    expect(wrapper.findAll('.image-annotation-dialog__footer .app-button').map((button) => button.classes())).toStrictEqual([
+      ['app-button', 'app-button--tertiary'],
+      ['app-button', 'app-button--secondary'],
+      ['app-button', 'app-button--primary', 'image-annotation-dialog__save'],
     ]);
 
     await wrapper.get('[aria-label="Clear image annotations"]').trigger('click');

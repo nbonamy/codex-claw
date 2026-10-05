@@ -3,13 +3,13 @@
 Use focused tests while iterating, then run the relevant final gates before
 handing off or committing.
 
-Codex Claw has an Electron desktop host and an initial localhost-only Express
+Korus has an Electron desktop host and an initial localhost-only Express
 web host. Do not copy id8's generic API harness here. When this repo says
-"contract" or "workflow" test, it means Electron IPC, the Claw WebSocket
+"contract" or "workflow" test, it means Electron IPC, the Korus WebSocket
 adapter, client state, renderer behavior, or a fake backend transport.
 Use a fake unified backend for app-controller/state routing tests, a fake Codex
 SDK surface for the real Codex driver, and a fake Claude SDK query for the real
-Claude driver. Do not run the real Codex SDK against a fake app-server in Claw's
+Claude driver. Do not run the real Codex SDK against a fake app-server in Korus's
 normal tests: that boundary belongs to the SDK repository.
 
 ## Quality Bar
@@ -118,7 +118,7 @@ real backend process by default.
 
 Cover:
 
-- Claw RPC parsing, request/response matching, notifications, malformed
+- Korus RPC parsing, request/response matching, notifications, malformed
   responses, and client callbacks (not Codex SDK wire parsing).
 - App-server lifecycle decisions: spawn/connect, readiness, restart, shutdown,
   and process cleanup.
@@ -127,8 +127,8 @@ Cover:
 - Driver/adapter policy: create/resume/archive, submit/steer/interrupt,
   status projection and routing by agent/conversation.
 - Codex routing-envelope behavior and SDK replica revision handling, without a
-  second Claw transcript reducer.
-- Host-boundary regressions proving Claw forwards SDK snapshots, events, and
+  second Korus transcript reducer.
+- Host-boundary regressions proving Korus forwards SDK snapshots, events, and
   promise-returning conversation actions without duplicating SDK behavior.
 - Approval and user-input request coordination.
 - Persistence, migrations, settings, teams, agents, selected
@@ -136,10 +136,10 @@ Cover:
 - Filesystem and git operations at the app boundary.
 
 Use these ownership boundaries for integration coverage: a Codex app SDK fake
-drives the real Claw Codex backend; a Claude Agent SDK fake drives the real Claw
+drives the real Korus Codex backend; a Claude Agent SDK fake drives the real Korus
 Claude backend; a unified backend fake drives application state and mounted UI.
-Claw tests its adapter translations and product behavior, not either SDK's
-implementation. Process/socket transport tests still validate Claw's own wire
+Korus tests its adapter translations and product behavior, not either SDK's
+implementation. Process/socket transport tests still validate Korus's own wire
 framing, decoding and lifecycle. Real provider smoke tests remain opt-in and are
 never required for the normal test gate. The complete gap/value inventory is
 tracked separately in the backend semantics and testing plan.
@@ -206,7 +206,7 @@ Rules:
 - If a component is too hard to test in isolation, split it before adding
   brittle tests around the whole shell.
 - Keep shared SDK behavior in the SDK component's isolated spec and keep only
-  Codex Claw wrapper, adapter, and product-policy assertions in this repo.
+  Korus wrapper, adapter, and product-policy assertions in this repo.
 - App-shell tests use contract-faithful product-child stubs by default and opt
   into real child trees only for representative composition workflows.
 
@@ -224,7 +224,7 @@ High-priority renderer coverage:
 
 Composer, message rendering, clipboard, attachment, paste/drop, transcription,
 approval, and ask-user behavior belong to the SDK test suite and should not be
-reimplemented or exhaustively retested in Codex Claw.
+reimplemented or exhaustively retested in Korus.
 
 ## Contract Fixtures
 
@@ -236,7 +236,7 @@ The reusable boundary fixtures are deliberately scripted, not simulators:
 - `backend/src/claude/__tests__/sdk-query-fixture.ts`: real transport consumes
   independently controlled SDK query iterators; inputs, permissions and failures
   are observable at the SDK boundary.
-- `vue/src/test/client-api-mock.ts`: exhaustive, typed `CodexClawApi` fake with
+- `vue/src/test/client-api-mock.ts`: exhaustive, typed `AppApi` fake with
   production snapshot/connection/sequence initialization and independent,
   disposable backend-event, app-command and update-status subscriptions. Explicit
   read defaults perform no I/O; consequential operations throw unless scripted.
@@ -255,7 +255,7 @@ interaction result, not merely inspect forwarded component props.
 `sdk-boundary-*.spec.ts`, Claude's `sdk-boundary.spec.ts`, and the app's
 `*backend-boundary.spec.ts` exercise these seams. They run in the normal workspace
 test glob and CI; `npm run test:integration` is a fast focused entry point.
-Keep lower-level tests for Claw-owned algorithms, provider translation, wire
+Keep lower-level tests for Korus-owned algorithms, provider translation, wire
 security, persistence, filesystem and Git safety. A provider-independent service
 does not need artificial Codex and Claude variants.
 
@@ -269,7 +269,7 @@ Rules:
   from the resulting app-owned contract, not an SDK fake inside the UI test.
 - Do not make renderer tests import generated Codex protocol types.
 
-When replacing tests, record the Claw behavior retained and the new owning suite.
+When replacing tests, record the Korus behavior retained and the new owning suite.
 Delete SDK-owned optimistic-message, raw protocol reduction and slash-prompt-copy
 assertions instead of transplanting them. Do not replace useful failure, identity
 or ordering tests with call-through smoke tests.
@@ -346,7 +346,7 @@ boundary; source aliases are not a substitute for package verification.
 
 ## Conversation Ownership Verification
 
-Provider suites own exact transcript semantics. Claw tests only the boundaries
+Provider suites own exact transcript semantics. Korus tests only the boundaries
 it owns:
 
 - targeted provider operations never cross agent or conversation identity;
@@ -355,7 +355,7 @@ it owns:
 - stale or gapped revisions trigger provider rehydration;
 - Electron forwards provider frames without reducing conversation state;
 - app snapshot persistence and synchronization remain transcript-free;
-- Claw projections such as plans, diffs, unread state, and sidebar activity are
+- Korus projections such as plans, diffs, unread state, and sidebar activity are
   read-only and cannot resurrect or mutate provider turns.
 
 Plan review decisions are explicit backend commands, not projection mutations.
@@ -366,5 +366,5 @@ to decode provider frames. Navigation/preferences tests assert client isolation
 and no implicit runtime loading; snapshot queries must not perform maintenance.
 
 Use captured long-conversation fixtures for deterministic performance or memory
-regressions. Do not reintroduce a Claw transcript reducer solely to benchmark
+regressions. Do not reintroduce a Korus transcript reducer solely to benchmark
 provider traffic.

@@ -40,11 +40,11 @@ describe('FormDialog', () => {
       },
     });
 
-    expect(wrapper.get('.claw-dialog__title').text()).toBe('Create team');
-    expect(wrapper.get('.claw-dialog__subtitle').text()).toBe('Choose how this team should work.');
+    expect(wrapper.get('.app-dialog__title').text()).toBe('Create team');
+    expect(wrapper.get('.app-dialog__subtitle').text()).toBe('Choose how this team should work.');
     expect(wrapper.get('input').attributes('aria-label')).toBe('Name');
-    expect(wrapper.get('.claw-form-dialog__footer-left').text()).toBe('Advanced');
-    expect(wrapper.findAll('.claw-form-dialog__footer-actions button').map((button) => button.text())).toStrictEqual([
+    expect(wrapper.get('.app-form-dialog__footer-left').text()).toBe('Advanced');
+    expect(wrapper.findAll('.app-form-dialog__footer-actions button').map((button) => button.text())).toStrictEqual([
       'Cancel',
       'Create',
     ]);
@@ -98,8 +98,8 @@ describe('FormDialogField', () => {
 
     expect(wrapper.get('label').attributes('for')).toBe('repository');
     expect(wrapper.get('label').text()).toBe('Repository');
-    expect(wrapper.get('.claw-form-dialog__help').text()).toBe('Choose where this session should work.');
-    expect(wrapper.findAll('.claw-form-dialog__field > *').map((node) => node.element.tagName)).toStrictEqual([
+    expect(wrapper.get('.app-form-dialog__help').text()).toBe('Choose where this session should work.');
+    expect(wrapper.findAll('.app-form-dialog__field > *').map((node) => node.element.tagName)).toStrictEqual([
       'DIV',
       'INPUT',
     ]);

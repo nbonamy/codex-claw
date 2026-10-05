@@ -1,28 +1,28 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { backendRequestTimeoutMs } from '@codex-claw/core/backend-protocol/request-timeout';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { backendRequestTimeoutMs } from '@workspace/core/backend-protocol/request-timeout';
 import {
-  decodeClawBackendEvent,
-  type ClawBackendEvent,
-} from '@codex-claw/core/backend-protocol/events';
+  decodeAppBackendEvent,
+  type AppBackendEvent,
+} from '@workspace/core/backend-protocol/events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
-  createClawRpcError,
-  createClawRpcRequest,
-  createClawRpcResult,
-  clawRpcErrorCodes,
-  isClawRpcNotification,
-  isClawRpcRequest,
-  isClawRpcResponse,
-  parseClawRpcMessage,
-  type ClawRpcId,
-  type ClawRpcRequest,
-  type ClawRpcResponse,
-} from '@codex-claw/core/backend-protocol/rpc';
-import type { RemoteConnection } from '@codex-claw/core/contracts';
+  createAppRpcError,
+  createAppRpcRequest,
+  createAppRpcResult,
+  appRpcErrorCodes,
+  isAppRpcNotification,
+  isAppRpcRequest,
+  isAppRpcResponse,
+  parseAppRpcMessage,
+  type AppRpcId,
+  type AppRpcRequest,
+  type AppRpcResponse,
+} from '@workspace/core/backend-protocol/rpc';
+import type { RemoteConnection } from '@workspace/core/contracts';
 import { warnMain } from '../log';
 import { sshStdioTransport } from './ssh-connections';
 
-export type RemoteClawdClientOptions = {
+export type RemoteDaemonClientOptions = {
   requestHandlers?: Record<string, (params: unknown) => unknown | Promise<unknown>>;
   spawnProcess?: typeof spawn;
 };
@@ -33,16 +33,16 @@ type PendingRequest = {
   timeout: NodeJS.Timeout;
 };
 
-export class RemoteClawdClientManager {
-  private readonly clients = new Map<string, RemoteClawdClient>();
+export class RemoteDaemonClientManager {
+  private readonly clients = new Map<string, RemoteDaemonClient>();
 
-  constructor(private readonly options: RemoteClawdClientOptions = {}) {}
+  constructor(private readonly options: RemoteDaemonClientOptions = {}) {}
 
   async request<Result>(
     connection: RemoteConnection,
     method: string,
     params?: unknown,
-    onEvent?: (event: ClawBackendEvent) => void,
+    onEvent?: (event: AppBackendEvent) => void,
   ): Promise<Result> {
     const client = await this.client(connection);
     if (onEvent) {
@@ -66,7 +66,7 @@ export class RemoteClawdClientManager {
     await client.close();
   }
 
-  private async client(connection: RemoteConnection): Promise<RemoteClawdClient> {
+  private async client(connection: RemoteConnection): Promise<RemoteDaemonClient> {
     const existing = this.clients.get(connection.id);
     if (existing) {
       if (existing.isRunning()) {
@@ -79,8 +79,8 @@ export class RemoteClawdClientManager {
       throw new Error(`Remote connection is not ready: ${connection.name}`);
     }
 
-    let client: RemoteClawdClient;
-    client = new RemoteClawdClient(connection, this.options, () => {
+    let client: RemoteDaemonClient;
+    client = new RemoteDaemonClient(connection, this.options, () => {
       if (this.clients.get(connection.id) === client) {
         this.clients.delete(connection.id);
       }
@@ -91,21 +91,21 @@ export class RemoteClawdClientManager {
   }
 }
 
-class RemoteClawdClient {
+class RemoteDaemonClient {
   private process: ChildProcessWithoutNullStreams | null = null;
   private stdoutBuffer = '';
   private stderrBuffer = '';
   private nextRequestId = 1;
-  private readonly pending = new Map<ClawRpcId, PendingRequest>();
-  private eventSink: ((event: ClawBackendEvent) => void) | null = null;
+  private readonly pending = new Map<AppRpcId, PendingRequest>();
+  private eventSink: ((event: AppBackendEvent) => void) | null = null;
 
   constructor(
     private readonly connection: RemoteConnection,
-    private readonly options: RemoteClawdClientOptions,
+    private readonly options: RemoteDaemonClientOptions,
     private readonly onStopped: () => void,
   ) {}
 
-  setEventSink(eventSink: (event: ClawBackendEvent) => void): void {
+  setEventSink(eventSink: (event: AppBackendEvent) => void): void {
     this.eventSink = eventSink;
   }
 
@@ -132,7 +132,7 @@ class RemoteClawdClient {
     child.once('exit', (code, signal) => {
       this.flushStderr();
       this.process = null;
-      this.rejectPending(new Error(`remote clawd exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
+      this.rejectPending(new Error(`remote daemon exited before responding (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
       this.onStopped();
     });
     child.once('error', (error) => {
@@ -160,10 +160,10 @@ class RemoteClawdClient {
 
   private logStderrLine(line: string): void {
     const detail = line.trim();
-    if (!detail || detail.startsWith('clawd daemon socket unavailable:')) {
+    if (!detail || detail.startsWith('daemon daemon socket unavailable:')) {
       return;
     }
-    warnMain('remote-clawd', '', {
+    warnMain('remote-daemon', '', {
       connectionId: this.connection.id,
       detail,
     });
@@ -171,16 +171,16 @@ class RemoteClawdClient {
 
   request<Result>(method: string, params?: unknown): Promise<Result> {
     if (!this.process) {
-      throw new Error('remote clawd is not running.');
+      throw new Error('remote daemon is not running.');
     }
 
     const requestTimeoutMs = backendRequestTimeoutMs(method);
     const id = this.nextRequestId++;
-    const message = createClawRpcRequest(id, method, params);
+    const message = createAppRpcRequest(id, method, params);
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`remote clawd request timed out: ${method}`));
+        reject(new Error(`remote daemon request timed out: ${method}`));
       }, requestTimeoutMs);
 
       this.pending.set(id, {
@@ -197,7 +197,7 @@ class RemoteClawdClient {
   async close(): Promise<void> {
     const child = this.process;
     this.process = null;
-    this.rejectPending(new Error('remote clawd client closed.'));
+    this.rejectPending(new Error('remote daemon client closed.'));
 
     if (!child || child.killed) {
       return;
@@ -228,20 +228,20 @@ class RemoteClawdClient {
   }
 
   private handleLine(line: string): void {
-    let message: ReturnType<typeof parseClawRpcMessage>;
+    let message: ReturnType<typeof parseAppRpcMessage>;
     try {
-      message = parseClawRpcMessage(JSON.parse(line));
+      message = parseAppRpcMessage(JSON.parse(line));
     } catch (error) {
       this.handleProtocolError(error);
       return;
     }
-    if (isClawRpcNotification(message)) {
+    if (isAppRpcNotification(message)) {
       if (message.method === backendMethods.backendEventNotify) {
-        let event: ClawBackendEvent;
+        let event: AppBackendEvent;
         try {
-          event = decodeClawBackendEvent(message.params);
+          event = decodeAppBackendEvent(message.params);
         } catch (error) {
-          warnMain('remote-clawd', 'ignored malformed remote backend event notification', {
+          warnMain('remote-daemon', 'ignored malformed remote backend event notification', {
             connectionId: this.connection.id,
             detail: error instanceof Error ? error.message : 'Invalid backend event notification.',
           });
@@ -251,18 +251,18 @@ class RemoteClawdClient {
       }
       return;
     }
-    if (isClawRpcRequest(message)) {
+    if (isAppRpcRequest(message)) {
       this.handleRequest(message);
       return;
     }
-    if (isClawRpcResponse(message)) {
+    if (isAppRpcResponse(message)) {
       this.handleResponse(message);
     }
   }
 
   private handleProtocolError(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
-    warnMain('remote-clawd', 'invalid remote backend response', {
+    warnMain('remote-daemon', 'invalid remote backend response', {
       connectionId: this.connection.id,
       detail: message,
     });
@@ -275,27 +275,27 @@ class RemoteClawdClient {
     }
   }
 
-  private handleRequest(message: ClawRpcRequest): void {
+  private handleRequest(message: AppRpcRequest): void {
     void this.handleRequestAsync(message);
   }
 
-  private async handleRequestAsync(message: ClawRpcRequest): Promise<void> {
+  private async handleRequestAsync(message: AppRpcRequest): Promise<void> {
     const handler = this.options.requestHandlers?.[message.method];
     if (!handler) {
-      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.methodNotFound, `Unknown client method: ${message.method}`));
+      this.writeResponse(createAppRpcError(message.id, appRpcErrorCodes.methodNotFound, `Unknown client method: ${message.method}`));
       return;
     }
 
     try {
-      this.writeResponse(createClawRpcResult(message.id, await handler(message.params)));
+      this.writeResponse(createAppRpcResult(message.id, await handler(message.params)));
     } catch (error) {
-      this.writeResponse(createClawRpcError(message.id, clawRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error)));
+      this.writeResponse(createAppRpcError(message.id, appRpcErrorCodes.internalError, error instanceof Error ? error.message : String(error)));
     }
   }
 
-  private handleResponse(response: ClawRpcResponse): void {
+  private handleResponse(response: AppRpcResponse): void {
     if (response.id === null) {
-      warnMain('remote-clawd', 'remote response without request id', {
+      warnMain('remote-daemon', 'remote response without request id', {
         connectionId: this.connection.id,
       });
       return;
@@ -303,7 +303,7 @@ class RemoteClawdClient {
 
     const pending = this.pending.get(response.id);
     if (!pending) {
-      warnMain('remote-clawd', 'remote response for unknown request id', {
+      warnMain('remote-daemon', 'remote response for unknown request id', {
         connectionId: this.connection.id,
         id: response.id,
       });
@@ -329,7 +329,7 @@ class RemoteClawdClient {
     this.pending.clear();
   }
 
-  private writeResponse(response: ClawRpcResponse): void {
+  private writeResponse(response: AppRpcResponse): void {
     this.process?.stdin.write(`${JSON.stringify(response)}\n`);
   }
 }

@@ -5,7 +5,7 @@ implementation/review role policy remains a separate decision.
 
 ## Problem
 
-Claw can create agents through several manual and automated entry points.
+Korus can create agents through several manual and automated entry points.
 Codex and Claude Code are peers. Either, both, or neither may be connected on a
 host. Installation and process health are distinct from authentication.
 
@@ -107,7 +107,7 @@ backend.
 Independent review exposes an optional provider selection so Claude can review
 Codex work and vice versa. It defaults to the source agent's backend, without
 persisting a separate reviewer preference. Findings, triage, remediation,
-and the completion message remain Claw-owned. Changing the reviewer provider
+and the completion message remain Korus-owned. Changing the reviewer provider
 must not transfer provider-specific conversation IDs or incompatible model
 settings; model selection must remain valid for the selected backend.
 
@@ -119,7 +119,7 @@ policy for later implementation and review roles remains to be agreed.
 `BackendSelector` is the shared product control, with small, default, and large
 sizes. `AppShell` provides the connected choices once through `backend-selection`;
 dialogs do not read settings independently.
-`clawd` owns connection observations and publishes them in snapshots. Observations
+`daemon` owns connection observations and publishes them in snapshots. Observations
 are not persisted. Installation and authentication are checked once per backend
 startup and cached for that process. Reading status, opening Settings, sending
 prompts, and provider errors do not trigger another check. Explicit connection,
@@ -143,7 +143,7 @@ available engine; another connected engine must be enabled first. Startup with
 no available engines shows setup even for an existing workspace. Setup can enable
 an already-authenticated engine without another sign-in, and returning users go
 straight back to their workspace after Continue. Disabling preserves histories, drafts, queues,
-and running turns, while preventing new work. Pending Claw prompts resume when
+and running turns, while preventing new work. Pending Korus prompts resume when
 the engine is enabled again. External auth loss surfaces as a request failure;
 an explicit connection action refreshes the cached authentication state.
 

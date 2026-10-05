@@ -26,7 +26,7 @@
       :width="220"
       :offset="variant === 'compact' ? 4 : 8"
       :show-arrow="false"
-      popper-class="claw-popover"
+      popper-class="app-popover"
     >
       <template #reference>
         <button
@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { OpenInApplication, OpenInApplicationCatalog } from '@workspace/core/contracts';
 import { ChevronDown, ExternalLinkIcon } from './icons/app-icons';
 import AppMenu from './menu/AppMenu.vue';
 import { openInApplicationFromMenuItem, openInMenuItems } from './open-in';

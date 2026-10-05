@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ElMessage } from 'element-plus';
 import BrowserPanel from '../BrowserPanel.vue';
 import { setElectronTestClient } from '../../test/client';
-import type { MainToRendererEvent } from '@codex-claw/core/contracts';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { MainToRendererEvent } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import GitDiffControl from '../GitDiffControl.vue';
 
 class ResizeObserverStub {
@@ -78,7 +78,7 @@ function mountPanel(
 
 describe('BrowserPanel', () => {
   it.each([
-    ['claw', 'https://www.google.com/search?q=claw'],
+    ['app', 'https://www.google.com/search?q=app'],
     ['  how do worktrees work?  ', 'https://www.google.com/search?q=how%20do%20worktrees%20work%3F'],
     ['example.com/docs', 'example.com/docs'],
     ['example.com:8080/docs', 'https://example.com:8080/docs'],

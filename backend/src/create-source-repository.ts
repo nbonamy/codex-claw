@@ -1,7 +1,7 @@
 import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { AppError } from '@codex-claw/core/app-error';
-import type { SourceRepository } from '@codex-claw/core/contracts';
+import { AppError } from '@workspace/core/app-error';
+import type { SourceRepository } from '@workspace/core/contracts';
 import { resolveSourceFolderPath } from './source-repositories';
 
 export async function createSourceRepository(

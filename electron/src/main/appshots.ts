@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { app } from 'electron';
 import type { Autolib } from 'autolib';
 import { executeComputerUseCommand, type ComputerUseOptions } from './computer-use-tools';
@@ -51,7 +52,7 @@ export async function captureAppshot(options: CaptureAppshotOptions = {}): Promi
       || screenshot.error.includes('Screen Recording')
     ) {
       await execute({ command: 'request_screen_capture', arguments: {}, options: helperOptions });
-      throw new Error('Allow Screen Recording for Codex Claw Computer Use, then try the Appshot again.');
+      throw new Error(`Allow Screen Recording for ${product.name} Computer Use, then try the Appshot again.`);
     }
     throw new Error(screenshot.error);
   }

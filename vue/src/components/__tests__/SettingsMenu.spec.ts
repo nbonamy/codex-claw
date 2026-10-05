@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SettingsMenu from '../SettingsMenu.vue';
-import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount } from '@codex-claw/core/contracts';
+import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount } from '@workspace/core/contracts';
 import { setElectronTestClient } from '../../test/client';
 
 afterEach(() => {

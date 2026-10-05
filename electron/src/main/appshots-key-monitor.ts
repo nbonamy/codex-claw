@@ -1,4 +1,4 @@
-import type { AppshotHotkey } from '@codex-claw/core/contracts';
+import type { AppshotHotkey } from '@workspace/core/contracts';
 import type { Autolib, KeyMonitorEvent } from 'autolib';
 import { loadNativeAutomation } from './native-automation';
 

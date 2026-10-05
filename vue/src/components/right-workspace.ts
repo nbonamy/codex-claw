@@ -1,5 +1,5 @@
-import type { WorkItem } from '@codex-claw/core/contracts';
-import type { WorkItemAssignmentAction } from '@codex-claw/core/work-item-prompts';
+import type { WorkItem } from '@workspace/core/contracts';
+import type { WorkItemAssignmentAction } from '@workspace/core/work-item-prompts';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState, SidePanelSourceState } from './side-panel';
 
 export type RightWorkspaceFileTab = `file:${string}`;
@@ -19,7 +19,7 @@ export function isRightWorkspaceBrowserTab(tab: RightWorkspaceTab): tab is Right
 
 export type RepositoryWorkStartInput = {
   isCurrent?: () => boolean;
-  backend?: import('@codex-claw/core/contracts').AgentBackend;
+  backend?: import('@workspace/core/contracts').AgentBackend;
   action: WorkItemAssignmentAction | 'custom';
   item: WorkItem;
   target: 'current' | 'duplicate';

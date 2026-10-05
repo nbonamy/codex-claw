@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AgentBackend, AppGeneralSettings } from '@codex-claw/core/contracts';
+import type { AgentBackend, AppGeneralSettings } from '@workspace/core/contracts';
 import { claudeConfigDirectory } from './claude/config-directory';
 import { backendCodexHomeDir } from './state';
 

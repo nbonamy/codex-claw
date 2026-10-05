@@ -20,8 +20,8 @@ export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPrompt
     '',
     `Work item ID: ${workItemId}`,
     completionPolicy === 'complete'
-      ? 'When the work is fully complete, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `completed`.'
-      : 'When the outcome is ready for the user to review, call the codex_claw MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
+      ? 'When the work is fully complete, call the workspace MCP tool `update-work-item` with this exact Work item ID and status `completed`.'
+      : 'When the outcome is ready for the user to review, call the workspace MCP tool `update-work-item` with this exact Work item ID and status `readyForReview`.',
     'If you need help or cannot proceed, call `update-work-item` with status `blocked` and a concise note explaining what you need. Use status `inProgress` when work resumes.',
     '',
     `Backlog source: ${item.sourceName}`,

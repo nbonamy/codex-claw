@@ -1,6 +1,7 @@
-import type { Agent, AppSnapshot } from '@codex-claw/core/contracts';
-import type { Mission } from '@codex-claw/core/missions';
-import type { MissionRun } from '@codex-claw/core/mission-execution';
+import { product } from '@workspace/core/product';
+import type { Agent, AppSnapshot } from '@workspace/core/contracts';
+import type { Mission } from '@workspace/core/missions';
+import type { MissionRun } from '@workspace/core/mission-execution';
 
 export function missionAgent(snapshot: AppSnapshot, id: string | undefined): Agent | undefined {
   return snapshot.agents.find(agent => agent.id === id);
@@ -33,7 +34,7 @@ export function missionWorkspaceName(mission: Mission): string {
 }
 
 export function stageKickoffPrompt(run: MissionRun): string {
-  if (run.stage === 'tickets') return 'The requirements are approved. Continue this Mission in the Tickets stage now: follow the assigned Claw Mission skill, then work with the user to shape and publish the backlog.';
+  if (run.stage === 'tickets') return `The requirements are approved. Continue this Mission in the Tickets stage now: follow the assigned ${product.name} Mission skill, then work with the user to shape and publish the backlog.`;
   if (run.stage === 'implementation') return `The tickets are approved. Begin implementation of assigned ticket ${(run.ticketIndex ?? 0) + 1} now and report progress in this Mission conversation.`;
   return 'The implementation is approved. Begin the Mission review now and prepare the delivery decision for the user.';
 }

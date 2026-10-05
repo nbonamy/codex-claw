@@ -1,5 +1,5 @@
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { workProviderDefinition } from '@workspace/core/work-providers';
+import { agentDisplayName } from '@workspace/core/agent-display';
 import type {
   Agent,
   AgentGitBranchInput,
@@ -12,15 +12,15 @@ import type {
   Team,
   WorkItem,
   WorkItemQuery,
-} from '@codex-claw/core/contracts';
-import { findAssignedAgentForWorkItem } from '@codex-claw/core/work-assignments';
+} from '@workspace/core/contracts';
+import { findAssignedAgentForWorkItem } from '@workspace/core/work-assignments';
 import {
   workItemAssignmentPrompt,
   workItemComposerPrompt,
   workItemBranchName,
   workItemDisplayIdentifier,
   type WorkItemAssignmentAction,
-} from '@codex-claw/core/work-item-prompts';
+} from '@workspace/core/work-item-prompts';
 import { computed, ref } from 'vue';
 import { translate } from '../i18n';
 import type { RepositoryWorkStartInput } from './right-workspace';

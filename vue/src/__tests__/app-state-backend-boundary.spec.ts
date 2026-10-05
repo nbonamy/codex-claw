@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { installBackendFixture } from '../test/backend-fixture';
 import { useAppState } from '../app-state';
 
-afterEach(() => { delete window.codexClaw; });
+afterEach(() => { delete window.app; });
 
 describe('unified backend → app state request lifecycle', () => {
   it('keeps a background proposal attached to its owner and opens it after navigation', async () => {

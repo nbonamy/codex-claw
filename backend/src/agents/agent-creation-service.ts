@@ -1,7 +1,7 @@
-import { createAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import type { Agent, AppSnapshot, CreateAgentInput } from '@codex-claw/core/contracts';
-import { createEntityId } from '@codex-claw/core/ids';
-import { resolveAgentBackend } from '@codex-claw/core/agent-backends';
+import { createAgentInSnapshot } from '@workspace/core/agent-manager';
+import type { Agent, AppSnapshot, CreateAgentInput } from '@workspace/core/contracts';
+import { createEntityId } from '@workspace/core/ids';
+import { resolveAgentBackend } from '@workspace/core/agent-backends';
 
 export type AgentCreationOptions = {
   id?: string;

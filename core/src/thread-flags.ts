@@ -2,7 +2,7 @@ export const threadFlagIds = ['delegate_to_worktree', 'ready_for_review'] as con
 
 export type ThreadFlagId = typeof threadFlagIds[number];
 
-/** Durable, predefined thread state authored by an agent and interpreted by Claw. */
+/** Durable, predefined thread state authored by an agent and interpreted by App. */
 export type ThreadFlags = Partial<Record<ThreadFlagId, true>>;
 
 export type ThreadFlagResponse = {

@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import AgentEmptyState from '../AgentEmptyState.vue';
@@ -9,9 +10,9 @@ describe('AgentEmptyState', () => {
         },
     });
 
-    expect(wrapper.text()).toContain('Welcome to Codex Claw');
+    expect(wrapper.text()).toContain(`Welcome to ${product.name}`);
     expect(wrapper.text()).toContain('Choose a source to start a session');
-    expect(wrapper.get('.agent-empty-state__mark img').attributes('alt')).toBe('Codex Claw');
+    expect(wrapper.get('.agent-empty-state__mark img').attributes('alt')).toBe(`${product.name}`);
     expect(wrapper.find('.agent-sidebar__new').exists()).toBe(false);
     expect(wrapper.getComponent({ name: 'AppMenu' }).props('items')).toHaveLength(4);
 

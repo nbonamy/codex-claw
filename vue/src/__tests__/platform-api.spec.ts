@@ -1,33 +1,34 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ElMessageBox } from 'element-plus';
-import { desktopClawHostCapabilities, webClawHostCapabilities } from '@codex-claw/core/client';
-import type { CodexClawApi } from '@codex-claw/core/contracts';
+import { desktopAppHostCapabilities, webAppHostCapabilities } from '@workspace/core/client';
+import type { AppApi } from '@workspace/core/contracts';
 import {
   CHATGPT_PLUGINS_URL,
   CODEX_APP_DEEP_LINK,
-  clawClientPlatform,
-  clawHostCapabilities,
-  clawPlatformActions,
-  configureClawClient,
+  appClientPlatform,
+  appHostCapabilities,
+  appPlatformActions,
+  configureAppClient,
 } from '../platform-api';
 
-describe('Claw renderer platform profiles', () => {
+describe(`${product.name} renderer platform profiles`, () => {
   afterEach(() => {
-    configureClawClient(undefined);
+    configureAppClient(undefined);
     vi.restoreAllMocks();
   });
 
   it('owns the desktop profile and launches ChatGPT through the desktop API', async () => {
     const launchChatGptApp = vi.fn().mockResolvedValue({ status: 'launched' });
-    configureClawClient({
-      api: { launchChatGptApp } as unknown as CodexClawApi,
+    configureAppClient({
+      api: { launchChatGptApp } as unknown as AppApi,
       platform: 'desktop',
     });
 
-    expect(clawClientPlatform).toBe('desktop');
-    expect(clawHostCapabilities).toBe(desktopClawHostCapabilities);
-    await clawPlatformActions.launchChatGpt();
-    await clawPlatformActions.managePlugins();
+    expect(appClientPlatform).toBe('desktop');
+    expect(appHostCapabilities).toBe(desktopAppHostCapabilities);
+    await appPlatformActions.launchChatGpt();
+    await appPlatformActions.managePlugins();
     expect(launchChatGptApp).toHaveBeenCalledTimes(2);
   });
 
@@ -36,15 +37,15 @@ describe('Claw renderer platform profiles', () => {
     const launchChatGptApp = vi.fn()
       .mockResolvedValueOnce({ status: 'alreadyRunning' })
       .mockResolvedValueOnce({ status: 'launched' });
-    configureClawClient({
-      api: { launchChatGptApp } as unknown as CodexClawApi,
+    configureAppClient({
+      api: { launchChatGptApp } as unknown as AppApi,
       platform: 'desktop',
     });
 
-    await clawPlatformActions.launchChatGpt();
+    await appPlatformActions.launchChatGpt();
 
     expect(confirm).toHaveBeenCalledWith(
-      'ChatGPT is already open. Codex Claw needs to relaunch it with Claw’s isolated Codex home.',
+      `ChatGPT is already open. ${product.name} needs to relaunch it with ${product.name}’s isolated Codex home.`,
       'Quit and relaunch ChatGPT?',
       expect.objectContaining({
         cancelButtonText: 'Cancel',
@@ -59,12 +60,12 @@ describe('Claw renderer platform profiles', () => {
   it('leaves an existing ChatGPT instance running when relaunch is canceled', async () => {
     vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue(new Error('cancel'));
     const launchChatGptApp = vi.fn().mockResolvedValue({ status: 'alreadyRunning' });
-    configureClawClient({
-      api: { launchChatGptApp } as unknown as CodexClawApi,
+    configureAppClient({
+      api: { launchChatGptApp } as unknown as AppApi,
       platform: 'desktop',
     });
 
-    await clawPlatformActions.launchChatGpt();
+    await appPlatformActions.launchChatGpt();
 
     expect(launchChatGptApp).toHaveBeenCalledOnce();
     expect(launchChatGptApp).toHaveBeenCalledWith();
@@ -72,13 +73,13 @@ describe('Claw renderer platform profiles', () => {
 
   it('owns the web profile and opens plugin management on ChatGPT web', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
-    configureClawClient({ api: {} as CodexClawApi, platform: 'web' });
+    configureAppClient({ api: {} as AppApi, platform: 'web' });
 
-    expect(clawClientPlatform).toBe('web');
-    expect(clawHostCapabilities).toBe(webClawHostCapabilities);
-    expect(clawPlatformActions.launchChatGpt).toBeTypeOf('function');
+    expect(appClientPlatform).toBe('web');
+    expect(appHostCapabilities).toBe(webAppHostCapabilities);
+    expect(appPlatformActions.launchChatGpt).toBeTypeOf('function');
     expect(CODEX_APP_DEEP_LINK).toBe('codex://');
-    await clawPlatformActions.managePlugins();
+    await appPlatformActions.managePlugins();
     expect(open).toHaveBeenCalledWith(CHATGPT_PLUGINS_URL, '_blank', 'noopener,noreferrer');
   });
 });

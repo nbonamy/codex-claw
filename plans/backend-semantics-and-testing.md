@@ -33,13 +33,13 @@ it is not evidence of a new semantic regression.
 
 ## Target
 
-Claw adapts Codex app SDK and Claude Agent SDK into a unified,
+Korus adapts Codex app SDK and Claude Agent SDK into a unified,
 capability-driven backend. Its application consumes that backend without
 needing provider identity to interpret product behavior.
 
-Test Claw's translations and behavior, not either SDK's implementation.
+Test Korus's translations and behavior, not either SDK's implementation.
 Preserve provider-owned conversation rendering and state; this work must not
-introduce a replacement Claw transcript reducer.
+introduce a replacement Korus transcript reducer.
 
 ## Testing work ledger (2026-09-16)
 
@@ -51,14 +51,14 @@ persistence and integration services: their own external boundary is the owner.
 
 | Domain | Owning tests and observable evidence | Disposition |
 | --- | --- | --- |
-| Provider prompts, settings and lifecycle | Codex `sdk-boundary-lifecycle`, `-controls`, `-sessions`: accepted/rejected sends, settings, attachments, archival order and rollback. Claude `sdk-boundary` joins the real transport, driver and server; `agent-sdk-transport` covers repeated turns, configuration changes, interruption and workspace isolation. | Rewritten Codex boundary; joined Claude boundary. Keep Claude translation unit tests because Claw owns that translation. |
+| Provider prompts, settings and lifecycle | Codex `sdk-boundary-lifecycle`, `-controls`, `-sessions`: accepted/rejected sends, settings, attachments, archival order and rollback. Claude `sdk-boundary` joins the real transport, driver and server; `agent-sdk-transport` covers repeated turns, configuration changes, interruption and workspace isolation. | Rewritten Codex boundary; joined Claude boundary. Keep Claude translation unit tests because Korus owns that translation. |
 | Plans and execution progress | Both SDK suites reach durable server review state and send acceptance back through the SDK. Codex duplicate/stale proposals cannot re-emit readiness. `agent-plan-review-service` covers cancellation, revision, retry, replacement during acceptance and persisted review round-trip. Mounted `App.backend-boundary` proves execution panel updates/clearing, review visibility, footer dismissal, cancel, failed acceptance and external resolution. App-state boundary covers background arrival, navigation and revision. | Added composition tests; retained focused lifecycle tests. Generic SDK plan reduction is not retested. |
 | Approvals/questions | `agent-request-registry`: scope, collision, retry, stale replacement and lifecycle validation. Codex SDK tests use colliding approval/question ID `0`. Claude SDK tests route decisions and cancelled/pre-aborted permissions into backend state. App-state boundary tests identical IDs across navigation and failed response; mounted app observes approval cancellation. | Added joined lifecycle tests. Found/fixed missing Claude cancellation propagation. SDK-owned question widget permutations remain SDK tests. |
 | Prompt queue/admission | `server-conversation-requests`: competing completion/idle events must send exactly once; acceptance/rejection/retry. App-state queue tests retain submission/agent ownership; mounted app proves queued row appearance/removal. Removing the in-flight lock makes the retained test fail. | Keep race coverage; add real composed visibility test. |
 | Capabilities/catalogs | `driver-capability-boundary` enumerates 18 unsupported operations, empty catalogs, archive support and unadvertised permission modes. Codex SDK controls check fresh catalogs, nested cloning and failures. Existing app-state catalogs check invalidation/selection/errors; mounted app receives changing advertised capabilities without changing provider. | New boundary coverage, no artificial parity. Claude goals, fast tier and archive are unsupported. |
 | Goals/usage/limits | Codex SDK projections check active/completed/cleared goals, action/event ownership, supplied context usage and account limits. Common optional-operation tests reject unsupported goals. Claude SDK transport measures live/persisted context without sending a prompt. Core policy/reducer tests own arithmetic and validation. | Rewritten provider mapping; retain pure algorithms. SDK token calculation is out of scope. |
-| Provider conversation frames/history | Codex SDK suites check independent opaque revisions, paging/cache/error, TTL, cold settings, turn operations and late events. App-state replica recovery tests subscribe-before-load, gaps and stale selection. Claude history/stream translation tests belong to Claw. | Remove Codex SDK reducer/optimistic-row assertions; keep transport integrity and recovery. |
-| Subagents/delegation | Codex `sdk-boundary-subagents`: owner routing, activity, live-vs-cold history, release and delayed identity after replacement. Existing delegated-report lifecycle/core tree tests own cross-agent coordination. | Migrated SDK inputs; retained Claw algorithms. Claude provider subagent stream projection is not an advertised equivalent. |
+| Provider conversation frames/history | Codex SDK suites check independent opaque revisions, paging/cache/error, TTL, cold settings, turn operations and late events. App-state replica recovery tests subscribe-before-load, gaps and stale selection. Claude history/stream translation tests belong to Korus. | Remove Codex SDK reducer/optimistic-row assertions; keep transport integrity and recovery. |
+| Subagents/delegation | Codex `sdk-boundary-subagents`: owner routing, activity, live-vs-cold history, release and delayed identity after replacement. Existing delegated-report lifecycle/core tree tests own cross-agent coordination. | Migrated SDK inputs; retained Korus algorithms. Claude provider subagent stream projection is not an advertised equivalent. |
 | Agents/teams/client navigation | `server-client-isolation-regressions`: concurrent clients cannot overwrite each other's selected agent or replay remote pending requests. App-state lifecycle tests retain stale-navigation cases. | Keep; included in focused integration command and normal glob-based CI. |
 | Persistence/recovery | `state-persistence`: coalesced writes, no credentials/transcripts, invalid metadata and remote-pointer repair. Server session tests roll back failed persistence; review service persists/restores pending workflow. | Keep real serialization and failure assertions, not SDK storage tests. |
 | Git/worktrees | Temporary Git repositories exercise actual commands and worktree safety. `server-git-workflow-requests` checks query/no presentation side effect, draft generation without conversation prompt, existing PR/push ordering and diff failure. `use-workspace-previews` rejects stale success/failure updates. | Keep; corrected obsolete test titles. SDK columns N/A. |
@@ -89,8 +89,8 @@ persistence and integration services: their own external boundary is the owner.
 ### Replacement/deletion ledger
 
 The old Codex adapter suite (47 cases, 2,287 lines) used a fake app-server
-underneath a real SDK. Its useful Claw assertions moved to the public SDK seam;
-the old driver suite (15 cases) mocked Claw's own adapter. Both files are removed.
+underneath a real SDK. Its useful Korus assertions moved to the public SDK seam;
+the old driver suite (15 cases) mocked Korus's own adapter. Both files are removed.
 This is not a claim that all 62 cases were useless.
 
 | Removed scenario group | Replacement / reason |
@@ -101,20 +101,20 @@ This is not a claim that all 62 cases were useless.
 | User thread source, workspace-free chat and generated titles | SDK lifecycle/settings creation assertions; sessions test absent cwd, cold restore and title notifications. |
 | Session compression/replacement | SDK sessions: handoff isolation/defaults, acceptance-before-archive and failed replacement rollback. Command routing remains in `codex-command`. |
 | Simultaneous semantic events, full snapshots, history pages, retry metadata and remote messages | SDK events forward opaque frames with independent revisions; lifecycle/sessions preserve cache, TTL, paging and errors. Removed detailed SDK-native item reduction, exact optimistic user row generation and app-server pagination permutations: SDK-owned. |
-| Tool/plan mutations and completed plan distinction | SDK events assert opaque forwarding and real server readiness; mounted application proves separate execution/review surfaces. No Claw Codex transcript reducer. |
+| Tool/plan mutations and completed plan distinction | SDK events assert opaque forwarding and real server readiness; mounted application proves separate execution/review surfaces. No Korus Codex transcript reducer. |
 | Subagent tree events, live history and cold completion | SDK subagents: routing, last-message cold reads, provider summaries, identity refresh and release/stale isolation. |
 | Approval routing, cwd skills and null skill fields | SDK events collide approval/question IDs across two owners; projections retain defensive wire decoding and nullable-field normalization. |
 | Prompt settings, attachments, model catalog/Astra, approval presets/capabilities, fast tier | SDK controls/lifecycle/sessions/projections preserve exact handle selection and settings; no hardcoded catalog filtering. |
 | Immediate turn ID, orphan history, active goals and async questions | SDK lifecycle/projections retain returned turn ID, orphan interrupt policy and status distinctions. SDK reconciliation internals are deliberately not recreated. |
 | Editing/retry/delete/fork/stable fork turn ID | SDK controls target real adapter operations at scripted handle; opaque snapshots/events remain provider-owned. |
-| Slash review materialization and compact routing | SDK controls and existing command parser tests retain Claw routing. Deleted exact SDK-generated review prompt text/optimistic row assertions. |
-| Driver pass-through title failure/history/catalog/lifecycle/goals | Real driver now participates in all six SDK suites; title error/retry, capabilities, history paging, goal set/clear and generation are tested against the SDK rather than a mocked Claw adapter. |
+| Slash review materialization and compact routing | SDK controls and existing command parser tests retain Korus routing. Deleted exact SDK-generated review prompt text/optimistic row assertions. |
+| Driver pass-through title failure/history/catalog/lifecycle/goals | Real driver now participates in all six SDK suites; title error/retry, capabilities, history paging, goal set/clear and generation are tested against the SDK rather than a mocked Korus adapter. |
 | Two Vue work-item prompt formatting cases | Removed duplicated pure-function tests; `core/src/__tests__/work-item-prompts.spec.ts` owns optional fields, truncation and assignment instructions. Vue still verifies assignment dispatch, removal and failed operations. |
 
 Other suites are retained for their distinct purpose, not presumed redundant
 because they share fixtures or exercise the same method. In particular the
 Claude transcript translator, protocol decoder, persistence, filesystem/Git,
-credential security and race tests belong to Claw.
+credential security and race tests belong to Korus.
 
 ### Fault sensitivity and defects found
 
@@ -133,7 +133,7 @@ exposed two genuine defects and were observed red before fixing them:
 - Replayed Codex proposals emitted duplicate `plan.readyForReview` events even
   though snapshot reduction was idempotent. The server now suppresses duplicate
   and obsolete-conversation proposals before publication.
-- SDK-cancelled Claude permissions stayed pending in Claw until turn completion.
+- SDK-cancelled Claude permissions stayed pending in Korus until turn completion.
   The internal transport now notifies the conversation host; it resolves the
   app-owned request, clears waiting status when no other input is pending, and
   handles already-aborted signals. Completion cannot resolve the same request
@@ -220,7 +220,7 @@ now implemented; the audit completion table covers the additional findings.
 
 ## 2. Make the backend contract independent of desktop types
 
-- [x] Stop deriving `ClawBackendEvent` from `MainToRendererEvent`.
+- [x] Stop deriving `AppBackendEvent` from `MainToRendererEvent`.
 - [x] Define backend domain contracts independently; desktop transport consumes them.
 - [x] Separate explicit host effects such as display-Markdown, browser and celebration from domain events.
 - [x] Separate client navigation/preferences from agent runtime operations where currently combined.
@@ -258,7 +258,7 @@ success, empty and error results.
 
 ## 5. Build the three test fixtures at the correct boundaries
 
-- [x] Typed Codex SDK fake driving the real Claw Codex adapter/backend.
+- [x] Typed Codex SDK fake driving the real Korus Codex adapter/backend.
 - [x] Typed Claude Agent SDK fake driving the real transport/driver/backend.
 - [x] Unified backend fake driving real application state and representative mounted UI.
 - [x] Controllable event delivery, deferred operations, errors and capability sets.
@@ -339,11 +339,11 @@ file names or test counts.
 ## 11. Replace and prune low-value tests alongside each migration
 
 - [x] Classify existing tests as keep / rewrite at correct seam / merge / delete.
-- [x] Record removed scenario groups and replacement suites, or why Claw does not own the assertion.
+- [x] Record removed scenario groups and replacement suites, or why Korus does not own the assertion.
 
 Primary candidates:
 
-- Fake app-server tests exercising SDK internals rather than Claw.
+- Fake app-server tests exercising SDK internals rather than Korus.
 - Tests asserting obsolete panel-event contracts.
 - Pass-through tests whose meaningful behavior is already proven by integration coverage.
 - Repeated permutations with identical failure detection.
@@ -351,16 +351,16 @@ Primary candidates:
 
 Preserve:
 
-- Pure Claw algorithms, validation, security and persistence tests.
+- Pure Korus algorithms, validation, security and persistence tests.
 - Focused failure/race tests with unique protection.
-- Provider-routing and ownership assertions testing Claw responsibility.
+- Provider-routing and ownership assertions testing Korus responsibility.
 - Protocol serialization tests with a distinct purpose.
 
-Done when there are fewer maintenance obligations without losing Claw behavior
+Done when there are fewer maintenance obligations without losing Korus behavior
 protection. No arbitrary deletion quota and no lowered coverage thresholds.
 
 There is evidence of misplaced coverage, but no defensible count of useless tests
-yet. A test using the wrong mock boundary may still contain valuable Claw
+yet. A test using the wrong mock boundary may still contain valuable Korus
 assertions. Preserve those assertions, not their unnecessary plumbing.
 
 ## 12. Make the strategy durable
@@ -415,7 +415,7 @@ working and design patterns after execution is complete.
   solely from backend or component-prop tests.
 - Keep existing coverage thresholds. Test count is not the success metric.
 
-The goal is a suite that fails when Claw's responsibilities break, and does not
+The goal is a suite that fails when Korus's responsibilities break, and does not
 require maintenance when an SDK changes internally.
 
 ## Verification results — 2026-09-16
@@ -444,7 +444,7 @@ require maintenance when an SDK changes internally.
 The review accepted the SDK boundaries but found three gaps in the application
 tests. All three are corrected:
 
-- The shared desktop client now supplies every `CodexClawApi` method, checked
+- The shared desktop client now supplies every `AppApi` method, checked
   against the required interface without casting a partial object. Normal tests
   use production `getSnapshotState`, connection state, sequence watermarks and
   disposable subscriptions. Per-test overrides merge into that complete fake;
@@ -475,7 +475,7 @@ separately recorded repository-wide coverage debt.
 - A green reducer test does not prove the producer emits a semantic event once.
   Join the SDK boundary to the real server and assert event count as well as state.
 - Testing SDK permission cancellation only at the transport hid a stale request
-  in Claw. Test the observable backend state before the turn ends.
+  in Korus. Test the observable backend state before the turn ends.
 - Scripted fakes supply events/results; they must not reproduce provider reducers.
   Each concurrent SDK query needs its own stream, or the test harness itself
   destroys the isolation it is supposed to test.

@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, expect, vi } from 'vitest';
-import type { Agent, Team } from '@codex-claw/core/contracts';
+import type { Agent, Team } from '@workspace/core/contracts';
 
 export function pointerEvent(type: string, clientX: number): PointerEvent {
   const event = new MouseEvent(type, {
@@ -99,8 +100,8 @@ export const agents: Agent[] = [
 
 export const teams: Team[] = [
   {
-    id: 'team-codex-claw',
-    name: 'Codex Claw',
+    id: 'team-app',
+    name: `${product.name}`,
     avatar: 'CC',
     color: '#1B4FB2',
     agentIds: ['agent-dina', 'agent-jesse'],

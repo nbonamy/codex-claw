@@ -35,7 +35,7 @@
           <IconSearch aria-hidden="true" />
         </button>
 
-        <el-popover placement="bottom-end" trigger="click" :width="360" popper-class="claw-popover cockpit-inbox__filters-popover">
+        <el-popover placement="bottom-end" trigger="click" :width="360" popper-class="app-popover cockpit-inbox__filters-popover">
           <template #reference>
             <button class="cockpit-inbox__filter-button" type="button">
               <IconFilter aria-hidden="true" /> {{ $t('surface.cockpitWorkInbox.filters') }} <span v-if="activeFilterCount">{{ activeFilterCount }}</span>
@@ -68,7 +68,7 @@
     <section v-if="scopePromptVisible" class="cockpit-inbox__scope" aria-labelledby="cockpit-global-scope-title">
       <div>
         <span>{{ $t('surface.cockpitWorkInbox.globalBacklog') }}</span>
-        <h2 id="cockpit-global-scope-title">{{ $t('surface.cockpitWorkInbox.chooseWhatClawShouldLoad') }}</h2>
+        <h2 id="cockpit-global-scope-title">{{ $t('surface.cockpitWorkInbox.chooseWhatAppShouldLoad') }}</h2>
         <p> {{ $t('surface.cockpitWorkInbox.aBacklogAcrossEveryRepositoryCanContainALotOfWorkAndCons') }} </p>
       </div>
       <div class="cockpit-inbox__scope-actions">
@@ -198,11 +198,11 @@
       </div>
     </footer>
 
-    <el-dialog :model-value="Boolean(detailItem)" class="claw-dialog" @update:model-value="detailItem = null">
+    <el-dialog :model-value="Boolean(detailItem)" class="app-dialog" @update:model-value="detailItem = null">
       <WorkItemDetail v-if="detailItem" :item="detailItem" />
     </el-dialog>
     <el-dialog
-      class="claw-dialog cockpit-inbox__start-dialog"
+      class="app-dialog cockpit-inbox__start-dialog"
       :model-value="startWorkDialogOpen"
       :teleported="false"
       width="520px"
@@ -211,8 +211,8 @@
       @update:model-value="closeStartWorkDialog"
     >
       <template #header>
-        <div class="claw-form-dialog__header">
-          <h2 class="claw-dialog__title">{{ $t('surface.cockpitWorkInbox.startWork') }}</h2>
+        <div class="app-form-dialog__header">
+          <h2 class="app-dialog__title">{{ $t('surface.cockpitWorkInbox.startWork') }}</h2>
         </div>
       </template>
 
@@ -232,11 +232,11 @@
       </div>
 
       <template #footer>
-        <div class="claw-dialog__footer">
+        <div class="app-dialog__footer">
           <BackendSelector v-model="selectedBackend" :team-id="selectedTeamId" :disabled="startingWork" class="cockpit-inbox__backend" />
-          <button class="claw-button claw-button--tertiary" type="button" :disabled="startingWork" @click="closeStartWorkDialog(false)">{{ $t('surface.cockpitWorkInbox.cancel') }}</button>
-          <button class="claw-button claw-button--secondary" type="button" :disabled="startingWork || !selectedTeamId || !selectedBackend" @click="startSelectedWork('investigate')">{{ $t('surface.cockpitWorkInbox.investigate') }}</button>
-          <button class="claw-button claw-button--primary" type="button" :disabled="startingWork || !selectedTeamId || !selectedBackend" @click="startSelectedWork('fix')">{{ $t('surface.cockpitWorkInbox.fix') }}</button>
+          <button class="app-button app-button--tertiary" type="button" :disabled="startingWork" @click="closeStartWorkDialog(false)">{{ $t('surface.cockpitWorkInbox.cancel') }}</button>
+          <button class="app-button app-button--secondary" type="button" :disabled="startingWork || !selectedTeamId || !selectedBackend" @click="startSelectedWork('investigate')">{{ $t('surface.cockpitWorkInbox.investigate') }}</button>
+          <button class="app-button app-button--primary" type="button" :disabled="startingWork || !selectedTeamId || !selectedBackend" @click="startSelectedWork('fix')">{{ $t('surface.cockpitWorkInbox.fix') }}</button>
         </div>
       </template>
     </el-dialog>
@@ -244,15 +244,15 @@
 </template>
 
 <script setup lang="ts">
-import { workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
+import { workProviderDefinition } from '@workspace/core/work-providers';
 import { translate } from '../i18n';
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue';
 import { IconAlertCircle, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleFilled, IconFilter, IconSearch } from '@tabler/icons-vue';
-import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkSource } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
-import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
+import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkSource } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
+import { repositoryIconForAgent } from '@workspace/core/workspace-sidebar';
 import { ExternalLinkIcon, EyeIcon, GitBranchIcon, GitHubIcon, PlayerPlayIcon, PlusCircleIcon, RefreshIcon } from '../shared/icons/app-icons';
 import WorkItemDetail from './WorkItemDetail.vue';
 import AgentAvatar from './AgentAvatar.vue';
@@ -286,8 +286,8 @@ const props = withDefaults(defineProps<{
   totalItems?: number;
   hasNextPage?: boolean;
   defaultTeamId?: string | null;
-  listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceRepository[]>;
-  startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@codex-claw/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@workspace/core/contracts').SourceRepository[]>;
+  startWorkAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@workspace/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
 }>(), { activeView: 'focus', defaultTeamId: null, globalScope: null, page: 1, pageLoading: false, pageSize: 50, repositoryIcons: () => ({}), searchQuery: '', selectedAssigneeLogin: null, selectedTagName: null, statusFilter: null });
 
 const emit = defineEmits<{
@@ -311,7 +311,7 @@ const startingWork = ref(false);
 const startWorkError = ref<string | null>(null);
 const selectedTeamId = ref('');
 const selectedBackend = ref<Agent['backend']>();
-const codeRepositories = ref<import('@codex-claw/core/contracts').SourceRepository[]>([]);
+const codeRepositories = ref<import('@workspace/core/contracts').SourceRepository[]>([]);
 const selectedCodeRepositoryPath = ref('');
 const codeRepositoriesLoading = ref(false);
 let contextRevision = 0;

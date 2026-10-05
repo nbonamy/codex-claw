@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Team } from '@codex-claw/core/contracts';
+import type { Team } from '@workspace/core/contracts';
 
 const props = defineProps<{
   teams: Pick<Team, 'color'>[];

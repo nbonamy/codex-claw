@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { approvalBackendDefaultsWithPreset } from '@codex-claw/core/approval-presets';
-import type { AppSnapshot, ThreadGoal, ThreadPlan } from '@codex-claw/core/contracts';
-import type { Visualization } from '@codex-claw/core/visualize';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { approvalBackendDefaultsWithPreset } from '@workspace/core/approval-presets';
+import type { AppSnapshot, ThreadGoal, ThreadPlan } from '@workspace/core/contracts';
+import type { Visualization } from '@workspace/core/visualize';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../../state-persistence';
 import { joinPersistedState, splitPersistedState } from '../layout';
 

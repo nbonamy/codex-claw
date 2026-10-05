@@ -1,5 +1,5 @@
-import type { Agent, AppCommand } from '@codex-claw/core/contracts';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, AppCommand } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type { CodexConversationPaneController, CodexMessageImage, CodexMessageImageContext } from '@codex-app-sdk/vue';
 import { shallowMount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';

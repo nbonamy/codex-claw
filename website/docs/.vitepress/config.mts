@@ -1,30 +1,30 @@
 import { defineConfig } from "vitepress";
 import { fileURLToPath } from "node:url";
+import product from "../../../core/src/product.json";
 
 export default defineConfig({
   lang: "en-US",
-  title: "Codex Claw",
-  description:
-    "Set up your coding agents, coordinate work, and review the results in Codex Claw.",
+  title: product.name,
+  description: `Set up your coding agents, coordinate work, and review the results in ${product.name}.`,
   base: "/docs/",
   // These assets are already owned by the public landing page.
   vite: { publicDir: fileURLToPath(new URL("../../assets", import.meta.url)) },
-  head: [["link", { rel: "icon", href: "/docs/claw-icon.png" }]],
+  head: [["link", { rel: "icon", href: "/docs/app-icon.png" }]],
   themeConfig: {
-    logo: { src: "/claw-icon.png", alt: "" },
-    siteTitle: "Claw Docs",
+    logo: { src: "/app-icon.png", alt: "" },
+    siteTitle: `${product.name} Docs`,
     nav: [
-      { text: "Website", link: "https://codex-claw.nabocorp.com" },
+      { text: "Website", link: product.websiteUrl },
       { text: "Install", link: "/getting-started/installation" },
       {
         text: "Download",
-        link: "https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg",
+        link: `${product.websiteUrl}/desktop/downloads/${product.downloadFileName}`,
       },
     ],
     search: { provider: "local" },
     outline: { level: [2, 3], label: "On this page" },
     sidebar: [
-      { items: [{ text: "Claw documentation", link: "/" }] },
+      { items: [{ text: `${product.name} documentation`, link: "/" }] },
       {
         text: "Getting started",
         items: [

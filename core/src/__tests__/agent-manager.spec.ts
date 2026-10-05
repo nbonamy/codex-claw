@@ -99,10 +99,10 @@ describe('agent-manager', () => {
 
     expect(duplicate).toStrictEqual({
       id: 'agent-duplicate-dina',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       name: 'Dina (copy)',
       avatar: 'DI',
-      folder: '~/src/codex-claw',
+      folder: '~/src/agent-workspace',
       backend: 'codex',
       backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
@@ -186,7 +186,7 @@ describe('agent-manager', () => {
 
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-duplicate-dina');
 
-    expect(duplicate?.teamId).toBe('team-codex-claw');
+    expect(duplicate?.teamId).toBe('team-app');
     expect(snapshot.teams[0].agentIds).toContain(duplicate?.id);
   });
 
@@ -202,8 +202,8 @@ describe('agent-manager', () => {
     });
     expect(snapshot.workBacklog.assignments[workItemAssignmentKey(firstItem)]).toStrictEqual({
       provider: 'github',
-      itemId: 'nbonamy/codex-claw#12',
-      item: expect.objectContaining({ id: 'nbonamy/codex-claw#12', sourceId: 'nbonamy/codex-claw' }),
+      itemId: 'nbonamy/agent-workspace#12',
+      item: expect.objectContaining({ id: 'nbonamy/agent-workspace#12', sourceId: 'nbonamy/agent-workspace' }),
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
       policy: 'review',
@@ -212,16 +212,16 @@ describe('agent-manager', () => {
 
     assignWorkItemToAgentInSnapshot(snapshot, 'agent-dina', secondItem, '2026-06-09T13:05:00.000Z');
     expect(Object.keys(snapshot.workBacklog.assignments).sort()).toStrictEqual([
-      'github:nbonamy/codex-claw#12',
-      'github:nbonamy/codex-claw#13',
+      'github:nbonamy/agent-workspace#12',
+      'github:nbonamy/agent-workspace#13',
     ]);
 
     assignWorkItemToAgentInSnapshot(snapshot, 'agent-jesse', firstItem, '2026-06-09T13:10:00.000Z');
 
     expect(snapshot.workBacklog.assignments[workItemAssignmentKey(firstItem)]).toStrictEqual({
       provider: 'github',
-      itemId: 'nbonamy/codex-claw#12',
-      item: expect.objectContaining({ id: 'nbonamy/codex-claw#12', sourceId: 'nbonamy/codex-claw' }),
+      itemId: 'nbonamy/agent-workspace#12',
+      item: expect.objectContaining({ id: 'nbonamy/agent-workspace#12', sourceId: 'nbonamy/agent-workspace' }),
       agentId: 'agent-jesse',
       assignedAt: '2026-06-09T13:10:00.000Z',
       policy: 'review',
@@ -238,8 +238,8 @@ describe('agent-manager', () => {
     expect(completeWorkItemAssignmentInSnapshot(snapshot, 'agent-jesse', workItemAssignmentKey(item), '2026-06-09T13:15:00.000Z')).toBeNull();
     expect(completeWorkItemAssignmentInSnapshot(snapshot, 'agent-dina', workItemAssignmentKey(item), '2026-06-09T13:15:00.000Z')).toStrictEqual({
       provider: 'github',
-      itemId: 'nbonamy/codex-claw#12',
-      item: expect.objectContaining({ id: 'nbonamy/codex-claw#12', sourceId: 'nbonamy/codex-claw' }),
+      itemId: 'nbonamy/agent-workspace#12',
+      item: expect.objectContaining({ id: 'nbonamy/agent-workspace#12', sourceId: 'nbonamy/agent-workspace' }),
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
       policy: 'review',
@@ -284,10 +284,10 @@ describe('agent-manager', () => {
     expect(removeWorkItemAssignmentFromSnapshot(snapshot, firstItem)).toBe(true);
 
     expect(snapshot.workBacklog.assignments).toStrictEqual({
-      'github:nbonamy/codex-claw#13': {
+      'github:nbonamy/agent-workspace#13': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#13',
-        item: expect.objectContaining({ id: 'nbonamy/codex-claw#13', sourceId: 'nbonamy/codex-claw' }),
+        itemId: 'nbonamy/agent-workspace#13',
+        item: expect.objectContaining({ id: 'nbonamy/agent-workspace#13', sourceId: 'nbonamy/agent-workspace' }),
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:05:00.000Z',
         policy: 'review',
@@ -337,10 +337,10 @@ describe('agent-manager', () => {
     expect(duplicate?.id).toBe('agent-abby');
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-abby', 'agent-jesse']);
 
-    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-abby', 'agent-dina')).toStrictEqual(duplicate);
+    expect(reorderAgentInTeam(snapshot, 'team-app', 'agent-abby', 'agent-dina')).toStrictEqual(duplicate);
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-abby', 'agent-dina', 'agent-jesse']);
 
-    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-abby', null)).toStrictEqual(duplicate);
+    expect(reorderAgentInTeam(snapshot, 'team-app', 'agent-abby', null)).toStrictEqual(duplicate);
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse', 'agent-abby']);
     expect(snapshot.activeAgentId).toBe('agent-abby');
   });
@@ -349,7 +349,7 @@ describe('agent-manager', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
-    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-dina', 'agent-dina')).toStrictEqual(snapshot.agents[0]);
+    expect(reorderAgentInTeam(snapshot, 'team-app', 'agent-dina', 'agent-dina')).toStrictEqual(snapshot.agents[0]);
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse']);
   });
 
@@ -362,30 +362,30 @@ describe('agent-manager', () => {
     }, '2026-06-05T10:11:12.000Z');
 
     expect(reorderAgentInTeam(snapshot, otherTeam.id, 'agent-dina', null)).toBeNull();
-    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-dina', 'missing-agent')).toBeNull();
+    expect(reorderAgentInTeam(snapshot, 'team-app', 'agent-dina', 'missing-agent')).toBeNull();
     expect(reorderAgentInTeam(snapshot, 'missing-team', 'agent-dina', null)).toBeNull();
-    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'missing-agent', null)).toBeNull();
+    expect(reorderAgentInTeam(snapshot, 'team-app', 'missing-agent', null)).toBeNull();
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina', 'agent-jesse']);
   });
 
   it('keeps agent reorders inside their repository group', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    snapshot.agents[0]!.workspace = gitWorkspace('claw');
+    snapshot.agents[0]!.workspace = gitWorkspace('app');
     snapshot.agents[1]!.workspace = gitWorkspace('sdk');
     const duplicate = duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
 
-    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', duplicate!.id, 'agent-jesse')).toBeNull();
+    expect(reorderAgentInTeam(snapshot, 'team-app', duplicate!.id, 'agent-jesse')).toBeNull();
     expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-dina', 'agent-abby', 'agent-jesse']);
 
-    expect(reorderAgentInTeam(snapshot, 'team-codex-claw', 'agent-dina', null)).toStrictEqual(snapshot.agents[0]);
+    expect(reorderAgentInTeam(snapshot, 'team-app', 'agent-dina', null)).toStrictEqual(snapshot.agents[0]);
     expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-abby', 'agent-dina', 'agent-jesse']);
   });
 
   it('reorders a repository as one block with all of its agents', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    snapshot.agents[0]!.workspace = gitWorkspace('claw');
+    snapshot.agents[0]!.workspace = gitWorkspace('app');
     snapshot.agents[1]!.workspace = gitWorkspace('sdk');
     duplicateAgentInSnapshot(snapshot, 'agent-dina', '2026-06-05T10:11:12.000Z', () => 'agent-abby');
     const quickChat = duplicateAgentInSnapshot(snapshot, 'agent-jesse', '2026-06-05T10:11:13.000Z', () => 'quick-chat');
@@ -393,14 +393,14 @@ describe('agent-manager', () => {
     delete quickChat!.workspace;
     snapshot.teams[0]!.agentIds = ['agent-dina', 'agent-abby', 'quick-chat', 'agent-jesse'];
 
-    expect(reorderRepositoryInTeam(snapshot, 'team-codex-claw', '/src/sdk', '/src/claw')?.map((agent) => agent.id))
+    expect(reorderRepositoryInTeam(snapshot, 'team-app', '/src/sdk', '/src/app')?.map((agent) => agent.id))
       .toStrictEqual(['agent-jesse']);
     expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-jesse', 'quick-chat', 'agent-dina', 'agent-abby']);
 
-    expect(reorderRepositoryInTeam(snapshot, 'team-codex-claw', '/src/sdk', null)?.map((agent) => agent.id))
+    expect(reorderRepositoryInTeam(snapshot, 'team-app', '/src/sdk', null)?.map((agent) => agent.id))
       .toStrictEqual(['agent-jesse']);
     expect(snapshot.teams[0]!.agentIds).toStrictEqual(['agent-dina', 'agent-abby', 'quick-chat', 'agent-jesse']);
-    expect(reorderRepositoryInTeam(snapshot, 'team-codex-claw', '/src/missing', null)).toBeNull();
+    expect(reorderRepositoryInTeam(snapshot, 'team-app', '/src/missing', null)).toBeNull();
   });
 
   it('restarts an idle agent by clearing conversation and runtime state', () => {
@@ -520,7 +520,7 @@ describe('agent-manager', () => {
       color: '#46A857',
     }, '2026-06-05T10:11:12.000Z');
     moveAgentToTeamInSnapshot(snapshot, 'agent-jesse', otherTeam.id);
-    snapshot.activeTeamId = 'team-codex-claw';
+    snapshot.activeTeamId = 'team-app';
     snapshot.activeAgentId = 'agent-dina';
     snapshot.teams[0].activeAgentId = 'agent-dina';
 
@@ -529,7 +529,7 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toStrictEqual([]);
     expect(snapshot.teams[0].activeAgentId).toBeUndefined();
     expect(snapshot.teams[1].agentIds).toStrictEqual(['agent-jesse']);
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.activeAgentId).toBeNull();
   });
 
@@ -540,7 +540,7 @@ describe('agent-manager', () => {
     expect(closeAgentInSnapshot(snapshot, 'agent-jesse')).toMatchObject({ id: 'agent-jesse' });
 
     expect(snapshot.activeAgentId).toBe('agent-dina');
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-dina']);
   });
 
@@ -559,7 +559,7 @@ describe('agent-manager', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
 
     expect(duplicateAgentInSnapshot(snapshot, 'missing-agent')).toBeNull();
-    expect(moveAgentToTeamInSnapshot(snapshot, 'missing-agent', 'team-codex-claw')).toBeNull();
+    expect(moveAgentToTeamInSnapshot(snapshot, 'missing-agent', 'team-app')).toBeNull();
     expect(moveAgentToTeamInSnapshot(snapshot, 'agent-dina', 'missing-team')).toBeNull();
     expect(restartAgentConversation(snapshot, 'missing-agent')).toBeNull();
     expect(closeAgentInSnapshot(snapshot, 'missing-agent')).toBeNull();
@@ -571,12 +571,12 @@ describe('agent-manager', () => {
 function workItem(number: number, title: string): WorkItem {
   return {
     provider: 'github',
-    id: `nbonamy/codex-claw#${number}`,
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: `nbonamy/agent-workspace#${number}`,
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number,
     title,
-    url: `https://github.com/nbonamy/codex-claw/issues/${number}`,
+    url: `https://github.com/nbonamy/agent-workspace/issues/${number}`,
     state: 'open',
     labels: [],
     createdAt: '2026-06-09T12:00:00.000Z',

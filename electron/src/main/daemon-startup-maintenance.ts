@@ -1,9 +1,9 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { dialog } from 'electron';
-import { isClawSnapshotGetResult } from '@codex-claw/core/backend-protocol/rpc';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { ClawBackendSocketClient } from './backend-socket-client';
-import { getClawdDaemonStatus, getResolvedClawdVersion, refreshClawdDaemon, type DaemonLaunchAgentDependencies } from './daemon-launch-agent';
+import { isAppSnapshotGetResult } from '@workspace/core/backend-protocol/rpc';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import { AppBackendSocketClient } from './backend-socket-client';
+import { getDaemonStatus, getResolvedDaemonVersion, refreshDaemon, type DaemonLaunchAgentDependencies } from './daemon-launch-agent';
 import { logMain, warnMain } from './log';
 import { mainT } from './i18n';
 
@@ -17,18 +17,18 @@ type ShowMessageBox = typeof dialog.showMessageBox;
 
 export type DaemonStartupMaintenanceDependencies = DaemonLaunchAgentDependencies & {
   createSnapshotClient?: (socketPath: string) => SnapshotClient;
-  getDaemonStatus?: typeof getClawdDaemonStatus;
-  getPackagedVersion?: typeof getResolvedClawdVersion;
-  refreshDaemon?: typeof refreshClawdDaemon;
+  getDaemonStatus?: typeof getDaemonStatus;
+  getPackagedVersion?: typeof getResolvedDaemonVersion;
+  refreshDaemon?: typeof refreshDaemon;
   showMessageBox?: ShowMessageBox;
 };
 
-export async function ensureCurrentClawdDaemonForStartup(
+export async function ensureCurrentDaemonForStartup(
   dependencies: DaemonStartupMaintenanceDependencies = {},
 ): Promise<void> {
-  const getDaemonStatus = dependencies.getDaemonStatus ?? getClawdDaemonStatus;
-  const getPackagedVersion = dependencies.getPackagedVersion ?? getResolvedClawdVersion;
-  const status = await getDaemonStatus(dependencies);
+  const readDaemonStatus = dependencies.getDaemonStatus ?? getDaemonStatus;
+  const getPackagedVersion = dependencies.getPackagedVersion ?? getResolvedDaemonVersion;
+  const status = await readDaemonStatus(dependencies);
   if (!status.supported || !status.installed || !status.running || !status.version) {
     return;
   }
@@ -48,7 +48,7 @@ export async function ensureCurrentClawdDaemonForStartup(
       type: 'info',
     });
     if (response.response !== 1) {
-      logMain('clawd', 'continuing with stale daemon after app update', {
+      logMain('daemon', 'continuing with stale daemon after app update', {
         daemonVersion: status.version,
         packagedVersion,
         pid: status.pid,
@@ -57,28 +57,28 @@ export async function ensureCurrentClawdDaemonForStartup(
     }
   }
 
-  logMain('clawd', 'restarting stale daemon after app update', {
+  logMain('daemon', 'restarting stale daemon after app update', {
     daemonVersion: status.version,
     packagedVersion,
     pid: status.pid,
   });
-  await (dependencies.refreshDaemon ?? refreshClawdDaemon)(dependencies);
+  await (dependencies.refreshDaemon ?? refreshDaemon)(dependencies);
 }
 
 async function daemonHasActiveWork(
   socketPath: string,
   dependencies: DaemonStartupMaintenanceDependencies,
 ): Promise<boolean> {
-  const client = dependencies.createSnapshotClient?.(socketPath) ?? new ClawBackendSocketClient({ socketPath });
+  const client = dependencies.createSnapshotClient?.(socketPath) ?? new AppBackendSocketClient({ socketPath });
   try {
     await client.start();
     const result = await client.request<unknown>(backendMethods.snapshotGet);
-    if (!isClawSnapshotGetResult(result)) {
+    if (!isAppSnapshotGetResult(result)) {
       return true;
     }
     return snapshotHasActiveWork(result.snapshot);
   } catch (error) {
-    warnMain('clawd', 'failed to inspect daemon activity before update restart', {
+    warnMain('daemon', 'failed to inspect daemon activity before update restart', {
       detail: error instanceof Error ? error.message : String(error),
     });
     return true;

@@ -1,6 +1,6 @@
-import type { Agent, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
-import type { BackendSendResult } from '@codex-claw/core/backend-driver';
-import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
+import type { Agent, BackendPublishedEvent, RendererMessage } from '@workspace/core/contracts';
+import type { BackendSendResult } from '@workspace/core/backend-driver';
+import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
 
 /** Observe a single accepted turn, then read its final text through the provider's history boundary. */
 export async function requestHandoffNote(agent: Agent, prompt: string, port: {

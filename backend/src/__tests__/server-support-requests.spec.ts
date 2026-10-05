@@ -2,17 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ClawBackendServer } from '../server';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { AppBackendServer } from '../server';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
 import {
   createTestSnapshot,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('edits instructions in each configured provider home', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'claw-personalization-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'app-personalization-'));
     const codexHome = path.join(root, 'codex-home');
     const claudeHome = path.join(root, 'claude-home');
     const codexFile = path.join(codexHome, 'AGENTS.md');
@@ -24,7 +24,7 @@ describe('ClawBackendServer', () => {
     };
     await Promise.all([mkdir(codexHome), mkdir(claudeHome)]);
     await Promise.all([writeFile(codexFile, 'Codex only'), writeFile(claudeFile, 'Claude only')]);
-    const server = new ClawBackendServer({ version: 'test', snapshot });
+    const server = new AppBackendServer({ version: 'test', snapshot });
     const request = (id: string, method: string, params: object) => server.handleMessage({ jsonrpc: '2.0', id, method, params });
     try {
       const codexRead = await request('codex-read', backendMethods.engineInstructionsRead, { engine: 'codex' });
@@ -62,16 +62,16 @@ describe('ClawBackendServer', () => {
       configureBacklog: vi.fn().mockResolvedValue(snapshot),
       listAssignedItems: vi.fn().mockResolvedValue([{
         provider: 'github',
-        id: 'github:nbonamy/codex-claw#13',
+        id: 'github:nbonamy/agent-workspace#13',
         title: 'Assigned bug',
-        url: 'https://github.com/nbonamy/codex-claw/issues/13',
+        url: 'https://github.com/nbonamy/agent-workspace/issues/13',
       }]),
       listGlobalItems: vi.fn().mockResolvedValue({
         items: [{
           provider: 'github',
-          id: 'github:nbonamy/codex-claw#14',
+          id: 'github:nbonamy/agent-workspace#14',
           title: 'Page global work',
-          url: 'https://github.com/nbonamy/codex-claw/issues/14',
+          url: 'https://github.com/nbonamy/agent-workspace/issues/14',
         }],
         page: 1,
         pageSize: 50,
@@ -79,12 +79,12 @@ describe('ClawBackendServer', () => {
       }),
       listItems: vi.fn().mockResolvedValue([{
         provider: 'github',
-        id: 'github:nbonamy/codex-claw#12',
+        id: 'github:nbonamy/agent-workspace#12',
         title: 'Fix bug',
-        url: 'https://github.com/nbonamy/codex-claw/issues/12',
+        url: 'https://github.com/nbonamy/agent-workspace/issues/12',
       }]),
     } as unknown as WorkIntegrationManager;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -103,13 +103,13 @@ describe('ClawBackendServer', () => {
       method: 'workProvider/globalItems/list',
       params: { provider: 'github', query: { assignment: 'viewer', pageSize: 50 } },
     })).resolves.toMatchObject({
-      result: { items: [{ id: 'github:nbonamy/codex-claw#14' }], page: 1, pageSize: 50, totalItems: 14 },
+      result: { items: [{ id: 'github:nbonamy/agent-workspace#14' }], page: 1, pageSize: 50, totalItems: 14 },
     });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'configure',
       method: 'workProvider/backlog/configure',
-      params: { input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } } },
+      params: { input: { provider: 'github', configuration: { sourceId: 'nbonamy/agent-workspace' } } },
     })).resolves.toMatchObject({ result: snapshot });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -117,15 +117,15 @@ describe('ClawBackendServer', () => {
       method: 'workProvider/assignedItems/list',
       params: { provider: 'github' },
     })).resolves.toMatchObject({
-      result: [{ id: 'github:nbonamy/codex-claw#13' }],
+      result: [{ id: 'github:nbonamy/agent-workspace#13' }],
     });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
       id: 'items',
       method: 'workProvider/items/list',
-      params: { provider: 'github', sourceId: 'nbonamy/codex-claw' },
+      params: { provider: 'github', sourceId: 'nbonamy/agent-workspace' },
     })).resolves.toMatchObject({
-      result: [{ id: 'github:nbonamy/codex-claw#12' }],
+      result: [{ id: 'github:nbonamy/agent-workspace#12' }],
     });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -133,19 +133,19 @@ describe('ClawBackendServer', () => {
       method: 'workProvider/items/list',
       params: {
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
         query: { kind: 'all', state: 'all' },
       },
     })).resolves.toMatchObject({
-      result: [{ id: 'github:nbonamy/codex-claw#12' }],
+      result: [{ id: 'github:nbonamy/agent-workspace#12' }],
     });
 
     expect(workIntegrations.connect).toHaveBeenCalledWith('github');
-    expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } });
+    expect(workIntegrations.configureBacklog).toHaveBeenCalledWith({ provider: 'github', configuration: { sourceId: 'nbonamy/agent-workspace' } });
     expect(workIntegrations.listAssignedItems).toHaveBeenCalledWith('github');
     expect(workIntegrations.listGlobalItems).toHaveBeenCalledWith('github', { assignment: 'viewer', pageSize: 50 });
-    expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
-    expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' });
+    expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace');
+    expect(workIntegrations.listItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace', { kind: 'all', state: 'all' });
   });
 
   it('reloads work provider connections from token storage', async () => {
@@ -161,7 +161,7 @@ describe('ClawBackendServer', () => {
         }];
       }),
     } as unknown as WorkIntegrationManager;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -193,7 +193,7 @@ describe('ClawBackendServer', () => {
   it('separates backend policy from client presentation settings', async () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -201,8 +201,8 @@ describe('ClawBackendServer', () => {
     });
 
     await server.handleMessage({ jsonrpc: '2.0', id: 'preferences', method: 'client/preferences/update', params: { input: {
-      general: { repositoryIcons: { 'git@github.com:nbonamy/codex-claw.git': '🦞' } },
-      theme: { id: 'codex-claw-dark', mode: 'dark', uiFontSize: 18 },
+      general: { repositoryIcons: { 'git@github.com:nbonamy/agent-workspace.git': '🦞' } },
+      theme: { id: 'app-dark', mode: 'dark', uiFontSize: 18 },
     } } });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -214,7 +214,7 @@ describe('ClawBackendServer', () => {
             claudeCodeEnabled: true,
             preventSleepWhenAgentsRun: false,
           },
-          sourceFolder: { path: '/Users/nbonamy/src', recentRepoNames: ['codex-claw', 'id8'] },
+          sourceFolder: { path: '/Users/nbonamy/src', recentRepoNames: ['agent-workspace', 'id8'] },
         },
       },
     })).resolves.toMatchObject({
@@ -223,16 +223,16 @@ describe('ClawBackendServer', () => {
           claudeCodeEnabled: true,
           preventSleepWhenAgentsRun: false,
           repositoryIcons: {
-            'remote:github.com/nbonamy/codex-claw': '🦞',
+            'remote:github.com/nbonamy/agent-workspace': '🦞',
           },
         },
         sourceFolder: {
           path: '/Users/nbonamy/src',
           initialized: true,
-          recentRepoNames: ['codex-claw', 'id8'],
+          recentRepoNames: ['agent-workspace', 'id8'],
         },
         theme: {
-          id: 'codex-claw-dark',
+          id: 'app-dark',
           mode: 'dark',
           uiFontSize: 18,
         },
@@ -241,7 +241,7 @@ describe('ClawBackendServer', () => {
 
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
     expect(snapshot.general.repositoryIcons).toStrictEqual({});
-    expect(snapshot.clientPreferences?.desktop?.general?.repositoryIcons).toStrictEqual({ 'git@github.com:nbonamy/codex-claw.git': '🦞' });
+    expect(snapshot.clientPreferences?.desktop?.general?.repositoryIcons).toStrictEqual({ 'git@github.com:nbonamy/agent-workspace.git': '🦞' });
   });
 
   it('changes Codex resource sharing only while chats are idle', async () => {
@@ -249,7 +249,7 @@ describe('ClawBackendServer', () => {
     const configureCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const inspectCodexResourceSharing = vi.fn().mockResolvedValue({ enabled: true, migrationRequired: true });
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       saveSnapshot,
@@ -295,7 +295,7 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-08-07T00:00:00.000Z',
     }];
     const configureCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       configureCodexResourceSharing,
@@ -323,7 +323,7 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-08-07T00:00:00.000Z',
     }];
     const configureCodexResourceSharing = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       configureCodexResourceSharing,

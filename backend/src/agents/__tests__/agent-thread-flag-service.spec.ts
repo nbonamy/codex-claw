@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { AgentThreadFlagService } from '../agent-thread-flag-service';
 import { WORKTREE_DELEGATION_PROMPT } from '../worktree-delegation';
 

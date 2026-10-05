@@ -1,8 +1,8 @@
-import { createEntityId } from '@codex-claw/core/ids';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { isMissionArtifacts, type Mission, type MissionReviewFinding, type MissionStage, type MissionTicket } from '@codex-claw/core/missions';
-import { missionWorkflow } from '@codex-claw/core/mission-workflows';
-import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionReviewFindingInput, type MissionReviewFindingUpdateInput, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@codex-claw/core/mission-execution';
+import { createEntityId } from '@workspace/core/ids';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import { isMissionArtifacts, type Mission, type MissionReviewFinding, type MissionStage, type MissionTicket } from '@workspace/core/missions';
+import { missionWorkflow } from '@workspace/core/mission-workflows';
+import { missionDeveloperInstructions, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionReviewFindingInput, type MissionReviewFindingUpdateInput, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@workspace/core/mission-execution';
 import type { MissionService } from './mission-service';
 import { missionTeamRepositories } from './mission-execution-policy';
 

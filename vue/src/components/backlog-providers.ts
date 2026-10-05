@@ -1,6 +1,6 @@
-import type { AutomationLocation, WorkIntegrationConnection, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { AutomationLocation, WorkIntegrationConnection, WorkProviderKind } from '@workspace/core/contracts';
 import { computed, inject, provide, ref, watch, type InjectionKey } from 'vue';
-import { codexClawApi } from '../platform-api';
+import { appApi } from '../platform-api';
 
 type Connections = () => WorkIntegrationConnection[];
 export const backlogConnectionsKey: InjectionKey<Connections> = Symbol('backlogConnections');
@@ -19,7 +19,7 @@ export function useBacklogConnections(location: () => AutomationLocation | undef
     remote.value = [];
     if (!key) return;
     try {
-      const snapshot = await codexClawApi?.getAutomationSnapshot(location());
+      const snapshot = await appApi?.getAutomationSnapshot(location());
       if (current) remote.value = snapshot?.workBacklog.connections ?? [];
     } catch { /* An unavailable host has no selectable providers. */ }
   }, { immediate: true });

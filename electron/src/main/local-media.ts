@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export const localMediaScheme = 'codex-claw-media';
+export const localMediaScheme = 'agent-workspace-media';
 
 type SchemeRegistrar = {
   registerSchemesAsPrivileged(schemes: Array<{

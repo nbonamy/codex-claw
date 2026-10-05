@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AgentGitDiff } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AgentGitDiff } from '@workspace/core/contracts';
 import { useRightWorkspaceState } from '../use-right-workspace-state';
 import { useWorkspacePreviews } from '../use-workspace-previews';
 

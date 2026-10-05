@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { AccountRateLimits, AppGeneralSettings, AppThemeSettings, Automation, RemoteConnection, SourceFolderState, SubagentNode, Team, WorkBacklogAssignment, WorkBacklogState } from '@codex-claw/core/contracts';
-import type { Mission } from '@codex-claw/core/missions';
-import { isVisualization } from '@codex-claw/core/visualize';
+import type { AccountRateLimits, AppGeneralSettings, AppThemeSettings, Automation, RemoteConnection, SourceFolderState, SubagentNode, Team, WorkBacklogAssignment, WorkBacklogState } from '@workspace/core/contracts';
+import type { Mission } from '@workspace/core/missions';
+import { isVisualization } from '@workspace/core/visualize';
 import { StoreFormatError } from './store-format';
 import type { RosterAgent, RosterData, SettingsData, VisualizationData } from './layout';
 

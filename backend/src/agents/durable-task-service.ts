@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { createHash, randomUUID } from 'node:crypto';
-import type { Agent, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
-import type { DelegatedTask, TaskAcceptance, TaskContract, TaskResultInput, TaskWorkspace, WaitTasksInput, WaitTasksResult } from '@codex-claw/core/delegated-task';
-import { providerConversationEventView } from '@codex-claw/core/provider-conversation-event';
-import { handoffInProgress } from '@codex-claw/core/agent-handoff';
+import type { Agent, BackendPublishedEvent, RendererMessage } from '@workspace/core/contracts';
+import type { DelegatedTask, TaskAcceptance, TaskContract, TaskResultInput, TaskWorkspace, WaitTasksInput, WaitTasksResult } from '@workspace/core/delegated-task';
+import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
+import { handoffInProgress } from '@workspace/core/agent-handoff';
 import { taskContractSchema, taskResultSchema } from '../persistence/task-schema';
 
 type CreateTaskInput = { requestId: string; task: TaskContract; prompt: string; backend: Agent['backend']; workspace?: TaskWorkspace; specification: unknown };
@@ -48,7 +49,7 @@ export class DurableTaskService {
 
   instructions(worker: string): string | undefined {
     const task = this.tasks.find(task => task.workerAgentId === worker && !terminal(task));
-    return task ? `Durable assignment ${task.id}: ${task.assignment.title}\nDone when: ${task.assignment.doneWhen}\nSubmit the outcome with complete-task (summary, evidence, artifact references, caveats) before finish_turn. Do not send a completion chat message to the parent; Claw delivers the saved result after your submitting turn succeeds. Do not continue mutating files after submission. End foreground tools and any background work you started before submitting; Claw cannot certify background process quiescence. Completion does not authorize merging, publication or Mission progression. Task result notifications require no acknowledgment or reply.` : undefined;
+    return task ? `Durable assignment ${task.id}: ${task.assignment.title}\nDone when: ${task.assignment.doneWhen}\nSubmit the outcome with complete-task (summary, evidence, artifact references, caveats) before finish_turn. Do not send a completion chat message to the parent; ${product.name} delivers the saved result after your submitting turn succeeds. Do not continue mutating files after submission. End foreground tools and any background work you started before submitting; ${product.name} cannot certify background process quiescence. Completion does not authorize merging, publication or Mission progression. Task result notifications require no acknowledgment or reply.` : undefined;
   }
 
   create(parent: Agent, input: CreateTaskInput, provision: (task: DelegatedTask) => Promise<Agent>): Promise<DelegatedTask> {
@@ -99,7 +100,7 @@ export class DurableTaskService {
         return true;
       });
       if (!ready) return this.list(parent.id, [task.id])[0]!;
-      const receipt = await this.ports.send(worker, `[Claw task ${task.id}; attempt ${task.attemptId}]\n${prompt}`);
+      const receipt = await this.ports.send(worker, `[${product.name} task ${task.id}; attempt ${task.attemptId}]\n${prompt}`);
       await this.change(tasks => {
         const current = tasks.find(item => item.id === task.id)!;
         current.acceptance = receipt;
@@ -224,8 +225,8 @@ export class DurableTaskService {
     };
     for (const task of this.tasks) {
       try {
-        const workerReceipt = !task.acceptance ? await findAcceptance(task.workerAgentId, `[Claw task ${task.id}; attempt ${task.attemptId}]`) : undefined;
-        const parentReceipt = task.delivery?.state === 'uncertain' ? await findAcceptance(task.parentAgentId, `Claw task results (${task.delivery.id}).`) : undefined;
+        const workerReceipt = !task.acceptance ? await findAcceptance(task.workerAgentId, `[${product.name} task ${task.id}; attempt ${task.attemptId}]`) : undefined;
+        const parentReceipt = task.delivery?.state === 'uncertain' ? await findAcceptance(task.parentAgentId, `${product.name} task results (${task.delivery.id}).`) : undefined;
         if (workerReceipt || parentReceipt) await this.change(tasks => {
           const current = tasks.find(item => item.id === task.id)!;
           if (workerReceipt) current.acceptance = workerReceipt;
@@ -350,7 +351,7 @@ export class DurableTaskService {
       this.parentAdmissions.set(parentId, admission);
       let receipt: TaskAcceptance | undefined;
       try {
-        receipt = await this.ports.send(currentParent, `Claw task results (${batch[0]!.delivery!.id}). These are saved task outcomes, not new assignments. No acknowledgment to workers is needed. Review results and continue only within the user's authorization. Completion does not approve merge, publication, or Mission progression.\n${JSON.stringify(batch.map(task => ({ taskId: task.id, title: task.assignment.title, workerAgentId: task.workerAgentId, result: task.submission })))}`);
+        receipt = await this.ports.send(currentParent, `${product.name} task results (${batch[0]!.delivery!.id}). These are saved task outcomes, not new assignments. No acknowledgment to workers is needed. Review results and continue only within the user's authorization. Completion does not approve merge, publication, or Mission progression.\n${JSON.stringify(batch.map(task => ({ taskId: task.id, title: task.assignment.title, workerAgentId: task.workerAgentId, result: task.submission })))}`);
         admission.turnId ??= receipt.turnId;
         await this.change(tasks => {
           for (const task of tasks) if (batch.some(item => item.id === task.id)) task.delivery = { ...task.delivery!, state: 'accepted', acceptance: receipt };

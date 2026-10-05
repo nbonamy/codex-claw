@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, BackendPublishedEvent, RendererMessage } from '@codex-claw/core/contracts';
+import type { Agent, BackendPublishedEvent, RendererMessage } from '@workspace/core/contracts';
 import { requestHandoffNote } from '../agents/handoff-note';
 
 const agent: Agent = { id: 'one', name: 'Worker', backend: 'codex', folder: '/repo', status: { type: 'idle' }, createdAt: '', updatedAt: '' };

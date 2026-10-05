@@ -82,13 +82,13 @@ describe('release-notes script', () => {
       rootPackage: { version: '0.5.0' },
       workspaces: [{
         path: 'electron/package.json',
-        manifest: { version: '0.5.0', dependencies: { '@codex-claw/core': '0.5.0' } },
+        manifest: { version: '0.5.0', dependencies: { '@workspace/core': '0.5.0' } },
       }],
       lockfile: {
         version: '0.5.0',
         packages: {
           '': { version: '0.5.0' },
-          electron: { version: '0.5.0', dependencies: { '@codex-claw/core': '0.5.0' } },
+          electron: { version: '0.5.0', dependencies: { '@workspace/core': '0.5.0' } },
         },
       },
     };

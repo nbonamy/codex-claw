@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import type { Agent } from '@codex-claw/core/contracts';
-import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import type { Agent } from '@workspace/core/contracts';
+import { claudeBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { BackendDriverRpc } from '../driver-rpc';
 
 const agent: Agent = { id: 'limited', name: 'Limited', folder: '/repo', backend: 'claude', status: { type: 'idle' }, createdAt: '', updatedAt: '' };

@@ -3,7 +3,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { LocalSocketRpcServer } from '../socket-server';
 
 describe('LocalSocketRpcServer', () => {
@@ -95,8 +95,8 @@ describe('LocalSocketRpcServer', () => {
 });
 
 async function tempSocketPath(): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), 'clawd-socket-test-'));
-  return path.join(dir, 'clawd.sock');
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'daemon-socket-test-'));
+  return path.join(dir, 'daemon.sock');
 }
 
 function connect(socketPath: string): Promise<net.Socket> {

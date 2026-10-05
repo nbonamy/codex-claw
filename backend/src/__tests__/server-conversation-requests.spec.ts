@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { ClawBackendServer } from '../server';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { WORKTREE_DELEGATION_PROMPT } from '../agents/worktree-delegation';
 import {
@@ -10,7 +11,7 @@ import {
   flushMicrotasks,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('clears stale review readiness when admitting a user prompt and assigns the conversation title', async () => {
     vi.useFakeTimers();
@@ -22,7 +23,7 @@ describe('ClawBackendServer', () => {
         id: 'agent-dina',
         teamId: 'team-test',
         name: 'Dina',
-        folder: '/Users/nbonamy/src/codex-claw',
+        folder: '/Users/nbonamy/src/agent-workspace',
         backend: 'codex',
         status: { type: 'idle' },
         threadFlags: { ready_for_review: true, delegate_to_worktree: true },
@@ -47,7 +48,7 @@ describe('ClawBackendServer', () => {
       };
       const events: unknown[] = [];
       const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-      const server = new ClawBackendServer({
+      const server = new AppBackendServer({
         version: 'test-version',
         pid: 123,
         snapshot,
@@ -114,7 +115,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const events: Array<{ type: string; payload: unknown }> = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version', pid: 123, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       onEvent: event => events.push(event),
@@ -136,22 +137,22 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('renames the active conversation when the Claw agent name changes', async () => {
+  it(`renames the active conversation when the ${product.name} agent name changes`, async () => {
     const snapshot = createTestSnapshot();
     snapshot.teams[0]!.agentIds = ['agent-dina'];
     snapshot.agents = [{
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       workspace: {
         kind: 'git',
-        folder: '/Users/nbonamy/src/codex-claw-work-routing',
-        repositoryName: 'codex-claw',
-        repositoryRoot: '/Users/nbonamy/src/codex-claw-work-routing',
-        branch: 'codex-claw-work-routing',
+        folder: '/Users/nbonamy/src/agent-workspace-work-routing',
+        repositoryName: 'agent-workspace',
+        repositoryRoot: '/Users/nbonamy/src/agent-workspace-work-routing',
+        branch: 'agent-workspace-work-routing',
         isLinkedWorktree: true,
-        primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+        primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace',
         updatedAt: '2026-06-13T00:00:00.000Z',
       },
       backend: 'codex',
@@ -176,7 +177,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -241,7 +242,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -264,7 +265,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -311,7 +312,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version', pid: 123, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       onEvent: (event) => events.push(event),
@@ -347,7 +348,7 @@ describe('ClawBackendServer', () => {
     expect(sendPrompt).not.toHaveBeenCalled();
     expect(onPromptStarting).not.toHaveBeenCalled();
 
-    // The provider conversation may already be idle before its completion event reaches Claw.
+    // The provider conversation may already be idle before its completion event reaches App.
     snapshot.agents[0]!.status = { type: 'idle' };
     server.emitEvent({
       agentId: 'agent-dina', backend: 'codex', threadId: 'thread-dina',
@@ -430,7 +431,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version', pid: 123, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       onEvent: (event) => events.push(event),
@@ -488,7 +489,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version', pid: 123, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
@@ -530,7 +531,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-old' },
       status: { type: 'idle' },
@@ -562,7 +563,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,

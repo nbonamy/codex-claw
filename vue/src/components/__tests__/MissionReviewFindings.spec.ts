@@ -1,8 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission } from '@codex-claw/core/missions';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission } from '@workspace/core/missions';
 import { i18n } from '../../i18n';
 import MissionReviewFindings from '../MissionReviewFindings.vue';
 

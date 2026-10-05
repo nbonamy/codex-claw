@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { defaultAppshotSettings } from '@codex-claw/core/settings';
+import { defaultAppshotSettings } from '@workspace/core/settings';
 import SettingsAppshotsPanel from '../SettingsAppshotsPanel.vue';
 
 describe('SettingsAppshotsPanel', () => {
@@ -10,7 +10,7 @@ describe('SettingsAppshotsPanel', () => {
       props: { settings: defaultAppshotSettings, updateSettings },
     });
 
-    expect(wrapper.text()).toContain('Take an Appshot to show Codex your frontmost window');
+    expect(wrapper.text()).toContain('Take a screenshot to show Codex your frontmost window');
     expect(wrapper.text()).toContain('Press both Command keys simultaneously');
     expect(wrapper.findAllComponents({ name: 'ElOption' }).some((option) => option.props('label') === 'Active agent')).toBe(true);
 

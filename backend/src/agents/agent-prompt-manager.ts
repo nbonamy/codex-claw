@@ -1,8 +1,8 @@
-import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
-import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
-import type { Agent, AppSnapshot, SendPromptOptions } from '@codex-claw/core/contracts';
-import { createEntityId } from '@codex-claw/core/ids';
-import { handoffInProgress } from '@codex-claw/core/agent-handoff';
+import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@workspace/core/backend-driver';
+import type { Agent, AppSnapshot, SendPromptOptions } from '@workspace/core/contracts';
+import { createEntityId } from '@workspace/core/ids';
+import { handoffInProgress } from '@workspace/core/agent-handoff';
 
 export type AgentPromptManagerOptions = {
   getSnapshot: () => AppSnapshot;

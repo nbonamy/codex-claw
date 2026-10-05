@@ -1,29 +1,30 @@
+import { product } from '@workspace/core/product';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import type { DelegatedTask } from '@codex-claw/core/delegated-task';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import type { DelegatedTask } from '@workspace/core/delegated-task';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { DurableTaskService } from '../../agents/durable-task-service';
 import { AppStateStore } from '../../persistence/store';
 import { BackendDriverRpc } from '../../driver-rpc';
-import { ClawBackendServer } from '../../server';
-import { ClawMcpService } from '../service';
+import { AppBackendServer } from '../../server';
+import { AppMcpService } from '../service';
 import { createTaskToolModuleProvider } from '../task-tools';
 import { codexSdkFixture, sdkSnapshot } from '../../codex/__tests__/sdk-surface-fixture';
 import { ClaudeBackendDriver } from '../../claude/claude-driver';
 import { ClaudeAgentSdkTransport } from '../../claude/agent-sdk-transport';
 import { createQueryHarness } from '../../claude/__tests__/sdk-query-fixture';
 
-vi.mock('@codex-claw/core/runtime-discovery', () => ({ withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }) }));
+vi.mock('@workspace/core/runtime-discovery', () => ({ withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }) }));
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
 
 async function setup(parentBackend: 'codex' | 'claude') {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'claw-task-mcp-'));
+  const home = await mkdtemp(path.join(os.tmpdir(), 'app-task-mcp-'));
   cleanup.push(() => rm(home, { recursive: true, force: true }));
   const store = new AppStateStore(home);
   const snapshot = createInitialSnapshot();
@@ -47,15 +48,15 @@ async function setup(parentBackend: 'codex' | 'claude') {
       return conversation.handle.getSnapshot();
     });
   }
-  let mcp!: ClawMcpService;
-  let server!: ClawBackendServer;
+  let mcp!: AppMcpService;
+  let server!: AppBackendServer;
   const tasks = new DurableTaskService({ tasks: [], save: data => store.saveTasks(data), agent: id => snapshot.agents.find(agent => agent.id === id), send: async (agent, prompt) => {
     const receipt = await server.sendTaskPrompt(agent, prompt);
     await store.save(snapshot);
     return receipt;
   }, interrupt: (agent, expectedTurnId) => rpc.handle(backendMethods.driverInterrupt, { agent, expectedTurnId }), onError: error => { throw error; } });
-  mcp = new ClawMcpService({ snapshot, tasks, persistSnapshot: () => store.save(snapshot), toolModuleProviders: [createTaskToolModuleProvider(tasks)] });
-  server = new ClawBackendServer({ version: 'test', snapshot, tasks, driverRpc: rpc, onBackendEventApplied: event => tasks.handleEvent(event) });
+  mcp = new AppMcpService({ snapshot, tasks, persistSnapshot: () => store.save(snapshot), toolModuleProviders: [createTaskToolModuleProvider(tasks)] });
+  server = new AppBackendServer({ version: 'test', snapshot, tasks, driverRpc: rpc, onBackendEventApplied: event => tasks.handleEvent(event) });
   mcp.setDriverRpc(rpc);
   mcp.setEventSink(event => server.emitEvent(event));
   const url = await mcp.start();
@@ -224,7 +225,7 @@ describe('durable tasks through authenticated MCP and real provider adapters', (
     const assignment = '<context>\nPreserve the contract and literal &lt;/context&gt; text.\n</context>\n\nPerform the assignment';
     expect(task.prompt).toBe(assignment);
     expect((await f.store.loadTasks())[0]!.prompt).toBe(assignment);
-    const sent = `[Claw task ${task.id}; attempt ${task.attemptId}]\n${assignment}`;
+    const sent = `[${product.name} task ${task.id}; attempt ${task.attemptId}]\n${assignment}`;
     if (backend === 'codex') expect(f.codex.conversation('codex-worker').handle.sendMessage.mock.calls[0]![0]).toBe(sent);
     else expect(f.claudeSdk.inputs[0]!.message.content).toEqual([{ type: 'text', text: sent }]);
     const worker = f.snapshot.agents.find(agent => agent.id === task.workerAgentId)!;

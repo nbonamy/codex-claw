@@ -563,22 +563,24 @@
 </template>
 
 <script setup lang="ts">
+import { product } from '@workspace/core/product';
+
 import { translate } from '../i18n';
 import { localizedErrorMessage, localizedText } from '../i18n/errors';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
-import { workProviderLabel, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { workProviderDefinition } from '@workspace/core/work-providers';
+import { workProviderLabel, workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
-import type { AgentBackend, AgentFileActivity } from '@codex-claw/core/contracts';
-import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, ClawdDaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
-import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { defaultTeamColor } from '@codex-claw/core/team-colors';
-import { projectAgentMentionLabels } from '@codex-claw/core/workspace-sidebar';
-import { codexClawApi } from '../platform-api';
+import type { AgentBackend, AgentFileActivity } from '@workspace/core/contracts';
+import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, DaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkSource } from '@workspace/core/contracts';
+import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import { defaultTeamColor } from '@workspace/core/team-colors';
+import { projectAgentMentionLabels } from '@workspace/core/workspace-sidebar';
+import { appApi } from '../platform-api';
 import AgentDialog from './AgentDialog.vue';
 import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import RepositorySessionSourceDialog from './RepositorySessionSourceDialog.vue';
@@ -592,7 +594,7 @@ import CockpitView from './CockpitView.vue';
 import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
 import AgentHandoffDialog from './AgentHandoffDialog.vue';
-import { agentHandoffBlocker, type AgentHandoffInput } from '@codex-claw/core/agent-handoff';
+import { agentHandoffBlocker, type AgentHandoffInput } from '@workspace/core/agent-handoff';
 import ImageAnnotationDialog from './ImageAnnotationDialog.vue';
 import FileQuickOpen from './FileQuickOpen.vue';
 import AgentQuickOpen from './AgentQuickOpen.vue';
@@ -618,9 +620,9 @@ import MissionDeleteDialog from './MissionDeleteDialog.vue';
 import type { MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';
 import ConversationPane from './ConversationPane.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
-import type { Mission, CreateMissionInput, DeleteMissionInput } from '@codex-claw/core/missions';
-import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
-import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
+import type { Mission, CreateMissionInput, DeleteMissionInput } from '@workspace/core/missions';
+import type { MissionImplementationStartProgress } from '@workspace/core/mission-execution';
+import { canonicalGitRemoteIdentity } from '@workspace/core/git-remote';
 import SettingsView from './SettingsView.vue';
 import FirstRunOnboardingGate from './FirstRunOnboardingGate.vue';
 import CodexResourceSharingMigrationDialog from './CodexResourceSharingMigrationDialog.vue';
@@ -643,7 +645,7 @@ import {
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
 import type { CodexConversationSnapshot, SurfaceMessage } from '@codex-app-sdk/core/surface';
-import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
+import type { ThreadFlagResponse } from '@workspace/core/thread-flags';
 import { BacklogIcon, BoltIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import {
   copyModelFavorite,
@@ -710,7 +712,7 @@ const props = withDefaults(defineProps<{
   assignedWorkItemsByProvider?: Partial<Record<WorkProviderKind, WorkItem[]>>;
   workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   workBacklogError?: string | null;
-  daemonStatus?: ClawdDaemonStatus | null;
+  daemonStatus?: DaemonStatus | null;
   daemonStatusError?: string | null;
   codexResourceSharingMigrationRequired?: boolean;
   chooseAgentFolder?: () => Promise<string | null>;
@@ -727,24 +729,24 @@ const props = withDefaults(defineProps<{
   chooseSourceWorktreeDestination?: (defaultPath: string) => Promise<string | null>;
   createSourceWorktree?: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   previewAgentFile?: (agentId: string, filePath: string) => Promise<AgentFilePreviewResult>;
-  getAgentGitDiff?: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
-  getAgentGitWorkflow?: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  generateAgentGitMessage?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@codex-claw/core/contracts').AgentGitMessageGenerationResult>;
-  stageAgentGitFiles?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitStageInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  commitAgentGitChanges?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitCommitInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  pushAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPushInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  createAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  createAgentGitPullRequest?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  mergeAgentGitBranch?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  updateAgentGitBranchFromBase?: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
+  getAgentGitDiff?: (agentId: string, target?: import('@workspace/core/contracts').AgentGitDiffTarget) => Promise<import('@workspace/core/contracts').AgentGitDiff>;
+  getAgentGitWorkflow?: (agentId: string) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  generateAgentGitMessage?: (agentId: string, input: import('@workspace/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@workspace/core/contracts').AgentGitMessageGenerationResult>;
+  stageAgentGitFiles?: (agentId: string, input: import('@workspace/core/contracts').AgentGitStageInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  commitAgentGitChanges?: (agentId: string, input: import('@workspace/core/contracts').AgentGitCommitInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  pushAgentGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitPushInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  createAgentGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitBranchInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  createAgentGitPullRequest?: (agentId: string, input: import('@workspace/core/contracts').AgentGitPullRequestInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  mergeAgentGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitMergeInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  updateAgentGitBranchFromBase?: (agentId: string, input: import('@workspace/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@workspace/core/contracts').AgentGitUpdateFromBaseResult>;
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission?: (input: CreateMissionInput) => Promise<Mission>;
   selectMission?: (missionId: string | null) => Promise<void>;
   deleteMission?: (input: DeleteMissionInput) => Promise<void>;
-  readMissionArtifact?: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
-  executeMission?: (input: import('@codex-claw/core/mission-execution').MissionExecutionInput) => Promise<void>;
+  readMissionArtifact?: (missionId: string, stage: import('@workspace/core/missions').MissionStage) => Promise<import('@workspace/core/mission-execution').MissionArtifactReadResult>;
+  executeMission?: (input: import('@workspace/core/mission-execution').MissionExecutionInput) => Promise<void>;
   missionImplementationStartProgress?: MissionImplementationStartProgress | null;
   createQuickChat?: (input: CreateQuickChatInput) => Promise<Agent | null | void>;
   createTeam?: (input: CreateTeamInput) => Promise<Team | null | void>;
@@ -752,7 +754,7 @@ const props = withDefaults(defineProps<{
   updateAgent?: (input: UpdateAgentInput) => Promise<void>;
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
   setCodexResourceSharing?: (input: SetCodexResourceSharingInput) => Promise<void>;
-  getPluginStatus?: () => Promise<import('@codex-claw/core/contracts').AppPluginStatus>;
+  getPluginStatus?: () => Promise<import('@workspace/core/contracts').AppPluginStatus>;
   listSshHosts?: () => Promise<SshHostCandidate[]>;
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
   checkRemoteConnection?: (connectionId: string, inspectOnly?: boolean) => Promise<void>;
@@ -788,7 +790,7 @@ const props = withDefaults(defineProps<{
   loadWorkItems?: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: WorkItemQuery) => Promise<WorkItem[] | void>;
   loadGlobalWorkItems?: (provider: WorkProviderKind, location?: AutomationLocation, query?: GlobalWorkItemQuery) => Promise<WorkItemPage>;
   loadAssignedWorkItems?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
-  duplicateAgentAction?: (agentId: string, options?: import('@codex-claw/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
+  duplicateAgentAction?: (agentId: string, options?: import('@workspace/core/contracts').DuplicateAgentOptions) => Promise<Agent | null>;
   assignWorkItemAction?: (payload: { agentId: string; item: WorkItem; prompt?: string }) => Promise<void>;
   loadOlderAgentHistory?: (agentId: string) => Promise<void>;
   retryAgentHistory?: () => Promise<void>;
@@ -802,19 +804,19 @@ const props = withDefaults(defineProps<{
   retryTurnAction?: (turnId: string) => Promise<void>;
   continueInterruptedTurnAction?: () => Promise<void>;
   quit?: () => Promise<void>;
-  startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
-  decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
-  discussCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
+  startCodeReview?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
+  decideCodeReviewFinding?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
+  discussCodeReviewFinding?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
-  startVisualize?: (agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => Promise<AppSnapshot>;
-  setVisualizeOpen?: (agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
-  generateVisualizationSuggestion?: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
-  selectVisualization?: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
-  deleteVisualization?: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
-  readVisualizationAsset?: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
+  startVisualize?: (agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput) => Promise<AppSnapshot>;
+  setVisualizeOpen?: (agentId: string, input: import('@workspace/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
+  generateVisualizationSuggestion?: (agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
+  selectVisualization?: (agentId: string, input: import('@workspace/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
+  deleteVisualization?: (agentId: string, input: import('@workspace/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
+  readVisualizationAsset?: (agentId: string, visualizationId: string) => Promise<import('@workspace/core/visualize').VisualizationAsset>;
 }>(), {
   answeredClientRequestIds: () => new Set<string>(),
   approvals: () => [],
@@ -997,11 +999,11 @@ type PendingReviewClarification = {
   sessionId: string;
   roundId: string;
   findingId: string;
-  finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+  finding: import('@workspace/core/code-review').CodeReviewFinding;
 };
 type PendingMissionReviewDiscussion = {
   agentId: string;
-  finding: import('@codex-claw/core/missions').MissionReviewFinding;
+  finding: import('@workspace/core/missions').MissionReviewFinding;
 };
 
 type AppSurface = 'mission' | 'agent' | 'cockpit' | 'backlog' | 'automations' | 'settings';
@@ -1026,7 +1028,7 @@ const codexResourceSharingBlocked = computed(() => props.snapshot.agents.some((a
 const agentSidebarMinWidth = 80;
 const agentSidebarMaxWidth = 420;
 const agentSidebarWidth = ref(260);
-const missionSurfaceStorageKey = 'codexClaw.activeMissionId';
+const missionSurfaceStorageKey = 'app.activeMissionId';
 function rememberedMissionId(): string | null {
   try {
     return window.localStorage.getItem(missionSurfaceStorageKey)?.trim() || null;
@@ -1234,7 +1236,7 @@ const handoffAgentId = ref<string | null>(null);
 const handoffAgent = computed(() => props.snapshot.agents.find(agent => agent.id === handoffAgentId.value) ?? null);
 function openHandoff(agentId: string) { handoffAgentId.value = agentId; }
 async function listHandoffModels(agentId: string, backend: AgentBackend) {
-  return await codexClawApi?.listBackendModels(agentId, backend) ?? [];
+  return await appApi?.listBackendModels(agentId, backend) ?? [];
 }
 const agentDialogMode = ref<'create' | 'edit'>('create');
 const editingAgentId = ref<string | null>(null);
@@ -1248,7 +1250,7 @@ const githubConnection = computed<WorkIntegrationConnection>(() => (
   }
 ));
 const firstRunOnboarding = useFirstRunOnboarding({
-  getApi: () => codexClawApi,
+  getApi: () => appApi,
   getConnections: () => props.snapshot.providerConnections ?? [],
   hasExistingWorkspace: () => props.snapshot.agents.length > 0 || props.snapshot.general.providerOnboardingComplete === true,
   isGitHubConnected: () => githubConnection.value.status === 'connected',
@@ -1631,7 +1633,7 @@ function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {
   openRightWorkspaceTabLocal(tab, agentId);
 }
 
-async function startVisualizeForAgent(agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput): Promise<void> {
+async function startVisualizeForAgent(agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput): Promise<void> {
   const alreadyOpen = rightWorkspaceFor(agentId).tabs.includes('visualize');
   openRightWorkspaceTab('visualize', agentId);
   try {
@@ -1688,7 +1690,7 @@ const {
   openMarkdown: openMarkdownRequest,
   openSidePanel: openSidePanelRequest,
 } = workspacePreviews;
-function openAgentGitDiffPreview(agentId = currentAgent.value?.id, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget): Promise<void> {
+function openAgentGitDiffPreview(agentId = currentAgent.value?.id, target?: import('@workspace/core/contracts').AgentGitDiffTarget): Promise<void> {
   return agentId ? openAgentGitDiffForAgent(agentId, target) : Promise.resolve();
 }
 const imageAnnotation = useImageAnnotation({
@@ -2246,8 +2248,8 @@ const backlogVisible = computed(() => activeSurface.value === 'backlog');
 const automationsVisible = computed(() => activeSurface.value === 'automations');
 const settingsVisible = computed(() => activeSurface.value === 'settings');
 async function setEngineEnabled(backend: AgentBackend, enabled: boolean) {
-  if (!codexClawApi) throw new Error('Backend connection is unavailable.');
-  await codexClawApi.setProviderEnabled(backend, enabled);
+  if (!appApi) throw new Error('Backend connection is unavailable.');
+  await appApi.setProviderEnabled(backend, enabled);
 }
 const isAgentWorkspaceVisible = computed(() => activeSurface.value === 'agent');
 const isModalDialogVisible = computed(() => (
@@ -2355,7 +2357,7 @@ function showDebugUserQuestions(agentId: string): void {
                   {
                     id: 'debug-user-questions-core-flow',
                     header: 'Core flow',
-                    question: 'What should the first Linear integration let a Codex Claw user do?',
+                    question: `What should the first Linear integration let a ${product.name} user do?`,
                     isOther: true,
                     isSecret: false,
                     options: [
@@ -2423,7 +2425,7 @@ function startDebugAgentCreationProgress(): void {
     id,
     state: 'running',
     backend: 'codex',
-    repositoryName: 'codex-claw',
+    repositoryName: 'agent-workspace',
     createWorktree: true,
     branchName: 'debug/worktree-preview',
     hasPrompt: true,
@@ -2771,7 +2773,7 @@ function forwardApprovalResolution(
 
 async function startCodeReviewFromShell(
   agentId: string,
-  input: import('@codex-claw/core/code-review').CodeReviewStartInput,
+  input: import('@workspace/core/code-review').CodeReviewStartInput,
 ): Promise<AppSnapshot> {
   const next = await props.startCodeReview(agentId, input);
   const reviewerAgentId = input.threadMode === 'independent'
@@ -2791,7 +2793,7 @@ function clarifyCodeReviewFinding(payload: {
   agentId: string;
   sessionId: string;
   roundId: string;
-  finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+  finding: import('@workspace/core/code-review').CodeReviewFinding;
 }): void {
   const { finding } = payload;
   pendingReviewClarification.value = {
@@ -2850,7 +2852,7 @@ function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): voi
 }
 
 function missionReviewDiscussionPrompt(
-  finding: import('@codex-claw/core/missions').MissionReviewFinding,
+  finding: import('@workspace/core/missions').MissionReviewFinding,
 ): string {
   const location = finding.location
     ? `${finding.location.file}${finding.location.line ? `:${finding.location.line}` : ''}`
@@ -3008,7 +3010,7 @@ async function declineCodexResourceSharingMigration(): Promise<void> {
   }
 }
 
-async function getPluginStatus(): Promise<import('@codex-claw/core/contracts').AppPluginStatus> {
+async function getPluginStatus(): Promise<import('@workspace/core/contracts').AppPluginStatus> {
   return props.getPluginStatus();
 }
 
@@ -3036,7 +3038,7 @@ async function quit(): Promise<void> {
   await props.quit();
 }
 
- const activeTeamName = computed(() => activeTeam.value?.name ?? 'Codex Claw');
+ const activeTeamName = computed(() => activeTeam.value?.name ?? `${product.name}`);
 const resumeSessionAgent = computed(() => (
   props.snapshot.agents.find((agent) => agent.id === resumeSessionAgentId.value) ?? null
 ));

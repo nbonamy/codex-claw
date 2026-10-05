@@ -1,13 +1,13 @@
 import { effectScope, ref } from 'vue';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@codex-claw/core/contracts';
+import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@workspace/core/contracts';
 import { relativeSessionDate, useSessionHistory } from '../use-session-history';
 
 const agent: Agent = {
   id: 'agent-dina',
   name: 'Dina',
-  folder: '~/src/codex-claw',
+  folder: '~/src/agent-workspace',
   backend: 'codex',
   backendDefaults: { kind: 'codex' },
   backendSession: { kind: 'codex', threadId: 'thread-current' },

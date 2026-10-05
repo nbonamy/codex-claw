@@ -1,36 +1,36 @@
-import type { ClawBackendEvent, ClawBackendHealth } from '@codex-claw/core/backend-protocol/rpc';
+import type { AppBackendEvent, AppBackendHealth } from '@workspace/core/backend-protocol/rpc';
 import { createRuntimeClientRequestHandlers } from './client-request-handlers';
-import { ClawBackendProcessClient } from './backend-process-client';
-import { ClawBackendSocketClient } from './backend-socket-client';
+import { AppBackendProcessClient } from './backend-process-client';
+import { AppBackendSocketClient } from './backend-socket-client';
 import { warnMain } from './log';
-import { runtimeClawdBackendMode, runtimeClawdCommand, runtimeClawdSocketPath, runtimeClawdWatchFile } from './runtime-config';
+import { runtimeDaemonBackendMode, runtimeDaemonCommand, runtimeDaemonSocketPath, runtimeDaemonWatchFile } from './runtime-config';
 import type { SpokenAnnouncementQueue } from './spoken-announcements';
-import type { SpokenAnnouncementVoice } from '@codex-claw/core/contracts';
+import type { SpokenAnnouncementVoice } from '@workspace/core/contracts';
 
-export type ClawBackendClientPort = {
+export type AppBackendClientPort = {
   close(): Promise<void>;
-  health(): Promise<ClawBackendHealth>;
+  health(): Promise<AppBackendHealth>;
   onConnectionState?(listener: (state: 'connected' | 'disconnected', error?: Error) => void): () => void;
-  onEvent(listener: (event: ClawBackendEvent) => void): () => void;
+  onEvent(listener: (event: AppBackendEvent) => void): () => void;
   request<Result>(method: string, params?: unknown): Promise<Result>;
   start(): Promise<void>;
 };
 
-export function createRuntimeClawBackendClient(options: {
+export function createRuntimeAppBackendClient(options: {
   browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
   spokenAnnouncements?: Pick<SpokenAnnouncementQueue, 'queue'>;
   spokenAnnouncementVoice?: () => SpokenAnnouncementVoice;
-} = {}): ClawBackendClientPort | null {
-  const mode = runtimeClawdBackendMode();
+} = {}): AppBackendClientPort | null {
+  const mode = runtimeDaemonBackendMode();
   const requestHandlers = createRuntimeClientRequestHandlers({
     browserExecute: options.browserExecute,
     browserOpen: options.browserOpen,
     spokenAnnouncements: options.spokenAnnouncements,
     spokenAnnouncementVoice: options.spokenAnnouncementVoice,
   });
-  const socketClient = new ClawBackendSocketClient({
-    socketPath: runtimeClawdSocketPath(),
+  const socketClient = new AppBackendSocketClient({
+    socketPath: runtimeDaemonSocketPath(),
     requestHandlers,
   });
 
@@ -38,26 +38,26 @@ export function createRuntimeClawBackendClient(options: {
     return socketClient;
   }
 
-  const command = runtimeClawdCommand();
-  const processClient = command ? new ClawBackendProcessClient({
+  const command = runtimeDaemonCommand();
+  const processClient = command ? new AppBackendProcessClient({
     command,
     requestHandlers,
-    watchFile: runtimeClawdWatchFile(),
+    watchFile: runtimeDaemonWatchFile(),
   }) : null;
 
   if (mode === 'bundled') {
     return processClient;
   }
 
-  return processClient ? new AutoClawBackendClient(socketClient, processClient) : socketClient;
+  return processClient ? new AutoAppBackendClient(socketClient, processClient) : socketClient;
 }
 
-class AutoClawBackendClient implements ClawBackendClientPort {
-  private active: ClawBackendClientPort | null = null;
+class AutoAppBackendClient implements AppBackendClientPort {
+  private active: AppBackendClientPort | null = null;
 
   constructor(
-    private readonly socketClient: ClawBackendClientPort,
-    private readonly processClient: ClawBackendClientPort,
+    private readonly socketClient: AppBackendClientPort,
+    private readonly processClient: AppBackendClientPort,
   ) {}
 
   async start(): Promise<void> {
@@ -73,7 +73,7 @@ class AutoClawBackendClient implements ClawBackendClientPort {
       this.active = this.socketClient;
     } catch (error) {
       await this.socketClient.close();
-      warnMain('clawd', 'local daemon unavailable, starting bundled backend', {
+      warnMain('daemon', 'local daemon unavailable, starting bundled backend', {
         detail: error instanceof Error ? error.message : String(error),
       });
       await this.processClient.start();
@@ -81,7 +81,7 @@ class AutoClawBackendClient implements ClawBackendClientPort {
     }
   }
 
-  async health(): Promise<ClawBackendHealth> {
+  async health(): Promise<AppBackendHealth> {
     return this.requireActive().health();
   }
 
@@ -89,7 +89,7 @@ class AutoClawBackendClient implements ClawBackendClientPort {
     return this.requireActive().request(method, params);
   }
 
-  onEvent(listener: (event: ClawBackendEvent) => void): () => void {
+  onEvent(listener: (event: AppBackendEvent) => void): () => void {
     return this.requireActive().onEvent(listener);
   }
 
@@ -102,9 +102,9 @@ class AutoClawBackendClient implements ClawBackendClientPort {
     this.active = null;
   }
 
-  private requireActive(): ClawBackendClientPort {
+  private requireActive(): AppBackendClientPort {
     if (!this.active) {
-      throw new Error('clawd backend is not connected.');
+      throw new Error('daemon backend is not connected.');
     }
     return this.active;
   }

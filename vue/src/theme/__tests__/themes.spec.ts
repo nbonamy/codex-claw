@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it } from 'vitest';
 import { appThemes, effectiveTheme, themeById, themeIdForAppearance } from '../themes';
-import { defaultThemeSettings } from '@codex-claw/core/settings';
+import { defaultThemeSettings } from '@workspace/core/settings';
 
 const requestedThemePairs = [
   ['absolutely-light', 'absolutely-dark'],
@@ -55,17 +56,17 @@ describe('appThemes', () => {
     );
   });
 
-  it('includes Codex Claw light, dark, and dark blue themes', () => {
-    expect(themeById('codex-claw-light')).toMatchObject({
-      name: 'Codex Claw Light',
+  it(`includes ${product.name} light, dark, and dark blue themes`, () => {
+    expect(themeById('app-light')).toMatchObject({
+      name: `${product.name} Light`,
       appearance: 'light',
     });
-    expect(themeById('codex-claw-dark')).toMatchObject({
-      name: 'Codex Claw Dark',
+    expect(themeById('app-dark')).toMatchObject({
+      name: `${product.name} Dark`,
       appearance: 'dark',
     });
-    expect(themeById('codex-claw-dark-blue')).toMatchObject({
-      name: 'Codex Claw Dark Blue',
+    expect(themeById('app-dark-blue')).toMatchObject({
+      name: `${product.name} Dark Blue`,
       appearance: 'dark',
     });
   });
@@ -96,29 +97,29 @@ describe('appThemes', () => {
     });
   });
 
-  it('uses Codex Claw Light as the default and pairs it with Codex Claw Dark for system mode', () => {
-    expect(defaultThemeSettings.id).toBe('codex-claw-light');
-    expect(effectiveTheme(defaultThemeSettings, false).id).toBe('codex-claw-light');
-    expect(effectiveTheme(defaultThemeSettings, true).id).toBe('codex-claw-dark');
-    expect(themeIdForAppearance('codex-claw-light', 'light')).toBe('codex-claw-light');
-    expect(themeIdForAppearance('codex-claw-light', 'dark')).toBe('codex-claw-dark');
-    expect(themeIdForAppearance('codex-claw-dark-blue', 'light')).toBe('codex-claw-light');
+  it(`uses ${product.name} Light as the default and pairs it with ${product.name} Dark for system mode`, () => {
+    expect(defaultThemeSettings.id).toBe('app-light');
+    expect(effectiveTheme(defaultThemeSettings, false).id).toBe('app-light');
+    expect(effectiveTheme(defaultThemeSettings, true).id).toBe('app-dark');
+    expect(themeIdForAppearance('app-light', 'light')).toBe('app-light');
+    expect(themeIdForAppearance('app-light', 'dark')).toBe('app-dark');
+    expect(themeIdForAppearance('app-dark-blue', 'light')).toBe('app-light');
   });
 
-  it('uses Witsy-derived colors for the Codex Claw themes', () => {
-    expect(themeById('codex-claw-light').colors).toMatchObject({
+  it(`uses Witsy-derived colors for the ${product.name} themes`, () => {
+    expect(themeById('app-light').colors).toMatchObject({
       '--color-surface': '#FAFAFA',
       '--color-surface-low': '#F4F4F5',
       '--color-surface-high': '#E9E9EC',
       '--color-primary': '#1B4FB2',
     });
-    expect(themeById('codex-claw-dark').colors).toMatchObject({
+    expect(themeById('app-dark').colors).toMatchObject({
       '--color-surface': '#202020',
       '--color-surface-low': '#303030',
       '--color-surface-high': '#404040',
       '--color-primary': 'rgb(11, 132, 255)',
     });
-    expect(themeById('codex-claw-dark-blue').colors).toMatchObject({
+    expect(themeById('app-dark-blue').colors).toMatchObject({
       '--color-surface': 'rgb(0, 31, 55)',
       '--color-surface-low': 'rgb(10, 44, 68)',
       '--color-surface-high': 'rgb(40, 50, 65)',
@@ -150,6 +151,6 @@ describe('appThemes', () => {
   });
 
   it('falls back to the default theme for unknown theme ids', () => {
-    expect(themeById('missing-theme').id).toBe('codex-claw-light');
+    expect(themeById('missing-theme').id).toBe('app-light');
   });
 });

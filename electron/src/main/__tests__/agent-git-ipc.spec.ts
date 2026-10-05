@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels } from '@codex-claw/core/ipc';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { ipcChannels } from '@workspace/core/ipc';
 import { registerAgentGitIpcHandlers } from '../agent-git-ipc';
-import type { ClawBackendClientPort } from '../backend-client';
-import { decodeAppErrorDescriptor } from '@codex-claw/core/app-error';
+import type { AppBackendClientPort } from '../backend-client';
+import { decodeAppErrorDescriptor } from '@workspace/core/app-error';
 
 describe('agent Git IPC', () => {
   it('forwards the selected Git diff target', async () => {
@@ -15,7 +15,7 @@ describe('agent Git IPC', () => {
     } as unknown as Parameters<typeof registerAgentGitIpcHandlers>[0];
     const backend = {
       request: vi.fn().mockResolvedValue({ target: { type: 'staged' }, diff: 'staged diff', sections: [], summary: { addedLines: 1, removedLines: 0, changedFiles: 1 } }),
-    } as unknown as ClawBackendClientPort;
+    } as unknown as AppBackendClientPort;
     registerAgentGitIpcHandlers(ipc, () => backend);
 
     const handler = handlers.get(ipcChannels.getAgentGitDiff);
@@ -48,7 +48,7 @@ describe('agent Git IPC', () => {
     } as unknown as Parameters<typeof registerAgentGitIpcHandlers>[0];
     const backend = {
       request: vi.fn().mockResolvedValue(result ?? true),
-    } as unknown as ClawBackendClientPort;
+    } as unknown as AppBackendClientPort;
     registerAgentGitIpcHandlers(ipc, () => backend);
 
     const handler = handlers.get(channel);
@@ -74,7 +74,7 @@ describe('agent Git IPC', () => {
       request: vi.fn().mockRejectedValue(Object.assign(new Error('Commit your work first.'), {
         data: { kind: 'appError', code: 'git.pullRequestChangesRequired' },
       })),
-    } as unknown as ClawBackendClientPort;
+    } as unknown as AppBackendClientPort;
     registerAgentGitIpcHandlers(ipc, () => backend);
 
     const handler = handlers.get(channel);

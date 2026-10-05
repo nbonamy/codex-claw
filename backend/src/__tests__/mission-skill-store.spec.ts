@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -5,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { FileMissionSkillStore } from '../mission-skill-store';
 
 describe('Mission skill store', () => {
-  it('materializes Claw-owned stage skills without requiring an installed workflow or setup command', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'claw-mission-skills-'));
+  it(`materializes ${product.name}-owned stage skills without requiring an installed workflow or setup command`, async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'app-mission-skills-'));
     try {
       const store = new FileMissionSkillStore(async missionId => path.join(root, missionId));
       const requirements = await store.ensure('mission-test', 'requirements');
@@ -22,7 +23,7 @@ describe('Mission skill store', () => {
       ]);
       expect(await store.ensure('mission-test', 'ship')).toStrictEqual([]);
       const ticketSkill = await readFile(tickets[0]!.path, 'utf8');
-      expect(ticketSkill).toContain('codex_claw.upsert-mission-ticket');
+      expect(ticketSkill).toContain('workspace.upsert-mission-ticket');
       expect(ticketSkill).toContain('without tracker setup');
       expect(ticketSkill).toContain('explicit Review stage');
       expect(ticketSkill).toContain('User review happens manually in the Mission workspace after submission');

@@ -1,7 +1,7 @@
 import { open, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { AgentFilePreviewResult, AgentFileSearchItem } from '@codex-claw/core/contracts';
-import type { AgentFileChunk } from '@codex-claw/core/contracts/workspace';
+import type { AgentFilePreviewResult, AgentFileSearchItem } from '@workspace/core/contracts';
+import type { AgentFileChunk } from '@workspace/core/contracts/workspace';
 
 const DEFAULT_AGENT_FILE_LIMIT = 1000;
 const DEFAULT_AGENT_FILE_DEPTH = 8;

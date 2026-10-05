@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
-import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@workspace/core/contracts';
 import { i18n } from '../../i18n';
 import '../../styles/base.css';
 
@@ -87,8 +87,8 @@ describe('AgentHeader', () => {
 
   it('shows the canonical repository name for a linked worktree', () => {
     const wrapper = mountHeader({ backend: 'codex', status: 'running' }, false, {
-      folder: '/Users/nbonamy/src/codex-claw-git-fixture-test',
-      repository: 'codex-claw-git-fixture',
+      folder: '/Users/nbonamy/src/agent-workspace-git-fixture-test',
+      repository: 'agent-workspace-git-fixture',
       branch: 'test',
       ahead: 0,
       behind: 0,
@@ -100,7 +100,7 @@ describe('AgentHeader', () => {
       updatedAt: '2026-08-11T00:00:00.000Z',
     });
 
-    expect(wrapper.get('.agent-header__folder').text()).toBe('test @ codex-claw-git-fixture');
+    expect(wrapper.get('.agent-header__folder').text()).toBe('test @ agent-workspace-git-fixture');
   });
 
   it('does not repeat a branch-derived name in the repository location', () => {
@@ -109,21 +109,21 @@ describe('AgentHeader', () => {
         agent: {
           ...agent,
           name: null,
-          folder: '/Users/nbonamy/src/codex-claw-hardening',
+          folder: '/Users/nbonamy/src/agent-workspace-hardening',
           workspace: {
             kind: 'git',
-            folder: '/Users/nbonamy/src/codex-claw-hardening',
-            repositoryName: 'codex-claw',
-            repositoryRoot: '/Users/nbonamy/src/codex-claw-hardening',
+            folder: '/Users/nbonamy/src/agent-workspace-hardening',
+            repositoryName: 'agent-workspace',
+            repositoryRoot: '/Users/nbonamy/src/agent-workspace-hardening',
             branch: 'chore/codebase-hardening-review',
             isLinkedWorktree: true,
-            primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+            primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace',
             updatedAt: '2026-09-07T00:00:00.000Z',
           },
         },
         gitStatus: {
-          folder: '/Users/nbonamy/src/codex-claw-hardening',
-          repository: 'codex-claw',
+          folder: '/Users/nbonamy/src/agent-workspace-hardening',
+          repository: 'agent-workspace',
           branch: 'chore/codebase-hardening-review',
           ahead: 0,
           behind: 0,
@@ -141,7 +141,7 @@ describe('AgentHeader', () => {
     });
 
     expect(wrapper.get('.agent-header__agent-line strong').text()).toBe('chore/codebase-hardening-review');
-    expect(wrapper.get('.agent-header__folder').text()).toBe('@ codex-claw');
+    expect(wrapper.get('.agent-header__folder').text()).toBe('@ agent-workspace');
   });
 
   it('uses persisted workspace identity before the first Git status refresh', () => {

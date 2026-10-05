@@ -348,17 +348,17 @@
 </template>
 
 <script setup lang="ts">
-import { codexClawApi } from '../platform-api';
-import type { SaveCanvasInput } from '@codex-claw/core/visualize-canvas';
+import { appApi } from '../platform-api';
+import type { SaveCanvasInput } from '@workspace/core/visualize-canvas';
 async function saveCanvas(agentId: string, input: SaveCanvasInput) {
-  if (!codexClawApi) throw new Error('Visualize is not available.');
-  return codexClawApi.saveVisualizationCanvas(agentId, input);
+  if (!appApi) throw new Error('Visualize is not available.');
+  return appApi.saveVisualizationCanvas(agentId, input);
 }
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
-import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkItem } from '@workspace/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
 import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppContextMenu from '../shared/menu/AppContextMenu.vue';
@@ -431,22 +431,22 @@ const props = withDefaults(defineProps<{
   openInCatalog?: OpenInApplicationCatalog;
   subagentTree?: AgentSubagentTree | null;
   loadSubagentMessages?: (conversationId: string) => Promise<RendererMessage[]>;
-  backlogLocation?: import('@codex-claw/core/contracts').AutomationLocation;
+  backlogLocation?: import('@workspace/core/contracts').AutomationLocation;
   githubRepository?: string | null;
   workAssignments?: Record<string, WorkBacklogAssignment>;
   clearRepositoryWorkAssignment?: (item: WorkItem) => void;
   closeRepositoryWorkAgent?: (agentId: string) => void;
   showRepositoryWorkAgent?: (agentId: string) => void;
   startRepositoryWork?: (input: import('./right-workspace').RepositoryWorkStartInput) => Promise<void>;
-  startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
-  decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
+  startCodeReview?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
+  decideCodeReviewFinding?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
-  generateVisualizationSuggestion?: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
-  selectVisualization?: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
-  deleteVisualization?: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
-  readVisualizationAsset?: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
+  generateVisualizationSuggestion?: (agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
+  selectVisualization?: (agentId: string, input: import('@workspace/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
+  deleteVisualization?: (agentId: string, input: import('@workspace/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
+  readVisualizationAsset?: (agentId: string, visualizationId: string) => Promise<import('@workspace/core/visualize').VisualizationAsset>;
 }>(), {
   browserPanels: () => ({}),
   filesPaneWidth: 280,
@@ -472,11 +472,11 @@ const emit = defineEmits<{
   openTab: [tab: RightWorkspaceTab];
   openIn: [payload: { application: OpenInApplication; filePath: string }];
   openLink: [link: CodexConversationLink];
-  refreshGitDiff: [target?: import('@codex-claw/core/contracts').AgentGitDiffTarget];
+  refreshGitDiff: [target?: import('@workspace/core/contracts').AgentGitDiffTarget];
   clarifyFinding: [payload: {
     sessionId: string;
     roundId: string;
-    finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+    finding: import('@workspace/core/code-review').CodeReviewFinding;
   }];
   selectTab: [tab: RightWorkspaceTab];
   sendPrompt: [prompt: string];

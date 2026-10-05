@@ -29,7 +29,7 @@ describe('agent chat service', () => {
     expect(result).toBe(snapshot);
     expect(backendDriver.sendPrompt).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-dina',
-      folder: '~/src/codex-claw',
+      folder: '~/src/agent-workspace',
     }), 'hello');
     expect(snapshot.agents[0].status).toStrictEqual({ type: 'working' });
     expect(events.map((event) => event.type)).toStrictEqual([

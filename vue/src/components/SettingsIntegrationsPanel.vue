@@ -32,8 +32,8 @@
 
 <script setup lang="ts">
 import { computed, type Component } from 'vue';
-import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@codex-claw/core/contracts';
-import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
+import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@workspace/core/contracts';
+import { workProviderDefinition, workProviderKinds } from '@workspace/core/work-providers';
 import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';
 import { BacklogIcon, GitHubIcon, LinearIcon } from '../shared/icons/app-icons';

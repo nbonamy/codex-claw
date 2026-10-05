@@ -1,6 +1,6 @@
-import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import type { Agent, AppSnapshot } from '@codex-claw/core/contracts';
-import { createMission, deleteMission, updateMission, type DeleteMissionInput, type Mission } from '@codex-claw/core/missions';
+import { closeAgentInSnapshot } from '@workspace/core/agent-manager';
+import type { Agent, AppSnapshot } from '@workspace/core/contracts';
+import { createMission, deleteMission, updateMission, type DeleteMissionInput, type Mission } from '@workspace/core/missions';
 
 /** Serializes mission revisions and publishes them only after durable storage succeeds. */
 export class MissionService {

@@ -60,9 +60,9 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
-import type { Mission } from '@codex-claw/core/missions';
-import type { MissionDelivery, MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, OpenInApplicationCatalog } from '@workspace/core/contracts';
+import type { Mission } from '@workspace/core/missions';
+import type { MissionDelivery, MissionExecutionInput } from '@workspace/core/mission-execution';
 import { ArrowRightIcon, CheckIcon, GitForkIcon } from '../shared/icons/app-icons';
 import GitWorkflowControl from './GitWorkflowControl.vue';
 import MissionWorkspaceOpenIn, { type MissionWorkspaceOpenRequest } from './MissionWorkspaceOpenIn.vue';

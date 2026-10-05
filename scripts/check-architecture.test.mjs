@@ -17,7 +17,7 @@ const directories = [
 ];
 
 async function checkFixture(files) {
-  const root = await mkdtemp(path.join(tmpdir(), "claw-architecture-"));
+  const root = await mkdtemp(path.join(tmpdir(), "app-architecture-"));
   try {
     await Promise.all(
       directories.map((directory) =>
@@ -57,7 +57,7 @@ test("architecture lint rejects imports across owned process boundaries", async 
     "backend/src/host.ts": "await import('electron');\n",
     "backend/src/types.ts": "type App = import('electron').App;\n",
     "electron/src/main/driver.ts":
-      "import { driver } from '@codex-claw/backend';\n",
+      "import { driver } from '@workspace/backend';\n",
     "electron/src/main/relative.ts":
       "import { driver } from '../../../backend/src/server';\n",
     "electron/src/preload/files.ts": "const fs = require('node:fs');\n",
@@ -74,11 +74,11 @@ test("architecture lint rejects imports across owned process boundaries", async 
     ["backend/src/types.ts", "backend cannot depend on Electron"],
     [
       "electron/src/main/driver.ts",
-      "Electron main must use the clawd protocol",
+      "Electron main must use the daemon protocol",
     ],
     [
       "electron/src/main/relative.ts",
-      "Electron main must use the clawd protocol",
+      "Electron main must use the daemon protocol",
     ],
     ["electron/src/preload/files.ts", "preload cannot use raw filesystem"],
   ]) {

@@ -6,7 +6,7 @@ import { createSourceRepository, requireRepositoryName } from '../create-source-
 
 describe('createSourceRepository', () => {
   it('creates an empty project folder without initializing Git', async () => {
-    const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'claw-create-repository-'));
+    const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'app-create-repository-'));
 
     try {
       await expect(createSourceRepository(sourceRoot, 'new-project')).resolves.toStrictEqual({
@@ -22,7 +22,7 @@ describe('createSourceRepository', () => {
   });
 
   it('rejects an existing destination and preserves its contents', async () => {
-    const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'claw-create-repository-existing-'));
+    const sourceRoot = await mkdtemp(path.join(os.tmpdir(), 'app-create-repository-existing-'));
     await mkdir(path.join(sourceRoot, 'existing'));
     await writeFile(path.join(sourceRoot, 'existing', 'notes.txt'), 'keep me');
 

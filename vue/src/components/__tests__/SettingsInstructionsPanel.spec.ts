@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, expect, it, vi } from 'vitest';
-import { defaultGeneralSettings } from '@codex-claw/core/settings';
+import { defaultGeneralSettings } from '@workspace/core/settings';
 import SettingsInstructionsPanel from '../SettingsInstructionsPanel.vue';
 afterEach(() => vi.useRealTimers());
 it('updates the worktree initialization policy', async () => {

@@ -1,13 +1,13 @@
 # Codex Integration
 
-Codex Claw talks to Codex through the Codex app-server. All provider
-communication with Codex happens in `clawd`, not Electron main. Electron main
+Korus talks to Codex through the Codex app-server. All provider
+communication with Codex happens in `daemon`, not Electron main. Electron main
 forwards renderer IPC over the app-owned backend protocol, fans backend events
 to the renderer, and owns only desktop-native callbacks.
 
 ## Boundary
 
-`clawd` responsibilities:
+`daemon` responsibilities:
 
 - choose an explicit Codex executable override when configured, otherwise use
   the Codex executable supplied by its local desktop host;
@@ -16,14 +16,14 @@ to the renderer, and owns only desktop-native callbacks.
 - own JSON-RPC request IDs and response matching;
 - route server notifications to the right agent/session;
 - answer server-initiated approval and user-input requests;
-- wrap SDK-owned conversation snapshots/events in Claw's agent/thread/revision
+- wrap SDK-owned conversation snapshots/events in Korus's agent/thread/revision
   routing envelope;
 - persist only app product state, not Codex transcripts.
 
 Codex assistant text keeps the app-server's optional `commentary` or
 `final_answer` phase through this adapter. Completed reasoning items contribute
 only their app-server-provided summaries; raw reasoning content is never copied
-into Claw state. The shared SDK Vue renderer uses those semantics to keep work
+into Korus state. The shared SDK Vue renderer uses those semantics to keep work
 expanded while a turn runs, then collapse it under `Done · View details` when
 the final answer begins.
 
@@ -31,12 +31,12 @@ The local `codex-app-sdk` dependency owns Codex executable discovery, generated
 app-server protocol types, request/response inference, bidirectional request
 routing, stdio JSONL framing, targeted conversation operations, conversation
 snapshots/reducers, optimistic submissions, history reconciliation, queues,
-turn mutations, and generic conversation rendering. `clawd` remains the
+turn mutations, and generic conversation rendering. `daemon` remains the
 product adapter: it owns explicit executable selection, initialization
-metadata, agent/session policy, approval presets, the Claw routing envelope,
+metadata, agent/session policy, approval presets, the Korus routing envelope,
 and recovery behavior. Product policy must not be added to the SDK to make a
-Codex Claw call compile; generic Codex conversation behavior must not be added
-to Claw to avoid fixing the SDK.
+Korus call compile; generic Codex conversation behavior must not be added
+to Korus to avoid fixing the SDK.
 
 SDK readiness is distinct from terminal outcome. A native thread-idle update
 releases readiness and queued prompts but does not fabricate `turn.completed`.
@@ -47,9 +47,9 @@ its original turn and must not clear a newer active turn.
 
 Electron main responsibilities:
 
-- spawn/connect to `clawd`;
+- spawn/connect to `daemon`;
 - translate renderer IPC calls into app-owned backend RPC calls;
-- provide client callbacks requested by `clawd`, such as open-external and
+- provide client callbacks requested by `daemon`, such as open-external and
   native permission prompts/settings;
 - fan backend events out to the renderer.
 
@@ -57,7 +57,7 @@ Renderer responsibilities:
 
 - route SDK-owned Codex provider frames to the addressed per-agent SDK replica
   and render it through `CodexConversationPane`;
-- render Claw-owned coordination and workspace state around that conversation;
+- render Korus-owned coordination and workspace state around that conversation;
 - send user actions through preload IPC;
 - never import generated Codex protocol types;
 - never spawn Codex or access `CODEX_HOME`.
@@ -89,10 +89,10 @@ include a Unix socket daemon or `codex app-server proxy`.
 Connection flow:
 
 1. Use an explicit user-configured Codex executable when present. Otherwise,
-   local desktop `clawd` uses the pinned executable bundled by Codex Claw;
-   remote `clawd` lets the SDK discover Codex on that remote machine.
+   local desktop `daemon` uses the pinned executable bundled by Korus;
+   remote `daemon` lets the SDK discover Codex on that remote machine.
 2. Start app-server with the chosen environment.
-3. Send `initialize` with `clientInfo.name = "codex_claw"` and
+3. Send `initialize` with `clientInfo.name = "workspace"` and
    `capabilities.experimentalApi = true`.
 4. Send `initialized`.
 5. Start or resume a thread for the selected agent folder.
@@ -100,29 +100,29 @@ Connection flow:
 7. Stream notifications and server requests into the session manager.
 8. Cleanly interrupt, stop, or shut down when the app exits.
 
-Electron allows up to 15 seconds for `clawd` shutdown. The SDK closes app-server
+Electron allows up to 15 seconds for `daemon` shutdown. The SDK closes app-server
 stdin first to allow provider-owned history flushing before bounded signal
 escalation. Optional SDK questions do not hold the agent in `awaitingInput`;
 that status is reserved for blocking requests and approvals.
 
-Codex Claw always gives the SDK an isolated Codex home at
-`~/.codex-claw/codex-home` (or `$CODEX_CLAW_HOME/codex-home`). Threads, config,
-and auth remain isolated so Claw cannot pollute the normal Codex CLI/Desktop
+Korus always gives the SDK an isolated Codex home at
+`~/.korus/codex-home` (or `$APP_HOME/codex-home`). Threads, config,
+and auth remain isolated so Korus cannot pollute the normal Codex CLI/Desktop
 home. By default, only the isolated home's `skills` and `plugins` entries are
 links to `~/.codex/skills` and `~/.codex/plugins`. The Codex settings screen can
-turn that sharing off when every chat is idle, either with fresh Claw
+turn that sharing off when every chat is idle, either with fresh Korus
 directories or by copying the current ChatGPT resources. A fresh home creates the links
 before any Codex driver starts. An existing non-linked home is left untouched;
-after launch, Claw asks whether to migrate it or keep it isolated. Migration is
-blocked while chats are active because it restarts `clawd` and its app-server
+after launch, Korus asks whether to migrate it or keep it isolated. Migration is
+blocked while chats are active because it restarts `daemon` and its app-server
 processes. The isolated home may require its own sign in on first launch; do
 not copy normal Codex thread or auth files into it.
 
-Claw disables the bundled unified Computer Use plugin in its app-server
-startup overrides, even when plugins are shared. macOS GUI automation in Claw
+Korus disables the bundled unified Computer Use plugin in its app-server
+startup overrides, even when plugins are shared. macOS GUI automation in Korus
 uses the app-owned Computer Use MCP tools instead.
 
-Codex Claw reads and mutates that isolated authentication state through the
+Korus reads and mutates that isolated authentication state through the
 SDK account surface. When `account/read` reports that OpenAI authentication is
 required and no account is loaded, the renderer gates the workspace behind a
 signed-out landing screen. `account/login/start` opens the ChatGPT browser
@@ -134,20 +134,20 @@ types and authentication files never cross into the renderer.
 SSH connection settings expose a separate, host-targeted Codex account check
 and **Connect ChatGPT** action. The latter invokes the SDK's
 `startChatGptDeviceCodeLogin()` on that host and displays its verification URL
-and user code. Claw polls the SDK account view while that UI is pending and
+and user code. Korus polls the SDK account view while that UI is pending and
 passes the exact login ID when cancelling; it never implements token exchange,
 copies credentials, or owns token refresh. These remote account results do not
 replace the local desktop's account state. Both local and SSH access use the
-same isolated Claw Codex home on the target host.
+same isolated Korus Codex home on the target host.
 
 The General settings Advanced section can store a Codex executable path. A
 non-empty value is passed as the executable for
 `codex app-server --listen stdio://` and always wins. Empty uses the pinned
 Codex executable bundled with local desktop builds. If no bundle is supplied,
-as with an SSH-installed remote `clawd`, SDK discovery searches the inherited
+as with an SSH-installed remote `daemon`, SDK discovery searches the inherited
 and login-shell `PATH`, common user and Homebrew bins, nvm installs, and Windows
 executable extensions. Changing the path persists the setting and relaunches
-Codex Claw so the backend and app-server start from a clean lifecycle.
+Korus so the backend and app-server start from a clean lifecycle.
 
 ## Bundled App Server
 
@@ -159,13 +159,13 @@ script runs <https://releases.openai.com/codex/install.sh> in an isolated
 temporary home with `CODEX_RELEASE`, `CODEX_NON_INTERACTIVE`, and
 `CODEX_INSTALL_DIR`, then copies the resolved executable into
 `electron/resources/codex/codex`. The official installer verifies its release
-checksums, and Claw verifies the resulting version and Developer ID signature.
+checksums, and Korus verifies the resulting version and Developer ID signature.
 Electron signing explicitly preserves the executable's upstream OpenAI
-signature and entitlements. The outer Codex Claw signature seals that nested
+signature and entitlements. The outer Korus signature seals that nested
 code, and release notarization validates the complete app bundle.
 
-Electron passes the copied path to local `clawd` through
-`CODEX_CLAW_BUNDLED_CODEX_PATH`. The SSH installer uploads only `clawd.mjs`,
+Electron passes the copied path to local `daemon` through
+`APP_BUNDLED_CODEX_PATH`. The SSH installer uploads only `daemon.mjs`,
 not the desktop Codex executable or that environment variable, so remote agents
 continue to require a Codex installation on the remote host.
 
@@ -176,14 +176,14 @@ home on the owning host; it is not another instruction string in app state.
 Isolated homes keep these instructions separate from the user's existing Codex
 or Claude setup. Saving to all requires explicit confirmation before
 overwriting both configured files. Codex discovers its home instructions
-natively; Claw adds only its own coordination and task-specific developer
+natively; Korus adds only its own coordination and task-specific developer
 instructions. Claude loads its home instructions through its existing
 user/project/local settings sources. Project-level instructions remain
 provider-owned. Changes apply when sessions start/resume, not by injecting a
 user message into an active turn. Remote hosts keep their own instruction
 files; the editor does not overwrite files on other hosts.
 
-Mission workers use the same conversation configuration boundary. Claw appends
+Mission workers use the same conversation configuration boundary. Korus appends
 the active Mission contract after its normal developer instructions inside a
 `<context>` block. Creating a Mission does not inject that contract as a user
 message or start a turn; the user's first visible message starts the provider
@@ -194,7 +194,7 @@ Git draft preferences are app-owned settings: commit-message instructions and
 PR-description instructions are sent only to their matching generation calls.
 They are separate from global agent instructions and do not trigger Git writes.
 
-Codex app-server owns conversation history and thread storage. Codex Claw owns
+Codex app-server owns conversation history and thread storage. Korus owns
 the product mapping:
 
 - team id;
@@ -208,22 +208,22 @@ the product mapping:
 One app-server process can host many threads. Agents are routed by `threadId`
 and app-owned `agentId`.
 
-If an agent has a persisted Codex `backendSession`, `clawd` resumes it with
+If an agent has a persisted Codex `backendSession`, `daemon` resumes it with
 `thread/resume` before starting the next turn. New agents without a Codex
-session use `thread/start`, then set the conversation title to the Claw agent
+session use `thread/start`, then set the conversation title to the Korus agent
 name with `thread/name/set` before the first `turn/start`. The generic backend
 seam repeats title synchronization after storing the new session, but the
-Codex adapter treats an already-matching title as a no-op. Editing the Claw
+Codex adapter treats an already-matching title as a no-op. Editing the Korus
 agent name updates the active conversation title as well.
 
-Claw maintains one non-archived Codex conversation per live agent. Restarting
+Korus maintains one non-archived Codex conversation per live agent. Restarting
 an agent archives its current conversation before clearing the provider
 reference. Closing an agent archives its conversation before removing
 app-owned state. If archiving fails, the restart or close fails without
-detaching the agent. On startup, `clawd` reconciles the isolated Claw
+detaching the agent. On startup, `daemon` reconciles the isolated Korus
 `CODEX_HOME`: top-level conversations not referenced by a live local agent are
 archived through the SDK, while an attached conversation found in the archived
-catalog is restored after an interrupted lifecycle transaction. Claw never
+catalog is restored after an interrupted lifecycle transaction. Korus never
 scans or moves rollout files itself.
 
 Code review defaults to a separate visible reviewer agent in the same workspace,
@@ -238,7 +238,7 @@ reviewer's conversation and binds a fresh one to the same sidebar agent, while
 current-thread reviews keep the user-owned conversation for the whole workflow.
 Finishing removes an independent reviewer agent and its conversation but leaves
 a current-thread conversation intact.
-Claw persists the selected Git scope, reviewer identity, opaque conversation
+Korus persists the selected Git scope, reviewer identity, opaque conversation
 reference, and app-owned finding ledger without creating a second transcript
 model.
 
@@ -248,29 +248,29 @@ agent/session mapping so the id is saved in backend-owned state and reused
 after relaunch.
 
 Codex approval presets are app-owned shortcuts over Codex thread settings. The
-renderer only sees the Codex preset id; `clawd` maps it to
+renderer only sees the Codex preset id; `daemon` maps it to
 `approvalPolicy`, `approvalsReviewer`, and sandbox settings for `thread/start`,
 `thread/resume`, and live `thread/settings/update` calls. Do not reuse these
 three Codex presets for Claude permission modes; Claude should expose its own
 backend-specific option set.
 
-Before applying a Codex approval preset, production `clawd` reads
+Before applying a Codex approval preset, production `daemon` reads
 `configRequirements/read` from app-server. Managed requirements can disallow
 specific approval policies, reviewers, sandbox modes, or permission profiles.
-When the configured/default Claw preset is not allowed, the Codex adapter clamps
+When the configured/default Korus preset is not allowed, the Codex adapter clamps
 to the best compatible preset (`approve-for-me`, then `ask-for-approval`, then
-`full-access`). If none of Claw's presets satisfy the app-server requirements,
-`clawd` omits approval/sandbox overrides and lets app-server use its effective
+`full-access`). If none of Korus's presets satisfy the app-server requirements,
+`daemon` omits approval/sandbox overrides and lets app-server use its effective
 configuration instead of sending a known-invalid `danger-full-access` request.
 The adapter returns the generated app-server `SandboxPolicy` shape directly;
 the shared SDK does not define or normalize a second sandbox-policy model.
 
-`thread/resume` and older-history paging are owned by the Codex SDK. Claw's
+`thread/resume` and older-history paging are owned by the Codex SDK. Korus's
 Codex adapter subscribes to the SDK's conversation-targeted replica bridge. It
 publishes one bounded `CodexConversationSnapshot`, then forwards only
 `CodexConversationEvent` deltas with a monotonic per-agent revision. The SDK
 owns history reconciliation, cursors, turn identity, optimistic messages, tool
-lifecycle, and mutation results; Claw does not translate those into a second
+lifecycle, and mutation results; Korus does not translate those into a second
 `RendererMessage` store.
 
 Existing active sessions remain SDK-memory-authoritative and are not re-resumed
@@ -279,15 +279,15 @@ reference to the targeted SDK surface and emits a fresh provider snapshot. The
 renderer creates one SDK replica for that agent and applies only contiguous
 provider revisions; a gap triggers rehydration.
 
-Claw's cross-agent prompt admission queue remains app-owned coordination state:
+Korus's cross-agent prompt admission queue remains app-owned coordination state:
 it decides whether a prompt starts now or waits for the agent, persists that
 pending work, and passes the active agent's queued prompts into the SDK pane for
 generic queue presentation and interaction. This is distinct from any
-provider-native queue represented by the SDK conversation snapshot; Claw must
+provider-native queue represented by the SDK conversation snapshot; Korus must
 not substitute the provider snapshot's queue for its own admitted prompts.
 
 The SDK pane's Continue control for a restored interrupted turn invokes a
-dedicated Claw controller action. Claw routes it through IPC and `clawd` to the
+dedicated Korus controller action. Korus routes it through IPC and `daemon` to the
 Codex conversation handle's `continueInterruptedTurn()` operation, which starts
 the next turn with empty input only after confirming the latest turn is
 interrupted. It must not submit the text `continue` as a new user prompt.
@@ -305,7 +305,7 @@ an archive primitive.
 
 Fork Agent calls the SDK conversation handle's high-level `fork()` operation,
 which owns `thread/fork` and returns a new conversation id plus its snapshot.
-`clawd` creates a selected agent directly below the source with the new
+`daemon` creates a selected agent directly below the source with the new
 `{ kind: "codex", threadId }` session and publishes the returned SDK snapshot;
 raw fork protocol types remain outside product contracts. Forking requires an
 idle Codex agent with an existing conversation.
@@ -319,7 +319,7 @@ workflow without changing the source thread.
 Compress Session is an app-owned session rollover, not Codex context
 compaction. It is available only for an idle agent with an existing Codex
 thread. The renderer keeps a blocking progress dialog visible across the
-transition. `clawd` asks the current SDK-owned conversation for a bounded
+transition. `daemon` asks the current SDK-owned conversation for a bounded
 handoff with a temporary fast model/effort override, waits for the exact
 handoff turn to complete, creates a replacement SDK conversation in the same
 folder with the agent's original Codex settings, sends the handoff inside a
@@ -330,16 +330,16 @@ must not update the agent's persisted defaults. The SDK strips the prompt's
 background-only instruction in the transcript. Submitting a turn also
 guarantees that the replacement has a persisted rollout that can be resumed
 after restart.
-After the replacement exists, `clawd` updates the agent's persisted thread
-reference and publishes the replacement SDK snapshot. Claw never copies or
+After the replacement exists, `daemon` updates the agent's persisted thread
+reference and publishes the replacement SDK snapshot. Korus never copies or
 reduces either transcript. If replacement creation or old-thread archival
 fails, the persisted agent continues to reference the old thread.
 
-The warning preference and rollover orchestration are Claw product metadata.
+The warning preference and rollover orchestration are Korus product metadata.
 The old and new conversation contents, optimistic messages, turns, history,
 and rendering remain SDK-owned throughout. This boundary is deliberate: do
 not implement a parallel handoff transcript, synthetic user message, or
-session reducer in Claw.
+session reducer in Korus.
 
 ## Requests
 
@@ -356,20 +356,20 @@ Important requests for the first product:
 - `model/list`
 - `skills/list`
 
-`clawd` should expose these through app-level backend driver/session services,
+`daemon` should expose these through app-level backend driver/session services,
 not directly through renderer IPC.
 
 ## Models And Reasoning Effort
 
 Codex app-server v2 exposes the model picker catalog through `model/list`.
-Codex Claw should use that request instead of hardcoding model or reasoning
+Korus should use that request instead of hardcoding model or reasoning
 level options. The response includes visible model entries, each model's
 `supportedReasoningEfforts` in the order Codex intends clients to display, and
 the model's `defaultReasoningEffort`. Models may also expose `serviceTiers` and
 `defaultServiceTier`; the SDK presents the fast/priority tier as the Fast mode
 toggle.
 
-The renderer consumes an app-owned picker shape only. `clawd` fetches and adapts
+The renderer consumes an app-owned picker shape only. `daemon` fetches and adapts
 the Codex catalog to `BackendModelOption[]`. An explicit picker choice is saved
 immediately in the agent's `backendDefaults`, marked as user-selected. Provider
 settings hydrate those defaults until the user makes an explicit choice; later
@@ -377,19 +377,19 @@ thread events cannot replace that choice for future prompts or agent actions.
 Each prompt request captures the selected model, reasoning effort, and service
 tier in app-owned prompt options, including when that prompt is queued.
 
-The selected service tier is part of the hydrated thread settings. `clawd`
+The selected service tier is part of the hydrated thread settings. `daemon`
 emits it through `conversation.settingsUpdated`, including an explicit `null` when
 Fast mode is disabled, so switching agents or reloading the app does not retain
 a stale toggle.
 
 `turn/start` accepts `model` and `effort` overrides for the current turn and
-subsequent turns, so Codex Claw applies the current picker selection on every
+subsequent turns, so Korus applies the current picker selection on every
 prompt without requiring a new thread.
 
 ## Skills
 
 Codex app-server v2 exposes available skills through `skills/list`.
-Codex Claw treats skills as agent-folder scoped because each agent has its own
+Korus treats skills as agent-folder scoped because each agent has its own
 cwd:
 
 ```json
@@ -402,7 +402,7 @@ cwd:
 }
 ```
 
-`clawd` adapts the response into `BackendSkillSummary[]` and exposes it through
+`daemon` adapts the response into `BackendSkillSummary[]` and exposes it through
 backend RPC, which Electron forwards over typed IPC. The renderer uses this
 app-owned shape for the composer skill menu; it does not import generated
 app-server skill types.
@@ -410,7 +410,7 @@ app-server skill types.
 When a prompt contains `$skill-name`, renderer state resolves the mention
 against the active skill catalog and sends those skills under
 `SendPromptOptions.backendOptions` with `kind: "codex"`. Slash skill fallback
-from `/` command search resolves the same way. `clawd` then appends Codex
+from `/` command search resolves the same way. `daemon` then appends Codex
 `UserInput` skill items to `turn/start`, alongside the normal text input:
 
 ```json
@@ -432,7 +432,7 @@ intercepts the bare slash form before normal prompt submission so the warning
 and blocking transition are always applied. `/compact <text>` remains a normal
 prompt.
 
-Bare `/review` is a Claw app command. The renderer intercepts it and opens the
+Bare `/review` is a Korus app command. The renderer intercepts it and opens the
 app-owned review setup without appending a visible user message or starting a
 provider turn. The same command is present for Codex and Claude agents. The
 Codex driver continues to own custom provider review prompts:
@@ -456,7 +456,7 @@ thread metadata instead of starting a visible prompt turn:
 - bare `/goal` and `/goal edit` are reserved for the goal shelf/editor surface.
 
 `review/start` uses `delivery: "inline"`, so app-server should return the same
-`reviewThreadId` as the active thread. `clawd` treats a different review thread id
+`reviewThreadId` as the active thread. `daemon` treats a different review thread id
 as a protocol error instead of moving the agent session. The review lifecycle
 streams `enteredReviewMode`/`exitedReviewMode` items; the final
 `exitedReviewMode.review` string is rendered as assistant text because it is the
@@ -464,26 +464,26 @@ plain-text review body, not hidden tool output. Review-mode markers are not
 tool parts and should not create a tool group in the renderer.
 
 This is preferred over relying on Codex to infer the skill from text alone.
-`skills/changed` is an invalidation notification; `clawd` emits app-owned
+`skills/changed` is an invalidation notification; `daemon` emits app-owned
 `skills.changed`, and the renderer invalidates the folder-keyed skill caches
 before warming the known agents again.
 
 ## MCP Enablement
 
-The Claw MCP server is documented in `docs/mcp.md`. It is an app-owned
+The Korus MCP server is documented in `docs/mcp.md`. It is an app-owned
 collaboration server, not a Codex-specific subsystem.
 
 For Codex, do not rely on a global `codex mcp add` entry for the product path.
-Codex Claw starts the app-server process with process-wide feature overrides,
-then passes the local Claw MCP server through each agent's thread config:
+Korus starts the app-server process with process-wide feature overrides,
+then passes the local Korus MCP server through each agent's thread config:
 
 The process-wide overrides enable Codex memories and streamed patch events for
-every Claw-managed Codex session.
+every Korus-managed Codex session.
 
 ```json
 {
-  "mcp_servers.codex_claw.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
-  "mcp_servers.codex_claw.default_tools_approval_mode": "approve"
+  "mcp_servers.workspace.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
+  "mcp_servers.workspace.default_tools_approval_mode": "approve"
 }
 ```
 
@@ -491,22 +491,22 @@ The `agentId` query parameter is session-local caller identity for the MCP
 server, not a tool argument the model has to provide for itself. The same
 unique ID is injected into the agent's developer instructions and returned by
 `list-agents` so duplicated agents can still coordinate precisely. The
-approval override is scoped to `codex_claw`; it does not put the entire Codex
+approval override is scoped to `workspace`; it does not put the entire Codex
 session into full-access/yolo mode.
 
 Each `thread/start` still receives agent-specific developer instructions, such
-as the Claw agent ID/name/folder and guidance to use the MCP server without
+as the Korus agent ID/name/folder and guidance to use the MCP server without
 passing its own caller ID to each tool.
 
 This keeps normal Codex config and normal Codex data untouched.
 
 Independent product review rounds create a fresh SDK conversation; a first round
 configured for the current thread loads that conversation instead. Both replace
-the normal Claw MCP URL with a review-session URL. That stable URL adds only the
+the normal Korus MCP URL with a review-session URL. That stable URL adds only the
 two finding actions documented in `docs/mcp.md`; normal repository tools remain
-owned by the Codex harness. After the turn completes, Claw reads the normal
+owned by the Codex harness. After the turn completes, Korus reads the normal
 assistant response for finding discussion, archives the temporary conversation,
-and forgets it. Findings themselves live in Claw's active review ledger.
+and forgets it. Findings themselves live in Korus's active review ledger.
 
 ## Notifications And Server Requests
 
@@ -566,7 +566,7 @@ Thread lifecycle notifications that can wait until thread/history management:
 - `thread/unarchived`
 - `thread/closed`
 
-Low-priority protocol surfaces for the current Claw MVP:
+Low-priority protocol surfaces for the current Korus MVP:
 
 - `app/list/updated`
 - `remoteControl/status/changed`
@@ -596,10 +596,10 @@ Current server-initiated request methods:
 - `applyPatchApproval`: legacy-ish and not implemented.
 - `execCommandApproval`: legacy-ish and not implemented.
 
-Server requests are not renderer implementation details. `clawd` stores the
+Server requests are not renderer implementation details. `daemon` stores the
 pending request, emits an app-owned prompt event, and resolves or rejects the
 server request when the renderer answers. Until a request type is implemented,
-`clawd` must log `not implemented` and respond with a JSON-RPC error so the
+`daemon` must log `not implemented` and respond with a JSON-RPC error so the
 app-server does not wait forever.
 
 `mcpServer/elicitation/request` with `_meta.codex_approval_kind =
@@ -607,7 +607,7 @@ app-server does not wait forever.
 `kind: "confirm_tool"` with a stable request id, summary, integration/server
 name, tool name, arguments preview, and supported persistence choices. The
 renderer returns `allow`, `allow_conversation`, `always_allow`, or `deny`;
-`clawd` translates that back to Codex's `accept`/`decline` elicitation response
+`daemon` translates that back to Codex's `accept`/`decline` elicitation response
 and optional `_meta.persist`.
 
 `item/tool/requestUserInput` maps to an app-owned `ask_user` client request.
@@ -624,7 +624,7 @@ Context compaction is primarily represented by the `contextCompaction`
 conversation events so its reducer can split the active assistant message and
 insert one visible compaction marker exactly where the item arrived in the
 stream. The deprecated `thread/compacted` notification remains an SDK-owned
-completion fallback. Claw only transports those provider events and must not
+completion fallback. Korus only transports those provider events and must not
 synthesize another compaction lifecycle.
 
 Unhandled notifications should also log `not implemented`, but they do not need
@@ -633,16 +633,16 @@ a response because notifications cannot block the app-server.
 ## Plan And Goal Modes
 
 Composer Plan mode is sent through Codex's experimental
-`turn/start.collaborationMode` override. `clawd` builds the `collaborationMode`
+`turn/start.collaborationMode` override. `daemon` builds the `collaborationMode`
 object from app-owned prompt options and the selected model/reasoning effort;
 renderer code only sees a boolean Plan toggle.
 Plan mode must be sent even when no model is selected in the renderer. In that
-case `clawd` omits `settings.model` and uses Codex's Plan preset default reasoning
+case `daemon` omits `settings.model` and uses Codex's Plan preset default reasoning
 effort of `medium`, with `developer_instructions: null` so the app-server keeps
 its built-in Plan instructions.
 Because Codex persists the thread collaboration mode, disabling Plan mode is
 also an app-server operation: native Codex prompts send `planMode: false`, and
-`clawd` maps that to `turn/start.collaborationMode.mode = "default"` with the
+`daemon` maps that to `turn/start.collaborationMode.mode = "default"` with the
 selected model/reasoning settings. Omitting `collaborationMode` would leave the
 thread in its previous mode.
 
@@ -653,7 +653,7 @@ Enter or Tab shows this pill, and submitting the objective sends
 The renderer handles
 `/goal` commands before prompt submission:
 
-- `/goal <objective>` calls `thread/goal/set` through `clawd`, strips the slash
+- `/goal <objective>` calls `thread/goal/set` through `daemon`, strips the slash
   command, and does not start a turn or add a visible user prompt.
 - `/goal clear` calls `thread/goal/clear`, even when the agent is busy.
 - Bare `/goal` and `/goal edit` do not submit a turn yet; goal editing is
@@ -669,19 +669,19 @@ per-turn prompt options.
 Mode notifications stay app-owned:
 
 - `thread/settings/updated` is still emitted for persistence/thread mapping.
-- If the thread settings include `collaborationMode.mode`, `clawd` also emits
+- If the thread settings include `collaborationMode.mode`, `daemon` also emits
   `conversation.modeUpdated` with `default` or `plan`.
 - `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
   so the agent metadata and shelf stay in sync.
-- `turn/plan/updated` is the structured plan artifact event. `clawd` stores it as
+- `turn/plan/updated` is the structured plan artifact event. `daemon` stores it as
   an execution-kind `agent.plan` and derives completion only when every step is
   complete. `turn/completed` finalizes any remaining execution plan as
   incomplete, interrupted, or failed before it is persisted.
 - Codex plan-mode output is a separate `ThreadItem` with `type: "plan"`, not a
-  normal assistant message. `clawd` stores `item/plan/delta` as a draft
+  normal assistant message. `daemon` stores `item/plan/delta` as a draft
   proposed-kind `agent.plan` artifact only; the app-server marks those deltas
   experimental. Its item status is not execution task-list status.
-- `item/completed` with `item.type === "plan"` is authoritative. `clawd` overwrites
+- `item/completed` with `item.type === "plan"` is authoritative. `daemon` overwrites
   any draft plan with the completed item text, persists it, and
   opens it in the markdown side panel when the corresponding turn completes.
 - Raw response assistant messages are diagnostic only for this path. Do not use
@@ -730,7 +730,7 @@ Plan previews use the markdown side panel with plan-specific review actions:
 }
 ```
 
-`clawd` converts this into `conversation.contextUsageUpdated` with an app-owned
+`daemon` converts this into `conversation.contextUsageUpdated` with an app-owned
 `contextUsage` payload. `total` is cumulative thread/session usage and can
 exceed the model window after a long conversation. Context occupancy uses
 `last.totalTokens`, which is the latest active context size, divided by
@@ -760,8 +760,8 @@ context fraction.
 ```
 
 The rate-limit notification is a sparse account-level update, not tied to an
-agent. `clawd` emits `account.rateLimitsUpdated` and the reducer stores it as
-global app state. `clawd` also persists the latest snapshot when
+agent. `daemon` emits `account.rateLimitsUpdated` and the reducer stores it as
+global app state. `daemon` also persists the latest snapshot when
 this event arrives because the app-server only sends it opportunistically
 during streaming.
 
@@ -788,10 +788,10 @@ The durable flow is:
 
 ```text
 Codex app-server -> Codex SDK surface -> targeted SDK snapshot/event
-                 -> Claw revisioned transport frame -> SDK renderer replica -> UI
+                 -> Korus revisioned transport frame -> SDK renderer replica -> UI
 ```
 
-Renderer components consume the SDK-owned conversation snapshot. Claw consumes
+Renderer components consume the SDK-owned conversation snapshot. Korus consumes
 only explicit read-only projections needed by product chrome, such as plan
 preview, diff, unread state, and sidebar activity.
 
@@ -820,7 +820,7 @@ SDK mapping sketch:
   the authoritative plan artifact. They are not replayed as normal assistant
   chat text.
 - MCP and dynamic tool calls become renderer tool calls.
-- `rawResponseItem/completed` is adapted in `clawd` into the same app-owned tool
+- `rawResponseItem/completed` is adapted in `daemon` into the same app-owned tool
   events when the app-server exposes raw function, shell, custom-tool, search,
   or output items.
 - approval and ask-user requests become pending UI prompts. MCP tool approval
@@ -837,7 +837,7 @@ The TypeScript SDK is useful for spikes, but it is not the target boundary. It
 wraps `codex exec --experimental-json`, spawns the CLI, and streams JSONL over
 stdin/stdout.
 
-Codex Claw should use app-server directly because the product needs:
+Korus should use app-server directly because the product needs:
 
 - thread list/read/resume;
 - active turn steering;
@@ -852,9 +852,9 @@ change when the SDK is removed.
 
 ## Testing
 
-Normal Claw integration tests use a typed fake Codex SDK surface and real Claw
+Normal Korus integration tests use a typed fake Codex SDK surface and real Korus
 driver/adapter/server code. The SDK repository owns app-server transport and
-conversation-reducer tests; Claw must not recreate them here.
+conversation-reducer tests; Korus must not recreate them here.
 
 Cover:
 

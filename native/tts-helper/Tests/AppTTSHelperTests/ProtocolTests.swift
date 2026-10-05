@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import CodexClawTTSHelper
+@testable import AppTTSHelper
 
 @Test func acceptsAndTrimsBoundedText() throws {
   let request = SpeakRequest(version: 1, id: "request-1", text: "  On it.  ", voice: nil)

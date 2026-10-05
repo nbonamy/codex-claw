@@ -15,7 +15,7 @@ afterEach(() => {
 describe('applyAppTheme', () => {
   it('keeps light theme sidebars darker than the main chat surface', () => {
     applyAppTheme({
-      id: 'codex-claw-light',
+      id: 'app-light',
       mode: 'light',
       uiFontSize: 14,
       chatFontSize: 15,
@@ -60,7 +60,7 @@ describe('applyAppTheme', () => {
     document.documentElement.dataset.platform = 'macos';
 
     applyAppTheme({
-      id: 'codex-claw-light',
+      id: 'app-light',
       mode: 'light',
       uiFontSize: 14,
       chatFontSize: 15,
@@ -108,7 +108,7 @@ describe('applyAppTheme', () => {
     vi.resetModules();
     const themeModule = await import('../apply-theme');
     themeModule.applyAppTheme({
-      id: 'codex-claw-light',
+      id: 'app-light',
       mode: 'system',
       uiFontSize: 14,
       chatFontSize: 15,

@@ -34,15 +34,15 @@ describe('AgentCloseDialog', () => {
   it('requires an explicit discard choice before deleting a dirty worktree and resets it on reopening', async () => {
     const wrapper = mountDialog();
     await wrapper.setProps({ workflow: { ...workflow, files: [{ path: 'README.fr.md', indexStatus: '?', worktreeStatus: '?' }] } });
-    expect(wrapper.get('.claw-button--primary').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('.app-button--primary').attributes('disabled')).toBeDefined();
     expect(wrapper.get('.agent-close-dialog__discard [role="switch"]').attributes('aria-checked')).toBe('false');
     await wrapper.get('.agent-close-dialog__discard .el-switch').trigger('click');
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
     expect(wrapper.emitted('delete-worktree')).toStrictEqual([[false, true]]);
     await wrapper.setProps({ visible: false });
     await wrapper.setProps({ visible: true });
-    expect(wrapper.get('.claw-button--primary').attributes('disabled')).toBeDefined();
-    await wrapper.get('.claw-button--secondary').trigger('click');
+    expect(wrapper.get('.app-button--primary').attributes('disabled')).toBeDefined();
+    await wrapper.get('.app-button--secondary').trigger('click');
     expect(wrapper.emitted('keep-worktree')).toStrictEqual([[]]);
   });
 
@@ -54,7 +54,7 @@ describe('AgentCloseDialog', () => {
     expect(wrapper.text()).toContain('Also delete origin/fix/gh-22');
 
     await wrapper.get('.agent-close-dialog__remote .el-switch').trigger('click');
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
 
     expect(wrapper.emitted('delete-worktree')).toStrictEqual([[true, false]]);
   });
@@ -62,7 +62,7 @@ describe('AgentCloseDialog', () => {
   it('can close the agent while preserving the worktree', async () => {
     const wrapper = mountDialog();
 
-    await wrapper.get('.claw-button--secondary').trigger('click');
+    await wrapper.get('.app-button--secondary').trigger('click');
 
     expect(wrapper.emitted('keep-worktree')).toStrictEqual([[]]);
   });

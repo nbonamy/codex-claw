@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { ClaudeAuthentication } from '@codex-claw/core/contracts';
-import { withDiscoveredRuntimePath } from '@codex-claw/core/runtime-discovery';
+import type { ClaudeAuthentication } from '@workspace/core/contracts';
+import { withDiscoveredRuntimePath } from '@workspace/core/runtime-discovery';
 import { claudeConfigDirectoryOverride } from './config-directory';
 
 const run = promisify(execFile);
@@ -10,7 +10,7 @@ const run = promisify(execFile);
 export async function logoutLocalClaude(): Promise<ClaudeAuthentication> {
   const configDirectory = claudeConfigDirectoryOverride();
   try {
-    await run(process.env.CODEX_CLAW_CLAUDE_COMMAND || 'claude', ['auth', 'logout'], {
+    await run(process.env.APP_CLAUDE_COMMAND || 'claude', ['auth', 'logout'], {
       env: withDiscoveredRuntimePath({ CLAUDE_CONFIG_DIR: configDirectory }),
       timeout: 15_000,
       maxBuffer: 64 * 1024,
@@ -27,7 +27,7 @@ export async function getLocalClaudeAuthentication(): Promise<ClaudeAuthenticati
   const configDirectory = claudeConfigDirectoryOverride();
   let stdout: string;
   try {
-    ({ stdout } = await run(process.env.CODEX_CLAW_CLAUDE_COMMAND || 'claude', ['auth', 'status', '--json'], {
+    ({ stdout } = await run(process.env.APP_CLAUDE_COMMAND || 'claude', ['auth', 'status', '--json'], {
       env: withDiscoveredRuntimePath({ CLAUDE_CONFIG_DIR: configDirectory }),
       timeout: 15_000,
       maxBuffer: 64 * 1024,

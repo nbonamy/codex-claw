@@ -41,7 +41,7 @@ export type AppErrorDescriptor = {
   params?: Record<string, string | number>;
 };
 
-const encodedAppErrorPrefix = 'codex-claw-app-error:';
+const encodedAppErrorPrefix = 'agent-workspace-app-error:';
 
 export class AppError extends Error {
   readonly descriptor: AppErrorDescriptor;

@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import * as z from 'zod/v4';
 import type { DurableTaskService } from '../agents/durable-task-service';
 import { taskResultSchema } from '../persistence/task-schema';
-import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+import { loggedToolResult, type AppMcpToolModuleProvider } from './tool-modules';
 
-export function createTaskToolModuleProvider(tasks: DurableTaskService): ClawMcpToolModuleProvider {
+export function createTaskToolModuleProvider(tasks: DurableTaskService): AppMcpToolModuleProvider {
   return {
     id: 'tasks',
     resolve: ({ agentId }) => ({
@@ -22,7 +23,7 @@ export function createTaskToolModuleProvider(tasks: DurableTaskService): ClawMcp
           inputSchema: { taskId: z.string().min(1) },
         }, ({ taskId }) => loggedToolResult('cancel-task', { agentId, taskId }, () => tasks.cancel(agentId, taskId)));
         if (tasks.instructions(agentId)) server.registerTool('complete-task', {
-          description: 'Save your assigned task result before finish_turn. Finish all foreground tools and background work first. Claw finalizes only after this exact provider turn succeeds, then delivers the result to the parent. Do not also send a completion message. This does not authorize merging or publication.',
+          description: `Save your assigned task result before finish_turn. Finish all foreground tools and background work first. ${product.name} finalizes only after this exact provider turn succeeds, then delivers the result to the parent. Do not also send a completion message. This does not authorize merging or publication.`,
           inputSchema: taskResultSchema.shape,
         }, input => loggedToolResult('complete-task', { agentId }, () => tasks.complete(agentId, input)));
       },

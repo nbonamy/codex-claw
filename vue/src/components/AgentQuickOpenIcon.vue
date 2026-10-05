@@ -20,8 +20,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Agent } from '@codex-claw/core/contracts';
-import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
+import type { Agent } from '@workspace/core/contracts';
+import { repositoryIconForAgent } from '@workspace/core/workspace-sidebar';
 import { computed } from 'vue';
 import { GitBranchIcon, GitForkIcon, MessageIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';

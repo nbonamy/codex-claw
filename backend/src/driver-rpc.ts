@@ -1,10 +1,11 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { product } from '@workspace/core/product';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { expandWorktreeDelegationCommand } from './agents/worktree-delegation';
-import { handoffInProgress } from '@codex-claw/core/agent-handoff';
-import { isAgentRequestResponse } from '@codex-claw/core/agent-request';
-import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@codex-claw/core/backend-driver';
-import { unsupportedBackendFeature } from '@codex-claw/core/backend-driver';
-import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, BackendSession, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@codex-claw/core/contracts';
+import { handoffInProgress } from '@workspace/core/agent-handoff';
+import { isAgentRequestResponse } from '@workspace/core/agent-request';
+import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@workspace/core/backend-driver';
+import { unsupportedBackendFeature } from '@workspace/core/backend-driver';
+import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, BackendSession, ConversationListInput, ConversationResumeTarget, CreateSourceWorktreeInput, DevicePairingSession, SendPromptOptions } from '@workspace/core/contracts';
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile, readAgentFolderFileChunk } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
@@ -14,7 +15,7 @@ import { resolveCodexCommand } from './codex/codex-command';
 import { createCodexSurface } from '@codex-app-sdk/backend';
 import { listSourceBranches, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
 import { WorktreeManager } from './worktrees/worktree-manager';
-import { buildCodexClawMcpConfigOverrides, buildCodexClawThreadConfig } from './mcp/codex-config';
+import { buildAppMcpConfigOverrides, buildAppThreadConfig } from './mcp/codex-config';
 import { backendCodexHomeDir } from './state';
 import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
@@ -22,7 +23,7 @@ import { cloneSourceRepository } from './clone-source-repository';
 import { createSourceRepository } from './create-source-repository';
 
 export type BackendDriverRegistryOptions = {
-  clawMcpServerUrl?: string | null;
+  appMcpServerUrl?: string | null;
   hostedMcpServerUrls?: () => Readonly<Record<string, string>>;
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
@@ -30,10 +31,10 @@ export type BackendDriverRegistryOptions = {
   additionalDeveloperInstructions?: (agent: Agent) => string | undefined;
 };
 
-type CodexClawLoadingStrategy = 'eager' | 'lazy';
+type AppLoadingStrategy = 'eager' | 'lazy';
 
-type CodexClawSurfaceOptions = Parameters<typeof createCodexSurface>[0] & {
-  loadingStrategy?: CodexClawLoadingStrategy;
+type AppSurfaceOptions = Parameters<typeof createCodexSurface>[0] & {
+  loadingStrategy?: AppLoadingStrategy;
 };
 
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
@@ -42,28 +43,28 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
 
 export function createBackendDriver(backend: AgentBackend, options: BackendDriverRegistryOptions = {}): AgentBackendDriver {
   if (backend === 'claude') return new ClaudeBackendDriver(undefined, undefined, {
-    clawMcpServerUrl: options.clawMcpServerUrl ?? null,
+    appMcpServerUrl: options.appMcpServerUrl ?? null,
     hostedMcpServerUrls: options.hostedMcpServerUrls,
     pluginSettings: options.pluginSettings,
     celebrationsEnabled: options.celebrationsEnabled,
     additionalDeveloperInstructions: options.additionalDeveloperInstructions,
   });
-  const codexSurface = createCodexSurface(codexClawSurfaceOptions(options));
+  const codexSurface = createCodexSurface(appSurfaceOptions(options));
   const codexSessionManager = new CodexSurfaceAgentAdapter(codexSurface);
   return new CodexBackendDriver(codexSessionManager);
 }
 
-export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = {}): CodexClawSurfaceOptions {
+export function appSurfaceOptions(options: BackendDriverRegistryOptions = {}): AppSurfaceOptions {
   return {
     autoSelectFirstConversation: false,
-    clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.3.0' },
+    clientInfo: { name: 'workspace', title: product.name, version: '0.3.0' },
     codexHome: options.generalSettings?.providerHomes?.codex?.homePath ?? backendCodexHomeDir(),
     loadingStrategy: 'lazy',
     transport: {
       command: resolveCodexCommand(options.generalSettings?.codexBinaryPath, {
-        bundledPath: process.env.CODEX_CLAW_BUNDLED_CODEX_PATH,
+        bundledPath: process.env.APP_BUNDLED_CODEX_PATH,
       }),
-      configOverrides: buildCodexClawMcpConfigOverrides(
+      configOverrides: buildAppMcpConfigOverrides(
         options.pluginSettings?.() ?? options.generalSettings?.plugins,
       ),
     },
@@ -72,9 +73,9 @@ export function codexClawSurfaceOptions(options: BackendDriverRegistryOptions = 
         const agent = reviewExtensionAgent(extensionContext) ?? (isAgent(extensionContext) ? extensionContext : null);
         if (!agent) return {};
         const reviewMcpServerUrl = reviewExtensionMcpUrl(extensionContext);
-        return buildCodexClawThreadConfig(
+        return buildAppThreadConfig(
           agent,
-          reviewMcpServerUrl ?? options.clawMcpServerUrl ?? null,
+          reviewMcpServerUrl ?? options.appMcpServerUrl ?? null,
           options.pluginSettings?.() ?? options.generalSettings?.plugins,
           {
             celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,

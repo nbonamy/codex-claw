@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
-import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import { product } from '@workspace/core/product';
+import type { DesktopUpdateStatus } from '@workspace/core/contracts';
 
 const props = defineProps<{
   status: DesktopUpdateStatus;
@@ -20,9 +21,9 @@ function isDownloading(): boolean {
 
 function title(): string {
   if (props.status.version) {
-    return `Update ${props.status.version} available. Restart Codex Claw to install.`;
+    return `Update ${props.status.version} available. Restart ${product.name} to install.`;
   }
-  return translate('surface.updateAvailableBadge.updateAvailableRestartCodexClawToInstall');
+  return translate('surface.updateAvailableBadge.updateAvailableRestartAppToInstall');
 }
 </script>
 

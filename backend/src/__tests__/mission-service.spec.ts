@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MissionService } from '../mission-service';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission } from '@codex-claw/core/missions';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission } from '@workspace/core/missions';
 
 describe('MissionService', () => {
   it('keeps failed writes out of live state and serializes competing revision updates', async () => {

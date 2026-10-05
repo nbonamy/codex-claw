@@ -7,7 +7,7 @@ out/
 coverage/
 *.log
 .env
-.codex-claw-dev/
+.app-dev/
 electron/.computer-use-artifacts/
 electron/.tts/
 native/**/.build/

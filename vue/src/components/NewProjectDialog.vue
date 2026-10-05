@@ -5,15 +5,15 @@
     :title="t('newProjectDialog.title')"
     @update:model-value="onVisibilityChanged"
   >
-    <form class="claw-form-dialog" @submit.prevent="submit">
+    <form class="app-form-dialog" @submit.prevent="submit">
       <p class="new-project-dialog__description">{{ t('newProjectDialog.description') }}</p>
       <FormDialogField :label="t('newProjectDialog.name')" label-for="new-project-name">
-        <div class="claw-form-dialog__control claw-form-dialog__input-control">
+        <div class="app-form-dialog__control app-form-dialog__input-control">
           <input
             id="new-project-name"
             ref="nameInput"
             v-model="name"
-            class="claw-form-dialog__text-input"
+            class="app-form-dialog__text-input"
             type="text"
             :placeholder="t('newProjectDialog.namePlaceholder')"
             autocomplete="off"
@@ -33,11 +33,11 @@
       <BackendSelector v-model="backend" :disabled="busy" />
     </template>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="close">
+      <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="close">
         {{ t('newProjectDialog.cancel') }}
       </button>
       <button
-        class="claw-button claw-button--primary"
+        class="app-button app-button--primary"
         type="button"
         :aria-busy="busy"
         :disabled="busy || !name.trim() || !backend"
@@ -57,7 +57,7 @@ import FormDialogField from '../shared/dialog/FormDialogField.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
-import type { AgentBackend } from '@codex-claw/core/contracts';
+import type { AgentBackend } from '@workspace/core/contracts';
 
 const props = withDefaults(defineProps<{
   busy?: boolean;

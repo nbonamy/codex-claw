@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
-import type { Agent } from '@codex-claw/core/contracts';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { createEmptySnapshot } from '@workspace/core/snapshot';
+import type { Agent } from '@workspace/core/contracts';
 import { AgentConversationService } from '../agent-conversation-service';
 
 describe('AgentConversationService', () => {
@@ -87,7 +87,7 @@ describe('AgentConversationService', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        sourceId: 'openai/codex-claw',
+        sourceId: 'openai/agent-workspace',
         executionRepositoryPath: '/repo',
       }],
       teamId: 'team-1',
@@ -101,9 +101,9 @@ describe('AgentConversationService', () => {
         createdAgents: [{
           agentId: agent.id,
           agentName: 'Dina',
-          workItemId: 'github:openai/codex-claw#1',
+          workItemId: 'github:openai/agent-workspace#1',
           workItemTitle: 'Fix it',
-          workItemUrl: 'https://github.com/openai/codex-claw/issues/1',
+          workItemUrl: 'https://github.com/openai/agent-workspace/issues/1',
           conversationRef: { backend: 'claude', folder: '/repo', sessionId: 'session-1' },
         }],
       }],

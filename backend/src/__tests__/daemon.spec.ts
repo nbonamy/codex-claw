@@ -4,10 +4,10 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import backendPackage from '../../package.json';
-import { CLAWD_VERSION, connectToDaemon, main } from '../clawd';
+import { DAEMON_VERSION, connectToDaemon, main } from '../daemon';
 import { LocalSocketRpcServer } from '../socket-server';
 
-describe('clawd entrypoint', () => {
+describe('daemon entrypoint', () => {
   const originalExitCode = process.exitCode;
   const originalStdoutWrite = process.stdout.write;
   const originalStderrWrite = process.stderr.write;
@@ -30,11 +30,11 @@ describe('clawd entrypoint', () => {
 
     await main(['--version']);
 
-    expect(CLAWD_VERSION).toBe(backendPackage.version);
-    expect(writes.join('')).toBe(`clawd ${backendPackage.version}\n`);
+    expect(DAEMON_VERSION).toBe(backendPackage.version);
+    expect(writes.join('')).toBe(`daemon ${backendPackage.version}\n`);
   });
 
-  it('rejects --state-dir so CODEX_CLAW_HOME is the only state-home override', async () => {
+  it('rejects --state-dir so APP_HOME is the only state-home override', async () => {
     const writes: string[] = [];
     process.exitCode = undefined;
     process.stderr.write = ((chunk: string | Uint8Array) => {
@@ -42,11 +42,11 @@ describe('clawd entrypoint', () => {
       return true;
     }) as typeof process.stderr.write;
 
-    await main(['--stdio', '--state-dir', '/tmp/codex-claw']);
+    await main(['--stdio', '--state-dir', '/tmp/agent-workspace']);
 
     expect(process.exitCode).toBe(1);
     expect(writes.join('')).toContain('Unsupported option: --state-dir');
-    expect(writes.join('')).toContain('CODEX_CLAW_HOME');
+    expect(writes.join('')).toContain('APP_HOME');
   });
 
   it('prints usage and exits non-zero when no command is selected', async () => {
@@ -60,10 +60,10 @@ describe('clawd entrypoint', () => {
     await main([]);
 
     expect(process.exitCode).toBe(1);
-    expect(writes.join('')).toContain('Usage: clawd --stdio | serve | connect | --version');
+    expect(writes.join('')).toContain('Usage: daemon --stdio | serve | connect | --version');
   });
 
-  it('bridges clawd connect stdio to a running daemon socket', async () => {
+  it('bridges daemon connect stdio to a running daemon socket', async () => {
     const socketPath = await tempSocketPath();
     socketServer = new LocalSocketRpcServer({
       socketPath,
@@ -92,7 +92,7 @@ describe('clawd entrypoint', () => {
     });
   });
 
-  it('exits non-zero when clawd connect cannot reach the daemon socket', async () => {
+  it('exits non-zero when daemon connect cannot reach the daemon socket', async () => {
     const input = new PassThrough();
     const output = new PassThrough();
     const stderr = new PassThrough();
@@ -120,7 +120,7 @@ describe('clawd entrypoint', () => {
       }) as never,
       input,
       output,
-      socketPath: '/tmp/fake-clawd.sock',
+      socketPath: '/tmp/fake-daemon.sock',
     });
     await Promise.resolve();
     await Promise.resolve();
@@ -132,8 +132,8 @@ describe('clawd entrypoint', () => {
 });
 
 async function tempSocketPath(): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), 'clawd-connect-test-'));
-  return path.join(dir, 'clawd.sock');
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'daemon-connect-test-'));
+  return path.join(dir, 'daemon.sock');
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {

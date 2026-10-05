@@ -1,12 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import { featureStages } from '@codex-claw/core/missions';
-import type { ClawMcpAgentCoordinator } from './agent-coordinator';
-import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+import { featureStages } from '@workspace/core/missions';
+import type { AppMcpAgentCoordinator } from './agent-coordinator';
+import { loggedToolResult, type AppMcpToolModuleProvider } from './tool-modules';
 
 export function createMissionToolModuleProvider(
-  coordinator: ClawMcpAgentCoordinator,
-): ClawMcpToolModuleProvider {
+  coordinator: AppMcpAgentCoordinator,
+): AppMcpToolModuleProvider {
   return {
     id: 'mission',
     resolve: ({ agentId }) => coordinator.missionContext(agentId) ? {
@@ -19,7 +19,7 @@ export function createMissionToolModuleProvider(
 
 function registerMissionTools(
   server: McpServer,
-  coordinator: ClawMcpAgentCoordinator,
+  coordinator: AppMcpAgentCoordinator,
   callerAgentId: string,
 ): void {
   server.registerTool('set-mission-title', {

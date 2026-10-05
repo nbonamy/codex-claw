@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { WorkProviderKind } from '@codex-claw/core/contracts';
-import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import type { WorkProviderKind } from '@workspace/core/contracts';
+import type { WorkIntegrationTokenStore, WorkProviderToken } from '@workspace/core/work-integration-tokens';
 
 type PersistedTokenFile = {
   tokens?: Partial<Record<WorkProviderKind, WorkProviderToken>>;

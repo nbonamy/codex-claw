@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { LinearWorkProviderDriver } from '../linear-driver';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { ClawBackendServer } from '../../server';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { AppBackendServer } from '../../server';
 import { WorkIntegrationManager } from '../manager';
 import { readyRemoteConnection } from '../../__tests__/server-test-fixtures';
 
@@ -18,13 +18,13 @@ it('round trips a remote Linear issue through the app-owned protocol and owning 
   const connection = readyRemoteConnection();
   snapshot.remoteConnections.connections = [connection];
   const manager = new WorkIntegrationManager({ drivers: [driver], getSnapshot: () => remoteSnapshot, saveSnapshot: async () => {}, tokenStore: { canStoreTokens: () => true, get: async () => token, set: async () => {}, delete: async () => {} } });
-  const remote = new ClawBackendServer({ version: 'test', snapshot: remoteSnapshot, workIntegrations: manager });
+  const remote = new AppBackendServer({ version: 'test', snapshot: remoteSnapshot, workIntegrations: manager });
   const request = vi.fn(async (_connection: unknown, method: string, params: unknown) => {
     const reply = await remote.handleMessage({ jsonrpc: '2.0', id: 2, method, params }) as { result: unknown; error?: unknown };
     if (reply.error) throw new Error(JSON.stringify(reply.error));
     return reply.result;
   });
-  const local = new ClawBackendServer({ version: 'test', snapshot, remoteClients: { request, close: async () => {} } as never });
+  const local = new AppBackendServer({ version: 'test', snapshot, remoteClients: { request, close: async () => {} } as never });
   vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
     const { query } = JSON.parse(init.body);
     if (query.includes('viewer')) return Response.json({ data: { viewer: { id: 'viewer' } } });

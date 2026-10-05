@@ -1,17 +1,18 @@
+import { product } from '@workspace/core/product';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { discoveredRuntimePath, resolveRuntimeExecutable, type RuntimeDiscoveryDependencies } from '@codex-claw/core/runtime-discovery';
+import { discoveredRuntimePath, resolveRuntimeExecutable, type RuntimeDiscoveryDependencies } from '@workspace/core/runtime-discovery';
 
-export type RuntimeClawdBackendMode = 'auto' | 'bundled' | 'existing';
+export type RuntimeDaemonBackendMode = 'auto' | 'bundled' | 'existing';
 
-export type RuntimeClawdCommand = {
+export type RuntimeDaemonCommand = {
   command: string;
   args: string[];
   env: NodeJS.ProcessEnv;
 };
 
-export type RuntimeClawdConfigDeps = RuntimeDiscoveryDependencies & {
+export type RuntimeDaemonConfigDeps = RuntimeDiscoveryDependencies & {
   cwd?: string;
   defaultApp?: boolean;
   env?: NodeJS.ProcessEnv;
@@ -20,14 +21,14 @@ export type RuntimeClawdConfigDeps = RuntimeDiscoveryDependencies & {
   resourcesPath?: string;
 };
 
-export function runtimeClawdCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeClawdCommand | null {
+export function runtimeDaemonCommand(deps: RuntimeDaemonConfigDeps = {}): RuntimeDaemonCommand | null {
   const env = deps.env ?? process.env;
-  const command = env.CODEX_CLAW_BACKEND_COMMAND?.trim();
+  const command = env.APP_BACKEND_COMMAND?.trim();
   if (!command) {
-    return packagedClawdCommand(deps);
+    return packagedDaemonCommand(deps);
   }
 
-  const args = env.CODEX_CLAW_BACKEND_ARGS
+  const args = env.APP_BACKEND_ARGS
     ?.split(',')
     .map((arg) => arg.trim())
     .filter(Boolean) ?? ['--stdio'];
@@ -35,12 +36,12 @@ export function runtimeClawdCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeC
   return {
     command,
     args,
-    env: runtimeClawdEnv(deps),
+    env: runtimeDaemonEnv(deps),
   };
 }
 
-export function runtimeClawdServeCommand(deps: RuntimeClawdConfigDeps = {}): RuntimeClawdCommand | null {
-  const command = runtimeClawdCommand(deps);
+export function runtimeDaemonServeCommand(deps: RuntimeDaemonConfigDeps = {}): RuntimeDaemonCommand | null {
+  const command = runtimeDaemonCommand(deps);
   if (!command) {
     return null;
   }
@@ -51,34 +52,34 @@ export function runtimeClawdServeCommand(deps: RuntimeClawdConfigDeps = {}): Run
   };
 }
 
-export function runtimeClawdBackendMode(deps: RuntimeClawdConfigDeps = {}): RuntimeClawdBackendMode {
+export function runtimeDaemonBackendMode(deps: RuntimeDaemonConfigDeps = {}): RuntimeDaemonBackendMode {
   const env = deps.env ?? process.env;
-  const mode = env.CODEX_CLAW_BACKEND_MODE?.trim();
+  const mode = env.APP_BACKEND_MODE?.trim();
   return mode === 'bundled' || mode === 'existing' ? mode : 'auto';
 }
 
-export function runtimeClawdSocketPath(deps: RuntimeClawdConfigDeps = {}): string {
+export function runtimeDaemonSocketPath(deps: RuntimeDaemonConfigDeps = {}): string {
   const env = deps.env ?? process.env;
-  const configured = env.CODEX_CLAW_BACKEND_SOCKET?.trim();
+  const configured = env.APP_BACKEND_SOCKET?.trim();
   if (configured) {
     return configured;
   }
-  return path.join(env.CODEX_CLAW_HOME?.trim() || path.join((deps.homedir ?? homedir)(), '.codex-claw'), 'clawd.sock');
+  return path.join(env.APP_HOME?.trim() || path.join((deps.homedir ?? homedir)(), `${product.homeDirectory}`), 'daemon.sock');
 }
 
-export function runtimeClawdHome(deps: RuntimeClawdConfigDeps = {}): string {
+export function runtimeDaemonHome(deps: RuntimeDaemonConfigDeps = {}): string {
   const env = deps.env ?? process.env;
-  return env.CODEX_CLAW_HOME?.trim() || path.join((deps.homedir ?? homedir)(), '.codex-claw');
+  return env.APP_HOME?.trim() || path.join((deps.homedir ?? homedir)(), `${product.homeDirectory}`);
 }
 
-export function runtimeClawdWatchFile(deps: RuntimeClawdConfigDeps = {}): string | null {
+export function runtimeDaemonWatchFile(deps: RuntimeDaemonConfigDeps = {}): string | null {
   const env = deps.env ?? process.env;
-  return env.CODEX_CLAW_BACKEND_WATCH_FILE?.trim() || null;
+  return env.APP_BACKEND_WATCH_FILE?.trim() || null;
 }
 
-function runtimeClawdAssetsPath(deps: RuntimeClawdConfigDeps = {}): string {
+function runtimeDaemonAssetsPath(deps: RuntimeDaemonConfigDeps = {}): string {
   const env = deps.env ?? process.env;
-  const configured = env.CODEX_CLAW_ASSETS_PATH?.trim();
+  const configured = env.APP_ASSETS_PATH?.trim();
   if (configured) {
     return configured;
   }
@@ -93,7 +94,7 @@ function runtimeClawdAssetsPath(deps: RuntimeClawdConfigDeps = {}): string {
   return path.resolve(deps.cwd ?? process.cwd(), 'assets');
 }
 
-function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand | null {
+function packagedDaemonCommand(deps: RuntimeDaemonConfigDeps): RuntimeDaemonCommand | null {
   const electronProcess = process as NodeJS.Process & { defaultApp?: boolean; resourcesPath?: string };
   const resourcesPath = deps.resourcesPath ?? electronProcess.resourcesPath;
   const defaultApp = deps.defaultApp ?? electronProcess.defaultApp;
@@ -101,8 +102,8 @@ function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand
     return null;
   }
 
-  const runtimeDir = path.join(resourcesPath, 'clawd');
-  const bundlePath = path.join(runtimeDir, 'clawd.mjs');
+  const runtimeDir = path.join(resourcesPath, 'daemon');
+  const bundlePath = path.join(runtimeDir, 'daemon.mjs');
   const fileExists = deps.existsSync ?? existsSync;
   if (!fileExists(bundlePath)) {
     return null;
@@ -115,34 +116,34 @@ function packagedClawdCommand(deps: RuntimeClawdConfigDeps): RuntimeClawdCommand
   return {
     command: nodeCommand,
     args: [bundlePath, '--stdio'],
-    env: runtimeClawdEnv(deps),
+    env: runtimeDaemonEnv(deps),
   };
 }
 
-function runtimeClawdEnv(deps: RuntimeClawdConfigDeps): NodeJS.ProcessEnv {
+function runtimeDaemonEnv(deps: RuntimeDaemonConfigDeps): NodeJS.ProcessEnv {
   const env = deps.env ?? process.env;
-  const githubClientId = env.CODEX_CLAW_GITHUB_CLIENT_ID?.trim();
-  const linearClientId = env.CODEX_CLAW_LINEAR_CLIENT_ID?.trim();
-  const linearCallbackUri = env.CODEX_CLAW_LINEAR_CALLBACK_URI?.trim();
+  const githubClientId = env.APP_GITHUB_CLIENT_ID?.trim();
+  const linearClientId = env.APP_LINEAR_CLIENT_ID?.trim();
+  const linearCallbackUri = env.APP_LINEAR_CALLBACK_URI?.trim();
   const bundledCodexPath = runtimeBundledCodexPath(deps);
   const runtimePath = !deps.env || env.PATH ? discoveredRuntimePath(deps) : '';
   const home = env.HOME?.trim() || (deps.homedir ?? homedir)();
 
   return {
-    CODEX_CLAW_ASSETS_PATH: runtimeClawdAssetsPath(deps),
-    ...(bundledCodexPath ? { CODEX_CLAW_BUNDLED_CODEX_PATH: bundledCodexPath } : {}),
-    CODEX_CLAW_HOME: runtimeClawdHome(deps),
+    APP_ASSETS_PATH: runtimeDaemonAssetsPath(deps),
+    ...(bundledCodexPath ? { APP_BUNDLED_CODEX_PATH: bundledCodexPath } : {}),
+    APP_HOME: runtimeDaemonHome(deps),
     HOME: home,
     ...(runtimePath ? { PATH: runtimePath } : {}),
-    ...(githubClientId ? { CODEX_CLAW_GITHUB_CLIENT_ID: githubClientId } : {}),
-    ...(linearClientId ? { CODEX_CLAW_LINEAR_CLIENT_ID: linearClientId } : {}),
-    ...(linearCallbackUri ? { CODEX_CLAW_LINEAR_CALLBACK_URI: linearCallbackUri } : {}),
+    ...(githubClientId ? { APP_GITHUB_CLIENT_ID: githubClientId } : {}),
+    ...(linearClientId ? { APP_LINEAR_CLIENT_ID: linearClientId } : {}),
+    ...(linearCallbackUri ? { APP_LINEAR_CALLBACK_URI: linearCallbackUri } : {}),
   };
 }
 
-function runtimeBundledCodexPath(deps: RuntimeClawdConfigDeps): string | null {
+function runtimeBundledCodexPath(deps: RuntimeDaemonConfigDeps): string | null {
   const env = deps.env ?? process.env;
-  const configured = env.CODEX_CLAW_BUNDLED_CODEX_PATH?.trim();
+  const configured = env.APP_BUNDLED_CODEX_PATH?.trim();
   if (configured) {
     return configured;
   }

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppSnapshot } from '@workspace/core/contracts';
 import { createClientApiMock } from '../test/client-api-mock';
-import { configureClawClient } from '../platform-api';
+import { configureAppClient } from '../platform-api';
 import { createWorkProviderState } from '../work-provider-state';
 
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); configureClawClient(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); configureAppClient(); });
 
 describe('work provider authorization state', () => {
   it('finishes Linear authorization without leaving settings busy or loading GitHub repositories', async () => {
@@ -14,7 +14,7 @@ describe('work provider authorization state', () => {
     const connected = structuredClone(snapshot);
     connected.workBacklog.connections.push({ provider: 'linear', status: 'connected', accountLabel: 'Alex' });
     api.pollWorkProviderAuthorization.mockResolvedValue(connected);
-    configureClawClient({ platform: 'desktop', api });
+    configureAppClient({ platform: 'desktop', api });
     const state = createWorkProviderState({ getSnapshot: () => snapshot, adoptSnapshot: value => { snapshot = value; } });
     await state.completeConnection('linear');
     expect(state.status.value).toBe('loaded');
@@ -37,7 +37,7 @@ describe('work provider authorization state', () => {
     api.disconnectWorkProvider.mockResolvedValue(disconnected);
     let completePoll!: (value: AppSnapshot) => void;
     api.pollWorkProviderAuthorization.mockImplementation(() => new Promise(resolve => { completePoll = resolve; }));
-    configureClawClient({ platform: 'desktop', api });
+    configureAppClient({ platform: 'desktop', api });
     const state = createWorkProviderState({ getSnapshot: () => snapshot, adoptSnapshot: value => { snapshot = value; } });
     await state.connect('linear');
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/oauth/authorize?state=public', '_blank', 'noopener,noreferrer');

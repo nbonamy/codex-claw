@@ -1,3 +1,4 @@
+import product from '../core/src/product.json' with { type: 'json' };
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -5,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ELECTRON_ROOT = path.join(ROOT, 'electron');
-const HOST = process.env.CODEX_CLAW_UPDATE_PUBLISH_HOST ?? 'joshua';
-const REMOTE_ROOT = process.env.CODEX_CLAW_UPDATE_REMOTE_ROOT ?? '/var/www/codex-claw';
+const HOST = process.env.APP_UPDATE_PUBLISH_HOST ?? 'joshua';
+const REMOTE_ROOT = process.env.APP_UPDATE_REMOTE_ROOT ?? product.deploymentRoot;
 const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const desktopVersion = packageJson.version;
 const REMOTE_RELEASE_MANIFEST = `${REMOTE_ROOT}/releases/darwin/arm64/RELEASES.json`;
@@ -41,7 +42,7 @@ export function parsePublishedManifest(rawManifest) {
 
 export function assertVersionNotAlreadyPublished({ currentVersion, publishedManifest }) {
   if (publishedManifest?.currentRelease === currentVersion) {
-    throw new Error(`Codex Claw version ${currentVersion} is already published. Bump the root package version before publishing.`);
+    throw new Error(`${product.name} version ${currentVersion} is already published. Bump the root package version before publishing.`);
   }
 }
 
@@ -63,9 +64,9 @@ export function checkPublishedVersion({
   const publishedManifest = readPublishedManifest({ execFileSyncImpl, host, remoteManifest });
   assertVersionNotAlreadyPublished({ currentVersion, publishedManifest });
   if (publishedManifest?.currentRelease) {
-    console.log(`Latest published Codex Claw version is ${publishedManifest.currentRelease}; local version is ${currentVersion}.`);
+    console.log(`Latest published ${product.name} version is ${publishedManifest.currentRelease}; local version is ${currentVersion}.`);
   } else {
-    console.log(`No published Codex Claw version found at ${host}:${remoteManifest}; local version is ${currentVersion}.`);
+    console.log(`No published ${product.name} version found at ${host}:${remoteManifest}; local version is ${currentVersion}.`);
   }
 }
 
@@ -93,7 +94,7 @@ function publishMacos() {
 
   execFileSync('ssh', [HOST, `mkdir -p ${shellQuote(`${REMOTE_ROOT}/downloads`)} ${shellQuote(`${REMOTE_ROOT}/releases/darwin/arm64`)}`], { stdio: 'inherit' });
   execFileSync('scp', [zipPath, manifestPath, `${HOST}:${REMOTE_ROOT}/releases/darwin/arm64/`], { stdio: 'inherit' });
-  execFileSync('scp', [dmgPath, `${HOST}:${REMOTE_ROOT}/downloads/codex-claw-macos-arm64.dmg`], { stdio: 'inherit' });
+  execFileSync('scp', [dmgPath, `${HOST}:${REMOTE_ROOT}/downloads/${product.downloadFileName}`], { stdio: 'inherit' });
   console.log(`Published ${path.basename(dmgPath)}, ${path.basename(zipPath)}, and RELEASES.json to ${HOST}:${REMOTE_ROOT}`);
 }
 

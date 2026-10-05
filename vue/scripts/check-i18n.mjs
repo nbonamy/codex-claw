@@ -1,3 +1,4 @@
+import product from '../../core/src/product.json' with { type: 'json' };
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,7 +76,7 @@ export function literalTemplateCopy(source, fileName = 'component.vue') {
           && presentationAttributes.has(prop.name)
           && prop.value
           && /[A-Za-z]/u.test(prop.value.content)
-          && prop.value.content !== 'Codex Claw'
+          && prop.value.content !== product.name
         ) {
           attributes.push(prop.value.content);
         }

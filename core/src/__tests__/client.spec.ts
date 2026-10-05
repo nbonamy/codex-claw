@@ -1,9 +1,10 @@
+import { product } from '../product';
 import { describe, expect, it } from 'vitest';
-import { desktopClawHostCapabilities, webClawHostCapabilities } from '../client';
+import { desktopAppHostCapabilities, webAppHostCapabilities } from '../client';
 
-describe('Claw client host capabilities', () => {
+describe(`${product.name} client host capabilities`, () => {
   it('describes the native desktop host', () => {
-    expect(desktopClawHostCapabilities).toStrictEqual({
+    expect(desktopAppHostCapabilities).toStrictEqual({
       appLifecycle: true,
       appshots: true,
       appUpdates: true,
@@ -18,7 +19,7 @@ describe('Claw client host capabilities', () => {
   });
 
   it('keeps the browser host free of desktop-only authority', () => {
-    expect(webClawHostCapabilities).toStrictEqual({
+    expect(webAppHostCapabilities).toStrictEqual({
       appLifecycle: false,
       appshots: false,
       appUpdates: false,

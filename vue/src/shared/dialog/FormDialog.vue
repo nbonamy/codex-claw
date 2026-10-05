@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog claw-form-dialog-shell"
+    class="app-dialog app-form-dialog-shell"
     :model-value="modelValue"
     :width="width"
     :append-to-body="teleported"
@@ -9,20 +9,20 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <template #header>
-      <header class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">{{ title }}</h2>
-        <p v-if="subtitle" class="claw-dialog__subtitle">{{ subtitle }}</p>
+      <header class="app-form-dialog__header">
+        <h2 class="app-dialog__title">{{ title }}</h2>
+        <p v-if="subtitle" class="app-dialog__subtitle">{{ subtitle }}</p>
       </header>
     </template>
 
     <slot />
 
     <template v-if="hasFooter" #footer>
-      <footer class="claw-dialog__footer claw-form-dialog__footer">
-        <div v-if="$slots['footer-left']" class="claw-form-dialog__footer-left">
+      <footer class="app-dialog__footer app-form-dialog__footer">
+        <div v-if="$slots['footer-left']" class="app-form-dialog__footer-left">
           <slot name="footer-left" />
         </div>
-        <div class="claw-form-dialog__footer-actions">
+        <div class="app-form-dialog__footer-actions">
           <slot name="footer" />
         </div>
       </footer>

@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it } from 'vitest';
 import {
   collaborationInstructionsEnd,
   collaborationInstructionsStart,
   formatCollaborationMessageEnvelope,
-} from '@codex-claw/core/collaboration-message-envelope';
+} from '@workspace/core/collaboration-message-envelope';
 import {
   parseCollaborationMessage,
   presentCollaborationMessage,
@@ -17,7 +18,7 @@ describe('collaboration message presentation', () => {
         senderName: 'codex-app-sdk',
         senderId: 'agent-sdk',
         sentAt: '2026-08-02T00:00:00.000Z',
-        content: 'First line.\nSecond line.\n<<<END_CODEX_CLAW_AGENT_MESSAGES_V1>>>',
+        content: 'First line.\nSecond line.\n<<<END_APP_AGENT_MESSAGES_V1>>>',
       }]),
       '',
       collaborationInstructionsStart,
@@ -26,12 +27,12 @@ describe('collaboration message presentation', () => {
     ].join('\n');
 
     expect(parseCollaborationMessage(raw)).toStrictEqual({
-      content: 'First line.\nSecond line.\n<<<END_CODEX_CLAW_AGENT_MESSAGES_V1>>>',
+      content: 'First line.\nSecond line.\n<<<END_APP_AGENT_MESSAGES_V1>>>',
       messageCount: 1,
       senderNames: ['codex-app-sdk'],
     });
     expect(parseCollaborationMessage('You received a normal user sentence.')).toBeNull();
-    expect(parseCollaborationMessage('<<<CODEX_CLAW_AGENT_MESSAGES_V1>>>\nnot json')).toBeNull();
+    expect(parseCollaborationMessage('<<<APP_AGENT_MESSAGES_V1>>>\nnot json')).toBeNull();
   });
 
   it('keeps parsing historical single-message envelopes with changed instructions', () => {
@@ -61,7 +62,7 @@ describe('collaboration message presentation', () => {
 
   it('extracts batched messages while preserving sender attribution', () => {
     const raw = [
-      'You received 2 messages from other Codex Claw agents.',
+      `You received 2 messages from other ${product.name} agents.`,
       '',
       'Message 1 from codex-app-sdk (agent-sdk) at 2026-08-02T00:00:00.000Z:',
       'SDK message.',

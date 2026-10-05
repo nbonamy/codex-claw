@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
 import { BackendDriverRpc } from '../driver-rpc';
-import { ClawBackendServer } from '../server';
+import { AppBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
 
-describe('ClawBackendServer Visualize workflow', () => {
+describe('AppBackendServer Visualize workflow', () => {
   it('routes canvas saves through the owning agent and publishes persisted content', async () => {
     const { agentId, server, snapshot } = setup();
     try {
@@ -49,7 +49,7 @@ describe('ClawBackendServer Visualize workflow', () => {
     expect(startPrompt.slice(0, startPrompt.indexOf('<context>')).trim()).toBe('Visualize the architecture of the feature.');
     expect(startPrompt).toContain('Create one visualization for this request');
     expect(startPrompt).toContain('Do not suggest visualizations first');
-    expect(startPrompt).toContain('codex_claw.add-visualization without a suggestion ID');
+    expect(startPrompt).toContain('workspace.add-visualization without a suggestion ID');
     expect(snapshot.agents.at(-1)?.visualize?.suggestions).toStrictEqual([]);
     await server.close();
   });
@@ -79,7 +79,7 @@ describe('ClawBackendServer Visualize workflow', () => {
 function setup(): {
   agentId: string;
   sendPrompt: ReturnType<typeof vi.fn>;
-  server: ClawBackendServer;
+  server: AppBackendServer;
   snapshot: ReturnType<typeof createTestSnapshot>;
 } {
   const snapshot = createTestSnapshot();
@@ -103,7 +103,7 @@ function setup(): {
     onEvent: () => () => undefined,
     close: vi.fn(),
   };
-  const server = new ClawBackendServer({
+  const server = new AppBackendServer({
     version: 'test',
     snapshot,
     driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
@@ -112,7 +112,7 @@ function setup(): {
   return { agentId: agent.id, sendPrompt, server, snapshot };
 }
 
-async function request(server: ClawBackendServer, params: unknown): Promise<void> {
+async function request(server: AppBackendServer, params: unknown): Promise<void> {
   const response = await server.handleMessage({
     jsonrpc: '2.0', id: 'visualize', method: backendMethods.agentVisualizeStart, params,
   });

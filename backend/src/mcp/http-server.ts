@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { logMain, warnMain } from '../log';
-import type { ClawMcpAgentCoordinator } from './agent-coordinator';
-import { createClawMcpServer } from './tools';
+import type { AppMcpAgentCoordinator } from './agent-coordinator';
+import { createAppMcpServer } from './tools';
 import type { ComputerUseClient } from './computer-use-tools';
 import type { InAppBrowserClient } from './browser-tools';
 import type { HostedMcpGateway, HostedMcpServerId } from './hosted-mcp-gateway';
@@ -17,32 +18,32 @@ import {
   createComputerUseToolModuleProvider,
   createReviewToolModuleProvider,
 } from './adapter-tool-modules';
-import type { ClawMcpToolModuleProvider } from './tool-modules';
+import type { AppMcpToolModuleProvider } from './tool-modules';
 
 const maxBodyBytes = 1024 * 1024;
 
-export type ClawMcpHttpServerOptions = {
-  coordinator: ClawMcpAgentCoordinator;
+export type AppMcpHttpServerOptions = {
+  coordinator: AppMcpAgentCoordinator;
   computerUse?: ComputerUseClient;
   computerUseEnabled?: () => boolean;
   browser?: InAppBrowserClient;
   hostedMcpGateway?: HostedMcpGateway;
   reviewTools?: ReviewToolRegistry;
-  toolModuleProviders?: readonly ClawMcpToolModuleProvider[];
+  toolModuleProviders?: readonly AppMcpToolModuleProvider[];
   host?: string;
   port?: number;
 };
 
-export class ClawMcpHttpServer {
-  private readonly coordinator: ClawMcpAgentCoordinator;
+export class AppMcpHttpServer {
+  private readonly coordinator: AppMcpAgentCoordinator;
   private readonly hostedMcpGateway: HostedMcpGateway | undefined;
-  private readonly toolModuleProviders: readonly ClawMcpToolModuleProvider[];
+  private readonly toolModuleProviders: readonly AppMcpToolModuleProvider[];
   private readonly host: string;
   private readonly port: number;
   private server: http.Server | null = null;
   private url: string | null = null;
 
-  constructor(options: ClawMcpHttpServerOptions) {
+  constructor(options: AppMcpHttpServerOptions) {
     this.coordinator = options.coordinator;
     this.hostedMcpGateway = options.hostedMcpGateway;
     const computerUseEnabled = options.computerUseEnabled ?? (() => true);
@@ -167,7 +168,7 @@ export class ClawMcpHttpServer {
     const startedAt = Date.now();
     logMain('mcp-http', 'request', requestSummary);
     if (!agentId) {
-      writeJsonRpcError(response, 400, -32000, 'Bad Request: missing Codex Claw agent identity');
+      writeJsonRpcError(response, 400, -32000, `Bad Request: missing ${product.name} agent identity`);
       warnMain('mcp-http', 'rejected request', requestSummary);
       return;
     }
@@ -178,7 +179,7 @@ export class ClawMcpHttpServer {
     }
 
     this.coordinator.connectAgent(agentId);
-    const mcpServer = createClawMcpServer({ agentId, url }, this.toolModuleProviders);
+    const mcpServer = createAppMcpServer({ agentId, url }, this.toolModuleProviders);
     const transport = new StreamableHTTPServerTransport({
       enableJsonResponse: true,
       sessionIdGenerator: undefined,
@@ -221,7 +222,7 @@ export class ClawMcpHttpServer {
     }
     const agentId = url.searchParams.get('agentId');
     if (!agentId) {
-      writeJsonRpcError(response, 400, -32000, 'Bad Request: missing Codex Claw agent identity');
+      writeJsonRpcError(response, 400, -32000, `Bad Request: missing ${product.name} agent identity`);
       return;
     }
 

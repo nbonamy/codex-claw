@@ -1,3 +1,5 @@
+import { product } from "./product.mjs";
+
 const DURATION = 46;
 const SCENES = [
   { name: "opening", start: 0, end: 3.2 },
@@ -15,8 +17,7 @@ const SCENES = [
     end: 18,
     chapter: "02 / 06",
     title: "Give the build its own space.",
-    detail:
-      "Submit /delegate here. Claw prepares the handoff and starts a worktree agent.",
+    detail: `Submit /delegate here. ${product.name} prepares the handoff and starts a worktree agent.`,
   },
   {
     name: "provision",
@@ -93,13 +94,13 @@ function provisioningDialog(step) {
     ["Creating isolated worktree", "feat/agent-switcher"],
     ["Initializing worktree", "Checking project setup"],
     ["Starting agent session", "New Codex session"],
-    ["Handing over initial instructions", "codex-claw"],
+    ["Handing over initial instructions", "example-project"],
   ];
-  return `<div class="delegation-dialog" id="provision-dialog"><span class="delegation-dialog__eyebrow">Delegating work</span><h3>Building an isolated home in codex-claw…</h3><p class="delegation-dialog__subtitle">A dedicated agent is getting ready for the implementation.</p><div class="delegation-steps">${steps.map(([title, detail], index) => `<div class="delegation-step ${index < step ? "is-complete" : index === step ? "is-active" : ""}"><span class="delegation-step__icon">${index < step ? "✓" : index + 1}</span><span class="delegation-step__copy"><strong>${title}</strong><small>${detail}</small></span></div>`).join("")}</div><div class="delegation-dialog__track"><i id="provision-fill"></i></div><div class="delegation-dialog__footer"><span>Preparing dedicated workspace</span><b id="provision-percent">0%</b></div></div>`;
+  return `<div class="delegation-dialog" id="provision-dialog"><span class="delegation-dialog__eyebrow">Delegating work</span><h3>Building an isolated home in example-project…</h3><p class="delegation-dialog__subtitle">A dedicated agent is getting ready for the implementation.</p><div class="delegation-steps">${steps.map(([title, detail], index) => `<div class="delegation-step ${index < step ? "is-complete" : index === step ? "is-active" : ""}"><span class="delegation-step__icon">${index < step ? "✓" : index + 1}</span><span class="delegation-step__copy"><strong>${title}</strong><small>${detail}</small></span></div>`).join("")}</div><div class="delegation-dialog__track"><i id="provision-fill"></i></div><div class="delegation-dialog__footer"><span>Preparing dedicated workspace</span><b id="provision-percent">0%</b></div></div>`;
 }
 
 function mergeDialog(cleanup) {
-  return `<div class="delegation-dialog delegate-merge-dialog" id="merge-dialog"><span class="delegation-dialog__eyebrow">Git workflow</span><h3>Merge branch</h3><p class="delegation-dialog__subtitle">codex-claw · feat/agent-switcher → main</p><div class="delegate-merge-dialog__options"><div class="delegate-merge-dialog__option is-selected"><strong>◉ Merge commit</strong><small>Preserve every commit in a merge commit</small></div><div class="delegate-merge-dialog__option"><strong>◯ Squash and merge</strong><small>Combine changes into one commit</small></div></div><div id="cleanup-switch" class="delegate-merge-dialog__switch ${cleanup ? "is-on" : ""}"><i></i><span>Delete worktree after merging</span></div><div class="delegate-merge-dialog__switch ${cleanup ? "is-on" : ""}"><i></i><span>Delete branch after removing worktree</span></div><div class="delegate-merge-dialog__actions"><span>Cancel</span><span id="merge-confirm">Merge</span></div></div>`;
+  return `<div class="delegation-dialog delegate-merge-dialog" id="merge-dialog"><span class="delegation-dialog__eyebrow">Git workflow</span><h3>Merge branch</h3><p class="delegation-dialog__subtitle">example-project · feat/agent-switcher → main</p><div class="delegate-merge-dialog__options"><div class="delegate-merge-dialog__option is-selected"><strong>◉ Merge commit</strong><small>Preserve every commit in a merge commit</small></div><div class="delegate-merge-dialog__option"><strong>◯ Squash and merge</strong><small>Combine changes into one commit</small></div></div><div id="cleanup-switch" class="delegate-merge-dialog__switch ${cleanup ? "is-on" : ""}"><i></i><span>Delete worktree after merging</span></div><div class="delegate-merge-dialog__switch ${cleanup ? "is-on" : ""}"><i></i><span>Delete branch after removing worktree</span></div><div class="delegate-merge-dialog__actions"><span>Cancel</span><span id="merge-confirm">Merge</span></div></div>`;
 }
 
 function mergeProgressDialog() {
@@ -120,7 +121,7 @@ function contentFor(scene, variant) {
                 : `<div class="delegate-iteration__later">A few iterations later</div>${userMessage("That covers Quick Chats, recents, and keyboard navigation.")}${agentMessage("We have a clear feature shape. Ready to give the implementation its own worktree?")}`,
         role: "Codex · main",
         name: "Feature discussion",
-        path: "codex-claw / main",
+        path: "example-project / main",
         status: "Planning",
         label: "DELEGATE / DISCUSS",
       };
@@ -129,7 +130,7 @@ function contentFor(scene, variant) {
         center: `${userMessage("That covers Quick Chats, recents, and keyboard navigation.")}${agentMessage("We have a clear feature shape. Ready to give the implementation its own worktree?")}${variant === "submitted" ? `${userMessage("/delegate")}${agentMessage("I’m preparing the handoff for a new agent in its own worktree. This conversation will stay open.")}` : ""}`,
         role: "Codex · main",
         name: "Feature discussion",
-        path: "codex-claw / main",
+        path: "example-project / main",
         status: variant === "submitted" ? "Preparing handoff" : "Planning",
         label: "DELEGATE / COMMAND",
       };
@@ -138,7 +139,7 @@ function contentFor(scene, variant) {
         center: `${userMessage("/delegate")}${agentMessage("I’m handing the feature brief to a new agent in feat/agent-switcher.")}${`<div class="delegate-tool"><b>●</b> Creating agent with a dedicated worktree</div>`}`,
         role: "Codex · main",
         name: "Feature discussion",
-        path: "codex-claw / main",
+        path: "example-project / main",
         status: "Creating worktree",
         label: "DELEGATE / PROVISION",
       };
@@ -150,7 +151,7 @@ function contentFor(scene, variant) {
         center: `${agentMessage("I’ve got the handoff. I’m adding ⌘K search across active agents and repositories in this worktree.", "Agent switcher")}${followup && variant !== "followup" ? userMessage("Please pin the three most recent sessions above search results.") : ""}${built ? agentMessage(variant === "ready" ? "Done. Recent sessions are pinned, keyboard navigation is in place, and the focused checks pass. The branch is committed and ready to merge." : "I’m wiring recent sessions into the search results and checking keyboard navigation.", "Agent switcher") : ""}${built ? codeDiff() : `<div class="delegate-tool"><b>●</b> Implementing in feat/agent-switcher</div>`}`,
         role: "Codex · feat/agent-switcher",
         name: "Agent switcher",
-        path: "codex-claw / feat/agent-switcher",
+        path: "example-project / feat/agent-switcher",
         status: variant === "ready" ? "Ready to merge" : "Working in worktree",
         label: "DELEGATE / BUILD",
       };
@@ -160,7 +161,7 @@ function contentFor(scene, variant) {
         center: `${agentMessage("The feature branch is committed. The agent switcher is ready to merge into main.", "Agent switcher")}${codeDiff()}${variant === "menu" ? `<div class="delegate-git-menu"><span>View changes</span><span>Commit changes</span><span id="merge-menu-action" class="is-selected">⑂ Merge branch…</span><span>Create pull request…</span></div>` : ""}`,
         role: "Codex · feat/agent-switcher",
         name: "Agent switcher",
-        path: "codex-claw / feat/agent-switcher",
+        path: "example-project / feat/agent-switcher",
         status: variant === "merging" ? "Merging" : "Ready to merge",
         label: "DELEGATE / MERGE",
       };
@@ -169,7 +170,7 @@ function contentFor(scene, variant) {
         center: `${agentMessage("Agent switcher is merged into main. The dedicated worktree and branch are cleaned up, and the implementation agent has closed.")}${`<div class="delegate-tool"><b>✓</b> Merge complete · feat/agent-switcher → main</div>`}`,
         role: "Codex · main",
         name: "Feature discussion",
-        path: "codex-claw / main",
+        path: "example-project / main",
         status: "Merged",
         label: "DELEGATE / COMPLETE",
       };

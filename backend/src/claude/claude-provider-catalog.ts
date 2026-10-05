@@ -1,13 +1,13 @@
 import { claudeWorkingDirectory } from './working-directory';
-import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { BackendEvent, BackendPermissionModeResult } from '@codex-claw/core/backend-driver';
+import { claudeBackendCapabilities } from '@workspace/core/backend-capabilities';
+import type { BackendEvent, BackendPermissionModeResult } from '@workspace/core/backend-driver';
 import type {
   Agent,
   BackendCapabilities,
   BackendModelOption,
   BackendRuntimeStatus,
   BackendSkillSummary,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 import { listClaudeSkills } from './skills';
 import type { ClaudeAvailableModel, ClaudeTurnTransport } from './transport';

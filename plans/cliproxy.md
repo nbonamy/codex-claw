@@ -6,10 +6,10 @@ Date: 2026-10-04.
 ## Decision and goal
 
 Replace the abandoned native multi-account subscription feature with an easy
-way to connect Codex Claw to an existing CLIProxyAPI service. Start fresh from
+way to connect Korus to an existing CLIProxyAPI service. Start fresh from
 main; do not merge or depend on `feat/multiple-subscriptions`.
 
-Claw continues to own agents, provider selection, local tools, approvals,
+Korus continues to own agents, provider selection, local tools, approvals,
 conversation presentation and provider-runtime lifecycle. CLIProxyAPI owns
 upstream accounts, OAuth credentials, refresh and account routing. Codex
 app-server and Claude Agent SDK remain the native engines; the proxy sits
@@ -36,12 +36,12 @@ Out of scope:
 
 - Native account registration, per-agent subscription selectors and account
   migration from the abandoned branch.
-- Claw-owned OAuth flows, token refresh, auth-file swapping or symlink overlays.
+- Korus-owned OAuth flows, token refresh, auth-file swapping or symlink overlays.
 - A new HTTP proxy, protocol translator, quota scheduler or automatic failover.
 - Installing, bundling, updating or supervising CLIProxyAPI itself.
 - Proxy management API integration, an embedded account dashboard, or importing
-  upstream credentials into Claw.
-- Promising account affinity for a whole Claw turn or the previously discussed
+  upstream credentials into Korus.
+- Promising account affinity for a whole Korus turn or the previously discussed
   reset-aware heuristic. CLIProxyAPI controls routing under its own policy.
 
 ## Proposed settings experience
@@ -71,12 +71,12 @@ the runtime can reconnect safely.
 ## Architecture and implementation boundaries
 
 1. Add minimal app-owned connection settings and sanitized observations through
-   core contracts, the clawd protocol, ClawBackendClient and existing settings
+   core contracts, the daemon protocol, BackendClient and existing settings
    state. Keep provider-specific configuration behind backend adapters.
-2. clawd validates the endpoint, owns the proxy secret and builds each child
+2. daemon validates the endpoint, owns the proxy secret and builds each child
    process's configuration. Use the repository's appropriate host-owned secret
    persistence boundary; confirm it works for desktop, web and remote hosts.
-   Never rely on Electron-only storage for credentials needed by remote clawd.
+   Never rely on Electron-only storage for credentials needed by remote daemon.
 3. The renderer sends an explicitly entered key only to its owning backend; it
    does not receive saved secret values, provider credentials or raw auth errors.
    Exclude keys and sensitive response bodies from logs, snapshots and URLs.
@@ -90,7 +90,7 @@ the runtime can reconnect safely.
    Preserve real HOME and the configured Claude data directory.
 6. Scope overrides to the selected provider and host. Do not mutate global
    process.env or share local proxy credentials with remote hosts. Loopback URLs
-   are relative to the owning clawd host; make that clear in remote settings.
+   are relative to the owning daemon host; make that clear in remote settings.
 7. Preserve existing thread references and storage. Verify direct-to-proxy and
    proxy-to-direct resume with the actual engines; do not rewrite history or
    silently substitute an unavailable model to make a transition succeed.
@@ -112,8 +112,8 @@ integration. It is not an end-to-end compatibility certification:
   connection settings, not its example permission bypasses or unrelated tuning.
 - [CLIProxyAPI source](https://github.com/router-for-me/CLIProxyAPI/tree/8ef43e4df3b216a42493105d31c2873b69191473)
   was inspected for credential storage, refresh and upstream executors. It owns
-  provider-specific behavior that Claw should not duplicate.
-- Claw's existing Codex adapter passes SDK transport configuration, and its
+  provider-specific behavior that Korus should not duplicate.
+- Korus's existing Codex adapter passes SDK transport configuration, and its
   Claude transport loads user/project/local settings. This suggests suitable
   integration points, but does not establish that auth detection, catalogs,
   usage reporting or every native feature works through a gateway unchanged.
@@ -128,12 +128,12 @@ from a successful text completion. Record the supported surface explicitly.
 ### 1. Prove the connection paths
 
 - [ ] Use isolated state and an existing or explicitly provisioned test proxy;
-  do not repoint Nicolas's active CLI or Claw processes.
+  do not repoint Nicolas's active CLI or Korus processes.
 - [ ] Exercise one native Codex app-server workflow and one Claude Agent SDK
   workflow through CLIProxyAPI: streaming, a local tool, approval handling,
   interruption and resume of the same conversation.
 - [ ] Verify model discovery and auth/availability observations. Check auxiliary
-  generation paths used by Claw, not just the main conversation launch.
+  generation paths used by Korus, not just the main conversation launch.
 - [ ] Verify direct/proxy transitions preserve history and existing home modes.
 - [ ] Record exact versions and distinguish fake-server evidence from real
   authenticated upstream execution. If real credentials are unavailable, report
@@ -146,7 +146,7 @@ regression coverage. Possible commit: `test: cover proxy runtime compatibility`.
 ### 2. Add backend connection configuration
 
 - [ ] Add host-scoped settings, secret persistence and sanitized status contracts.
-- [ ] Add connection testing through clawd with bounded timeouts, cancellation,
+- [ ] Add connection testing through daemon with bounded timeouts, cancellation,
   endpoint validation and safe errors. Do not forward keys across redirects.
 - [ ] Implement the Codex adapter configuration and Claude SDK environment path.
 - [ ] Preserve direct-mode defaults and implement safe configuration activation.
@@ -161,13 +161,13 @@ Suggested commits:
 
 ### 3. Add the settings UI
 
-- [ ] Read docs/frontend.md and codex-claw-frontend-dev before UI changes.
+- [ ] Read docs/frontend.md and app-frontend-dev before UI changes.
 - [ ] Implement the shared connection editor and consistent provider controls.
 - [ ] Wire Test connection, masked saved-key state and dashboard opening.
 - [ ] Cover loading, invalid configuration, offline proxy and authentication
   failure without discarding the user's input or changing active routing.
 - [ ] Verify the rendered workflow against a branch-faithful isolated backend
-  using codex-claw-live-preview.
+  using app-live-preview.
 
 Suggested commit: `feat: add cliproxyapi connection setup`.
 
@@ -178,7 +178,7 @@ Suggested commit: `feat: add cliproxyapi connection setup`.
   connection conventions changed. Add concise user setup guidance in the
   existing guide structure after reading website/README.md.
 - [ ] Run affected tests, typechecks and lint, plus the cross-cutting test gate
-  and appropriate coverage checks required by codex-claw-dod.
+  and appropriate coverage checks required by app-dod.
 - [ ] Run git diff --check and inspect git status. Do not update CHANGELOG.md,
   package/sign a release, merge or push as part of this implementation.
 - [ ] Report limitations, configuration mode, runtime versions, test results and
@@ -189,7 +189,7 @@ Commit checkpoints are proposed boundaries, not authorization to commit/push.
 
 ## Test strategy
 
-Use docs/testing.md, codex-claw-testing-coverage and the mandatory test-audit
+Use docs/testing.md, app-testing-coverage and the mandatory test-audit
 value gate. Tests must protect user behavior or owned boundaries, not source
 text. Keep detailed provider wire tests in the owning SDK repository.
 
@@ -219,7 +219,7 @@ Do not merge the multi-account branch to recover it; reproduce and port only
 the relevant behavior if it remains missing.
 
 The observed failure was repeated roughly 1.9 MB skills.changed notifications
-filling clawd's stdio output buffer. The old worktree's fix removed local
+filling daemon's stdio output buffer. The old worktree's fix removed local
 per-agent fanout of account/cwd-scoped skill catalog broadcasts in
 backend/src/server.ts. It also made every matching mounted composer synchronize
 after a shared skill cache update in vue/src/agent-composer-state.ts.

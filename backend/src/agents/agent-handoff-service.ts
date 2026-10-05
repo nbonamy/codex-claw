@@ -1,8 +1,9 @@
-import type { Agent, AppSnapshot, CreateAgentInput } from '@codex-claw/core/contracts';
-import { agentHandoffBlocker, handoffInProgress, handoffNoteLimit, type AgentHandoff, type AgentHandoffInput } from '@codex-claw/core/agent-handoff';
-import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import { resolveAgentBackend } from '@codex-claw/core/agent-backends';
-import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
+import { product } from '@workspace/core/product';
+import type { Agent, AppSnapshot, CreateAgentInput } from '@workspace/core/contracts';
+import { agentHandoffBlocker, handoffInProgress, handoffNoteLimit, type AgentHandoff, type AgentHandoffInput } from '@workspace/core/agent-handoff';
+import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
+import { resolveAgentBackend } from '@workspace/core/agent-backends';
+import { closeAgentInSnapshot } from '@workspace/core/agent-manager';
 
 type Options = {
   snapshot: AppSnapshot;
@@ -14,7 +15,7 @@ type Options = {
   start(agent: Agent, prompt: string): Promise<void>;
 };
 
-/** Replaces a Claw worker; provider history and the workspace remain provider/filesystem owned. */
+/** Replaces a App worker; provider history and the workspace remain provider/filesystem owned. */
 export class AgentHandoffService {
   private readonly running = new Map<string, Promise<void>>();
 
@@ -117,7 +118,7 @@ function notePrompt(input: AgentHandoffInput): string {
     'Write a self-contained handoff note as your final response, under 32,000 characters.',
     'Include the objective, user constraints and decisions, completed changes, verification evidence, relevant files, unfinished work, and the next action.',
     'Distinguish observed results from assumptions. Do not include secrets.',
-    'Do not run tools, change files, create agents, or close anything. Claw will create the replacement after this turn finishes.',
+    `Do not run tools, change files, create agents, or close anything. ${product.name} will create the replacement after this turn finishes.`,
     ...(input.instructions?.trim() ? [`Additional handoff instructions from the user:\n${input.instructions.trim()}`] : []),
   ].join('\n\n');
 }

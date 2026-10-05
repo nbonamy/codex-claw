@@ -83,7 +83,7 @@ type AppSurface =
 
 If a team-scoped Backlog is added later, its filter configuration should be
 remembered per team while provider credentials and assignment records remain
-global. `clawd` should own validation and persistence; renderer should only
+global. `daemon` should own validation and persistence; renderer should only
 choose a scope and route typed requests.
 
 Do not couple this to the Team Cockpit. Agent overview scope and work-provider

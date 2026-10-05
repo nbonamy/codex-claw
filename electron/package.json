@@ -1,8 +1,7 @@
 {
-  "name": "@codex-claw/electron",
+  "name": "@workspace/electron",
   "version": "0.25.2",
   "private": true,
-  "productName": "Codex Claw",
   "description": "Native Codex team desktop app.",
   "main": ".vite/build/main.js",
   "scripts": {
@@ -25,8 +24,8 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-claw/core": "0.25.2",
-    "@codex-claw/vue": "0.25.2",
+    "@workspace/core": "0.25.2",
+    "@workspace/vue": "0.25.2",
     "autolib": "github:nbonamy/witsy-autolib#v1.2.3",
     "@codex-app-sdk/electron": "0.12.6",
     "electron-log": "^5.4.4",
@@ -53,7 +52,6 @@
     "vitest": "^4.1.8"
   },
   "build": {
-    "appId": "com.nabocorp.codex-claw",
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity"

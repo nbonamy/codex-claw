@@ -1,4 +1,4 @@
-import type { BackendModelOption, ModelFavorite } from '@codex-claw/core/contracts';
+import type { BackendModelOption, ModelFavorite } from '@workspace/core/contracts';
 
 export function copyModelFavorite(favorite: ModelFavorite): ModelFavorite {
   return {

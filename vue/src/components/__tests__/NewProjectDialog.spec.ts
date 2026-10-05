@@ -18,7 +18,7 @@ describe('NewProjectDialog', () => {
 
     expect(wrapper.find('select').exists()).toBe(false);
     await wrapper.get('#new-project-name').setValue('  fresh-project  ');
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
 
     expect(wrapper.emitted('create')).toStrictEqual([['fresh-project', 'claude']]);
   });
@@ -31,7 +31,7 @@ describe('NewProjectDialog', () => {
     });
 
     await wrapper.get('#new-project-name').setValue('../fresh-project');
-    await wrapper.get('.claw-button--primary').trigger('click');
+    await wrapper.get('.app-button--primary').trigger('click');
 
     expect(wrapper.emitted('create')).toBeUndefined();
     expect(wrapper.text()).toContain('Use a single folder name without slashes.');

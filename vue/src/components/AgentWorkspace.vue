@@ -66,8 +66,8 @@
       :browser-visualization="rightWorkspaceFor(agent.id).browserVisualization"
       :browser-panels="rightWorkspaceFor(agent.id).browserPanels"
       :link-drop-active="Boolean(linkDrag.draggedLink.value) && isRightWorkspaceVisible(agent.id)"
-      :browser-available="clawHostCapabilities.embeddedBrowser"
-      :open-in-available="clawHostCapabilities.openInApplications && isLocalAgent(agent)"
+      :browser-available="appHostCapabilities.embeddedBrowser"
+      :open-in-available="appHostCapabilities.openInApplications && isLocalAgent(agent)"
       :open-in-catalog="openInApplications"
       :subagent-tree="subagentTreeFor(agent.id)"
       :load-subagent-messages="(conversationId) => loadSubagentMessages(agent.id, conversationId)"
@@ -147,8 +147,8 @@ import type {
   RendererSendPromptOptions,
   ThreadPlan,
   WorkItem,
-} from '@codex-claw/core/contracts';
-import { PRIMARY_BROWSER_ID, type AppCommand } from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
+import { PRIMARY_BROWSER_ID, type AppCommand } from '@workspace/core/contracts';
 import type {
   CodexConversationLink,
   CodexConversationPaneController,
@@ -160,11 +160,11 @@ import type {
 } from '@codex-app-sdk/vue';
 import { ElMessage } from 'element-plus';
 import { computed, reactive, ref, toRefs, watch, type ComponentPublicInstance } from 'vue';
-import { repositoryIconForAgent } from '@codex-claw/core/workspace-sidebar';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
+import { repositoryIconForAgent } from '@workspace/core/workspace-sidebar';
+import { agentDisplayName } from '@workspace/core/agent-display';
 import { translate } from '../i18n';
 import { localizedErrorMessage } from '../i18n/errors';
-import { clawHostCapabilities } from '../platform-api';
+import { appHostCapabilities } from '../platform-api';
 import AgentEmptyState from './AgentEmptyState.vue';
 import AgentHeader from './AgentHeader.vue';
 import ConversationPane from './ConversationPane.vue';
@@ -175,7 +175,7 @@ import { constrainedRightWorkspaceWidth, type AgentRightWorkspaceState } from '.
 import type { PlanReviewComment, SidePanelGitDiffState } from './side-panel';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
 import type { VisualizationAnnotation, VisualizationAnnotationInput } from './use-visualization-annotations';
-import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
+import type { ThreadFlagResponse } from '@workspace/core/thread-flags';
 import { fileBasename } from './use-workspace-previews';
 import {
   isRightWorkspaceSubagentTab,
@@ -204,7 +204,7 @@ const props = defineProps<{
   conversationPlan: ThreadPlan | null;
   chatTextAnnotations: readonly ChatTextAnnotation[];
   visualizationAnnotations: readonly VisualizationAnnotation[];
-  reviewFindingAttachment?: import('@codex-claw/core/code-review').CodeReviewFinding | null;
+  reviewFindingAttachment?: import('@workspace/core/code-review').CodeReviewFinding | null;
   currentAgent: Agent | null;
   emptySplitPane?: boolean;
   splitHeaders?: boolean;
@@ -228,8 +228,8 @@ const props = defineProps<{
   hasRunningPlanTool: boolean;
   latestConversationTurnId: string | null;
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
-  updateAgentGitBranchFromBase: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@codex-claw/core/contracts').AgentGitUpdateFromBaseResult>;
-  updateAgent: (input: import('@codex-claw/core/contracts').UpdateAgentInput) => Promise<void>;
+  updateAgentGitBranchFromBase: (agentId: string, input: import('@workspace/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@workspace/core/contracts').AgentGitUpdateFromBaseResult>;
+  updateAgent: (input: import('@workspace/core/contracts').UpdateAgentInput) => Promise<void>;
   openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   openAttachmentImageAnnotation: (attachment: CodexNativeAttachment) => void;
@@ -260,17 +260,17 @@ const props = defineProps<{
   updateStatus?: DesktopUpdateStatus;
   commitAgentGitChanges: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
   createAgentGitPullRequest: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
-  startCodeReview?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
-  decideCodeReviewFinding?: (agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
+  startCodeReview?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewStartInput) => Promise<AppSnapshot>;
+  decideCodeReviewFinding?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
-  generateVisualizationSuggestion: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
-  startVisualize: (agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => Promise<void>;
-  selectVisualization: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
-  deleteVisualization: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
-  readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
+  generateVisualizationSuggestion: (agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
+  startVisualize: (agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput) => Promise<void>;
+  selectVisualization: (agentId: string, input: import('@workspace/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
+  deleteVisualization: (agentId: string, input: import('@workspace/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
+  readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@workspace/core/visualize').VisualizationAsset>;
 }>();
 
 const agentHeaders = new Map<string, InstanceType<typeof AgentHeader>>();
@@ -284,7 +284,7 @@ const emit = defineEmits<{
     agentId: string;
     sessionId: string;
     roundId: string;
-    finding: import('@codex-claw/core/code-review').CodeReviewFinding;
+    finding: import('@workspace/core/code-review').CodeReviewFinding;
   }];
   removeReviewFindingAttachment: [];
   sendPrompt: [prompt: string];
@@ -475,10 +475,10 @@ function headerBindingsFor(agentId: string | null, topRight: boolean, topLeft: b
     workspaceToggleDisabled: !props.currentAgent || Boolean(props.emptySplitPane),
     isLoading: props.isLoading,
     sidebarCollapsed: topLeft && props.agentSidebarCollapsed,
-    updateStatus: topRight && clawHostCapabilities.appUpdates ? props.updateStatus : undefined,
+    updateStatus: topRight && appHostCapabilities.appUpdates ? props.updateStatus : undefined,
     executionPlanAvailable: focused && Boolean(currentTurnPlan.value),
     executionPlanOpen: focused && executionPlanVisible.value,
-    openInAvailable: Boolean(agent && clawHostCapabilities.openInApplications && isLocalAgent(agent)),
+    openInAvailable: Boolean(agent && appHostCapabilities.openInApplications && isLocalAgent(agent)),
     openInCatalog: props.openInApplications,
     subagentTree: agentId ? subagentTreeFor(agentId) : null,
     selectedSubagentConversationId: agentId ? selectedSubagentConversationIdFor(agentId) : null,
@@ -532,7 +532,7 @@ function openRequestedBrowser(agentId: string, command: Extract<AppCommand, { ty
 
 function openConversationVisualization(visualization: CodexConversationVisualization, agentId = currentAgent.value?.id): void {
   const agent = props.snapshot.agents.find(agent => agent.id === agentId);
-  if (!agent || !clawHostCapabilities.embeddedBrowser) return;
+  if (!agent || !appHostCapabilities.embeddedBrowser) return;
   const workspace = rightWorkspaceFor(agent.id);
   workspace.browserId = PRIMARY_BROWSER_ID;
   workspace.browserInitialUrl = '';
@@ -602,7 +602,7 @@ function openConversationLink(link: CodexConversationLink): void | Promise<void>
 }
 
 const linkDrag = useWorkspaceLinkDrag({
-  browserAvailable: clawHostCapabilities.embeddedBrowser,
+  browserAvailable: appHostCapabilities.embeddedBrowser,
   open: (agentId, link) => {
     if (!props.snapshot.agents.some(agent => agent.id === agentId)) return;
     if (agentId !== currentAgent.value?.id) props.selectAgentFromShell(agentId);

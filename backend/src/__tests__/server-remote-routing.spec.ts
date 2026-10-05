@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { ClawBackendServer } from '../server';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import {
   createTestSnapshot,
   readyRemoteConnection,
@@ -11,7 +12,7 @@ import {
   createWorkItem,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('inspects remote versions without closing or upgrading the connection', async () => {
     const snapshot = createTestSnapshot();
@@ -19,11 +20,11 @@ describe('ClawBackendServer', () => {
     const connection = readyRemoteConnection();
     snapshot.remoteConnections.connections = [connection];
     const sshConnections = {
-      inspectVersions: vi.fn().mockResolvedValue({ ...connection, clawdVersion: '0.19.1', codexVersion: '0.143.0', detail: 'versions' }),
+      inspectVersions: vi.fn().mockResolvedValue({ ...connection, daemonVersion: '0.19.1', codexVersion: '0.143.0', detail: 'versions' }),
       checkConnection: vi.fn(),
     };
     const remoteClients = { closeConnection: vi.fn() };
-    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, sshConnections: sshConnections as never, remoteClients: remoteClients as never });
+    const server = new AppBackendServer({ version: 'test', pid: 1, snapshot, sshConnections: sshConnections as never, remoteClients: remoteClients as never });
     const result = await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'connections/runtime/inspect', params: { connectionId: connection.id } });
     expect(result).toMatchObject({ result: { remoteConnections: { connections: [expect.objectContaining({ codexVersion: '0.143.0' })] } } });
     expect(remoteClients.closeConnection).not.toHaveBeenCalled();
@@ -31,7 +32,7 @@ describe('ClawBackendServer', () => {
     expect(sshConnections.inspectVersions).toHaveBeenCalledWith(connection);
   });
 
-  it('routes SSH connection discovery and persistence through clawd', async () => {
+  it('routes SSH connection discovery and persistence through daemon', async () => {
     const snapshot = createTestSnapshot();
     snapshot.general.claudeCodeEnabled = true;
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
@@ -50,14 +51,14 @@ describe('ClawBackendServer', () => {
         transport: {
           type: 'ssh-stdio',
           command: 'ssh',
-          args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+          args: ['devbox', `node ~/${product.homeDirectory}/daemon.mjs --stdio`],
         },
         createdAt: '2026-06-14T10:00:00.000Z',
         updatedAt: '2026-06-14T10:00:00.000Z',
       }),
       checkConnection: vi.fn(),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -108,7 +109,7 @@ describe('ClawBackendServer', () => {
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
-  it('checks and removes remote connections through clawd', async () => {
+  it('checks and removes remote connections through daemon', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [{
       id: 'connection-devbox',
@@ -125,11 +126,11 @@ describe('ClawBackendServer', () => {
       checkConnection: vi.fn().mockResolvedValue({
         ...snapshot.remoteConnections.connections[0],
         status: 'ready',
-        detail: 'Ready (clawd 0.1.0)',
+        detail: 'Ready (daemon 0.1.0)',
         transport: {
           type: 'ssh-stdio',
           command: 'ssh',
-          args: ['devbox', 'node ~/.codex-claw/clawd.mjs connect || exec node ~/.codex-claw/clawd.mjs --stdio'],
+          args: ['devbox', `node ~/${product.homeDirectory}/daemon.mjs connect || exec node ~/${product.homeDirectory}/daemon.mjs --stdio`],
         },
         updatedAt: '2026-06-14T10:01:00.000Z',
       }),
@@ -139,7 +140,7 @@ describe('ClawBackendServer', () => {
       close: vi.fn(),
       closeConnection: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -158,7 +159,7 @@ describe('ClawBackendServer', () => {
           connections: [{
             id: 'connection-devbox',
             status: 'ready',
-            detail: 'Ready (clawd 0.1.0)',
+            detail: 'Ready (daemon 0.1.0)',
           }],
         },
       },
@@ -180,7 +181,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-05T00:00:00.000Z',
@@ -208,7 +209,7 @@ describe('ClawBackendServer', () => {
     expect(remoteClients.closeConnection).toHaveBeenCalledWith('connection-devbox');
   });
 
-  it('updates remote connection source folder settings on the remote clawd', async () => {
+  it('updates remote connection source folder settings on the remote daemon', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     const connection = snapshot.remoteConnections.connections[0]!;
@@ -217,7 +218,7 @@ describe('ClawBackendServer', () => {
       close: vi.fn().mockResolvedValue(undefined),
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -269,7 +270,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn().mockResolvedValue(remoteSnapshot),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -337,7 +338,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn().mockResolvedValue(remoteSnapshot),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -352,7 +353,7 @@ describe('ClawBackendServer', () => {
       params: {
         input: {
           name: 'Dina',
-          folder: '/home/mnmt/src/codex-claw',
+          folder: '/home/mnmt/src/agent-workspace',
           teamId: 'team-pointer',
         },
       },
@@ -377,7 +378,7 @@ describe('ClawBackendServer', () => {
       { ...{
         input: {
           name: 'Dina',
-          folder: '/home/mnmt/src/codex-claw',
+          folder: '/home/mnmt/src/agent-workspace',
           teamId: 'team-remote',
         },
       }, _clientId: 'remote-controller' },
@@ -418,7 +419,7 @@ describe('ClawBackendServer', () => {
         throw new Error(`Unexpected remote method: ${method}`);
       }),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       sshConnections: sshConnections as never,
@@ -441,7 +442,7 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     const driverRpc = new BackendDriverRpc(new Map());
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       driverRpc,
@@ -477,7 +478,7 @@ describe('ClawBackendServer', () => {
     })).rejects.toThrow('This session does not have a project workspace.');
   });
 
-  it('routes remote agent prompts to the owning remote clawd', async () => {
+  it('routes remote agent prompts to the owning remote daemon', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams = [{
@@ -506,7 +507,7 @@ describe('ClawBackendServer', () => {
         .mockResolvedValueOnce(remoteSnapshotAfterPrompt),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -615,7 +616,7 @@ describe('ClawBackendServer', () => {
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -645,7 +646,7 @@ describe('ClawBackendServer', () => {
     await server.close();
   });
 
-  it('projects and removes remote work item assignments through the owning remote clawd', async () => {
+  it('projects and removes remote work item assignments through the owning remote daemon', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams = [{
@@ -715,7 +716,7 @@ describe('ClawBackendServer', () => {
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -775,7 +776,7 @@ describe('ClawBackendServer', () => {
     expect(snapshot.workBacklog.assignments).toStrictEqual({});
   });
 
-  it('routes remote message actions to the owning remote clawd', async () => {
+  it('routes remote message actions to the owning remote daemon', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     snapshot.teams = [{
@@ -809,7 +810,7 @@ describe('ClawBackendServer', () => {
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -888,7 +889,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-local',
       teamId: 'team-local',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-14T10:00:00.000Z',
@@ -898,7 +899,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -1004,7 +1005,7 @@ describe('ClawBackendServer', () => {
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -1100,7 +1101,7 @@ describe('ClawBackendServer', () => {
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,

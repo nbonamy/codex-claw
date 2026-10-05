@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { backendChoicesKey } from '../components/backend-selection';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { i18n } from '../i18n';
-import { configureClawClient } from '../platform-api';
+import { configureAppClient } from '../platform-api';
 import { installElectronTestClientAccessor, setElectronTestClient } from './client';
 import { elementPlusStubs } from './element-plus-stubs';
 
@@ -25,7 +25,7 @@ enableAutoUnmount(afterEach);
 
 afterEach(() => {
   setElectronTestClient();
-  delete window.codexClaw;
-  configureClawClient(undefined);
+  delete window.app;
+  configureAppClient(undefined);
   vi.unstubAllGlobals();
 });

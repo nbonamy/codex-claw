@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createAgentFromInput } from '@codex-claw/core/agent-manager';
-import type { SourceRepository } from '@codex-claw/core/contracts';
+import { createAgentFromInput } from '@workspace/core/agent-manager';
+import type { SourceRepository } from '@workspace/core/contracts';
 import { ProjectCreationService } from '../project-creation-service';
 
 const repository: SourceRepository = {

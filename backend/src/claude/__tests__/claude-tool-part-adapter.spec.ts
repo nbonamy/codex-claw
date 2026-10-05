@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it } from 'vitest';
 import {
   claudeToolFileActivity,
@@ -122,11 +123,11 @@ describe('Claude tool part adapter', () => {
     });
   });
 
-  it('preserves MCP identity for Claw-owned tool presentation', () => {
+  it(`preserves MCP identity for ${product.name}-owned tool presentation`, () => {
     const part = claudeToolPart({
       type: 'tool_use',
       id: 'mcp-1',
-      name: 'mcp__codex_claw__set_status',
+      name: 'mcp__workspace__set_status',
       input: {
         status: 'Testing',
         announcement: { phase: 'start', text: 'A phrase that must not enter renderer state.' },
@@ -135,11 +136,11 @@ describe('Claude tool part adapter', () => {
 
     expect(part).toMatchObject({
       kind: 'mcp',
-      title: 'codex_claw.set_status',
+      title: 'workspace.set_status',
       input: { status: 'Testing' },
       metadata: {
         provider: 'claude',
-        server: 'codex_claw',
+        server: 'workspace',
         tool: 'set_status',
       },
     });
@@ -150,7 +151,7 @@ describe('Claude tool part adapter', () => {
     const part = claudeToolPart({
       type: 'tool_use',
       id: 'mcp-finish',
-      name: 'mcp__codex_claw__finish_turn',
+      name: 'mcp__workspace__finish_turn',
       input: {
         flag: 'ready_for_review',
         announcement: { text: 'A private completion phrase.' },

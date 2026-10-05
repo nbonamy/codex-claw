@@ -2,7 +2,7 @@ import type { Dirent } from 'node:fs';
 import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart, ThreadGoal } from '@codex-claw/core/contracts';
+import type { Agent, BackendSession, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart, ThreadGoal } from '@workspace/core/contracts';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
 import { claudeToolPart, completedClaudeToolPart } from './claude-tool-part-adapter';

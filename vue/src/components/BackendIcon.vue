@@ -5,7 +5,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { AgentBackend } from '@codex-claw/core/contracts';
+import type { AgentBackend } from '@workspace/core/contracts';
 
 const props = defineProps<{ backend: AgentBackend; monochrome?: boolean }>();
 const icons = {

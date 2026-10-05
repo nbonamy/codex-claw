@@ -12,7 +12,7 @@
     </template>
 
     <SettingsSection
-      :title="$t('surface.settingsConnectionsPanel.remoteCodexClawAgents')"
+      :title="$t('surface.settingsConnectionsPanel.remoteAppAgents')"
       title-id="settings-connections-remotes-title"
     >
       <div
@@ -64,7 +64,7 @@
             trigger="manual"
             width="180"
             :teleported="true"
-            popper-class="claw-popover settings-connections-panel__menu-popover"
+            popper-class="app-popover settings-connections-panel__menu-popover"
             @update:visible="setMenuVisible(connection.id, $event)"
           >
             <template #reference>
@@ -107,21 +107,21 @@
       :teleported="true"
       append-to-body
     >
-      <form class="claw-form-dialog" @submit.prevent="saveConnectionSettings">
+      <form class="app-form-dialog" @submit.prevent="saveConnectionSettings">
         <FormDialogField
           :label="$t('surface.settingsConnectionsPanel.sourceFolder')"
           label-for="settings-connection-source-folder"
         >
-          <div class="claw-form-dialog__control claw-form-dialog__input-control settings-connections-panel__source-folder-control">
+          <div class="app-form-dialog__control app-form-dialog__input-control settings-connections-panel__source-folder-control">
             <input
               id="settings-connection-source-folder"
               v-model="settingsSourceFolderPath"
-              class="claw-form-dialog__text-input"
+              class="app-form-dialog__text-input"
               type="text"
               :placeholder="$t('surface.settingsConnectionsPanel.src')"
             />
             <button
-              class="claw-form-dialog__button-control settings-connections-panel__browse"
+              class="app-form-dialog__button-control settings-connections-panel__browse"
               type="button"
               :disabled="!settingsConnection"
               @click="openSettingsFolderPicker"
@@ -136,9 +136,9 @@
         </p>
       </form>
       <template #footer>
-        <button class="claw-button claw-button--tertiary" type="button" @click="closeConnectionSettings"> {{ $t('surface.settingsConnectionsPanel.cancel') }} </button>
+        <button class="app-button app-button--tertiary" type="button" @click="closeConnectionSettings"> {{ $t('surface.settingsConnectionsPanel.cancel') }} </button>
         <button
-          class="claw-button claw-button--primary"
+          class="app-button app-button--primary"
           type="button"
           :aria-busy="savingConnectionSettings"
           :disabled="savingConnectionSettings"
@@ -162,7 +162,7 @@
       :title="$t('surface.settingsConnectionsPanel.addSSHConnection')"
       width="680"
       append-to-body
-      class="claw-dialog"
+      class="app-dialog"
     >
       <div class="settings-connections-panel__dialog">
         <p
@@ -206,8 +206,8 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import { bundledCodexVersion } from '@codex-claw/core/codex-release';
-import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import { bundledCodexVersion } from '@workspace/core/codex-release';
+import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@workspace/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
@@ -406,15 +406,15 @@ onMounted(async () => {
 });
 
 function canUpgrade(connection: RemoteConnection): boolean {
-  const remoteVersion = connectionClawdVersion(connection);
+  const remoteVersion = connectionDaemonVersion(connection);
   return connection.status === 'ready'
     && Boolean((remoteVersion && props.appVersion && remoteVersion !== props.appVersion)
       || connection.codexVersion !== bundledCodexVersion);
 }
 
-function connectionClawdVersion(connection: RemoteConnection): string | null {
-  if (connection.clawdVersion) return connection.clawdVersion;
-  return /\bclawd\s+([^,)]+)/u.exec(connection.detail ?? '')?.[1]?.trim() ?? null;
+function connectionDaemonVersion(connection: RemoteConnection): string | null {
+  if (connection.daemonVersion) return connection.daemonVersion;
+  return /\bdaemon\s+([^,)]+)/u.exec(connection.detail ?? '')?.[1]?.trim() ?? null;
 }
 
 function selectConnectionMenuItem(connection: RemoteConnection, itemId: string): void {

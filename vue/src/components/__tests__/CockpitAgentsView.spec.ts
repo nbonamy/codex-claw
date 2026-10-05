@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import CockpitAgentsView from '../CockpitAgentsView.vue';
 
 describe('CockpitAgentsView', () => {
@@ -14,14 +15,14 @@ describe('CockpitAgentsView', () => {
     });
 
     expect(wrapper.findAll('.cockpit-view__agent-card')).toHaveLength(2);
-    expect(wrapper.text()).toContain('Codex Claw');
+    expect(wrapper.text()).toContain(`${product.name}`);
     expect(wrapper.text()).toContain('Dina');
 
     await wrapper.findAll('.cockpit-view__agent-card')[0]!.trigger('click');
 
     expect(wrapper.emitted('select-agent')).toStrictEqual([[{
       agentId: 'agent-dina',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
     }]]);
   });
 
@@ -36,7 +37,7 @@ describe('CockpitAgentsView', () => {
 
     await wrapper.get('.cockpit-view__add-card').trigger('click');
 
-    expect(wrapper.emitted('add-agent')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('add-agent')).toStrictEqual([['team-app']]);
   });
 
   it('shows one recent grid without team creation affordances', () => {

@@ -2,9 +2,9 @@ import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { AgentBackend, AppSnapshot, CodexResourceSharingStatus, SetCodexResourceSharingInput } from '@codex-claw/core/contracts';
-import type { ProviderHomeSettings, ProviderSetupChoice } from '@codex-claw/core/contracts/provider-setup';
-import { withDiscoveredRuntimePath } from '@codex-claw/core/runtime-discovery';
+import type { AgentBackend, AppSnapshot, CodexResourceSharingStatus, SetCodexResourceSharingInput } from '@workspace/core/contracts';
+import type { ProviderHomeSettings, ProviderSetupChoice } from '@workspace/core/contracts/provider-setup';
+import { withDiscoveredRuntimePath } from '@workspace/core/runtime-discovery';
 import { backendHomeDir } from './state';
 import { createCodexLifecycle } from './codex/provider-lifecycle';
 import { createClaudeLifecycle } from './claude/provider-lifecycle';
@@ -29,7 +29,7 @@ export function createProviderLifecycles(): ReadonlyMap<AgentBackend, ProviderLi
 export function providerHomePaths(backend: AgentBackend, configured: string | undefined) {
   const isolated = path.join(backendHomeDir(), `${backend}-home`);
   const candidate = configured ? path.resolve(configured) : null;
-  // A launcher can inherit Claw's private home; that is not the external setup.
+  // A launcher can inherit App's private home; that is not the external setup.
   const existing = candidate && candidate !== isolated ? candidate : path.join(homedir(), `.${backend}`);
   return { isolated, existing };
 }

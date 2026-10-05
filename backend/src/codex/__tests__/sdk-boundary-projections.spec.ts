@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexConversationSnapshot, CodexSurfaceSkill } from '@codex-app-sdk/core/surface';
-import { decodeClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
+import { decodeAppBackendEvent } from '@workspace/core/backend-protocol/events';
 import { codexSdkFixture, sdkAgent } from './sdk-surface-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
@@ -102,7 +102,7 @@ describe('Codex SDK → app-owned projections', () => {
     conversation('conversation-a').emit({ ...metadata, type: 'conversation.skillsChanged', payload: { cwd: '/repo', status: 'loaded', skills } });
     const event = events.find((entry) => entry.type === 'skills.changed')!;
     const wireEvent = { ...event, seq: 1, occurredAt: metadata.occurredAt };
-    expect(decodeClawBackendEvent(wireEvent)).toBe(wireEvent);
+    expect(decodeAppBackendEvent(wireEvent)).toBe(wireEvent);
     surface.listSkills.mockResolvedValue([{ ...skills[0]!, brandColor: '#123abc', defaultPrompt: 'Review this' }]);
     expect(await driver.listSkills(sdkAgent())).toMatchObject([{ brandColor: '#123abc', defaultPrompt: 'Review this' }]);
   });

@@ -1,5 +1,5 @@
-import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkSource } from '@workspace/core/contracts';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
 
 export type WorkProviderDeviceAuthorization = WorkProviderAuthorization & {
   deviceCode: string;

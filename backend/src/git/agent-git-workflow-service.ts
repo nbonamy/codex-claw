@@ -1,7 +1,7 @@
-import { closeAgentInSnapshot, updateAgentFolder } from '@codex-claw/core/agent-manager';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
-import { agentGitBackendMethods, backendMethods, type AgentGitBackendMethod } from '@codex-claw/core/backend-protocol/methods';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
+import { closeAgentInSnapshot, updateAgentFolder } from '@workspace/core/agent-manager';
+import type { BackendEvent } from '@workspace/core/backend-driver';
+import { agentGitBackendMethods, backendMethods, type AgentGitBackendMethod } from '@workspace/core/backend-protocol/methods';
+import { requireAgentFolder } from '@workspace/core/agent-folder';
 import type {
   Agent,
   AgentGitDiff,
@@ -12,7 +12,7 @@ import type {
   AgentGitUpdateFromBaseResult,
   AgentGitWorkflow,
   AppSnapshot,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import type { DelegatedWorkReportPort } from '../agents/delegated-work-report-service';
 import type { AgentGitService } from './agent-git-service';
 

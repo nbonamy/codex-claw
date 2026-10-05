@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { HostedMcpGateway, hostedMcpServerUrl } from '../hosted-mcp-gateway';
 
 describe('HostedMcpGateway', () => {
-  it('publishes connected provider servers under the Claw loopback origin', () => {
+  it(`publishes connected provider servers under the ${product.name} loopback origin`, () => {
     const credentials = {
       isConnected: vi.fn(() => true),
       authorizationHeader: vi.fn(),

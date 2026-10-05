@@ -1,5 +1,5 @@
 import canvasConfetti, { type Shape } from 'canvas-confetti';
-import type { CelebrationKind } from '@codex-claw/core/contracts';
+import type { CelebrationKind } from '@workspace/core/contracts';
 
 const maximumContinuousDurationMs = 2_400;
 const zIndex = 9_999;

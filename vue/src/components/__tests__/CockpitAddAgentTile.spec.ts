@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
-import type { WorkItem } from '@codex-claw/core/contracts';
+import type { WorkItem } from '@workspace/core/contracts';
 import CockpitAddAgentTile from '../CockpitAddAgentTile.vue';
 
 describe('CockpitAddAgentTile', () => {
@@ -12,8 +12,8 @@ describe('CockpitAddAgentTile', () => {
     await wrapper.get('.new-agent-button__primary').trigger('click');
 
     expect(wrapper.emitted('new-agent')).toStrictEqual([
-      ['team-codex-claw'],
-      ['team-codex-claw'],
+      ['team-app'],
+      ['team-app'],
     ]);
   });
 
@@ -34,7 +34,7 @@ describe('CockpitAddAgentTile', () => {
     await nextTick();
     expect(wrapper.emitted('assign-to-new-agent')).toStrictEqual([[{
       item,
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
     }]]);
   });
 
@@ -58,7 +58,7 @@ function mountTile(props: { draggedWorkItem?: WorkItem | null } = {}) {
   return mount(CockpitAddAgentTile, {
     props: {
       draggedWorkItem: null,
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       ...props,
     },
   });
@@ -67,12 +67,12 @@ function mountTile(props: { draggedWorkItem?: WorkItem | null } = {}) {
 function workItem(): WorkItem {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw#12',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace#12',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix cockpit drag target',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     labels: [],
     createdAt: '2026-06-09T12:00:00.000Z',

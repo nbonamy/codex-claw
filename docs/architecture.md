@@ -1,8 +1,8 @@
-# Codex Claw Architecture
+# Korus Architecture
 
 ## Durable delegated tasks
 
-`clawd` owns durable assignments through `DurableTaskService`. Tasks have an
+`daemon` owns durable assignments through `DurableTaskService`. Tasks have an
 identity and lifetime separate from worker agents and provider conversations.
 Optional `create-agent.task` contracts use existing worktree creation, agent
 creation and prompt admission, including provider/model selection. A stable
@@ -53,14 +53,14 @@ through the worker after parent replacement/removal.
 Provider success covers foreground turns only. Codex readiness can inspect
 turns, queue and requests; the shared seam does not certify detached native
 processes/background tasks. Workers must finish that work before submitting;
-Claw does not claim background process quiescence.
+Korus does not claim background process quiescence.
 
 
 Status: updated for modular desktop/web hosts, 2026-08-07.
 
-Codex Claw is a modular team/agent app with native chat and artifact rendering.
+Korus is a modular team/agent app with native chat and artifact rendering.
 The app implements Codex through Codex app-server and Claude through the local
-Claude Code CLI stream-json surface behind the `clawd` backend. It does not
+Claude Code CLI stream-json surface behind the `daemon` backend. It does not
 launch a terminal emulator as the primary user experience; backend drivers own
 protocol/process communication and the renderer displays app-owned events.
 
@@ -73,15 +73,15 @@ protocol/process communication and the renderer displays app-owned events.
 - Keep Codex as the primary implemented backend and preserve a narrow backend
   seam so coding backends such as Claude can be added without rewriting the UI.
 - Use the Codex app-server protocol as the long-term integration boundary.
-- Keep all app-server communication in `clawd`. Renderer and Electron main code
+- Keep all app-server communication in `daemon`. Renderer and Electron main code
   never own Codex process lifecycle, JSON-RPC request IDs, approval callbacks,
   or auth.
 - Use the SDK's Electron native-capability bridge for product-neutral desktop
   behavior such as clipboard copy, attachment ingestion, safe external links,
-  and voice transcription. Keep Claw-specific native effects in its desktop
+  and voice transcription. Keep Korus-specific native effects in its desktop
   adapter.
 - Use the SDK conversation pane for messages, streaming text, tool calls,
-  approvals, composer behavior, markdown, mermaid, and media. Keep Claw's
+  approvals, composer behavior, markdown, mermaid, and media. Keep Korus's
   workspace/agent shell and artifact panes product-owned.
 - Build theme support from day one with semantic tokens, not hardcoded colors.
 - Keep milestones demoable: product state is teams plus agents, while backend
@@ -98,7 +98,7 @@ protocol/process communication and the renderer displays app-owned events.
 
 ## Product Model
 
-Codex Claw uses "team" for its top-level agent grouping.
+Korus uses "team" for its top-level agent grouping.
 
 Missions are separate app-owned persisted outcomes in `AppSnapshot.missions`.
 A mission references a versioned workflow type, its current stage, structured
@@ -108,7 +108,7 @@ implementation, review, ship). Review records findings without delivering code.
 Ship persists one delivery result per affected repository and completes only
 after every repository has either produced a pull request or merged. Core owns
 its pure validation and transition policy;
-`clawd` serializes mission writes and publishes snapshots only after saving.
+`daemon` serializes mission writes and publishes snapshots only after saving.
 Mission navigation is client-local; each persisted mission belongs to exactly
 one team but is not a team member or provider thread. The active team's sidebar
 shows only its missions, and its eligible repositories come from all agents in
@@ -118,11 +118,11 @@ without transferring transcript ownership.
 Mission navigation uses the same compact workspace-group and session-row
 patterns as project and quick-chat navigation. Sidebar creation persists a
 team-scoped placeholder `New mission`, selects it, and immediately starts the
-requirements stage from a Claw-owned mission home without requiring a repository.
+requirements stage from a Korus-owned mission home without requiring a repository.
 Creation prepares an idle hidden worker but does not submit a provider turn. The
 conversation initially asks “What do you want to build?” and the user's first
 message starts the provider session. The Mission execution contract is appended
-after Claw's normal developer instructions inside a hidden `<context>` block; it
+after Korus's normal developer instructions inside a hidden `<context>` block; it
 never appears as a user message or transcript item. During that conversation,
 the assigned worker replaces the placeholder with a concise outcome through
 the mission-scoped title tool.
@@ -140,16 +140,16 @@ orchestrator conversation on the right. The conversation drives
 ideation and revision; there are no renderer-owned artifact forms. User
 acceptance carries an artifact forward and starts the next stage, while prior
 artifacts remain available for inspection.
-Mission execution is owned by `clawd`: selected team member profiles supply
+Mission execution is owned by `daemon`: selected team member profiles supply
 provider settings for stage work. Requirements and Tickets keep the same hidden
-orchestrator and provider conversation; `clawd` refreshes its hidden Mission
+orchestrator and provider conversation; `daemon` refreshes its hidden Mission
 context and starts the Tickets turn after approval. Later stage kickoffs are also
 queued automatically after approval. Requirements and tickets run
-from `$CODEX_CLAW_HOME/missions/<mission-id>`. Each accepted ticket names exactly
-one repository represented by the Mission team. When code work begins, `clawd`
+from `$APP_HOME/missions/<mission-id>`. Each accepted ticket names exactly
+one repository represented by the Mission team. When code work begins, `daemon`
 creates a sibling managed Git worktree only for each affected repository. Every
 worktree uses the same human-readable Mission suffix and branch name; the normal
-repository basename still distinguishes its physical path. Claw does not create a
+repository basename still distinguishes its physical path. Korus does not create a
 special multi-repository parent directory or rewrite local dependency paths.
 Canonical Markdown artifacts live under the mission home `artifacts/` directory.
 During Tickets, Mission-scoped upserts assign stable app-owned ticket IDs and
@@ -158,8 +158,8 @@ observe the backlog as it develops. External tracker identifiers remain optional
 references assigned by the configured tracker.
 The Mission snapshot carries their revisions and sizes rather than exposing file
 access to the renderer or provider.
-Runs persist assignment, Claw-owned Mission skill paths, proposal, status, and feedback.
-`clawd` materializes those stage skills under the Mission home before a run
+Runs persist assignment, Korus-owned Mission skill paths, proposal, status, and feedback.
+`daemon` materializes those stage skills under the Mission home before a run
 starts. Mission workflow behavior therefore stays provider-neutral and does not
 depend on a user's installed skill catalog. Repository instructions still
 provide project and tracker conventions, but they cannot replace Mission stage
@@ -180,7 +180,7 @@ repository.
 `write-mission-artifact` provide the canonical handoff between stage agents;
 writes are limited to the caller's assigned stage and use optimistic artifact
 revisions. Implementation agents submit ticket-scoped code and test evidence;
-`clawd` aggregates it into the canonical implementation artifact. Other stages
+`daemon` aggregates it into the canonical implementation artifact. Other stages
 submit or revise proposals only after their stage artifact has been written.
 Only the user can accept Requirements, Tickets, and Review proposals and approve
 advancement through those gates. Implementation evidence is aggregated automatically
@@ -189,12 +189,12 @@ Configured Pocock tracker instructions remain authoritative
 for published tickets; mission tickets retain canonical references and record local
 implementation acceptance, not external issue status. Mission ticketing proceeds
 without tracker setup when no tracker is already configured.
-The workflow reuses Claw's diff and explicit commit/push/PR controls; agents do not
+The workflow reuses Korus's diff and explicit commit/push/PR controls; agents do not
 publish or merge automatically. External ticket refresh, cross-repository branch
 integration, and automatic repair of local relative dependencies are not part of
 this execution policy.
 
-Stage approval is one revision-checked `clawd` command. It accepts the proposal,
+Stage approval is one revision-checked `daemon` command. It accepts the proposal,
 advances or completes the workflow when the stage is ready, and queues the next
 run in the same persisted Mission transaction. Renderer components never compute
 intermediate Mission revisions or chain separate accept, advance, and run writes.
@@ -246,9 +246,9 @@ type AgentStatus =
 
 Codex app-server owns Codex conversation state and thread history in
 `CODEX_HOME`. The Claude conversation host owns the normalized Agent SDK
-session transcript. Codex Claw owns only product state: teams, agents,
+session transcript. Korus owns only product state: teams, agents,
 selected folders, the global source folder, view preferences, theme
-preference, workspace identity, provider conversation references, and Claw
+preference, workspace identity, provider conversation references, and Korus
 metadata, including predefined typed thread flags authored through its MCP
 server. `AppSnapshot` contains no provider transcript. Persisted Git remote
 identities are canonical and credential-free.
@@ -279,16 +279,16 @@ GitHub repository, and explicit repository URL sources as **Add project**.
 
 The source folder is a global convenience setting. It is not team membership,
 it is not an agent backend setting, and it does not replace the explicit folder
-stored on each agent. Instead, it gives the app and Claw MCP tools a common
+stored on each agent. Instead, it gives the app and Korus MCP tools a common
 place to discover local source repositories when creating agents or worktrees.
 
-Codex Claw persists the selected source folder path, whether initial detection
+Korus persists the selected source folder path, whether initial detection
 has already run, and up to five recent repository names. On a fresh app state,
-`clawd` may initialize the source folder once from common source-code
+`daemon` may initialize the source folder once from common source-code
 locations. After the user clears or changes the folder, the app respects that
 explicit choice and does not keep auto-detecting behind their back.
 
-Repository discovery is read-only and shallow. `clawd` scans only direct
+Repository discovery is read-only and shallow. `daemon` scans only direct
 children of the configured source folder because the source folder belongs to
 the backend location, not to a desktop window. A child with a `.git` directory
 is a clone, and a child with a `.git` file pointing into a parent repo worktree
@@ -301,97 +301,97 @@ Creating a project, and listing and creating worktrees, are backend operations.
 Project creation makes one empty direct child of the configured source folder
 without initializing Git. Discovery can show
 shallow worktree hints from source-folder metadata, but an explicit worktree
-list runs `git worktree list --porcelain` inside `clawd`. Creating a worktree
+list runs `git worktree list --porcelain` inside `daemon`. Creating a worktree
 runs through the shared backend worktree manager, which creates the checkout,
 initializes it, and then refreshes discovery. Renderer code, Git workflows, and
 MCP tools request this through typed app interfaces; they never scan arbitrary
 folders, spawn Git, or run initialization independently.
 
 Repositories may provide deterministic setup under `.agents/worktree/`. On
-macOS, Claw selects `setup-macos.sh` and falls back to `setup`; Linux selects
+macOS, Korus selects `setup-macos.sh` and falls back to `setup`; Linux selects
 `setup-linux.sh` and falls back to `setup`; Windows selects `setup-win.ps1` and
 falls back to `setup`. Only the first applicable file runs. An empty applicable
 file is an intentional no-op. When no repository setup applies, the user's
-worktree-initialization setting may let `clawd` copy local `.env` and `.env.*`
+worktree-initialization setting may let `daemon` copy local `.env` and `.env.*`
 files into the new checkout, then detect every supported ecosystem at the
 worktree root and restore their dependencies sequentially. Environment files
 come from an existing default-branch worktree when available, then the source
-checkout, then another existing worktree. Claw preserves relative paths, skips
+checkout, then another existing worktree. Korus preserves relative paths, skips
 templates, generated dependency/build folders, and nested Git checkouts, and
 never overwrites a file already present in the new worktree. Repository setup
 always takes precedence and suppresses both environment copying and ecosystem
 detection. Existing worktrees are not initialized again. Local and remote
-worktrees follow the same contract on the `clawd` that owns their filesystem.
+worktrees follow the same contract on the `daemon` that owns their filesystem.
 
 The renderer uses source repositories only as creation affordances: Settings
 chooses or clears the source folder; **Add project** can create a project folder,
 open a discovered local repository, clone a connected GitHub repository, or
 clone an explicit repository URL; and repository-level session creation can use the default
-branch or create a named worktree. The Claw MCP server exposes the same
+branch or create a named worktree. The Korus MCP server exposes the same
 app-owned operations with `list-repos`, `list-worktrees`, `create-worktree`,
 and `create-agent`.
 
 Agents created through delegation keep a durable link to the agent that
 created them. When the user finishes delegated work through the pull-request
-or merge flow, `clawd` tells the idle worker which Git action Claw is taking
+or merge flow, `daemon` tells the idle worker which Git action Korus is taking
 over and asks for a whole-task handoff before touching the branch. The worker
 is told not to make further changes or speculate about delivery; after the Git
-operation succeeds, Claw adds its authoritative PR or direct-merge result and
+operation succeeds, Korus adds its authoritative PR or direct-merge result and
 delivers the report to the delegating agent. This ordering also keeps a linked
 worktree alive until the worker finishes its handoff. When merge cleanup removes
-that worktree, `clawd` delivers the handoff and closes the worker instead of
+that worktree, `daemon` delivers the handoff and closes the worker instead of
 moving it onto the shared base checkout. The renderer only
 presents the opt-in control when that relationship resolves to a live agent.
 Pull-request and merge progress can be dismissed while the request continues;
 the renderer reports the final result through a notification without allowing
 a second Git operation to race the first one.
 
-Pull requests created by Claw are tracked on their owning agent with the
+Pull requests created by Korus are tracked on their owning agent with the
 repository, branch, head commit, provider state, and timestamps. A generic
-`clawd` runtime scheduler polls only those known PRs through the work-provider
+`daemon` runtime scheduler polls only those known PRs through the work-provider
 adapter, once at startup and then periodically. When GitHub reports a merge,
 the sidebar shows an agent-scoped cleanup alert. A closed but unmerged PR uses
 the same terminal-state alert with explicit warning copy and preserves its
 remote branch. Cleanup remains explicit and is accepted only for an idle agent
-whose linked worktree is unshared, clean, and still points at the PR head Claw
+whose linked worktree is unshared, clean, and still points at the PR head Korus
 recorded.
 
 ## Process Architecture
 
-The app is extracted from an Electron-main backend into a separate `clawd`
+The app is extracted from an Electron-main backend into a separate `daemon`
 process. `docs/backend-architecture.md` is the canonical extraction record, and
 `docs/protocol.md` is the concrete bidirectional message catalog. The target
 invariant is that Electron main is a desktop adapter and stdio client; provider
 drivers, provider protocols, app state, backend-owned filesystem work, git,
-automations, worktree path policy, and agent runtime state belong behind `clawd`.
+automations, worktree path policy, and agent runtime state belong behind `daemon`.
 That includes file previews: desktop and future non-desktop clients may request
-file content from `clawd`, but they do not read backend-owned agent workspace
+file content from `daemon`, but they do not read backend-owned agent workspace
 paths themselves. If model output includes an absolute or `file://` link, the
 client normalizes it to a path relative to the active agent folder when
-possible and otherwise forwards the absolute path to the owning `clawd`. This
+possible and otherwise forwards the absolute path to the owning `daemon`. This
 keeps remote previews on the backend host while allowing transcript links to
 files outside the repository.
 
-The Codex SDK defines the composable provider-runtime foundation for `clawd`.
+The Codex SDK defines the composable provider-runtime foundation for `daemon`.
 Its `CodexAppBackend` owns one shared `CodexSurface` and accepts named app
-modules; Claw's Codex agent adapter has a host-owned lifecycle so it can sit at
+modules; Korus's Codex agent adapter has a host-owned lifecycle so it can sit at
 that app-module boundary once the SDK artifact containing the host is consumed.
 Generic Codex concerns remain in the SDK, while teams, agents, collaboration,
 automations, work integrations, and the provider-neutral `AgentBackendDriver` seam
-remain in Claw. The SDK backend is embedded in `clawd`; it is not another
-process and does not replace Claw's existing Claude driver boundary.
+remain in Korus. The SDK backend is embedded in `daemon`; it is not another
+process and does not replace Korus's existing Claude driver boundary.
 
-Product snapshot mutation is backend-owned. `clawd` applies coordination
+Product snapshot mutation is backend-owned. `daemon` applies coordination
 events to the authoritative `AppSnapshot` and is the only process that persists
 it. Provider conversations follow a separate path: the Codex SDK owns its
 snapshot and reducer, while the Claude conversation host owns one Claude
-snapshot and reducer. `clawd` transports one bounded provider reset followed by
+snapshot and reducer. `daemon` transports one bounded provider reset followed by
 revisioned provider-native deltas. Electron forwards those frames without
 reducing them, and the renderer maintains one per-agent provider replica.
-Streaming therefore never grows an app snapshot or crosses a shared Claw
+Streaming therefore never grows an app snapshot or crosses a shared Korus
 transcript reducer.
 
-Claw may derive read-only coordination projections such as sidebar activity,
+Korus may derive read-only coordination projections such as sidebar activity,
 plans, diffs, file activity, unread state, and agent status from provider
 events. Those projections cannot construct, replace, or mutate provider
 messages or turns.
@@ -401,24 +401,24 @@ derived `ClientState` for details such as source-folder dialog defaults and
 whether display sleep should be prevented; Electron runs the native APIs but
 does not derive those decisions from agent/product state.
 
-`@codex-claw/core` is intentionally runtime-thin: contracts, protocol types, and pure
+`@workspace/core` is intentionally runtime-thin: contracts, protocol types, and pure
 normalization helpers only. Node filesystem persistence such as the roster and
-settings files belongs in `clawd`, so desktop, mobile, and web clients share the
+settings files belongs in `daemon`, so desktop, mobile, and web clients share the
 same backend contract without inheriting local file-read authority.
 
 The workspace layers are explicit:
 
-- `@codex-claw/core` owns platform-neutral contracts, reducers, and client
+- `@workspace/core` owns platform-neutral contracts, reducers, and client
   capability ports;
-- `@codex-claw/vue` owns the reusable Vue product shell and receives a typed
-  `ClawClient` at bootstrap;
-- `@codex-claw/electron` composes preload IPC and desktop-native capabilities;
-- `@codex-claw/web` composes the same Vue shell with an Express-owned WebSocket
+- `@workspace/vue` owns the reusable Vue product shell and receives a typed
+  `AppClient` at bootstrap;
+- `@workspace/electron` composes preload IPC and desktop-native capabilities;
+- `@workspace/web` composes the same Vue shell with an Express-owned WebSocket
   adapter built on the SDK web socket ports; and
-- `@codex-claw/backend` remains the product authority and agent runtime.
+- `@workspace/backend` remains the product authority and agent runtime.
 
 The initial web server binds to `127.0.0.1`, uses an explicit fixed
-`local-single-user` identity, and starts a dedicated stdio `clawd` child. The
+`local-single-user` identity, and starts a dedicated stdio `daemon` child. The
 browser can invoke only an allowlisted set of product operations; desktop-only
 methods are rejected server-side. It is intentionally a local, single-user
 host and is not a public deployment foundation.
@@ -441,20 +441,20 @@ to cover every workspace. Web additionally exposes `preview:web`.
 
 Host capabilities are enforced at both UI and backend boundaries. Electron
 advertises native dialogs, app lifecycle, updates, Dock badges, Open In,
-Appshots, the embedded browser, and Computer Use. Web advertises none of those,
-and its `clawd` runtime omits Computer Use and embedded-browser MCP tools even
+Screenshots, the embedded browser, and Computer Use. Web advertises none of those,
+and its `daemon` runtime omits Computer Use and embedded-browser MCP tools even
 if a persisted desktop preference had enabled them. Voice transcription is an
 SDK-native capability: the SDK composer hides the microphone when a host does
-not provide transcription, so Claw does not maintain a duplicate flag.
+not provide transcription, so Korus does not maintain a duplicate flag.
 
 ```mermaid
 flowchart LR
-  Renderer["Reusable @codex-claw/vue UI"]
+  Renderer["Reusable @workspace/vue UI"]
   Preload["Preload: typed bridge"]
   Main["Electron main: desktop adapter"]
-  Client["ClawBackendClient"]
-  Backend["clawd"]
-  Web["Express + Claw WebSocket adapter"]
+  Client["BackendClient"]
+  Backend["daemon"]
+  Web["Express + Korus WebSocket adapter"]
   Browser["Web browser"]
   Store["Backend app state directory"]
   Server["Codex app-server / Claude Code"]
@@ -482,13 +482,13 @@ that truly require Electron APIs. The main-window adapter persists normal
 window bounds and maximized state locally as they change, and restores them
 only when the bounds still intersect a connected display.
 
-Appshots are one such desktop effect. A passive native key monitor recognizes
+Screenshots are one such desktop effect. A passive native key monitor recognizes
 left-and-right modifier chords, while the bundled Computer Use helper captures
 the frontmost macOS window and reports its Screen Recording trust. Electron
 routes permission status through the app-owned backend protocol and delivers
 the resulting PNG to the active renderer composer as a normal SDK attachment.
 
-Spoken agent acknowledgments are another native desktop effect. `clawd` owns
+Spoken agent acknowledgments are another native desktop effect. `daemon` owns
 the always-exposed provider-neutral MCP tool and applies persisted enablement,
 dictated-input, mute, and selected-agent policy before asking the connected
 client to queue a bounded phrase. Stable developer instructions require the
@@ -504,20 +504,20 @@ best-effort.
 
 Modules:
 
-- `ClawBackendProcessClient`: starts the local `clawd` command, frames
+- `AppBackendProcessClient`: starts the local `daemon` command, frames
   JSON-RPC over stdio, tracks request IDs/timeouts, restarts the dev backend
   bundle, and exposes app-owned requests to main-process callers.
 - `AppController`: desktop IPC and native-affordance adapter. Product state,
   provider operations, client request ownership, durable snapshot persistence,
   automations, work integrations, git/file/source operations, and system permission
-  API calls belong in `clawd`; Electron forwards app-owned RPC requests, fans
+  API calls belong in `daemon`; Electron forwards app-owned RPC requests, fans
   backend events to renderer windows, and registers the SDK native bridge.
 
 Future transport options:
 
-- run local `clawd` as an always-on daemon over a Unix socket or Windows named
+- run local `daemon` as an always-on daemon over a Unix socket or Windows named
   pipe;
-- use SSH stdio to connect Electron to a remote `clawd`;
+- use SSH stdio to connect Electron to a remote `daemon`;
 - use Electron `utilityProcess` with message ports only if packaging forces it.
 
 The protocol itself must stay transport-neutral. Stdio is the first transport,
@@ -527,7 +527,7 @@ backend. See `docs/protocol.md` for supported methods in both directions.
 
 ### Backend Seam
 
-Codex Claw should not pretend to be provider-agnostic on day one. The product
+Korus should not pretend to be provider-agnostic on day one. The product
 is Codex-native and should expose Codex semantics where they matter: app-server
 threads, turns, steering, approvals, diffs, and persisted Codex sessions.
 
@@ -572,7 +572,7 @@ any archived conversation still referenced by a live agent. Resume searches
 archived history and performs a compensating switch: restore and load the
 target, archive the displaced conversation, then persist the new reference.
 
-`BackendEvent` is produced by backend drivers inside `clawd`. Coordination
+`BackendEvent` is produced by backend drivers inside `daemon`. Coordination
 events use app-owned payloads. Conversation traffic uses app-owned outer frames
 (`codex.conversation*` or `claude.conversation*`) containing the matching
 provider snapshot or event. The outer frame provides agent identity, provider
@@ -589,18 +589,18 @@ renderer UI. The required path is:
    `BackendConversationRef`, `BackendModelOption`, and `BackendSkillSummary`.
    Provider-owned conversation snapshots and events remain provider-specific.
 2. Add or extend an optional `AgentBackendDriver` method or declared backend
-   capability behind `clawd`. Optional methods are the parity boundary when
+   capability behind `daemon`. Optional methods are the parity boundary when
    Codex and Claude do not support the same feature yet.
 3. Keep provider details inside backend driver/adapter code such as
    `backend/src/codex/*` or `backend/src/claude/*`.
 4. Route renderer requests through app controller/preload IPC and
-   `ClawBackendClient` using the app-owned methods documented in
+   `BackendClient` using the app-owned methods documented in
    `docs/protocol.md`. Renderer components may branch on app capabilities or
    empty data, but must not import Codex/Claude protocol types or know where a
    backend stores history.
 5. Test the seam: fake backend-driver routing in controller tests, concrete
    provider host tests for protocol behavior, provider replica revision tests,
-   and renderer component tests for Claw-owned decorations.
+   and renderer component tests for Korus-owned decorations.
 
 Conversation history is the canonical example. The searchable Resume Session
 dialog opened from the sidebar agent menu renders `ConversationSummary` rows
@@ -613,13 +613,13 @@ The renderer knows only the app-owned `storageState`, not either storage model.
 
 The preload script exposes a narrow typed bridge. It should be the only
 renderer entrypoint to Electron APIs. This bridge is desktop-specific: mobile
-and web clients should talk to `clawd` over the backend protocol instead of
+and web clients should talk to `daemon` over the backend protocol instead of
 depending on Electron IPC or local filesystem access. File surfaces are
 product-level backend requests such as `listAgentFiles` and `previewAgentFile`
 by `agentId`; clients must not read workspace files themselves.
 
 ```ts
-type CodexClawApi = {
+type AppApi = {
   getSnapshot(): Promise<AppSnapshot>
   listBackendModels(agentId: string): Promise<BackendModelOption[]>
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>
@@ -667,19 +667,19 @@ Renderer layers:
   sits beside a tabbed right workspace, initially hosting Browser and GitHub
   Review, while focused document, plan, and read-only source previews can take
   over that area without forcing every artifact into the chat column. Opening
-  the workspace before a tab exists shows a Claw-owned launcher for the
+  the workspace before a tab exists shows a Korus-owned launcher for the
   currently supported surfaces;
 - a provider-replica registry that routes revisioned conversation frames to the
   addressed per-agent SDK/host reducer without interpreting transcript events;
 - the SDK `CodexConversationPane` for product-neutral message, tool, approval,
   composer, markdown, mermaid, media, clipboard, attachment, and transcription
-  behavior; the Claw wrapper only adapts provider capabilities and product
+  behavior; the Korus wrapper only adapts provider capabilities and product
   events;
 - local generated-media paths remain backend/main data. Electron replaces them
-  with opaque `codex-claw-media` URLs at the renderer boundary and serves only
+  with opaque `app-media` URLs at the renderer boundary and serves only
   paths previously registered by main; the renderer never receives a local
   filesystem path or broad file access;
-- git status and repository comparisons are provider-neutral `clawd` behavior
+- git status and repository comparisons are provider-neutral `daemon` behavior
   owned by `AgentGitService`, not backend-driver capabilities. Runtime status
   exposes branch, uncommitted, unstaged, staged, and recent-commit summaries;
   providers may additionally contribute their native current-turn diff through
@@ -689,8 +689,8 @@ Renderer layers:
   resolve or pass local workspace roots for file previews. Source highlighting
   uses Shiki. GitHub Review is a right-workspace tab: clicking the active
   agent's git statistics can select branch, uncommitted, unstaged, staged,
-  recent-commit, or last-turn changes from `clawd`, then parses and renders
-  every file with Claw-owned Vue components;
+  recent-commit, or last-turn changes from `daemon`, then parses and renders
+  every file with Korus-owned Vue components;
 - theme provider that applies semantic CSS custom properties to the document.
 
 Streaming preserves structural identity outside the row that changed. The
@@ -704,17 +704,17 @@ compete with layout and paint work for the full history.
 
 Renderer IPC and the backend protocol should be app-domain messages, not
 app-server messages. Renderer-to-Electron IPC remains a desktop preload detail;
-Electron forwards those calls to `clawd` as app-owned JSON-RPC methods.
+Electron forwards those calls to `daemon` as app-owned JSON-RPC methods.
 `docs/protocol.md` is the authoritative method catalog for the backend
 protocol.
 
 Every emitted backend event gets a monotonically increasing sequence number so
 the renderer can detect gaps after reloads.
 
-The desktop adapter owns the `codex-claw://` deep-link scheme and converts
+The desktop adapter owns the `korus://` deep-link scheme and converts
 accepted URLs into typed `AppCommand` values; raw URLs never cross preload.
-`codex-claw://new?prompt=...` submits to the active agent, while
-`codex-claw://agents/<agent-id>?prompt=...` selects a specific agent and submits
+`korus://new?prompt=...` submits to the active agent, while
+`korus://agents/<agent-id>?prompt=...` selects a specific agent and submits
 to it. Prompt values must be URL encoded. Submission is the default because the
 scheme is an automation interface. Add `submit=false` to prefill and focus the
 composer without submitting. A link with no prompt only selects the agent.
@@ -738,7 +738,7 @@ but remains owned by the corresponding provider module.
 On renderer reload, the client calls `snapshot/get` and receives the current
 authoritative app state, the last backend event sequence number, and
 backend-derived client state. Electron and renderer code must not fabricate
-product state when `clawd` is unavailable.
+product state when `daemon` is unavailable.
 
 ## Codex App-Server Integration
 
@@ -753,7 +753,7 @@ local.
 Connection lifecycle:
 
 1. Start app-server.
-2. Send `initialize` with `clientInfo.name = "codex_claw"` and
+2. Send `initialize` with `clientInfo.name = "workspace"` and
    `capabilities.experimentalApi = true`.
 3. Send `initialized`.
 4. Call `thread/start` or `thread/resume` for the selected agent folder.
@@ -783,24 +783,24 @@ codex app-server generate-ts --experimental --out <dir>
 ```
 
 Those generated types live in the local `codex-app-sdk` package. The package
-also owns typed bidirectional request routing and transport framing. Codex Claw
-depends on that package through a local npm dependency while `clawd` keeps all
+also owns typed bidirectional request routing and transport framing. Korus
+depends on that package through a local npm dependency while `daemon` keeps all
 product policy and app-event adaptation. Renderer and Electron main code still
 depend on app-owned IPC/event types instead of generated provider types.
 
 ## Agent Collaboration MCP
 
-Codex Claw's MCP server is the app-owned collaboration protocol for agents.
-It lives in `clawd`, exposes app-owned communication tools, stores runtime inbox
+Korus's MCP server is the app-owned collaboration protocol for agents.
+It lives in `daemon`, exposes app-owned communication tools, stores runtime inbox
 state, and emits app-owned agent updates back to Electron as backend events.
 Detailed behavior lives in `docs/mcp.md`.
 
 Backend drivers enable this server in backend-specific ways. Codex receives the
 server through `thread/start.config` or `thread/resume.config` entries for
-`mcp_servers.codex_claw`. During MCP elicitation development, the scoped
+`mcp_servers.workspace`. During MCP elicitation development, the scoped
 `default_tools_approval_mode = "approve"` override stays disabled so the
-approval UI path is exercised; we expect to bring it back for normal Claw MCP
-collaboration after that flow is proven. Future backends should keep the Claw
+approval UI path is exercised; we expect to bring it back for normal Korus MCP
+collaboration after that flow is proven. Future backends should keep the Korus
 tool semantics and only change the backend-specific enablement path.
 
 ## Codex Exec SDK Decision
@@ -810,7 +810,7 @@ wraps `codex exec --experimental-json`, spawns the CLI, and streams JSONL
 events over stdin/stdout. That is a good spike tool and may help bootstrap a
 throwaway single-agent demo quickly.
 
-For Codex Claw proper, use app-server directly from the first implementation
+For Korus proper, use app-server directly from the first implementation
 phase if possible. The product needs app-server concepts the SDK does not fully
 model: thread list/read/resume, active turn steering, approval routing, turn
 diff updates, server-initiated requests, and future realtime/control surfaces.
@@ -827,7 +827,7 @@ shared transport/type boundary used by the current implementation.
 
 `codex-app-sdk` is deliberately product-neutral:
 
-- it uses Codex naming only and contains no Codex Claw identifiers;
+- it uses Codex naming only and contains no Korus identifiers;
 - generated protocol types are the source of truth for requests, results,
   notifications, and server-initiated requests;
 - its Electron helpers provide typed app-server IPC plus product-neutral native
@@ -838,23 +838,23 @@ shared transport/type boundary used by the current implementation.
 - its Codex conversation replica owns message and turn identity, optimistic
   submissions, streaming, history reconciliation, queues, mutation results,
   and other generic conversation lifecycle state;
-- Codex Claw wrappers map approval presets, plan mode, message actions, and
+- Korus wrappers map approval presets, plan mode, message actions, and
   design tokens onto those primitives.
 
 The SDK boundary is enforced by tests. Generic Codex behavior and regressions
-are specified in the SDK. Claw tests only its routing envelope, adapter policy,
-controller wiring, and Claw-specific decorations. A missing generic behavior is
-implemented in the SDK first; Claw must not patch over it with a parallel
+are specified in the SDK. Korus tests only its routing envelope, adapter policy,
+controller wiring, and Korus-specific decorations. A missing generic behavior is
+implemented in the SDK first; Korus must not patch over it with a parallel
 message store, optimistic row, history reducer, queue reducer, or turn-mutation
 state machine.
 
 ## Conversation Ownership
 
 Conversation state remains native to its provider host rather than being
-translated into one Claw transcript model:
+translated into one Korus transcript model:
 
 - Codex app-server events enter the `codex-app-sdk` conversation replica in
-  `clawd`. Claw adds an outer envelope with agent id, thread id, and revision,
+  `daemon`. Korus adds an outer envelope with agent id, thread id, and revision,
   but does not translate the contained snapshot or event.
 - Electron forwards that envelope unchanged. The renderer routes it to the
   addressed per-agent SDK replica, and `CodexConversationPane` renders the SDK
@@ -865,17 +865,17 @@ translated into one Claw transcript model:
   optimistic first prompt across the provisional agent key to the authoritative
   thread id and reconciles it with the matching SDK message.
 - The Claude conversation host similarly owns its normalized Claude snapshot
-  and reducer. Provider parity is expressed through Claw capabilities and
+  and reducer. Provider parity is expressed through Korus capabilities and
   product actions, not a lowest-common-denominator transcript.
-- Claw may derive read-only coordination projections—agent status, unread
+- Korus may derive read-only coordination projections—agent status, unread
   state, plans, diffs, file activity, and sidebar indicators—from provider
   events. Those projections never construct, replace, reorder, or mutate
   provider messages or turns.
 
 This boundary is the default design test for conversation changes: if a change
-would make Claw remember provider message identity or reproduce an SDK reducer
+would make Korus remember provider message identity or reproduce an SDK reducer
 transition, the seam is wrong. Put the behavior in the provider SDK/host and
-make Claw's integration thinner.
+make Korus's integration thinner.
 
 ## Theming
 
@@ -910,7 +910,7 @@ The renderer applies a theme by writing CSS custom properties on
 - `--diff-removed`
 
 id8 already uses CSS custom properties in `@id8/shared/styles/variables.css`;
-Codex Claw should keep that pattern but rename tokens to app-owned names rather
+Korus should keep that pattern but rename tokens to app-owned names rather
 than depending on id8 branding.
 
 For VS Code themes, add an importer that maps `workbench.colorCustomizations`
@@ -920,10 +920,10 @@ Shiki theme or equivalent syntax theme adapter.
 
 ## Persistence
 
-Durable persistence is a small set of versioned JSON files under the `clawd`
-backend home. The default backend home is `~/.codex-claw`; `CODEX_CLAW_HOME` is
+Durable persistence is a small set of versioned JSON files under the `daemon`
+backend home. The default backend home is `~/.korus`; `APP_HOME` is
 the only supported override. Electron does not pass its app data directory to
-`clawd`, and only the backend reads and writes these files:
+`daemon`, and only the backend reads and writes these files:
 
 ```
 roster.json                       active team, teams, agents, automations, missions,
@@ -959,9 +959,9 @@ Not persisted: subagent operations and activities (nothing reads them), plans
 and goals that are finished, plan reviews once resolved, and the Codex approval
 policy, reviewer and sandbox when a preset already defines them.
 
-Move to SQLite only when `clawd` needs queryable app state beyond what provider
+Move to SQLite only when `daemon` needs queryable app state beyond what provider
 backends already persist. Conversation history should not be duplicated in
-Codex Claw unless we need an app-specific cache for performance.
+Korus unless we need an app-specific cache for performance.
 
 Runtime catalog data is not persisted. The renderer warms model
 catalogs once per backend at startup and caches skills and file listings by
@@ -971,10 +971,10 @@ writes are coalesced so bursts of backend metadata events write only the latest
 durable projection.
 
 Engine settings show safe cached account metadata and offer app-only
-Connect/Disconnect controls. Disconnect disables the engine in Claw without
+Connect/Disconnect controls. Disconnect disables the engine in Korus without
 logging out its CLI or removing agents. Skills-only changes keep the same home
 and roster, require idle agents, and preserve private skills rather than
-overwriting them. Changing between a separate Claw home
+overwriting them. Changing between a separate Korus home
 and the existing CLI setup is an explicit roster reset: the client confirms the
 exact local agent IDs, including Quick Chats, with an acknowledgment checkbox.
 `ProviderSetup` checks the roster again after asynchronous preparation, refuses
@@ -984,7 +984,7 @@ Remote agents and other engines remain untouched. The runtime makes verified
 roster/settings backups first; a failed switch restores the previous home and
 roster. App RPC mutations are paused during the switch. Original provider
 conversation files remain in the old home, but switching back does not recreate
-their Claw agents.
+their Korus agents.
 
 An in-progress code review is app-owned state, not provider transcript state.
 The visible reviewer agent carries one active review ledger containing rounds, structured
@@ -1010,7 +1010,7 @@ the target agent and its conversation remain intact. Every new round receives
 the cumulative ledger inside a `<context>`
 block. Its exclusions therefore include every finding skipped by the user
 across the review, not only exclusions from the immediately preceding round.
-`clawd` persists the ledger and opaque reviewer session reference in `roster.json`
+`daemon` persists the ledger and opaque reviewer session reference in `roster.json`
 so reloads and agent switches do not lose unfinished arbitration while the Review
 pane remains open. Finishing the review or closing its pane removes the ledger;
 reopening Review starts from zero, and completed findings are not permanent project
@@ -1021,7 +1021,7 @@ history.
 Work backlog providers are app-owned integrations, not agent backend features.
 The renderer consumes provider-neutral `WorkRepository` and `WorkItem`
 contracts and emits assignment intents. GitHub-specific OAuth, REST payloads,
-token persistence, and provider polling live in `clawd`; Electron supplies
+token persistence, and provider polling live in `daemon`; Electron supplies
 desktop-only services such as browser opening through backend-initiated client
 callbacks.
 
@@ -1031,16 +1031,16 @@ provider-specific backlog configuration. GitHub currently stores the selected
 repository id and optional tag name as its backlog configuration. Secret
 material belongs behind the backend token-store port. The current local
 implementation stores token data in an owner-readable JSON file under
-`~/.codex-claw`; future packaged builds can replace that port with a native
+`~/.korus`; future packaged builds can replace that port with a native
 keychain or credential-helper implementation without moving ownership back to
 Electron.
 
 GitHub uses OAuth device flow for the desktop app. It requires a public client
-ID but no client secret or localhost callback route. `clawd` resolves the client
-ID from Settings, then `CODEX_CLAW_GITHUB_CLIENT_ID`, then an optional packaged
-backend default baked into official `clawd` builds. That packaged value is a
+ID but no client secret or localhost callback route. `daemon` resolves the client
+ID from Settings, then `APP_GITHUB_CLIENT_ID`, then an optional packaged
+backend default baked into official `daemon` builds. That packaged value is a
 public OAuth app identifier, not a secret, and belongs in the backend package so
-standalone `clawd` can run without Electron. Actual GitHub access tokens remain
+standalone `daemon` can run without Electron. Actual GitHub access tokens remain
 outside the persisted app snapshot in the backend token store.
 Starting device flow only returns the code to the renderer; opening GitHub is a
 separate user action so the user can see and copy the code before the browser
@@ -1050,7 +1050,7 @@ best-effort prefill. After the device flow starts, the renderer polls the
 work-provider completion endpoint on the provider interval
 instead of requiring a manual "finish connection" step.
 Device flow produces a GitHub App user access token, not a permanent
-device-bound credential. When GitHub returns expiring-token metadata, `clawd`
+device-bound credential. When GitHub returns expiring-token metadata, `daemon`
 stores the rotating refresh token beside the access token and refreshes it
 before provider requests. Concurrent requests share one refresh operation
 because GitHub invalidates the old access and refresh tokens after rotation.
@@ -1068,21 +1068,21 @@ catalogs key requests by provider, source and host location and reject late
 responses after a context switch. GitHub continues to own branch/PR and clone
 operations. Browsing does not infer a code repository from Linear names.
 
-Linear uses the app's public OAuth client ID from `CODEX_CLAW_LINEAR_CLIENT_ID`,
+Linear uses the app's public OAuth client ID from `APP_LINEAR_CLIENT_ID`,
 which can also be baked into the backend build from the repository `.env`.
 The registered callback defaults to
 `http://127.0.0.1:5173/api/auth/callback/linear`; an optional
-`CODEX_CLAW_LINEAR_CALLBACK_URI` overrides it at runtime or build time.
+`APP_LINEAR_CALLBACK_URI` overrides it at runtime or build time.
 Nonempty legacy `workBacklog.providerSettings.linear` values remain compatible
 and take precedence; blank saved values fall through to app defaults.
 Settings exposes connection controls, with no client ID or callback fields.
 No client secret or API key is used.
 
 The app registration must include the exact callback, and its port must be free.
-`clawd` binds that loopback address only during authorization; a bind failure
+`daemon` binds that loopback address only during authorization; a bind failure
 appears in Settings before opening Linear. The browser must run on the same
-computer as `clawd` (the desktop and localhost web hosts). A remote browser
-cannot use this loopback callback: connect on the owning computer. Claw does
+computer as `daemon` (the desktop and localhost web hosts). A remote browser
+cannot use this loopback callback: connect on the owning computer. Korus does
 not deploy an OAuth broker or expose the callback on a network interface.
 Cancellation, replacement, timeout, completion, and runtime shutdown dispose
 the listener. An abandoned browser tab expires after ten minutes and can be
@@ -1111,14 +1111,14 @@ inside the guest view; Electron returns only structured annotation metadata to
 the renderer. The renderer queues the user's written comments as a transient
 batch, then turns the complete batch into one ordinary agent prompt, leaving
 durable conversation state and agent execution in
-`clawd`. Browser page state is deliberately ephemeral and is not added to the
+`daemon`. Browser page state is deliberately ephemeral and is not added to the
 persisted application snapshot. Switching right-workspace tabs hides the
 webview element without discarding its current page; closing the Browser tab
-destroys the guest. Because the page is inside the workspace DOM, Claw's menus
+destroys the guest. Because the page is inside the workspace DOM, Korus's menus
 and dialogs can layer over it without hiding the page.
 
 The app-owned MCP `browser-open` tool can request this same surface for its
-calling agent. `clawd` delegates through `client/browser/open`; Electron asks
+calling agent. `daemon` delegates through `client/browser/open`; Electron asks
 the renderer to mount or navigate the addressed agent/browser tab, then
 resolves the callback only after the renderer-hosted guest has loaded
 the requested URL. Each agent owns independent right-workspace state, and
@@ -1131,15 +1131,15 @@ Agent selection reuses that agent's provider replica when available. First
 startup and the first visit to an uncached conversation keep the history loader
 visible until the provider snapshot arrives. Codex paging cursors and history
 reconciliation remain inside the SDK; Claude hydration remains inside its
-conversation host. Claw selects lazy rendering so the DOM stays bounded while
+conversation host. Korus selects lazy rendering so the DOM stays bounded while
 the provider retains the complete in-memory snapshot it needs.
 
 Git status and agent-specific catalogs still reconcile in the background.
 Selection requests carry a monotonic renderer token so a stale response from a
 rapid earlier switch cannot replace the current agent. Provider runtimes decide
-their own in-memory lifecycle; Claw persists only the conversation reference and
+their own in-memory lifecycle; Korus persists only the conversation reference and
 rehydrates through the provider after restart. Drafts, attachments, queues,
-side-panel state, and browser state remain separate Claw state.
+side-panel state, and browser state remain separate Korus state.
 
 Global snapshot notifications contain only product and coordination state. An
 unrelated agent, queue, automation, or status change therefore cannot clone,
@@ -1150,15 +1150,15 @@ in `workBacklog.assignments`, keyed by provider and provider-generated item id,
 then sends a deterministic prompt through the existing prompt path. Assignment
 state is local and provider-neutral: newly assigned items are `inProgress`, and
 agents update them to `blocked`, `readyForReview`, or `completed` through the
-`update-work-item` Claw MCP tool using the exact work item id from that prompt.
+`update-work-item` Korus MCP tool using the exact work item id from that prompt.
 Blocked updates include a user-facing note explaining what help is needed.
 Every provider's assignments retain a sanitized issue reference (native identifier,
 URL, body and opaque source identity) through persistence and remote snapshots.
 The backlog source is separate from the execution repository: repository entry
 points use their current repository, while global batch starts require a code
-repository chosen on the selected Claw team's host. This choice is transient;
+repository chosen on the selected Korus team's host. This choice is transient;
 there is no saved Linear source-to-repository mapping. Linear branch defaults
-use the full issue identifier, and Claw status updates do not change Linear's
+use the full issue identifier, and Korus status updates do not change Linear's
 workflow state.
 Automation-created assignments also store automation origin metadata so one
 execution can be completed after all of its work items finish. Assigning the same
@@ -1172,7 +1172,7 @@ instructions are added only to the selected workers' normal assignment prompts.
 Assignment status belongs to the backlog record, so it is preserved even when
 the stored agent id no longer exists; only the live assignee navigation/avatar
 depends on the agent still being present. Resetting an assignment clears Codex
-Claw's local assignment metadata and lifecycle state.
+Korus's local assignment metadata and lifecycle state.
 Automations keep their generated agents and isolated worktrees after completion so
 the user can review or continue the work explicitly.
 Linear automations persist each team/project source ID with an explicit code
@@ -1235,17 +1235,17 @@ Implemented product surfaces:
   closed, and selected.
 - Empty teams show a first-agent call to action instead of creating a default
   agent.
-- `clawd` starts/connects to Codex app-server, creates or resumes Codex
+- `daemon` starts/connects to Codex app-server, creates or resumes Codex
   threads, hydrates history, sends prompts, steers active turns, and
-  interrupts. Electron main forwards renderer IPC to `clawd` and owns desktop
+  interrupts. Electron main forwards renderer IPC to `daemon` and owns desktop
   affordances only.
 - Renderer displays ordered chat/tool parts, Markdown, links, diff stats,
   queued prompts, ask-user prompts, approvals, context usage, rate limits,
   file mentions, skills, plan/goal controls, and voice transcription controls.
 - Settings can connect work backlog integrations, starting with GitHub OAuth.
-- Settings > Connections separates SSH links to remote `clawd` instances from
+- Settings > Connections separates SSH links to remote `daemon` instances from
   official Codex device pairing. Pairing stays behind app-owned contracts:
-  `clawd` calls the state-neutral `codex-app-sdk` remote-control facade, converts
+  `daemon` calls the state-neutral `codex-app-sdk` remote-control facade, converts
   app-server timestamps and client records, and Electron exposes only explicit
   typed IPC methods to the renderer.
 - Cockpit is a backlog-first operator inbox across connected repositories. It
@@ -1262,7 +1262,7 @@ Implemented product surfaces:
   so later Cockpit visits load all repositories automatically. Global loading
   preserves successful repository results when individual repositories fail
   and reports the failed subset without discarding useful work.
-- Claw's backend-owned local MCP server supports agent registration, status, listing,
+- Korus's backend-owned local MCP server supports agent registration, status, listing,
   direct messages, broadcast, and inbox checks.
 
 Still intentionally incomplete:
@@ -1278,11 +1278,11 @@ Still intentionally incomplete:
 
 - Use "team" as the product term.
 - Local desktop builds bundle a pinned, checksum-verified Codex executable and
-  pass it to local `clawd`. SSH-installed remote `clawd` continues to discover
+  pass it to local `daemon`. SSH-installed remote `daemon` continues to discover
   Codex on the remote host.
 - Current local access exists through `codex app-server`; a separate
   `codex-app-server` binary is not required for the first prototype.
-- Prefer an isolated Codex identity for Codex Claw, potentially including a
+- Prefer an isolated Codex identity for Korus, potentially including a
   custom `CODEX_HOME`, so the app does not disturb normal Codex CLI/app data.
 - Hard-copying id8 renderer code into this repo is acceptable for the initial
   build. Extraction can happen only after the shared surface is obvious.
@@ -1294,7 +1294,7 @@ Still intentionally incomplete:
 - Should a custom `CODEX_HOME` be mandatory from day one, or only for packaged
   builds?
 - Do we need a custom app-server session source in Codex itself, or is
-  `clientInfo.name = "codex_claw"` plus custom `CODEX_HOME` enough for now?
+  `clientInfo.name = "workspace"` plus custom `CODEX_HOME` enough for now?
 
 ## References Studied
 

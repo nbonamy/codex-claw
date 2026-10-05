@@ -1,12 +1,12 @@
-import type { AgentBackend, ClaudeAuthentication, CodexAuthentication, CodexClawApi } from '@codex-claw/core/contracts';
-import type { ProviderConnection, ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { AgentBackend, ClaudeAuthentication, CodexAuthentication, AppApi } from '@workspace/core/contracts';
+import type { ProviderConnection, ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
 import { computed, onScopeDispose, ref, watch } from 'vue';
 import { translate } from '../i18n';
 import { localizedErrorMessage } from '../i18n/errors';
 import { clearFirstRunOnboardingStage, getFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
 
 type FirstRunOnboardingOptions = {
-  getApi: () => CodexClawApi | undefined;
+  getApi: () => AppApi | undefined;
   getConnections: () => ProviderConnection[];
   hasExistingWorkspace: () => boolean;
   isGitHubConnected: () => boolean;
@@ -284,9 +284,9 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     authenticationPoll = null;
   }
 
-  function requireApi(): CodexClawApi {
+  function requireApi(): AppApi {
     const api = options.getApi();
-    if (!api) throw new Error(translate('surface.appShell.codexClawAPIIsUnavailable'));
+    if (!api) throw new Error(translate('surface.appShell.appAPIIsUnavailable'));
     return api;
   }
 

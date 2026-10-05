@@ -1,16 +1,17 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CodexClawApi } from '@codex-claw/core/contracts';
+import type { AppApi } from '@workspace/core/contracts';
 import SettingsPluginsPanel from '../SettingsPluginsPanel.vue';
-import { configureClawClient } from '../../platform-api';
+import { configureAppClient } from '../../platform-api';
 
 describe('SettingsPluginsPanel', () => {
   let builtInLaunchChatGpt: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     builtInLaunchChatGpt = vi.fn().mockResolvedValue({ status: 'launched' });
-    configureClawClient({
-      api: { launchChatGptApp: builtInLaunchChatGpt } as unknown as CodexClawApi,
+    configureAppClient({
+      api: { launchChatGptApp: builtInLaunchChatGpt } as unknown as AppApi,
       platform: 'desktop',
     });
   });
@@ -19,12 +20,12 @@ describe('SettingsPluginsPanel', () => {
     document.body.innerHTML = '';
   });
 
-  it('separates Claw capabilities from Codex plugins', () => {
+  it(`separates ${product.name} capabilities from Codex plugins`, () => {
     const wrapper = mount(SettingsPluginsPanel, {
     });
 
     expect(wrapper.findAll('.settings-section__header h3').map((heading) => heading.text())).toStrictEqual([
-      'Claw',
+      `${product.name}`,
       'Codex',
     ]);
     const sections = wrapper.findAll('.settings-section');
@@ -102,7 +103,7 @@ describe('SettingsPluginsPanel', () => {
   });
 
   it('does not offer Computer Use when the host does not provide it', () => {
-    configureClawClient(undefined);
+    configureAppClient(undefined);
     const wrapper = mount(SettingsPluginsPanel, {
     });
 
@@ -133,9 +134,9 @@ describe('SettingsPluginsPanel', () => {
     await flushPromises();
 
     const sections = wrapper.findAll('.settings-section');
-    const clawRows = sections[0].findAll('.settings-row');
+    const appRows = sections[0].findAll('.settings-row');
     const codexRows = sections[1].findAll('.settings-row');
-    expect(clawRows[0].text()).not.toContain('ChatGPT is unavailable.');
+    expect(appRows[0].text()).not.toContain('ChatGPT is unavailable.');
     expect(codexRows[0].text()).toContain('ChatGPT is unavailable.');
     expect(codexRows[1].text()).not.toContain('ChatGPT is unavailable.');
   });

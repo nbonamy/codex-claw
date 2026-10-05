@@ -1,5 +1,5 @@
-import type { MissionTicket } from '@codex-claw/core/missions';
-import type { MissionRun } from '@codex-claw/core/mission-execution';
+import type { MissionTicket } from '@workspace/core/missions';
+import type { MissionRun } from '@workspace/core/mission-execution';
 
 export type MissionImplementationTicketItem = { ticket: MissionTicket; index: number; run?: MissionRun };
 export type MissionImplementationTicketStatus = 'queued' | 'blocked' | MissionRun['status'];

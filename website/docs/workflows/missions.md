@@ -6,7 +6,7 @@ description: Shape and ship a feature through explicit stages and reviewable art
 
 A Mission turns a feature into a staged workflow with an approved brief, repository-owned tickets, implementation evidence, review findings, and delivery tracking.
 
-Use a direct agent conversation for a focused fix or investigation. Use a Mission when you want explicit requirements and ticket approval before implementation, especially when the feature spans repositories. Mission workers are separate Claw agents; they are not simply native subagents of the conversation where you started.
+Use a direct agent conversation for a focused fix or investigation. Use a Mission when you want explicit requirements and ticket approval before implementation, especially when the feature spans repositories. Mission workers are separate Korus agents; they are not simply native subagents of the conversation where you started.
 
 ::: info Upcoming release
 Linear issue selection and **Update from main** in Ship are implemented on main for the intended 0.26.0 release. They are not included in the published 0.25.2 app.
@@ -51,7 +51,7 @@ Approving Requirements starts ticket shaping. Approving Tickets creates isolated
 
 ## Follow implementation
 
-Claw creates one Mission worktree per affected repository. Tickets in the same repository run sequentially with a repository worker; ready tickets in different repositories can run concurrently. Dependencies can keep a ticket waiting even when its repository worker is idle.
+Korus creates one Mission worktree per affected repository. Tickets in the same repository run sequentially with a repository worker; ready tickets in different repositories can run concurrently. Dependencies can keep a ticket waiting even when its repository worker is idle.
 
 Open a ticket to inspect its evidence or select its worker conversation for clarification. Workers record changes and verification as they complete their tickets. Implementation results advance automatically; there is no separate manual approval for every completed ticket. The explicit human review follows the completed implementation.
 
@@ -72,7 +72,7 @@ This review is part of the Mission. The separate conversation command [`/review`
 
 Ship shows a delivery card for each affected repository. Commit any remaining intended changes, then use its Git controls to create a pull request or merge. Check the branch, destination, title/message, and cleanup choices before confirming. Follow [Worktrees](./worktrees#review-and-merge) for merge prerequisites and cleanup behavior.
 
-When the destination has advanced, use **Update from main** in the delivery card's Git controls; the label follows the repository's base branch name. Claw merges the base into the Mission branch. Resolve any conflicts in the Mission worktree and rerun the relevant checks, then return to Ship and refresh the Git state before merging. Updating the branch does not itself deliver the Mission.
+When the destination has advanced, use **Update from main** in the delivery card's Git controls; the label follows the repository's base branch name. Korus merges the base into the Mission branch. Resolve any conflicts in the Mission worktree and rerun the relevant checks, then return to Ship and refresh the Git state before merging. Updating the branch does not itself deliver the Mission.
 
 The Mission completes when every affected repository has a recorded pull request or merge. A created pull request can still need review and merging. Mission completion does not mean the code was deployed.
 

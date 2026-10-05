@@ -58,7 +58,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Agent, AgentGitDiffScope, AgentGitStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitDiffScope, AgentGitStatus } from '@workspace/core/contracts';
 import { DotsVerticalIcon, FileDiffIcon, FileTextIcon, GitCommitIcon, GitHubIcon, ListDetailsIcon, RefreshIcon, TextWrapDisabledIcon, TextWrapIcon } from '../shared/icons/app-icons';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';

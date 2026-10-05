@@ -9,10 +9,10 @@ import type { CodexConversationSnapshot } from '@codex-app-sdk/core/surface';
 import { defineComponent, nextTick } from 'vue';
 import { expect, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConnectionState, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, OpenInApplication, OpenInApplicationCatalog, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
-import type { CreateMissionInput, DeleteMissionInput, Mission } from '@codex-claw/core/missions';
-import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import type { Agent, AgentFilePreviewResult, AgentFileSearchItem, AppSnapshot, BackendConnectionState, BackendConversationRef, BackendModelOption, ClaudeConversationSnapshot, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateTeamInput, AutomationLocation, OpenInApplication, OpenInApplicationCatalog, ReasoningEffort, RendererMessage, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput, UpdateAutomationInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderKind, WorkSource } from '@workspace/core/contracts';
+import type { CreateMissionInput, DeleteMissionInput, Mission } from '@workspace/core/missions';
+import type { MissionExecutionInput } from '@workspace/core/mission-execution';
 
 const ConversationPaneStub = defineComponent({
   name: 'ConversationPane',
@@ -124,25 +124,25 @@ export function mountShell(overrides: Partial<{
   unreadAgentIds: string[];
   composerAttachments: readonly CodexNativeAttachment[];
   composerState: { text: string; selectionStart: number; selectionEnd: number };
-  queuedPrompts: import('@codex-claw/core/contracts').AgentQueuedPrompt[];
+  queuedPrompts: import('@workspace/core/contracts').AgentQueuedPrompt[];
   codexConversationSnapshot: CodexConversationSnapshot | null;
   claudeConversationSnapshot: ClaudeConversationSnapshot | null;
   chooseAgentFolder: () => Promise<string | null>;
-  cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
-  createSourceRepository: (input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => Promise<SourceRepository>;
-  createProject: (input: import('@codex-claw/core/contracts').CreateProjectInput) => Promise<void>;
+  cloneSourceRepository: (input: import('@workspace/core/contracts').CloneSourceRepositoryInput) => Promise<SourceRepository>;
+  createSourceRepository: (input: import('@workspace/core/contracts').CreateSourceRepositoryInput) => Promise<SourceRepository>;
+  createProject: (input: import('@workspace/core/contracts').CreateProjectInput) => Promise<void>;
   createAgent: (input: CreateAgentInput) => Promise<Agent | null | void>;
   createMission: (input: CreateMissionInput) => Promise<Mission>;
   selectMission: (missionId: string | null) => Promise<void>;
   deleteMission: (input: DeleteMissionInput) => Promise<void>;
-  readMissionArtifact: (missionId: string, stage: import('@codex-claw/core/missions').MissionStage) => Promise<import('@codex-claw/core/mission-execution').MissionArtifactReadResult>;
+  readMissionArtifact: (missionId: string, stage: import('@workspace/core/missions').MissionStage) => Promise<import('@workspace/core/mission-execution').MissionArtifactReadResult>;
   executeMission: (input: MissionExecutionInput) => Promise<void>;
-  createQuickChat: (input: import('@codex-claw/core/contracts').CreateQuickChatInput) => Promise<Agent | null | void>;
-  createSourceWorktree: (input: import('@codex-claw/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
+  createQuickChat: (input: import('@workspace/core/contracts').CreateQuickChatInput) => Promise<Agent | null | void>;
+  createSourceWorktree: (input: import('@workspace/core/contracts').CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   createTeam: (input: CreateTeamInput) => Promise<Team | null | void>;
   listSourceFolders: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-  listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceBranch[]>;
+  listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<import('@workspace/core/contracts').SourceBranch[]>;
   sourceRepositories: SourceRepository[];
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => Promise<SourceWorktree[]>;
   updateTeam: (input: UpdateTeamInput) => Promise<void>;
@@ -153,18 +153,18 @@ export function mountShell(overrides: Partial<{
   clearAutomationHistory: (automationId: string) => Promise<void>;
   deleteAutomationExecution: (automationId: string, executionId: string) => Promise<void>;
   deleteAutomation: (automationId: string) => Promise<void>;
-  listAgentConversations: (agentId: string, input?: import('@codex-claw/core/contracts').ConversationListInput) => Promise<ConversationSummary[]>;
-  resumeAgentConversation: (agentId: string, target: import('@codex-claw/core/contracts').ConversationResumeTarget) => Promise<void>;
+  listAgentConversations: (agentId: string, input?: import('@workspace/core/contracts').ConversationListInput) => Promise<ConversationSummary[]>;
+  resumeAgentConversation: (agentId: string, target: import('@workspace/core/contracts').ConversationResumeTarget) => Promise<void>;
   readConversationMessages: (ref: BackendConversationRef, agentId: string) => Promise<RendererMessage[]>;
-  getAgentGitDiff: (agentId: string) => Promise<import('@codex-claw/core/contracts').AgentGitDiff>;
+  getAgentGitDiff: (agentId: string) => Promise<import('@workspace/core/contracts').AgentGitDiff>;
   configureWorkBacklog: (input: WorkBacklogConfigurationInput) => Promise<void>;
   loadWorkRepositories: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkSource[] | void>;
   loadAssignedWorkItems: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkItem[] | void>;
-  loadGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => Promise<import('@codex-claw/core/contracts').WorkItemPage>;
-  loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
-  createAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitBranchInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  createAgentGitPullRequest: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitPullRequestInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
-  mergeAgentGitBranch: (agentId: string, input: import('@codex-claw/core/contracts').AgentGitMergeInput) => Promise<import('@codex-claw/core/contracts').AgentGitWorkflow>;
+  loadGlobalWorkItems: (provider: WorkProviderKind, location?: AutomationLocation, query?: import('@workspace/core/contracts').GlobalWorkItemQuery) => Promise<import('@workspace/core/contracts').WorkItemPage>;
+  loadWorkItems: (provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@workspace/core/contracts').WorkItemQuery) => Promise<WorkItem[] | void>;
+  createAgentGitBranch: (agentId: string, input: import('@workspace/core/contracts').AgentGitBranchInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  createAgentGitPullRequest: (agentId: string, input: import('@workspace/core/contracts').AgentGitPullRequestInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  mergeAgentGitBranch: (agentId: string, input: import('@workspace/core/contracts').AgentGitMergeInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
   openInApplications: OpenInApplicationCatalog;
   openAgentPath: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   duplicateAgentAction: (agentId: string, options?: { name?: string; select?: boolean }) => Promise<Agent | null>;
@@ -180,25 +180,25 @@ export function mountShell(overrides: Partial<{
   stubTeamRail: boolean;
   isConversationLoadFailed: boolean;
   retryAgentHistory: () => Promise<void>;
-  sendPromptAction: (prompt: string, options?: import('@codex-claw/core/contracts').RendererSendPromptOptions) => Promise<void>;
-  respondToThreadFlagAction: (response: import('@codex-claw/core/thread-flags').ThreadFlagResponse) => Promise<void>;
+  sendPromptAction: (prompt: string, options?: import('@workspace/core/contracts').RendererSendPromptOptions) => Promise<void>;
+  respondToThreadFlagAction: (response: import('@workspace/core/thread-flags').ThreadFlagResponse) => Promise<void>;
   deleteTurnAction: (turnId: string) => Promise<void>;
   editTurnAction: (payload: { content: string; turnId: string }) => Promise<void>;
   retryTurnAction: (turnId: string) => Promise<void>;
   continueInterruptedTurnAction: () => Promise<void>;
   startCodeReview: (
     agentId: string,
-    input: import('@codex-claw/core/code-review').CodeReviewStartInput,
+    input: import('@workspace/core/code-review').CodeReviewStartInput,
   ) => Promise<AppSnapshot>;
-  startVisualize: (agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => Promise<AppSnapshot>;
-  setVisualizeOpen: (agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
-  generateVisualizationSuggestion: (agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
-  selectVisualization: (agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
-  deleteVisualization: (agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
-  readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@codex-claw/core/visualize').VisualizationAsset>;
+  startVisualize: (agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput) => Promise<AppSnapshot>;
+  setVisualizeOpen: (agentId: string, input: import('@workspace/core/visualize').SetVisualizeOpenInput) => Promise<AppSnapshot>;
+  generateVisualizationSuggestion: (agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
+  selectVisualization: (agentId: string, input: import('@workspace/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
+  deleteVisualization: (agentId: string, input: import('@workspace/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
+  readVisualizationAsset: (agentId: string, visualizationId: string) => Promise<import('@workspace/core/visualize').VisualizationAsset>;
   discussCodeReviewFinding: (
     agentId: string,
-    input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput,
+    input: import('@workspace/core/code-review').CodeReviewDiscussionInput,
   ) => Promise<AppSnapshot>;
 }> = {}) {
   const snapshot = overrides.snapshot ?? createInitialSnapshot();
@@ -339,12 +339,12 @@ export function resolveConversationControllerValue<T>(source: T | { readonly val
 export function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw#12',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace#12',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix cockpit drag target',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     authorName: 'nbonamy',
     body: 'Make issue assignment feel obvious.',

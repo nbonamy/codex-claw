@@ -1,3 +1,4 @@
+import product from '../core/src/product.json' with { type: 'json' };
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,8 +28,8 @@ function run(command, args) {
 function localBuild() {
   run('bash', [
     sourceBuildScript,
-    '--app-name', 'Codex Claw Computer Use',
-    '--bundle-identifier', 'com.nabocorp.codex-claw.computer-use',
+    '--app-name', `${product.name} Computer Use`,
+    '--bundle-identifier', `${product.appId}.computer-use`,
     '--icon', iconPath,
     '--output', outputDir,
   ]);
@@ -66,8 +67,8 @@ function releaseBuild() {
     const extractedRoot = path.join(extractDir, 'computer-use-pilot-macos-arm64-' + version);
     run('bash', [
       path.join(extractedRoot, 'scripts', 'package-app.sh'),
-      '--app-name', 'Codex Claw Computer Use',
-      '--bundle-identifier', 'com.nabocorp.codex-claw.computer-use',
+      '--app-name', `${product.name} Computer Use`,
+      '--bundle-identifier', `${product.appId}.computer-use`,
       '--icon', iconPath,
       '--binary', path.join(extractedRoot, 'bin', 'computer-use-pilot'),
       '--resource-dir', path.join(extractedRoot, 'Resources'),

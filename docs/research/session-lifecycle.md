@@ -1,6 +1,6 @@
 # Agent session lifecycle
 
-Research snapshot: Claw `cb94e295`, codex-app-sdk `0410ca2d`, upstream Codex
+Research snapshot: Korus `cb94e295`, codex-app-sdk `0410ca2d`, upstream Codex
 `c888e8e7` (2026-09-08).
 
 ## Decision
@@ -10,17 +10,17 @@ Codex agent, and make Resume Session search both active and archived
 conversations. Selecting an archived conversation must unarchive it before
 resuming it.**
 
-Do this through `codex-app-sdk`; Claw must not scan, move, index, or otherwise
-own Codex rollout files. Claw owns the product transaction (restart, close, or
+Do this through `codex-app-sdk`; Korus must not scan, move, index, or otherwise
+own Codex rollout files. Korus owns the product transaction (restart, close, or
 switch session), while its Codex adapter delegates archive, unarchive, list,
 search, and resume to the SDK. App relaunch is not an agent restart and must
 continue hydrating the existing session without archiving it.
 
 This gives the lifecycle the UI already implies:
 
-| User action | Current conversation | Claw agent |
+| User action | Current conversation | Korus agent |
 | --- | --- | --- |
-| Quit/relaunch Claw | remains active and is hydrated | remains |
+| Quit/relaunch Korus | remains active and is hydrated | remains |
 | Restart Agent | archived, then detached | remains; next prompt creates a new conversation |
 | Close Agent | archived, then detached | removed |
 | Resume active session | resumed directly | points to selected session |
@@ -28,10 +28,10 @@ This gives the lifecycle the UI already implies:
 
 The SDK already exposes every required primitive, so an SDK change is not a
 prerequisite. A future SDK convenience such as `restoreConversation(id)` could
-make unarchive-plus-load transactional for all hosts, but Claw should not wait
+make unarchive-plus-load transactional for all hosts, but Korus should not wait
 for it and should not reimplement SDK conversation state.
 
-## What Claw does today
+## What Korus does today
 
 ### Restart detaches but does not archive
 
@@ -47,7 +47,7 @@ not call archive
 Result: Restart Agent creates a new conversation on the next prompt, but the old
 conversation stays in the normal, non-archived provider catalog.
 
-### Close removes Claw state but does not archive
+### Close removes Korus state but does not archive
 
 Close validates optional worktree cleanup, forgets the live provider session,
 optionally deletes the worktree, and removes the agent from the snapshot
@@ -132,8 +132,8 @@ Codex:
   rollout back, and updates state metadata
   ([unarchive_thread.rs](../../../codex/codex-rs/thread-store/src/local/unarchive_thread.rs#L15-L94)).
 
-Claw should never depend on these paths. They are evidence that the provider
-already owns the special archive folder and index; direct Claw filesystem code
+Korus should never depend on these paths. They are evidence that the provider
+already owns the special archive folder and index; direct Korus filesystem code
 would duplicate the provider and fail for remote or future stores.
 
 ### An archived thread is recoverable, but not directly resumable
@@ -171,7 +171,7 @@ stop-and-archive operation, not a harmless catalog toggle.
 
 ### Mobile/ChatGPT visibility needs one cross-client acceptance test
 
-Nicolas's observation—that Claw threads appear in the mobile ChatGPT app—is
+Nicolas's observation—that Korus threads appear in the mobile ChatGPT app—is
 strong product evidence that leaving retired threads non-archived creates real
 cross-client clutter. OpenAI's product documentation says supported desktop
 Codex chats are available from the mobile app's Remote tab and that archiving a
@@ -195,7 +195,7 @@ in unit tests or UI copy.
 
 ### App-owned contract
 
-Restore a provider-neutral lifecycle seam behind `clawd`, rather than calling
+Restore a provider-neutral lifecycle seam behind `daemon`, rather than calling
 Codex from Electron or Vue:
 
 - add capability-gated driver operations to archive the agent's current
@@ -269,7 +269,7 @@ before external operations finish.
 - **Busy or approvals pending:** Close must visibly stop the thread before
   archive. Restart remains idle-only.
 - **Spawned descendants:** Codex archives them with the root. Do not archive a
-  root if any separate Claw agent is currently bound to its spawned subtree.
+  root if any separate Korus agent is currently bound to its spawned subtree.
 - **Forks:** app-server spawn descendants and ordinary forks are different
   relationships; verify both in integration tests rather than assuming archive
   cascade semantics.
@@ -288,7 +288,7 @@ before external operations finish.
    indistinguishable from abandoning a visible conversation. Rejected.
 2. **Archive only on Close.** Reduces some clutter, but every Restart and session
    switch still leaks an active conversation. Rejected.
-3. **Move/index rollout files in a Claw-specific archive folder.** Duplicates
+3. **Move/index rollout files in a Korus-specific archive folder.** Duplicates
    Codex's existing archive store, breaks SDK ownership and remote backends, and
    risks state-db corruption. Rejected.
 4. **Delete retired sessions.** Prevents resume and is irreversible. Rejected.
@@ -306,11 +306,11 @@ Automated coverage should prove:
 - Search reaches matches older than 30 rows in both catalogs.
 - Resume/load failure does not overwrite the current agent ref.
 - Busy Close has explicit stop -> terminal -> archive ordering.
-- Codex archive invalidates the SDK runtime once; Claw creates no parallel
+- Codex archive invalidates the SDK runtime once; Korus creates no parallel
   transcript or rollout index.
 - Claude's capability-limited behavior remains unchanged.
 
-Manual acceptance must include: create a recognizable Claw conversation, close
-or restart its agent, confirm it leaves Claw's active Resume list, verify its
-visibility in the mobile ChatGPT client, restore it from Claw's Archived list,
+Manual acceptance must include: create a recognizable Korus conversation, close
+or restart its agent, confirm it leaves Korus's active Resume list, verify its
+visibility in the mobile ChatGPT client, restore it from Korus's Archived list,
 and verify both transcript continuity and mobile visibility after restoration.

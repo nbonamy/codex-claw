@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import type { WorkProviderAuthorization } from '@codex-claw/core/contracts';
+import type { WorkProviderAuthorization } from '@workspace/core/contracts';
 import { useI18n } from 'vue-i18n';
 import { GitHubIcon } from '../shared/icons/app-icons';
 import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';

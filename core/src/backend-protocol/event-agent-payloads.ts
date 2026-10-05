@@ -1,3 +1,4 @@
+import { product } from '../product';
 import { isThreadFlags } from '../thread-flags';
 import { isAppTextDescriptor } from '../app-text';
 import {
@@ -25,7 +26,7 @@ import {
 function expectAppText(value: unknown, path: string): void {
   if (typeof value !== 'string' && !isAppTextDescriptor(value)) {
     throw new Error(
-      `Invalid Claw backend event at ${path}: expected application text.`,
+      `Invalid ${product.name} backend event at ${path}: expected application text.`,
     );
   }
 }

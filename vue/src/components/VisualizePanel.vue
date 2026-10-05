@@ -86,10 +86,10 @@
 import { computed, reactive, watch } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import { IconX as XIcon } from '@tabler/icons-vue';
-import type { Visualization, VisualizationAsset, VisualizeSession } from '@codex-claw/core/visualize';
+import type { Visualization, VisualizationAsset, VisualizeSession } from '@workspace/core/visualize';
 import { translate } from '../i18n';
 import ExcalidrawCanvas from './ExcalidrawCanvas.vue';
-import type { SaveCanvasInput, CanvasDocument } from '@codex-claw/core/visualize-canvas';
+import type { SaveCanvasInput, CanvasDocument } from '@workspace/core/visualize-canvas';
 import VisualizationView from './VisualizationView.vue';
 import { visualizationRenderKey } from './visualization-render-key';
 import type { VisualizationAnnotationInput } from './use-visualization-annotations';

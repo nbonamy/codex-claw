@@ -1,5 +1,6 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { bundledCodexVersion } from '@workspace/core/codex-release';
 import { resolveCodexCommand } from '../codex-command';
 
 describe('resolveCodexCommand', () => {
@@ -19,15 +20,15 @@ describe('resolveCodexCommand', () => {
   });
 
   it('launches the managed remote Codex installation when it is present', () => {
-    vi.stubEnv('CODEX_CLAW_HOME', '/home/mnmt/.codex-claw');
-    const managedCodex = `/home/mnmt/.codex-claw/codex/${bundledCodexVersion}/bin/codex`;
+    vi.stubEnv('APP_HOME', `/home/mnmt/${product.homeDirectory}`);
+    const managedCodex = `/home/mnmt/${product.homeDirectory}/codex/${bundledCodexVersion}/bin/codex`;
     expect(resolveCodexCommand('', {
       bundledPath: '',
       existsSync: (candidate) => candidate === managedCodex,
     })).toBe(managedCodex);
   });
 
-  it('defers app bundle discovery to the SDK when Claw has no managed executable', () => {
+  it(`defers app bundle discovery to the SDK when ${product.name} has no managed executable`, () => {
     expect(resolveCodexCommand('', {
       bundledPath: ' ',
       existsSync: (candidate) => candidate === '/Applications/ChatGPT.app/Contents/Resources/codex',

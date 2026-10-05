@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerMissionIpcHandlers } from '../mission-ipc';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission } from '@codex-claw/core/missions';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission } from '@workspace/core/missions';
 
 describe('mission IPC', () => {
-  it('forwards mission writes to clawd and adopts the returned snapshots', async () => {
+  it('forwards mission writes to daemon and adopts the returned snapshots', async () => {
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     const handlers = new Map<string, (...args: unknown[]) => unknown>();

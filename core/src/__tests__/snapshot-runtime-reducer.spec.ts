@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { decodeClawBackendEvent } from '../backend-protocol/events';
+import { decodeAppBackendEvent } from '../backend-protocol/events';
 import { decodeAppSnapshot } from '../snapshot-guards';
 import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
 import {
@@ -19,7 +19,7 @@ describe('snapshot runtime reducer', () => {
       conversationId: 'thread-1',
       backend: 'codex',
       type: 'agent.conversationAttached',
-      payload: { cwd: '/Users/nbonamy/src/codex-claw' },
+      payload: { cwd: '/Users/nbonamy/src/agent-workspace' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     } as unknown as SnapshotEventOwnedBy<'runtime'>);
     applyMainEventToSnapshot(snapshot, {
@@ -361,7 +361,7 @@ describe('snapshot runtime reducer', () => {
   });
 
   it('rejects legacy flat account rate-limit payloads', () => {
-    const decode = () => decodeClawBackendEvent({
+    const decode = () => decodeAppBackendEvent({
       seq: 1,
       type: 'account.rateLimitsUpdated',
       backend: 'codex',
@@ -398,10 +398,10 @@ describe('snapshot runtime reducer', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       }],
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       schedule: { intervalMinutes: 60 },
       executionLog: [],
       createdAt: '2026-06-09T10:00:00.000Z',
@@ -472,10 +472,10 @@ describe('snapshot runtime reducer', () => {
 
     expect(snapshot.agents[0]).toStrictEqual({
       id: 'agent-dina',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       name: 'Dina',
       avatar: 'DI',
-      folder: '~/src/codex-claw',
+      folder: '~/src/agent-workspace',
       backend: 'codex',
       backendDefaults: { kind: 'codex' },
       isRegistered: true,
@@ -518,7 +518,7 @@ describe('snapshot runtime reducer', () => {
       type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
+        itemId: 'nbonamy/agent-workspace#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
         policy: 'review',
@@ -529,9 +529,9 @@ describe('snapshot runtime reducer', () => {
     });
 
     expect(snapshot.workBacklog.assignments).toStrictEqual({
-      'github:nbonamy/codex-claw#12': {
+      'github:nbonamy/agent-workspace#12': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
+        itemId: 'nbonamy/agent-workspace#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
         policy: 'review',
@@ -549,7 +549,7 @@ describe('snapshot runtime reducer', () => {
       agentId: 'agent-dina',
       type: 'git.statusUpdated',
       payload: {
-        folder: '/Users/nbonamy/src/codex-claw',
+        folder: '/Users/nbonamy/src/agent-workspace',
         branch: 'main',
         ahead: 1,
         behind: 0,
@@ -564,7 +564,7 @@ describe('snapshot runtime reducer', () => {
     });
 
     expect(snapshot.agentGitStatuses['agent-dina']).toStrictEqual({
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       branch: 'main',
       ahead: 1,
       behind: 0,
@@ -666,7 +666,7 @@ describe('snapshot runtime reducer', () => {
       type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#global',
+        itemId: 'nbonamy/agent-workspace#global',
         agentId: 'agent-dina',
         assignedAt: '2026-06-05T00:00:02.000Z',
         status: 'working',
@@ -680,7 +680,7 @@ describe('snapshot runtime reducer', () => {
       type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#review',
+        itemId: 'nbonamy/agent-workspace#review',
         agentId: 'agent-dina',
         assignedAt: '2026-06-05T00:00:03.000Z',
         status: 'readyForReview',
@@ -689,9 +689,9 @@ describe('snapshot runtime reducer', () => {
       occurredAt: '2026-06-05T00:00:03.000Z',
     });
 
-    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#global']).toStrictEqual({
+    expect(snapshot.workBacklog.assignments['github:nbonamy/agent-workspace#global']).toStrictEqual({
       provider: 'github',
-      itemId: 'nbonamy/codex-claw#global',
+      itemId: 'nbonamy/agent-workspace#global',
       agentId: 'agent-dina',
       assignedAt: '2026-06-05T00:00:02.000Z',
       policy: 'complete',
@@ -699,9 +699,9 @@ describe('snapshot runtime reducer', () => {
       automationId: 'automation-global',
       automationExecutionId: 'execution-global',
     });
-    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#review']).toStrictEqual({
+    expect(snapshot.workBacklog.assignments['github:nbonamy/agent-workspace#review']).toStrictEqual({
       provider: 'github',
-      itemId: 'nbonamy/codex-claw#review',
+      itemId: 'nbonamy/agent-workspace#review',
       agentId: 'agent-dina',
       assignedAt: '2026-06-05T00:00:03.000Z',
       policy: 'review',
@@ -714,7 +714,7 @@ describe('snapshot runtime reducer', () => {
     const snapshot = createInitialSnapshot();
     const backendRuntimes = snapshot.backendRuntimes;
 
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       seq: 1,
       backend: 'codex',
       type: 'backend.statusChanged',
@@ -734,7 +734,7 @@ describe('snapshot runtime reducer', () => {
 
     const goal = snapshot.agents[0].goal;
     const contextUsage = snapshot.agents[0].contextUsage;
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       seq: 4,
       agentId: 'agent-dina',
       threadId: 'thread-1',
@@ -742,7 +742,7 @@ describe('snapshot runtime reducer', () => {
       payload: { goal: { objective: 'missing fields' } },
       occurredAt: '2026-06-05T00:00:04.000Z',
     })).toThrow();
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       seq: 5,
       agentId: 'agent-dina',
       backend: 'codex',
@@ -759,12 +759,12 @@ describe('snapshot runtime reducer', () => {
     const snapshot = createInitialSnapshot();
     const assignments = snapshot.workBacklog.assignments;
 
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       seq: 3,
       type: 'workItem.assignmentUpdated',
       payload: {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#malformed',
+        itemId: 'nbonamy/agent-workspace#malformed',
         agentId: 'agent-dina',
         assignedAt: '2026-06-05T00:00:03.000Z',
       },

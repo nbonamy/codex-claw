@@ -31,7 +31,7 @@ if (hasExpectedRelease(outputPath, codeModeHostOutputPath)) {
 }
 
 async function installRelease() {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-claw-app-server-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-workspace-app-server-'));
   const installerPath = path.join(tempDir, 'install.sh');
   const installBinDir = path.join(tempDir, 'bin');
   const installHomeDir = path.join(tempDir, 'home');

@@ -1,7 +1,7 @@
 <template>
   <div class="remote-engine-connections">
     <template v-for="engine in engines" :key="engine.backend">
-      <button v-if="!engine.installed" class="claw-button claw-button--secondary" type="button" :disabled="busy" @click="install(engine.backend)">
+      <button v-if="!engine.installed" class="app-button app-button--secondary" type="button" :disabled="busy" @click="install(engine.backend)">
         {{ $t('auth.installProvider') }} {{ backendDisplayName(engine.backend) }}
       </button>
       <template v-else>
@@ -11,17 +11,17 @@
       </template>
     </template>
     <p v-if="error" role="alert">{{ error }}</p>
-    <button v-if="error" class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="refresh">{{ $t('surface.remoteClaudeAuth.retry') }}</button>
+    <button v-if="error" class="app-button app-button--tertiary" type="button" :disabled="busy" @click="refresh">{{ $t('surface.remoteClaudeAuth.retry') }}</button>
     <span v-else-if="busy">{{ $t('auth.checking') }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onScopeDispose, ref, watch } from 'vue';
-import type { AgentBackend, RemoteConnection } from '@codex-claw/core/contracts';
-import type { ProviderConnection } from '@codex-claw/core/contracts/provider-setup';
-import { backendDisplayName } from '@codex-claw/core/backend-driver';
-import { codexClawApi } from '../platform-api';
+import type { AgentBackend, RemoteConnection } from '@workspace/core/contracts';
+import type { ProviderConnection } from '@workspace/core/contracts/provider-setup';
+import { backendDisplayName } from '@workspace/core/backend-driver';
+import { appApi } from '../platform-api';
 import { translate } from '../i18n';
 import RemoteCodexAuthentication from './RemoteCodexAuthentication.vue';
 import RemoteClaudeAuthentication from './RemoteClaudeAuthentication.vue';
@@ -38,8 +38,8 @@ async function refresh() {
   busy.value = true;
   error.value = '';
   try {
-    if (!codexClawApi) throw new Error('Backend connection is unavailable.');
-    const result = await codexClawApi.getProviderConnections(props.connection.id);
+    if (!appApi) throw new Error('Backend connection is unavailable.');
+    const result = await appApi.getProviderConnections(props.connection.id);
     if (expected === revision) engines.value = result;
   } catch (cause) {
     if (expected === revision) error.value = cause instanceof Error ? cause.message : String(cause);
@@ -50,17 +50,17 @@ async function install(backend: AgentBackend) {
   error.value = '';
   const expected = revision;
   try {
-    if (!codexClawApi) throw new Error('Backend connection is unavailable.');
-    await codexClawApi.installProvider(backend, props.connection.id);
+    if (!appApi) throw new Error('Backend connection is unavailable.');
+    await appApi.installProvider(backend, props.connection.id);
     if (expected === revision) await refresh();
   } catch (cause) {
     if (expected === revision) error.value = cause instanceof Error ? cause.message : String(cause);
   } finally { if (expected === revision) busy.value = false; }
 }
 async function setEnabled(backend: AgentBackend, enabled: boolean) {
-  if (!codexClawApi) throw new Error('Backend connection is unavailable.');
+  if (!appApi) throw new Error('Backend connection is unavailable.');
   const expected = revision;
-  const result = await codexClawApi.setProviderEnabled(backend, enabled, props.connection.id);
+  const result = await appApi.setProviderEnabled(backend, enabled, props.connection.id);
   if (expected === revision) engines.value = result;
 }
 async function connect(engine: ProviderConnection) {
@@ -77,8 +77,8 @@ async function disconnect(backend: AgentBackend) {
   error.value = '';
   const expected = revision;
   try {
-    if (!codexClawApi) throw new Error('Backend connection is unavailable.');
-    await codexClawApi.disconnectProvider(backend, props.connection.id);
+    if (!appApi) throw new Error('Backend connection is unavailable.');
+    await appApi.disconnectProvider(backend, props.connection.id);
     if (expected === revision) { signingIn.value = null; await refresh(); }
   } catch {
     if (expected === revision) error.value = translate('engineConnection.disconnectFailed');

@@ -1,12 +1,13 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
-import type { Agent } from '@codex-claw/core/contracts';
-import { defaultGeneralSettings } from '@codex-claw/core/settings';
-import { BackendDriverRpc, codexClawSurfaceOptions } from '../driver-rpc';
-import { ClawBackendServer } from '../server';
+import type { AgentBackendDriver, BackendSendResult } from '@workspace/core/backend-driver';
+import type { Agent } from '@workspace/core/contracts';
+import { defaultGeneralSettings } from '@workspace/core/settings';
+import { BackendDriverRpc, appSurfaceOptions } from '../driver-rpc';
+import { AppBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
 import { CodexBackendDriver } from '../codex/codex-driver';
 import { WORKTREE_DELEGATION_PROMPT } from '../agents/worktree-delegation';
@@ -71,7 +72,7 @@ describe('BackendDriverRpc', () => {
     const authenticate = vi.fn().mockResolvedValue({ kind: 'codex', connected: true, state });
     const driver = createDriver({ authenticate });
     const rpc = new BackendDriverRpc(new Map([['codex', driver]]));
-    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: rpc,
+    const server = new AppBackendServer({ version: 'test', snapshot, driverRpc: rpc,
       providerSetup: { isChanging: () => false, list: () => [{ backend: 'codex', installed: true }] } as never });
     try {
       await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/connections/get' });
@@ -96,7 +97,7 @@ describe('BackendDriverRpc', () => {
     const claude = createDriver({ backend: 'claude', getAccountRateLimits });
     const codex = createDriver();
     const rpc = new BackendDriverRpc(new Map([['claude', claude], ['codex', codex]]));
-    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: rpc });
+    const server = new AppBackendServer({ version: 'test', snapshot, driverRpc: rpc });
     try {
       await expect(server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/usage/get', params: { backend: 'claude' } })).resolves.toMatchObject({ result: limits });
       expect(snapshot.backendAccountRateLimits?.claude).toEqual(limits);
@@ -113,7 +114,7 @@ describe('BackendDriverRpc', () => {
   });
 
   it('uses the selected Codex home and replaces only the configured provider driver', async () => {
-    expect(codexClawSurfaceOptions({ generalSettings: { ...defaultGeneralSettings, providerHomes: { codex: { isolated: false, shareSkills: true, homePath: '/existing/codex' } } } }).codexHome).toBe('/existing/codex');
+    expect(appSurfaceOptions({ generalSettings: { ...defaultGeneralSettings, providerHomes: { codex: { isolated: false, shareSkills: true, homePath: '/existing/codex' } } } }).codexHome).toBe('/existing/codex');
     const unsubscribe = vi.fn();
     const previous = createDriver({ onEvent: vi.fn(() => unsubscribe) });
     const next = createDriver();
@@ -129,37 +130,37 @@ describe('BackendDriverRpc', () => {
     expect(next.close).toHaveBeenCalledOnce();
     expect(claude.close).toHaveBeenCalledOnce();
   });
-  it('appends agent-specific context after the default Claw instructions', async () => {
-    const options = codexClawSurfaceOptions({
-      clawMcpServerUrl: 'http://localhost:4321/mcp',
+  it(`appends agent-specific context after the default ${product.name} instructions`, async () => {
+    const options = appSurfaceOptions({
+      appMcpServerUrl: 'http://localhost:4321/mcp',
       additionalDeveloperInstructions: () => '<context>\nMission contract\n</context>',
     });
     const extension = await options.extensions?.[0]?.configureConversation?.({ extensionContext: createAgent() } as never);
-    expect(extension?.developerInstructions).toContain('Your Codex Claw agent ID');
+    expect(extension?.developerInstructions).toContain(`Your ${product.name} agent ID`);
     expect(extension?.developerInstructions).toContain('<context>\nMission contract\n</context>');
-    expect(extension!.developerInstructions!.indexOf('Your Codex Claw agent ID'))
+    expect(extension!.developerInstructions!.indexOf(`Your ${product.name} agent ID`))
       .toBeLessThan(extension!.developerInstructions!.indexOf('<context>'));
   });
 
-  it('configures the Claw MCP tools for a new Quick Chat without a folder', async () => {
+  it(`configures the ${product.name} MCP tools for a new Quick Chat without a folder`, async () => {
     const agent: Agent = { ...createAgent(), folder: null, sessionKind: 'quickChat' };
-    const options = codexClawSurfaceOptions({ clawMcpServerUrl: 'http://127.0.0.1:4321/mcp' });
+    const options = appSurfaceOptions({ appMcpServerUrl: 'http://127.0.0.1:4321/mcp' });
 
     const extension = await options.extensions?.[0]?.configureConversation?.({ extensionContext: agent } as never);
 
-    expect(extension?.config?.['mcp_servers.codex_claw.url'])
+    expect(extension?.config?.['mcp_servers.workspace.url'])
       .toBe(`http://127.0.0.1:4321/mcp?agentId=${agent.id}`);
     expect(extension?.developerInstructions).toContain('use create-project');
   });
 
-  it('puts Codex app-server state below the Claw home instead of ~/.codex', () => {
-    vi.stubEnv('CODEX_CLAW_HOME', '/tmp/codex-claw-isolated-home');
-    vi.stubEnv('CODEX_CLAW_BUNDLED_CODEX_PATH', '/app/resources/codex/codex');
+  it(`puts Codex app-server state below the ${product.name} home instead of ~/.codex`, () => {
+    vi.stubEnv('APP_HOME', '/tmp/agent-workspace-isolated-home');
+    vi.stubEnv('APP_BUNDLED_CODEX_PATH', '/app/resources/codex/codex');
     vi.stubEnv('CODEX_HOME', '/tmp/normal-codex-home');
     try {
-      expect(codexClawSurfaceOptions()).toMatchObject({
-        clientInfo: { name: 'codex_claw', title: 'Codex Claw', version: '0.3.0' },
-        codexHome: '/tmp/codex-claw-isolated-home/codex-home',
+      expect(appSurfaceOptions()).toMatchObject({
+        clientInfo: { name: 'workspace', title: product.name, version: '0.3.0' },
+        codexHome: '/tmp/agent-workspace-isolated-home/codex-home',
         loadingStrategy: 'lazy',
         transport: {
           command: '/app/resources/codex/codex',
@@ -173,7 +174,7 @@ describe('BackendDriverRpc', () => {
   it('uses the live plugin settings for Codex transport overrides', () => {
     const pluginSettings = vi.fn().mockReturnValue({ computerUseEnabled: false, chromeEnabled: true });
 
-    const options = codexClawSurfaceOptions({ pluginSettings });
+    const options = appSurfaceOptions({ pluginSettings });
 
     expect(options).toMatchObject({
       transport: {
@@ -185,8 +186,8 @@ describe('BackendDriverRpc', () => {
 
   it('uses the live celebration setting while keeping unified presence instructions stable', async () => {
     const celebrationsEnabled = vi.fn().mockReturnValue(false);
-    const options = codexClawSurfaceOptions({
-      clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+    const options = appSurfaceOptions({
+      appMcpServerUrl: 'http://127.0.0.1:4321/mcp',
       celebrationsEnabled,
     });
     const configureConversation = options.extensions?.[0]?.configureConversation;
@@ -441,8 +442,8 @@ describe('BackendDriverRpc', () => {
   });
 
   it('routes source repository discovery through backend-owned filesystem scanning', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-source-'));
-    const repoPath = path.join(tempDir, 'codex-claw');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-rpc-source-'));
+    const repoPath = path.join(tempDir, 'agent-workspace');
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 
     try {
@@ -450,7 +451,7 @@ describe('BackendDriverRpc', () => {
       await writeFile(path.join(repoPath, '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
       await expect(rpc.handle('source/repositories/list', { sourceFolderPath: tempDir })).resolves.toStrictEqual([{
-        name: 'codex-claw',
+        name: 'agent-workspace',
         path: repoPath,
         worktrees: [{ name: 'main', path: repoPath }],
       }]);
@@ -465,15 +466,15 @@ describe('BackendDriverRpc', () => {
 
     await expect(rpc.handle('source/worktree/path/suggest', {
       input: {
-        repoPath: '/Users/nbonamy/src/codex-claw',
+        repoPath: '/Users/nbonamy/src/agent-workspace',
         branchName: 'feature/backend split',
       },
-    })).resolves.toBe(path.join('/Users/nbonamy/src', 'codex-claw-feature-backend-split'));
+    })).resolves.toBe(path.join('/Users/nbonamy/src', 'agent-workspace-feature-backend-split'));
     await rpc.close();
   });
 
   it('routes agent file listing and previews through backend-owned filesystem access', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-files-'));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-rpc-files-'));
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 
     try {
@@ -498,7 +499,7 @@ describe('BackendDriverRpc', () => {
   });
 
   it('validates agent folders through backend-owned filesystem access', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-agent-folder-'));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-rpc-agent-folder-'));
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 
     try {
@@ -514,7 +515,7 @@ describe('BackendDriverRpc', () => {
   });
 
   it('lists source folders through backend-owned filesystem access', async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-rpc-source-folders-'));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-rpc-source-folders-'));
     const rpc = new BackendDriverRpc(new Map([['codex', createDriver()]]));
 
     try {
@@ -597,7 +598,7 @@ function createAgent(): Agent {
     id: 'agent-dina',
     name: 'Dina',
     backend: 'codex',
-    folder: '/tmp/codex-claw-agent',
+    folder: '/tmp/agent-workspace-agent',
     status: { type: 'idle' },
     createdAt: '2026-06-13T00:00:00.000Z',
     updatedAt: '2026-06-13T00:00:00.000Z',

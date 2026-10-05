@@ -1,14 +1,15 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CodexConversationEvent } from '@codex-app-sdk/core/surface';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
-import { ClawBackendServer } from '../../server';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/events';
+import { AppBackendServer } from '../../server';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { createTestSnapshot } from '../../__tests__/server-test-fixtures';
 import { codexSdkFixture, sdkAgent } from './sdk-surface-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn-a' };
 
-describe('Codex SDK → Claw backend event contract', () => {
+describe(`Codex SDK → ${product.name} backend event contract`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
   const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });
@@ -19,8 +20,8 @@ describe('Codex SDK → Claw backend event contract', () => {
     const agent = { ...sdkAgent(), teamId: 'team-test' };
     snapshot.agents = [agent];
     snapshot.teams[0]!.agentIds = [agent.id];
-    const events: ClawBackendEvent[] = [];
-    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot,
+    const events: AppBackendEvent[] = [];
+    const server = new AppBackendServer({ version: 'test', pid: 1, snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])), onEvent: (event) => events.push(event),
     });
     try {

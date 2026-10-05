@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { WorkspaceSidebarGroup } from '@codex-claw/core/workspace-sidebar';
+import type { WorkspaceSidebarGroup } from '@workspace/core/workspace-sidebar';
 import { useRepositorySessionMenu } from '../use-repository-session-menu';
 
 const group: WorkspaceSidebarGroup = {
-  id: 'git:/src/claw',
+  id: 'git:/src/agent-workspace',
   kind: 'repository',
-  label: 'claw',
-  repositoryRoot: '/src/claw',
+  label: 'app',
+  repositoryRoot: '/src/agent-workspace',
   sessions: [{
     agentId: 'agent-one',
     customName: null,
     conversationTitle: null,
     displayTitle: 'main',
     branch: 'main',
-    folder: '/src/claw',
+    folder: '/src/agent-workspace',
     isLinkedWorktree: false,
     kind: 'main',
     isActive: true,

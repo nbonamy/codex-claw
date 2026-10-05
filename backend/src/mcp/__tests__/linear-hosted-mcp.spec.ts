@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { WorkProviderKind } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { WorkProviderKind } from '@workspace/core/contracts';
 import { WorkIntegrationManager } from '../../work-integrations/manager';
 import { MemoryWorkIntegrationTokenStore } from '../../work-integrations/memory-token-store';
 import { LinearWorkProviderDriver } from '../../work-integrations/linear-driver';
 import { GitHubWorkProviderDriver } from '../../work-integrations/github-driver';
 import { HostedMcpGateway } from '../hosted-mcp-gateway';
-import { ClawMcpService } from '../service';
-import { codexClawSurfaceOptions } from '../../driver-rpc';
+import { AppMcpService } from '../service';
+import { appSurfaceOptions } from '../../driver-rpc';
 import { ClaudeBackendDriver } from '../../claude/claude-driver';
 import { ClaudeAgentSdkTransport } from '../../claude/agent-sdk-transport';
 import { createQueryHarness } from '../../claude/__tests__/sdk-query-fixture';
 
-vi.mock('@codex-claw/core/runtime-discovery', () => ({
+vi.mock('@workspace/core/runtime-discovery', () => ({
   withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
 }));
 
@@ -40,7 +40,7 @@ async function setup() {
   await manager.hydrateConnections();
   const upstream = vi.fn<typeof fetch>();
   const gateway = new HostedMcpGateway({ credentials: manager, fetch: upstream });
-  const service = new ClawMcpService({ snapshot, hostedMcpGateway: gateway });
+  const service = new AppMcpService({ snapshot, hostedMcpGateway: gateway });
   const url = await service.start();
   cleanups.push(async () => { manager.close(); await service.stop(); });
   const post = (provider: string, body: unknown, agentId = snapshot.agents[0]!.id) => fetch(
@@ -51,7 +51,7 @@ async function setup() {
   return { snapshot, tokenStore, seed, manager, upstream, gateway, service, url, post };
 }
 
-describe('Linear hosted MCP through clawd', () => {
+describe('Linear hosted MCP through daemon', () => {
   it('preserves initialize, native tools and issue calls while isolating concurrent GitHub traffic', async () => {
     const { upstream, post, url } = await setup();
     const exchanges = [
@@ -112,7 +112,7 @@ describe('Linear hosted MCP through clawd', () => {
 
   it('uses live integration state for Codex configuration and rejects cached URLs after disconnect', async () => {
     const { snapshot, manager, service, url, post, upstream, seed } = await setup();
-    const options = codexClawSurfaceOptions({ clawMcpServerUrl: url, hostedMcpServerUrls: () => service.hostedMcpServerUrls() });
+    const options = appSurfaceOptions({ appMcpServerUrl: url, hostedMcpServerUrls: () => service.hostedMcpServerUrls() });
     const configure = () => options.extensions![0]!.configureConversation!({ extensionContext: snapshot.agents[0] } as never);
     const enabled = await configure();
     expect(enabled.config).toMatchObject({
@@ -120,7 +120,7 @@ describe('Linear hosted MCP through clawd', () => {
       'mcp_servers.github.url': `${new URL(url).origin}/mcp/providers/github?agentId=${snapshot.agents[0]!.id}`,
       'apps.connector_76869538009648d5b282a4bb21c3d157.enabled': false,
     });
-    expect(Object.keys(enabled.config!).filter(key => key.endsWith('default_tools_approval_mode'))).toStrictEqual(['mcp_servers.codex_claw.default_tools_approval_mode']);
+    expect(Object.keys(enabled.config!).filter(key => key.endsWith('default_tools_approval_mode'))).toStrictEqual(['mcp_servers.workspace.default_tools_approval_mode']);
     expect(JSON.stringify(enabled)).not.toMatch(/linear-secret|github-secret|linear-refresh|github-refresh/);
     await manager.disconnect('linear');
     const disabled = await configure();
@@ -143,7 +143,7 @@ describe('Linear hosted MCP through clawd', () => {
       if (!connected) await manager.disconnect('linear');
       if (index === 2) { await seed('linear'); await manager.hydrateConnections(); }
       const driver = new ClaudeBackendDriver(new ClaudeAgentSdkTransport({ createQuery: sdk.createQuery }), async () => null, {
-        clawMcpServerUrl: url, hostedMcpServerUrls: () => service.hostedMcpServerUrls(),
+        appMcpServerUrl: url, hostedMcpServerUrls: () => service.hostedMcpServerUrls(),
       });
       try {
         const currentAgent = index === 0 ? agent : { ...agent, backendSession: { kind: 'claude' as const, sessionId: 'persisted-session', transport: 'stdio' as const } };
@@ -153,7 +153,7 @@ describe('Linear hosted MCP through clawd', () => {
         expect(options.mcpServers?.github).toStrictEqual({ type: 'http', url: `${new URL(url).origin}/mcp/providers/github?agentId=${agent.id}` });
         if (connected) expect(options.mcpServers?.linear).toStrictEqual({ type: 'http', url: `${new URL(url).origin}/mcp/providers/linear?agentId=${agent.id}` });
         else expect(options.mcpServers).not.toHaveProperty('linear');
-        expect(options.allowedTools).toStrictEqual(['mcp__codex_claw__*']);
+        expect(options.allowedTools).toStrictEqual(['mcp__workspace__*']);
         if (index > 0) expect(options.resume).toBe('persisted-session');
         expect(JSON.stringify(options.mcpServers)).not.toMatch(/secret|refresh|Bearer/);
         sdk.emit({ type: 'system', subtype: 'init', session_id: 'persisted-session' }, index);

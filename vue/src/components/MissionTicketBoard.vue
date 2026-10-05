@@ -104,7 +104,7 @@ import {
   type ComponentPublicInstance,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import type { MissionTicket } from "@codex-claw/core/missions";
+import type { MissionTicket } from "@workspace/core/missions";
 import { ChevronRightIcon } from "../shared/icons/app-icons";
 import AnnotationSendButton from "./AnnotationSendButton.vue";
 import MissionTicketDialog, { type MissionTicketComment } from "./MissionTicketDialog.vue";

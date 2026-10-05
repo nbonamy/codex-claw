@@ -15,21 +15,21 @@ import {
   type EventValueValidator,
 } from './event-validation';
 
-type ClawBackendEventFrom<Event extends BackendPublishedEvent> = Event extends BackendPublishedEvent
+type AppBackendEventFrom<Event extends BackendPublishedEvent> = Event extends BackendPublishedEvent
   ? Omit<Event, 'source'> & { clientState?: ClientState }
   : never;
 
-export type ClawBackendEvent = ClawBackendEventFrom<BackendPublishedEvent>;
+export type AppBackendEvent = AppBackendEventFrom<BackendPublishedEvent>;
 
-type ClawBackendEventType = ClawBackendEvent['type'];
+type AppBackendEventType = AppBackendEvent['type'];
 
 const payloadValidators = {
   ...runtimePayloadValidators,
   ...agentPayloadValidators,
   ...conversationPayloadValidators,
-} satisfies Record<ClawBackendEventType, EventValueValidator>;
+} satisfies Record<AppBackendEventType, EventValueValidator>;
 
-type EventRecord = Record<string, unknown> & { type: ClawBackendEventType };
+type EventRecord = Record<string, unknown> & { type: AppBackendEventType };
 
 function expectRequiredString(
   event: Record<string, unknown>,
@@ -163,7 +163,7 @@ function expectEventContext(event: EventRecord): void {
   }
 }
 
-export function decodeClawBackendEvent(value: unknown): ClawBackendEvent {
+export function decodeAppBackendEvent(value: unknown): AppBackendEvent {
   expectRecord(value, '$');
   expectNumber(value.seq, '$.seq');
   expectString(value.occurredAt, '$.occurredAt');
@@ -192,5 +192,5 @@ export function decodeClawBackendEvent(value: unknown): ClawBackendEvent {
   });
   payloadValidators[event.type](event.payload, '$.payload');
   expectEventContext(event);
-  return value as ClawBackendEvent;
+  return value as AppBackendEvent;
 }

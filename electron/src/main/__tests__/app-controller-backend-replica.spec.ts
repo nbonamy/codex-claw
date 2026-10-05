@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, ClientState, MainToRendererEvent, RendererSnapshotState } from '@codex-claw/core/contracts';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels } from '@codex-claw/core/ipc';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppSnapshot, ClientState, MainToRendererEvent, RendererSnapshotState } from '@workspace/core/contracts';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { ipcChannels } from '@workspace/core/ipc';
 import { callPrivate, emitBackendEvent, setMainWindowSend, currentSnapshot, createBackendClient, getSnapshot } from './app-controller-test-harness';
 
 describe('AppController', () => {
@@ -42,16 +43,16 @@ describe('AppController', () => {
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'working' });
   });
 
-  it('hydrates its metadata cache from clawd snapshot state', async () => {
+  it('hydrates its metadata cache from daemon snapshot state', async () => {
     const initialSnapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...createInitialSnapshot(),
       activeAgentId: 'agent-dina',
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
       sourceFolder: {
         path: '/Users/nbonamy/src',
         initialized: true,
-        recentRepoNames: ['codex-claw'],
+        recentRepoNames: ['agent-workspace'],
       },
     };
     const clientState: ClientState = {
@@ -61,7 +62,7 @@ describe('AppController', () => {
     const request = vi.fn();
     const backendClient: NonNullable<ConstructorParameters<typeof AppController>[1]> = {
       start: vi.fn().mockResolvedValue(undefined),
-      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'daemon', version: '0.1.0', pid: 123 }),
       request: <Result,>(method: string): Promise<Result> => {
         request(method);
         return Promise.resolve((method === 'snapshot/get' ? { snapshot: backendSnapshot, lastEventSeq: 17, clientState } : {}) as Result);
@@ -141,7 +142,7 @@ describe('AppController', () => {
     reconnectedSnapshot.agents[0]!.status = { type: 'working' };
     const clientState: ClientState = { sourceFolderPath: '', shouldPreventDisplaySleep: false };
     let connectionListener: (state: 'connected' | 'disconnected', error?: Error) => void = () => undefined;
-    let backendEventListener: (event: ClawBackendEvent) => void = () => undefined;
+    let backendEventListener: (event: AppBackendEvent) => void = () => undefined;
     let resolveReconnectSnapshot!: (value: {
       snapshot: AppSnapshot;
       lastEventSeq: number;
@@ -157,7 +158,7 @@ describe('AppController', () => {
     let snapshotReads = 0;
     const backendClient: NonNullable<ConstructorParameters<typeof AppController>[1]> = {
       start: vi.fn().mockResolvedValue(undefined),
-      health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+      health: vi.fn().mockResolvedValue({ ok: true, name: 'daemon', version: '0.1.0', pid: 123 }),
       request: vi.fn(async (method: string) => {
         if (method === 'snapshot/get') {
           snapshotReads += 1;
@@ -209,7 +210,7 @@ describe('AppController', () => {
           conversationId: 'thread-dina',
           type: 'message.delta',
           payload: { messageId: 'message-1', itemId: 'item-1', delta: 'Hello' },
-        } as unknown as Extract<ClawBackendEvent, { type: 'codex.conversationEventReceived' }>['payload']['event'],
+        } as unknown as Extract<AppBackendEvent, { type: 'codex.conversationEventReceived' }>['payload']['event'],
       },
     });
     resolveReconnectSnapshot({
@@ -238,12 +239,12 @@ describe('AppController', () => {
     await controller.shutdown();
   });
 
-  it('caches authoritative snapshot metadata from backend events emitted by the clawd process client', async () => {
+  it('caches authoritative snapshot metadata from backend events emitted by the daemon process client', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = createInitialSnapshot();
     backendSnapshot.agents[0]!.status = { type: 'working' };
     const unsubscribe = vi.fn();
-    let emitBackendEvent: (event: ClawBackendEvent) => void = () => undefined;
+    let emitBackendEvent: (event: AppBackendEvent) => void = () => undefined;
     const backendClient = createBackendClientWithEventEmitter((listener) => {
       emitBackendEvent = listener;
       return unsubscribe;
@@ -297,7 +298,7 @@ describe('AppController', () => {
     setMainWindowSend(controller, send);
     await controller.initialize();
     (controller as unknown as {
-      emitBackendEvent(event: ClawBackendEvent): void;
+      emitBackendEvent(event: AppBackendEvent): void;
     }).emitBackendEvent({
       seq: 1,
       type: 'snapshot.updated',
@@ -318,12 +319,12 @@ describe('AppController', () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     const send = vi.fn();
-    const generatedImageUrl = 'file:///Users/nbonamy/.codex-claw/codex-home/generated_images/thread/image.png';
+    const generatedImageUrl = `file:///Users/nbonamy/${product.homeDirectory}/codex-home/generated_images/thread/image.png`;
 
     setMainWindowSend(controller, send);
     await controller.initialize();
     (controller as unknown as {
-      emitBackendEvent(event: ClawBackendEvent): void;
+      emitBackendEvent(event: AppBackendEvent): void;
     }).emitBackendEvent({
       seq: 1,
       agentId: 'agent-dina',
@@ -359,7 +360,7 @@ describe('AppController', () => {
               }],
             },
           },
-        } as unknown as Extract<ClawBackendEvent, { type: 'codex.conversationEventReceived' }>['payload']['event'],
+        } as unknown as Extract<AppBackendEvent, { type: 'codex.conversationEventReceived' }>['payload']['event'],
       },
       occurredAt: '2026-08-30T18:33:55.000Z',
     });
@@ -373,7 +374,7 @@ describe('AppController', () => {
       : undefined;
     const media = message?.parts.find((part) => part.type === 'media');
 
-    expect(media?.type === 'media' ? media.media.url : null).toMatch(/^codex-claw-media:\/\/generated\//);
+    expect(media?.type === 'media' ? media.media.url : null).toMatch(/^agent-workspace-media:\/\/generated\//);
     expect(media?.type === 'media' ? media.media.url : null).not.toBe(generatedImageUrl);
     expect(currentSnapshot(controller)).toBe(snapshot);
   });
@@ -389,7 +390,7 @@ describe('AppController', () => {
     setMainWindowSend(controller, send);
     await controller.initialize();
     (controller as unknown as {
-      emitBackendEvent(event: ClawBackendEvent): void;
+      emitBackendEvent(event: AppBackendEvent): void;
     }).emitBackendEvent({
       seq: 1,
       type: 'snapshot.updated',
@@ -401,13 +402,13 @@ describe('AppController', () => {
     malformedPayload.agents[0]!.name = 'Malformed payload';
     (malformedPayload.sourceFolder as unknown as Record<string, unknown>).initialized = 'yes';
     (controller as unknown as {
-      emitBackendEvent(event: ClawBackendEvent): void;
+      emitBackendEvent(event: AppBackendEvent): void;
     }).emitBackendEvent({
       seq: 2,
       type: 'snapshot.updated',
       payload: malformedPayload,
       occurredAt: '2026-06-13T00:00:01.000Z',
-    } as unknown as ClawBackendEvent);
+    } as unknown as AppBackendEvent);
 
     expect(currentSnapshot(controller)).toBe(snapshot);
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'idle' });
@@ -418,7 +419,7 @@ describe('AppController', () => {
     }));
   });
 
-  it('caches token usage updates emitted by clawd', async () => {
+  it('caches token usage updates emitted by daemon', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     const contextUsage = {
@@ -446,7 +447,7 @@ describe('AppController', () => {
     expect(snapshot.agents[0].contextUsage).toStrictEqual(contextUsage);
   });
 
-  it('caches account rate-limit updates emitted by clawd', async () => {
+  it('caches account rate-limit updates emitted by daemon', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     const rateLimits = {
@@ -480,7 +481,7 @@ describe('AppController', () => {
   });
 
 
-  it('caches turn diff updates emitted by clawd without deriving side-panel previews', async () => {
+  it('caches turn diff updates emitted by daemon without deriving side-panel previews', async () => {
     const snapshot = createInitialSnapshot();
     const controller = new AppController(snapshot, createBackendClient());
     await controller.initialize();
@@ -557,11 +558,11 @@ function currentClientState(controller: AppController): ClientState {
 }
 
 function createBackendClientWithEventEmitter(
-  onEvent: (listener: (event: ClawBackendEvent) => void) => () => void,
+  onEvent: (listener: (event: AppBackendEvent) => void) => () => void,
 ) {
   return {
     start: vi.fn().mockResolvedValue(undefined),
-    health: vi.fn().mockResolvedValue({ ok: true, name: 'clawd', version: '0.1.0', pid: 123 }),
+    health: vi.fn().mockResolvedValue({ ok: true, name: 'daemon', version: '0.1.0', pid: 123 }),
     request: vi.fn().mockResolvedValue({}),
     onEvent: vi.fn(onEvent),
     close: vi.fn().mockResolvedValue(undefined),

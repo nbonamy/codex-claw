@@ -1,10 +1,10 @@
-import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionResultInput, MissionReviewFindingInput, MissionReviewFindingUpdateInput, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@codex-claw/core/mission-execution';
-import type { MissionArtifactFile, MissionStage } from '@codex-claw/core/missions';
+import type { MissionArtifactReadResult, MissionArtifactWriteInput, MissionResultInput, MissionReviewFindingInput, MissionReviewFindingUpdateInput, MissionTicketDraftInput, MissionTicketDraftResult, MissionToolContext } from '@workspace/core/mission-execution';
+import type { MissionArtifactFile, MissionStage } from '@workspace/core/missions';
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
-import type { DelegatedTask, TaskContract } from '@codex-claw/core/delegated-task';
+import type { Agent, AgentBackend, AgentStatus, AnnouncementPhase, CelebrationKind, CreateSourceWorktreeInput, SourceRepository, SourceWorktree, WorkBacklogAssignmentStatus } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import type { ThreadFlagId } from '@workspace/core/thread-flags';
+import type { DelegatedTask, TaskContract } from '@workspace/core/delegated-task';
 
 export type McpAgentInfo = {
   id: string;
@@ -157,7 +157,7 @@ export type MissionToolPort = {
   updateReviewFinding(agentId: string, input: MissionReviewFindingUpdateInput): Promise<unknown>;
 };
 
-export type ClawMcpAgentCoordinatorOptions = {
+export type AppMcpAgentCoordinatorOptions = {
   missionTools?: MissionToolPort;
   getAgents: () => Agent[];
   onAgentUpdated?: (agent: Agent) => void;
@@ -181,7 +181,7 @@ export class McpToolError extends Error {
   }
 }
 
-export class ClawMcpAgentCoordinator {
+export class AppMcpAgentCoordinator {
   private readonly missionTools?: MissionToolPort;
   private readonly messages: McpMessage[] = [];
   private readonly getAgents: () => Agent[];
@@ -198,7 +198,7 @@ export class ClawMcpAgentCoordinator {
   private readonly createId: () => string;
   private readonly now: () => Date;
 
-  constructor(options: ClawMcpAgentCoordinatorOptions) {
+  constructor(options: AppMcpAgentCoordinatorOptions) {
     this.missionTools = options.missionTools;
     this.getAgents = options.getAgents;
     this.onAgentUpdated = options.onAgentUpdated;

@@ -43,7 +43,7 @@ Open the browser's **…** menu for:
 
 Device dimensions help check responsive layout. Use a real device when the result depends on that device's browser, input, or hardware behavior.
 
-Choose **Annotate page** to mark an element or area and add a comment. Collect the changes you want, then use the annotation send button. Claw sends the page URL, targets, and feedback to the agent as a request to inspect the rendered page and address those annotations.
+Choose **Annotate page** to mark an element or area and add a comment. Collect the changes you want, then use the annotation send button. Korus sends the page URL, targets, and feedback to the agent as a request to inspect the rendered page and address those annotations.
 
 ## Keep context with the agent
 
@@ -55,13 +55,13 @@ Use Chrome when the task needs your existing Chrome login, tabs, or extensions:
 
 1. Open **Settings → Plugins**.
 2. Choose the **Chrome** control in the **Codex** section. It opens the Codex plugin manager; complete the Chrome plugin setup there.
-3. Return to Claw and check the Chrome status. Start a new Codex agent if an existing session does not discover the newly enabled plugin.
+3. Return to Korus and check the Chrome status. Start a new Codex agent if an existing session does not discover the newly enabled plugin.
 4. Explicitly name Chrome and the page you want the agent to use.
 
 ```text
 Use Chrome and my existing signed-in project tab to inspect the dashboard.
 ```
 
-Chrome is a Codex plugin, separate from Claw's provider-neutral in-app browser. Opening a URL with **Open in external browser** uses your system browser; it does not enable agent control of that browser.
+Chrome is a Codex plugin, separate from Korus's provider-neutral in-app browser. Opening a URL with **Open in external browser** uses your system browser; it does not enable agent control of that browser.
 
 See [Computer Use](./computer-use) for native application interactions.

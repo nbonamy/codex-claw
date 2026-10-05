@@ -1,4 +1,4 @@
-import type { AppSnapshot, AutomationLocation } from '@codex-claw/core/contracts';
+import type { AppSnapshot, AutomationLocation } from '@workspace/core/contracts';
 
 export type RepositorySessionSource = {
   agentId?: string;

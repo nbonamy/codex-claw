@@ -4,11 +4,11 @@ import path from 'node:path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@codex-claw/core': path.resolve(__dirname, '../core/src'),
+      '@workspace/core': path.resolve(__dirname, '../core/src'),
     },
   },
   ssr: {
-    noExternal: ['@codex-claw/core'],
+    noExternal: ['@workspace/core'],
   },
   build: {
     ssr: path.resolve(__dirname, 'src/server/index.ts'),

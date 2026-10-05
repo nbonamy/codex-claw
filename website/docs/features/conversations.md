@@ -24,7 +24,7 @@ In the upcoming release after 0.25.2, the composer's **+** menu includes **Revie
 
 ## Discuss before implementation
 
-Use `/plan` to enter Plan mode, then explain what you want to decide before editing. Claw uses Codex's native Plan mode; for Claude Code, it supplies planning instructions to the conversation.
+Use `/plan` to enter Plan mode, then explain what you want to decide before editing. Korus uses Codex's native Plan mode; for Claude Code, it supplies planning instructions to the conversation.
 
 ```text
 First discuss the tradeoffs between extending this module and adding
@@ -35,7 +35,7 @@ Review the proposed plan and answer any questions before asking the agent to imp
 
 ## Follow the evidence
 
-Claw renders messages, tool calls, command output, plans, approvals, and file changes. Use those details to check what the agent inspected and what it actually validated.
+Korus renders messages, tool calls, command output, plans, approvals, and file changes. Use those details to check what the agent inspected and what it actually validated.
 
 Open a document or diff in the workspace when you need to examine it while continuing the discussion.
 
@@ -84,7 +84,7 @@ Use **Hand off…** to continue a workspace task with a new agent, including swi
 1. Wait until the agent is idle, then right-click it in the sidebar or Cockpit and choose **Hand off…**. The native **Agent** menu offers the same action.
 2. Choose the destination **Coding agent** and **Model**, or keep **Provider default**.
 3. Optionally add **Additional handoff instructions** describing what the current agent should emphasize in its note.
-4. Choose **Hand off**. The current agent writes the note, and Claw replaces it with a new agent that starts work from that note.
+4. Choose **Hand off**. The current agent writes the note, and Korus replaces it with a new agent that starts work from that note.
 
 The replacement keeps the same folder, branch, and uncommitted changes and uses the destination engine's default permissions. The source conversation remains available through **Source conversation** in the handoff dialog, alongside the **Saved handoff note**. This transfers a written summary rather than converting one provider's conversation history into another's.
 
@@ -100,6 +100,6 @@ Claude goal support is new in the upcoming release after 0.25.2. It uses Claude 
 
 ## Resume work
 
-Claw restores durable workspace state when you return. Older messages load through conversation history; use the retry action if history loading reports a failure.
+Korus restores durable workspace state when you return. Older messages load through conversation history; use the retry action if history loading reports a failure.
 
 Its background daemon can keep agent work running after the desktop window closes. The host still needs to be running and connected; stopping the daemon or sleeping the host interrupts that availability. Check the conversation and current status before submitting another instruction.

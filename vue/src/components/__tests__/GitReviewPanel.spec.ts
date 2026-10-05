@@ -28,14 +28,14 @@ describe('GitReviewPanel', () => {
           teamId: 'team-1',
           name: 'Dina',
           avatar: 'D',
-          folder: '/Users/nicolas/src/codex-claw',
+          folder: '/Users/nicolas/src/agent-workspace',
           backend: 'codex',
           status: { type: 'idle' },
           createdAt: '2026-08-01T00:00:00.000Z',
           updatedAt: '2026-08-01T00:00:00.000Z',
         },
         gitStatus: {
-          folder: '/Users/nicolas/src/codex-claw',
+          folder: '/Users/nicolas/src/agent-workspace',
           branch: 'main',
           upstream: 'origin/main',
           ahead: 0,
@@ -51,7 +51,7 @@ describe('GitReviewPanel', () => {
       },
     });
 
-    expect(wrapper.text()).toContain('codex-claw');
+    expect(wrapper.text()).toContain('agent-workspace');
     expect(wrapper.text()).toContain('main→origin/main');
     expect(wrapper.get('[aria-label="Diff statistics"]').text()).toBe('+2-1');
     expect(wrapper.text()).toContain('src/main.ts');

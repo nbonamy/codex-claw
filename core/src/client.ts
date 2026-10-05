@@ -1,8 +1,8 @@
-import type { CodexClawApi } from './contracts';
+import type { AppApi } from './contracts';
 
-export type ClawClientPlatform = 'desktop' | 'web';
+export type AppClientPlatform = 'desktop' | 'web';
 
-export type ClawHostCapabilities = {
+export type AppHostCapabilities = {
   appLifecycle: boolean;
   appshots: boolean;
   appUpdates: boolean;
@@ -15,12 +15,12 @@ export type ClawHostCapabilities = {
   systemPermissions: boolean;
 };
 
-export type ClawClient = {
-  api: CodexClawApi;
-  platform: ClawClientPlatform;
+export type AppClient = {
+  api: AppApi;
+  platform: AppClientPlatform;
 };
 
-export const desktopClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.freeze({
+export const desktopAppHostCapabilities: Readonly<AppHostCapabilities> = Object.freeze({
   appLifecycle: true,
   appshots: true,
   appUpdates: true,
@@ -33,7 +33,7 @@ export const desktopClawHostCapabilities: Readonly<ClawHostCapabilities> = Objec
   systemPermissions: true,
 });
 
-export const webClawHostCapabilities: Readonly<ClawHostCapabilities> = Object.freeze({
+export const webAppHostCapabilities: Readonly<AppHostCapabilities> = Object.freeze({
   appLifecycle: false,
   appshots: false,
   appUpdates: false,

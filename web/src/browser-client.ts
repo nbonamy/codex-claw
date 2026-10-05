@@ -1,13 +1,14 @@
+import { product } from '@workspace/core/product';
 import { createCodexBrowserWebSocketPort, type CodexWebSocketPort } from '@codex-app-sdk/web/client';
-import type { CodexClawApi, MainToRendererEvent } from '@codex-claw/core/contracts';
+import type { AppApi, MainToRendererEvent } from '@workspace/core/contracts';
 import {
-  ClawWebEventDecodeError,
-  clawWebProtocolVersion,
-  encodeClawWebMessage,
-  parseClawWebServerMessage,
+  AppWebEventDecodeError,
+  appWebProtocolVersion,
+  encodeAppWebMessage,
+  parseAppWebServerMessage,
 } from './protocol';
 
-export type CreateClawBrowserClientOptions = {
+export type CreateAppBrowserClientOptions = {
   createSocket(): WebSocket;
   requestTimeoutMs?: number;
 };
@@ -18,8 +19,8 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
-export function createClawBrowserClient(options: CreateClawBrowserClientOptions): CodexClawApi {
-  const transport = new ClawBrowserTransport(options);
+export function createAppBrowserClient(options: CreateAppBrowserClientOptions): AppApi {
+  const transport = new AppBrowserTransport(options);
   return new Proxy({}, {
     get(_target, property) {
       if (property === 'onEvent') return (listener: (event: MainToRendererEvent) => void) => transport.onEvent(listener);
@@ -29,10 +30,10 @@ export function createClawBrowserClient(options: CreateClawBrowserClientOptions)
       if (typeof property !== 'string') return undefined;
       return (...args: unknown[]) => transport.invoke(property, args);
     },
-  }) as CodexClawApi;
+  }) as AppApi;
 }
 
-class ClawBrowserTransport {
+class AppBrowserTransport {
   private readonly listeners = new Set<(event: MainToRendererEvent) => void>();
   private readonly pending = new Map<string, PendingRequest>();
   private readonly requestTimeoutMs: number;
@@ -40,24 +41,24 @@ class ClawBrowserTransport {
   private connectPromise: Promise<void> | null = null;
   private sequence = 0;
 
-  constructor(private readonly options: CreateClawBrowserClientOptions) {
+  constructor(private readonly options: CreateAppBrowserClientOptions) {
     this.requestTimeoutMs = options.requestTimeoutMs ?? 60_000;
   }
 
   async invoke(operation: string, args: unknown[]): Promise<unknown> {
     await this.connect();
     const socket = this.socket;
-    if (!socket) throw new Error('Claw web socket is not connected.');
-    const id = `claw-${++this.sequence}`;
+    if (!socket) throw new Error(`${product.name} web socket is not connected.`);
+    const id = `app-${++this.sequence}`;
     const result = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`Claw web request timed out: ${operation}`));
+        reject(new Error(`${product.name} web request timed out: ${operation}`));
       }, this.requestTimeoutMs);
       this.pending.set(id, { resolve, reject, timeout });
     });
-    socket.send(encodeClawWebMessage({
-      version: clawWebProtocolVersion,
+    socket.send(encodeAppWebMessage({
+      version: appWebProtocolVersion,
       type: 'request',
       id,
       operation,
@@ -81,7 +82,7 @@ class ClawBrowserTransport {
       let ready = false;
       socket.onMessage((data) => {
         try {
-          const message = parseClawWebServerMessage(JSON.parse(webSocketText(data)));
+          const message = parseAppWebServerMessage(JSON.parse(webSocketText(data)));
           if (message.type === 'ready') {
             ready = true;
             this.socket = socket;
@@ -99,14 +100,14 @@ class ClawBrowserTransport {
           if (message.ok) pending.resolve(message.result);
           else pending.reject(new Error(message.error));
         } catch (error) {
-          if (error instanceof ClawWebEventDecodeError) console.warn(error.message);
+          if (error instanceof AppWebEventDecodeError) console.warn(error.message);
           else if (!ready) reject(error);
         }
       });
       socket.onClose(() => {
         if (this.socket === socket) this.socket = null;
         this.connectPromise = null;
-        const error = new Error('Claw web socket disconnected.');
+        const error = new Error(`${product.name} web socket disconnected.`);
         for (const request of this.pending.values()) {
           clearTimeout(request.timeout);
           request.reject(error);
@@ -133,5 +134,5 @@ function trimTrailingUndefined(args: unknown[]): unknown[] {
 function webSocketText(data: unknown): string {
   if (typeof data === 'string') return data;
   if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) return new TextDecoder().decode(data);
-  throw new TypeError('Claw WebSocket messages must contain text or UTF-8 bytes.');
+  throw new TypeError(`${product.name} WebSocket messages must contain text or UTF-8 bytes.`);
 }

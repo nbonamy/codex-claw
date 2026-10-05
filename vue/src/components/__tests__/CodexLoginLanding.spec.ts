@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { ElButton } from 'element-plus';
@@ -20,8 +21,8 @@ function mountLanding(props: InstanceType<typeof CodexLoginLanding>['$props'] = 
 describe('CodexLoginLanding', () => {
   it('offers independent customization and does not treat CLI detection as a connection', async () => {
     const wrapper = mountLanding({ providerSetup: [
-      { backend: 'codex', installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: false },
-      { backend: 'claude', installed: false, isolated: true, shareSkills: true, homePath: '/claw/claude-home', locked: false },
+      { backend: 'codex', installed: true, isolated: true, shareSkills: true, homePath: '/app/codex-home', locked: false },
+      { backend: 'claude', installed: false, isolated: true, shareSkills: true, homePath: '/app/claude-home', locked: false },
     ] });
     const providers = wrapper.findAll('.codex-login__provider');
     expect(providers[0]!.text()).toContain('Detected');
@@ -41,10 +42,10 @@ describe('CodexLoginLanding', () => {
     const wrapper = mountLanding();
 
     expect(wrapper.classes()).toContain('codex-login--sign-in');
-    expect(wrapper.get('h1').text()).toContain('Codex Claw,');
+    expect(wrapper.get('h1').text()).toContain(`${product.name},`);
     expect(wrapper.get('h1').text()).toContain('a home for your coding agents.');
     expect(wrapper.get('h1').find('br').exists()).toBe(true);
-    expect(wrapper.get('.codex-login__mark img').attributes('alt')).toBe('Codex Claw');
+    expect(wrapper.get('.codex-login__mark img').attributes('alt')).toBe(`${product.name}`);
     expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
     await wrapper.get('.codex-login__providers .el-button').trigger('click');
     expect(wrapper.emitted('login')).toStrictEqual([[]]);
@@ -96,7 +97,7 @@ describe('CodexLoginLanding', () => {
 
   it('offers cancellation while Codex sign-in is pending without hiding Claude', async () => {
     const wrapper = mountLanding({ cancellable: false, providerSetup: [
-      { backend: 'codex', installed: true, isolated: true, shareSkills: true, homePath: '/claw/codex-home', locked: false },
+      { backend: 'codex', installed: true, isolated: true, shareSkills: true, homePath: '/app/codex-home', locked: false },
     ] });
 
     expect(wrapper.find('.codex-login__cancel').exists()).toBe(false);

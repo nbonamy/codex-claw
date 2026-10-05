@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, AgentStatus } from '@codex-claw/core/contracts';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, AgentStatus } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import {
-  ClawMcpAgentCoordinator,
+  AppMcpAgentCoordinator,
   McpToolError,
-  type ClawMcpAgentCoordinatorOptions,
+  type AppMcpAgentCoordinatorOptions,
 } from '../agent-coordinator';
 
-describe('ClawMcpAgentCoordinator', () => {
+describe('AppMcpAgentCoordinator', () => {
   it('requires a known caller before exposing or invoking mission capabilities', async () => {
     const { coordinator } = fixture();
     const input = { summary: 'Ready', artifacts: { requirements: { problem: 'Billing', acceptance: 'Pay' }, tickets: [], implementation: { changes: '', tests: '' }, review: { summary: '', pullRequestUrl: '' } } };
@@ -231,7 +231,7 @@ describe('ClawMcpAgentCoordinator', () => {
       .toThrowError("Recipient name 'Jesse' is ambiguous");
     expect(() => coordinator.listAgents('missing'))
       .toThrowError(/Visible agents:\n\n- agent-dina: Dina/);
-    const emptyCoordinator = new ClawMcpAgentCoordinator({ getAgents: () => [] });
+    const emptyCoordinator = new AppMcpAgentCoordinator({ getAgents: () => [] });
     expect(() => emptyCoordinator.listAgents('missing'))
       .toThrowError("Agent 'missing' not found. No agents are currently available.");
   });
@@ -295,24 +295,24 @@ describe('ClawMcpAgentCoordinator', () => {
 
   it('lists repositories and static or refreshed worktrees', async () => {
     const repos = [{
-      name: 'codex-claw',
-      path: '/src/codex-claw',
-      worktrees: [{ name: 'main', path: '/src/codex-claw' }],
+      name: 'agent-workspace',
+      path: '/src/agent-workspace',
+      worktrees: [{ name: 'main', path: '/src/agent-workspace' }],
     }];
     const onListSourceRepositories = vi.fn().mockResolvedValue(repos);
     const onListSourceWorktrees = vi.fn().mockResolvedValue([
-      { name: 'coverage', path: '/src/codex-claw-coverage' },
+      { name: 'coverage', path: '/src/agent-workspace-coverage' },
     ]);
     const refreshed = fixture({ onListSourceRepositories, onListSourceWorktrees }).coordinator;
     const staticCoordinator = fixture({ onListSourceRepositories }).coordinator;
 
     await expect(refreshed.listSourceRepositories('agent-dina')).resolves.toStrictEqual({ repos });
-    await expect(refreshed.listSourceWorktrees('agent-dina', ' /src/codex-claw ')).resolves.toStrictEqual({
-      repoPath: '/src/codex-claw',
-      worktrees: [{ name: 'coverage', path: '/src/codex-claw-coverage' }],
+    await expect(refreshed.listSourceWorktrees('agent-dina', ' /src/agent-workspace ')).resolves.toStrictEqual({
+      repoPath: '/src/agent-workspace',
+      worktrees: [{ name: 'coverage', path: '/src/agent-workspace-coverage' }],
     });
-    await expect(staticCoordinator.listSourceWorktrees('agent-dina', '/src/codex-claw')).resolves.toStrictEqual({
-      repoPath: '/src/codex-claw',
+    await expect(staticCoordinator.listSourceWorktrees('agent-dina', '/src/agent-workspace')).resolves.toStrictEqual({
+      repoPath: '/src/agent-workspace',
       worktrees: repos[0]!.worktrees,
     });
     await expect(refreshed.listSourceWorktrees('agent-dina', '/src/missing'))
@@ -325,7 +325,7 @@ describe('ClawMcpAgentCoordinator', () => {
     await expect(coordinator.listSourceRepositories('agent-dina'))
       .rejects.toThrowError('Source repositories are not available.');
     await expect(coordinator.createSourceWorktree('agent-dina', {
-      repoPath: '/src/claw',
+      repoPath: '/src/app',
       branchName: 'coverage',
     })).rejects.toThrowError('Source worktree creation is not available.');
   });
@@ -333,7 +333,7 @@ describe('ClawMcpAgentCoordinator', () => {
   it('normalizes worktree creation and agent creation inputs', async () => {
     const onCreateSourceWorktree = vi.fn().mockResolvedValue({
       name: 'coverage',
-      path: '/src/claw-coverage',
+      path: '/src/app-coverage',
     });
     const onCreateAgent = vi.fn().mockResolvedValue({
       success: true,
@@ -343,47 +343,47 @@ describe('ClawMcpAgentCoordinator', () => {
     const { coordinator, agents } = fixture({ onCreateSourceWorktree, onCreateAgent });
 
     await coordinator.createSourceWorktree('agent-dina', {
-      repoPath: ' /src/claw ',
+      repoPath: ' /src/app ',
       branchName: ' coverage ',
-      destinationPath: ' /src/claw-coverage ',
+      destinationPath: ' /src/app-coverage ',
     });
     expect(onCreateSourceWorktree).toHaveBeenCalledWith({
-      repoPath: '/src/claw',
+      repoPath: '/src/app',
       branchName: 'coverage',
-      destinationPath: '/src/claw-coverage',
+      destinationPath: '/src/app-coverage',
     });
 
     await coordinator.createAgent('agent-dina', {
-      repoPath: ' /src/claw ',
+      repoPath: ' /src/app ',
       name: ' New Agent ',
       model: ' gpt-5.6-sol ',
       reasoningEffort: ' high ',
       createWorktree: true,
       branchName: ' coverage ',
-      destinationPath: ' /src/claw-coverage ',
+      destinationPath: ' /src/app-coverage ',
       prompt: ' Fix the flaky test. ',
     });
     expect(onCreateAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), {
-      repoPath: '/src/claw',
+      repoPath: '/src/app',
       name: 'New Agent',
       backend: 'codex',
       model: 'gpt-5.6-sol',
       reasoningEffort: 'high',
       createWorktree: true,
       branchName: 'coverage',
-      destinationPath: '/src/claw-coverage',
+      destinationPath: '/src/app-coverage',
       prompt: 'Fix the flaky test.',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
     });
     agents[0]!.backend = 'claude';
-    await coordinator.createAgent('agent-dina', { repoPath: '/src/claw' });
+    await coordinator.createAgent('agent-dina', { repoPath: '/src/app' });
     expect(onCreateAgent).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ backend: 'claude' }));
-    await coordinator.createAgent('agent-dina', { repoPath: '/src/claw', backend: 'codex' });
+    await coordinator.createAgent('agent-dina', { repoPath: '/src/app', backend: 'codex' });
     expect(onCreateAgent).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ backend: 'codex' }));
   });
 
   it('reports unavailable agent creation', async () => {
-    await expect(fixture().coordinator.createAgent('agent-dina', { repoPath: '/src/claw' }))
+    await expect(fixture().coordinator.createAgent('agent-dina', { repoPath: '/src/app' }))
       .rejects.toThrowError('Agent creation is not available.');
   });
 
@@ -451,14 +451,14 @@ describe('ClawMcpAgentCoordinator', () => {
   });
 });
 
-function fixture(overrides: Partial<ClawMcpAgentCoordinatorOptions> = {}) {
+function fixture(overrides: Partial<AppMcpAgentCoordinatorOptions> = {}) {
   const agents = createInitialSnapshot().agents;
   agents[0]!.folder = '/tmp/dina';
   agents[1]!.folder = '/tmp/jesse';
   const onAgentUpdated = vi.fn();
   const onInboxMessage = vi.fn();
   let id = 0;
-  const coordinator = new ClawMcpAgentCoordinator({
+  const coordinator = new AppMcpAgentCoordinator({
     getAgents: () => agents,
     onAgentUpdated,
     onInboxMessage,
@@ -473,7 +473,7 @@ function agent(overrides: Partial<Agent> & Pick<Agent, 'id' | 'name' | 'folder'>
   const { id, name, folder, ...rest } = overrides;
   return {
     id,
-    teamId: 'team-codex-claw',
+    teamId: 'team-app',
     name,
     avatar: 'AG',
     folder,

@@ -1,7 +1,7 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { app, shell } from 'electron';
-import type { SystemPermissionsStatus } from '@codex-claw/core/contracts';
-import { type AnnouncementPhase, type SpokenAnnouncementRequest, type SpokenAnnouncementVoice } from '@codex-claw/core/contracts';
+import type { SystemPermissionsStatus } from '@workspace/core/contracts';
+import { type AnnouncementPhase, type SpokenAnnouncementRequest, type SpokenAnnouncementVoice } from '@workspace/core/contracts';
 import { executeComputerUseCommand, getComputerUseStatus, isComputerUseCommand, requestComputerUseAccessibility, requestComputerUseScreenCapture, stopComputerUseHelper, type ComputerUseOptions } from './computer-use-tools';
 import { getSystemPermissionsStatus, openAccessibilitySettings } from './system-permissions';
 import { createRuntimeSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';

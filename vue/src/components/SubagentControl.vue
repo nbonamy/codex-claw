@@ -50,7 +50,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { IconLego } from '@tabler/icons-vue';
 import { useI18n } from 'vue-i18n';
-import type { AgentSubagentTree, SubagentNode } from '@codex-claw/core/contracts';
+import type { AgentSubagentTree, SubagentNode } from '@workspace/core/contracts';
 
 const props = defineProps<{
   tree: AgentSubagentTree;

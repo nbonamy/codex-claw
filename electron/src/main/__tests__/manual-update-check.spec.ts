@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { ManualUpdateCheckController } from '../manual-update-check';
 
@@ -21,7 +22,7 @@ describe('manual update checks', () => {
     await flushPromises();
 
     expect(showMessageBox).toHaveBeenCalledWith(null, expect.objectContaining({
-      message: 'Codex Claw is up to date',
+      message: `${product.name} is up to date`,
       type: 'info',
     }));
   });

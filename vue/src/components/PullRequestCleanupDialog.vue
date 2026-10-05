@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog pull-request-cleanup-dialog"
+    class="app-dialog pull-request-cleanup-dialog"
     :model-value="visible"
     :teleported="false"
     width="520px"
@@ -9,8 +9,8 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">
+      <div class="app-form-dialog__header">
+        <h2 class="app-dialog__title">
           {{ cleanupTitle }}
         </h2>
       </div>
@@ -22,11 +22,11 @@
     </div>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')">
+      <div class="app-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="emit('close')">
           {{ t('pullRequestCleanup.later') }}
         </button>
-        <button class="claw-button claw-button--primary" type="button" :aria-busy="busy" :disabled="busy" @click="emit('confirm')">
+        <button class="app-button app-button--primary" type="button" :aria-busy="busy" :disabled="busy" @click="emit('confirm')">
           {{ t('pullRequestCleanup.action') }}
         </button>
       </div>
@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 

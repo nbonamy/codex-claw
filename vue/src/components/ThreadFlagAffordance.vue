@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
+import type { ThreadFlagId } from '@workspace/core/thread-flags';
 import { IconChecklist } from '@tabler/icons-vue';
 import { CheckIcon, GitBranchIcon, X } from '../shared/icons/app-icons';
 

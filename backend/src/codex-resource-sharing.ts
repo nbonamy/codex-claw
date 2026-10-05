@@ -1,19 +1,19 @@
 import { cp, lstat, mkdir, readdir, readlink, rm, symlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import type { CodexResourceSharingStatus, SetCodexResourceSharingInput } from '@codex-claw/core/contracts';
+import type { CodexResourceSharingStatus, SetCodexResourceSharingInput } from '@workspace/core/contracts';
 import { backendCodexHomeDir } from './state';
 
 const resourceDirectoryNames = ['skills', 'plugins'] as const;
 
 export type CodexResourceSharingPaths = {
-  clawCodexHome: string;
+  appCodexHome: string;
   userCodexHome: string;
 };
 
 function defaultCodexResourceSharingPaths(): CodexResourceSharingPaths {
   return {
-    clawCodexHome: backendCodexHomeDir(),
+    appCodexHome: backendCodexHomeDir(),
     userCodexHome: path.join(homedir(), '.codex'),
   };
 }
@@ -68,27 +68,27 @@ export async function setCodexResourceSharing(
 }
 
 async function shareCodexResources(paths: CodexResourceSharingPaths): Promise<void> {
-  await mkdir(paths.clawCodexHome, { recursive: true, mode: 0o700 });
+  await mkdir(paths.appCodexHome, { recursive: true, mode: 0o700 });
   await mkdir(paths.userCodexHome, { recursive: true, mode: 0o700 });
 
   for (const name of resourceDirectoryNames) {
     const sharedPath = path.join(paths.userCodexHome, name);
-    const clawPath = path.join(paths.clawCodexHome, name);
+    const appPath = path.join(paths.appCodexHome, name);
     await mkdir(sharedPath, { recursive: true, mode: 0o700 });
-    if (await isLinkTo(clawPath, sharedPath)) continue;
-    await rm(clawPath, { recursive: true, force: true });
-    await symlink(path.relative(paths.clawCodexHome, sharedPath), clawPath, 'dir');
+    if (await isLinkTo(appPath, sharedPath)) continue;
+    await rm(appPath, { recursive: true, force: true });
+    await symlink(path.relative(paths.appCodexHome, sharedPath), appPath, 'dir');
   }
 }
 
 async function ensureIsolatedCodexResources(paths: CodexResourceSharingPaths): Promise<void> {
-  await mkdir(paths.clawCodexHome, { recursive: true, mode: 0o700 });
+  await mkdir(paths.appCodexHome, { recursive: true, mode: 0o700 });
   for (const name of resourceDirectoryNames) {
-    const clawPath = path.join(paths.clawCodexHome, name);
-    if (await isSymbolicLink(clawPath)) {
-      await rm(clawPath, { force: true });
+    const appPath = path.join(paths.appCodexHome, name);
+    if (await isSymbolicLink(appPath)) {
+      await rm(appPath, { force: true });
     }
-    await mkdir(clawPath, { recursive: true, mode: 0o700 });
+    await mkdir(appPath, { recursive: true, mode: 0o700 });
   }
 }
 
@@ -96,18 +96,18 @@ async function isolateCodexResources(
   mode: Extract<SetCodexResourceSharingInput, { enabled: false }>['mode'],
   paths: CodexResourceSharingPaths,
 ): Promise<void> {
-  await mkdir(paths.clawCodexHome, { recursive: true, mode: 0o700 });
+  await mkdir(paths.appCodexHome, { recursive: true, mode: 0o700 });
   await mkdir(paths.userCodexHome, { recursive: true, mode: 0o700 });
 
   for (const name of resourceDirectoryNames) {
     const sharedPath = path.join(paths.userCodexHome, name);
-    const clawPath = path.join(paths.clawCodexHome, name);
+    const appPath = path.join(paths.appCodexHome, name);
     await mkdir(sharedPath, { recursive: true, mode: 0o700 });
-    await rm(clawPath, { recursive: true, force: true });
+    await rm(appPath, { recursive: true, force: true });
     if (mode === 'copy') {
-      await cp(sharedPath, clawPath, { recursive: true, preserveTimestamps: true });
+      await cp(sharedPath, appPath, { recursive: true, preserveTimestamps: true });
     } else {
-      await mkdir(clawPath, { recursive: true, mode: 0o700 });
+      await mkdir(appPath, { recursive: true, mode: 0o700 });
     }
   }
 }
@@ -126,13 +126,13 @@ async function isLinkTo(linkPath: string, targetPath: string): Promise<boolean> 
 
 async function hasConflictingCodexResources(paths: CodexResourceSharingPaths): Promise<boolean> {
   for (const name of resourceDirectoryNames) {
-    const clawPath = path.join(paths.clawCodexHome, name);
+    const appPath = path.join(paths.appCodexHome, name);
     const sharedPath = path.join(paths.userCodexHome, name);
     try {
-      const stats = await lstat(clawPath);
+      const stats = await lstat(appPath);
       // Turning sharing off creates empty directories; relinking them loses no data.
-      if (stats.isDirectory() && (await readdir(clawPath)).length === 0) continue;
-      if (!await isLinkTo(clawPath, sharedPath)) return true;
+      if (stats.isDirectory() && (await readdir(appPath)).length === 0) continue;
+      if (!await isLinkTo(appPath, sharedPath)) return true;
     } catch (error) {
       if (!isNodeError(error) || error.code !== 'ENOENT') throw error;
     }

@@ -45,7 +45,7 @@
         :can-retry-message="false"
         follow-ups-disabled
         :messages="messages"
-        :tool-visibility="isClawToolVisible"
+        :tool-visibility="isAppToolVisible"
       />
       <div
         v-else
@@ -56,14 +56,14 @@
 </template>
 
 <script setup lang="ts">
-import type { RendererMessage } from '@codex-claw/core/contracts';
+import type { RendererMessage } from '@workspace/core/contracts';
 import { CodexMessageList } from '@codex-app-sdk/vue';
 import { useI18n } from 'vue-i18n';
 import { X } from '../shared/icons/app-icons';
-import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
+import { isAppToolVisible, provideAppToolPresentation } from '../tool-presentation';
 
 const { t } = useI18n();
-provideClawToolPresentation((key, params) => t(key, params ?? {}));
+provideAppToolPresentation((key, params) => t(key, params ?? {}));
 
 const props = defineProps<{
   agentName: string;

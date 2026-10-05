@@ -5,13 +5,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { WorkIntegrationManager } from '../manager';
 import { FileWorkIntegrationTokenStore } from '../file-token-store';
 import { LinearWorkProviderDriver } from '../linear-driver';
 import { GitHubWorkProviderDriver } from '../github-driver';
-import { ClawBackendServer } from '../../server';
-import { decodeAppSnapshot } from '@codex-claw/core/snapshot-guards';
+import { AppBackendServer } from '../../server';
+import { decodeAppSnapshot } from '@workspace/core/snapshot-guards';
 
 const managers: WorkIntegrationManager[] = [];
 const temporaryDirectories: string[] = [];
@@ -29,7 +29,7 @@ async function setup() {
   await new Promise<void>(resolve => listener.close(() => resolve()));
   const callbackUri = `http://127.0.0.1:${address.port}/oauth/linear/callback`;
   const snapshot = createInitialSnapshot();
-  const directory = await mkdtemp(path.join(tmpdir(), 'claw-linear-test-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'app-linear-test-'));
   temporaryDirectories.push(directory);
   const tokenPath = path.join(directory, 'tokens.json');
   const tokenStore = new FileWorkIntegrationTokenStore(tokenPath);
@@ -189,7 +189,7 @@ describe('Linear OAuth through manager and HTTP callback', () => {
 
   it('round trips Linear authorization through the app-owned backend protocol and snapshot decoder', async () => {
     const { manager, snapshot, callbackUri } = await setup();
-    const server = new ClawBackendServer({ version: 'test', snapshot, workIntegrations: manager });
+    const server = new AppBackendServer({ version: 'test', snapshot, workIntegrations: manager });
     try {
       const result = await server.handleMessage({ jsonrpc: '2.0', id: 'connect', method: 'workProvider/connect', params: { provider: 'linear' } }) as { result: { snapshot: typeof snapshot; authorization: { verificationUri: string; flow: string } } };
       expect(result.result.authorization.flow).toBe('browser');

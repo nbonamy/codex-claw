@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AgentBackend, MainToRendererEvent } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AgentBackend, MainToRendererEvent } from '@workspace/core/contracts';
 import { AgentRequestRegistry } from './agent-request-registry';
-import { approvalAgentRequest } from '@codex-claw/core/agent-request';
+import { approvalAgentRequest } from '@workspace/core/agent-request';
 
 function setup(backend: AgentBackend = 'codex', remoteConnectionId: string | null = null) {
   const snapshot = createInitialSnapshot();

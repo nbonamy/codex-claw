@@ -23,7 +23,7 @@ describe('AutomationEditor behavior', () => {
     });
 
     const repositoryOptions = wrapper.findAllComponents({ name: 'ElSelect' })[1]!.findAllComponents({ name: 'ElOption' });
-    expect(repositoryOptions.map((option) => option.props('label'))).toStrictEqual(['nbonamy/codex-claw']);
+    expect(repositoryOptions.map((option) => option.props('label'))).toStrictEqual(['nbonamy/agent-workspace']);
   });
 
   it('does not submit without a repository selection', async () => {

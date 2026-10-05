@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import type {
   PermissionResult,
 } from '@anthropic-ai/claude-agent-sdk';
@@ -13,7 +14,7 @@ import type { ClaudeSdkMessage } from '../protocol';
 import { ClaudeBackendDriver } from '../claude-driver';
 import { createQueryHarness } from './sdk-query-fixture';
 
-vi.mock('@codex-claw/core/runtime-discovery', () => ({
+vi.mock('@workspace/core/runtime-discovery', () => ({
   // Runtime discovery owns its shell integration tests; this suite tests the transport boundary.
   withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({
     ...process.env,
@@ -210,12 +211,12 @@ describe('ClaudeAgentSdkTransport', () => {
       prompt: 'first prompt',
       model: 'sonnet',
       permissionMode: 'default',
-      appendSystemPrompt: 'Claw instructions',
+      appendSystemPrompt: `${product.name} instructions`,
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
       hostedMcpServerUrls: {
         github: 'http://127.0.0.1:4321/mcp/providers/github?agentId=agent-1',
       },
-      allowedTools: ['mcp__codex_claw__*'],
+      allowedTools: ['mcp__workspace__*'],
     }, (message) => firstMessages.push(message));
 
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
@@ -223,16 +224,16 @@ describe('ClaudeAgentSdkTransport', () => {
     expect(harness.options[0]).toMatchObject({
       cwd: '/tmp/project',
       pathToClaudeCodeExecutable: '/usr/local/bin/claude',
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: 'Claw instructions' },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: `${product.name} instructions` },
       tools: { type: 'preset', preset: 'claude_code' },
       settingSources: ['user', 'project', 'local'],
       includePartialMessages: true,
       model: 'sonnet',
       permissionMode: 'default',
       sessionId: '11111111-1111-4111-8111-111111111111',
-      allowedTools: ['mcp__codex_claw__*'],
+      allowedTools: ['mcp__workspace__*'],
       mcpServers: {
-        codex_claw: {
+        workspace: {
           type: 'http',
           url: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
         },
@@ -243,7 +244,7 @@ describe('ClaudeAgentSdkTransport', () => {
       },
       env: expect.objectContaining({
         PATH: expect.stringContaining('/usr/local/bin'),
-        CLAUDE_AGENT_SDK_CLIENT_APP: 'codex-claw',
+        CLAUDE_AGENT_SDK_CLIENT_APP: 'agent-workspace',
       }),
     });
     expect(harness.options[0]?.env).not.toHaveProperty('NODE_OPTIONS');
@@ -284,9 +285,9 @@ describe('ClaudeAgentSdkTransport', () => {
       model: 'opus',
       effort: 'high',
       permissionMode: 'acceptEdits',
-      appendSystemPrompt: 'Claw instructions',
+      appendSystemPrompt: `${product.name} instructions`,
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
-      allowedTools: ['mcp__codex_claw__*'],
+      allowedTools: ['mcp__workspace__*'],
     }, (message) => secondMessages.push(message));
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(2));
 
@@ -304,9 +305,9 @@ describe('ClaudeAgentSdkTransport', () => {
       cwd: '/tmp/project',
       prompt: 'third prompt',
       sessionId: '11111111-1111-4111-8111-111111111111',
-      appendSystemPrompt: 'Claw instructions',
+      appendSystemPrompt: `${product.name} instructions`,
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-1',
-      allowedTools: ['mcp__codex_claw__*'],
+      allowedTools: ['mcp__workspace__*'],
     }, () => undefined);
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(3));
     expect(harness.runtimes[0]?.setModel).toHaveBeenLastCalledWith(undefined);
@@ -364,9 +365,9 @@ describe('ClaudeAgentSdkTransport', () => {
       cwd: '/tmp/project',
       sessionId: '21212121-2121-4121-8121-212121212121',
       model: 'haiku',
-      appendSystemPrompt: 'Claw instructions',
+      appendSystemPrompt: `${product.name} instructions`,
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude',
-      allowedTools: ['mcp__codex_claw__*'],
+      allowedTools: ['mcp__workspace__*'],
     });
     expect(harness.runtimes).toHaveLength(1);
     harness.runtimes[0]?.getContextUsage.mockResolvedValueOnce({
@@ -399,7 +400,7 @@ describe('ClaudeAgentSdkTransport', () => {
   });
 
   it('sends image, text, and PDF attachments as native Agent SDK content blocks', async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-claude-attachments-'));
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-claude-attachments-'));
     const imagePath = path.join(directory, 'reference.png');
     const textPath = path.join(directory, 'notes.md');
     const pdfPath = path.join(directory, 'report.pdf');
@@ -599,7 +600,7 @@ describe('ClaudeAgentSdkTransport', () => {
       requestId: 'request-plan-1',
     })).resolves.toStrictEqual({
       behavior: 'deny',
-      message: 'Codex Claw captured the proposed plan. Wait for the user to review or request implementation.',
+      message: `${product.name} captured the proposed plan. Wait for the user to review or request implementation.`,
     });
     expect(requests).toHaveLength(2);
 
@@ -689,7 +690,7 @@ describe('ClaudeAgentSdkTransport', () => {
       requestId: 'request-no-ui',
     })).resolves.toStrictEqual({
       behavior: 'deny',
-      message: 'Codex Claw cannot display this Claude permission request.',
+      message: `${product.name} cannot display this Claude permission request.`,
     });
 
     harness.emit({ type: 'system', subtype: 'init', session_id: '77777777-7777-4777-8777-777777777777' });

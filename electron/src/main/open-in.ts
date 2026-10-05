@@ -5,7 +5,7 @@ import { access, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { OpenInApplication, OpenInApplicationCatalog, OpenInApplicationOption } from '@codex-claw/core/contracts';
+import type { OpenInApplication, OpenInApplicationCatalog, OpenInApplicationOption } from '@workspace/core/contracts';
 
 type InstalledOpenInApplication = OpenInApplicationOption & {
   applicationPath: string;

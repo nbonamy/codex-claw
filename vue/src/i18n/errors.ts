@@ -1,5 +1,5 @@
-import { decodeAppErrorDescriptor } from '@codex-claw/core/app-error';
-import type { AppText } from '@codex-claw/core/contracts';
+import { decodeAppErrorDescriptor } from '@workspace/core/app-error';
+import type { AppText } from '@workspace/core/contracts';
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 

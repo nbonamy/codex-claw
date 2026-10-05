@@ -3,7 +3,7 @@ import type {
   MessageBoxOptions,
   MessageBoxReturnValue,
 } from 'electron';
-import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import type { DesktopUpdateStatus } from '@workspace/core/contracts';
 import { mainT } from './i18n';
 
 type ManualUpdateCheckOptions = {

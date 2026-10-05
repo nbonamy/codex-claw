@@ -1,7 +1,7 @@
 # Custom MCP Tools
 
-This guide covers app-owned tools exposed by the `codex_claw` MCP server. A
-tool is a product capability, not only an MCP schema: `clawd` owns its behavior,
+This guide covers app-owned tools exposed by the `workspace` MCP server. A
+tool is a product capability, not only an MCP schema: `daemon` owns its behavior,
 the app-owned protocol carries any client effect, and Vue owns its presentation.
 
 Use the smallest path that satisfies the behavior. A pure coordinator query
@@ -11,8 +11,8 @@ does not need a renderer event. A native desktop action does.
 
 ```text
 backend agent
-  -> codex_claw MCP tool
-  -> clawd coordinator/service
+  -> workspace MCP tool
+  -> daemon coordinator/service
   -> optional app-owned backend event or client request
   -> renderer or Electron effect
 ```
@@ -43,9 +43,9 @@ modules returned by the configured providers. Core collaboration, Missions,
 Review, Browser, and Computer Use each own their registration module.
 
 Add a tool to the module that owns its product behavior. For a contextual
-family such as Visualize, create one `ClawMcpToolModuleProvider` whose `resolve`
+family such as Visualize, create one `AppMcpToolModuleProvider` whose `resolve`
 method returns a module only for an agent in that context, then attach the
-provider through `ClawMcpServiceOptions.toolModuleProviders`. Do not add a
+provider through `AppMcpServiceOptions.toolModuleProviders`. Do not add a
 Visualize branch to the server composer or to unrelated tool modules.
 
 Providers and resolved modules have stable unique IDs. Composition rejects
@@ -57,7 +57,7 @@ example, Mission owns proposed actions, so the collaboration module exposes a
 the tools for its family:
 
 ```ts
-const visualizeTools: ClawMcpToolModuleProvider = {
+const visualizeTools: AppMcpToolModuleProvider = {
   id: 'visualize',
   resolve: ({ agentId }) => visualize.contextForAgent(agentId) ? {
     id: 'visualize',
@@ -80,11 +80,11 @@ conversion stay consistent. Return deliberate domain errors with
 
 ## Domain behavior and effects
 
-Put agent/team state transitions in `ClawMcpAgentCoordinator`. Inject product
+Put agent/team state transitions in `AppMcpAgentCoordinator`. Inject product
 effects as callbacks rather than giving the coordinator renderer or Electron
 dependencies.
 
-Use `ClawMcpService` when the operation needs the application snapshot, a
+Use `AppMcpService` when the operation needs the application snapshot, a
 backend driver, persistence, or an app-owned event. Define shared event payloads
 in `core/src/contracts.ts`, reduce durable state in core, and handle transient
 visual effects in Vue.
@@ -126,10 +126,10 @@ MCP calls have a presentation lifecycle:
 - `failed`: the call returned an error.
 
 This lifecycle belongs to the conversation tool row when one is shown. It does
-not update `agent.statusText`. Claw hides `set-status` and `finish_turn` from
+not update `agent.statusText`. Korus hides `set-status` and `finish_turn` from
 the conversation because their effects have dedicated UI; the calls still run
-and remain in the provider transcript. Without a Claw presenter, the SDK uses
-a generic title such as `Ran codex_claw.example-tool`.
+and remain in the provider transcript. Without a Korus presenter, the SDK uses
+a generic title such as `Ran workspace.example-tool`.
 
 ## Structured results and bounded presentation data
 
@@ -145,7 +145,7 @@ return {
 };
 ```
 
-Claw intentionally does not persist arbitrary tool input and output. Provider
+Korus intentionally does not persist arbitrary tool input and output. Provider
 payloads may contain large command output, screenshots, file content, secrets,
 or deeply nested data. `backend/src/codex/codex-surface-adapter.ts` projects a
 small set of presentation-safe keys before messages enter app state and stdio
@@ -160,11 +160,11 @@ When a custom title needs a new value:
 4. Keep large or sensitive siblings absent from the projected result.
 
 A denylist is not suitable here: a newly introduced provider field would enter
-durable snapshots before Claw knew whether it was large or sensitive.
+durable snapshots before Korus knew whether it was large or sensitive.
 
 ## Custom tool-row presentation
 
-Claw extends the SDK presentation surface in:
+Korus extends the SDK presentation surface in:
 
 - `vue/src/tool-presentation.ts`: recognized tools and icons;
 - `vue/src/tool-title-presenter.ts`: phase-aware titles and targets;
@@ -197,8 +197,8 @@ expanded content or logs.
 effect in one model round trip:
 
 - schema and behavioral description in `backend/src/mcp/tools.ts`;
-- normalization and state mutation in `ClawMcpAgentCoordinator.setStatus()`;
-- `agent.updated` emission in `ClawMcpService`;
+- normalization and state mutation in `AppMcpAgentCoordinator.setStatus()`;
+- `agent.updated` emission in `AppMcpService`;
 - optional bounded announcement validation and native queueing through the same
   coordinator call;
 - automatic cleanup from the provider-independent `turn.completed` lifecycle.
@@ -210,7 +210,7 @@ app event, not from the result text.
 
 `finish_turn` clears collaboration status and can select one flag, queue one
 finish acknowledgment, and request one celebration in the same final model
-call. Claw keeps a strict flag allowlist in Core. Flags describe typed thread
+call. Korus keeps a strict flag allowlist in Core. Flags describe typed thread
 state rather than presentation. The payload-free flags are:
 
 - `delegate_to_worktree`, which submits a fixed delegation prompt through the
@@ -221,7 +221,7 @@ state rather than presentation. The payload-free flags are:
   and skip it when review was deferred or immediate commit/push was requested.
 
 Passing a new flag replaces the current proposal; omitting it preserves any
-existing proposal. Claw clears `ready_for_review` when a new user prompt is
+existing proposal. Korus clears `ready_for_review` when a new user prompt is
 submitted, because the earlier review proposal no longer describes the pending
 work; the agent reassesses and proposes review again when the diff remains
 ready, including turns that made no code changes.
@@ -266,7 +266,7 @@ their durable lifecycle updates:
   phrase and detailed suppression reason remain private;
 - Vue renders the Voice settings section and rail mute control. The section
   owns enablement, selected-agent and foreground scope, a
-  curated Kokoro voice picker, and a local preview action. Claw-owned normalized
+  curated Kokoro voice picker, and a local preview action. Korus-owned normalized
   renderer projections omit the spoken text and playback result; provider-native
   conversation replicas remain provider-owned.
 
@@ -283,7 +283,7 @@ are fetched individually from the Apache-2.0 upstream model at a pinned
 revision when first selected or previewed. The helper extracts the raw stored
 tensor, checks its exact size and pinned SHA-256 digest, and places it in
 FluidAudio's cache. Preview uses the same global Electron queue as agent speech
-with the fixed phrase “Codex Claw is on it—sharp claws, clean code,” so previews
+with a short product-branded readiness phrase, so previews
 cannot overlap live acknowledgments.
 
 The original KittenTTS 0.1.0 integration gate was rejected before product
@@ -314,5 +314,5 @@ Add focused tests at every owned seam the tool crosses:
 - component or app-state tests for any visible effect.
 
 Run the smallest red test first. Before handoff, run the affected package
-typechecks, lint/build gates, `git diff --check`, and the Codex Claw Definition
+typechecks, lint/build gates, `git diff --check`, and the Korus Definition
 of Done.

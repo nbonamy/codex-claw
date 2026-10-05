@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent } from '@codex-claw/core/contracts';
+import type { Agent } from '@workspace/core/contracts';
 import { createVisualizeDebugFixture } from '../visualize-debug-fixtures';
 
 describe('Visualize debug fixture', () => {

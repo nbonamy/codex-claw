@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import type { DelegatedTask } from '@codex-claw/core/delegated-task';
+import type { DelegatedTask } from '@workspace/core/delegated-task';
 import { tasksSchema } from './task-schema';
 import { mkdir, readFile, readdir, rename, rmdir, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import { projectClientSnapshot } from '@workspace/core/client-preferences';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { backupFile } from './backup';
 import { joinPersistedState, splitPersistedState, type StoreFiles, type VisualizationData } from './layout';
@@ -20,7 +20,7 @@ const backupsDirectory = 'backups';
 const legacyFile = 'state.json';
 
 /** Left in place of the legacy file: it is not JSON, so builds that predate the store refuse to start. */
-const retiredMarker = '# codex-claw: this file was replaced by roster.json, settings.json and visualizations/.\n# It is not JSON on purpose, so an older build fails to start instead of creating an empty state.\n';
+const retiredMarker = '# agent-workspace: this file was replaced by roster.json, settings.json and visualizations/.\n# It is not JSON on purpose, so an older build fails to start instead of creating an empty state.\n';
 
 /** Steps for files older than the current schema. Version 1 is the first, so there are none yet. */
 const fileMigrations = {

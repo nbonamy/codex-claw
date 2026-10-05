@@ -1,9 +1,9 @@
 ---
-name: codex-claw-frontend-dev
-description: Use when working on Codex Claw frontend development, including Vue components, Element Plus controls, app shell, agent/team/Bench UI, chat rendering, artifact panes, design tokens, themes, or frontend component tests.
+name: app-frontend-dev
+description: Use when working on Korus frontend development, including Vue components, Element Plus controls, app shell, agent/team/Bench UI, chat rendering, artifact panes, design tokens, themes, or frontend component tests.
 ---
 
-# Codex Claw Frontend Development
+# Korus Frontend Development
 
 Use this skill for renderer work: Vue components, Element Plus controls, chat
 rendering, app shell, agent/team/Bench surfaces, artifact panes, themes, and

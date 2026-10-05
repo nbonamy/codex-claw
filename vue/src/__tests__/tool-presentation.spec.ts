@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it } from 'vitest';
 import type { CodexToolPresentationContext } from '@codex-app-sdk/vue';
 import {
@@ -13,9 +14,9 @@ import {
   IconUsers as UsersIcon,
 } from '@tabler/icons-vue';
 import { messages } from '../i18n/messages';
-import { presentClawTool } from '../tool-presentation';
+import { presentAppTool } from '../tool-presentation';
 
-describe('Claw tool presentation', () => {
+describe(`${product.name} tool presentation`, () => {
   it.each([
     ['wait-tasks', SquareCheck, 'Checked delegated tasks'],
     ['complete-task', SquareCheck, 'Submitted task result'],
@@ -24,7 +25,7 @@ describe('Claw tool presentation', () => {
     ['add-visualization', SitemapIcon, 'Created diagram'],
     ['delete-visualization', SitemapIcon, 'Deleted diagram'],
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
-    ['computer-use-get-app-state', DeviceDesktopIcon, 'Inspected Codex Claw'],
+    ['computer-use-get-app-state', DeviceDesktopIcon, `Inspected ${product.name}`],
     ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],
     ['computer-use-list-windows', DeviceDesktopIcon, 'Listed Safari windows'],
     ['computer-use-dismiss', DeviceDesktopIcon, 'Dismissed native menu'],
@@ -52,7 +53,7 @@ describe('Claw tool presentation', () => {
     ['submit-mission-result', SquareCheck, 'Mission artifact ready for review'],
     ['upsert-mission-ticket', SquareCheck, 'Drafted mission ticket'],
     ['update-work-item', SquareCheck, 'Updated work item'],
-  ])('presents %s with a semantic Claw icon and title', (tool, icon, title) => {
+  ])(`presents %s with a semantic ${product.name} icon and title`, (tool, icon, title) => {
     const args = tool === 'send-message'
       ? { to: 'codex-app-sdk' }
       : tool === 'create-worktree'
@@ -62,7 +63,7 @@ describe('Claw tool presentation', () => {
         : tool === 'display-markdown'
           ? { title: 'Review notes' }
           : tool === 'computer-use-get-app-state'
-            ? { app: 'Codex Claw' }
+            ? { app: `${product.name}` }
             : tool === 'computer-use-list-windows'
               ? { app: 'Safari' }
               : tool === 'computer-use-press-key'
@@ -75,11 +76,11 @@ describe('Claw tool presentation', () => {
                     ? { scope: 'screen' }
                     : {};
 
-    expect(presentClawTool(context(tool, args), translate)).toStrictEqual({ icon, title });
+    expect(presentAppTool(context(tool, args), translate)).toStrictEqual({ icon, title });
   });
 
   it('normalizes underscored tool metadata from provider adapters', () => {
-    expect(presentClawTool(context('computer_use_list_apps', {}), translate)).toStrictEqual({
+    expect(presentAppTool(context('computer_use_list_apps', {}), translate)).toStrictEqual({
       icon: DeviceDesktopIcon,
       title: 'Listed open apps',
     });
@@ -89,7 +90,7 @@ describe('Claw tool presentation', () => {
     const running = context('send-message', { to: 'agent-sdk' });
     running.toolCall = { ...running.toolCall, done: false, state: 'running' };
 
-    expect(presentClawTool(
+    expect(presentAppTool(
       running,
       translate,
       (identifier) => identifier === 'agent-sdk' ? 'codex-app-sdk' : undefined,
@@ -112,20 +113,20 @@ describe('Claw tool presentation', () => {
       state,
     };
 
-    expect(presentClawTool(call, translate)).toStrictEqual({ icon: DeviceDesktopIcon, title });
+    expect(presentAppTool(call, translate)).toStrictEqual({ icon: DeviceDesktopIcon, title });
   });
 
   it('leaves unknown, non-MCP, and third-party tools to the SDK fallback', () => {
-    expect(presentClawTool(context('future-tool', {}), translate)).toBeUndefined();
-    expect(presentClawTool(context('browser-open', {}, 'github'), translate)).toBeUndefined();
-    expect(presentClawTool({ ...context('browser-open', {}), kind: 'generic' }, translate)).toBeUndefined();
+    expect(presentAppTool(context('future-tool', {}), translate)).toBeUndefined();
+    expect(presentAppTool(context('browser-open', {}, 'github'), translate)).toBeUndefined();
+    expect(presentAppTool({ ...context('browser-open', {}), kind: 'generic' }, translate)).toBeUndefined();
   });
 });
 
 function context(
   tool: string,
   args: unknown,
-  server = 'codex_claw',
+  server = 'workspace',
 ): CodexToolPresentationContext {
   return {
     kind: 'mcp',

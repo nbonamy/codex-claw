@@ -131,12 +131,12 @@
 </template>
 
 <script setup lang="ts">
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import { workProviderDefinition } from '@workspace/core/work-providers';
 import { translate } from '../i18n';
 import { computed, ref, watch } from 'vue';
 import { IconChevronDown, IconFolder, IconSearch } from '@tabler/icons-vue';
-import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkSource } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import type { Agent, Team, WorkBacklogAssignment, WorkIntegrationConnection, WorkItem, WorkSource } from '@workspace/core/contracts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { ExternalLinkIcon } from '../shared/icons/app-icons';
 import CockpitWorkInbox from './CockpitWorkInbox.vue';
 import BacklogSourceSelector from './BacklogSourceSelector.vue';
@@ -166,14 +166,14 @@ type SummaryFilter = 'inProgress' | 'blocked' | 'readyForReview';
 type SummaryMetric = { count: number; filter: SummaryFilter; id: 'working' | 'blocked' | 'review'; label: string; view: InboxView };
 
 const props = defineProps<{
-  workProvider?: import('@codex-claw/core/contracts').WorkProviderKind;
-  workProviders?: import('@codex-claw/core/contracts').WorkProviderKind[];
+  workProvider?: import('@workspace/core/contracts').WorkProviderKind;
+  workProviders?: import('@workspace/core/contracts').WorkProviderKind[];
   agents: Agent[];
   repositoryIcons?: Record<string, string>;
   teams: Team[];
   defaultTeamId?: string | null;
-  listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@codex-claw/core/contracts').SourceRepository[]>;
-  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@codex-claw/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
+  listSourceRepositories?: (remoteConnectionId?: string) => Promise<import('@workspace/core/contracts').SourceRepository[]>;
+  startWorkItemsAction: (input: { action: 'investigate' | 'fix'; items: WorkItem[]; teamId: string; backend?: Agent['backend']; repository?: import('@workspace/core/contracts').SourceRepository; isCurrent?: () => boolean }) => Promise<void>;
   workBacklog?: CockpitWorkBacklog | null;
 }>();
 
@@ -182,7 +182,7 @@ const repositoryIcons = computed(() => props.repositoryIcons ?? {});
 const startWorkItemsAction = props.startWorkItemsAction;
 
 const emit = defineEmits<{
-  'select-work-provider': [provider: import('@codex-claw/core/contracts').WorkProviderKind];
+  'select-work-provider': [provider: import('@workspace/core/contracts').WorkProviderKind];
   'assign-work-item-to-new-agent': [intent: WorkItemAssignmentIntent];
   'assign-work-item': [payload: { agentId: string; item: WorkItem }];
   'refresh-work-items': [repositoryId: string | null];

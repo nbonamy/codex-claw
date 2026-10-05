@@ -1,5 +1,5 @@
 import { flushPromises, shallowMount } from '@vue/test-utils';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { describe, expect, it } from 'vitest';
 import FirstRunOnboardingGate from '../FirstRunOnboardingGate.vue';
 

@@ -1,7 +1,7 @@
 <template>
   <OnboardingLandingFrame
     class="onboarding-complete"
-    :label="$t('surface.onboardingCompleteLanding.codexClawIsReady')"
+    :label="$t('surface.onboardingCompleteLanding.appIsReady')"
   >
     <div class="onboarding-complete__content">
       <img

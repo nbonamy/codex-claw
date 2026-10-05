@@ -10,9 +10,9 @@ import {
   type CodeReviewRound,
   type CodeReviewSession,
   type CodeReviewStartInput,
-} from '@codex-claw/core/code-review';
-import type { BackendCodeReviewResult } from '@codex-claw/core/backend-driver';
-import type { Agent, AppSnapshot, BackendSession, CreateAgentInput } from '@codex-claw/core/contracts';
+} from '@workspace/core/code-review';
+import type { BackendCodeReviewResult } from '@workspace/core/backend-driver';
+import type { Agent, AppSnapshot, BackendSession, CreateAgentInput } from '@workspace/core/contracts';
 import type { AgentCreationOptions } from '../agents/agent-creation-service';
 import type { ReviewToolHandlers } from './review-tool-registry';
 

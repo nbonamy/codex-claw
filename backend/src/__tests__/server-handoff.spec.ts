@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import type { AgentBackend, RendererMessage } from '@codex-claw/core/contracts';
-import { codexBackendCapabilities, claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { ClawBackendServer } from '../server';
+import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
+import type { AgentBackend, RendererMessage } from '@workspace/core/contracts';
+import { codexBackendCapabilities, claudeBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { createTestSnapshot, createRemoteAgent, createRemoteTeamSnapshot, readyRemoteConnection } from './server-test-fixtures';
 
@@ -17,7 +17,7 @@ it('routes an ambiguous remote retry through the linked replacement without crea
     request: vi.fn().mockResolvedValueOnce({ snapshot: remoteSnapshot, lastEventSeq: 0, clientState: { sourceFolderPath: '', shouldPreventDisplaySleep: false } }).mockResolvedValue(remoteSnapshot),
     close: vi.fn().mockResolvedValue(undefined),
   };
-  const server = new ClawBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never });
+  const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never });
   const params = { agentId: 'old-remote', input: { operationId: 'once', backend: 'claude' } };
   try {
     await server.handleMessage({ jsonrpc: '2.0', id: 'retry', method: 'agent/handoff/start', params });
@@ -62,7 +62,7 @@ describe.each(['codex', 'claude'] as const)('%s handoff routing', backend => {
       });
     }
     const persisted: unknown[] = [];
-    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(drivers), saveSnapshot: async value => { persisted.push(structuredClone(value)); } });
+    const server = new AppBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(drivers), saveSnapshot: async value => { persisted.push(structuredClone(value)); } });
     const params = { agentId: 'source', input: { operationId: 'once', backend: targetBackend } };
     const operation = server.handleMessage({ jsonrpc: '2.0', id: 'handoff', method: 'agent/handoff/start', params });
     await vi.waitFor(() => expect(sourceSend).toHaveBeenCalledOnce());

@@ -25,7 +25,7 @@ describe('AutomationEditor submission', () => {
     await choose('Team / project', 'Engineering');
     await wrapper.get('form').trigger('submit');
     expect(wrapper.emitted('submit')).toBeUndefined();
-    await choose('Code repository for Engineering / Login', 'codex-claw');
+    await choose('Code repository for Engineering / Login', 'agent-workspace');
     await choose('Code repository for Engineering', 'witsy');
     await wrapper.findAll('textarea')[0]!.setValue('Ready bugs');
     await wrapper.findAll('textarea')[1]!.setValue('Fix and verify');
@@ -33,7 +33,7 @@ describe('AutomationEditor submission', () => {
     const input = wrapper.emitted('submit')![0]![0];
     expect(input).toMatchObject({ repositories: [
       { provider: 'linear', sourceId: 'linear:eng', executionRepositoryPath: '/Users/nbonamy/src/witsy' },
-      { provider: 'linear', sourceId: 'linear:eng:login', executionRepositoryPath: '/Users/nbonamy/src/codex-claw' },
+      { provider: 'linear', sourceId: 'linear:eng:login', executionRepositoryPath: '/Users/nbonamy/src/agent-workspace' },
     ], selectionPrompt: 'Ready bugs', assignmentPrompt: 'Fix and verify' });
     wrapper.unmount();
     const reopened = mountEditor({ connections, repositories: sources, automation: automation(input as Parameters<typeof automation>[0]) });
@@ -50,7 +50,7 @@ describe('AutomationEditor submission', () => {
   it('emits repositories, team, schedule, both prompts, and enabled state', async () => {
     const wrapper = mountEditor();
     const selects = wrapper.findAllComponents({ name: 'ElSelect' });
-    await selects[1]!.vm.$emit('update:modelValue', ['github:nbonamy/codex-claw', 'github:nbonamy/witsy']);
+    await selects[1]!.vm.$emit('update:modelValue', ['github:nbonamy/agent-workspace', 'github:nbonamy/witsy']);
     await selects[3]!.vm.$emit('update:modelValue', 360);
     const textareas = wrapper.findAll('textarea');
     await textareas[0]!.setValue('  Pick bugs labeled ready.  ');
@@ -65,8 +65,8 @@ describe('AutomationEditor submission', () => {
           repositories: [
             {
               provider: 'github',
-              sourceId: 'nbonamy/codex-claw',
-              executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+              sourceId: 'nbonamy/agent-workspace',
+              executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
             },
             {
               provider: 'github',
@@ -74,7 +74,7 @@ describe('AutomationEditor submission', () => {
               executionRepositoryPath: '/Users/nbonamy/src/witsy',
             },
           ],
-          teamId: 'team-codex-claw',
+          teamId: 'team-app',
           selectionPrompt: 'Pick bugs labeled ready.',
           assignmentPrompt: 'Triage the issue and verify the fix.',
           schedule: { intervalMinutes: 360 },
@@ -95,11 +95,11 @@ describe('AutomationEditor submission', () => {
       repositories: [
         {
           provider: 'github',
-          sourceId: 'nbonamy/codex-claw',
-          executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+          sourceId: 'nbonamy/agent-workspace',
+          executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
         },
       ],
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       selectionPrompt: 'Pick ready bugs.',
       assignmentPrompt: 'Fix the issue and run tests.',
       schedule: { intervalMinutes: 60 },

@@ -30,7 +30,7 @@ describe('logging sink boundary', () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
   it('initializes once with bounded files and routes renderer severity without noisy diagnostics', async () => {
-    vi.stubEnv('CODEX_CLAW_LOG_LEVEL', ' DEBUG ');
+    vi.stubEnv('APP_LOG_LEVEL', ' DEBUG ');
     const logging = await import('../log');
     logging.initializeMainLogging();
     logging.initializeMainLogging();
@@ -39,7 +39,7 @@ describe('logging sink boundary', () => {
     sink.info.mockClear();
     for (const [level, method] of [[0, 'debug'], [1, 'info'], [2, 'warn'], [3, 'error']] as const) {
       logging.logRendererConsole(level, 'Bearer token-value', { line: 7, sourceId: 'password=hidden' });
-      expect(sink[method]).toHaveBeenLastCalledWith('[codex-claw:renderer] Bearer [redacted] {"line":7,"sourceId":"password=[redacted]"}');
+      expect(sink[method]).toHaveBeenLastCalledWith('[agent-workspace:renderer] Bearer [redacted] {"line":7,"sourceId":"password=[redacted]"}');
     }
     logging.logRendererConsole(3, 'Electron Security Warning: noisy');
     logging.logRendererConsole(3, '');
@@ -63,9 +63,9 @@ describe('logging sink boundary', () => {
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     warnMain('backend', 'cycle', circular);
-    expect(sink.warn).toHaveBeenCalledWith('[codex-claw:backend] cycle {"detail":"unserializable"}');
+    expect(sink.warn).toHaveBeenCalledWith('[agent-workspace:backend] cycle {"detail":"unserializable"}');
     logMain('backend', 'large', { detail: 'x'.repeat(5000) });
-    expect(sink.info.mock.calls.at(-1)![0]).toHaveLength('[codex-claw:backend] large '.length + 4000);
+    expect(sink.info.mock.calls.at(-1)![0]).toHaveLength('[agent-workspace:backend] large '.length + 4000);
     expect(sink.transports.file.level).toBe('info');
   });
 

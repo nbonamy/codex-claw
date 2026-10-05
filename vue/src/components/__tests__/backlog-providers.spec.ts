@@ -1,17 +1,17 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, ref } from 'vue';
 import { afterEach, expect, it } from 'vitest';
-import type { AppSnapshot, AutomationLocation } from '@codex-claw/core/contracts';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { configureClawClient } from '../../platform-api';
+import type { AppSnapshot, AutomationLocation } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { configureAppClient } from '../../platform-api';
 import { createClientApiMock } from '../../test/client-api-mock';
 import { backlogConnectionsKey, useBacklogConnections, useBacklogProviders } from '../backlog-providers';
 
-afterEach(() => configureClawClient());
+afterEach(() => configureAppClient());
 
 it('uses the selected host connections and ignores a late response from the previous host', async () => {
   const { api } = createClientApiMock();
-  configureClawClient({ platform: 'desktop', api });
+  configureAppClient({ platform: 'desktop', api });
   const location = ref<AutomationLocation>({ kind: 'local' });
   let resolveOld!: (snapshot: AppSnapshot) => void;
   const remote = createInitialSnapshot();

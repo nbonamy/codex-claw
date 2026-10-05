@@ -35,7 +35,7 @@
         <AffiliateIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.integrations') }}</span>
       </el-menu-item>
-      <el-menu-item v-if="clawHostCapabilities.appshots" index="appshots">
+      <el-menu-item v-if="appHostCapabilities.appshots" index="appshots">
         <PhotoIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.appshots') }}</span>
       </el-menu-item>
@@ -55,7 +55,7 @@
 import type { SettingsTab } from './settings-tabs';
 import { AffiliateIcon, GitBranchIcon, PaletteIcon, PhotoIcon, PuzzleIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 import BackendIcon from './BackendIcon.vue';
-import { clawHostCapabilities } from '../platform-api';
+import { appHostCapabilities } from '../platform-api';
 
 defineProps<{
   activeTab: SettingsTab;

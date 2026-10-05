@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 it('installs Claude into the remote user home when the CLI is missing', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'claw-remote-claude-'));
+  const home = await mkdtemp(path.join(os.tmpdir(), 'app-remote-claude-'));
   temporaryHomes.push(home);
   const fakeBin = path.join(home, 'fake-bin');
   await mkdir(fakeBin);
@@ -47,7 +47,7 @@ cp "$FAKE_INSTALLER" "$output"
 });
 
 it('returns signed-out JSON even when Claude auth status exits one', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'claw-remote-claude-auth-'));
+  const home = await mkdtemp(path.join(os.tmpdir(), 'app-remote-claude-auth-'));
   temporaryHomes.push(home);
   const bin = path.join(home, '.local/bin');
   await mkdir(bin, { recursive: true });

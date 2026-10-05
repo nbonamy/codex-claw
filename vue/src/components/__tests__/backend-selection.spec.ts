@@ -1,12 +1,12 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h, reactive, ref } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot';
-import type { AgentBackend } from '@codex-claw/core/contracts';
+import { createEmptySnapshot } from '@workspace/core/snapshot';
+import type { AgentBackend } from '@workspace/core/contracts';
 import BackendSelector from '../BackendSelector.vue';
 import { provideBackendChoices } from '../backend-selection';
 
-afterEach(() => localStorage.removeItem('codexClaw:preferredEngines'));
+afterEach(() => localStorage.removeItem('app:preferredEngines'));
 
 describe('host-scoped manual engine selection', () => {
   it('remembers explicit choices per host, but not temporary availability fallback', async () => {
@@ -33,7 +33,7 @@ describe('host-scoped manual engine selection', () => {
     snapshot.providerConnections[1]!.connected = false;
     await wrapper.vm.$nextTick();
     expect(model.value).toBe('codex');
-    expect(JSON.parse(localStorage.getItem('codexClaw:preferredEngines')!)).toEqual({ local: 'claude' });
+    expect(JSON.parse(localStorage.getItem('app:preferredEngines')!)).toEqual({ local: 'claude' });
     snapshot.providerConnections[1]!.connected = true;
     wrapper.unmount();
     model.value = undefined;

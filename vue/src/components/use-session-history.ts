@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue';
-import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@codex-claw/core/contracts';
+import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@workspace/core/contracts';
 
 type SessionTranslation = (key: string, params?: Record<string, number>) => string;
 

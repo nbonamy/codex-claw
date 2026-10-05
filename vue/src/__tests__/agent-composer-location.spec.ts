@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { createAgentComposerState } from '../agent-composer-state';
 import { stubElectronTestWindow } from '../test/client';
 
@@ -14,7 +14,7 @@ describe('composer catalog locations', () => {
       defaultReasoningEffort: 'medium',
       supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Medium' }, { reasoningEffort: 'high', description: 'High' }],
     });
-    stubElectronTestWindow({ codexClaw: {
+    stubElectronTestWindow({ app: {
       listBackendModels: vi.fn(async () => [model('shared-default'), model('guest-high')]),
     } });
     const composer = createAgentComposerState({ getSnapshot: () => snapshot });
@@ -37,7 +37,7 @@ describe('composer catalog locations', () => {
     const model = (id: string) => ({ id, model: id, displayName: id, isDefault: true });
     let finishCodex!: (models: ReturnType<typeof model>[]) => void;
     const oldModels = new Promise<ReturnType<typeof model>[]>(resolve => { finishCodex = resolve; });
-    stubElectronTestWindow({ codexClaw: {
+    stubElectronTestWindow({ app: {
       listBackendModels: vi.fn(() => agent.backend === 'codex' ? oldModels : Promise.resolve([model('sonnet')])),
     } });
     const composer = createAgentComposerState({ getSnapshot: () => snapshot });
@@ -61,7 +61,7 @@ describe('composer catalog locations', () => {
     snapshot.teams.push({ id: remote.teamId, name: 'Remote', agentIds: [remote.id], remoteConnectionId: 'ssh-devbox' });
     const model = (id: string) => ({ id, model: id, displayName: id, isDefault: true });
     const listBackendModels = vi.fn(async (id: string) => [model(id === local.id ? 'local-model' : 'remote-model')]);
-    stubElectronTestWindow({ codexClaw: { listBackendModels } });
+    stubElectronTestWindow({ app: { listBackendModels } });
     const composer = createAgentComposerState({ getSnapshot: () => snapshot });
     snapshot.activeAgentId = local.id;
     await composer.loadModels(local.id);

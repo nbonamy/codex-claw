@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ClawBackendServer } from '../server';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import {
   createTestSnapshot,
   createThreadGoal,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('reconciles unowned Codex conversations once before serving snapshots', async () => {
     const snapshot = createTestSnapshot();
@@ -25,7 +25,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version', snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
@@ -61,7 +61,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version', snapshot, saveSnapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
@@ -99,7 +99,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version', snapshot, saveSnapshot: vi.fn().mockRejectedValue(new Error('Disk full')),
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
     });
@@ -129,7 +129,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-old' },
       status: { type: 'idle' },
@@ -162,7 +162,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -240,7 +240,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-dina' },
       status: { type: 'idle' },
@@ -250,7 +250,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-jesse',
       teamId: 'team-test',
       name: 'Jesse',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -274,7 +274,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -324,7 +324,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -360,7 +360,7 @@ describe('ClawBackendServer', () => {
     };
     const events: unknown[] = [];
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -434,7 +434,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-claude',
       teamId: 'team-test',
       name: 'Claude',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'claude',
       backendDefaults: { kind: 'claude', model: 'sonnet' },
       status: { type: 'idle' },
@@ -456,7 +456,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -492,7 +492,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'working' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -518,7 +518,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -567,7 +567,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'working' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -584,7 +584,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const events: unknown[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -619,7 +619,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-old' },
       status: { type: 'working' },
@@ -643,7 +643,7 @@ describe('ClawBackendServer', () => {
     };
     const events: unknown[] = [];
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,

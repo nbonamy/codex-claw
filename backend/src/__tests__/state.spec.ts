@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,9 +11,9 @@ describe('backend state loading', () => {
   let homeDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(path.join(os.tmpdir(), 'clawd-state-'));
+    tempDir = await mkdtemp(path.join(os.tmpdir(), 'daemon-state-'));
     homeDir = path.join(tempDir, 'home');
-    vi.stubEnv('CODEX_CLAW_HOME', homeDir);
+    vi.stubEnv('APP_HOME', homeDir);
   });
 
   afterEach(async () => {
@@ -20,13 +21,13 @@ describe('backend state loading', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it('defaults the backend home to ~/.codex-claw', () => {
-    vi.stubEnv('CODEX_CLAW_HOME', '');
+  it(`defaults the backend home to ~/${product.homeDirectory}`, () => {
+    vi.stubEnv('APP_HOME', '');
 
-    expect(backendHomeDir()).toBe(path.join(os.homedir(), '.codex-claw'));
+    expect(backendHomeDir()).toBe(path.join(os.homedir(), product.homeDirectory));
   });
 
-  it('uses CODEX_CLAW_HOME as the only backend home override', () => {
+  it('uses APP_HOME as the only backend home override', () => {
     expect(backendHomeDir()).toBe(homeDir);
     expect(backendCodexHomeDir()).toBe(path.join(homeDir, 'codex-home'));
     expect(backendLegacyStateFilePath()).toBe(path.join(homeDir, 'state.json'));
@@ -34,13 +35,13 @@ describe('backend state loading', () => {
     expect(backendProviderTokensFilePath()).toBe(path.join(homeDir, 'provider-tokens.json'));
   });
 
-  it('creates an isolated Codex home under the Claw backend home', async () => {
+  it(`creates an isolated Codex home under the ${product.name} backend home`, async () => {
     await expect(ensureBackendCodexHome()).resolves.toBe(path.join(homeDir, 'codex-home'));
     const directory = await stat(path.join(homeDir, 'codex-home'));
     expect(directory.isDirectory()).toBe(true);
   });
 
-  it('creates a mission-owned artifact directory under the Claw backend home', async () => {
+  it(`creates a mission-owned artifact directory under the ${product.name} backend home`, async () => {
     await expect(ensureBackendMissionHome('mission-billing')).resolves.toBe(path.join(homeDir, 'missions', 'mission-billing'));
     expect((await stat(path.join(homeDir, 'missions', 'mission-billing', 'artifacts'))).isDirectory()).toBe(true);
     await expect(ensureBackendMissionHome('../outside')).rejects.toThrow('Invalid mission ID');
@@ -59,7 +60,7 @@ describe('backend state loading', () => {
   it('creates a default snapshot when no state file exists', async () => {
     const snapshot = await loadBackendSnapshot();
 
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     await expect(readFile(path.join(homeDir, 'state.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -86,7 +87,7 @@ describe('backend state loading', () => {
     expect(persisted.schemaVersion).toBe(1);
     expect(persisted.data).not.toHaveProperty('messages');
     await expect(readFile(path.join(homeDir, 'state.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
-    await expect(loadBackendSnapshot()).resolves.toMatchObject({ activeTeamId: 'team-codex-claw' });
+    await expect(loadBackendSnapshot()).resolves.toMatchObject({ activeTeamId: 'team-app' });
   });
 
   it('falls back to a default snapshot for malformed state shape', async () => {
@@ -94,7 +95,7 @@ describe('backend state loading', () => {
     await writeFile(path.join(homeDir, 'state.json'), JSON.stringify({ teams: [] }), 'utf8');
 
     await expect(loadBackendSnapshot()).resolves.toMatchObject({
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
     });
   });
 });

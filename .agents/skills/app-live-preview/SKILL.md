@@ -1,11 +1,11 @@
 ---
-name: codex-claw-live-preview
-description: Use when interactively dogfooding any Codex Claw feature from a worktree in the in-app browser, especially with seeded state, reload persistence, UI workflows, or branch-local backend changes.
+name: app-live-preview
+description: Use when interactively dogfooding any Korus feature from a worktree in the in-app browser, especially with seeded state, reload persistence, UI workflows, or branch-local backend changes.
 ---
 
-# Codex Claw Live Preview
+# Korus Live Preview
 
-Run a **branch-faithful preview** for any Claw feature: the real renderer and
+Run a **branch-faithful preview** for any Korus feature: the real renderer and
 backend from the current worktree, isolated app state, and enough realistic data
 to exercise the behavior as a user would. Keep automated tests as a separate
 gate; this preview exists to find integration, state, and interaction failures
@@ -19,13 +19,13 @@ that mounted tests can miss.
    than a decorative screenshot fixture. The seed must match the current
    app-owned schema.
 3. Build the current worktree with `npm run build:web`.
-4. Create a uniquely named temporary Claw home outside the repository. Include
+4. Create a uniquely named temporary Korus home outside the repository. Include
    the agent or worktree identity in the prefix and let `mktemp` add uniqueness.
    Put the seed at `<preview-home>/state.json` (a legacy-shaped seed is migrated
    on first start, with its backup kept in `<preview-home>/backups/`) or write
    `roster.json` and `settings.json` directly; never point the preview at the
-   user's normal Claw home.
-5. If the normal Claw installation is already authenticated, copy only its
+   user's normal Korus home.
+5. If the normal Korus installation is already authenticated, copy only its
    `codex-home/auth.json` into `<preview-home>/codex-home/auth.json`, preserve
    restrictive permissions, and never read or print its contents. Otherwise,
    let the user authenticate in the isolated preview.
@@ -35,7 +35,7 @@ do not include it in command output, and remove it after the testing session.
 
 ## Allocate A Parallel-Safe Port
 
-Assume other Claw agents are previewing other worktrees at the same time. Never
+Assume other Korus agents are previewing other worktrees at the same time. Never
 use a fixed port.
 
 1. Ask the operating system for an available loopback port with a short-lived
@@ -58,8 +58,8 @@ current agent's ownership record.
 
 ## Pin The Worktree Runtime
 
-Codex Claw agents inherit environment variables from the host app. In
-particular, `CODEX_CLAW_BACKEND_COMMAND` and `CODEX_CLAW_BACKEND_ARGS` may point
+Korus agents inherit environment variables from the host app. In
+particular, `APP_BACKEND_COMMAND` and `APP_BACKEND_ARGS` may point
 at the host app or a different worktree. A preview that inherits them can render
 the new frontend against an old backend and produce convincing false failures.
 
@@ -67,9 +67,9 @@ Resolve the Node executable and worktree root with separate read-only commands,
 then launch with literal absolute values:
 
 ```bash
-CODEX_CLAW_HOME=<preview-home> \
-CODEX_CLAW_BACKEND_COMMAND=<absolute-node-path> \
-CODEX_CLAW_BACKEND_ARGS=<absolute-worktree>/backend/dist/clawd.mjs,--stdio \
+APP_HOME=<preview-home> \
+APP_BACKEND_COMMAND=<absolute-node-path> \
+APP_BACKEND_ARGS=<absolute-worktree>/backend/dist/daemon.mjs,--stdio \
 PORT=<allocated-loopback-port> \
 npm run start:web
 ```
@@ -82,7 +82,7 @@ credentials stay out of output.
 
 ## Drive The Real Shell
 
-1. Open the allocated loopback URL with the Codex Claw in-app browser.
+1. Open the allocated loopback URL with the Korus in-app browser.
 2. Use browser DOM inspection before each interaction. Complete or skip
    first-run onboarding inside the isolated preview, then navigate to the
    feature through the same shell controls a user would use.

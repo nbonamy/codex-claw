@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@codex-claw/core/contracts';
-import { AppError } from '@codex-claw/core/app-error';
-import { sanitizeGitRemoteUrl } from '@codex-claw/core/git-remote';
-import type { AgentGitStatus } from '@codex-claw/core/contracts';
+import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@workspace/core/contracts';
+import { AppError } from '@workspace/core/app-error';
+import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
+import type { AgentGitStatus } from '@workspace/core/contracts';
 import type { GitWorktreeCreateInput } from '../git-worktrees';
 
 const execFileAsync = promisify(execFile);
@@ -619,7 +620,7 @@ const maxGenerationContextLength = 60_000;
 
 function boundedGenerationContext(value: string): string {
   if (value.length <= maxGenerationContextLength) return value;
-  return `${value.slice(0, maxGenerationContextLength)}\n\n[diff truncated by Codex Claw]`;
+  return `${value.slice(0, maxGenerationContextLength)}\n\n[diff truncated by ${product.name}]`;
 }
 
 function isIntegrationBranch(branch: string): boolean {

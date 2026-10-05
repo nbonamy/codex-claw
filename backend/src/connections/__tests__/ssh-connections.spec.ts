@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { SshConnectionService, parseSshConfig, sshStdioTransport } from '../ssh-connections';
-import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { bundledCodexVersion } from '@workspace/core/codex-release';
 import { remoteCodexVersionCommand } from '../remote-codex-install';
 import { remoteClaudeVersionCommand } from '../remote-claude-install';
 
@@ -52,22 +53,22 @@ Host bad;alias
     await expect(service.listHostCandidates()).resolves.toStrictEqual([]);
   });
 
-  it('syncs the clawd package and stores the daemon-first stdio transport', async () => {
+  it('syncs the daemon package and stores the daemon-first stdio transport', async () => {
     const run = vi.fn(async (command: string, args: string[]) => {
       if (command === 'ssh' && args.at(-1) === remoteCodexVersionCommand()) {
         return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       }
       if (command === 'ssh' && args.at(-1)?.includes('--version')) {
-        return { stdout: 'clawd 0.1.0\n', stderr: '' };
+        return { stdout: 'daemon 0.1.0\n', stderr: '' };
       }
       return { stdout: '', stderr: '' };
     });
     const service = new SshConnectionService({
       accessFile: vi.fn().mockResolvedValue(undefined),
-      assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
+      assetsPath: `/Applications/${product.name}.app/Contents/Resources`,
       createId: () => 'connection-devbox',
       now: () => new Date('2026-06-14T10:00:00.000Z'),
-      providerTokensFilePath: '/Users/nicolas/.codex-claw/provider-tokens.json',
+      providerTokensFilePath: `/Users/nicolas/${product.homeDirectory}/provider-tokens.json`,
       run,
     });
 
@@ -85,9 +86,9 @@ Host bad;alias
       user: 'nicolas',
       port: 2222,
       status: 'ready',
-      clawdVersion: '0.1.0',
+      daemonVersion: '0.1.0',
       codexVersion: bundledCodexVersion,
-      detail: `Ready (clawd 0.1.0, Codex ${bundledCodexVersion})`,
+      detail: `Ready (daemon 0.1.0, Codex ${bundledCodexVersion})`,
       transport: sshStdioTransport('devbox'),
       installedAt: '2026-06-14T10:00:00.000Z',
       lastCheckedAt: '2026-06-14T10:00:00.000Z',
@@ -100,16 +101,16 @@ Host bad;alias
       'BatchMode=yes',
       '-o',
       'ConnectTimeout=10',
-      '/Applications/Codex Claw.app/Contents/Resources/clawd/clawd.mjs',
-      'devbox:~/.codex-claw/clawd.mjs.tmp',
+      `/Applications/${product.name}.app/Contents/Resources/daemon/daemon.mjs`,
+      `devbox:~/${product.homeDirectory}/daemon.mjs.tmp`,
     ], { timeoutMs: 15000 });
     expect(run).toHaveBeenCalledWith('scp', [
       '-o',
       'BatchMode=yes',
       '-o',
       'ConnectTimeout=10',
-      '/Users/nicolas/.codex-claw/provider-tokens.json',
-      'devbox:~/.codex-claw/provider-tokens.json.tmp',
+      `/Users/nicolas/${product.homeDirectory}/provider-tokens.json`,
+      `devbox:~/${product.homeDirectory}/provider-tokens.json.tmp`,
     ], { timeoutMs: 15000 });
     expect(run).toHaveBeenCalledWith('ssh', [
       '-o',
@@ -117,7 +118,7 @@ Host bad;alias
       '-o',
       'ConnectTimeout=10',
       'devbox',
-      `mv ~/.codex-claw/provider-tokens.json.tmp ~/.codex-claw/provider-tokens.json && chmod 600 ~/.codex-claw/provider-tokens.json`,
+      `mv ~/${product.homeDirectory}/provider-tokens.json.tmp ~/${product.homeDirectory}/provider-tokens.json && chmod 600 ~/${product.homeDirectory}/provider-tokens.json`,
     ], { timeoutMs: 15000 });
     expect(run.mock.calls.some(([command, args]) => (
       command === 'ssh' &&
@@ -135,13 +136,13 @@ Host bad;alias
         return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       }
       if (command === 'ssh' && remoteCommand.includes('--version')) {
-        return { stdout: 'clawd 0.21.1\n', stderr: '' };
+        return { stdout: 'daemon 0.21.1\n', stderr: '' };
       }
       return { stdout: '', stderr: '' };
     });
     const service = new SshConnectionService({
       accessFile: vi.fn().mockResolvedValue(undefined),
-      assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
+      assetsPath: `/Applications/${product.name}.app/Contents/Resources`,
       run,
     });
 
@@ -149,7 +150,7 @@ Host bad;alias
 
     expect(connection).toMatchObject({
       status: 'ready',
-      detail: `Ready (clawd 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`,
+      detail: `Ready (daemon 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`,
     });
     expect(run).not.toHaveBeenCalledWith('ssh', expect.arrayContaining([
       'devbox', expect.stringContaining('https://claude.ai/install.sh'),
@@ -166,13 +167,13 @@ Host bad;alias
         throw new Error('Codex not installed');
       }
       if (command === 'ssh' && remoteCommand.includes('--version')) {
-        return { stdout: 'clawd 0.21.1\n', stderr: '' };
+        return { stdout: 'daemon 0.21.1\n', stderr: '' };
       }
       return { stdout: '', stderr: '' };
     });
     const service = new SshConnectionService({
       accessFile: vi.fn().mockResolvedValue(undefined),
-      assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
+      assetsPath: `/Applications/${product.name}.app/Contents/Resources`,
       run,
     });
 
@@ -180,7 +181,7 @@ Host bad;alias
 
     expect(connection).toMatchObject({
       status: 'ready',
-      detail: 'Ready (clawd 0.21.1, Claude 2.1.283)',
+      detail: 'Ready (daemon 0.21.1, Claude 2.1.283)',
       transport: sshStdioTransport('devbox'),
     });
   });
@@ -191,7 +192,7 @@ Host bad;alias
       command: 'ssh',
       args: [
         'devbox',
-        'node ~/.codex-claw/clawd.mjs connect || exec node ~/.codex-claw/clawd.mjs --stdio',
+        `node ~/${product.homeDirectory}/daemon.mjs connect || exec node ~/${product.homeDirectory}/daemon.mjs --stdio`,
       ],
     });
   });
@@ -202,7 +203,7 @@ Host bad;alias
         return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       }
       if (command === 'ssh' && args.at(-1)?.includes('--version')) {
-        return { stdout: 'clawd 0.1.0\n', stderr: '' };
+        return { stdout: 'daemon 0.1.0\n', stderr: '' };
       }
       return { stdout: '', stderr: '' };
     });
@@ -213,10 +214,10 @@ Host bad;alias
     });
     const service = new SshConnectionService({
       accessFile,
-      assetsPath: '/Applications/Codex Claw.app/Contents/Resources',
+      assetsPath: `/Applications/${product.name}.app/Contents/Resources`,
       createId: () => 'connection-devbox',
       now: () => new Date('2026-06-14T10:00:00.000Z'),
-      providerTokensFilePath: '/Users/nicolas/.codex-claw/provider-tokens.json',
+      providerTokensFilePath: `/Users/nicolas/${product.homeDirectory}/provider-tokens.json`,
       run,
     });
 
@@ -230,7 +231,7 @@ Host bad;alias
       '-o',
       'ConnectTimeout=10',
       'devbox',
-      'rm -f ~/.codex-claw/provider-tokens.json',
+      `rm -f ~/${product.homeDirectory}/provider-tokens.json`,
     ], { timeoutMs: 15000 });
   });
 
@@ -252,13 +253,13 @@ Host bad;alias
 
   it('inspects versions without copying, installing, or restarting anything', async () => {
     const run = vi.fn(async (_command: string, args: string[]) => ({
-      stdout: args.at(-1)?.startsWith('node ') ? 'clawd 0.19.1' : 'codex-cli 0.143.0', stderr: '',
+      stdout: args.at(-1)?.startsWith('node ') ? 'daemon 0.19.1' : 'codex-cli 0.143.0', stderr: '',
     }));
     const service = new SshConnectionService({ run });
     const connection = { id: 'remote', kind: 'ssh' as const, host: 'devbox', name: 'Dev', status: 'ready' as const, createdAt: '', updatedAt: '' };
-    await expect(service.inspectVersions(connection)).resolves.toMatchObject({ clawdVersion: '0.19.1', codexVersion: '0.143.0' });
+    await expect(service.inspectVersions(connection)).resolves.toMatchObject({ daemonVersion: '0.19.1', codexVersion: '0.143.0' });
     expect(run.mock.calls.map(([command, args]) => [command, args.at(-1)])).toEqual([
-      ['ssh', 'node ~/.codex-claw/clawd.mjs --version'],
+      ['ssh', `node ~/${product.homeDirectory}/daemon.mjs --version`],
       ['ssh', remoteCodexVersionCommand()],
       ['ssh', remoteClaudeVersionCommand()],
     ]);
@@ -267,7 +268,7 @@ Host bad;alias
   it('reports the remote Claude version during read-only inspection when enabled', async () => {
     const run = vi.fn(async (_command: string, args: string[]) => {
       const command = args.at(-1) ?? '';
-      if (command.startsWith('node ')) return { stdout: 'clawd 0.21.1\n', stderr: '' };
+      if (command.startsWith('node ')) return { stdout: 'daemon 0.21.1\n', stderr: '' };
       if (command.includes('codex')) return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       return { stdout: '2.1.283 (Claude Code)\n', stderr: '' };
     });
@@ -276,14 +277,14 @@ Host bad;alias
 
     const inspected = await service.inspectVersions(connection);
 
-    expect(inspected.detail).toBe(`Ready (clawd 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`);
+    expect(inspected.detail).toBe(`Ready (daemon 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`);
     expect(run.mock.calls.some(([, args]) => (args.at(-1) ?? '').includes('claude.ai/install.sh'))).toBe(false);
   });
 
   it('keeps the connection ready when read-only inspection finds no Claude CLI', async () => {
     const run = vi.fn(async (_command: string, args: string[]) => {
       const command = args.at(-1) ?? '';
-      if (command.startsWith('node ')) return { stdout: 'clawd 0.21.1\n', stderr: '' };
+      if (command.startsWith('node ')) return { stdout: 'daemon 0.21.1\n', stderr: '' };
       if (command.includes('codex')) return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       throw new Error('Claude Code is not installed.');
     });
@@ -292,7 +293,7 @@ Host bad;alias
 
     await expect(service.inspectVersions(connection)).resolves.toMatchObject({
       status: 'ready',
-      detail: `Ready (clawd 0.21.1, Codex ${bundledCodexVersion}); Claude unavailable: Claude Code is not installed.`,
+      detail: `Ready (daemon 0.21.1, Codex ${bundledCodexVersion}); Claude unavailable: Claude Code is not installed.`,
     });
   });
 

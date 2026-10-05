@@ -12,13 +12,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     define: {
-      __CODEX_CLAW_GITHUB_CLIENT_ID__: JSON.stringify(env.CODEX_CLAW_GITHUB_CLIENT_ID ?? ''),
-      __CODEX_CLAW_LINEAR_CLIENT_ID__: JSON.stringify(env.CODEX_CLAW_LINEAR_CLIENT_ID ?? ''),
-      __CODEX_CLAW_LINEAR_CALLBACK_URI__: JSON.stringify(env.CODEX_CLAW_LINEAR_CALLBACK_URI ?? ''),
+      __APP_GITHUB_CLIENT_ID__: JSON.stringify(env.APP_GITHUB_CLIENT_ID ?? ''),
+      __APP_LINEAR_CLIENT_ID__: JSON.stringify(env.APP_LINEAR_CLIENT_ID ?? ''),
     },
     resolve: {
       alias: {
-        '@codex-claw/core': path.resolve(__dirname, '../core/src'),
+        '@workspace/core': path.resolve(__dirname, '../core/src'),
         ...(useSdkSources ? sdkSourceAliases : {}),
       },
     },
@@ -26,7 +25,7 @@ export default defineConfig(({ mode }) => {
       noExternal: true,
     },
     build: {
-      ssr: path.resolve(__dirname, 'src/clawd.ts'),
+      ssr: path.resolve(__dirname, 'src/daemon.ts'),
       outDir: 'dist',
       emptyOutDir: true,
       sourcemap: true,
@@ -34,7 +33,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         external: [/^node:/],
         output: {
-          entryFileNames: 'clawd.mjs',
+          entryFileNames: 'daemon.mjs',
           format: 'es',
         },
       },

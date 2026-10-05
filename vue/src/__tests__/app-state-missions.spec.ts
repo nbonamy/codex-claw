@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { useAppState } from '../app-state';
 import { stubElectronTestWindow } from '../test/client';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, updateMission } from '@codex-claw/core/missions';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission, updateMission } from '@workspace/core/missions';
 
 describe('mission client state', () => {
   it('adopts backend mission revisions without changing agent navigation and preserves state on failure', async () => {
@@ -13,7 +13,7 @@ describe('mission client state', () => {
       readMissionArtifact: vi.fn().mockResolvedValue({ stage: 'requirements', content: '# Billing', revision: 1, updatedAt: '2026-09-19T00:00:00.000Z' }),
       updateMission: vi.fn(async input => { updateMission(backend, input); return structuredClone(backend); }),
     };
-    stubElectronTestWindow({ codexClaw: api });
+    stubElectronTestWindow({ app: api });
     const state = useAppState();
     await state.loadSnapshot();
     const mission = await state.createMission({ outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: backend.teams[0]!.id, orchestratorMemberId: backend.agents[0]!.id });

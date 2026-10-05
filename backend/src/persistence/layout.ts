@@ -1,7 +1,7 @@
-import type { AccountRateLimits, AgentSubagentTree, AppGeneralSettings, AppThemeSettings, Automation, BackendDefaults, BackendSession, RemoteConnection, SourceFolderState, SubagentNode, Team, WorkBacklogState } from '@codex-claw/core/contracts';
-import { approvalBackendDefaultsWithPreset } from '@codex-claw/core/approval-presets';
-import type { Mission } from '@codex-claw/core/missions';
-import type { Visualization } from '@codex-claw/core/visualize';
+import type { AccountRateLimits, AgentSubagentTree, AppGeneralSettings, AppThemeSettings, Automation, BackendDefaults, BackendSession, RemoteConnection, SourceFolderState, SubagentNode, Team, WorkBacklogState } from '@workspace/core/contracts';
+import { approvalBackendDefaultsWithPreset } from '@workspace/core/approval-presets';
+import type { Mission } from '@workspace/core/missions';
+import type { Visualization } from '@workspace/core/visualize';
 import type { FullPersistedState, PersistedAgent, PersistedState } from '../state-persistence';
 import './agent-fields';
 

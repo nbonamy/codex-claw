@@ -2,7 +2,7 @@ import type { CodexMessageTextSelection } from '@codex-app-sdk/vue';
 import { flushPromises } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import {
   conversationControllerActions,
   mountShell,

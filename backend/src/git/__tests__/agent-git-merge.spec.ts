@@ -13,7 +13,7 @@ const git: AgentGitRunner = (cwd, args) => exec('git', args, {
 });
 
 async function fixture() {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'claw-merge-')));
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'app-merge-')));
   const repo = join(root, 'repo');
   const feature = join(root, 'feature');
   await git(root, ['init', '-b', 'main', repo]);

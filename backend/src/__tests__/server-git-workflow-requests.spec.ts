@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ClawBackendServer } from '../server';
+import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
+import { claudeBackendCapabilities, codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import type { WorkIntegrationManager } from '../work-integrations/manager';
 import type { AgentGitService } from '../git/agent-git-service';
@@ -11,7 +11,7 @@ import {
   createWorkItem,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('returns git diff data without emitting presentation events', async () => {
     const snapshot = createTestSnapshot();
@@ -20,7 +20,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'claude',
       backendDefaults: { kind: 'claude' },
       status: { type: 'idle' },
@@ -38,7 +38,7 @@ describe('ClawBackendServer', () => {
       ],
     });
     const getGitStatus = vi.fn().mockResolvedValue({
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       branch: 'main',
       upstream: 'origin/main',
       ahead: 0,
@@ -61,7 +61,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const events: unknown[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -78,7 +78,7 @@ describe('ClawBackendServer', () => {
     });
     expect(result).toStrictEqual({ jsonrpc: '2.0', id: 'open-diff', result: await getGitDiff.mock.results[0]?.value });
 
-    expect(getGitDiff).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw', { type: 'uncommitted' });
+    expect(getGitDiff).toHaveBeenCalledWith('/Users/nbonamy/src/agent-workspace', { type: 'uncommitted' });
     expect(getGitStatus).not.toHaveBeenCalled();
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'sidePanel.gitDiffRequested' }));
     expect(events).not.toContainEqual(expect.objectContaining({ type: 'git.statusUpdated' }));
@@ -142,7 +142,7 @@ describe('ClawBackendServer', () => {
     };
     const events: unknown[] = [];
     const findPullRequest = vi.fn().mockResolvedValue(null);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
@@ -201,7 +201,7 @@ describe('ClawBackendServer', () => {
     };
     const commitMessageContext = vi.fn().mockResolvedValue({ context: '## staged changes\ndiff' });
     const pullRequestMessageContext = vi.fn().mockResolvedValue({ baseRef: 'origin/main', context: '## Diff\nbranch diff' });
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
@@ -275,7 +275,7 @@ describe('ClawBackendServer', () => {
     const deliverReport = vi.fn();
     const notifyWorker = vi.fn();
     const events: BackendEvent[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       onEvent: (event) => events.push(event),
@@ -361,7 +361,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -379,7 +379,7 @@ describe('ClawBackendServer', () => {
     };
     const events: unknown[] = [];
     const diff = vi.fn().mockRejectedValue(new Error('Git diff failed.'));
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -405,14 +405,14 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -429,7 +429,7 @@ describe('ClawBackendServer', () => {
       result: {
         workBacklog: {
           assignments: {
-            'github:github:nbonamy/codex-claw#12': {
+            'github:github:nbonamy/agent-workspace#12': {
               agentId: 'agent-dina',
               policy: 'review',
               status: 'inProgress',

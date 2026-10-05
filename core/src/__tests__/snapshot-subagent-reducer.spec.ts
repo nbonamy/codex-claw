@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeClawBackendEvent } from '../backend-protocol/events';
+import { decodeAppBackendEvent } from '../backend-protocol/events';
 import { createInitialSnapshot } from '../snapshot';
 import { applySubagentEventToSnapshot as applyMainEventToSnapshot } from '../snapshot-subagent-reducer';
 import type { SnapshotEventOwnedBy } from '../snapshot-event-ownership';
@@ -334,7 +334,7 @@ describe('snapshot subagent reducer', () => {
       } as unknown as SnapshotEventOwnedBy<'subagent'>;
 
     for (const event of malformedEvents) {
-      expect(() => decodeClawBackendEvent(event)).toThrow();
+      expect(() => decodeAppBackendEvent(event)).toThrow();
     }
     applyMainEventToSnapshot(snapshot, agentlessEvent);
 

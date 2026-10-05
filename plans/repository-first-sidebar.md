@@ -10,7 +10,7 @@ conversation as a repository-scoped work session.
 ```text
 TEAM
   Quick chats
-  codex-claw
+  example-project
     main · Improve repository navigation
     feat/work-routing · Add work routing
   codex-app-sdk
@@ -68,7 +68,7 @@ type AgentWorkspaceIdentity =
     };
 ```
 
-- Resolve identity behind `clawd`, never in Vue.
+- Resolve identity behind `daemon`, never in Vue.
 - Use lightweight Git identity commands rather than full `git status`.
 - Persist the latest identity in the app snapshot.
 - Reconcile when an agent is created, its folder changes, a branch/worktree

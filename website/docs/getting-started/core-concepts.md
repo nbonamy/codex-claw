@@ -4,7 +4,7 @@ description: Understand teams, agents, conversations, repositories, worktrees, a
 
 # Core concepts
 
-Claw organizes the workspace around agents and the work you give them.
+Korus organizes the workspace around agents and the work you give them.
 
 ## Teams and agents
 
@@ -20,7 +20,7 @@ The start-work menu can create a new project, open an existing folder, browse Gi
 
 ## Provider setup and accounts
 
-Each coding engine has a selected setup environment, including its authentication and configuration. Claw's **Customize** flow lets you keep that environment separate or use an existing provider setup. This is independent for Codex and Claude Code.
+Each coding engine has a selected setup environment, including its authentication and configuration. Korus's **Customize** flow lets you keep that environment separate or use an existing provider setup. This is independent for Codex and Claude Code.
 
 A provider home is different from an agent's working folder. The home controls the engine's setup; the working folder controls where the agent reads and changes project files.
 
@@ -28,7 +28,7 @@ See [Provider guides](../providers/) before switching a provider's location. Cha
 
 ## Conversations
 
-A conversation carries the instructions, questions, approvals, and evidence for an agent's task. Claw renders messages, tool calls, command output, plans, and file changes in the workspace.
+A conversation carries the instructions, questions, approvals, and evidence for an agent's task. Korus renders messages, tool calls, command output, plans, and file changes in the workspace.
 
 Drafts and workspace state stay with the agent as you switch between conversations. Read [Conversations](../features/conversations) for sending, steering, and queued instructions.
 
@@ -50,6 +50,6 @@ A Mission is a staged outcome: Requirements, Tickets, Implementation, Review, an
 
 ## Providers
 
-The provider supplies the coding engine and model access. Claw supplies team coordination, workspace surfaces, and delivery workflows around it. Available controls can differ between engines.
+The provider supplies the coding engine and model access. Korus supplies team coordination, workspace surfaces, and delivery workflows around it. Available controls can differ between engines.
 
 See [Providers](../providers/) and [Missions](../workflows/missions).

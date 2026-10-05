@@ -1,5 +1,5 @@
-import type { AgentBackend } from '@codex-claw/core/contracts';
-import type { ProviderAuthentication, ProviderConnection } from '@codex-claw/core/contracts/provider-setup';
+import type { AgentBackend } from '@workspace/core/contracts';
+import type { ProviderAuthentication, ProviderConnection } from '@workspace/core/contracts/provider-setup';
 
 type ConnectionProbe = { backend: AgentBackend; installed: boolean; homePath: string };
 

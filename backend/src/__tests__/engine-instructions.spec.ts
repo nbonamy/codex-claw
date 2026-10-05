@@ -8,7 +8,7 @@ const homes: string[] = [];
 afterEach(async () => { vi.unstubAllEnvs(); await Promise.all(homes.splice(0).map(home => rm(home, { recursive: true, force: true }))); });
 describe('engine instruction files', () => {
   it('reads and saves Claude personalization in the configured provider home', async () => {
-    const home = await mkdtemp(path.join(tmpdir(), 'claw-claude-instructions-')); homes.push(home);
+    const home = await mkdtemp(path.join(tmpdir(), 'app-claude-instructions-')); homes.push(home);
     vi.stubEnv('CLAUDE_CONFIG_DIR', home);
     vi.stubEnv('HOME', path.join(home, 'personal'));
     const file = path.join(home, 'CLAUDE.md');
@@ -18,7 +18,7 @@ describe('engine instruction files', () => {
     expect(await readEngineInstructions('claude')).toEqual({ path: file, text: 'Use the configured instructions.\n' });
   });
   it('reads missing files as empty and saves the selected existing provider home', async () => {
-    const home = await mkdtemp(path.join(tmpdir(), 'claw-instructions-')); homes.push(home);
+    const home = await mkdtemp(path.join(tmpdir(), 'app-instructions-')); homes.push(home);
     const providerHomes = {
       codex: { homePath: path.join(home, '.codex'), isolated: false, shareSkills: true },
       claude: { homePath: path.join(home, '.claude'), isolated: false, shareSkills: true },

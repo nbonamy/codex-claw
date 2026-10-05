@@ -10,11 +10,11 @@ import type {
   WorkProviderAuthorization,
   WorkProviderKind,
   WorkSource,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { localizedText } from './i18n/errors';
 import { translate } from './i18n';
 import { isFirstRunOnboardingActive } from './onboarding-session';
-import { clawPlatformActions, codexClawApi } from './platform-api';
+import { appPlatformActions, appApi } from './platform-api';
 import { useConfetti } from './shared/confetti/use-confetti';
 
 type WorkProviderStateOptions = {
@@ -38,19 +38,19 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   const itemRevisions = new Map<string, number>();
 
   async function connect(provider: WorkProviderKind): Promise<void> {
-    if (!codexClawApi?.connectWorkProvider) return;
+    if (!appApi?.connectWorkProvider) return;
     const revision = ++authorizationRevision;
     status.value = 'loading';
     error.value = null;
     try {
-      const result = await codexClawApi.connectWorkProvider(provider);
+      const result = await appApi.connectWorkProvider(provider);
       if (revision !== authorizationRevision) return;
       options.adoptSnapshot(result.snapshot);
       authorization.value = result.authorization ?? null;
       if (result.authorization) scheduleAuthorizationPoll(provider);
       else clearAuthorizationPoll(provider);
       if (result.authorization?.flow === 'browser') {
-        await clawPlatformActions.openExternal?.(result.authorization.verificationUri);
+        await appPlatformActions.openExternal?.(result.authorization.verificationUri);
         if (revision !== authorizationRevision) return;
       }
       status.value = 'loaded';
@@ -67,8 +67,8 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     error.value = null;
     try {
       const pending = authorization.value;
-      if (pending?.provider === provider && clawPlatformActions.openExternal) {
-        await clawPlatformActions.openExternal(pending.verificationUri);
+      if (pending?.provider === provider && appPlatformActions.openExternal) {
+        await appPlatformActions.openExternal(pending.verificationUri);
       } else {
         throw new Error('Start authorization before opening the provider login page.');
       }
@@ -82,18 +82,18 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   }
 
   async function completeConnection(provider: WorkProviderKind): Promise<void> {
-    if (codexClawApi?.pollWorkProviderAuthorization) {
+    if (appApi?.pollWorkProviderAuthorization) {
       await pollConnection(provider, { userInitiated: true });
     }
   }
 
   async function disconnect(provider: WorkProviderKind): Promise<void> {
-    if (!codexClawApi?.disconnectWorkProvider) return;
+    if (!appApi?.disconnectWorkProvider) return;
     const revision = ++authorizationRevision;
     catalogRevisions.set(provider, (catalogRevisions.get(provider) ?? 0) + 1);
     for (const [key, value] of itemRevisions) if (key.startsWith(`${provider}:`)) itemRevisions.set(key, value + 1);
     clearAuthorizationPoll(provider);
-    const snapshot = await codexClawApi.disconnectWorkProvider(provider);
+    const snapshot = await appApi.disconnectWorkProvider(provider);
     if (revision !== authorizationRevision) return;
     options.adoptSnapshot(snapshot);
     if (authorization.value?.provider === provider) authorization.value = null;
@@ -105,9 +105,9 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
 
   async function loadRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]> {
     if (isRemoteAutomationLocation(location)) {
-      return await codexClawApi?.listWorkSources?.(provider, location) ?? [];
+      return await appApi?.listWorkSources?.(provider, location) ?? [];
     }
-    if (!codexClawApi?.listWorkSources || connection(provider)?.status !== 'connected') {
+    if (!appApi?.listWorkSources || connection(provider)?.status !== 'connected') {
       repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: [] };
       status.value = 'notLoaded';
       return [];
@@ -118,7 +118,7 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     const revision = (catalogRevisions.get(provider) ?? 0) + 1;
     catalogRevisions.set(provider, revision);
     try {
-      const repositories = await codexClawApi.listWorkSources(provider);
+      const repositories = await appApi.listWorkSources(provider);
       if (catalogRevisions.get(provider) !== revision) return [];
       repositoriesByProvider.value = { ...repositoriesByProvider.value, [provider]: repositories };
       status.value = 'loaded';
@@ -142,10 +142,10 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   }
 
   async function configure(input: WorkBacklogConfigurationInput, location?: AutomationLocation): Promise<void> {
-    if (!codexClawApi?.configureWorkBacklog) return;
+    if (!appApi?.configureWorkBacklog) return;
     const next = location
-      ? await codexClawApi.configureWorkBacklog(input, location)
-      : await codexClawApi.configureWorkBacklog(input);
+      ? await appApi.configureWorkBacklog(input, location)
+      : await appApi.configureWorkBacklog(input);
     if (!isRemoteAutomationLocation(location)) options.adoptSnapshot(next);
   }
 
@@ -155,11 +155,11 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     location?: AutomationLocation,
     query?: WorkItemQuery,
   ): Promise<WorkItem[] | undefined> {
-    if (!codexClawApi?.listWorkItems || !repositoryId) return [];
+    if (!appApi?.listWorkItems || !repositoryId) return [];
     if (isRemoteAutomationLocation(location)) {
-      return codexClawApi.listWorkItems(provider, repositoryId, location, query);
+      return appApi.listWorkItems(provider, repositoryId, location, query);
     }
-    if (query) return codexClawApi.listWorkItems(provider, repositoryId, undefined, query);
+    if (query) return appApi.listWorkItems(provider, repositoryId, undefined, query);
 
     const key = workItemsKey(provider, repositoryId);
     const revision = (itemRevisions.get(key) ?? 0) + 1;
@@ -167,7 +167,7 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     status.value = 'loading';
     error.value = null;
     try {
-      const items = await codexClawApi.listWorkItems(provider, repositoryId);
+      const items = await appApi.listWorkItems(provider, repositoryId);
       if (itemRevisions.get(key) !== revision) return undefined;
       itemsByRepository.value = { ...itemsByRepository.value, [workItemsKey(provider, repositoryId)]: items };
       status.value = 'loaded';
@@ -185,18 +185,18 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
     location?: AutomationLocation,
     query?: GlobalWorkItemQuery,
   ): Promise<WorkItemPage> {
-    if (!codexClawApi?.listGlobalWorkItems) {
+    if (!appApi?.listGlobalWorkItems) {
       return { items: [] };
     }
-    return codexClawApi.listGlobalWorkItems(provider, location, query);
+    return appApi.listGlobalWorkItems(provider, location, query);
   }
 
   async function loadAssignedItems(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkItem[]> {
-    if (!codexClawApi?.listAssignedWorkItems) return [];
+    if (!appApi?.listAssignedWorkItems) return [];
     status.value = 'loading';
     error.value = null;
     try {
-      const items = await codexClawApi.listAssignedWorkItems(provider, location);
+      const items = await appApi.listAssignedWorkItems(provider, location);
       assignedItemsByProvider.value = { ...assignedItemsByProvider.value, [provider]: items };
       status.value = 'loaded';
       return items;
@@ -215,12 +215,12 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
   }
 
   async function pollConnection(provider: WorkProviderKind, pollOptions: { userInitiated?: boolean } = {}): Promise<void> {
-    if (!codexClawApi?.pollWorkProviderAuthorization) return;
+    if (!appApi?.pollWorkProviderAuthorization) return;
     const revision = authorizationRevision;
     if (pollOptions.userInitiated) status.value = 'loading';
     error.value = null;
     try {
-      const snapshot = await codexClawApi.pollWorkProviderAuthorization(provider);
+      const snapshot = await appApi.pollWorkProviderAuthorization(provider);
       if (revision !== authorizationRevision) return;
       options.adoptSnapshot(snapshot);
       const current = connection(provider);

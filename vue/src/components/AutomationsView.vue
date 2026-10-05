@@ -112,7 +112,7 @@
                     trigger="manual"
                     width="180"
                     :teleported="true"
-                    popper-class="claw-popover automations-view__menu-popover"
+                    popper-class="app-popover automations-view__menu-popover"
                     @update:visible="setMenuVisible(row.id, $event)"
                   >
                     <template #reference>
@@ -162,8 +162,8 @@ import type {
   UpdateAutomationInput,
   WorkProviderKind,
   WorkSource,
-} from '@codex-claw/core/contracts';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
+} from '@workspace/core/contracts';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AppMenu from '../shared/menu/AppMenu.vue';

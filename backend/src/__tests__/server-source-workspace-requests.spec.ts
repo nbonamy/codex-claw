@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SourceWorktree } from '@codex-claw/core/contracts';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ClawBackendServer } from '../server';
+import type { SourceWorktree } from '@workspace/core/contracts';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import { AgentGitService } from '../git/agent-git-service';
-import { createQuickChatInSnapshot } from '@codex-claw/core/agent-manager';
+import { createQuickChatInSnapshot } from '@workspace/core/agent-manager';
 import {
   createTestSnapshot,
   readyRemoteConnection,
@@ -12,7 +12,7 @@ import {
   createRemoteTeamSnapshot,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('owns source repository discovery path resolution', async () => {
     const snapshot = createTestSnapshot();
@@ -22,16 +22,16 @@ describe('ClawBackendServer', () => {
       recentRepoNames: [],
     };
     const repositories = [{
-      name: 'codex-claw',
-      path: '/Users/nbonamy/src/codex-claw',
-      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      name: 'agent-workspace',
+      path: '/Users/nbonamy/src/agent-workspace',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/agent-workspace' }],
     }];
     const driverRpc = {
       handle: vi.fn().mockResolvedValue(repositories),
       onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as BackendDriverRpc;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -69,7 +69,7 @@ describe('ClawBackendServer', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as BackendDriverRpc;
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -110,7 +110,7 @@ describe('ClawBackendServer', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as BackendDriverRpc;
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -158,7 +158,7 @@ describe('ClawBackendServer', () => {
       })),
       status: vi.fn().mockResolvedValue(null),
     } as unknown as AgentGitService;
-    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc, agentGitService });
+    const server = new AppBackendServer({ version: 'test', snapshot, driverRpc, agentGitService });
 
     const response = await server.handleMessage({
       jsonrpc: '2.0', id: 'project-create', method: backendMethods.projectCreate,
@@ -185,7 +185,7 @@ describe('ClawBackendServer', () => {
       folder: '/home/nicolas/src/new-product',
     }]);
     const remoteClients = { request: vi.fn().mockResolvedValue(remoteSnapshot), close: vi.fn() };
-    const server = new ClawBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never });
+    const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'remote-project', method: backendMethods.projectCreate,
@@ -228,8 +228,8 @@ describe('ClawBackendServer', () => {
       })),
       status: vi.fn().mockResolvedValue(null),
     } as unknown as AgentGitService;
-    const events: import('@codex-claw/core/contracts').MainToRendererEvent[] = [];
-    const server = new ClawBackendServer({ version: 'test', snapshot, driverRpc, agentGitService, onEvent: event => events.push(event) });
+    const events: import('@workspace/core/contracts').MainToRendererEvent[] = [];
+    const server = new AppBackendServer({ version: 'test', snapshot, driverRpc, agentGitService, onEvent: event => events.push(event) });
     const result = await server.createProjectFromQuickChat(
       'agent-quick-chat', 'new-product', 'Build the agreed product.',
     );
@@ -261,15 +261,15 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     const repositories = [{
-      name: 'codex-claw',
-      path: '/home/nicolas/src/codex-claw',
-      worktrees: [{ name: 'main', path: '/home/nicolas/src/codex-claw' }],
+      name: 'agent-workspace',
+      path: '/home/nicolas/src/agent-workspace',
+      worktrees: [{ name: 'main', path: '/home/nicolas/src/agent-workspace' }],
     }];
     const remoteClients = {
       request: vi.fn().mockResolvedValue(repositories),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -305,7 +305,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn().mockResolvedValue(repository),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -340,7 +340,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn().mockResolvedValue(repository),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -383,7 +383,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn().mockResolvedValue(listing),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -433,7 +433,7 @@ describe('ClawBackendServer', () => {
       onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as BackendDriverRpc;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -461,18 +461,18 @@ describe('ClawBackendServer', () => {
   it('owns source worktree path suggestions', async () => {
     const snapshot = createTestSnapshot();
     const driverRpc = {
-      handle: vi.fn().mockResolvedValue('/Users/nbonamy/src/codex-claw-backend-split'),
+      handle: vi.fn().mockResolvedValue('/Users/nbonamy/src/agent-workspace-backend-split'),
       onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as BackendDriverRpc;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
       driverRpc,
     });
     const input = {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'backend-split',
     };
 
@@ -482,7 +482,7 @@ describe('ClawBackendServer', () => {
       method: 'source/worktree/path/suggest',
       params: { input },
     })).resolves.toMatchObject({
-      result: '/Users/nbonamy/src/codex-claw-backend-split',
+      result: '/Users/nbonamy/src/agent-workspace-backend-split',
     });
 
     expect(driverRpc.handle).toHaveBeenCalledWith('source/worktree/path/suggest', { input });
@@ -491,15 +491,15 @@ describe('ClawBackendServer', () => {
   it('owns git worktree listing', async () => {
     const snapshot = createTestSnapshot();
     const worktrees: SourceWorktree[] = [
-      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
-      { name: 'backend-split', path: '/Users/nbonamy/src/codex-claw-backend-split' },
+      { name: 'main', path: '/Users/nbonamy/src/agent-workspace' },
+      { name: 'backend-split', path: '/Users/nbonamy/src/agent-workspace-backend-split' },
     ];
     const driverRpc = {
       handle: vi.fn().mockResolvedValue(worktrees),
       onEvent: vi.fn(() => () => undefined),
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as BackendDriverRpc;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -510,13 +510,13 @@ describe('ClawBackendServer', () => {
       jsonrpc: '2.0',
       id: 'source-worktrees',
       method: 'source/worktrees/list',
-      params: { repoPath: '/Users/nbonamy/src/codex-claw' },
+      params: { repoPath: '/Users/nbonamy/src/agent-workspace' },
     })).resolves.toMatchObject({
       result: worktrees,
     });
 
     expect(driverRpc.handle).toHaveBeenCalledWith('source/worktrees/list', {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
     });
   });
 
@@ -529,7 +529,7 @@ describe('ClawBackendServer', () => {
     };
     const worktree = {
       name: 'backend-split',
-      path: '/Users/nbonamy/src/codex-claw-backend-split',
+      path: '/Users/nbonamy/src/agent-workspace-backend-split',
     };
     const driverRpc = {
       handle: vi.fn().mockResolvedValue(worktree),
@@ -537,7 +537,7 @@ describe('ClawBackendServer', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as BackendDriverRpc;
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -545,7 +545,7 @@ describe('ClawBackendServer', () => {
       driverRpc,
     });
     const input = {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'backend-split',
     };
 
@@ -559,22 +559,22 @@ describe('ClawBackendServer', () => {
     });
 
     expect(driverRpc.handle).toHaveBeenCalledWith('source/worktree/create', { input });
-    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['codex-claw', 'id8']);
+    expect(snapshot.sourceFolder.recentRepoNames).toStrictEqual(['agent-workspace', 'id8']);
     expect(saveSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
-  it('routes source worktree creation to remote clawd without rebrokering metadata', async () => {
+  it('routes source worktree creation to remote daemon without rebrokering metadata', async () => {
     const snapshot = createTestSnapshot();
     snapshot.remoteConnections.connections = [readyRemoteConnection()];
     const worktree = {
       name: 'remote-agent',
-      path: '/home/nicolas/src/codex-claw-remote-agent',
+      path: '/home/nicolas/src/agent-workspace-remote-agent',
     };
     const remoteClients = {
       request: vi.fn().mockResolvedValue(worktree),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -587,7 +587,7 @@ describe('ClawBackendServer', () => {
       method: 'source/worktree/create',
       params: {
         input: {
-          repoPath: '/home/nicolas/src/codex-claw',
+          repoPath: '/home/nicolas/src/agent-workspace',
           branchName: 'remote-agent',
           reuseExisting: true,
           remoteConnectionId: 'connection-devbox',
@@ -602,7 +602,7 @@ describe('ClawBackendServer', () => {
       'source/worktree/create',
       { ...{
         input: {
-          repoPath: '/home/nicolas/src/codex-claw',
+          repoPath: '/home/nicolas/src/agent-workspace',
           branchName: 'remote-agent',
           reuseExisting: true,
         },
@@ -620,14 +620,14 @@ describe('ClawBackendServer', () => {
     const remoteSnapshot = createRemoteTeamSnapshot([{
       ...createRemoteAgent(),
       name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
+      folder: '/home/nicolas/src/agent-workspace',
     }]);
     const remoteClients = {
       request: vi.fn().mockResolvedValue(remoteSnapshot),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -642,7 +642,7 @@ describe('ClawBackendServer', () => {
       params: {
         input: {
           name: 'Remote Dina',
-          folder: '/home/nicolas/src/codex-claw',
+          folder: '/home/nicolas/src/agent-workspace',
           backend: 'codex',
         },
       },
@@ -657,7 +657,7 @@ describe('ClawBackendServer', () => {
         agents: [{
           id: 'agent-remote',
           name: 'Remote Dina',
-          folder: '/home/nicolas/src/codex-claw',
+          folder: '/home/nicolas/src/agent-workspace',
           teamId: 'team-test',
         }],
       },
@@ -669,7 +669,7 @@ describe('ClawBackendServer', () => {
       { ...{
         input: {
           name: 'Remote Dina',
-          folder: '/home/nicolas/src/codex-claw',
+          folder: '/home/nicolas/src/agent-workspace',
           backend: 'codex',
           teamId: 'team-remote',
         },
@@ -688,13 +688,13 @@ describe('ClawBackendServer', () => {
     const remoteSnapshot = createRemoteTeamSnapshot([{
       ...createRemoteAgent(),
       name: 'Remote Dina',
-      folder: '/home/nicolas/src/codex-claw',
+      folder: '/home/nicolas/src/agent-workspace',
     }]);
     const remoteClients = {
       request: vi.fn().mockResolvedValue(remoteSnapshot),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -710,7 +710,7 @@ describe('ClawBackendServer', () => {
         params: {
           input: {
             name: 'Remote Dina',
-            folder: '/home/nicolas/src/codex-claw',
+            folder: '/home/nicolas/src/agent-workspace',
             backend: 'codex',
           },
         },
@@ -737,7 +737,7 @@ describe('ClawBackendServer', () => {
       { ...{
         input: {
           name: 'Remote Dina',
-          folder: '/home/nicolas/src/codex-claw',
+          folder: '/home/nicolas/src/agent-workspace',
           backend: 'codex',
           teamId: 'team-remote',
         },

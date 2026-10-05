@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ProviderHomeSettings } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderHomeSettings } from '@workspace/core/contracts/provider-setup';
 import SettingsRow from './SettingsRow.vue';
 defineProps<{ home?: ProviderHomeSettings }>();
 const emit = defineEmits<{ customize: [] }>();

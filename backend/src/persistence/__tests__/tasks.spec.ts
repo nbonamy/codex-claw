@@ -2,13 +2,13 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import type { DelegatedTask } from '@codex-claw/core/delegated-task';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import type { DelegatedTask } from '@workspace/core/delegated-task';
 import { AppStateStore } from '../store';
 import { serializeStoreFile } from '../store-format';
 
 let home: string;
-beforeEach(async () => { home = await mkdtemp(path.join(os.tmpdir(), 'claw-tasks-')); });
+beforeEach(async () => { home = await mkdtemp(path.join(os.tmpdir(), 'app-tasks-')); });
 afterEach(async () => { await rm(home, { recursive: true, force: true }); });
 const task = (): DelegatedTask => ({
   id: 'task-1', requestId: 'request-1', requestFingerprint: 'fingerprint', parentAgentId: 'parent', workerAgentId: 'worker',

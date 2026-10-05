@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 
 import { translate } from '../i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import type { Team } from '@codex-claw/core/contracts';
+import type { Team } from '@workspace/core/contracts';
 
 export async function confirmCloseTeam(
   team: Team,
@@ -41,7 +42,7 @@ export async function confirmCloseTeam(
     await ElMessageBox.confirm(
       isRemoteTeam
         ? 'Agents, missions and quick chats will be deleted on the remote backend. Mission worktrees will not be deleted.'
-        : 'Agents, missions and quick chats will be removed from Codex Claw. Mission worktrees will not be deleted.',
+        : `Agents, missions and quick chats will be removed from ${product.name}. Mission worktrees will not be deleted.`,
       isRemoteTeam ? `Delete ${team.name}?` : `Close ${team.name}?`,
       {
         cancelButtonText: translate('common.cancel'),

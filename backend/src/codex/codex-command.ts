@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { bundledCodexVersion } from '@workspace/core/codex-release';
 import { backendHomeDir } from '../state';
 
 export type CodexCommandDependencies = {
@@ -17,7 +17,7 @@ export function resolveCodexCommand(
     return explicit;
   }
 
-  const bundled = (dependencies.bundledPath ?? process.env.CODEX_CLAW_BUNDLED_CODEX_PATH)?.trim();
+  const bundled = (dependencies.bundledPath ?? process.env.APP_BUNDLED_CODEX_PATH)?.trim();
   if (bundled) {
     return bundled;
   }

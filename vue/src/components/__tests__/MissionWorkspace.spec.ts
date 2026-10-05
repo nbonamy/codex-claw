@@ -1,9 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, type Mission } from '@codex-claw/core/missions';
-import type { MissionArtifactReadResult, MissionExecutionInput, MissionImplementationStartProgress, MissionRun } from '@codex-claw/core/mission-execution';
-import type { Agent, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission, type Mission } from '@workspace/core/missions';
+import type { MissionArtifactReadResult, MissionExecutionInput, MissionImplementationStartProgress, MissionRun } from '@workspace/core/mission-execution';
+import type { Agent, OpenInApplicationCatalog } from '@workspace/core/contracts';
 import MissionWorkspace from '../MissionWorkspace.vue';
 import WorkspaceProvisioningProgressDialog from '../WorkspaceProvisioningProgressDialog.vue';
 import MissionTicketBoard, { type MissionTicketComment } from '../MissionTicketBoard.vue';
@@ -73,7 +73,7 @@ describe('MissionWorkspace', () => {
     const executeMission = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { executeMission });
 
-    const continueButton = wrapper.get('.mission-workspace__stage-header .claw-button');
+    const continueButton = wrapper.get('.mission-workspace__stage-header .app-button');
     expect(continueButton.text()).toContain('Continue to Review');
     expect(executeMission).not.toHaveBeenCalled();
     await continueButton.trigger('click');
@@ -84,7 +84,7 @@ describe('MissionWorkspace', () => {
 
     mission.artifacts.tickets[0]!.done = false;
     await wrapper.setProps({ mission: structuredClone(mission) });
-    expect(wrapper.find('.mission-workspace__stage-header .claw-button').exists()).toBe(false);
+    expect(wrapper.find('.mission-workspace__stage-header .app-button').exists()).toBe(false);
   });
 
   it('keeps Review approval available when selected findings remain unresolved', async () => {
@@ -145,12 +145,12 @@ describe('MissionWorkspace', () => {
     expect(stageHeader.get('h2').text()).toBe('Mission brief');
     expect(stageHeader.text()).not.toContain('Define the outcome');
     expect(stageHeader.find('.mission-workspace__review-status').exists()).toBe(false);
-    expect(stageHeader.get('.claw-button').text()).toContain('Approve and continue');
+    expect(stageHeader.get('.app-button').text()).toContain('Approve and continue');
     expect(wrapper.find('.mission-workspace__artifact-toolbar').exists()).toBe(false);
     expect(wrapper.get('.mission-requirement-review__footer').text()).toContain('Select text to leave an inline comment.');
     expect(wrapper.find('.conversation-slot').exists()).toBe(true);
 
-    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .app-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenNthCalledWith(1, {
@@ -181,7 +181,7 @@ describe('MissionWorkspace', () => {
         ticketCount: 2,
       },
     });
-    const continueButton = wrapper.get('.mission-workspace__stage-header .claw-button');
+    const continueButton = wrapper.get('.mission-workspace__stage-header .app-button');
 
     await continueButton.trigger('click');
 
@@ -250,7 +250,7 @@ describe('MissionWorkspace', () => {
     });
     wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .app-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenCalledExactlyOnceWith({
@@ -435,7 +435,7 @@ describe('MissionWorkspace', () => {
     const executeMission = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountWorkspace(mission, { executeMission });
 
-    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .app-button').trigger('click');
     await flushPromises();
 
     expect(executeMission).toHaveBeenCalledTimes(1);
@@ -502,7 +502,7 @@ describe('MissionWorkspace', () => {
     expect(ticketDialog.text()).toContain('Implement checkout end to end.');
     expect(ticketDialog.text()).toContain('checkout integration test passes');
 
-    expect(wrapper.find('.mission-implementation__dialog-footer .claw-button').exists()).toBe(false);
+    expect(wrapper.find('.mission-implementation__dialog-footer .app-button').exists()).toBe(false);
   });
 
   it('keeps failed and running implementation tickets recoverable from their repository lane', async () => {
@@ -520,7 +520,7 @@ describe('MissionWorkspace', () => {
     await wrapper.get('.mission-implementation__ticket-details').trigger('click');
     await flushPromises();
     expect(wrapper.get('.mission-implementation__ticket').text()).toContain('Failed');
-    await wrapper.get('.mission-implementation__dialog-footer .claw-button').trigger('click');
+    await wrapper.get('.mission-implementation__dialog-footer .app-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({
       id: mission.id, revision: mission.revision, action: 'run', ticketIndex: 0,
     });
@@ -532,7 +532,7 @@ describe('MissionWorkspace', () => {
     expect(wrapper.get('.mission-implementation__ticket-details').attributes('aria-expanded')).toBe('true');
     expect(wrapper.get('.mission-workspace__run-status').text()).toBe('Building tickets');
     expect(wrapper.find('.mission-workspace__run-status button').exists()).toBe(false);
-    await wrapper.get('.mission-implementation__dialog-footer .claw-button').trigger('click');
+    await wrapper.get('.mission-implementation__dialog-footer .app-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({
       id: mission.id, revision: mission.revision, action: 'cancel', runId: 'run-checkout',
     });
@@ -542,11 +542,11 @@ describe('MissionWorkspace', () => {
     const mission = missionWithRun('accepted', true);
     mission.stage = 'implementation';
     mission.execution!.debugFixture = true;
-    mission.artifacts.tickets = [{ title: 'Execution board', repositoryPath: '/src/codex-claw', done: false }];
-    mission.execution!.workspaces = [{ repositoryPath: '/src/codex-claw', path: '/src/codex-claw', branch: 'mission/debug' }];
+    mission.artifacts.tickets = [{ title: 'Execution board', repositoryPath: '/src/agent-workspace', done: false }];
+    mission.execution!.workspaces = [{ repositoryPath: '/src/agent-workspace', path: '/src/agent-workspace', branch: 'mission/debug' }];
     mission.execution!.runs = [{
       id: 'run-debug', stage: 'implementation', memberId: 'agent-dina', workerId: 'agent-dina', ticketIndex: 0,
-      repositoryPath: '/src/codex-claw', status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
+      repositoryPath: '/src/agent-workspace', status: 'awaitingReview', skills: [], feedback: '', startedAt: '2026-09-19T00:01:00.000Z',
       implementationResult: { changes: 'Rendered the execution board.', tests: 'Component behavior passes.' },
     }];
     const wrapper = mountWorkspace(mission);
@@ -555,7 +555,7 @@ describe('MissionWorkspace', () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: 'ElDialog' }).text()).toContain('Rendered the execution board.');
-    expect(wrapper.find('.mission-implementation__dialog-footer .claw-button').exists()).toBe(false);
+    expect(wrapper.find('.mission-implementation__dialog-footer .app-button').exists()).toBe(false);
     expect(wrapper.find('.code-review-slot').exists()).toBe(false);
   });
 
@@ -567,7 +567,7 @@ describe('MissionWorkspace', () => {
     mission.execution!.runs[0]!.status = 'failed';
     mission.execution!.runs[0]!.error = 'Provider offline';
     await wrapper.setProps({ mission: structuredClone(mission) });
-    await wrapper.get('.mission-workspace__empty-artifact .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__empty-artifact .app-button').trigger('click');
     expect(executeMission).toHaveBeenLastCalledWith({ id: mission.id, revision: mission.revision, action: 'run' });
   });
 
@@ -578,7 +578,7 @@ describe('MissionWorkspace', () => {
 
     mission.execution!.runs[0]!.status = 'failed';
     await wrapper.setProps({ mission: structuredClone(mission) });
-    await wrapper.get('.mission-workspace__empty-artifact .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__empty-artifact .app-button').trigger('click');
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toBe('Could not restart the worker');
   });
@@ -646,7 +646,7 @@ describe('MissionWorkspace', () => {
     const mission = missionWithRun('awaitingReview', true);
     const wrapper = mountWorkspace(mission, { executeMission: vi.fn().mockRejectedValue(new Error('Worker unavailable')) });
 
-    await wrapper.get('.mission-workspace__stage-header .claw-button').trigger('click');
+    await wrapper.get('.mission-workspace__stage-header .app-button').trigger('click');
     await flushPromises();
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Worker unavailable');

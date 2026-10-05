@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import BackendConnectionBanner from '../BackendConnectionBanner.vue';
 
 describe('BackendConnectionBanner', () => {
-  it('stays hidden while clawd is connected', () => {
+  it('stays hidden while daemon is connected', () => {
     const wrapper = mount(BackendConnectionBanner, {
       props: { connectionState: { status: 'connected' } },
     });

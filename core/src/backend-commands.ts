@@ -1,3 +1,4 @@
+import { product } from './product';
 import type { AgentBackend, BackendCommandSummary } from './contracts';
 
 export const codexBackendCommands: BackendCommandSummary[] = [
@@ -11,20 +12,20 @@ export const codexBackendCommands: BackendCommandSummary[] = [
     submitOnSelect: true,
   },
   {
-    id: 'claw.review',
+    id: 'app.review',
     backend: 'codex',
     name: 'review',
     displayName: 'Review',
-    description: 'Open Claw\'s code review workflow.',
+    description: `Open ${product.name}'s code review workflow.`,
     slashName: 'review',
     submitOnSelect: true,
   },
   {
-    id: 'claw.visualize',
+    id: 'app.visualize',
     backend: 'codex',
     name: 'visualize',
     displayName: 'Visualize',
-    description: 'Open Claw Visualize mode for diagrams.',
+    description: `Open ${product.name} Visualize mode for diagrams.`,
     slashName: 'visualize',
     submitOnSelect: true,
   },
@@ -63,20 +64,20 @@ export const claudeBackendCommands: BackendCommandSummary[] = [
     submitOnSelect: true,
   },
   {
-    id: 'claw.review',
+    id: 'app.review',
     backend: 'claude',
     name: 'review',
     displayName: 'Review',
-    description: 'Open Claw\'s code review workflow.',
+    description: `Open ${product.name}'s code review workflow.`,
     slashName: 'review',
     submitOnSelect: true,
   },
   {
-    id: 'claw.visualize',
+    id: 'app.visualize',
     backend: 'claude',
     name: 'visualize',
     displayName: 'Visualize',
-    description: 'Open Claw Visualize mode for diagrams.',
+    description: `Open ${product.name} Visualize mode for diagrams.`,
     slashName: 'visualize',
     submitOnSelect: true,
   },
@@ -94,7 +95,7 @@ export const claudeBackendCommands: BackendCommandSummary[] = [
 
 function worktreeDelegationCommands(backend: AgentBackend): BackendCommandSummary[] {
   return ['delegate', 'worktree'].map((name) => ({
-    id: `claw.${name}`,
+    id: `app.${name}`,
     backend,
     name,
     displayName: name === 'delegate' ? 'Delegate' : 'Worktree',

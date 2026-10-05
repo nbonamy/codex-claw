@@ -1,12 +1,12 @@
 import type { TypedIpcMain } from '@codex-app-sdk/electron';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import type { ClawBackendClientPort } from './backend-client';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { ipcChannels, type AppIpcRequests } from '@workspace/core/ipc';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import type { AppBackendClientPort } from './backend-client';
 
 export function registerMissionIpcHandlers(
-  ipc: TypedIpcMain<CodexClawIpcRequests>,
-  backend: () => ClawBackendClientPort,
+  ipc: TypedIpcMain<AppIpcRequests>,
+  backend: () => AppBackendClientPort,
   adopt: (snapshot: AppSnapshot) => AppSnapshot | Promise<AppSnapshot>,
   select: (missionId: string | null) => void,
 ): void {

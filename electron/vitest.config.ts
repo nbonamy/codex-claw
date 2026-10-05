@@ -4,7 +4,7 @@ import path from 'node:path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@codex-claw/core': path.resolve(__dirname, '../core/src'),
+      '@workspace/core': path.resolve(__dirname, '../core/src'),
     },
   },
   test: {

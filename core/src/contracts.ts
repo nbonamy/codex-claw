@@ -581,7 +581,7 @@ export type LaunchChatGptAppResult = {
   status: 'alreadyRunning' | 'launched';
 };
 
-export type ClawdDaemonStatus = {
+export type DaemonStatus = {
   supported: boolean;
   installed: boolean;
   running: boolean;
@@ -783,7 +783,7 @@ export type DesktopUpdateStatus = {
   version?: string;
 };
 
-export type CodexClawApi = {
+export type AppApi = {
   startVisualize(agentId: string, input?: import('./visualize').StartVisualizeInput): Promise<AppSnapshot>;
   setVisualizeOpen(agentId: string, input: import('./visualize').SetVisualizeOpenInput): Promise<AppSnapshot>;
   generateVisualizationSuggestion(agentId: string, input: import('./visualize').GenerateVisualizationSuggestionInput): Promise<AppSnapshot>;
@@ -917,8 +917,8 @@ export type CodexClawApi = {
   getUpdateStatus(): Promise<DesktopUpdateStatus>;
   installUpdate(): Promise<void>;
   setDockBadgeCount(count: number): Promise<void>;
-  getDaemonStatus(): Promise<ClawdDaemonStatus>;
-  setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus>;
+  getDaemonStatus(): Promise<DaemonStatus>;
+  setDaemonEnabled(enabled: boolean): Promise<DaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
   openAccessibilitySettings(): Promise<SystemPermissionsStatus>;
   openScreenRecordingSettings(): Promise<SystemPermissionsStatus>;

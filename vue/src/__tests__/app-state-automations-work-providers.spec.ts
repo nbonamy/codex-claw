@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import { useAppState } from '../app-state';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { BackendConversationRef, CodexClawApi, RendererMessage, WorkSource } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { BackendConversationRef, AppApi, RendererMessage, WorkSource } from '@workspace/core/contracts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { clearConfetti, useConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow, stubLegacyElectronTestWindow } from '../test/client';
-import { configureClawClient } from '../platform-api';
+import { configureAppClient } from '../platform-api';
 import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onboarding-session';
 import { workItem } from './app-state-test-harness';
 
@@ -15,7 +15,7 @@ describe('useAppState', () => {
     const listWorkSources = vi.fn().mockResolvedValue([]);
     const configureWorkBacklog = vi.fn();
     const listWorkItems = vi.fn();
-    stubElectronTestWindow({ codexClaw: { listWorkSources, configureWorkBacklog, listWorkItems } });
+    stubElectronTestWindow({ app: { listWorkSources, configureWorkBacklog, listWorkItems } });
     const state = useAppState();
     const location = { kind: 'remote' as const, remoteConnectionId: 'devbox' };
     await state.listAutomationWorkRepositories('linear', location);
@@ -49,7 +49,7 @@ describe('useAppState', () => {
     const selectedSnapshot = createInitialSnapshot();
     selectedSnapshot.workBacklog.connections = connectedSnapshot.workBacklog.connections;
     selectedSnapshot.workBacklog.providerConfigurations.github = {
-      sourceId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
     };
     const repository = workRepository();
     const item = workItem();
@@ -68,13 +68,13 @@ describe('useAppState', () => {
     const configureWorkBacklog = vi.fn().mockResolvedValue(selectedSnapshot);
     const listWorkItems = vi.fn().mockResolvedValue([item]);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         connectWorkProvider,
         pollWorkProviderAuthorization,
         listWorkSources,
         configureWorkBacklog,
         listWorkItems,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -98,15 +98,15 @@ describe('useAppState', () => {
     expect(configureWorkBacklog).toHaveBeenCalledWith({
       provider: 'github',
       configuration: {
-        sourceId: 'nbonamy/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
         assigneeLogin: null,
         tagName: null,
       },
     });
-    expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace');
     expect(state.workProviderAuthorization.value).toBeNull();
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([repository]);
-    expect(state.workItemsByRepository.value['github:nbonamy/codex-claw']).toStrictEqual([item]);
+    expect(state.workItemsByRepository.value['github:nbonamy/agent-workspace']).toStrictEqual([item]);
   });
 
   it('leaves first-run onboarding to own the GitHub connection celebration', async () => {
@@ -117,10 +117,10 @@ describe('useAppState', () => {
       accountLabel: 'nbonamy',
     }];
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         pollWorkProviderAuthorization: vi.fn().mockResolvedValue(connectedSnapshot),
         listWorkSources: vi.fn().mockResolvedValue([]),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     setFirstRunOnboardingStage('github');
     const state = useAppState();
@@ -148,8 +148,8 @@ describe('useAppState', () => {
     const api = {
       connectWorkProvider,
       openWorkProviderAuthorization: backendOpenAuthorization,
-    } as unknown as CodexClawApi;
-    configureClawClient({ api, platform: 'web' });
+    } as unknown as AppApi;
+    configureAppClient({ api, platform: 'web' });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
 
@@ -170,7 +170,7 @@ describe('useAppState', () => {
     const snapshot = createInitialSnapshot();
     const assignment = {
       provider: 'github' as const,
-      itemId: 'nbonamy/codex-claw#12',
+      itemId: 'nbonamy/agent-workspace#12',
       agentId: 'agent-dina',
       assignedAt: '2026-06-09T13:00:00.000Z',
       policy: 'review' as const,
@@ -178,17 +178,17 @@ describe('useAppState', () => {
     };
     const assignedSnapshot = createInitialSnapshot();
     assignedSnapshot.workBacklog.assignments = {
-      'github:nbonamy/codex-claw#12': assignment,
+      'github:nbonamy/agent-workspace#12': assignment,
     };
     const updatedSnapshot = createInitialSnapshot();
     updatedSnapshot.workBacklog.assignments = assignedSnapshot.workBacklog.assignments;
     const assignWorkItemToAgent = vi.fn().mockResolvedValue(assignedSnapshot);
     const sendPrompt = vi.fn().mockResolvedValue(updatedSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         assignWorkItemToAgent,
         sendPrompt,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = snapshot;
@@ -203,7 +203,7 @@ describe('useAppState', () => {
     expect(assignWorkItemToAgent.mock.calls[0]?.[1]).not.toBe(item);
     expect(sendPrompt.mock.calls[0]?.[0]).toBe('agent-dina');
     expect(sendPrompt.mock.calls[0]?.[1]).toContain('Issue: #12 Fix cockpit drag target');
-    expect(sendPrompt.mock.calls[0]?.[1]).toContain('URL: https://github.com/nbonamy/codex-claw/issues/12');
+    expect(sendPrompt.mock.calls[0]?.[1]).toContain('URL: https://github.com/nbonamy/agent-workspace/issues/12');
     expect(state.snapshot.value.workBacklog.assignments).toStrictEqual(assignedSnapshot.workBacklog.assignments);
   });
 
@@ -212,10 +212,10 @@ describe('useAppState', () => {
     const assignWorkItemToAgent = vi.fn().mockResolvedValue(assignedSnapshot);
     const sendPrompt = vi.fn().mockResolvedValue(assignedSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         assignWorkItemToAgent,
         sendPrompt,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
@@ -246,10 +246,10 @@ describe('useAppState', () => {
     const removeWorkItemAssignment = vi.fn().mockResolvedValue(unassignedSnapshot);
     const sendPrompt = vi.fn();
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         removeWorkItemAssignment,
         sendPrompt,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = assignedSnapshot;
@@ -263,7 +263,7 @@ describe('useAppState', () => {
   });
 
   it('handles missing work provider bridge methods as no-ops', async () => {
-    stubLegacyElectronTestWindow({ codexClaw: {} });
+    stubLegacyElectronTestWindow({ app: {} });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
 
@@ -295,12 +295,12 @@ describe('useAppState', () => {
     const listWorkSources = vi.fn().mockRejectedValue('repos failed');
     const listWorkItems = vi.fn().mockRejectedValue('items failed');
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         connectWorkProvider,
         pollWorkProviderAuthorization,
         listWorkSources,
         listWorkItems,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = snapshot;
@@ -316,7 +316,7 @@ describe('useAppState', () => {
     expect(state.workRepositoriesByProvider.value.github).toStrictEqual([]);
     expect(state.workBacklogError.value).toBe('repos failed');
 
-    await expect(state.loadWorkItems('github', 'nbonamy/codex-claw')).resolves.toBeUndefined();
+    await expect(state.loadWorkItems('github', 'nbonamy/agent-workspace')).resolves.toBeUndefined();
     expect(state.workBacklogError.value).toBe('items failed');
   });
 
@@ -328,11 +328,11 @@ describe('useAppState', () => {
       accountLabel: 'nbonamy',
     }];
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         connectWorkProvider: vi.fn().mockRejectedValue(new Error('connect object failed')),
         listWorkSources: vi.fn().mockRejectedValue(new Error('repo object failed')),
         listWorkItems: vi.fn().mockRejectedValue(new Error('item object failed')),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = snapshot;
@@ -343,7 +343,7 @@ describe('useAppState', () => {
     await state.loadWorkRepositories('github');
     expect(state.workBacklogError.value).toBe('repo object failed');
 
-    await expect(state.loadWorkItems('github', 'nbonamy/codex-claw')).resolves.toBeUndefined();
+    await expect(state.loadWorkItems('github', 'nbonamy/agent-workspace')).resolves.toBeUndefined();
     expect(state.workBacklogError.value).toBe('item object failed');
   });
 
@@ -357,10 +357,10 @@ describe('useAppState', () => {
     const pollWorkProviderAuthorization = vi.fn().mockResolvedValue(connectingSnapshot);
     const listWorkSources = vi.fn();
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         pollWorkProviderAuthorization,
         listWorkSources,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
 
@@ -379,7 +379,7 @@ describe('useAppState', () => {
       accountLabel: 'nbonamy',
     }];
     connectedSnapshot.workBacklog.providerConfigurations.github = {
-      sourceId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
       tagName: 'bug',
     };
     const disconnectedSnapshot = createInitialSnapshot();
@@ -391,11 +391,11 @@ describe('useAppState', () => {
     const configureWorkBacklog = vi.fn().mockResolvedValue(disconnectedSnapshot);
     const listWorkItems = vi.fn();
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         disconnectWorkProvider,
         configureWorkBacklog,
         listWorkItems,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = connectedSnapshot;
@@ -406,7 +406,7 @@ describe('useAppState', () => {
       expiresAt: '2026-06-09T12:05:00.000Z',
     };
     state.workRepositoriesByProvider.value = { github: [workRepository()] };
-    state.workItemsByRepository.value = { 'github:nbonamy/codex-claw': [workItem()] };
+    state.workItemsByRepository.value = { 'github:nbonamy/agent-workspace': [workItem()] };
 
     await state.configureWorkBacklog({
       provider: 'github',
@@ -441,9 +441,9 @@ describe('useAppState', () => {
     };
     const configureWorkBacklog = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         configureWorkBacklog,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = localSnapshot;
@@ -476,7 +476,7 @@ describe('useAppState', () => {
       accountLabel: 'nbonamy',
     }];
     snapshot.workBacklog.providerConfigurations.github = {
-      sourceId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
     };
     const listWorkSources = vi.fn()
       .mockResolvedValueOnce([workRepository()])
@@ -484,17 +484,17 @@ describe('useAppState', () => {
     const listWorkItems = vi.fn().mockResolvedValue([workItem()]);
     const configureWorkBacklog = vi.fn();
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         listWorkSources,
         listWorkItems,
         configureWorkBacklog,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = snapshot;
 
     await state.loadWorkRepositories('github');
-    expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw');
+    expect(listWorkItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace');
     expect(configureWorkBacklog).not.toHaveBeenCalled();
 
     delete state.snapshot.value.workBacklog.providerConfigurations.github;
@@ -508,10 +508,10 @@ describe('useAppState', () => {
       name: 'GitHub bugs',
       repositories: [{
         provider: 'github' as const,
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       }],
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       schedule: { intervalMinutes: 60 },
     };
     const createdSnapshot = {
@@ -583,7 +583,7 @@ describe('useAppState', () => {
     const readConversationMessages = vi.fn().mockResolvedValue(conversationMessages);
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
         createAutomation,
@@ -593,7 +593,7 @@ describe('useAppState', () => {
         deleteAutomationExecution,
         deleteAutomation,
         readConversationMessages,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -612,7 +612,7 @@ describe('useAppState', () => {
     await expect(state.readConversationMessages({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina')).resolves.toStrictEqual(conversationMessages);
     const reactiveConversationRef = reactive({
       backend: 'claude' as const,
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       sessionId: 'session-dina',
     });
     await expect(state.readConversationMessages(reactiveConversationRef as BackendConversationRef, 'agent-dina')).resolves.toStrictEqual(conversationMessages);
@@ -631,7 +631,7 @@ describe('useAppState', () => {
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-dina' }, 'agent-dina');
     expect(readConversationMessages).toHaveBeenLastCalledWith({
       backend: 'claude',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       sessionId: 'session-dina',
     }, 'agent-dina');
     expect(readConversationMessages.mock.calls.at(-1)?.[0]).not.toBe(reactiveConversationRef);
@@ -642,11 +642,11 @@ describe('useAppState', () => {
 function workRepository(): WorkSource {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace',
     owner: 'nbonamy',
-    name: 'codex-claw',
-    fullName: 'nbonamy/codex-claw',
-    url: 'https://github.com/nbonamy/codex-claw',
+    name: 'agent-workspace',
+    fullName: 'nbonamy/agent-workspace',
+    url: 'https://github.com/nbonamy/agent-workspace',
     isPrivate: true,
   };
 }

@@ -1,4 +1,4 @@
-import type { AskUserAnswers, AskUserQuestion, PromptAttachment } from '@codex-claw/core/contracts';
+import type { AskUserAnswers, AskUserQuestion, PromptAttachment } from '@workspace/core/contracts';
 import type { ClaudeSdkMessage } from './protocol';
 
 export type ClaudeTurnParams = {
@@ -70,7 +70,7 @@ export type ClaudePermissionResponse = {
 };
 
 export type ClaudeTurnTransport = {
-  generateText?(input: import('@codex-claw/core/backend-driver').BackendTextGenerationInput): Promise<import('@codex-claw/core/backend-driver').BackendTextGenerationResult>;
+  generateText?(input: import('@workspace/core/backend-driver').BackendTextGenerationInput): Promise<import('@workspace/core/backend-driver').BackendTextGenerationResult>;
   startTurn(
     params: ClaudeTurnParams,
     onMessage: (message: ClaudeSdkMessage) => void,

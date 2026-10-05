@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RendererToolPart } from '@codex-claw/core/contracts';
+import type { RendererToolPart } from '@workspace/core/contracts';
 import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtures';
 import { claudePaneClientRequests } from '../claude-pane-client-requests';
 

@@ -28,7 +28,7 @@ describe('WorkspaceProvisioningProgressDialog', () => {
       ...progress, phase: 'startingPrompt', state: 'error', error: 'Project remains available; backend offline.',
     } } });
     expect(wrapper.get('[role="status"]').text()).toContain('Project remains available; backend offline.');
-    await wrapper.get('.claw-dialog__footer button').trigger('click');
+    await wrapper.get('.app-dialog__footer button').trigger('click');
     expect(wrapper.emitted('close')).toStrictEqual([['project-1']]);
   });
 
@@ -135,7 +135,7 @@ describe('WorkspaceProvisioningProgressDialog', () => {
     });
 
     expect(wrapper.get('[role="status"]').text()).toContain('Web worktree could not be created.');
-    await wrapper.get('.claw-dialog__footer button').trigger('click');
+    await wrapper.get('.app-dialog__footer button').trigger('click');
     expect(wrapper.emitted('close')).toStrictEqual([['mission-1']]);
   });
 });

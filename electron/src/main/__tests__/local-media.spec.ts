@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import {
   installLocalMediaProtocol,
@@ -15,7 +16,7 @@ describe('local media', () => {
         parts: [{
           type: 'media',
           media: {
-            url: 'file:///Users/nbonamy/.codex-claw/codex-home/generated_images/thread/image.png',
+            url: `file:///Users/nbonamy/${product.homeDirectory}/codex-home/generated_images/thread/image.png`,
             mimeType: 'image/png',
           },
         }],
@@ -30,7 +31,7 @@ describe('local media', () => {
         parts: [{
           type: 'media',
           media: {
-            url: 'codex-claw-media://generated/token-1',
+            url: 'agent-workspace-media://generated/token-1',
             mimeType: 'image/png',
           },
         }],
@@ -65,7 +66,7 @@ describe('local media', () => {
     expect(handle).toHaveBeenCalledWith(localMediaScheme, expect.any(Function));
     const handler = handle.mock.calls[0]?.[1] as (request: { url: string }) => Promise<Response> | Response;
     const response = await handler({ url: rendererUrl! });
-    const missing = await handler({ url: 'codex-claw-media://generated/not-registered' });
+    const missing = await handler({ url: 'agent-workspace-media://generated/not-registered' });
 
     expect(fetchLocalFile).toHaveBeenCalledWith('file:///tmp/generated%20image.png');
     expect(await response.text()).toBe('png');

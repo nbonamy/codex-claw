@@ -3,8 +3,8 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
 import { promisify } from 'node:util';
-import type { LaunchChatGptAppInput, LaunchChatGptAppResult } from '@codex-claw/core/contracts';
-import { runtimeClawdHome } from './runtime-config';
+import type { LaunchChatGptAppInput, LaunchChatGptAppResult } from '@workspace/core/contracts';
+import { runtimeDaemonHome } from './runtime-config';
 
 const defaultChatGptAppPath = '/Applications/ChatGPT.app';
 const defaultOpenCommand = '/usr/bin/open';
@@ -16,7 +16,7 @@ const execFile = promisify(execFileCallback);
 
 export type ChatGptAppDependencies = {
   appPath?: string;
-  clawHome?: string;
+  appHome?: string;
   execFile?: (command: string, args: readonly string[]) => Promise<unknown>;
   existsSync?: (filePath: string) => boolean;
   openCommand?: string;
@@ -45,8 +45,8 @@ export async function launchChatGptApp(
     await quitChatGptApp(run, dependencies.wait ?? wait);
   }
 
-  const clawHome = dependencies.clawHome ?? runtimeClawdHome();
-  const codexHome = path.join(clawHome, 'codex-home');
+  const appHome = dependencies.appHome ?? runtimeDaemonHome();
+  const codexHome = path.join(appHome, 'codex-home');
   await run(dependencies.openCommand ?? defaultOpenCommand, [
     '-n',
     '--env',

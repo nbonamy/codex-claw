@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog claw-dialog--compact repository-session-source-dialog"
+    class="app-dialog app-dialog--compact repository-session-source-dialog"
     :class="{ 'repository-session-source-dialog--assignment': selectedWorkItem, 'repository-session-source-dialog--issue-picker': purpose === 'missionIssue' }"
     :model-value="visible"
     :teleported="false"
@@ -120,8 +120,8 @@
 </template>
 
 <script setup lang="ts">
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
-import { workItemBranchName, workItemDisplayIdentifier } from '@codex-claw/core/work-item-prompts';
+import { workProviderDefinition } from '@workspace/core/work-providers';
+import { workItemBranchName, workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -130,7 +130,7 @@ import {
   IconGitPullRequest as GitPullRequestIcon,
   IconSearch as SearchIcon,
 } from '@tabler/icons-vue';
-import type { SourceBranch, WorkItem, WorkSource } from '@codex-claw/core/contracts';
+import type { SourceBranch, WorkItem, WorkSource } from '@workspace/core/contracts';
 import BacklogSourceSelector from './BacklogSourceSelector.vue';
 import WorkItemDetail from './WorkItemDetail.vue';
 import { useWorkSourceBacklog } from './use-work-source-backlog';
@@ -139,7 +139,7 @@ import WorkItemAssignmentPicker from './WorkItemAssignmentPicker.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
-const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend');
+const backend = defineModel<import('@workspace/core/contracts').AgentBackend>('backend');
 useNewAgentBackend(backend, backendChoices);
 import StagedOperationProgress from './StagedOperationProgress.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
@@ -147,7 +147,7 @@ import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './W
 type SourceTab = 'branches' | 'pullRequests' | 'issues';
 
 const props = withDefaults(defineProps<{
-  location?: import('@codex-claw/core/contracts').AutomationLocation;
+  location?: import('@workspace/core/contracts').AutomationLocation;
   branches?: SourceBranch[];
   assignmentError?: string | null;
   assignmentState?: 'idle' | 'running' | 'success' | 'error';
@@ -367,7 +367,7 @@ function resetPreparation(clearSelection = true): void {
 }
 
 /* Keep the search clear of the close button in every picker mode. */
-:global(.repository-session-source-dialog.claw-dialog--compact .el-dialog__header) {
+:global(.repository-session-source-dialog.app-dialog--compact .el-dialog__header) {
   padding-right: 48px;
 }
 

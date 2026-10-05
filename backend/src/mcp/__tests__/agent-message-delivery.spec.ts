@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCollaborationMessageEnvelope } from '@codex-claw/core/collaboration-message-envelope';
+import { parseCollaborationMessageEnvelope } from '@workspace/core/collaboration-message-envelope';
 import { agentMessagesPrompt } from '../agent-prompts';
 
 describe('agent message delivery', () => {

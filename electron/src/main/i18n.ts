@@ -1,6 +1,7 @@
+import { product } from '@workspace/core/product';
 const messages = {
   en: {
-    'menu.app': 'Codex Claw',
+    'menu.app': `${product.name}`,
     'menu.agent': 'Agent',
     'menu.browser': 'Browser',
     'menu.checkForUpdates': 'Check for Updates...',
@@ -23,7 +24,7 @@ const messages = {
     'menu.previousAgent': 'Previous Agent',
     'menu.changes': 'Changes',
     'menu.quit': 'Quit',
-    'menu.quitApp': 'Quit Codex Claw',
+    'menu.quitApp': `Quit ${product.name}`,
     'menu.restartAgent': 'Restart Agent',
     'menu.resumeSession': 'Resume Session',
     'menu.saveDraft': 'Save Draft for Later',
@@ -40,17 +41,17 @@ const messages = {
     'dialog.worktreeFolderMessage': 'Choose location for the worktree',
     'update.install': 'Install and Relaunch',
     'update.later': 'Later',
-    'update.downloadedVersion': 'Codex Claw {version} has been downloaded. Install and relaunch now?',
-    'update.downloaded': 'A Codex Claw update has been downloaded. Install and relaunch now?',
+    'update.downloadedVersion': `${product.name} {version} has been downloaded. Install and relaunch now?`,
+    'update.downloaded': `A ${product.name} update has been downloaded. Install and relaunch now?`,
     'update.ready': 'Update ready to install',
     'update.ok': 'OK',
     'update.unavailable': 'Update checks are not available',
     'update.checkFailed': 'Unable to check for updates',
-    'update.latestDetail': 'You are using the latest version of Codex Claw.',
-    'update.latest': 'Codex Claw is up to date',
+    'update.latestDetail': `You are using the latest version of ${product.name}.`,
+    'update.latest': `${product.name} is up to date`,
     'daemon.continueOld': 'Continue with old backend',
     'daemon.restartNow': 'Restart backend now',
-    'daemon.restartRequired': 'Codex Claw updated. The background backend must restart to use the latest version. Active agents or automations are running.',
+    'daemon.restartRequired': `${product.name} updated. The background backend must restart to use the latest version. Active agents or automations are running.`,
   },
 } as const;
 

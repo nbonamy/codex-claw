@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
-import type { AgentFileSearchItem } from '@codex-claw/core/contracts';
+import type { AgentFileSearchItem } from '@workspace/core/contracts';
 import { ChevronRightIcon, FileTextIcon, FolderIcon } from '../shared/icons/app-icons';
 
 type ExplorerRow = { id: string; kind: 'folder' | 'file'; name: string; path: string; depth: number };

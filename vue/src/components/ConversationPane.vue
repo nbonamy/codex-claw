@@ -21,7 +21,7 @@
       :has-composer-context="textAnnotations.length > 0 || visualizationAnnotations.length > 0"
       :message-text-selection="true"
       :transform-message="transformConversationMessage"
-      :tool-visibility="isClawToolVisible"
+      :tool-visibility="isAppToolVisible"
       @message-text-selection-change="messageTextSelection = $event"
     >
       <template #empty>
@@ -94,7 +94,7 @@
         </div>
       </template>
       <template #before-composer>
-        <button v-if="agent && !backendChoices.includes(agent.backend)" class="claw-button claw-button--tertiary" type="button" @click="connectEngine">
+        <button v-if="agent && !backendChoices.includes(agent.backend)" class="app-button app-button--tertiary" type="button" @click="connectEngine">
           {{ t('engineConnection.required') }}
         </button>
         <div v-if="draftPickerOpen" class="conversation-pane__draft-anchor">
@@ -153,9 +153,9 @@ import type {
   RendererMessage,
   SavedPromptDraft,
   ThreadPlan,
-} from '@codex-claw/core/contracts';
-import type { ThreadFlagId, ThreadFlagResponse } from '@codex-claw/core/thread-flags';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
+} from '@workspace/core/contracts';
+import type { ThreadFlagId, ThreadFlagResponse } from '@workspace/core/thread-flags';
+import { agentDisplayName } from '@workspace/core/agent-display';
 import ConversationPlanPanel from './ConversationPlanPanel.vue';
 import ConversationLoadError from './ConversationLoadError.vue';
 import AgentMention from './AgentMention.vue';
@@ -165,17 +165,17 @@ import ThreadFlagAffordance from './ThreadFlagAffordance.vue';
 import BackendSelector from './BackendSelector.vue';
 import SavedPromptDraftPicker from './SavedPromptDraftPicker.vue';
 import { useBackendChoices, useBackendSwitch, useConnectEngine } from './backend-selection';
-import { canSelectAgentBackend } from '@codex-claw/core/agent-backends';
+import { canSelectAgentBackend } from '@workspace/core/agent-backends';
 import { ElMessage } from 'element-plus';
 import type { ChatTextAnnotation } from './use-chat-text-annotations';
 import type { VisualizationAnnotation } from './use-visualization-annotations';
-import type { CodeReviewFinding } from '@codex-claw/core/code-review';
+import type { CodeReviewFinding } from '@workspace/core/code-review';
 import {
   presentCollaborationMessage,
   presentRendererCollaborationMessage,
   type CollaborationMessagePresentation,
 } from '../shared/collaboration-message';
-import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
+import { isAppToolVisible, provideAppToolPresentation } from '../tool-presentation';
 const backendSwitch = useBackendSwitch();
 const backendChoices = useBackendChoices(() => props.agent?.teamId);
 const connectEngine = useConnectEngine();
@@ -226,7 +226,7 @@ const props = withDefaults(defineProps<{
   threadFlagBusy: false,
   savedPromptDrafts: () => [],
 });
-provideClawToolPresentation(
+provideAppToolPresentation(
   (key, params) => t(key, params ?? {}),
   (identifier) => {
     const agent = props.agents.find((candidate) => candidate.id === identifier);

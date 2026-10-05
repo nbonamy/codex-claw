@@ -1,3 +1,5 @@
+import "./product.mjs";
+
 const DURATION = 31;
 const SCENES = [
   { name: "opening", start: 0, end: 2.5 },

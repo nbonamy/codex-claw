@@ -5,19 +5,19 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const backendDistDir = path.join(rootDir, 'backend/dist');
-const resourcesDir = path.join(rootDir, 'electron/resources/clawd');
-const backendBundle = path.join(backendDistDir, 'clawd.mjs');
-const backendSourceMap = path.join(backendDistDir, 'clawd.mjs.map');
+const resourcesDir = path.join(rootDir, 'electron/resources/daemon');
+const backendBundle = path.join(backendDistDir, 'daemon.mjs');
+const backendSourceMap = path.join(backendDistDir, 'daemon.mjs.map');
 
 await assertFile(backendBundle);
 await assertSelfContainedBackendBundle(backendBundle);
 await mkdir(resourcesDir, { recursive: true });
-await copyFile(backendBundle, path.join(resourcesDir, 'clawd.mjs'));
+await copyFile(backendBundle, path.join(resourcesDir, 'daemon.mjs'));
 await rm(path.join(resourcesDir, 'node'), { force: true });
 await rm(path.join(resourcesDir, 'node.exe'), { force: true });
 
 if (await fileExists(backendSourceMap)) {
-  await copyFile(backendSourceMap, path.join(resourcesDir, 'clawd.mjs.map'));
+  await copyFile(backendSourceMap, path.join(resourcesDir, 'daemon.mjs.map'));
 }
 
 console.log(`[package-backend] copied ${path.relative(rootDir, backendBundle)} to ${path.relative(rootDir, resourcesDir)}`);
@@ -30,7 +30,7 @@ async function assertFile(filePath) {
     }
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      throw new Error(`Backend bundle is missing: ${filePath}. Run npm run build -w @codex-claw/backend first.`);
+      throw new Error(`Backend bundle is missing: ${filePath}. Run npm run build -w @workspace/backend first.`);
     }
     throw error;
   }

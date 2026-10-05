@@ -6,14 +6,14 @@
     :title="t('repositories.acquire.cloneRepository')"
     @update:model-value="onVisibilityChanged"
   >
-    <form class="claw-form-dialog" @submit.prevent="submitUrl">
+    <form class="app-form-dialog" @submit.prevent="submitUrl">
       <FormDialogField :label="t('repositories.acquire.url')" label-for="repository-acquire-url">
-        <div class="claw-form-dialog__control claw-form-dialog__input-control">
+        <div class="app-form-dialog__control app-form-dialog__input-control">
           <input
             id="repository-acquire-url"
             ref="urlInput"
             v-model="url"
-            class="claw-form-dialog__text-input"
+            class="app-form-dialog__text-input"
             type="text"
             :aria-label="t('repositories.acquire.url')"
             autocomplete="url"
@@ -28,16 +28,16 @@
       <BackendSelector v-model="backend" :disabled="busy" />
     </template>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
-      <button class="claw-button claw-button--primary" type="button" :disabled="!canSubmitUrl || busy" @click="submitUrl">
+      <button class="app-button app-button--tertiary" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
+      <button class="app-button app-button--primary" type="button" :disabled="!canSubmitUrl || busy" @click="submitUrl">
         {{ busy ? t('repositories.acquire.cloning') : t('repositories.acquire.cloneRepository') }}
       </button>
     </template>
   </FormDialog>
   <el-dialog
     v-else
-    class="claw-dialog repository-acquire-dialog"
-    :class="{ 'claw-dialog--compact': mode === 'github' }"
+    class="app-dialog repository-acquire-dialog"
+    :class="{ 'app-dialog--compact': mode === 'github' }"
     :model-value="visible"
     :teleported="false"
     :width="githubConnected ? '680px' : '560px'"
@@ -108,7 +108,7 @@
         />
         <div v-else class="repository-acquire-dialog__connect">
           <button
-            class="claw-button claw-button--primary"
+            class="app-button app-button--primary"
             type="button"
             :disabled="busy"
             @click="emit('connect')"
@@ -130,8 +130,8 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
-import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkSource } from '@codex-claw/core/contracts';
-import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
+import type { WorkIntegrationConnection, WorkProviderAuthorization, WorkSource } from '@workspace/core/contracts';
+import { canonicalGitRemoteIdentity } from '@workspace/core/git-remote';
 import { GitHubIcon, ShieldCheckIcon } from '../shared/icons/app-icons';
 import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';
 import BackendSelector from './BackendSelector.vue';
@@ -139,7 +139,7 @@ import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
-const backend = defineModel<import('@codex-claw/core/contracts').AgentBackend>('backend');
+const backend = defineModel<import('@workspace/core/contracts').AgentBackend>('backend');
 useNewAgentBackend(backend, backendChoices);
 
 const props = withDefaults(defineProps<{
@@ -240,7 +240,7 @@ function repositoryKindLabel(repository: WorkSource): string {
   font: inherit;
 }
 
-.claw-dialog--compact .repository-acquire-dialog__body {
+.app-dialog--compact .repository-acquire-dialog__body {
   padding: var(--space-4) var(--space-6) var(--space-6);
 }
 
@@ -316,7 +316,7 @@ function repositoryKindLabel(repository: WorkSource): string {
   gap: var(--space-8);
 }
 
-.repository-acquire-dialog__connect .claw-button {
+.repository-acquire-dialog__connect .app-button {
   min-width: 176px;
 }
 

@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog agent-close-dialog"
+    class="app-dialog agent-close-dialog"
     :model-value="visible"
     :teleported="false"
     width="520px"
@@ -9,8 +9,8 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-form-dialog__header agent-close-dialog__header">
-        <h2 class="claw-dialog__title">{{ $t('surface.agentCloseDialog.close') }} {{ agent?.name }}?</h2>
+      <div class="app-form-dialog__header agent-close-dialog__header">
+        <h2 class="app-dialog__title">{{ $t('surface.agentCloseDialog.close') }} {{ agent?.name }}?</h2>
       </div>
     </template>
 
@@ -30,10 +30,10 @@
     </div>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')"> {{ $t('surface.agentCloseDialog.cancel') }} </button>
-        <button class="claw-button claw-button--secondary" type="button" :disabled="busy" @click="emit('keep-worktree')"> {{ $t('surface.agentCloseDialog.keepWorktree') }} </button>
-        <button class="claw-button claw-button--primary" type="button" :aria-busy="busy" :disabled="busy || (hasChanges && !discardChanges)" @click="deleteWorktree"> {{ $t('surface.agentCloseDialog.deleteWorktree') }} </button>
+      <div class="app-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="emit('close')"> {{ $t('surface.agentCloseDialog.cancel') }} </button>
+        <button class="app-button app-button--secondary" type="button" :disabled="busy" @click="emit('keep-worktree')"> {{ $t('surface.agentCloseDialog.keepWorktree') }} </button>
+        <button class="app-button app-button--primary" type="button" :aria-busy="busy" :disabled="busy || (hasChanges && !discardChanges)" @click="deleteWorktree"> {{ $t('surface.agentCloseDialog.deleteWorktree') }} </button>
       </div>
     </template>
   </el-dialog>
@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Agent, AgentGitWorkflow } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitWorkflow } from '@workspace/core/contracts';
 
 const props = withDefaults(defineProps<{
   agent?: Agent | null;

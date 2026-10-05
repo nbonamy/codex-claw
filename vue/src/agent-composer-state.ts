@@ -1,7 +1,7 @@
 import {
   promptSkillInputsFromText,
 } from '@codex-app-sdk/vue';
-import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
 import type {
   Agent,
   AgentModelSelection,
@@ -14,10 +14,10 @@ import type {
   MainToRendererEvent,
   ReasoningEffort,
   RendererSendPromptOptions,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { computed, reactive, ref } from 'vue';
 import { AsyncCatalogCache, type AsyncCatalogEntry, type AsyncCatalogStatus } from './async-catalog-cache';
-import { codexClawApi } from './platform-api';
+import { appApi } from './platform-api';
 
 export type AgentComposerConfiguration = {
   backend: Agent['backend'] | undefined;
@@ -305,7 +305,7 @@ export function createAgentComposerState(options: {
 
   async function loadModels(agentId = snapshot().activeAgentId): Promise<void> {
     if (agentId === snapshot().activeAgentId) rememberActive();
-    const source = codexClawApi;
+    const source = appApi;
     const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
     const initial = agentId ? configuration(agentId) : null;
     if (!agent || !source?.listBackendModels) {
@@ -331,7 +331,7 @@ export function createAgentComposerState(options: {
 
   async function loadSkills(agentId = snapshot().activeAgentId): Promise<void> {
     if (agentId === snapshot().activeAgentId) rememberActive();
-    const source = codexClawApi;
+    const source = appApi;
     const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
     const initial = agentId ? configuration(agentId) : null;
     if (!agent || !source?.listBackendSkills) {
@@ -356,7 +356,7 @@ export function createAgentComposerState(options: {
 
   async function loadPlugins(agentId = snapshot().activeAgentId): Promise<void> {
     if (agentId === snapshot().activeAgentId) rememberActive();
-    const source = codexClawApi;
+    const source = appApi;
     const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
     const initial = agentId ? configuration(agentId) : null;
     if (!agent || !source?.listBackendPlugins || !capabilitiesForAgent(agent).plugins) {
@@ -379,7 +379,7 @@ export function createAgentComposerState(options: {
 
   async function loadFiles(agentId = snapshot().activeAgentId): Promise<void> {
     if (agentId === snapshot().activeAgentId) rememberActive();
-    const source = codexClawApi;
+    const source = appApi;
     const agent = agentId ? snapshot().agents.find((candidate) => candidate.id === agentId) : null;
     const initial = agentId ? configuration(agentId) : null;
     if (!agent || !agent.folder || !source?.listAgentFiles) {
@@ -484,7 +484,7 @@ export function createAgentComposerState(options: {
     catalog.sync(catalog.agentId, entry);
     if (catalog.agentId === snapshot().activeAgentId) restore(catalog.agentId);
     await entry.promise;
-    if (catalog.session !== codexClawApi || snapshot().agents.find(agent => agent.id === catalog.agentId)?.backend !== backend) return;
+    if (catalog.session !== appApi || snapshot().agents.find(agent => agent.id === catalog.agentId)?.backend !== backend) return;
     catalog.sync(catalog.agentId, entry);
     if (catalog.agentId === snapshot().activeAgentId) restore(catalog.agentId);
   }

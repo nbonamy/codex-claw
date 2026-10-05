@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodeReviewFinding } from '@codex-claw/core/code-review';
+import type { CodeReviewFinding } from '@workspace/core/code-review';
 import { ReviewToolRegistry } from '../review-tool-registry';
 
 const finding = (): CodeReviewFinding => ({

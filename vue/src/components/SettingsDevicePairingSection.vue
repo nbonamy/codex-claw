@@ -127,7 +127,7 @@ import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toString as qrCodeToString } from 'qrcode';
-import type { DevicePairingSession, DevicePairingStatus, PairedDevice, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import type { DevicePairingSession, DevicePairingStatus, PairedDevice, UpdateSettingsInput } from '@workspace/core/contracts';
 import { codexPairingUrl } from '../device-pairing';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
@@ -171,7 +171,7 @@ const description = computed(() => {
   if (status.value?.status === 'connected') return translate('surface.settingsDevicePairingSection.remoteControlIsOnPairAndManageDevicesThatCanAccessThisCl');
   if (status.value?.status === 'connecting') return translate('surface.settingsDevicePairingSection.connectingToTheCodexRemoteControlService');
   if (status.value?.status === 'errored') return translate('surface.settingsDevicePairingSection.codexRemoteControlNeedsAttention');
-  return translate('surface.settingsDevicePairingSection.connectTheOfficialCodexMobileAppToThisClawInstance');
+  return translate('surface.settingsDevicePairingSection.connectTheOfficialCodexMobileAppToThisAppInstance');
 });
 const remoteControlEnabled = computed(() => (
   status.value !== null && status.value.status !== 'disabled'

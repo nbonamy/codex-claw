@@ -1,17 +1,18 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElPopover } from 'element-plus';
 import { computed, ref } from 'vue';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
 import AgentSidebar from '../AgentSidebar.vue';
-import type { Agent, AgentBackend } from '@codex-claw/core/contracts';
+import type { Agent, AgentBackend } from '@workspace/core/contracts';
 
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
   it('does not reveal engine icons solely because a selected Mission row retains focus', async () => {
-    const { createMission } = await import('@codex-claw/core/missions');
-    const { createInitialSnapshot } = await import('@codex-claw/core/snapshot-construction');
+    const { createMission } = await import('@workspace/core/missions');
+    const { createInitialSnapshot } = await import('@workspace/core/snapshot-construction');
     const snapshot = createInitialSnapshot();
     const mission = createMission(snapshot, {
       outcome: 'Add team billing', workflowType: 'shapeAndShipFeature',
@@ -80,7 +81,7 @@ describe('AgentSidebar sessions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -104,7 +105,7 @@ describe('AgentSidebar sessions', () => {
       props: {
         agents,
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -139,7 +140,7 @@ describe('AgentSidebar sessions', () => {
         agents,
         activeAgentId: 'agent-dina',
         listRepositoryBranches,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -148,7 +149,7 @@ describe('AgentSidebar sessions', () => {
     });
 
     const sessionMenu = wrapper.findAllComponents({ name: 'ElPopover' }).find((popover) => (
-      popover.props('popperClass') === 'claw-popover agent-sidebar__repository-session-menu-popover'
+      popover.props('popperClass') === 'app-popover agent-sidebar__repository-session-menu-popover'
     ));
     await sessionMenu?.vm.$emit('update:visible', true);
     await flushPromises();
@@ -181,13 +182,13 @@ describe('AgentSidebar sessions', () => {
         agents: [agents[0]!],
         activeAgentId: 'agent-dina',
         listRepositoryBranches: vi.fn().mockRejectedValue(new Error('offline')),
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
 
     const sessionMenu = wrapper.findAllComponents({ name: 'ElPopover' }).find((popover) => (
-      popover.props('popperClass') === 'claw-popover agent-sidebar__repository-session-menu-popover'
+      popover.props('popperClass') === 'app-popover agent-sidebar__repository-session-menu-popover'
     ));
     await sessionMenu?.vm.$emit('update:visible', true);
     await flushPromises();
@@ -201,7 +202,7 @@ describe('AgentSidebar sessions', () => {
         agents,
         activeAgentId: 'agent-dina',
         compact: true,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: {
         components: { ElPopover },
@@ -221,7 +222,7 @@ describe('AgentSidebar sessions', () => {
         agents,
         activeAgentId: 'agent-dina',
         repositoryIcons: { '~/src/id8': '🦞' },
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -244,7 +245,7 @@ describe('AgentSidebar sessions', () => {
         activeAgentId: 'agent-dina',
         unreadAgentIds: ['agent-jesse'],
         quickSwitchShortcutsVisible: true,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -267,7 +268,7 @@ describe('AgentSidebar sessions', () => {
         agents: manyAgents,
         activeAgentId: manyAgents[0]!.id,
         quickSwitchShortcutsVisible: true,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -280,7 +281,7 @@ describe('AgentSidebar sessions', () => {
       props: {
         agents: manyAgents,
         activeAgentId: manyAgents[0]!.id,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -294,7 +295,7 @@ describe('AgentSidebar sessions', () => {
         agents: [{ ...agents[0]!, name: null }],
         activeAgentId: 'agent-dina',
         quickSwitchShortcutsVisible: true,
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -308,7 +309,7 @@ describe('AgentSidebar sessions', () => {
       props: {
         agents: [{ ...agents[0]!, name: null, conversationTitle: 'Previous conversation' }],
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -337,7 +338,7 @@ describe('AgentSidebar sessions', () => {
       props: {
         agents: [{ ...agents[0]!, name: null }, computerUseAgent],
         activeAgentId: 'agent-dina',
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -353,7 +354,7 @@ describe('AgentSidebar sessions', () => {
         agents: [agents[0]!],
         activeAgentId: 'agent-dina',
         collapsedRepositoryKeys: [repositoryKey],
-        teamName: 'Codex Claw',
+        teamName: `${product.name}`,
       },
       global: { components: { ElPopover } },
     });
@@ -369,8 +370,8 @@ describe('AgentSidebar sessions', () => {
 
 describe('mission navigation', () => {
   it('uses the native workspace-group and session-row layout for missions', async () => {
-    const { createMission } = await import('@codex-claw/core/missions');
-    const { createInitialSnapshot } = await import('@codex-claw/core/snapshot-construction');
+    const { createMission } = await import('@workspace/core/missions');
+    const { createInitialSnapshot } = await import('@workspace/core/snapshot-construction');
     const missionSnapshot = createInitialSnapshot();
     const mission = createMission(missionSnapshot, { outcome: 'Add team billing', workflowType: 'shapeAndShipFeature', teamId: missionSnapshot.teams[0]!.id, orchestratorMemberId: missionSnapshot.agents[0]!.id });
     const wrapper = mount(AgentSidebar, {

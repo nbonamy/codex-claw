@@ -1,12 +1,12 @@
-import type { AppSnapshot } from '@codex-claw/core/contracts';
+import type { AppSnapshot } from '@workspace/core/contracts';
 import * as z from 'zod/v4';
 import type { CreatedProject } from '../projects/project-creation-service';
-import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+import { loggedToolResult, type AppMcpToolModuleProvider } from './tool-modules';
 
 export function createQuickChatProjectToolModuleProvider(options: {
   snapshot: AppSnapshot;
   createProject: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude') => Promise<CreatedProject>;
-}): ClawMcpToolModuleProvider {
+}): AppMcpToolModuleProvider {
   return {
     id: 'quick-chat-project',
     resolve: ({ agentId }) => {

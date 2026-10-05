@@ -1,4 +1,5 @@
-import { approvalAgentRequest, approvalOutcome } from '@codex-claw/core/agent-request';
+import { product } from '../product';
+import { approvalAgentRequest, approvalOutcome } from '@workspace/core/agent-request';
 import { describe, expect, it } from 'vitest';
 import { applyMainEventToSnapshot, createEmptySnapshot } from '../snapshot';
 import type { MainToRendererEvent } from '../contracts';
@@ -29,7 +30,7 @@ describe('snapshot coordination reducer', () => {
     expect(snapshot.queuedPrompts).toEqual([]);
   });
 
-  it('owns legacy backend approval lifecycle as Claw coordination state', () => {
+  it(`owns legacy backend approval lifecycle as ${product.name} coordination state`, () => {
     const snapshot = createEmptySnapshot();
     snapshot.agents.push({
       id: 'agent-1', name: 'Agent', folder: null, backend: 'codex', status: { type: 'idle' },

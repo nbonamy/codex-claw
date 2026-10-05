@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 
 type PublishMacosScript = {
@@ -26,7 +27,7 @@ describe('publish-macos script', () => {
     expect(() => assertVersionNotAlreadyPublished({
       currentVersion: '0.3.0',
       publishedManifest: { currentRelease: '0.3.0' },
-    })).toThrow('Codex Claw version 0.3.0 is already published');
+    })).toThrow(`${product.name} version 0.3.0 is already published`);
   });
 
   it('checks the remote manifest before publishing', async () => {
@@ -38,15 +39,15 @@ describe('publish-macos script', () => {
       currentVersion: '0.3.0',
       execFileSyncImpl,
       host: 'test-host',
-      remoteManifest: '/srv/codex-claw/RELEASES.json',
+      remoteManifest: '/srv/agent-workspace/RELEASES.json',
     });
 
     expect(execFileSyncImpl).toHaveBeenCalledWith(
       'ssh',
-      ['test-host', "test -f '/srv/codex-claw/RELEASES.json' && cat '/srv/codex-claw/RELEASES.json' || true"],
+      ['test-host', "test -f '/srv/agent-workspace/RELEASES.json' && cat '/srv/agent-workspace/RELEASES.json' || true"],
       { encoding: 'utf8' },
     );
-    expect(log).toHaveBeenCalledWith('Latest published Codex Claw version is 0.2.0; local version is 0.3.0.');
+    expect(log).toHaveBeenCalledWith(`Latest published ${product.name} version is 0.2.0; local version is 0.3.0.`);
     log.mockRestore();
   });
 

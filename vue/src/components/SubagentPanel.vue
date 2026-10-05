@@ -5,7 +5,7 @@
       <div v-else-if="error" class="subagent-panel__state subagent-panel__state--error">
         <span>{{ t('chat.subagents.loadError') }}</span>
         <button
-          class="claw-button claw-button--secondary"
+          class="app-button app-button--secondary"
           data-testid="subagent-conversation-retry"
           type="button"
           @click="refreshMessages"
@@ -16,7 +16,7 @@
       <CodexMessageList
         v-else
         :messages="messages"
-        :tool-visibility="isClawToolVisible"
+        :tool-visibility="isAppToolVisible"
         :reset-key="conversationId"
         :actions-disabled="true"
         :can-delete-message="false"
@@ -36,9 +36,9 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { CodexMessageList, type CodexConversationLink } from '@codex-app-sdk/vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentSubagentTree, RendererMessage } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
-import { isClawToolVisible, provideClawToolPresentation } from '../tool-presentation';
+import type { Agent, AgentSubagentTree, RendererMessage } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { isAppToolVisible, provideAppToolPresentation } from '../tool-presentation';
 
 const props = withDefaults(defineProps<{
   agents?: readonly Agent[];
@@ -55,7 +55,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-provideClawToolPresentation(
+provideAppToolPresentation(
   (key, params) => t(key, params ?? {}),
   (identifier) => {
     const agent = props.agents?.find((candidate) => candidate.id === identifier);

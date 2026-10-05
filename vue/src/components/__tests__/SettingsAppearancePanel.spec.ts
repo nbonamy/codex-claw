@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsAppearancePanel from '../SettingsAppearancePanel.vue';
-import { defaultThemeSettings } from '@codex-claw/core/settings';
+import { defaultThemeSettings } from '@workspace/core/settings';
 
 describe('SettingsAppearancePanel', () => {
   it('emits appearance setting updates', async () => {
@@ -22,7 +22,7 @@ describe('SettingsAppearancePanel', () => {
     expect(wrapper.text()).toContain('Select the color palette used across the app');
     expect(wrapper.text()).toContain('src/theme.ts');
     expect(wrapper.text()).toContain('28 unmodified lines');
-    expect(wrapper.text()).toContain("accent: 'claw'");
+    expect(wrapper.text()).toContain("accent: 'app'");
     expect(wrapper.findAll('.git-diff-preview-panel__line--added')).toHaveLength(1);
     expect(wrapper.findAll('.git-diff-preview-panel__line--deleted')).toHaveLength(1);
     await wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'dark');
@@ -30,7 +30,7 @@ describe('SettingsAppearancePanel', () => {
     await wrapper.findAllComponents({ name: 'ElInputNumber' })[0].vm.$emit('update:modelValue', 17);
     await wrapper.findAllComponents({ name: 'ElInputNumber' })[1].vm.$emit('update:modelValue', 15);
 
-    expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'dark', id: 'codex-claw-dark' } });
+    expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'dark', id: 'app-dark' } });
     expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark' } });
     expect(updateSettings).toHaveBeenCalledWith({ theme: { chatFontSize: 17 } });
     expect(updateSettings).toHaveBeenCalledWith({ theme: { codeFontSize: 15 } });
@@ -42,7 +42,7 @@ describe('SettingsAppearancePanel', () => {
       props: {
         settings: {
           ...defaultThemeSettings,
-          id: 'codex-claw-dark',
+          id: 'app-dark',
           mode: 'dark',
         },
         updateSettings,
@@ -55,7 +55,7 @@ describe('SettingsAppearancePanel', () => {
     await wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'dark');
 
     expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'system' } });
-    expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'dark', id: 'codex-claw-dark' } });
+    expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'dark', id: 'app-dark' } });
   });
 
   it('ignores invalid mode and numeric updates', async () => {

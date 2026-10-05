@@ -1,12 +1,12 @@
 <template>
   <FormDialog :model-value="Boolean(setup)" :title="confirming ? t('engineSetup.confirmTitle') : t('auth.customizeProvider', { provider: setup?.backend === 'codex' ? 'Codex' : 'Claude Code' })" teleported @update:model-value="!$event && !busy && emit('close')">
-    <div v-if="confirming" class="claw-form-dialog provider-setup__confirmation">
+    <div v-if="confirming" class="app-form-dialog provider-setup__confirmation">
       <p>{{ t('engineSetup.warning', { count: setup?.affectedAgentIds?.length ?? 0, provider: setup?.backend === 'codex' ? 'Codex' : 'Claude Code' }) }}</p>
       <p>{{ t('engineSetup.historyPreserved') }}</p>
       <el-checkbox v-model="acknowledged" :disabled="busy" class="provider-setup__acknowledgment">{{ t('engineSetup.acknowledgment') }}</el-checkbox>
       <p v-if="error" role="alert">{{ error }}</p>
     </div>
-    <div v-else class="claw-form-dialog">
+    <div v-else class="app-form-dialog">
       <p v-if="setup && !setup.installed">{{ t('auth.installExplanation') }}</p>
       <FormDialogField :label="t('auth.conversations')" :help="t('auth.separateExplanation')">
         <el-radio-group v-model="isolated" class="provider-setup__choices" :disabled="busy || (setup?.locked && !allowReset)">
@@ -19,8 +19,8 @@
       <p v-if="error" role="alert">{{ error }}</p>
     </div>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" :disabled="busy" @click="emit('close')">{{ t(confirming ? 'common.cancel' : 'surface.remoteClaudeAuth.close') }}</button>
-      <button class="claw-button claw-button--primary" type="button" :disabled="busy || (confirming ? !acknowledged : setup?.locked && setup.installed && (!allowReset || (isolated === setup.isolated && shareSkills === setup.shareSkills)))" @click="save">{{ t(busy ? 'auth.settingUp' : confirming ? 'engineSetup.removeAndSwitch' : setup?.installed ? 'auth.saveSetup' : 'auth.installProvider') }}</button>
+      <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="emit('close')">{{ t(confirming ? 'common.cancel' : 'surface.remoteClaudeAuth.close') }}</button>
+      <button class="app-button app-button--primary" type="button" :disabled="busy || (confirming ? !acknowledged : setup?.locked && setup.installed && (!allowReset || (isolated === setup.isolated && shareSkills === setup.shareSkills)))" @click="save">{{ t(busy ? 'auth.settingUp' : confirming ? 'engineSetup.removeAndSwitch' : setup?.installed ? 'auth.saveSetup' : 'auth.installProvider') }}</button>
     </template>
   </FormDialog>
 </template>
@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { ProviderSetupChange, ProviderSetupStatus } from '@codex-claw/core/contracts/provider-setup';
+import type { ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 

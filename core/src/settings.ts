@@ -48,7 +48,7 @@ export const defaultSourceFolderState: SourceFolderState = {
 };
 
 export const defaultThemeSettings: AppThemeSettings = {
-  id: 'codex-claw-light',
+  id: 'app-light',
   mode: 'system',
   uiFontSize: 14,
   chatFontSize: 15,

@@ -1,13 +1,13 @@
-import { codexClawApi } from './platform-api';
+import { appApi } from './platform-api';
 
 /** Read bounded backend frames, including remote agents, then use the host's download flow. */
 export async function downloadAgentFile(agentId: string, filePath: string): Promise<void> {
-  if (!codexClawApi) throw new Error('File downloads are unavailable.');
+  if (!appApi) throw new Error('File downloads are unavailable.');
   const parts: ArrayBuffer[] = [];
   let offset = 0;
   let size: number | undefined;
   do {
-    const chunk = await codexClawApi.readAgentFileChunk(agentId, filePath, offset);
+    const chunk = await appApi.readAgentFileChunk(agentId, filePath, offset);
     if (size !== undefined && chunk.size !== size) throw new Error('File changed while downloading. Try again.');
     size = chunk.size;
     const bytes = Uint8Array.from(atob(chunk.data), character => character.charCodeAt(0));

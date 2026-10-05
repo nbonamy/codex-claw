@@ -32,7 +32,7 @@ import type {
   WorkBacklogAssignmentPolicy,
   WorkBacklogAssignmentStatus
 } from '../contracts';
-import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '../ipc';
+import { ipcChannels, type AppIpcEvents, type AppIpcRequests } from '../ipc';
 
 describe('ipc channels', () => {
   it('derives request and event payloads from the preload API contract', () => {
@@ -134,15 +134,15 @@ describe('ipc channels', () => {
       source?: 'backend' | 'client';
     };
 
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.sendPrompt]['args']>()
       .toEqualTypeOf<[agentId: string, prompt: string, options?: RendererSendPromptOptions]>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.sendPrompt]['result']>()
       .toEqualTypeOf<AppSnapshot>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.compressAgentSession]['args']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.compressAgentSession]['args']>()
       .toEqualTypeOf<[agentId: string]>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.compressAgentSession]['result']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.compressAgentSession]['result']>()
       .toEqualTypeOf<AppSnapshot>();
-    expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.event]>()
+    expectTypeOf<AppIpcEvents[typeof ipcChannels.event]>()
       .toEqualTypeOf<MainToRendererEvent>();
     expectTypeOf<Extract<MainToRendererEvent, { type: 'client.connectionChanged' }>['payload']>()
       .toEqualTypeOf<BackendConnectionState>();
@@ -320,21 +320,21 @@ describe('ipc channels', () => {
     }>();
     expectTypeOf<Pick<BackendApprovalResolvedEvent, keyof BackendThreadEventContext>>()
       .toEqualTypeOf<BackendThreadEventContext>();
-    expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.appCommand]>()
+    expectTypeOf<AppIpcEvents[typeof ipcChannels.appCommand]>()
       .toEqualTypeOf<AppCommand>();
-    expectTypeOf<CodexClawIpcEvents[typeof ipcChannels.updateStatusChanged]>()
+    expectTypeOf<AppIpcEvents[typeof ipcChannels.updateStatusChanged]>()
       .toEqualTypeOf<DesktopUpdateStatus>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.launchChatGptApp]['args']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.launchChatGptApp]['args']>()
       .toEqualTypeOf<[input?: LaunchChatGptAppInput]>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.launchChatGptApp]['result']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.launchChatGptApp]['result']>()
       .toEqualTypeOf<LaunchChatGptAppResult>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.openAgentPath]['args']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.openAgentPath]['args']>()
       .toEqualTypeOf<[agentId: string, application: OpenInApplication, filePath?: string]>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.openAgentPath]['result']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.openAgentPath]['result']>()
       .toEqualTypeOf<AppSnapshot>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.setDockBadgeCount]['args']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.setDockBadgeCount]['args']>()
       .toEqualTypeOf<[count: number]>();
-    expectTypeOf<CodexClawIpcRequests[typeof ipcChannels.setDockBadgeCount]['result']>()
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.setDockBadgeCount]['result']>()
       .toEqualTypeOf<void>();
   });
 });

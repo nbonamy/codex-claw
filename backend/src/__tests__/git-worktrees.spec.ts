@@ -4,11 +4,11 @@ import { createGitWorktree, createSourceWorktree, listSourceBranches, listSource
 
 describe('git worktree operations', () => {
   it('suggests sibling worktree paths from repo and branch names', () => {
-    expect(suggestedSourceWorktreePath('/Users/nbonamy/src/codex-claw', 'feature/source folder')).toBe(
-      path.join('/Users/nbonamy/src', 'codex-claw-feature-source-folder'),
+    expect(suggestedSourceWorktreePath('/Users/nbonamy/src/agent-workspace', 'feature/source folder')).toBe(
+      path.join('/Users/nbonamy/src', 'agent-workspace-feature-source-folder'),
     );
-    expect(suggestedSourceWorktreePath('/Users/nbonamy/src/codex-claw', 'bug/fix/path')).toBe(
-      path.join('/Users/nbonamy/src', 'codex-claw-bug-fix-path'),
+    expect(suggestedSourceWorktreePath('/Users/nbonamy/src/agent-workspace', 'bug/fix/path')).toBe(
+      path.join('/Users/nbonamy/src', 'agent-workspace-bug-fix-path'),
     );
   });
 
@@ -19,11 +19,11 @@ describe('git worktree operations', () => {
     });
 
     await expect(createSourceWorktree({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/source-folder',
     }, { run })).resolves.toStrictEqual({
       name: 'source-folder',
-      path: path.join('/Users/nbonamy/src', 'codex-claw-feature-source-folder'),
+      path: path.join('/Users/nbonamy/src', 'agent-workspace-feature-source-folder'),
     });
 
     expect(run).toHaveBeenLastCalledWith('git', [
@@ -31,9 +31,9 @@ describe('git worktree operations', () => {
       'add',
       '-b',
       'feature/source-folder',
-      path.join('/Users/nbonamy/src', 'codex-claw-feature-source-folder'),
+      path.join('/Users/nbonamy/src', 'agent-workspace-feature-source-folder'),
     ], {
-      cwd: '/Users/nbonamy/src/codex-claw',
+      cwd: '/Users/nbonamy/src/agent-workspace',
     });
   });
 
@@ -140,7 +140,7 @@ describe('git worktree operations', () => {
     const run = vi.fn();
 
     await expect(createSourceWorktree({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: ' ',
     }, { run })).rejects.toThrow('Branch name is required.');
     expect(run).not.toHaveBeenCalled();
@@ -149,29 +149,29 @@ describe('git worktree operations', () => {
   it('lists source worktrees through git worktree porcelain output', async () => {
     const run = vi.fn().mockResolvedValue({
       stdout: [
-        'worktree /Users/nbonamy/src/codex-claw',
+        'worktree /Users/nbonamy/src/agent-workspace',
         'HEAD abc123',
         'branch refs/heads/main',
         '',
-        'worktree /Users/nbonamy/src/codex-claw-backend',
+        'worktree /Users/nbonamy/src/agent-workspace-backend',
         'HEAD def456',
         'branch refs/heads/feature/backend',
         '',
-        'worktree /Users/nbonamy/src/codex-claw-detached',
+        'worktree /Users/nbonamy/src/agent-workspace-detached',
         'HEAD fedcba',
         'detached',
         '',
       ].join('\n'),
     });
 
-    await expect(listSourceWorktrees('/Users/nbonamy/src/codex-claw', { run })).resolves.toStrictEqual([
-      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
-      { name: 'codex-claw-detached', path: '/Users/nbonamy/src/codex-claw-detached' },
-      { name: 'feature/backend', path: '/Users/nbonamy/src/codex-claw-backend' },
+    await expect(listSourceWorktrees('/Users/nbonamy/src/agent-workspace', { run })).resolves.toStrictEqual([
+      { name: 'main', path: '/Users/nbonamy/src/agent-workspace' },
+      { name: 'agent-workspace-detached', path: '/Users/nbonamy/src/agent-workspace-detached' },
+      { name: 'feature/backend', path: '/Users/nbonamy/src/agent-workspace-backend' },
     ]);
 
     expect(run).toHaveBeenCalledWith('git', ['worktree', 'list', '--porcelain'], {
-      cwd: '/Users/nbonamy/src/codex-claw',
+      cwd: '/Users/nbonamy/src/agent-workspace',
     });
   });
 

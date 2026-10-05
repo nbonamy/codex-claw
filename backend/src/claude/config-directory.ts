@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import path from 'node:path';
 
-/** The CLI, SDK child processes, and Claw's filesystem readers must agree. */
+/** The CLI, SDK child processes, and App's filesystem readers must agree. */
 export function claudeConfigDirectory(): string {
   return path.resolve(process.env.CLAUDE_CONFIG_DIR || path.join(homedir(), '.claude'));
 }

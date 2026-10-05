@@ -8,9 +8,9 @@
     </template>
 
     <SettingsSection
-      v-if="clawHostCapabilities.computerUse"
-      :title="$t('surface.settingsPluginsPanel.claw')"
-      title-id="settings-plugins-claw-title"
+      v-if="appHostCapabilities.computerUse"
+      :title="$t('surface.settingsPluginsPanel.app')"
+      title-id="settings-plugins-app-title"
     >
       <SettingsRow
         as="label"
@@ -68,14 +68,14 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { AppPluginSettings, AppPluginStatus, UpdateSettingsInput } from '@codex-claw/core/contracts';
-import { defaultPluginSettings } from '@codex-claw/core/settings';
+import type { AppPluginSettings, AppPluginStatus, UpdateSettingsInput } from '@workspace/core/contracts';
+import { defaultPluginSettings } from '@workspace/core/settings';
 import { ChevronRightIcon } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsPluginsBanner from './SettingsPluginsBanner.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
-import { clawHostCapabilities, clawPlatformActions } from '../platform-api';
+import { appHostCapabilities, appPlatformActions } from '../platform-api';
 
 type PendingPlugin = 'computerUse' | 'chrome';
 
@@ -151,7 +151,7 @@ async function managePlugins(source: 'chrome' | 'install'): Promise<void> {
   managingPlugins.value = true;
   errorState.value = null;
   try {
-    await clawPlatformActions.managePlugins();
+    await appPlatformActions.managePlugins();
   } catch (error) {
     errorState.value = error instanceof Error ? error.message : String(error);
   } finally {

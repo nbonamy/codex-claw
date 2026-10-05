@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { appendFileSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -41,11 +42,11 @@ export function errorMain(area: string, message: string, details?: Record<string
 }
 
 export function backendLogFilePath(): string {
-  return path.join(backendLogDirectoryPath(), 'clawd.log');
+  return path.join(backendLogDirectoryPath(), 'daemon.log');
 }
 
 export function backendLogDirectoryPath(): string {
-  const home = process.env.CODEX_CLAW_HOME?.trim() || path.join(homedir(), '.codex-claw');
+  const home = process.env.APP_HOME?.trim() || path.join(homedir(), product.homeDirectory);
   return path.join(home, 'logs');
 }
 
@@ -81,7 +82,7 @@ function getLogger(): Logger {
     });
     logger = pino({
       base: {
-        service: 'clawd',
+        service: 'daemon',
       },
       formatters: {
         level: (label) => ({ level: label }),
@@ -140,7 +141,7 @@ class RotatingJsonLogStream extends Writable {
     try {
       this.writeChunk(buffer);
     } catch (error) {
-      process.stderr.write(`[clawd:log] failed to write log file ${error instanceof Error ? error.message : String(error)}\n`);
+      process.stderr.write(`[daemon:log] failed to write log file ${error instanceof Error ? error.message : String(error)}\n`);
     }
     callback();
   }
@@ -215,22 +216,22 @@ function rotatedLogFilePath(filePath: string, index: number): string {
 }
 
 function logLevel(): LevelWithSilent {
-  const configured = process.env.CODEX_CLAW_LOG_LEVEL?.trim().toLowerCase();
+  const configured = process.env.APP_LOG_LEVEL?.trim().toLowerCase();
   return isPinoLevel(configured) ? configured : 'info';
 }
 
 function stderrLogLevel(): LevelWithSilent {
-  const configured = process.env.CODEX_CLAW_LOG_STDERR_LEVEL?.trim().toLowerCase();
+  const configured = process.env.APP_LOG_STDERR_LEVEL?.trim().toLowerCase();
   return isPinoLevel(configured) ? configured : 'warn';
 }
 
 function logMaxBytes(): number {
-  const configured = Number.parseInt(process.env.CODEX_CLAW_LOG_MAX_BYTES ?? '', 10);
+  const configured = Number.parseInt(process.env.APP_LOG_MAX_BYTES ?? '', 10);
   return Number.isFinite(configured) && configured > 0 ? configured : defaultMaxLogBytes;
 }
 
 function logMaxFiles(): number {
-  const configured = Number.parseInt(process.env.CODEX_CLAW_LOG_MAX_FILES ?? '', 10);
+  const configured = Number.parseInt(process.env.APP_LOG_MAX_FILES ?? '', 10);
   return Number.isFinite(configured) && configured >= 0 ? configured : defaultMaxLogFiles;
 }
 

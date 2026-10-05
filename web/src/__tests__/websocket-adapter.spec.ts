@@ -1,15 +1,16 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexWebSocketClose, CodexWebSocketPort } from '@codex-app-sdk/web';
-import { bindClawWebSocket } from '../server/websocket-adapter';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+import { bindAppWebSocket } from '../server/websocket-adapter';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
 
-describe('Claw web WebSocket adapter', () => {
+describe(`${product.name} web WebSocket adapter`, () => {
   it('scopes requests and snapshot events to the authenticated browser profile', async () => {
     const socket = new FakeSocket();
-    let emit!: (event: ClawBackendEvent) => void;
+    let emit!: (event: AppBackendEvent) => void;
     const backend = { request: vi.fn().mockResolvedValue({}), onEvent: (listener: typeof emit) => { emit = listener; return () => undefined; } };
-    bindClawWebSocket({ backend, socket, userId: 'user', clientId: 'phone' });
+    bindAppWebSocket({ backend, socket, userId: 'user', clientId: 'phone' });
     socket.receive(JSON.stringify({ version: 1, type: 'request', id: 'navigation', operation: 'selectAgent', args: ['agent-dina'] }));
     await vi.waitFor(() => expect(backend.request).toHaveBeenCalledWith('client/navigation/selectAgent', { agentId: 'agent-dina', _clientId: 'web:user:phone' }));
     const snapshot = createInitialSnapshot();
@@ -32,7 +33,7 @@ describe('Claw web WebSocket adapter', () => {
       }),
     };
 
-    bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
+    bindAppWebSocket({ backend, socket, userId: 'local-single-user' });
     expect(socket.messages.map(JSON.parse)).toContainEqual({
       version: 1,
       type: 'ready',
@@ -44,7 +45,7 @@ describe('Claw web WebSocket adapter', () => {
       type: 'request',
       id: 'request-1',
       operation: 'createTeam',
-      args: [{ name: 'Claw' }],
+      args: [{ name: `${product.name}` }],
     }));
     await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
       version: 1,
@@ -73,7 +74,7 @@ describe('Claw web WebSocket adapter', () => {
       request: vi.fn(),
       onEvent: () => () => undefined,
     };
-    bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
+    bindAppWebSocket({ backend, socket, userId: 'local-single-user' });
 
     socket.receive(JSON.stringify({ version: 1, type: 'request', id: 'bad', operation: 'quit', args: [] }));
     await vi.waitFor(() => expect(socket.messages.map(JSON.parse)).toContainEqual({
@@ -81,11 +82,11 @@ describe('Claw web WebSocket adapter', () => {
       type: 'response',
       id: 'bad',
       ok: false,
-      error: "'quit' is not available in Claw Web.",
+      error: `'quit' is not available in ${product.name} Web.`,
     }));
 
     socket.receive('{');
-    await vi.waitFor(() => expect(socket.closed).toEqual({ code: 4400, reason: 'Invalid Claw web request' }));
+    await vi.waitFor(() => expect(socket.closed).toEqual({ code: 4400, reason: `Invalid ${product.name} web request` }));
   });
 
   it('preserves successful void responses as valid protocol frames', async () => {
@@ -94,7 +95,7 @@ describe('Claw web WebSocket adapter', () => {
       request: vi.fn().mockResolvedValue(undefined),
       onEvent: () => () => undefined,
     };
-    bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
+    bindAppWebSocket({ backend, socket, userId: 'local-single-user' });
 
     socket.receive(JSON.stringify({
       version: 1,
@@ -118,7 +119,7 @@ describe('Claw web WebSocket adapter', () => {
       request: vi.fn().mockResolvedValue({ ok: true }),
       onEvent: () => unsubscribeEvent,
     };
-    const session = bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
+    const session = bindAppWebSocket({ backend, socket, userId: 'local-single-user' });
     socket.receive(Buffer.from(JSON.stringify({
       version: 1,
       type: 'request',
@@ -150,7 +151,7 @@ describe('Claw web WebSocket adapter', () => {
         return () => undefined;
       },
     };
-    const session = bindClawWebSocket({ backend, socket, userId: 'local-single-user' });
+    const session = bindAppWebSocket({ backend, socket, userId: 'local-single-user' });
     socket.receive(JSON.stringify({
       version: 1,
       type: 'request',

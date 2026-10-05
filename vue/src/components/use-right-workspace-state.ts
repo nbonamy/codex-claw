@@ -1,4 +1,4 @@
-import { PRIMARY_BROWSER_ID } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID } from '@workspace/core/contracts';
 import type { CodexConversationVisualization } from '@codex-app-sdk/vue';
 import { computed, onScopeDispose, reactive, ref, watch } from 'vue';
 import type { SidePanelGitDiffState, SidePanelImageState, SidePanelMarkdownState } from './side-panel';

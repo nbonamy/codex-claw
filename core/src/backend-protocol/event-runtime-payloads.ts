@@ -1,3 +1,4 @@
+import { product } from '../product';
 import { isAppTextDescriptor } from '../app-text';
 import { isAccountRateLimits } from '../snapshot-guard-collections';
 import { decodeAppSnapshot } from '../snapshot-guards';
@@ -17,7 +18,7 @@ import {
 function expectAppText(value: unknown, path: string): void {
   if (typeof value !== 'string' && !isAppTextDescriptor(value)) {
     throw new Error(
-      `Invalid Claw backend event at ${path}: expected application text.`,
+      `Invalid ${product.name} backend event at ${path}: expected application text.`,
     );
   }
 }
@@ -96,7 +97,7 @@ function expectAppSnapshot(value: unknown, path: string): void {
   const decoded = decodeAppSnapshot(value);
   if (!decoded) {
     throw new Error(
-      `Invalid Claw backend event at ${path}: expected an app snapshot.`,
+      `Invalid ${product.name} backend event at ${path}: expected an app snapshot.`,
     );
   }
 }

@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 // Component-scoped renderer copy. Keep keys stable when editing messages.
 export const surfaceMessages = {
   "instructionSettings": {
@@ -16,7 +17,7 @@ export const surfaceMessages = {
     "worktreeInitializationAutomatic": "Auto-detect",
     "worktreeInitializationRepository": "Repo instructions only",
     "worktreeInitializationDisabled": "Disabled",
-    "personalizationHint": "Edits the selected engine's instruction file on this host. Isolated setups stay separate; existing setups are shared outside Claw. Changes apply when sessions start or resume; project instructions remain in place.",
+    "personalizationHint": `Edits the selected engine's instruction file on this host. Isolated setups stay separate; existing setups are shared outside ${product.name}. Changes apply when sessions start or resume; project instructions remain in place.`,
     "engine": "Engine",
     "saveAll": "Save to all",
     "overwrite": "Replace",
@@ -100,7 +101,7 @@ export const surfaceMessages = {
     "chooseFolder": "Choose folder..."
   },
   "agentEmptyState": {
-    "codexClaw": "Codex Claw"
+    "app": `${product.name}`
   },
   "agentQuickOpen": {
     "openAgent": "Open agent",
@@ -169,7 +170,7 @@ export const surfaceMessages = {
     "removeFavoriteNamed": "Remove {model}",
     "noModelFavorites": "No favorites yet.",
     "standardSpeed": "Standard",
-    "codexClawAPIIsUnavailable": "Codex Claw API is unavailable.",
+    "appAPIIsUnavailable": `${product.name} API is unavailable.`,
     "review": "Review",
     "subagentConversationIsUnavailable": "Subagent conversation is unavailable.",
     "theSelectedAgentIsUnavailable": "The selected agent is unavailable.",
@@ -186,14 +187,14 @@ export const surfaceMessages = {
     "debugMarkdown": "Debug Markdown",
     "allowDebugCommand": "Allow debug command",
     "aDeterministicApprovalRequestFromTheDebugMenu": "A deterministic approval request from the Debug menu.",
-    "selectAnAgentThatSupportsImageAttachmentsBeforeTakingAnA": "Select an agent that supports image attachments before taking an Appshot.",
-    "appshotIngestionReturnedNoAttachment": "Appshot ingestion returned no attachment.",
-    "theAppshotCouldNotBeAttached": "The Appshot could not be attached.",
+    "selectAnAgentThatSupportsImageAttachmentsBeforeTakingAnA": "Select an agent that supports image attachments before taking a screenshot.",
+    "appshotIngestionReturnedNoAttachment": "Screenshot ingestion returned no attachment.",
+    "theAppshotCouldNotBeAttached": "The screenshot could not be attached.",
     "thisLoadsYourGlobalGitHubBacklogOnePageAtATimeLargeBackl": "This loads your global GitHub backlog one page at a time. Large backlogs may use additional GitHub quota as you load more pages.",
     "loadTheGlobalBacklog": "Load the global backlog?",
-    "connectingToClawd": "Connecting to clawd…",
-    "reconnectingToClawdAgentsKeepWorkingInTheBackground": "Reconnecting to clawd… Agents keep working in the background.",
-    "clawdIsUnavailableReconnectionWillContinueAutomatically": "Clawd is unavailable. Reconnection will continue automatically.",
+    "connectingToDaemon": "Connecting to daemon…",
+    "reconnectingToDaemonAgentsKeepWorkingInTheBackground": "Reconnecting to daemon… Agents keep working in the background.",
+    "daemonIsUnavailableReconnectionWillContinueAutomatically": "Daemon is unavailable. Reconnection will continue automatically.",
     "selectAnAgent": "Select an agent",
     "claude": "Claude",
     "codex": "Codex",
@@ -352,7 +353,7 @@ export const surfaceMessages = {
     "startWork": "Start work",
     "refreshWorkItems": "Refresh work items",
     "globalBacklog": "Global backlog",
-    "chooseWhatClawShouldLoad": "Choose what Claw should load",
+    "chooseWhatAppShouldLoad": `Choose what ${product.name} should load`,
     "aBacklogAcrossEveryRepositoryCanContainALotOfWorkAndCons": "A backlog across every repository can contain a lot of work and consume significant provider quota. For a focused view, select a repository from the sidebar.",
     "showItemsAssignedToMe": "Show items assigned to me",
     "loadEverything": "Load everything",
@@ -389,19 +390,19 @@ export const surfaceMessages = {
     "ready": "Ready"
   },
   "codexLoginLanding": {
-    "signInToCodexClaw": "Sign in to Codex Claw",
-    "connectingToCodexClaw": "Connecting Codex Claw",
-    "codexClaw": "Codex Claw"
+    "signInToApp": `Sign in to ${product.name}`,
+    "connectingToApp": `Connecting ${product.name}`,
+    "app": `${product.name}`
   },
   "githubOnboardingLanding": {
     "connectGitHub": "Connect GitHub"
   },
   "onboardingCompleteLanding": {
-    "codexClawIsReady": "Codex Claw is ready"
+    "appIsReady": `${product.name} is ready`
   },
   "codexResourceSharingMigrationDialog": {
     "shareSkillsAndPluginsWithChatGPT": "Share skills and plugins with ChatGPT?",
-    "codexClawCanUseTheSkillsAndPluginsInstalledInChatGPTMigr": "Codex Claw can use the skills and plugins installed in ChatGPT. Migrating replaces the existing Claw folders with links to",
+    "appCanUseTheSkillsAndPluginsInstalledInChatGPTMigr": `${product.name} can use the skills and plugins installed in ChatGPT. Migrating replaces the existing ${product.name} folders with links to`,
     "codex": "~/.codex",
     "migrationCannotRunWhileChatsAreActiveWaitForThemToFinish": "Migration cannot run while chats are active. Wait for them to finish, or keep the current isolated setup.",
     "keepIsolated": "Keep isolated",
@@ -586,7 +587,7 @@ export const surfaceMessages = {
     "everyDay": "Every day",
     "selectionPrompt": "What should be picked up?",
     "selectionPromptPlaceholder": "For example: open bugs labeled ready that have clear acceptance criteria",
-    "selectionPromptHelp": "Your selected coding agent evaluates open work not already assigned in Claw. Leave blank to pick up all of it.",
+    "selectionPromptHelp": `Your selected coding agent evaluates open work not already assigned in ${product.name}. Leave blank to pick up all of it.`,
     "assignmentPrompt": "What should each agent do?",
     "assignmentPromptPlaceholder": "For example: reproduce the problem, implement the fix, and run focused tests",
     "assignmentPromptHelp": "Each selected item gets a dedicated worktree and agent. Its repository and work item details are included automatically.",
@@ -721,7 +722,7 @@ export const surfaceMessages = {
     "appearance": "Appearance",
     "color": "Color",
     "mode": "Mode",
-    "chooseHowCodexClawFollowsLightAndDarkAppearances": "Choose how Codex Claw follows light and dark appearances",
+    "chooseHowAppFollowsLightAndDarkAppearances": `Choose how ${product.name} follows light and dark appearances`,
     "theme": "Theme",
     "selectTheColorPaletteUsedAcrossTheApp": "Select the color palette used across the app",
     "typography": "Typography",
@@ -735,19 +736,19 @@ export const surfaceMessages = {
     "system": "System"
   },
   "settingsAppshotsPanel": {
-    "appshots": "Appshots",
-    "takeAnAppshotToShowCodexYourFrontmostWindow": "Take an Appshot to show Codex your frontmost window",
-    "appshotsCaptureTheWindowImageAndAttachItToYourActiveAgen": "Appshots capture the window image and attach it to your active agent.",
+    "appshots": "Screenshots",
+    "takeAnAppshotToShowCodexYourFrontmostWindow": "Take a screenshot to show Codex your frontmost window",
+    "appshotsCaptureTheWindowImageAndAttachItToYourActiveAgen": "Screenshots capture the window image and attach it to your active agent.",
     "hotkey": "Hotkey",
-    "appshotHotkey": "Appshot hotkey",
+    "appshotHotkey": "Screenshot hotkey",
     "none": "None",
-    "appshotDestination": "Appshot destination",
-    "chooseWhereAppshotsGoWhenYouUseTheHotkey": "Choose where Appshots go when you use the hotkey",
+    "appshotDestination": "Screenshot destination",
+    "chooseWhereAppshotsGoWhenYouUseTheHotkey": "Choose where screenshots go when you use the hotkey",
     "activeAgent": "Active agent",
     "playSoundEffect": "Play sound effect",
     "confirmWhenTheFrontmostWindowHasBeenCaptured": "Confirm when the frontmost window has been captured",
-    "playAppshotSoundEffect": "Play Appshot sound effect",
-    "appshotsAreDisabled": "Appshots are disabled",
+    "playAppshotSoundEffect": "Play screenshot sound effect",
+    "appshotsAreDisabled": "Screenshots are disabled",
     "command": "Command",
     "option": "Option",
     "shift": "Shift"
@@ -761,20 +762,20 @@ export const surfaceMessages = {
     "codex": "Codex",
     "chatGPT": "ChatGPT",
     "launchChatGPT": "Launch ChatGPT",
-    "manageCodexPluginsSkillsAndSandboxPoliciesInChatGPTUsing": "Manage Codex plugins, skills, and sandbox policies in ChatGPT using the same Codex home as Claw.",
+    "manageCodexPluginsSkillsAndSandboxPoliciesInChatGPTUsing": `Manage Codex plugins, skills, and sandbox policies in ChatGPT using the same Codex home as ${product.name}.`,
     "shareSkillsAndPluginsWithChatGPT": "Share skills and plugins with ChatGPT",
     "runtime": "Runtime",
     "codexExecutable": "Codex executable",
-    "leaveEmptyToUseTheBundledCodexChangingThisRestartsCodexC": "Leave empty to use the bundled Codex. Changing this restarts Codex Claw.",
+    "leaveEmptyToUseTheBundledCodexChangingThisRestartsCodexC": `Leave empty to use the bundled Codex. Changing this restarts ${product.name}.`,
     "codexExecutablePath": "Codex executable path",
     "bundledCodex": "Bundled Codex",
     "choose": "Choose",
     "clear": "Clear",
     "thisOptionCannotBeChangedWhileChatsAreRunningWaitForEver": "This option cannot be changed while chats are running. Wait for every chat to finish and try again.",
     "chatsAreRunning": "Chats are running",
-    "youAreGoingToLoseAllPluginsAndSkillsInstalledOnlyInCodex": "You are going to lose all plugins and skills installed only in Codex Claw. Continue?",
+    "youAreGoingToLoseAllPluginsAndSkillsInstalledOnlyInCodex": `You are going to lose all plugins and skills installed only in ${product.name}. Continue?`,
     "shareSkillsAndPluginsWithChatGPT2": "Share skills and plugins with ChatGPT?",
-    "doYouWantToStartFreshOrCopyYourExistingChatGPTSkillsAndP": "Do you want to start fresh or copy your existing ChatGPT skills and plugins into Codex Claw?",
+    "doYouWantToStartFreshOrCopyYourExistingChatGPTSkillsAndP": `Do you want to start fresh or copy your existing ChatGPT skills and plugins into ${product.name}?`,
     "stopSharingSkillsAndPlugins": "Stop sharing skills and plugins?",
     "thisOptionCannotBeChangedWhileChatsAreRunning": "This option cannot be changed while chats are running.",
     "useTheSameSkillsAndPluginsAsChatGPTChangingThisRestartsT": "Use the same skills and plugins as ChatGPT. Changing this restarts the backend."
@@ -782,7 +783,7 @@ export const surfaceMessages = {
   "settingsConnectionsPanel": {
     "connections": "Connections",
     "addRemote": "Add remote",
-    "remoteCodexClawAgents": "Remote Codex Claw agents",
+    "remoteAppAgents": `Remote ${product.name} agents`,
     "noRemoteConnections": "No remote connections",
     "connectionSettings": "Connection settings",
     "connectionActions": "Connection actions",
@@ -821,10 +822,10 @@ export const surfaceMessages = {
     "revokePairedDevice": "Revoke paired device?",
     "codexDevice": "Codex device",
     "disabledByYourCodexConfiguration": "Disabled by your Codex configuration.",
-    "remoteControlIsOnPairAndManageDevicesThatCanAccessThisCl": "Remote control is on. Pair and manage devices that can access this Claw instance.",
+    "remoteControlIsOnPairAndManageDevicesThatCanAccessThisCl": `Remote control is on. Pair and manage devices that can access this ${product.name} instance.`,
     "connectingToTheCodexRemoteControlService": "Connecting to the Codex remote-control service...",
     "codexRemoteControlNeedsAttention": "Codex remote control needs attention.",
-    "connectTheOfficialCodexMobileAppToThisClawInstance": "Connect the official Codex mobile app to this Claw instance.",
+    "connectTheOfficialCodexMobileAppToThisAppInstance": `Connect the official Codex mobile app to this ${product.name} instance.`,
     "connectingBeforeDevicesCanBePaired": "Connecting before devices can be paired",
     "remoteControlNeedsAttention": "Remote control needs attention",
     "noPairedDevices": "No paired devices",
@@ -850,8 +851,8 @@ export const surfaceMessages = {
     "inTheBackgroundToo": "In the background too",
     "scope": "Scope",
     "chooseWhichAgentsMaySpeak": "Choose which agents may speak",
-    "onlySpeakWhileFocused": "Only speak while Codex Claw is focused",
-    "silenceAcknowledgmentsWhileCodexClawIsInTheBackground": "Silence acknowledgments while Codex Claw is in the background",
+    "onlySpeakWhileFocused": `Only speak while ${product.name} is focused`,
+    "silenceAcknowledgmentsWhileAppIsInTheBackground": `Silence acknowledgments while ${product.name} is in the background`,
     "chooseAnOnDeviceNeuralVoice": "Choose an on-device neural voice; additional voices download on first preview",
     "preview": "Preview",
     "previewVoice": "Preview voice",
@@ -866,7 +867,7 @@ export const surfaceMessages = {
     "voiceGeorge": "George · British",
     "selectedAgentOnly": "Selected agent only",
     "allAgents": "All agents",
-    "keepCodexClawReadyInTheBackground": "Keep Codex Claw ready in the background",
+    "keepAppReadyInTheBackground": `Keep ${product.name} ready in the background`,
     "sourceFolder": "Source folder",
     "discoverRepositoriesAndWorktreesWhenCreatingAgents": "Discover repositories and worktrees when creating agents",
     "choose": "Choose",
@@ -876,7 +877,7 @@ export const surfaceMessages = {
     "grant": "Grant",
     "refresh": "Refresh",
     "screenRecording": "Screen Recording",
-    "restartCodexClaw": "Restart Codex Claw?",
+    "restartApp": `Restart ${product.name}?`,
     "installing": "Installing...",
     "uninstalling": "Uninstalling...",
     "checking": "Checking",
@@ -884,16 +885,16 @@ export const surfaceMessages = {
     "running": "Running",
     "installed": "Installed",
     "off": "Off",
-    "startTheCodexClawAgentToKeepYourAutomationsRunning": "Start the Codex Claw agent to keep your automations running.",
+    "startTheAppAgentToKeepYourAutomationsRunning": `Start the ${product.name} agent to keep your automations running.`,
     "notNeeded": "Not needed",
     "granted": "Granted",
     "required": "Required",
     "computerUseDoesNotNeedThisPermissionOnThisPlatform": "Computer Use does not need this permission on this platform.",
-    "requiredForComputerUseToInspectAndClickCodexClaw": "Required for Computer Use to inspect and click Codex Claw.",
-    "appshotsDoNotNeedThisPermissionOnThisPlatform": "Appshots do not need this permission on this platform.",
-    "requiredForAppshotsToCaptureTheFrontmostWindow": "Required for Appshots to capture the frontmost window.",
-    "codexClawNeedsToRestartToConnectToTheBackgroundAgent": "Codex Claw needs to restart to connect to the background agent.",
-    "codexClawNeedsToRestartToUseTheInAppAgent": "Codex Claw needs to restart to use the in-app agent."
+    "requiredForComputerUseToInspectAndClickApp": `Required for Computer Use to inspect and click ${product.name}.`,
+    "appshotsDoNotNeedThisPermissionOnThisPlatform": "Screenshots do not need this permission on this platform.",
+    "requiredForAppshotsToCaptureTheFrontmostWindow": "Required for screenshots to capture the frontmost window.",
+    "appNeedsToRestartToConnectToTheBackgroundAgent": `${product.name} needs to restart to connect to the background agent.`,
+    "appNeedsToRestartToUseTheInAppAgent": `${product.name} needs to restart to use the in-app agent.`
   },
   "settingsIntegrationsPanel": {
     "integrations": "Integrations",
@@ -904,10 +905,10 @@ export const surfaceMessages = {
     "step1CopyTheCode": "Step 1: Copy the code",
     "clickTheCodeToCopyIt": "Click the code to copy it.",
     "step2OpenGitHub": "Step 2: Open GitHub",
-    "gitHubWillAskForTheCodePasteItThereAuthorizeCodexClawThe": "GitHub will ask for the code. Paste it there, authorize Codex Claw, then come back here.",
+    "gitHubWillAskForTheCodePasteItThereAuthorizeAppThe": `GitHub will ask for the code. Paste it there, authorize ${product.name}, then come back here.`,
     "openGitHub": "Open GitHub",
     "step3ComeBackHere": "Step 3: Come back here",
-    "codexClawWillFinishTheConnectionAutomaticallyOnceGitHubA": "Codex Claw will finish the connection automatically once GitHub approves it.",
+    "appWillFinishTheConnectionAutomaticallyOnceGitHubA": `${product.name} will finish the connection automatically once GitHub approves it.`,
     "waitingForGitHubAuthorization": "Waiting for GitHub authorization",
     "waiting": "Waiting...",
     "gitHubOAuthOrAppClientId": "GitHub OAuth or App client ID",
@@ -936,7 +937,7 @@ export const surfaceMessages = {
   },
   "settingsPluginsPanel": {
     "plugins": "Plugins",
-    "claw": "Claw",
+    "app": `${product.name}`,
     "computerUse": "Computer Use",
     "letAgentsInspectAndControlMacOSAppsThroughTheLocalComput": "Let agents inspect and control macOS apps through the local Computer Use helper",
     "enableComputerUse": "Enable Computer Use",
@@ -953,7 +954,7 @@ export const surfaceMessages = {
     "codex": "Codex",
     "claudeCode": "Claude Code",
     "appearance": "Appearance",
-    "appshots": "Appshots",
+    "appshots": "Screenshots",
     "plugins": "Plugins",
     "integrations": "Integrations",
     "connections": "Connections"
@@ -1001,11 +1002,11 @@ export const surfaceMessages = {
     "checkingForUpdates": "Checking…",
     "downloadingUpdate": "Downloading…",
     "updateAvailable": "Update available",
-    "updateAvailableRestartCodexClawToInstall": "Update available. Restart Codex Claw to install."
+    "updateAvailableRestartAppToInstall": `Update available. Restart ${product.name} to install.`
   },
   "whatsNewDialog": {
     "releaseVersion": "Release version",
-    "whatSNewInCodexClaw": "What’s new in Codex Claw",
+    "whatSNewInApp": `What’s new in ${product.name}`,
     "released": "Released",
     "closeWhatSNew": "Close What’s New"
   },
@@ -1047,7 +1048,7 @@ export const surfaceMessages = {
   },
   "platform-api": {
     "chatGPTCouldNotBeLaunchedFromThisWindow": "ChatGPT could not be launched from this window.",
-    "chatGPTIsAlreadyOpenCodexClawNeedsToRelaunchItWithClawSI": "ChatGPT is already open. Codex Claw needs to relaunch it with Claw’s isolated Codex home.",
+    "chatGPTIsAlreadyOpenAppNeedsToRelaunchItWithAppSI": `ChatGPT is already open. ${product.name} needs to relaunch it with ${product.name}’s isolated Codex home.`,
     "quitAndRelaunchChatGPT": "Quit and relaunch ChatGPT?"
   },
   "conversationPane": {

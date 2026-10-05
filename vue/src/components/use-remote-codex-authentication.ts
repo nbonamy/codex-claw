@@ -1,11 +1,11 @@
 import { computed, onScopeDispose, ref, watch } from 'vue';
-import type { CodexAuthentication, CodexChatGptDeviceCodeLogin, CodexClawApi, RemoteConnection } from '@codex-claw/core/contracts';
-import { codexClawApi } from '../platform-api';
+import type { CodexAuthentication, CodexChatGptDeviceCodeLogin, AppApi, RemoteConnection } from '@workspace/core/contracts';
+import { appApi } from '../platform-api';
 
-export type RemoteCodexAuthApi = Pick<CodexClawApi,
+export type RemoteCodexAuthApi = Pick<AppApi,
   'getCodexAuthentication' | 'startCodexChatGptDeviceCodeLogin' | 'cancelCodexChatGptLogin'>;
 
-export function useRemoteCodexAuthentication(connection: () => RemoteConnection, api: () => RemoteCodexAuthApi | undefined = () => codexClawApi) {
+export function useRemoteCodexAuthentication(connection: () => RemoteConnection, api: () => RemoteCodexAuthApi | undefined = () => appApi) {
   const authentication = ref<CodexAuthentication | null>(null);
   const login = ref<CodexChatGptDeviceCodeLogin | null>(null);
   const busy = ref(false);

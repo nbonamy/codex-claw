@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 
 const mocks = vi.hoisted(() => ({
   snapshot: {
     agents: [{
       id: 'agent-dina',
-      teamId: 'team-claw',
+      teamId: 'team-app',
       name: 'Dina',
       avatar: 'DI',
-      folder: '/src/claw',
+      folder: '/src/app',
       backend: 'codex',
       backendDefaults: { kind: 'codex' },
       status: { type: 'idle' },
@@ -61,11 +61,11 @@ const mocks = vi.hoisted(() => ({
   warnMain: vi.fn(),
 }));
 
-vi.mock('@codex-claw/core/agent-chat-service', () => ({
+vi.mock('@workspace/core/agent-chat-service', () => ({
   sendAgentPrompt: mocks.sendAgentPrompt,
 }));
 
-vi.mock('@codex-claw/core/automation-manager', () => ({
+vi.mock('@workspace/core/automation-manager', () => ({
   updateAutomationExecutionAgentConversationInSnapshot: mocks.updateAutomationConversation,
 }));
 
@@ -88,7 +88,7 @@ vi.mock('../plugin-status', () => ({
 }));
 
 vi.mock('../mcp/service', () => ({
-  ClawMcpService: class {
+  AppMcpService: class {
     constructor(options: unknown) { mocks.mcpOptions.push(options); }
     start = mocks.mcpStart;
     stop = mocks.mcpStop;
@@ -150,7 +150,7 @@ vi.mock('../scheduling/runtime-scheduler', () => ({
 }));
 
 vi.mock('../server', () => ({
-  ClawBackendServer: class {
+  AppBackendServer: class {
     initialize = vi.fn().mockResolvedValue(undefined);
     requireConnectedEngine = vi.fn(async (backend: string) => backend);
     constructor(options: unknown) { mocks.serverOptions.push(options); }
@@ -160,8 +160,8 @@ vi.mock('../server', () => ({
   },
 }));
 
-vi.mock('../connections/remote-clawd-client', () => ({
-  RemoteClawdClientManager: class {
+vi.mock('../connections/remote-daemon-client', () => ({
+  RemoteDaemonClientManager: class {
     constructor(options: unknown) { mocks.remoteOptions.push(options); }
   },
 }));
@@ -178,7 +178,7 @@ vi.mock('../log', () => ({ warnMain: mocks.warnMain }));
 
 vi.mock('../git/agent-git-service', () => ({
   AgentGitService: class {
-    identity = vi.fn().mockResolvedValue({ kind: 'folder', folder: '/src/claw', label: 'claw', updatedAt: '2026-09-02T00:00:00.000Z' });
+    identity = vi.fn().mockResolvedValue({ kind: 'folder', folder: '/src/app', label: 'app', updatedAt: '2026-09-02T00:00:00.000Z' });
 
     constructor() {
       mocks.agentGitServices.push(this);
@@ -186,7 +186,7 @@ vi.mock('../git/agent-git-service', () => ({
   },
 }));
 
-import { createClawdRuntime } from '../runtime';
+import { createDaemonRuntime } from '../runtime';
 
 type McpOptions = {
   hostedMcpGateway?: unknown;
@@ -223,7 +223,7 @@ type AutomationRunnerOptions = {
   notifySnapshotUpdated(): void;
   saveSnapshot(): Promise<unknown>;
   sendPrompt(agentId: string, prompt: string, context: { automationId: string; executionId: string }): Promise<unknown>;
-  selectWorkItems(automation: import('@codex-claw/core/contracts').Automation, candidates: import('@codex-claw/core/contracts').WorkItem[]): Promise<import('@codex-claw/core/contracts').WorkItem[]>;
+  selectWorkItems(automation: import('@workspace/core/contracts').Automation, candidates: import('@workspace/core/contracts').WorkItem[]): Promise<import('@workspace/core/contracts').WorkItem[]>;
 };
 
 type SchedulerOptions = { onError(taskId: string, error: unknown): void };
@@ -240,7 +240,7 @@ type RemoteOptions = {
   requestHandlers: Record<string, (params: unknown) => Promise<unknown>>;
 };
 
-describe('clawd runtime', () => {
+describe('daemon runtime', () => {
   const driver = {
     generateText: vi.fn(),
     setConversationTitle: vi.fn(),
@@ -280,18 +280,18 @@ describe('clawd runtime', () => {
     mocks.runtimeGitHubOAuthClientId.mockReturnValue('github-client');
     requestClient.mockImplementation(async (method: string, params?: unknown) => ({ method, params }));
     mocks.automationRunAll.mockResolvedValue(undefined);
-    driver.generateText.mockResolvedValue({ text: '{"workItemIds":["github:nbonamy/codex-claw#12"]}' });
+    driver.generateText.mockResolvedValue({ text: '{"workItemIds":["github:nbonamy/agent-workspace#12"]}' });
   });
 
   it('constructs the runtime services and forwards client-owned operations', async () => {
-    await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+    await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
 
     expect(mocks.loadBackendSnapshot).toHaveBeenCalledOnce();
     expect(mocks.initializeProviderSetup).toHaveBeenCalledOnce();
     expect(mocks.ensureBackendCodexHome).toHaveBeenCalledOnce();
     expect(mocks.mcpStart).toHaveBeenCalledOnce();
     expect(mocks.createDefaultBackendDrivers).toHaveBeenCalledWith(expect.objectContaining({
-      clawMcpServerUrl: 'http://127.0.0.1:4242/mcp',
+      appMcpServerUrl: 'http://127.0.0.1:4242/mcp',
       generalSettings: mocks.snapshot.general,
       pluginSettings: expect.any(Function),
     }));
@@ -306,8 +306,8 @@ describe('clawd runtime', () => {
 
     const mcp = mocks.mcpOptions[0] as McpOptions;
     expect(mcp.hostedMcpGateway).toBeDefined();
-    await mcp.resolveWorkspaceIdentity('/src/claw');
-    expect(mocks.agentGitServices[0]?.identity).toHaveBeenCalledWith('/src/claw');
+    await mcp.resolveWorkspaceIdentity('/src/app');
+    expect(mocks.agentGitServices[0]?.identity).toHaveBeenCalledWith('/src/app');
     await mcp.computerUse!.execute({ command: 'click' });
     await mcp.computerUse!.requestAccessibility();
     await mcp.computerUse!.status();
@@ -386,7 +386,7 @@ describe('clawd runtime', () => {
     };
     mocks.loadPluginStatus.mockResolvedValueOnce({ chromeEnabled: true });
 
-    await createClawdRuntime({
+    await createDaemonRuntime({
       emitEvent,
       features: { computerUse: false, embeddedBrowser: false },
       requestClient,
@@ -414,7 +414,7 @@ describe('clawd runtime', () => {
     };
     mocks.loadPluginStatus.mockResolvedValueOnce({ chromeEnabled: true });
 
-    await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+    await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
 
     const driverOptions = mocks.createDefaultBackendDrivers.mock.calls[0]?.[0] as {
       pluginSettings(): { computerUseEnabled: boolean; chromeEnabled: boolean };
@@ -447,7 +447,7 @@ describe('clawd runtime', () => {
       });
     });
 
-    await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+    await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
     const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
     await expect(automations.sendPrompt('missing', 'ignore', { automationId: 'automation-1', executionId: 'run-1' }))
       .resolves.toBe(mocks.snapshot);
@@ -493,16 +493,16 @@ describe('clawd runtime', () => {
   });
 
   it('uses hidden structured generation to select automation work across all repositories', async () => {
-    await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+    await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
     const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
     const item = {
       provider: 'github' as const,
-      id: 'nbonamy/codex-claw#12',
-      sourceId: 'nbonamy/codex-claw',
-      sourceName: 'nbonamy/codex-claw',
+      id: 'nbonamy/agent-workspace#12',
+      sourceId: 'nbonamy/agent-workspace',
+      sourceName: 'nbonamy/agent-workspace',
       number: 12,
       title: 'Fix the picker',
-      url: 'https://github.com/nbonamy/codex-claw/issues/12',
+      url: 'https://github.com/nbonamy/agent-workspace/issues/12',
       state: 'open' as const,
       assignees: [],
       labels: [],
@@ -514,10 +514,10 @@ describe('clawd runtime', () => {
       name: 'Ready work',
       enabled: true,
       repositories: [
-        { provider: 'github' as const, sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/src/claw' },
+        { provider: 'github' as const, sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/src/app' },
         { provider: 'github' as const, sourceId: 'nbonamy/witsy', executionRepositoryPath: '/src/witsy' },
       ],
-      teamId: 'team-claw',
+      teamId: 'team-app',
       selectionPrompt: 'Only ready bugs.',
       schedule: { intervalMinutes: 60 },
       executionLog: [],
@@ -530,7 +530,7 @@ describe('clawd runtime', () => {
     expect(driver.generateText).toHaveBeenCalledWith(
       mocks.snapshot.agents[0],
       expect.objectContaining({
-        cwd: '/src/claw',
+        cwd: '/src/app',
         prompt: expect.stringContaining('nbonamy/witsy (local clone: /src/witsy)'),
         outputSchema: expect.objectContaining({ type: 'object' }),
       }),
@@ -543,7 +543,7 @@ describe('clawd runtime', () => {
       hooks = value;
     });
     driver.setConversationTitle.mockRejectedValue('rename failed');
-    const runtime = await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+    const runtime = await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
     const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
     await automations.sendPrompt('agent-dina', 'run', { automationId: 'automation-1', executionId: 'run-1' });
     await hooks?.onBackendSessionUpdated({ backendSession: { kind: 'codex', threadId: 'thread' } }, false);
@@ -566,7 +566,7 @@ describe('clawd runtime', () => {
   });
 
   it('rejects automation prompts when a backend driver is not configured', async () => {
-    const runtime = await createClawdRuntime({ emitEvent, requestClient, version: '1.2.3' });
+    const runtime = await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
     mocks.drivers.clear();
     const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
 

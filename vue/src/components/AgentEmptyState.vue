@@ -10,7 +10,7 @@
     <div class="agent-empty-state__mark">
       <img
         :src="appIconUrl"
-        :alt="$t('surface.agentEmptyState.codexClaw')"
+        :alt="$t('surface.agentEmptyState.app')"
       >
     </div>
 

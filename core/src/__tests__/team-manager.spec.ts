@@ -1,3 +1,4 @@
+import { product } from '../product';
 import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot, createInitialSnapshot } from '../snapshot';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, teamInitials, updateTeamInSnapshot } from '../team-manager';
@@ -58,8 +59,8 @@ describe('team-manager', () => {
       color: '#0093FF',
     }, '2026-06-05T10:11:12.000Z');
 
-    selectTeam(snapshot, 'team-codex-claw');
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    selectTeam(snapshot, 'team-app');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.activeAgentId).toBe('agent-dina');
 
     selectTeam(snapshot, emptyTeam.id);
@@ -71,7 +72,7 @@ describe('team-manager', () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams[0].activeAgentId = 'agent-jesse';
 
-    selectTeam(snapshot, 'team-codex-claw');
+    selectTeam(snapshot, 'team-app');
 
     expect(snapshot.activeAgentId).toBe('agent-jesse');
   });
@@ -81,10 +82,10 @@ describe('team-manager', () => {
     snapshot.teams[0].activeAgentId = 'missing-agent';
 
     selectTeam(snapshot, 'missing-team');
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.activeAgentId).toBe('agent-dina');
 
-    selectTeam(snapshot, 'team-codex-claw');
+    selectTeam(snapshot, 'team-app');
     expect(snapshot.activeAgentId).toBe('agent-dina');
     expect(snapshot.teams[0].activeAgentId).toBe('agent-dina');
   });
@@ -93,11 +94,11 @@ describe('team-manager', () => {
     const snapshot = createInitialSnapshot();
 
     expect(updateTeamInSnapshot(snapshot, {
-      id: 'team-codex-claw',
+      id: 'team-app',
       name: ' Skwad Core ',
       color: '#46A857',
     })).toStrictEqual({
-      id: 'team-codex-claw',
+      id: 'team-app',
       name: 'Skwad Core',
       avatar: 'SC',
       color: '#46A857',
@@ -109,8 +110,8 @@ describe('team-manager', () => {
     const snapshot = createInitialSnapshot();
 
     expect(() => updateTeamInSnapshot(snapshot, {
-      id: 'team-codex-claw',
-      name: 'Codex Claw',
+      id: 'team-app',
+      name: product.name,
       color: '#1B4FB2',
       remoteConnectionId: 'connection-devbox',
     })).toThrow('Team connection cannot be changed while it has agents.');
@@ -126,29 +127,29 @@ describe('team-manager', () => {
       name: 'Tools',
       color: '#0093FF',
     }, '2026-06-05T10:11:13.000Z');
-    selectTeam(snapshot, 'team-codex-claw');
+    selectTeam(snapshot, 'team-app');
 
-    expect(reorderTeamInSnapshot(snapshot, toolsTeam.id, 'team-codex-claw')).toStrictEqual(toolsTeam);
-    expect(snapshot.teams.map((team) => team.id)).toStrictEqual([toolsTeam.id, 'team-codex-claw', skwadTeam.id]);
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(reorderTeamInSnapshot(snapshot, toolsTeam.id, 'team-app')).toStrictEqual(toolsTeam);
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual([toolsTeam.id, 'team-app', skwadTeam.id]);
+    expect(snapshot.activeTeamId).toBe('team-app');
 
     expect(reorderTeamInSnapshot(snapshot, toolsTeam.id, null)).toStrictEqual(toolsTeam);
-    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-codex-claw', skwadTeam.id, toolsTeam.id]);
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-app', skwadTeam.id, toolsTeam.id]);
   });
 
   it('keeps team order unchanged when dropping a team onto itself', () => {
     const snapshot = createInitialSnapshot();
 
-    expect(reorderTeamInSnapshot(snapshot, 'team-codex-claw', 'team-codex-claw')).toStrictEqual(snapshot.teams[0]);
-    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-codex-claw']);
+    expect(reorderTeamInSnapshot(snapshot, 'team-app', 'team-app')).toStrictEqual(snapshot.teams[0]);
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-app']);
   });
 
   it('ignores missing team reorder targets', () => {
     const snapshot = createInitialSnapshot();
 
     expect(reorderTeamInSnapshot(snapshot, 'missing-team', null)).toBeNull();
-    expect(reorderTeamInSnapshot(snapshot, 'team-codex-claw', 'missing-team')).toBeNull();
-    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-codex-claw']);
+    expect(reorderTeamInSnapshot(snapshot, 'team-app', 'missing-team')).toBeNull();
+    expect(snapshot.teams.map((team) => team.id)).toStrictEqual(['team-app']);
   });
 
   it('closes a team with its agents and selects the next team', () => {
@@ -157,9 +158,9 @@ describe('team-manager', () => {
       name: 'Skwad',
       color: '#46A857',
     }, '2026-06-05T10:11:12.000Z');
-    selectTeam(snapshot, 'team-codex-claw');
+    selectTeam(snapshot, 'team-app');
 
-    expect(closeTeamInSnapshot(snapshot, 'team-codex-claw')).toMatchObject({ id: 'team-codex-claw' });
+    expect(closeTeamInSnapshot(snapshot, 'team-app')).toMatchObject({ id: 'team-app' });
     expect(snapshot.teams.map((team) => team.id)).toStrictEqual([skwadTeam.id]);
     expect(snapshot.agents).toStrictEqual([]);
     expect(snapshot.activeTeamId).toBe(skwadTeam.id);
@@ -172,10 +173,10 @@ describe('team-manager', () => {
       name: 'Skwad',
       color: '#46A857',
     }, '2026-06-05T10:11:12.000Z');
-    selectTeam(snapshot, 'team-codex-claw');
+    selectTeam(snapshot, 'team-app');
 
     expect(closeTeamInSnapshot(snapshot, inactiveTeam.id)).toMatchObject({ id: inactiveTeam.id });
-    expect(snapshot.activeTeamId).toBe('team-codex-claw');
+    expect(snapshot.activeTeamId).toBe('team-app');
     expect(snapshot.activeAgentId).toBe('agent-dina');
     expect(snapshot.agents.map((agent) => agent.id)).toStrictEqual(['agent-dina', 'agent-jesse']);
   });
@@ -188,10 +189,10 @@ describe('team-manager', () => {
     otherAgent.teamId = otherTeam.id;
     snapshot.agents.push(otherAgent);
     otherTeam.agentIds.push(otherAgent.id);
-    const closedMission = createMission(snapshot, { outcome: 'Closed', workflowType: 'shapeAndShipFeature', teamId: 'team-codex-claw', orchestratorMemberId: snapshot.agents[0]!.id });
+    const closedMission = createMission(snapshot, { outcome: 'Closed', workflowType: 'shapeAndShipFeature', teamId: 'team-app', orchestratorMemberId: snapshot.agents[0]!.id });
     const retainedMission = createMission(snapshot, { outcome: 'Retained', workflowType: 'shapeAndShipFeature', teamId: otherTeam.id, orchestratorMemberId: otherAgent.id });
 
-    closeTeamInSnapshot(snapshot, 'team-codex-claw');
+    closeTeamInSnapshot(snapshot, 'team-app');
 
     expect(snapshot.missions?.map(mission => mission.id)).toStrictEqual([retainedMission.id]);
     expect(snapshot.missions).not.toContainEqual(closedMission);
@@ -218,11 +219,11 @@ describe('team-manager', () => {
         },
       ],
     }, 'missing-team')).toBeNull();
-    expect(() => closeTeamInSnapshot(snapshot, 'team-codex-claw')).toThrow('At least one team must remain open.');
+    expect(() => closeTeamInSnapshot(snapshot, 'team-app')).toThrow('At least one team must remain open.');
   });
 
   it('computes short initials for team avatars', () => {
-    expect(teamInitials('Codex Claw')).toBe('CC');
+    expect(teamInitials('Workspace App')).toBe('WA');
     expect(teamInitials('Skwad')).toBe('SK');
     expect(teamInitials('')).toBe('?');
   });

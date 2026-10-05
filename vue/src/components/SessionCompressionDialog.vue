@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog session-compression-dialog"
+    class="app-dialog session-compression-dialog"
     :model-value="visible"
     :teleported="false"
     width="520px"
@@ -11,8 +11,8 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-form-dialog__header">
-        <h2 class="claw-dialog__title">
+      <div class="app-form-dialog__header">
+        <h2 class="app-dialog__title">
           {{ busy ? t('sessionCompression.progressTitle') : t('sessionCompression.title') }}
         </h2>
       </div>
@@ -33,11 +33,11 @@
     </div>
 
     <template #footer>
-      <div v-if="!busy" class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="emit('close')">
+      <div v-if="!busy" class="app-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" @click="emit('close')">
           {{ t('common.cancel') }}
         </button>
-        <button class="claw-button claw-button--primary" type="button" @click="emit('confirm', dontShowAgain)">
+        <button class="app-button app-button--primary" type="button" @click="emit('confirm', dontShowAgain)">
           {{ t('sessionCompression.action') }}
         </button>
       </div>

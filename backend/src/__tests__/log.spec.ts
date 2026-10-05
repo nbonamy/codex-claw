@@ -8,8 +8,8 @@ let tempDir: string | null = null;
 
 beforeEach(async () => {
   vi.resetModules();
-  tempDir = await mkdtemp(path.join(tmpdir(), 'codex-claw-log-'));
-  vi.stubEnv('CODEX_CLAW_HOME', tempDir);
+  tempDir = await mkdtemp(path.join(tmpdir(), 'agent-workspace-log-'));
+  vi.stubEnv('APP_HOME', tempDir);
   vi.stubEnv('NODE_ENV', 'development');
   vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
@@ -32,7 +32,7 @@ afterEach(async () => {
 });
 
 describe('backend logging', () => {
-  it('writes structured backend logs under CODEX_CLAW_HOME and mirrors warn+ to stderr', async () => {
+  it('writes structured backend logs under APP_HOME and mirrors warn+ to stderr', async () => {
     const { backendLogFilePath, flushBackendLogs, logMain, warnMain } = await import('../log');
 
     logMain('mcp-http', 'listening', {
@@ -43,12 +43,12 @@ describe('backend logging', () => {
     warnMain('mcp-tool', 'error', { tool: 'send_message', message: 'failed' });
     await flushBackendLogs();
 
-    expect(backendLogFilePath()).toBe(path.join(tempDir!, 'logs', 'clawd.log'));
+    expect(backendLogFilePath()).toBe(path.join(tempDir!, 'logs', 'daemon.log'));
     const records = await readJsonLogRecords(backendLogFilePath());
     expect(records).toMatchObject([
       {
         level: 'info',
-        service: 'clawd',
+        service: 'daemon',
         area: 'mcp-http',
         msg: 'listening',
         accessToken: '[redacted]',
@@ -57,7 +57,7 @@ describe('backend logging', () => {
       },
       {
         level: 'warn',
-        service: 'clawd',
+        service: 'daemon',
         area: 'mcp-tool',
         msg: 'error',
         message: 'failed',
@@ -71,8 +71,8 @@ describe('backend logging', () => {
   });
 
   it('rotates backend log files when the current file reaches the size limit', async () => {
-    vi.stubEnv('CODEX_CLAW_LOG_MAX_BYTES', '320');
-    vi.stubEnv('CODEX_CLAW_LOG_MAX_FILES', '2');
+    vi.stubEnv('APP_LOG_MAX_BYTES', '320');
+    vi.stubEnv('APP_LOG_MAX_FILES', '2');
     const { backendLogDirectoryPath, flushBackendLogs, logMain } = await import('../log');
 
     for (let index = 0; index < 8; index += 1) {
@@ -84,14 +84,14 @@ describe('backend logging', () => {
     await flushBackendLogs();
 
     await expect(readdir(backendLogDirectoryPath())).resolves.toEqual(expect.arrayContaining([
-      'clawd.log',
-      'clawd.1.log',
-      'clawd.2.log',
+      'daemon.log',
+      'daemon.1.log',
+      'daemon.2.log',
     ]));
   });
 
   it('allows the stderr mirror threshold to be raised independently from the file log level', async () => {
-    vi.stubEnv('CODEX_CLAW_LOG_STDERR_LEVEL', 'error');
+    vi.stubEnv('APP_LOG_STDERR_LEVEL', 'error');
     const { flushBackendLogs, warnMain, errorMain } = await import('../log');
 
     warnMain('stderr-test', 'warn only');

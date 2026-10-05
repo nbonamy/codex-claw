@@ -8,7 +8,7 @@ export function excalidrawAssets(): Plugin {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const source = path.join(root, 'node_modules/@excalidraw/excalidraw/dist/prod');
   return {
-    name: 'claw-excalidraw-assets',
+    name: 'app-excalidraw-assets',
     async generateBundle() {
       for (const file of await readdir(path.join(source, 'fonts'), { recursive: true, withFileTypes: true })) {
         if (!file.isFile()) continue;

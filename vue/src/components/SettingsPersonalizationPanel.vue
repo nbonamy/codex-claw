@@ -6,7 +6,7 @@
             <el-option :label="$t('surface.settingsSidebar.claudeCode')" value="claude" />
           </el-select>
       <div class="settings-personalization__actions">
-        <button class="claw-button claw-button--secondary" type="button" :disabled="busy || !loaded" @click="saveAll">{{ $t('surface.instructionSettings.saveAll') }}</button>
+        <button class="app-button app-button--secondary" type="button" :disabled="busy || !loaded" @click="saveAll">{{ $t('surface.instructionSettings.saveAll') }}</button>
       </div>
     </div>
     <p class="settings-personalization__path">{{ filePath }}</p>
@@ -20,12 +20,12 @@
 import { onMounted, ref } from 'vue';
 import { useDebouncedSave } from '../shared/use-debounced-save';
 import { ElMessageBox } from 'element-plus';
-import type { AgentBackend, CodexClawApi } from '@codex-claw/core/contracts';
-import { codexClawApi } from '../platform-api';
+import type { AgentBackend, AppApi } from '@workspace/core/contracts';
+import { appApi } from '../platform-api';
 import { translate } from '../i18n';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 
-const props = defineProps<{ api?: Pick<CodexClawApi, 'readEngineInstructions' | 'saveEngineInstructions'> }>();
+const props = defineProps<{ api?: Pick<AppApi, 'readEngineInstructions' | 'saveEngineInstructions'> }>();
 const engine = ref<AgentBackend>('codex');
 const text = ref('');
 const original = ref('');
@@ -34,7 +34,7 @@ const busy = ref(false);
 const loaded = ref(false);
 const error = ref('');
 const { schedule, flush, error: saveError } = useDebouncedSave(async (input: { engine: AgentBackend; text: string }) => {
-  const client = props.api ?? codexClawApi;
+  const client = props.api ?? appApi;
   if (!client) throw new Error('Settings client unavailable.');
   await client.saveEngineInstructions(input);
   if (engine.value === input.engine) original.value = input.text;
@@ -45,7 +45,7 @@ async function load(next: AgentBackend) {
   error.value = '';
   loaded.value = false;
   try {
-    const client = props.api ?? codexClawApi;
+    const client = props.api ?? appApi;
     if (!client) throw new Error('Settings client unavailable.');
     const result = await client.readEngineInstructions(next);
     engine.value = next;
@@ -69,7 +69,7 @@ async function saveAll() {
   error.value = '';
   try {
     if (!await flush()) return;
-    const client = props.api ?? codexClawApi;
+    const client = props.api ?? appApi;
     if (!client) throw new Error('Settings client unavailable.');
     await client.saveEngineInstructions({ engine: engine.value, text: text.value, all: true, confirmed: true });
     original.value = text.value;

@@ -1,10 +1,11 @@
-import { approvalAgentRequest } from '@codex-claw/core/agent-request';
+import { product } from '@workspace/core/product';
+import { approvalAgentRequest } from '@workspace/core/agent-request';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useAppState } from '../app-state';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppSnapshot, CodexClawApi, DevicePairingSession, MainToRendererEvent, SourceRepository } from '@codex-claw/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppSnapshot, AppApi, DevicePairingSession, MainToRendererEvent, SourceRepository } from '@workspace/core/contracts';
 import { clearConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow, stubLegacyElectronTestWindow } from '../test/client';
 import { clearFirstRunOnboardingStage } from '../onboarding-session';
@@ -31,10 +32,10 @@ describe('useAppState', () => {
     const getOpenInApplications = vi.fn().mockResolvedValue(catalog);
     const openAgentPath = vi.fn().mockResolvedValue(openedSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getOpenInApplications,
         openAgentPath,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = initialSnapshot;
@@ -53,7 +54,7 @@ describe('useAppState', () => {
     state.snapshot.value = createInitialSnapshot();
     state.snapshot.value.agents.push({
       id: 'agent-jesse',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       name: 'Jesse',
       folder: '/Users/nbonamy/src/multi-llm-ts',
       backend: 'codex',
@@ -69,7 +70,7 @@ describe('useAppState', () => {
     expect(state.activeAgent.value?.id).toBe('agent-dina');
   });
 
-  it('loads, clones, and creates worktrees through clawd', async () => {
+  it('loads, clones, and creates worktrees through daemon', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.sourceFolder = {
       path: '~/src',
@@ -77,26 +78,26 @@ describe('useAppState', () => {
       recentRepoNames: [],
     };
     const repositories: SourceRepository[] = [{
-      name: 'codex-claw',
-      path: '/Users/nbonamy/src/codex-claw',
+      name: 'agent-workspace',
+      path: '/Users/nbonamy/src/agent-workspace',
       worktrees: [{
         name: 'main',
-        path: '/Users/nbonamy/src/codex-claw',
+        path: '/Users/nbonamy/src/agent-workspace',
       }],
     }];
     const listSourceRepositories = vi.fn().mockResolvedValue(repositories);
     const listSourceWorktrees = vi.fn().mockResolvedValue([
-      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
-      { name: 'source-folder', path: '/Users/nbonamy/src/codex-claw-source-folder' },
+      { name: 'main', path: '/Users/nbonamy/src/agent-workspace' },
+      { name: 'source-folder', path: '/Users/nbonamy/src/agent-workspace-source-folder' },
     ]);
     const createSourceWorktree = vi.fn().mockResolvedValue({
       name: 'source-folder',
-      path: '/Users/nbonamy/src/codex-claw-source-folder',
+      path: '/Users/nbonamy/src/agent-workspace-source-folder',
     });
     const cloneSourceRepository = vi.fn().mockResolvedValue(repositories[0]);
     const createSourceRepository = vi.fn().mockResolvedValue(repositories[0]);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         listSourceRepositories,
         cloneSourceRepository,
@@ -104,7 +105,7 @@ describe('useAppState', () => {
         listSourceWorktrees,
         createSourceWorktree,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -112,26 +113,26 @@ describe('useAppState', () => {
 
     expect(state.sourceRepositoryStatus.value).toBe('loaded');
     expect(state.sourceRepositories.value).toStrictEqual(repositories);
-    await expect(state.listSourceWorktrees('/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual([
-      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
-      { name: 'source-folder', path: '/Users/nbonamy/src/codex-claw-source-folder' },
+    await expect(state.listSourceWorktrees('/Users/nbonamy/src/agent-workspace')).resolves.toStrictEqual([
+      { name: 'main', path: '/Users/nbonamy/src/agent-workspace' },
+      { name: 'source-folder', path: '/Users/nbonamy/src/agent-workspace-source-folder' },
     ]);
 
     await expect(state.createSourceWorktree({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/source-folder',
     })).resolves.toStrictEqual({
       name: 'source-folder',
-      path: '/Users/nbonamy/src/codex-claw-source-folder',
+      path: '/Users/nbonamy/src/agent-workspace-source-folder',
     });
     await expect(state.cloneSourceRepository({
-      url: 'https://github.com/nbonamy/codex-claw',
+      url: 'https://github.com/nbonamy/agent-workspace',
     })).resolves.toStrictEqual(repositories[0]);
     expect(cloneSourceRepository).toHaveBeenCalledWith({
-      url: 'https://github.com/nbonamy/codex-claw',
+      url: 'https://github.com/nbonamy/agent-workspace',
     });
-    await expect(state.createSourceRepository({ name: 'codex-claw' })).resolves.toStrictEqual(repositories[0]);
-    expect(createSourceRepository).toHaveBeenCalledWith({ name: 'codex-claw' });
+    await expect(state.createSourceRepository({ name: 'agent-workspace' })).resolves.toStrictEqual(repositories[0]);
+    expect(createSourceRepository).toHaveBeenCalledWith({ name: 'agent-workspace' });
     expect(listSourceRepositories).toHaveBeenCalledTimes(4);
   });
 
@@ -147,19 +148,19 @@ describe('useAppState', () => {
     };
     const createProject = vi.fn().mockResolvedValue(created);
     const listSourceRepositories = vi.fn().mockResolvedValue([repository]);
-    stubElectronTestWindow({ codexClaw: { createProject, listSourceRepositories } satisfies Partial<CodexClawApi> });
+    stubElectronTestWindow({ app: { createProject, listSourceRepositories } satisfies Partial<AppApi> });
     const state = useAppState();
     state.snapshot.value = initial;
 
-    await state.createProject({ name: 'new-product', teamId: 'team-codex-claw' });
+    await state.createProject({ name: 'new-product', teamId: 'team-app' });
 
-    expect(createProject).toHaveBeenCalledWith({ name: 'new-product', teamId: 'team-codex-claw' });
+    expect(createProject).toHaveBeenCalledWith({ name: 'new-product', teamId: 'team-app' });
     expect(state.activeAgent.value?.id).toBe('agent-project');
     expect(state.sourceRepositories.value).toStrictEqual([repository]);
   });
 
   it('uses source repository fallbacks when preload helpers are unavailable', async () => {
-    stubLegacyElectronTestWindow({ codexClaw: {} });
+    stubLegacyElectronTestWindow({ app: {} });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
     state.snapshot.value.sourceFolder = {
@@ -170,13 +171,13 @@ describe('useAppState', () => {
 
     await expect(state.chooseSourceFolder()).resolves.toBeNull();
     await expect(state.suggestSourceWorktreePath({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/source-folder',
     })).resolves.toBe('');
-    await expect(state.listSourceWorktrees('/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual([]);
-    await expect(state.chooseSourceWorktreeDestination('/Users/nbonamy/src/codex-claw-source-folder')).resolves.toBeNull();
+    await expect(state.listSourceWorktrees('/Users/nbonamy/src/agent-workspace')).resolves.toStrictEqual([]);
+    await expect(state.chooseSourceWorktreeDestination('/Users/nbonamy/src/agent-workspace-source-folder')).resolves.toBeNull();
     await expect(state.createSourceWorktree({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/source-folder',
     })).rejects.toThrow('Source worktree creation is not available.');
 
@@ -192,9 +193,9 @@ describe('useAppState', () => {
     const listSourceRepositories = vi.fn().mockRejectedValueOnce(new Error('source folder disappeared'))
       .mockRejectedValueOnce('plain failure');
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         listSourceRepositories,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.snapshot.value = createInitialSnapshot();
@@ -224,11 +225,11 @@ describe('useAppState', () => {
     const selectAgent = vi.fn().mockResolvedValue(jesseSnapshot);
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectAgent,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -246,11 +247,11 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     const selectTeam = vi.fn();
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectTeam,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -258,7 +259,7 @@ describe('useAppState', () => {
     await state.selectTeam('team-missing');
 
     expect(selectTeam).not.toHaveBeenCalled();
-    expect(state.snapshot.value.activeTeamId).toBe('team-codex-claw');
+    expect(state.snapshot.value.activeTeamId).toBe('team-app');
   });
 
   it('ignores stale agent selection responses when switching quickly', async () => {
@@ -267,11 +268,11 @@ describe('useAppState', () => {
     const dinaSelection = deferred<AppSnapshot>();
     const selectAgent = vi.fn((agentId: string) => agentId === 'agent-jesse' ? jesseSelection.promise : dinaSelection.promise);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectAgent,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -308,12 +309,12 @@ describe('useAppState', () => {
     const selectAgent = vi.fn().mockReturnValue(agentSelection.promise);
     const selectTeam = vi.fn().mockReturnValue(clientNavigationSelectTeamion.promise);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectAgent,
         selectTeam,
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -358,7 +359,7 @@ describe('useAppState', () => {
     });
     const setDockBadgeCount = vi.fn().mockResolvedValue(undefined);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectAgent: vi.fn().mockResolvedValue(remoteSnapshot),
         setDockBadgeCount,
@@ -366,7 +367,7 @@ describe('useAppState', () => {
           listeners.push(listener);
           return () => undefined;
         }),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     const state = useAppState();
     state.setRendererWindowFocused(true);
@@ -492,13 +493,13 @@ describe('useAppState', () => {
     selectedTeamSnapshot.activeAgentId = 'agent-joel';
     selectedTeamSnapshot.teams.find((team) => team.id === 'team-other')!.activeAgentId = 'agent-joel';
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         selectTeam: vi.fn().mockResolvedValue(selectedTeamSnapshot),
         loadConversationHistory: vi.fn().mockResolvedValue(selectedTeamSnapshot),
         setDockBadgeCount,
         onEvent: vi.fn(() => () => undefined),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0)
@@ -544,18 +545,18 @@ describe('useAppState', () => {
     };
     const selectedCoreTeamSnapshot = {
       ...selectedTeamSnapshot,
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
       activeAgentId: 'agent-dina',
     };
     const updatedTeamSnapshot = {
       ...selectedCoreTeamSnapshot,
-      teams: selectedCoreTeamSnapshot.teams.map((team) => team.id === 'team-codex-claw'
+      teams: selectedCoreTeamSnapshot.teams.map((team) => team.id === 'team-app'
         ? { ...team, name: 'Core Team', avatar: 'CT', color: '#46A857' }
         : team),
     };
     const reorderedAgentsSnapshot = {
       ...updatedTeamSnapshot,
-      teams: updatedTeamSnapshot.teams.map((team) => team.id === 'team-codex-claw'
+      teams: updatedTeamSnapshot.teams.map((team) => team.id === 'team-app'
         ? { ...team, agentIds: ['agent-jesse', 'agent-dina'] }
         : team),
     };
@@ -565,7 +566,7 @@ describe('useAppState', () => {
         ...reorderedAgentsSnapshot.agents,
         {
           id: 'agent-jules',
-          teamId: 'team-codex-claw',
+          teamId: 'team-app',
           name: 'Jules',
           avatar: '🤖',
           folder: '/Users/nbonamy/src/jules',
@@ -603,7 +604,7 @@ describe('useAppState', () => {
     const closedTeamSnapshot = {
       ...closedSnapshot,
       teams: closedSnapshot.teams.filter((team) => team.id !== 'team-skwad-core'),
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
     };
     const chooseAgentFolder = vi.fn().mockResolvedValue('/Users/nbonamy/src/jules');
     const createTeam = vi.fn().mockResolvedValue(teamSnapshot);
@@ -621,7 +622,7 @@ describe('useAppState', () => {
     const closeAgent = vi.fn().mockResolvedValue(closedSnapshot);
 
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
         chooseAgentFolder,
@@ -638,7 +639,7 @@ describe('useAppState', () => {
         reorderAgents,
         restartAgent,
         closeAgent,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -646,10 +647,10 @@ describe('useAppState', () => {
 
     await expect(state.chooseAgentFolder()).resolves.toBe('/Users/nbonamy/src/jules');
     await state.createTeam({ name: 'Skwad Core', color: '#46A857' });
-    await state.reorderTeams({ teamId: 'team-skwad-core', beforeTeamId: 'team-codex-claw' });
-    await state.selectTeam('team-codex-claw');
-    await state.updateTeam({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
-    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
+    await state.reorderTeams({ teamId: 'team-skwad-core', beforeTeamId: 'team-app' });
+    await state.selectTeam('team-app');
+    await state.updateTeam({ id: 'team-app', name: 'Core Team', color: '#46A857' });
+    await state.reorderAgents({ teamId: 'team-app', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     await state.createAgent({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     await state.updateAgent({ id: 'agent-jules', name: 'Jules Prime' });
     await state.forkActiveAgentTurn('turn-4');
@@ -661,10 +662,10 @@ describe('useAppState', () => {
     await state.closeTeam('team-skwad-core');
 
     expect(createTeam).toHaveBeenCalledWith({ name: 'Skwad Core', color: '#46A857' });
-    expect(reorderTeams).toHaveBeenCalledWith({ teamId: 'team-skwad-core', beforeTeamId: 'team-codex-claw' });
-    expect(selectTeam).toHaveBeenCalledWith('team-codex-claw');
-    expect(updateTeam).toHaveBeenCalledWith({ id: 'team-codex-claw', name: 'Core Team', color: '#46A857' });
-    expect(reorderAgents).toHaveBeenCalledWith({ teamId: 'team-codex-claw', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
+    expect(reorderTeams).toHaveBeenCalledWith({ teamId: 'team-skwad-core', beforeTeamId: 'team-app' });
+    expect(selectTeam).toHaveBeenCalledWith('team-app');
+    expect(updateTeam).toHaveBeenCalledWith({ id: 'team-app', name: 'Core Team', color: '#46A857' });
+    expect(reorderAgents).toHaveBeenCalledWith({ teamId: 'team-app', agentId: 'agent-jesse', beforeAgentId: 'agent-dina' });
     expect(createAgent).toHaveBeenCalledWith({ name: 'Jules', avatar: '🤖', folder: '/Users/nbonamy/src/jules', backend: 'claude' });
     expect(updateAgent).toHaveBeenCalledWith({ id: 'agent-jules', name: 'Jules Prime' });
     expect(duplicateAgent).toHaveBeenCalledWith('agent-jules');
@@ -682,7 +683,7 @@ describe('useAppState', () => {
     const initialSnapshot = createInitialSnapshot();
     initialSnapshot.teams.push({ id: 'team-other', name: 'Other', agentIds: [] });
     const moveAgentToTeam = vi.fn().mockRejectedValue(new Error('Unable to save team membership.'));
-    stubElectronTestWindow({ codexClaw: { moveAgentToTeam } });
+    stubElectronTestWindow({ app: { moveAgentToTeam } });
     const state = useAppState();
     state.snapshot.value = structuredClone(initialSnapshot);
 
@@ -710,27 +711,27 @@ describe('useAppState', () => {
     fallbackSnapshot.activeAgentId = null;
     const closeTeam = vi.fn().mockResolvedValue(fallbackSnapshot);
     const disconnectTeam = vi.fn().mockResolvedValue(fallbackSnapshot);
-    stubElectronTestWindow({ codexClaw: { closeTeam, disconnectTeam } satisfies Partial<CodexClawApi> });
+    stubElectronTestWindow({ app: { closeTeam, disconnectTeam } satisfies Partial<AppApi> });
     const state = useAppState();
 
     state.snapshot.value = remotePointerSnapshot;
-    await state.closeTeam('team-codex-claw');
-    expect(closeTeam).toHaveBeenCalledExactlyOnceWith('team-codex-claw');
+    await state.closeTeam('team-app');
+    expect(closeTeam).toHaveBeenCalledExactlyOnceWith('team-app');
     expect(state.snapshot.value.activeTeamId).toBe('team-local');
 
     state.snapshot.value = remotePointerSnapshot;
-    await state.disconnectTeam('team-codex-claw');
-    expect(disconnectTeam).toHaveBeenCalledExactlyOnceWith('team-codex-claw');
+    await state.disconnectTeam('team-app');
+    expect(disconnectTeam).toHaveBeenCalledExactlyOnceWith('team-app');
     expect(state.snapshot.value.activeTeamId).toBe('team-local');
   });
 
   it('returns safe defaults when optional agent preload helpers are unavailable', async () => {
     const remoteSnapshot = createInitialSnapshot();
     stubLegacyElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -752,18 +753,18 @@ describe('useAppState', () => {
     await expect(state.getAgentGitDiff('agent-dina')).rejects.toThrow('Git diff preview is not available.');
     await expect(state.openAgentPath('agent-dina', 'finder')).rejects.toThrow('Open In is not available.');
     await state.createTeam({ name: 'Ignored Team', color: '#46A857' });
-    await state.updateTeam({ id: 'team-codex-claw', name: 'Ignored Team', color: '#46A857' });
-    await state.reorderTeams({ teamId: 'team-codex-claw', beforeTeamId: null });
-    await state.closeTeam('team-codex-claw');
-    await state.selectTeam('team-codex-claw');
+    await state.updateTeam({ id: 'team-app', name: 'Ignored Team', color: '#46A857' });
+    await state.reorderTeams({ teamId: 'team-app', beforeTeamId: null });
+    await state.closeTeam('team-app');
+    await state.selectTeam('team-app');
     await state.createAgent({ name: 'Ignored', folder: '/tmp/ignored' });
     await state.updateAgent({ id: 'agent-dina', name: 'Ignored' });
     await state.duplicateAgent('agent-dina');
-    await state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-codex-claw' });
-    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-dina', beforeAgentId: null });
+    await state.moveAgentToTeam({ agentId: 'agent-dina', teamId: 'team-app' });
+    await state.reorderAgents({ teamId: 'team-app', agentId: 'agent-dina', beforeAgentId: null });
     await state.restartAgent('agent-dina');
     await state.closeAgent('agent-dina');
-    await state.disconnectTeam('team-codex-claw');
+    await state.disconnectTeam('team-app');
     await expect(state.getAutomationSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(before);
     await expect(state.createAutomation({} as never)).resolves.toBeUndefined();
     await expect(state.updateAutomation({ id: 'missing' } as never)).resolves.toBeUndefined();
@@ -826,14 +827,14 @@ describe('useAppState', () => {
     delete restartedSnapshot.agents[0]!.backendSession;
     const restartAgent = vi.fn().mockResolvedValue(restartedSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn((listener) => {
           listeners.push(listener);
           return () => undefined;
         }),
         restartAgent,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -871,11 +872,11 @@ describe('useAppState', () => {
     };
     const duplicateAgent = vi.fn().mockResolvedValue(duplicatedSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
         onEvent: vi.fn(),
         duplicateAgent,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
@@ -900,8 +901,8 @@ describe('useAppState', () => {
     const updatedSnapshot = structuredClone(initialSnapshot);
     updatedSnapshot.sourceFolder.path = '/Users/nbonamy/projects';
     const repositories: SourceRepository[] = [{
-      name: 'codex-claw',
-      path: '/Users/nbonamy/projects/codex-claw',
+      name: 'agent-workspace',
+      path: '/Users/nbonamy/projects/agent-workspace',
       worktrees: [],
     }];
     const pairingSession: DevicePairingSession = {
@@ -913,12 +914,12 @@ describe('useAppState', () => {
       supported: true,
       installed: true,
       running: true,
-      socketPath: '/tmp/clawd.sock',
+      socketPath: '/tmp/daemon.sock',
       pid: 1234,
     };
     const api = {
       listSourceRepositories: vi.fn().mockResolvedValue(repositories),
-      previewAgentFile: vi.fn().mockResolvedValue({ path: 'README.md', content: '# Claw' }),
+      previewAgentFile: vi.fn().mockResolvedValue({ path: 'README.md', content: `# ${product.name}` }),
       getAgentGitDiff: vi.fn().mockResolvedValue(undefined),
       disconnectTeam: vi.fn().mockResolvedValue(initialSnapshot),
       getAutomationSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
@@ -938,14 +939,14 @@ describe('useAppState', () => {
       getDaemonStatus: vi.fn().mockResolvedValue(daemonStatus),
       setDaemonEnabled: vi.fn().mockResolvedValue(daemonStatus),
       loadOlderAgentHistory: vi.fn().mockResolvedValue({ hasOlder: false }),
-    } satisfies Partial<CodexClawApi>;
-    stubElectronTestWindow({ codexClaw: api });
+    } satisfies Partial<AppApi>;
+    stubElectronTestWindow({ app: api });
 
     const state = useAppState();
     state.snapshot.value = initialSnapshot;
 
     await expect(state.listSourceRepositories('ssh-1')).resolves.toStrictEqual(repositories);
-    await expect(state.previewAgentFile('agent-dina', 'README.md')).resolves.toStrictEqual({ path: 'README.md', content: '# Claw' });
+    await expect(state.previewAgentFile('agent-dina', 'README.md')).resolves.toStrictEqual({ path: 'README.md', content: `# ${product.name}` });
     await state.getAgentGitDiff('agent-dina');
     await state.disconnectTeam('team-other');
     await expect(state.getAutomationSnapshot({ kind: 'remote', remoteConnectionId: 'ssh-1' })).resolves.toBe(initialSnapshot);
@@ -979,7 +980,7 @@ describe('useAppState', () => {
       structuredClone(target);
       return { target: { type: 'branch' as const, baseRef: 'origin/main' }, diff: '', sections: [], summary: { addedLines: 0, removedLines: 0, changedFiles: 0 } };
     });
-    stubElectronTestWindow({ codexClaw: { getAgentGitDiff } satisfies Partial<CodexClawApi> });
+    stubElectronTestWindow({ app: { getAgentGitDiff } satisfies Partial<AppApi> });
     const state = useAppState();
 
     await expect(state.getAgentGitDiff(
@@ -1010,8 +1011,8 @@ describe('useAppState', () => {
       listBackendSkills: vi.fn().mockRejectedValue('skills unavailable'),
       listAgentFiles: vi.fn().mockRejectedValue(new Error('files unavailable')),
       loadOlderAgentHistory: vi.fn().mockReturnValue(history.promise),
-    } satisfies Partial<CodexClawApi>;
-    stubElectronTestWindow({ codexClaw: api });
+    } satisfies Partial<AppApi>;
+    stubElectronTestWindow({ app: api });
 
     const state = useAppState();
     state.snapshot.value = initialSnapshot;
@@ -1052,22 +1053,22 @@ describe('useAppState', () => {
     const reorderTeams = vi.fn().mockResolvedValue(remoteSnapshot);
     const reorderAgents = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
         reorderTeams,
         reorderAgents,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
     await state.loadSnapshot();
 
     await state.reorderTeams({ teamId: 'missing-team', beforeTeamId: null });
-    await state.reorderTeams({ teamId: 'team-codex-claw', beforeTeamId: 'missing-team' });
+    await state.reorderTeams({ teamId: 'team-app', beforeTeamId: 'missing-team' });
     await state.reorderAgents({ teamId: 'missing-team', agentId: 'agent-dina', beforeAgentId: null });
-    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'missing-agent', beforeAgentId: null });
-    await state.reorderAgents({ teamId: 'team-codex-claw', agentId: 'agent-dina', beforeAgentId: 'missing-agent' });
+    await state.reorderAgents({ teamId: 'team-app', agentId: 'missing-agent', beforeAgentId: null });
+    await state.reorderAgents({ teamId: 'team-app', agentId: 'agent-dina', beforeAgentId: 'missing-agent' });
 
     expect(reorderTeams).not.toHaveBeenCalled();
     expect(reorderAgents).not.toHaveBeenCalled();
@@ -1077,10 +1078,10 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0]!.workspace = {
       kind: 'git',
-      folder: '/Users/nbonamy/src/codex-claw',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/Users/nbonamy/src/codex-claw',
-      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
+      primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace',
       branch: 'main',
       isLinkedWorktree: false,
       updatedAt: '2026-06-05T00:00:00.000Z',
@@ -1097,20 +1098,20 @@ describe('useAppState', () => {
     };
     const reorderRepositories = vi.fn().mockResolvedValue(remoteSnapshot);
     stubElectronTestWindow({
-      codexClaw: {
+      app: {
         getSnapshot: vi.fn().mockResolvedValue(remoteSnapshot),
         onEvent: vi.fn(),
         reorderRepositories,
-      } satisfies Partial<CodexClawApi>,
+      } satisfies Partial<AppApi>,
     });
 
     const state = useAppState();
     await state.loadSnapshot();
 
     const input = {
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       repositoryRoot: '/Users/nbonamy/src/id8',
-      beforeRepositoryRoot: '/Users/nbonamy/src/codex-claw',
+      beforeRepositoryRoot: '/Users/nbonamy/src/agent-workspace',
     };
     await state.reorderRepositories(input);
     await state.reorderRepositories({ ...input, repositoryRoot: '/missing' });

@@ -1,3 +1,4 @@
+import product from '../core/src/product.json' with { type: 'json' };
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -9,12 +10,12 @@ import {
   verifyGitHubMcpToken,
 } from './verify-github-mcp-token.mjs';
 
-test('resolves the token file from the Claw home', () => {
+test(`resolves the token file from the ${product.name} home`, () => {
   assert.equal(
-    providerTokensFilePath({ CODEX_CLAW_HOME: ' /tmp/claw-home ' }, '/Users/test'),
-    '/tmp/claw-home/provider-tokens.json',
+    providerTokensFilePath({ APP_HOME: ' /tmp/app-home ' }, '/Users/test'),
+    '/tmp/app-home/provider-tokens.json',
   );
-  assert.equal(providerTokensFilePath({}, '/Users/test'), '/Users/test/.codex-claw/provider-tokens.json');
+  assert.equal(providerTokensFilePath({}, '/Users/test'), `/Users/test/${product.homeDirectory}/provider-tokens.json`);
 });
 
 test('reads only the connected GitHub access token', () => {

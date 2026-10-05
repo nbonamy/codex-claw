@@ -1,6 +1,6 @@
-import type { AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@codex-claw/core/contracts';
-import type { Mission } from '@codex-claw/core/missions';
-import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
+import type { AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@workspace/core/contracts';
+import type { Mission } from '@workspace/core/missions';
+import type { MissionImplementationStartProgress } from '@workspace/core/mission-execution';
 import { missionTeamRepositories, missionWorkspaceName } from './mission-execution-policy';
 
 export type MissionWorkspacePorts = {

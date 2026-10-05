@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog claw-dialog--compact workspace-provisioning-progress-dialog"
+    class="app-dialog app-dialog--compact workspace-provisioning-progress-dialog"
     :model-value="operation !== null"
     :teleported="false"
     width="480px"
@@ -24,8 +24,8 @@
       @complete="close"
     />
     <template v-if="operationState === 'error'" #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="close">
+      <div class="app-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" @click="close">
           {{ t('common.close') }}
         </button>
       </div>
@@ -36,8 +36,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { AgentCreationProgress } from '@codex-claw/core/contracts';
-import type { MissionImplementationStartProgress } from '@codex-claw/core/mission-execution';
+import type { AgentCreationProgress } from '@workspace/core/contracts';
+import type { MissionImplementationStartProgress } from '@workspace/core/mission-execution';
 import StagedOperationProgress, { type StagedOperationStep } from './StagedOperationProgress.vue';
 import { missionRepositoryName } from './mission-implementation-model';
 
@@ -163,7 +163,7 @@ function onVisibilityChanged(visible: boolean): void {
   display: none;
 }
 
-.claw-dialog__footer {
+.app-dialog__footer {
   justify-content: flex-end;
 }
 </style>

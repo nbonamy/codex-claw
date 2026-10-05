@@ -26,8 +26,8 @@ describe('PlanReviewFooter', () => {
     expect(wrapper.get('[aria-label="Send 1 comment"]').text()).toBe('Send 1');
     expect(wrapper.findAll('.plan-review-footer__actions button').map((button) => button.text())).toStrictEqual(['Cancel', 'Clear', 'Send 1']);
     expect(wrapper.get('.plan-review-footer__button--cancel').classes()).toEqual(expect.arrayContaining([
-      'claw-button',
-      'claw-button--tertiary',
+      'app-button',
+      'app-button--tertiary',
     ]));
     expect(wrapper.find('.plan-review-footer__button--primary').exists()).toBe(false);
   });
@@ -44,8 +44,8 @@ describe('PlanReviewFooter', () => {
     expect(wrapper.find('.plan-review-footer__help svg').exists()).toBe(true);
     expect(wrapper.findAll('.plan-review-footer__button').map((button) => button.text())).toStrictEqual(['Cancel', 'Confirm']);
     expect(wrapper.get('.plan-review-footer__button--cancel').classes()).toEqual(expect.arrayContaining([
-      'claw-button',
-      'claw-button--tertiary',
+      'app-button',
+      'app-button--tertiary',
     ]));
 
     await (wrapper as unknown as { setProps: (props: Record<string, unknown>) => Promise<void> }).setProps({

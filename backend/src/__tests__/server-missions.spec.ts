@@ -1,8 +1,9 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
-import { ClawBackendServer } from '../server';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
+import { AppBackendServer } from '../server';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
+import type { AppSnapshot } from '@workspace/core/contracts';
 import { AgentGitService } from '../git/agent-git-service';
 
 describe('mission backend boundary', () => {
@@ -28,7 +29,7 @@ describe('mission backend boundary', () => {
       respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
     };
     let disk: unknown;
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
       saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); },
     });
@@ -68,7 +69,7 @@ describe('mission backend boundary', () => {
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     let disk: unknown;
     const onEvent = vi.fn();
-    const server = new ClawBackendServer({ version: 'test', pid: 1, snapshot, saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); }, onEvent });
+    const server = new AppBackendServer({ version: 'test', pid: 1, snapshot, saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); }, onEvent });
     const call = (method: string, input: unknown) => server.handleMessage({ jsonrpc: '2.0', id: 1, method, params: { input } });
     try {
       const created = await call('mission/create', {
@@ -112,7 +113,7 @@ describe('mission backend boundary', () => {
     const validateLinkedWorktreeDeletion = vi.fn().mockResolvedValue(undefined);
     const deleteLinkedWorktree = vi.fn().mockResolvedValue(undefined);
     const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot,
       agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
       deleteMissionHome,
@@ -148,7 +149,7 @@ describe('mission backend boundary', () => {
     const validateLinkedWorktreeDeletion = vi.fn();
     const deleteLinkedWorktree = vi.fn();
     const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot,
       agentGitService: { validateLinkedWorktreeDeletion, deleteLinkedWorktree } as unknown as AgentGitService,
       deleteMissionHome,
@@ -183,7 +184,7 @@ describe('mission backend boundary', () => {
     const validateLinkedWorktreeDeletion = vi.fn()
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('The current folder is not a linked worktree.'));
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test', snapshot,
       agentGitService: {
         validateLinkedWorktreeDeletion,
@@ -210,16 +211,16 @@ import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { createMission } from '@codex-claw/core/missions';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { createMission } from '@workspace/core/missions';
 import { BackendDriverRpc } from '../driver-rpc';
 
 it('prepares a mission without a provider turn, then starts it from the first user message', async () => {
   const exec = promisify(execFile);
-  const root = await mkdtemp(join(tmpdir(), 'claw-mission-protocol-'));
+  const root = await mkdtemp(join(tmpdir(), 'app-mission-protocol-'));
   const repo = join(root, 'repo');
-  let server: ClawBackendServer | undefined;
+  let server: AppBackendServer | undefined;
   try {
     await exec('git', ['init', repo]);
     await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: repo });
@@ -235,7 +236,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
     const archiveAgentConversation = vi.fn().mockResolvedValue(undefined);
     const releaseConversation = vi.fn();
     const refreshedContexts: Array<{
-      context: ReturnType<ClawBackendServer['missionContext']>;
+      context: ReturnType<AppBackendServer['missionContext']>;
       instructions: string | undefined;
     }> = [];
     const loadConversation = vi.fn(async (agent: Parameters<NonNullable<AgentBackendDriver['loadConversation']>>[0]) => {
@@ -254,7 +255,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
     let disk: unknown;
     const missionHome = join(root, 'mission-home');
     await mkdir(missionHome);
-    server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])), ensureMissionHome: async () => missionHome, saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); } });
+    server = new AppBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])), ensureMissionHome: async () => missionHome, saveSnapshot: async value => { disk = persistedStateFromSnapshot(value); } });
     const call = (method: string, input: unknown) => server!.handleMessage({ jsonrpc: '2.0', id: 1, method, params: { input } });
     await call('mission/create', { outcome: 'Billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     const current = () => snapshot.missions![0]!;
@@ -305,7 +306,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
     });
     expect(refreshedContexts.at(-1)?.instructions).toContain('Owners can pay');
     await vi.waitFor(() => expect(snapshot.queuedPrompts).toEqual([
-      expect.objectContaining({ agentId: worker.id, text: expect.stringContaining('assigned Claw Mission skill') }),
+      expect.objectContaining({ agentId: worker.id, text: expect.stringContaining(`assigned ${product.name} Mission skill`) }),
     ]));
     await server.upsertMissionTicket(worker.id, {
       title: 'Implement billing', body: 'Deliver owner checkout.', repositoryPath: repo,
@@ -331,9 +332,9 @@ it('prepares a mission without a provider turn, then starts it from the first us
 
 it('recovers a persisted preparing mission without starting its provider conversation', async () => {
   const exec = promisify(execFile);
-  const root = await mkdtemp(join(tmpdir(), 'claw-mission-recovery-'));
+  const root = await mkdtemp(join(tmpdir(), 'app-mission-recovery-'));
   const repo = join(root, 'repo');
-  let server: ClawBackendServer | undefined;
+  let server: AppBackendServer | undefined;
   try {
     await exec('git', ['init', repo]);
     await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: repo });
@@ -364,7 +365,7 @@ it('recovers a persisted preparing mission without starting its provider convers
       sendPrompt, interrupt: async () => ({ backendSession: { kind: 'codex', threadId: 'recovered-mission-thread' } }), respondToAgentRequest: async () => undefined, onEvent: () => () => {}, close: async () => {},
       listSkills: async () => [{ name: 'grilling', path: '/skills/grilling/SKILL.md', enabled: true }],
     };
-    server = new ClawBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])) });
+    server = new AppBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['codex', driver]])) });
 
     await server.initialize();
     await server.initialize();

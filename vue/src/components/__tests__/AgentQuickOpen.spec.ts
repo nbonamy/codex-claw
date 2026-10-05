@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Agent, Team } from '@codex-claw/core/contracts';
+import type { Agent, Team } from '@workspace/core/contracts';
 import AgentQuickOpen from '../AgentQuickOpen.vue';
 
 const teams: Team[] = [

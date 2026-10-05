@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue';
-import type { SourceBranch } from '@codex-claw/core/contracts';
-import type { WorkspaceSidebarGroup } from '@codex-claw/core/workspace-sidebar';
+import type { SourceBranch } from '@workspace/core/contracts';
+import type { WorkspaceSidebarGroup } from '@workspace/core/workspace-sidebar';
 
 type RepositoryBranchLoader = (input: {
   agentId: string;

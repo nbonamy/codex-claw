@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import type { ClawMcpAgentCoordinator } from './agent-coordinator';
+import type { AppMcpAgentCoordinator } from './agent-coordinator';
 import { findingBodySchema, findingPrioritySchema, findingTitleSchema } from './finding-tool-schemas';
-import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+import { loggedToolResult, type AppMcpToolModuleProvider } from './tool-modules';
 
-export function createMissionReviewToolModuleProvider(coordinator: ClawMcpAgentCoordinator): ClawMcpToolModuleProvider {
+export function createMissionReviewToolModuleProvider(coordinator: AppMcpAgentCoordinator): AppMcpToolModuleProvider {
   return {
     id: 'mission-review-findings',
     resolve: ({ agentId }) => coordinator.missionContext(agentId)?.stage === 'review' ? {
@@ -14,7 +14,7 @@ export function createMissionReviewToolModuleProvider(coordinator: ClawMcpAgentC
   };
 }
 
-function registerMissionReviewTools(server: McpServer, coordinator: ClawMcpAgentCoordinator, callerAgentId: string): void {
+function registerMissionReviewTools(server: McpServer, coordinator: AppMcpAgentCoordinator, callerAgentId: string): void {
   server.registerTool('report-mission-review-finding', {
     description: 'Report one durable structured finding for the authenticated Mission Review stage.',
     inputSchema: {

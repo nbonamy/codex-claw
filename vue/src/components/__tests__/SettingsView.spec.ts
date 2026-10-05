@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SettingsView from '../SettingsView.vue';
-import type { CodexClawApi } from '@codex-claw/core/contracts';
-import { defaultGeneralSettings, defaultThemeSettings } from '@codex-claw/core/settings';
-import { configureClawClient } from '../../platform-api';
+import type { AppApi } from '@workspace/core/contracts';
+import { defaultGeneralSettings, defaultThemeSettings } from '@workspace/core/settings';
+import { configureAppClient } from '../../platform-api';
 import { setElectronTestClient } from '../../test/client';
 
 describe('SettingsView', () => {
@@ -34,7 +35,7 @@ describe('SettingsView', () => {
       'Claude Code',
       'Plugins',
       'Integrations',
-      'Appshots',
+      'Screenshots',
       'Connections',
       'Git',
     ]);
@@ -116,7 +117,7 @@ describe('SettingsView', () => {
     await wrapper.findComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'github-dark');
     await wrapper.findAllComponents({ name: 'ElInputNumber' })[0].vm.$emit('update:modelValue', 17);
 
-    expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'dark', id: 'codex-claw-dark' } });
+    expect(updateSettings).toHaveBeenCalledWith({ theme: { mode: 'dark', id: 'app-dark' } });
     expect(updateSettings).toHaveBeenCalledWith({ theme: { id: 'github-dark' } });
     expect(updateSettings).toHaveBeenCalledWith({ theme: { chatFontSize: 17 } });
   });
@@ -141,8 +142,8 @@ describe('SettingsView', () => {
 
   it('places plugin controls before integrations and forwards plugin management actions', async () => {
     const launchChatGptApp = vi.fn().mockResolvedValue({ status: 'launched' });
-    configureClawClient({
-      api: { launchChatGptApp } as unknown as CodexClawApi,
+    configureAppClient({
+      api: { launchChatGptApp } as unknown as AppApi,
       platform: 'desktop',
     });
     const updateSettings = vi.fn().mockResolvedValue(undefined);
@@ -204,7 +205,7 @@ describe('SettingsView', () => {
         },
     });
 
-    expect(wrapper.text()).toContain('Remote Codex Claw agents');
+    expect(wrapper.text()).toContain(`Remote ${product.name} agents`);
     expect(wrapper.text()).toContain('devbox');
 
     await wrapper.get('[aria-label="devbox actions"]').trigger('click');
@@ -221,7 +222,7 @@ describe('SettingsView', () => {
   });
 
   it('omits desktop-only settings when mounted by a web host', () => {
-    configureClawClient(undefined);
+    configureAppClient(undefined);
     const wrapper = mount(SettingsView, {
       props: {
         settings: defaultThemeSettings,
@@ -230,9 +231,9 @@ describe('SettingsView', () => {
       },
     });
 
-    expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).not.toContain('Appshots');
+    expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).not.toContain('Screenshots');
     expect(wrapper.text()).not.toContain('Prevent sleep while agents run');
-    expect(wrapper.text()).not.toContain('Keep Codex Claw ready in the background');
+    expect(wrapper.text()).not.toContain(`Keep ${product.name} ready in the background`);
     expect(wrapper.text()).not.toContain('System permissions');
     expect(wrapper.text()).not.toContain('Codex executable');
   });

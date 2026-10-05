@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { shallowMount } from '@vue/test-utils';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { createMission } from '@codex-claw/core/missions';
-import { createTeamInSnapshot } from '@codex-claw/core/team-manager';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { createMission } from '@workspace/core/missions';
+import { createTeamInSnapshot } from '@workspace/core/team-manager';
 import { describe, expect, it, vi } from 'vitest';
 import AppShellNavigation from '../AppShellNavigation.vue';
 
@@ -11,7 +12,7 @@ function mountNavigation(snapshot = createInitialSnapshot()) {
     props: {
       activeTeam,
       activeTeamAgents: snapshot.agents,
-      activeTeamName: activeTeam?.name ?? 'Codex Claw',
+      activeTeamName: activeTeam?.name ?? `${product.name}`,
       agentListCompact: false,
       agentSidebarWidth: 260,
       authentication: null,
@@ -42,13 +43,13 @@ describe('AppShellNavigation', () => {
     rail.vm.$emit('new-team');
     rail.vm.$emit('select-backlog');
     rail.vm.$emit('select-cockpit');
-    rail.vm.$emit('select-team', 'team-codex-claw');
+    rail.vm.$emit('select-team', 'team-app');
     rail.vm.$emit('toggle-speech-mute');
 
     expect(wrapper.emitted('new-team')).toStrictEqual([[]]);
     expect(wrapper.emitted('open-backlog')).toStrictEqual([[]]);
     expect(wrapper.emitted('open-cockpit')).toStrictEqual([[]]);
-    expect(wrapper.emitted('select-team')).toStrictEqual([['team-codex-claw']]);
+    expect(wrapper.emitted('select-team')).toStrictEqual([['team-app']]);
     expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
   });
 

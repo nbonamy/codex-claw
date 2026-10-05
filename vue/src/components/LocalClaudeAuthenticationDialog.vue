@@ -1,6 +1,6 @@
 <template>
   <FormDialog :model-value="modelValue" :title="$t('auth.connectClaude')" :subtitle="$t('auth.claudeLoginInstructions')" teleported @update:model-value="emit('update:modelValue', $event)">
-    <div class="claw-form-dialog">
+    <div class="app-form-dialog">
       <FormDialogField v-for="option in options" :key="option.kind" :label="$t(option.label)">
         <div class="claude-login-command">
           <code>{{ option.command }}</code>
@@ -11,8 +11,8 @@
       <p v-if="error" role="alert">{{ error }}</p>
     </div>
     <template #footer>
-      <button class="claw-button claw-button--tertiary" type="button" @click="emit('update:modelValue', false)">{{ $t('surface.remoteClaudeAuth.close') }}</button>
-      <button class="claw-button claw-button--primary" type="button" :disabled="loading" @click="emit('refresh')">{{ $t('surface.remoteClaudeAuth.refresh') }}</button>
+      <button class="app-button app-button--tertiary" type="button" @click="emit('update:modelValue', false)">{{ $t('surface.remoteClaudeAuth.close') }}</button>
+      <button class="app-button app-button--primary" type="button" :disabled="loading" @click="emit('refresh')">{{ $t('surface.remoteClaudeAuth.refresh') }}</button>
     </template>
   </FormDialog>
 </template>

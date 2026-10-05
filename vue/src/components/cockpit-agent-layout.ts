@@ -1,4 +1,4 @@
-import type { Agent, CockpitAgentViewMode, Team } from '@codex-claw/core/contracts';
+import type { Agent, CockpitAgentViewMode, Team } from '@workspace/core/contracts';
 
 export type CockpitAgentSection = {
   agents: Agent[];

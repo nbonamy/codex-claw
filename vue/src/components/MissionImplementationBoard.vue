@@ -111,7 +111,7 @@
           <button
             v-if="!readOnly && selected.run && ['preparing', 'running'].includes(selected.run.status)"
             type="button"
-            class="claw-button"
+            class="app-button"
             :disabled="busy"
             @click="emit('stop', selected.run.id)"
           >
@@ -120,7 +120,7 @@
           <button
             v-else-if="!readOnly && selected.run && ['failed', 'cancelled'].includes(selected.run.status)"
             type="button"
-            class="claw-button claw-button--primary"
+            class="app-button app-button--primary"
             :disabled="busy"
             @click="emit('retry', selected.index)"
           >
@@ -135,9 +135,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { Agent, OpenInApplicationCatalog } from "@codex-claw/core/contracts";
-import type { Mission } from "@codex-claw/core/missions";
-import type { MissionRun } from "@codex-claw/core/mission-execution";
+import type { Agent, OpenInApplicationCatalog } from "@workspace/core/contracts";
+import type { Mission } from "@workspace/core/missions";
+import type { MissionRun } from "@workspace/core/mission-execution";
 import { FolderIcon, GitBranchIcon } from "../shared/icons/app-icons";
 import MissionImplementationTicketCard from "./MissionImplementationTicketCard.vue";
 import MissionTicketDialog from "./MissionTicketDialog.vue";

@@ -1,22 +1,23 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import TeamDialog from '../TeamDialog.vue';
-import { teamColors } from '@codex-claw/core/team-colors';
-import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@codex-claw/core/contracts';
+import { teamColors } from '@workspace/core/team-colors';
+import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@workspace/core/contracts';
 
 describe('TeamDialog', () => {
   it('renders the Skwad-style create team layout and disables save until named', () => {
     const wrapper = mountDialog();
 
-    expect(wrapper.get('.claw-dialog__title').text()).toBe('Create Team');
-    expect(wrapper.find('.claw-dialog__subtitle').exists()).toBe(false);
-    expect(wrapper.findAll('.claw-form-dialog__field')).toHaveLength(3);
+    expect(wrapper.get('.app-dialog__title').text()).toBe('Create Team');
+    expect(wrapper.find('.app-dialog__subtitle').exists()).toBe(false);
+    expect(wrapper.findAll('.app-form-dialog__field')).toHaveLength(3);
     expect(wrapper.text()).toContain('Name');
     expect(wrapper.text()).toContain('Connection');
     expect(wrapper.text()).toContain('Color');
     expect(wrapper.text()).not.toContain("Choose where this team's agents run.");
     expect(wrapper.text()).not.toContain('Give this team a name for the sidebar.');
-    expect(wrapper.findAll('.claw-form-dialog__label').map((label) => label.text())).toStrictEqual([
+    expect(wrapper.findAll('.app-form-dialog__label').map((label) => label.text())).toStrictEqual([
       'Connection',
       'Name',
       'Color',
@@ -24,9 +25,9 @@ describe('TeamDialog', () => {
     expect(wrapper.get('#team-dialog-name').attributes('placeholder')).toBe('Enter team name');
     expect(wrapper.findAll('.team-dialog__color')).toHaveLength(teamColors.length);
     expect(wrapper.find('.team-dialog__preview').exists()).toBe(false);
-    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
-      ['claw-button', 'claw-button--tertiary'],
-      ['claw-button', 'claw-button--primary'],
+    expect(wrapper.findAll('.app-dialog__footer .app-button').map((button) => button.classes())).toStrictEqual([
+      ['app-button', 'app-button--tertiary'],
+      ['app-button', 'app-button--primary'],
     ]);
     expect(saveButton(wrapper).attributes()).toHaveProperty('disabled');
   });
@@ -98,8 +99,8 @@ describe('TeamDialog', () => {
     const wrapper = mountDialog({
       mode: 'edit',
       team: {
-        id: 'team-codex-claw',
-        name: 'Codex Claw',
+        id: 'team-app',
+        name: `${product.name}`,
         avatar: 'CC',
         color: '#1B4FB2',
         agentIds: ['agent-dina'],
@@ -107,15 +108,15 @@ describe('TeamDialog', () => {
       updateTeam,
     });
 
-    expect(wrapper.get('.claw-dialog__title').text()).toBe('Edit Team');
-    expect((wrapper.get('#team-dialog-name').element as HTMLInputElement).value).toBe('Codex Claw');
+    expect(wrapper.get('.app-dialog__title').text()).toBe('Edit Team');
+    expect((wrapper.get('#team-dialog-name').element as HTMLInputElement).value).toBe(`${product.name}`);
 
     await wrapper.get('#team-dialog-name').setValue('Skwad Core');
     await wrapper.findAll('.team-dialog__color')[10]?.trigger('click');
     await saveButton(wrapper, 'Save').trigger('click');
 
     expect(updateTeam).toHaveBeenCalledWith({
-      id: 'team-codex-claw',
+      id: 'team-app',
       name: 'Skwad Core',
       color: '#46A857',
     });
@@ -134,7 +135,7 @@ describe('TeamDialog', () => {
       mode: 'edit',
       remoteConnections: [readyConnection()],
       team: {
-        id: 'team-codex-claw',
+        id: 'team-app',
         name: 'Local Empty',
         avatar: 'LE',
         color: '#1B4FB2',
@@ -152,7 +153,7 @@ describe('TeamDialog', () => {
 
     expect(loadRemoteTeams).toHaveBeenCalledWith('connection-devbox');
     expect(updateTeam).toHaveBeenCalledWith({
-      id: 'team-codex-claw',
+      id: 'team-app',
       name: 'Remote Core',
       color: '#46A857',
       remoteConnectionId: 'connection-devbox',
@@ -166,8 +167,8 @@ describe('TeamDialog', () => {
       mode: 'edit',
       remoteConnections: [readyConnection()],
       team: {
-        id: 'team-codex-claw',
-        name: 'Codex Claw',
+        id: 'team-app',
+        name: `${product.name}`,
         avatar: 'CC',
         color: '#1B4FB2',
         remoteConnectionId: 'connection-devbox',
@@ -231,7 +232,7 @@ function readyConnection(): RemoteConnection {
     transport: {
       type: 'ssh-stdio',
       command: 'ssh',
-      args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+      args: ['devbox', 'node ~/.agent-workspace/daemon.mjs --stdio'],
     },
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',

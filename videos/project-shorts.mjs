@@ -1,3 +1,5 @@
+import { product } from "./product.mjs";
+
 const DURATION = 40;
 const SCENES = [
   { name: "opening", start: 0, end: 2.5 },
@@ -37,7 +39,7 @@ const SCENES = [
     end: 27.5,
     chapter: "04 / 06",
     label: "CREATE",
-    title: "Claw sets up the project.",
+    title: `${product.name} sets up the project.`,
     subtitle: "Folder, project agent, and handoff.",
     note: "One request. The setup happens automatically.",
   },

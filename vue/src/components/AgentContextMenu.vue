@@ -17,8 +17,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@codex-claw/core/contracts';
-import { defaultTeamColor } from '@codex-claw/core/team-colors';
+import type { OpenInApplication, OpenInApplicationCatalog, Team } from '@workspace/core/contracts';
+import { defaultTeamColor } from '@workspace/core/team-colors';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import {

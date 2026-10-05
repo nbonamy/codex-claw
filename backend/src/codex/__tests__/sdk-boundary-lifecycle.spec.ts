@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
 
-describe('Codex SDK → Claw backend lifecycle', () => {
+describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
   const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); vi.useRealTimers(); });

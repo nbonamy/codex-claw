@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, MainToRendererEvent } from '@codex-claw/core/contracts';
-import { createEmptySnapshot } from '@codex-claw/core/snapshot-construction';
-import { applyMainEventToSnapshot } from '@codex-claw/core/snapshot';
+import type { Agent, MainToRendererEvent } from '@workspace/core/contracts';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import { applyMainEventToSnapshot } from '@workspace/core/snapshot';
 import { AgentPlanReviewService } from '../agent-plan-review-service';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../../state-persistence';
 

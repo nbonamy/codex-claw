@@ -32,7 +32,7 @@ vi.mock('../app-menu', () => ({ installAppMenu: vi.fn() }));
 vi.mock('../log', () => ({ logRendererConsole: vi.fn(), warnMain: vi.fn() }));
 import { createMainWindow } from '../main-window';
 import { cycleTeamsAccelerator } from '../app-shortcuts';
-import { ipcChannels } from '@codex-claw/core/ipc';
+import { ipcChannels } from '@workspace/core/ipc';
 import { logRendererConsole, warnMain } from '../log';
 
 function openWindow() {
@@ -47,7 +47,7 @@ function openWindow() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
-  host.userData = mkdtempSync(path.join(os.tmpdir(), 'claw-window-'));
+  host.userData = mkdtempSync(path.join(os.tmpdir(), 'app-window-'));
   host.packaged = false;
   host.registered = false;
   host.register.mockReturnValue(true);

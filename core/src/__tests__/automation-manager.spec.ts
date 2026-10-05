@@ -21,11 +21,11 @@ describe('automation manager', () => {
       {
         enabled: true,
         repositories: [
-          repository(' nbonamy/codex-claw ', ' /src/codex-claw '),
-          repository('nbonamy/codex-claw', '/duplicate'),
+          repository(' nbonamy/agent-workspace ', ' /src/agent-workspace '),
+          repository('nbonamy/agent-workspace', '/duplicate'),
           repository('nbonamy/witsy', '/src/witsy'),
         ],
-        teamId: ' team-codex-claw ',
+        teamId: ' team-app ',
         selectionPrompt: ' Pick ready bugs. ',
         assignmentPrompt: ' Fix the issue and verify it. ',
         schedule: { intervalMinutes: 60.9 },
@@ -37,10 +37,10 @@ describe('automation manager', () => {
     expect(automation).toStrictEqual({
       backend: 'codex',
       id: 'automation-github-work',
-      name: 'nbonamy/codex-claw +1',
+      name: 'nbonamy/agent-workspace +1',
       enabled: true,
-      repositories: [repository('nbonamy/codex-claw', '/src/codex-claw'), repository('nbonamy/witsy', '/src/witsy')],
-      teamId: 'team-codex-claw',
+      repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace'), repository('nbonamy/witsy', '/src/witsy')],
+      teamId: 'team-app',
       selectionPrompt: 'Pick ready bugs.',
       assignmentPrompt: 'Fix the issue and verify it.',
       schedule: { intervalMinutes: 60 },
@@ -66,8 +66,8 @@ describe('automation manager', () => {
     ).toMatchObject({
       name: 'Nightly triage',
       enabled: false,
-      repositories: [repository('nbonamy/codex-claw', '/src/codex-claw')],
-      teamId: 'team-codex-claw',
+      repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace')],
+      teamId: 'team-app',
       schedule: { intervalMinutes: 1_440 },
       updatedAt: '2026-06-09T12:00:00.000Z',
     });
@@ -88,7 +88,7 @@ describe('automation manager', () => {
     expect(
       createAutomationInSnapshot(snapshot, {
         ...automationInput(),
-        repositories: [repository('', '/src/codex-claw')],
+        repositories: [repository('', '/src/agent-workspace')],
       }),
     ).toBeNull();
     expect(
@@ -175,8 +175,8 @@ describe('automation manager', () => {
 
 function automationInput(): CreateAutomationInput {
   return {
-    repositories: [repository('nbonamy/codex-claw', '/src/codex-claw')],
-    teamId: 'team-codex-claw',
+    repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace')],
+    teamId: 'team-app',
     selectionPrompt: 'Pick ready bugs.',
     assignmentPrompt: 'Fix the issue.',
     schedule: { intervalMinutes: 60 },
@@ -202,9 +202,9 @@ function execution(
       {
         agentId: 'agent-dina',
         agentName: 'Dina',
-        workItemId: 'github:nbonamy/codex-claw#12',
+        workItemId: 'github:nbonamy/agent-workspace#12',
         workItemTitle: 'Fix cockpit',
-        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+        workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
       },
     ],
   };

@@ -9,8 +9,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import type { WorkProviderKind, WorkSource } from '@codex-claw/core/contracts';
-import { workProviderDefinition } from '@codex-claw/core/work-providers';
+import type { WorkProviderKind, WorkSource } from '@workspace/core/contracts';
+import { workProviderDefinition } from '@workspace/core/work-providers';
 withDefaults(defineProps<{ provider: WorkProviderKind; providers: WorkProviderKind[]; sources?: WorkSource[]; sourceId?: string | null; showSource?: boolean; size?: 'default' | 'small'; fullWidth?: boolean }>(), { sources: () => [], sourceId: null, showSource: true, size: 'default', fullWidth: false });
 const emit = defineEmits<{ 'select-provider': [provider: WorkProviderKind]; 'select-source': [id: string | null] }>();
 </script>

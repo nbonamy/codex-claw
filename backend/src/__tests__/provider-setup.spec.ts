@@ -4,13 +4,13 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProviderSetup } from '../provider-setup';
 import { createTestSnapshot, createRemoteAgent } from './server-test-fixtures';
-import { ClawBackendServer } from '../server';
+import { AppBackendServer } from '../server';
 import { backupProviderSetup, loadBackendSnapshot, saveBackendSnapshot } from '../state';
-import type { Agent } from '@codex-claw/core/contracts';
-import { createMission } from '@codex-claw/core/missions';
+import type { Agent } from '@workspace/core/contracts';
+import { createMission } from '@workspace/core/missions';
 
 const cli = vi.hoisted(() => ({ installed: new Set<string>(), fail: false, installs: 0 }));
-vi.mock('@codex-claw/core/runtime-discovery', () => ({
+vi.mock('@workspace/core/runtime-discovery', () => ({
   resolveRuntimeExecutable: (command: string) => cli.installed.has(command) ? command : null,
   withDiscoveredRuntimePath: () => ({}),
 }));
@@ -28,17 +28,17 @@ vi.mock('node:child_process', async importOriginal => ({
 
 let root: string;
 beforeEach(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'claw-provider-setup-'));
-  vi.stubEnv('CODEX_CLAW_HOME', path.join(root, 'claw'));
+  root = await mkdtemp(path.join(tmpdir(), 'app-provider-setup-'));
+  vi.stubEnv('APP_HOME', path.join(root, 'app'));
   vi.stubEnv('CODEX_HOME', path.join(root, 'codex'));
   vi.stubEnv('CLAUDE_CONFIG_DIR', path.join(root, 'claude'));
-  vi.stubEnv('CODEX_CLAW_BUNDLED_CODEX_PATH', '');
-  vi.stubEnv('CODEX_CLAW_CLAUDE_COMMAND', '');
+  vi.stubEnv('APP_BUNDLED_CODEX_PATH', '');
+  vi.stubEnv('APP_CLAUDE_COMMAND', '');
   cli.installed.clear(); cli.installs = 0; cli.fail = false;
 });
 afterEach(async () => { vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true }); });
 
-function addRosterLinks(snapshot: import('@codex-claw/core/contracts').AppSnapshot, removedId: string, survivingId: string) {
+function addRosterLinks(snapshot: import('@workspace/core/contracts').AppSnapshot, removedId: string, survivingId: string) {
   const survivor = snapshot.agents.find(agent => agent.id === survivingId)!;
   survivor.delegatedByAgentId = removedId;
   snapshot.agentGitStatuses[removedId] = { folder: '/repo', ahead: 0, behind: 0, changedFiles: 0, addedLines: 0, removedLines: 0, hasUntracked: false, state: 'clean', updatedAt: 'now' };
@@ -103,8 +103,8 @@ describe('provider onboarding setup', () => {
     expect(other.delegatedByAgentId).toBeUndefined();
     expect((await loadBackendSnapshot()).agents.map(agent => agent.id)).toEqual(['other', 'remote']);
     expect(await readFile(path.join(oldHome, 'conversation.jsonl'), 'utf8')).toBe('keep provider history');
-    const backup = (await readdir(path.join(root, 'claw/backups'))).find(file => file.startsWith('provider-setup-roster'))!;
-    expect(JSON.parse(await readFile(path.join(root, 'claw/backups', backup), 'utf8')).data.agents).toHaveLength(4);
+    const backup = (await readdir(path.join(root, 'app/backups'))).find(file => file.startsWith('provider-setup-roster'))!;
+    expect(JSON.parse(await readFile(path.join(root, 'app/backups', backup), 'utf8')).data.agents).toHaveLength(4);
   });
 
   it('does not touch the home or roster if its verified backup cannot be made', async () => {
@@ -298,7 +298,7 @@ describe('provider onboarding setup', () => {
     const reloaded = await loadBackendSnapshot();
     const restarted = new ProviderSetup(reloaded, vi.fn(), vi.fn());
     await restarted.initialize();
-    const server = new ClawBackendServer({ version: 'test', snapshot: reloaded, providerSetup: restarted, saveSnapshot: saveBackendSnapshot });
+    const server = new AppBackendServer({ version: 'test', snapshot: reloaded, providerSetup: restarted, saveSnapshot: saveBackendSnapshot });
     try {
       expect(await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'settings/codexResourceSharing/get' }))
         .toMatchObject({ result: { enabled: false, migrationRequired: false } });
@@ -306,7 +306,7 @@ describe('provider onboarding setup', () => {
       expect(reloaded.general).not.toHaveProperty('shareCodexSkillsAndPlugins');
       await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'settings/codexResourceSharing/set', params: { input: { enabled: true } } });
       expect((await loadBackendSnapshot()).general.providerHomes?.codex?.shareSkills).toBe(true);
-      expect(await readlink(path.join(root, 'claw/codex-home/skills'))).toBe(path.relative(path.join(root, 'claw/codex-home'), path.join(root, 'codex/skills')));
+      expect(await readlink(path.join(root, 'app/codex-home/skills'))).toBe(path.relative(path.join(root, 'app/codex-home'), path.join(root, 'codex/skills')));
     } finally { await server.close(); }
   });
   it('persists separate homes and shares skills without copying credentials; reload keeps the choices', async () => {
@@ -317,19 +317,19 @@ describe('provider onboarding setup', () => {
     await writeFile(path.join(root, 'claude/auth.json'), 'private');
     const setup = new ProviderSetup(snapshot, () => saveBackendSnapshot(snapshot), vi.fn());
     await setup.initialize();
-    expect(await readFile(path.join(root, 'claw/claude-home/skills/example.md'), 'utf8')).toBe('my skill');
-    await expect(readFile(path.join(root, 'claw/claude-home/auth.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await readFile(path.join(root, 'app/claude-home/skills/example.md'), 'utf8')).toBe('my skill');
+    await expect(readFile(path.join(root, 'app/claude-home/auth.json'))).rejects.toMatchObject({ code: 'ENOENT' });
     const reloaded = await loadBackendSnapshot();
     expect(reloaded.general.providerEnabled).toEqual({ codex: true, claude: false });
     expect(reloaded.general.providerHomes).toStrictEqual({
-      codex: { isolated: true, shareSkills: true, homePath: path.join(root, 'claw/codex-home') },
-      claude: { isolated: true, shareSkills: true, homePath: path.join(root, 'claw/claude-home') },
+      codex: { isolated: true, shareSkills: true, homePath: path.join(root, 'app/codex-home') },
+      claude: { isolated: true, shareSkills: true, homePath: path.join(root, 'app/claude-home') },
     });
     await setup.configure('claude', { isolated: false, shareSkills: true });
     expect(process.env.CLAUDE_CONFIG_DIR).toBe(path.join(root, 'claude'));
     expect((await loadBackendSnapshot()).general.providerHomes?.claude?.homePath).toBe(path.join(root, 'claude'));
     await setup.configure('claude', { isolated: true, shareSkills: false });
-    await expect(readlink(path.join(root, 'claw/claude-home/skills'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readlink(path.join(root, 'app/claude-home/skills'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(await readFile(path.join(root, 'claude/skills/example.md'), 'utf8')).toBe('my skill');
   });
 
@@ -346,7 +346,7 @@ describe('provider onboarding setup', () => {
   });
 
   it('never replaces existing private skills', async () => {
-    const privateSkills = path.join(root, 'claw/claude-home/skills');
+    const privateSkills = path.join(root, 'app/claude-home/skills');
     await mkdir(privateSkills, { recursive: true });
     await writeFile(path.join(privateSkills, 'mine.md'), 'keep');
     const setup = new ProviderSetup(createTestSnapshot(), vi.fn(), vi.fn());
@@ -366,7 +366,7 @@ describe('provider onboarding setup', () => {
     await setup.initialize();
     const changing = setup.configure('claude', { isolated: false, shareSkills: true });
     await vi.waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
-    const server = new ClawBackendServer({ version: 'test', snapshot, providerSetup: setup });
+    const server = new AppBackendServer({ version: 'test', snapshot, providerSetup: setup });
     await expect(server.requireConnectedEngine('claude')).rejects.toThrow('Engine setup is changing');
     expect(await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/setup/get' })).toHaveProperty('result');
     expect(await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'settings/update', params: { input: { general: { theme: 'dark' } } } })).toMatchObject({ error: { message: 'Engine setup is changing. Try again when it finishes.' } });
@@ -385,7 +385,7 @@ describe('provider onboarding setup', () => {
     cli.installed.add('codex');
     const setup = new ProviderSetup(snapshot, vi.fn(), vi.fn());
     await setup.initialize();
-    const server = new ClawBackendServer({ version: 'test', snapshot, providerSetup: setup });
+    const server = new AppBackendServer({ version: 'test', snapshot, providerSetup: setup });
     const request = (method: string, params?: unknown) => server.handleMessage({ jsonrpc: '2.0', id: 1, method, params });
     expect(await request('provider/setup/get')).toMatchObject({ result: [expect.objectContaining({ backend: 'codex', installed: true }), expect.objectContaining({ backend: 'claude', installed: false })] });
     expect(cli.installs).toBe(0);

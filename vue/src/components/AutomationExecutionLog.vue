@@ -79,7 +79,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, ref } from 'vue';
-import type { BackendConversationRef, Automation, AutomationExecutionStatus, RendererMessage } from '@codex-claw/core/contracts';
+import type { BackendConversationRef, Automation, AutomationExecutionStatus, RendererMessage } from '@workspace/core/contracts';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
 import AutomationExecutionConversationOverlay from './AutomationExecutionConversationOverlay.vue';

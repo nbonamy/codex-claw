@@ -1,6 +1,6 @@
 import { mount, type DOMWrapper } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Team } from '@codex-claw/core/contracts';
+import type { Team } from '@workspace/core/contracts';
 import CockpitIcon from '../CockpitIcon.vue';
 
 describe('CockpitIcon', () => {

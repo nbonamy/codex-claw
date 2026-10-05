@@ -1,13 +1,14 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from '../app-controller';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AddSshConnectionInput, AppSnapshot, ClientRequestResponse, CloneSourceRepositoryInput, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MoveAgentToTeamInput, PairedDevice, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@codex-claw/core/contracts';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AddSshConnectionInput, AppSnapshot, ClientRequestResponse, CloneSourceRepositoryInput, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceRepositoryInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DevicePairingStatus, DuplicateAgentOptions, Automation, AutomationLocation, MoveAgentToTeamInput, PairedDevice, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, SystemPermissionsStatus, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkProviderConnectResult, WorkProviderKind } from '@workspace/core/contracts';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { currentSnapshot, createBackendClient, updateSettings } from './app-controller-test-harness';
 
 describe('AppController', () => {
 
-  it('routes client request responses through clawd', async () => {
+  it('routes client request responses through daemon', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...snapshot,
@@ -28,7 +29,7 @@ describe('AppController', () => {
     expect(currentSnapshot(controller).agents[0]?.status).toStrictEqual({ type: 'idle' });
   });
 
-  it('routes source repository discovery through clawd', async () => {
+  it('routes source repository discovery through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder = {
       path: '/Users/nbonamy/src',
@@ -36,11 +37,11 @@ describe('AppController', () => {
       recentRepoNames: [],
     };
     const repositories: SourceRepository[] = [{
-      name: 'codex-claw',
-      path: '/Users/nbonamy/src/codex-claw',
+      name: 'agent-workspace',
+      path: '/Users/nbonamy/src/agent-workspace',
       worktrees: [{
         name: 'main',
-        path: '/Users/nbonamy/src/codex-claw',
+        path: '/Users/nbonamy/src/agent-workspace',
       }],
     }];
     const request = vi.fn().mockResolvedValue(repositories);
@@ -52,15 +53,15 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('source/repositories/list', undefined);
   });
 
-  it('routes source repository cloning through clawd', async () => {
+  it('routes source repository cloning through daemon', async () => {
     const repository: SourceRepository = {
-      name: 'codex-claw',
-      path: '/Users/nbonamy/src/codex-claw',
-      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/codex-claw' }],
+      name: 'agent-workspace',
+      path: '/Users/nbonamy/src/agent-workspace',
+      worktrees: [{ name: 'main', path: '/Users/nbonamy/src/agent-workspace' }],
     };
     const request = vi.fn().mockResolvedValue(repository);
     const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }));
-    const input: CloneSourceRepositoryInput = { url: 'https://github.com/nbonamy/codex-claw' };
+    const input: CloneSourceRepositoryInput = { url: 'https://github.com/nbonamy/agent-workspace' };
 
     await controller.initialize();
 
@@ -68,7 +69,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith(backendMethods.sourceRepositoryClone, { input });
   });
 
-  it('routes source repository creation through clawd', async () => {
+  it('routes source repository creation through daemon', async () => {
     const repository: SourceRepository = {
       name: 'fresh-project',
       path: '/Users/nbonamy/src/fresh-project',
@@ -91,7 +92,7 @@ describe('AppController', () => {
     created.activeAgentId = 'agent-project';
     const request = vi.fn().mockResolvedValue(created);
     const controller = new AppController(initial, createBackendClient({ request }));
-    const input: CreateProjectInput = { name: 'new-product', teamId: 'team-codex-claw' };
+    const input: CreateProjectInput = { name: 'new-product', teamId: 'team-app' };
     await controller.initialize();
 
     await expect((controller as unknown as { createProject(input: CreateProjectInput): Promise<AppSnapshot> }).createProject(input))
@@ -100,24 +101,24 @@ describe('AppController', () => {
     expect(currentSnapshot(controller).activeAgentId).toBe('agent-project');
   });
 
-  it('routes source worktree listing through clawd', async () => {
+  it('routes source worktree listing through daemon', async () => {
     const snapshot = createInitialSnapshot();
     const worktrees: SourceWorktree[] = [
-      { name: 'main', path: '/Users/nbonamy/src/codex-claw' },
-      { name: 'backend-split', path: '/Users/nbonamy/src/codex-claw-backend-split' },
+      { name: 'main', path: '/Users/nbonamy/src/agent-workspace' },
+      { name: 'backend-split', path: '/Users/nbonamy/src/agent-workspace-backend-split' },
     ];
     const request = vi.fn().mockResolvedValueOnce(worktrees);
     const controller = new AppController(snapshot, createBackendClient({ request }));
 
     await controller.initialize();
 
-    await expect(listSourceWorktrees(controller, '/Users/nbonamy/src/codex-claw')).resolves.toStrictEqual(worktrees);
+    await expect(listSourceWorktrees(controller, '/Users/nbonamy/src/agent-workspace')).resolves.toStrictEqual(worktrees);
     expect(request).toHaveBeenCalledWith('source/worktrees/list', {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
     });
   });
 
-  it('routes source worktree creation through clawd', async () => {
+  it('routes source worktree creation through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder = {
       path: '/Users/nbonamy/src',
@@ -126,12 +127,12 @@ describe('AppController', () => {
     };
     const worktree: SourceWorktree = {
       name: 'backend-split',
-      path: '/Users/nbonamy/src/codex-claw-backend-split',
+      path: '/Users/nbonamy/src/agent-workspace-backend-split',
     };
     const request = vi.fn().mockResolvedValueOnce(worktree);
     const controller = new AppController(snapshot, createBackendClient({ request }));
     const input: CreateSourceWorktreeInput = {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'backend-split',
       reuseExisting: true,
     };
@@ -142,13 +143,13 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('source/worktree/create', { input });
   });
 
-  it('routes source worktree path suggestions through clawd', async () => {
+  it('routes source worktree path suggestions through daemon', async () => {
     const snapshot = createInitialSnapshot();
-    const suggestion = '/Users/nbonamy/src/codex-claw-backend-split';
+    const suggestion = '/Users/nbonamy/src/agent-workspace-backend-split';
     const request = vi.fn().mockResolvedValueOnce(suggestion);
     const controller = new AppController(snapshot, createBackendClient({ request }));
     const input = {
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'backend-split',
     };
 
@@ -158,7 +159,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('source/worktree/path/suggest', { input });
   });
 
-  it('routes system permission actions through clawd', async () => {
+  it('routes system permission actions through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const permissionStatus: SystemPermissionsStatus = {
@@ -202,7 +203,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(3, 'system/permissions/screenRecording/open', undefined);
   });
 
-  it('routes work provider actions through clawd when the backend client is connected', async () => {
+  it('routes work provider actions through daemon when the backend client is connected', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const configuredSnapshot = {
@@ -210,7 +211,7 @@ describe('AppController', () => {
       workBacklog: {
         ...snapshot.workBacklog,
         providerConfigurations: {
-          github: { sourceId: 'nbonamy/codex-claw' },
+          github: { sourceId: 'nbonamy/agent-workspace' },
         },
       },
     };
@@ -222,13 +223,13 @@ describe('AppController', () => {
         return configuredSnapshot;
       }
       if (method === 'workProvider/items/list') {
-        return [{ provider: 'github', id: 'github:nbonamy/codex-claw#12', title: 'Fix bug', url: 'https://github.com/nbonamy/codex-claw/issues/12' }];
+        return [{ provider: 'github', id: 'github:nbonamy/agent-workspace#12', title: 'Fix bug', url: 'https://github.com/nbonamy/agent-workspace/issues/12' }];
       }
       if (method === 'workProvider/assignedItems/list') {
-        return [{ provider: 'github', id: 'github:nbonamy/codex-claw#13', title: 'Assigned bug', url: 'https://github.com/nbonamy/codex-claw/issues/13' }];
+        return [{ provider: 'github', id: 'github:nbonamy/agent-workspace#13', title: 'Assigned bug', url: 'https://github.com/nbonamy/agent-workspace/issues/13' }];
       }
       if (method === 'workProvider/globalItems/list') {
-        return { items: [{ provider: 'github', id: 'github:nbonamy/codex-claw#14', title: 'Global bug', url: 'https://github.com/nbonamy/codex-claw/issues/14' }], page: 1, pageSize: 50, totalItems: 14 };
+        return { items: [{ provider: 'github', id: 'github:nbonamy/agent-workspace#14', title: 'Global bug', url: 'https://github.com/nbonamy/agent-workspace/issues/14' }], page: 1, pageSize: 50, totalItems: 14 };
       }
       return snapshot;
     });
@@ -239,25 +240,25 @@ describe('AppController', () => {
     await expect(connectWorkProvider(controller, 'github')).resolves.toMatchObject({
       authorization: { provider: 'github', userCode: 'ABCD-1234' },
     });
-    await expect(configureWorkBacklog(controller, { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } })).resolves.toStrictEqual(configuredSnapshot);
-    await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw')).resolves.toStrictEqual([{
+    await expect(configureWorkBacklog(controller, { provider: 'github', configuration: { sourceId: 'nbonamy/agent-workspace' } })).resolves.toStrictEqual(configuredSnapshot);
+    await expect(listWorkItems(controller, 'github', 'nbonamy/agent-workspace')).resolves.toStrictEqual([{
       provider: 'github',
-      id: 'github:nbonamy/codex-claw#12',
+      id: 'github:nbonamy/agent-workspace#12',
       title: 'Fix bug',
-      url: 'https://github.com/nbonamy/codex-claw/issues/12',
+      url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     }]);
     await expect(listAssignedWorkItems(controller, 'github')).resolves.toStrictEqual([{
       provider: 'github',
-      id: 'github:nbonamy/codex-claw#13',
+      id: 'github:nbonamy/agent-workspace#13',
       title: 'Assigned bug',
-      url: 'https://github.com/nbonamy/codex-claw/issues/13',
+      url: 'https://github.com/nbonamy/agent-workspace/issues/13',
     }]);
     await expect(listGlobalWorkItems(controller, 'github', { assignment: 'all', pageSize: 50 })).resolves.toMatchObject({
-      items: [{ id: 'github:nbonamy/codex-claw#14' }],
+      items: [{ id: 'github:nbonamy/agent-workspace#14' }],
       page: 1,
       totalItems: 14,
     });
-    await expect(listWorkItems(controller, 'github', 'nbonamy/codex-claw', { kind: 'all', state: 'all' })).resolves.toHaveLength(1);
+    await expect(listWorkItems(controller, 'github', 'nbonamy/agent-workspace', { kind: 'all', state: 'all' })).resolves.toHaveLength(1);
     await expect(configureWorkBacklog(
       controller,
       { provider: 'github', configuration: { sourceId: 'nbonamy/remote' } },
@@ -265,8 +266,8 @@ describe('AppController', () => {
     )).resolves.toStrictEqual(configuredSnapshot);
 
     expect(request).toHaveBeenNthCalledWith(1, 'workProvider/connect', { provider: 'github' });
-    expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } } });
-    expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', sourceId: 'nbonamy/codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(2, 'workProvider/backlog/configure', { input: { provider: 'github', configuration: { sourceId: 'nbonamy/agent-workspace' } } });
+    expect(request).toHaveBeenNthCalledWith(3, 'workProvider/items/list', { provider: 'github', sourceId: 'nbonamy/agent-workspace' });
     expect(request).toHaveBeenNthCalledWith(4, 'workProvider/assignedItems/list', { provider: 'github' });
     expect(request).toHaveBeenNthCalledWith(5, 'workProvider/globalItems/list', {
       provider: 'github',
@@ -274,7 +275,7 @@ describe('AppController', () => {
     });
     expect(request).toHaveBeenNthCalledWith(6, 'workProvider/items/list', {
       provider: 'github',
-      sourceId: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
       query: { kind: 'all', state: 'all' },
     });
     expect(request).toHaveBeenNthCalledWith(7, 'workProvider/backlog/configure', {
@@ -283,7 +284,7 @@ describe('AppController', () => {
     });
   });
 
-  it('routes work item assignment mutations through clawd', async () => {
+  it('routes work item assignment mutations through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const item = createWorkItem();
@@ -292,9 +293,9 @@ describe('AppController', () => {
       workBacklog: {
         ...snapshot.workBacklog,
         assignments: {
-          'github:github:nbonamy/codex-claw#12': {
+          'github:github:nbonamy/agent-workspace#12': {
             provider: 'github',
-            itemId: 'github:nbonamy/codex-claw#12',
+            itemId: 'github:nbonamy/agent-workspace#12',
             agentId: 'agent-dina',
             assignedAt: '2026-06-13T00:00:00.000Z',
             policy: 'review',
@@ -315,7 +316,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenNthCalledWith(2, 'agent/workItem/assignment/delete', { item });
   });
 
-  it('routes team mutations through clawd', async () => {
+  it('routes team mutations through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
@@ -330,7 +331,7 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
     const createInput: CreateTeamInput = { name: 'Backend', color: '#7158D4' };
     const updateInput: UpdateTeamInput = { id: 'team-backend', name: 'Backend Core', color: '#AA4AB8' };
-    const reorderInput: ReorderTeamsInput = { teamId: 'team-backend', beforeTeamId: 'team-codex-claw' };
+    const reorderInput: ReorderTeamsInput = { teamId: 'team-backend', beforeTeamId: 'team-app' };
 
     await controller.initialize();
 
@@ -338,16 +339,16 @@ describe('AppController', () => {
     await expect(updateTeam(controller, updateInput)).resolves.toBe(backendSnapshot);
     await expect(reorderTeams(controller, reorderInput)).resolves.toBe(backendSnapshot);
     await expect(closeTeam(controller, 'team-backend')).resolves.toBe(backendSnapshot);
-    await expect(selectTeam(controller, 'team-codex-claw')).resolves.toBe(backendSnapshot);
+    await expect(selectTeam(controller, 'team-app')).resolves.toBe(backendSnapshot);
 
     expect(request).toHaveBeenNthCalledWith(1, 'team/create', { input: createInput });
     expect(request).toHaveBeenNthCalledWith(2, 'team/update', { input: updateInput });
     expect(request).toHaveBeenNthCalledWith(3, 'client/teamOrder/update', { input: reorderInput });
     expect(request).toHaveBeenNthCalledWith(4, 'team/delete', { teamId: 'team-backend' });
-    expect(request).toHaveBeenNthCalledWith(5, 'client/navigation/selectTeam', { teamId: 'team-codex-claw' });
+    expect(request).toHaveBeenNthCalledWith(5, 'client/navigation/selectTeam', { teamId: 'team-app' });
   });
 
-  it('routes agent CRUD and layout mutations through clawd', async () => {
+  it('routes agent CRUD and layout mutations through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
@@ -361,9 +362,9 @@ describe('AppController', () => {
     const controller = new AppController(snapshot, createBackendClient({ request }));
     const createInput: CreateAgentInput = {
       name: 'Backend Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
     };
     const updateInput: UpdateAgentInput = {
       id: 'agent-dina',
@@ -371,16 +372,16 @@ describe('AppController', () => {
     };
     const moveInput: MoveAgentToTeamInput = {
       agentId: 'agent-dina',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
     };
     const reorderInput: ReorderAgentsInput = {
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       agentId: 'agent-dina',
       beforeAgentId: null,
     };
     const reorderRepositoriesInput: ReorderRepositoriesInput = {
-      teamId: 'team-codex-claw',
-      repositoryRoot: '/Users/nbonamy/src/codex-claw',
+      teamId: 'team-app',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
       beforeRepositoryRoot: null,
     };
 
@@ -408,11 +409,11 @@ describe('AppController', () => {
     expect(request).not.toHaveBeenCalledWith('workspace/folder/validate', expect.anything());
   });
 
-  it('routes quick-chat creation through clawd', async () => {
+  it('routes quick-chat creation through daemon', async () => {
     const snapshot = createInitialSnapshot();
     const request = vi.fn().mockResolvedValue(snapshot);
     const controller = new AppController(snapshot, createBackendClient({ request }));
-    const input: CreateQuickChatInput = { teamId: 'team-codex-claw' };
+    const input: CreateQuickChatInput = { teamId: 'team-app' };
 
     await controller.initialize();
     await expect(createQuickChat(controller, input)).resolves.toBe(snapshot);
@@ -420,7 +421,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('agent/quickChat/create', { input });
   });
 
-  it('routes session compression through clawd and adopts the replacement snapshot', async () => {
+  it('routes session compression through daemon and adopts the replacement snapshot', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = structuredClone(snapshot);
     backendSnapshot.agents[0].backendSession = { kind: 'codex', threadId: 'thread-compressed' };
@@ -434,7 +435,7 @@ describe('AppController', () => {
   });
 
 
-  it('routes settings updates through clawd', async () => {
+  it('routes settings updates through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
@@ -457,7 +458,7 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('client/preferences/update', { input: { theme: input.theme } });
   });
 
-  it('routes remote connection actions through clawd', async () => {
+  it('routes remote connection actions through daemon', async () => {
     const snapshot = createInitialSnapshot();
     const backendSnapshot = {
       ...snapshot,
@@ -513,9 +514,9 @@ describe('AppController', () => {
     expect(request).toHaveBeenCalledWith('connections/delete', { connectionId: 'connection-devbox' });
   });
 
-  it('routes device pairing actions through clawd', async () => {
+  it('routes device pairing actions through daemon', async () => {
     const status: DevicePairingStatus = {
-      status: 'connected', serverName: 'Claw', installationId: 'installation-1', environmentId: 'environment-1',
+      status: 'connected', serverName: `${product.name}`, installationId: 'installation-1', environmentId: 'environment-1',
     };
     const session: DevicePairingSession = {
       pairingCode: 'opaque-payload', manualPairingCode: 'ABCD-EFGH', environmentId: 'environment-1',
@@ -551,7 +552,7 @@ describe('AppController', () => {
     });
   });
 
-  it('routes automation mutations and runs through clawd', async () => {
+  it('routes automation mutations and runs through daemon', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.sourceFolder.initialized = true;
     const backendSnapshot = {
@@ -563,8 +564,8 @@ describe('AppController', () => {
     const createInput: CreateAutomationInput = {
       name: 'GitHub bugs',
       enabled: true,
-      repositories: [{ provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/repo' }],
-      teamId: 'team-codex-claw',
+      repositories: [{ provider: 'github', sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/repo' }],
+      teamId: 'team-app',
       schedule: { intervalMinutes: 60 },
     };
     const updateInput: UpdateAutomationInput = {
@@ -602,7 +603,7 @@ describe('AppController', () => {
     const createInput: CreateAutomationInput = {
       name: 'Remote bugs',
       enabled: true,
-      repositories: [{ provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/repo' }],
+      repositories: [{ provider: 'github', sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/repo' }],
       teamId: 'team-remote',
       schedule: { intervalMinutes: 60 },
     };
@@ -621,12 +622,12 @@ describe('AppController', () => {
   });
 });
 
-function automationFixture(teamId = 'team-codex-claw'): Automation {
+function automationFixture(teamId = 'team-app'): Automation {
   return {
     id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
-    repositories: [{ provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/repo' }],
+    repositories: [{ provider: 'github', sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/repo' }],
     teamId,
     schedule: { intervalMinutes: 60 },
     executionLog: [],
@@ -934,9 +935,9 @@ async function configureWorkBacklog(controller: AppController, input: WorkBacklo
   }).configureWorkBacklog(input, location);
 }
 
-async function listWorkItems(controller: AppController, provider: WorkProviderKind, repositoryId: string, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
+async function listWorkItems(controller: AppController, provider: WorkProviderKind, repositoryId: string, query?: import('@workspace/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
   return (controller as unknown as {
-    listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: import('@codex-claw/core/contracts').AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]>;
+    listWorkItems(provider: WorkProviderKind, repositoryId: string, location?: import('@workspace/core/contracts').AutomationLocation, query?: import('@workspace/core/contracts').WorkItemQuery): Promise<WorkItem[]>;
   }).listWorkItems(provider, repositoryId, undefined, query);
 }
 
@@ -949,22 +950,22 @@ async function listAssignedWorkItems(controller: AppController, provider: WorkPr
 async function listGlobalWorkItems(
   controller: AppController,
   provider: WorkProviderKind,
-  query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery,
-): Promise<import('@codex-claw/core/contracts').WorkItemPage> {
+  query?: import('@workspace/core/contracts').GlobalWorkItemQuery,
+): Promise<import('@workspace/core/contracts').WorkItemPage> {
   return (controller as unknown as {
-    listGlobalWorkItems(provider: WorkProviderKind, location?: import('@codex-claw/core/contracts').AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery): Promise<import('@codex-claw/core/contracts').WorkItemPage>;
+    listGlobalWorkItems(provider: WorkProviderKind, location?: import('@workspace/core/contracts').AutomationLocation, query?: import('@workspace/core/contracts').GlobalWorkItemQuery): Promise<import('@workspace/core/contracts').WorkItemPage>;
   }).listGlobalWorkItems(provider, undefined, query);
 }
 
 function createWorkItem(): WorkItem {
   return {
     provider: 'github',
-    id: 'github:nbonamy/codex-claw#12',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'github:nbonamy/agent-workspace#12',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix bug',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     labels: [],
     createdAt: '2026-06-13T00:00:00.000Z',

@@ -1,9 +1,9 @@
 import { ref } from 'vue';
 import { createCodexConversationPaneController, type CodexConversationPaneActions, type CodexConversationPaneState, type CodexRendererSendMessageOptions, type CodexComposerMenuItem } from '@codex-app-sdk/vue';
-import type { BackendApprovalDecision, BackendApprovalScope, ClientRequestResponse, ReasoningEffort, RendererSendPromptOptions, ApprovalPreset } from '@codex-claw/core/contracts';
-import type { ThreadFlagResponse } from '@codex-claw/core/thread-flags';
-import { approvalPresetFromDefaults } from '@codex-claw/core/approval-presets';
-import { defaultBackendCommands } from '@codex-claw/core/backend-commands';
+import type { BackendApprovalDecision, BackendApprovalScope, ClientRequestResponse, ReasoningEffort, RendererSendPromptOptions, ApprovalPreset } from '@workspace/core/contracts';
+import type { ThreadFlagResponse } from '@workspace/core/thread-flags';
+import { approvalPresetFromDefaults } from '@workspace/core/approval-presets';
+import { defaultBackendCommands } from '@workspace/core/backend-commands';
 import type { AgentConversationView } from '../app-state';
 import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';

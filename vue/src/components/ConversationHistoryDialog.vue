@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog claw-dialog--compact conversation-history-dialog"
+    class="app-dialog app-dialog--compact conversation-history-dialog"
     :model-value="visible"
     :teleported="false"
     width="520px"
@@ -56,7 +56,7 @@
 import { nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconSearch as SearchIcon } from '@tabler/icons-vue';
-import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@codex-claw/core/contracts';
+import type { Agent, ConversationListInput, ConversationResumeTarget, ConversationSummary } from '@workspace/core/contracts';
 import { MessageCircleIcon } from '../shared/icons/app-icons';
 import { relativeSessionDate, useSessionHistory } from './use-session-history';
 

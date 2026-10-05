@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -27,7 +28,7 @@ describe('OnboardingCompleteLanding', () => {
     const wrapper = mountLanding();
 
     expect(wrapper.text()).toContain("You're all set.");
-    expect(wrapper.text()).toContain('Codex Claw is ready.');
+    expect(wrapper.text()).toContain(`${product.name} is ready.`);
     expect(useConfetti().bursts.value).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(5000);

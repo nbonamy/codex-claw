@@ -11,7 +11,7 @@
 
 <script setup lang="ts">
 import AnnotationPopup, { type AnnotationPopupAnchor } from './components/AnnotationPopup.vue';
-import { codexClawApi } from './platform-api';
+import { appApi } from './platform-api';
 
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token') ?? '';
@@ -20,7 +20,7 @@ const anchor = parseAnchor(params.get('anchor'));
 
 async function resolve(comment: string | null): Promise<void> {
   if (!token) return;
-  await codexClawApi?.browserResolveAnnotation(token, comment);
+  await appApi?.browserResolveAnnotation(token, comment);
 }
 
 function parseAnchor(value: string | null): AnnotationPopupAnchor {

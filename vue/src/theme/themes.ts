@@ -1,4 +1,5 @@
-import type { AppearanceMode, AppThemeSettings } from '@codex-claw/core/contracts';
+import { product } from '@workspace/core/product';
+import type { AppearanceMode, AppThemeSettings } from '@workspace/core/contracts';
 
 export type AppThemeDefinition = {
   id: string;
@@ -25,24 +26,24 @@ type ThemeSeed = {
   outlineVariant: string;
 };
 
-const codexClawSystemPair = {
-  light: 'codex-claw-light',
-  dark: 'codex-claw-dark',
+const appSystemPair = {
+  light: 'app-light',
+  dark: 'app-dark',
 } as const;
 
 const themePairsById: Record<string, { light: string; dark: string }> = {
-  'codex-claw-light': codexClawSystemPair,
-  'codex-claw-dark': codexClawSystemPair,
-  'codex-claw-dark-blue': {
-    light: 'codex-claw-light',
-    dark: 'codex-claw-dark-blue',
+  'app-light': appSystemPair,
+  'app-dark': appSystemPair,
+  'app-dark-blue': {
+    light: 'app-light',
+    dark: 'app-dark-blue',
   },
 };
 
 const unsortedAppThemes: AppThemeDefinition[] = [
   theme({
-    id: 'codex-claw-light',
-    name: 'Codex Claw Light',
+    id: 'app-light',
+    name: `${product.name} Light`,
     appearance: 'light',
     primary: '#1B4FB2',
     secondary: '#0C72EE',
@@ -58,8 +59,8 @@ const unsortedAppThemes: AppThemeDefinition[] = [
     outlineVariant: '#D9D9DD',
   }),
   theme({
-    id: 'codex-claw-dark',
-    name: 'Codex Claw Dark',
+    id: 'app-dark',
+    name: `${product.name} Dark`,
     appearance: 'dark',
     primary: 'rgb(11, 132, 255)',
     secondary: 'rgb(110, 180, 255)',
@@ -75,8 +76,8 @@ const unsortedAppThemes: AppThemeDefinition[] = [
     outlineVariant: '#646464',
   }),
   theme({
-    id: 'codex-claw-dark-blue',
-    name: 'Codex Claw Dark Blue',
+    id: 'app-dark-blue',
+    name: `${product.name} Dark Blue`,
     appearance: 'dark',
     primary: 'rgb(10, 120, 240)',
     secondary: 'rgb(110, 180, 255)',
@@ -794,7 +795,7 @@ export const appThemes: AppThemeDefinition[] = [...unsortedAppThemes].sort((left
 
 export function themeById(themeId: string): AppThemeDefinition {
   return appThemes.find((themeDefinition) => themeDefinition.id === themeId)
-    ?? appThemes.find((themeDefinition) => themeDefinition.id === codexClawSystemPair.light)
+    ?? appThemes.find((themeDefinition) => themeDefinition.id === appSystemPair.light)
     ?? appThemes[0];
 }
 
@@ -809,12 +810,12 @@ export function themeIdForAppearance(themeId: string, appearance: AppThemeDefini
     return pair[appearance];
   }
 
-  return appThemes.find((themeDefinition) => themeDefinition.appearance === appearance)?.id ?? codexClawSystemPair.light;
+  return appThemes.find((themeDefinition) => themeDefinition.appearance === appearance)?.id ?? appSystemPair.light;
 }
 
 export function effectiveTheme(settings: AppThemeSettings, prefersDark: boolean): AppThemeDefinition {
-  if (settings.mode === 'system' && settings.id === codexClawSystemPair.light) {
-    return themeById(prefersDark ? codexClawSystemPair.dark : codexClawSystemPair.light);
+  if (settings.mode === 'system' && settings.id === appSystemPair.light) {
+    return themeById(prefersDark ? appSystemPair.dark : appSystemPair.light);
   }
 
   return themeById(settings.id);

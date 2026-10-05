@@ -1,41 +1,42 @@
+import { product } from '@workspace/core/product';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { createCodexNodeWebSocketPort } from '@codex-app-sdk/web/server';
-import { ClawWebBackendProcess } from './backend-process.js';
-import { bindClawWebSocket } from './websocket-adapter.js';
+import { AppWebBackendProcess } from './backend-process.js';
+import { bindAppWebSocket } from './websocket-adapter.js';
 
 type SiteUser = { id: string };
 
 const host = process.env.HOST?.trim() || '127.0.0.1';
 const port = Number(process.env.PORT ?? 3000);
 if (!isLoopbackHost(host)) {
-  throw new Error('Unauthenticated Claw Web may only bind to localhost. Add authentication before exposing this server.');
+  throw new Error(`Unauthenticated ${product.name} Web may only bind to localhost. Add authentication before exposing this server.`);
 }
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 const clientDirectory = path.resolve(moduleDirectory, '../client');
 const repositoryDirectory = path.resolve(moduleDirectory, '../../..');
-const backendBundle = path.join(repositoryDirectory, 'backend/dist/clawd.mjs');
-const backend = new ClawWebBackendProcess(backendCommand());
+const backendBundle = path.join(repositoryDirectory, 'backend/dist/daemon.mjs');
+const backend = new AppWebBackendProcess(backendCommand());
 const app = express();
 const httpServer = createServer(app);
 const webSocketServer = new WebSocketServer({ noServer: true });
 
 app.use(express.static(clientDirectory));
-app.get('/health', (_request, response) => response.json({ ok: true, name: 'codex-claw-web' }));
+app.get('/health', (_request, response) => response.json({ ok: true, name: 'agent-workspace-web' }));
 app.get('*path', (_request, response) => response.sendFile(path.join(clientDirectory, 'index.html')));
 
 httpServer.on('upgrade', (request, socket, head) => {
   const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
   const siteUser = authenticateSiteRequest(request);
-  if (pathname !== '/claw' || !siteUser) {
+  if (pathname !== '/app' || !siteUser) {
     socket.destroy();
     return;
   }
   webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
-    bindClawWebSocket({
+    bindAppWebSocket({
       backend,
       socket: createCodexNodeWebSocketPort(webSocket),
       userId: siteUser.id,
@@ -46,7 +47,7 @@ httpServer.on('upgrade', (request, socket, head) => {
 
 await backend.start();
 httpServer.listen(port, host, () => {
-  process.stdout.write(`Codex Claw Web: http://${host}:${port}\n`);
+  process.stdout.write(`${product.name} Web: http://${host}:${port}\n`);
 });
 
 function authenticateSiteRequest(_request: import('node:http').IncomingMessage): SiteUser | null {
@@ -60,11 +61,11 @@ function isLoopbackHost(value: string): boolean {
 }
 
 function backendCommand() {
-  const command = process.env.CODEX_CLAW_BACKEND_COMMAND?.trim();
+  const command = process.env.APP_BACKEND_COMMAND?.trim();
   if (command) {
     return {
       command,
-      args: process.env.CODEX_CLAW_BACKEND_ARGS?.split(',').map((arg) => arg.trim()).filter(Boolean) ?? ['--stdio'],
+      args: process.env.APP_BACKEND_ARGS?.split(',').map((arg) => arg.trim()).filter(Boolean) ?? ['--stdio'],
       cwd: repositoryDirectory,
     };
   }

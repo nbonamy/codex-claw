@@ -1,81 +1,82 @@
-import { decodeClawBackendEvent } from '@codex-claw/core/backend-protocol/events';
-import type { MainToRendererEvent } from '@codex-claw/core/contracts';
+import { product } from '@workspace/core/product';
+import { decodeAppBackendEvent } from '@workspace/core/backend-protocol/events';
+import type { MainToRendererEvent } from '@workspace/core/contracts';
 
-export const clawWebProtocolVersion = 1 as const;
+export const appWebProtocolVersion = 1 as const;
 
-type ClawWebRequest = {
-  version: typeof clawWebProtocolVersion;
+type AppWebRequest = {
+  version: typeof appWebProtocolVersion;
   type: 'request';
   id: string;
   operation: string;
   args: unknown[];
 };
 
-type ClawWebReady = {
-  version: typeof clawWebProtocolVersion;
+type AppWebReady = {
+  version: typeof appWebProtocolVersion;
   type: 'ready';
   userId: string;
 };
 
-type ClawWebEvent = {
-  version: typeof clawWebProtocolVersion;
+type AppWebEvent = {
+  version: typeof appWebProtocolVersion;
   type: 'event';
   event: MainToRendererEvent;
 };
 
-type ClawWebResponse = {
-  version: typeof clawWebProtocolVersion;
+type AppWebResponse = {
+  version: typeof appWebProtocolVersion;
   type: 'response';
   id: string;
   ok: true;
   result?: unknown;
 } | {
-  version: typeof clawWebProtocolVersion;
+  version: typeof appWebProtocolVersion;
   type: 'response';
   id: string;
   ok: false;
   error: string;
 };
 
-export type ClawWebClientMessage = ClawWebRequest;
-export type ClawWebServerMessage = ClawWebReady | ClawWebEvent | ClawWebResponse;
+export type AppWebClientMessage = AppWebRequest;
+export type AppWebServerMessage = AppWebReady | AppWebEvent | AppWebResponse;
 
-export class ClawWebEventDecodeError extends TypeError {}
+export class AppWebEventDecodeError extends TypeError {}
 
-export function encodeClawWebMessage(message: ClawWebClientMessage | ClawWebServerMessage): string {
+export function encodeAppWebMessage(message: AppWebClientMessage | AppWebServerMessage): string {
   return JSON.stringify(message);
 }
 
-export function parseClawWebClientMessage(value: unknown): ClawWebClientMessage {
-  if (!isRecord(value) || value.version !== clawWebProtocolVersion || value.type !== 'request') {
-    throw new TypeError('Invalid Claw web request.');
+export function parseAppWebClientMessage(value: unknown): AppWebClientMessage {
+  if (!isRecord(value) || value.version !== appWebProtocolVersion || value.type !== 'request') {
+    throw new TypeError(`Invalid ${product.name} web request.`);
   }
   if (typeof value.id !== 'string' || typeof value.operation !== 'string' || !Array.isArray(value.args)) {
-    throw new TypeError('Malformed Claw web request.');
+    throw new TypeError(`Malformed ${product.name} web request.`);
   }
-  return value as ClawWebRequest;
+  return value as AppWebRequest;
 }
 
-export function parseClawWebServerMessage(value: unknown): ClawWebServerMessage {
-  if (!isRecord(value) || value.version !== clawWebProtocolVersion) {
-    throw new TypeError('Invalid Claw web response.');
+export function parseAppWebServerMessage(value: unknown): AppWebServerMessage {
+  if (!isRecord(value) || value.version !== appWebProtocolVersion) {
+    throw new TypeError(`Invalid ${product.name} web response.`);
   }
-  if (value.type === 'ready' && typeof value.userId === 'string') return value as ClawWebReady;
+  if (value.type === 'ready' && typeof value.userId === 'string') return value as AppWebReady;
   if (value.type === 'event') {
     try {
-      decodeClawBackendEvent(value.event);
-      return value as ClawWebEvent;
+      decodeAppBackendEvent(value.event);
+      return value as AppWebEvent;
     } catch (error) {
-      throw new ClawWebEventDecodeError(
-        `Malformed Claw web event: ${error instanceof Error ? error.message : 'Invalid backend event.'}`,
+      throw new AppWebEventDecodeError(
+        `Malformed ${product.name} web event: ${error instanceof Error ? error.message : 'Invalid backend event.'}`,
       );
     }
   }
   if (value.type === 'response' && typeof value.id === 'string' && typeof value.ok === 'boolean') {
-    if (value.ok === true) return value as ClawWebResponse;
-    if (value.ok === false && typeof value.error === 'string') return value as ClawWebResponse;
+    if (value.ok === true) return value as AppWebResponse;
+    if (value.ok === false && typeof value.error === 'string') return value as AppWebResponse;
   }
-  throw new TypeError('Malformed Claw web response.');
+  throw new TypeError(`Malformed ${product.name} web response.`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

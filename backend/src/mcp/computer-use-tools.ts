@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod/v4';
@@ -30,9 +31,9 @@ type ComputerUseCommand =
   | 'screenshot'
   | 'type_text';
 
-const COMPUTER_USE_GUIDE = `# Codex Claw Computer Use
+const COMPUTER_USE_GUIDE = `# ${product.name} Computer Use
 
-Use only the \`codex_claw\` Computer Use tools. Do not load Codex's built-in Computer Use skill or call \`sky.*\`; those control a different host.
+Use only the \`workspace\` Computer Use tools. Do not load Codex's built-in Computer Use skill or call \`sky.*\`; those control a different host.
 
 1. Start with \`computer-use-status\`. Request Accessibility or Screen Recording only when the returned status requires it.
 2. Target a named app directly when known. Otherwise list running apps, find an installed app, or launch it. Then call \`computer-use-list-windows\`, select the intended \`window_id\`, and pass that explicit ID to window state, window screenshots, focus, and every action. Refresh the window list after opening or closing a window; never retry against another window implicitly.

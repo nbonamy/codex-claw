@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AppCommand, ApprovalPreset, BackendConversationRef, BrowserBounds, ClientRequestResponse, CodexClawApi, ConversationListInput, ConversationResumeTarget, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@codex-claw/core/contracts';
-import { ipcChannels, type CodexClawIpcEvents, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
+import type { AddSshConnectionInput, AgentGitBranchInput, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStageInput, AgentGitUpdateFromBaseInput, AppCommand, ApprovalPreset, BackendConversationRef, BrowserBounds, ClientRequestResponse, AppApi, ConversationListInput, ConversationResumeTarget, CreateAgentInput, CreateAutomationInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DevicePairingSession, DesktopUpdateStatus, DuplicateAgentOptions, GlobalWorkItemQuery, AutomationLocation, MainToRendererEvent, MoveAgentToTeamInput, OpenInApplication, RendererSendPromptOptions, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, SetCodexResourceSharingInput, SourceFolderListInput, SpokenAnnouncementVoice, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkItem, WorkItemQuery, WorkProviderKind } from '@workspace/core/contracts';
+import { ipcChannels, type AppIpcEvents, type AppIpcRequests } from '@workspace/core/ipc';
 import { exposeCodexNativeRendererApi, TypedIpcRenderer } from '@codex-app-sdk/electron/preload';
 
-const ipc = new TypedIpcRenderer<CodexClawIpcRequests, CodexClawIpcEvents>(ipcRenderer);
+const ipc = new TypedIpcRenderer<AppIpcRequests, AppIpcEvents>(ipcRenderer);
 
-const api: CodexClawApi = {
+const api: AppApi = {
   startVisualize: (agentId, input) => ipc.invoke(ipcChannels.startVisualize, agentId, input),
   setVisualizeOpen: (agentId, input) => ipc.invoke(ipcChannels.setVisualizeOpen, agentId, input),
   generateVisualizationSuggestion: (agentId, input) => ipc.invoke(ipcChannels.generateVisualizationSuggestion, agentId, input),
@@ -50,7 +50,7 @@ const api: CodexClawApi = {
   listAgentFiles: (agentId: string) => ipc.invoke(ipcChannels.listAgentFiles, agentId),
   previewAgentFile: (agentId: string, filePath: string) => ipc.invoke(ipcChannels.previewAgentFile, agentId, filePath),
   readAgentFileChunk: (agentId, filePath, offset) => ipc.invoke(ipcChannels.readAgentFileChunk, agentId, filePath, offset),
-  getAgentGitDiff: (agentId: string, target?: import('@codex-claw/core/contracts').AgentGitDiffTarget) => ipc.invoke(ipcChannels.getAgentGitDiff, agentId, target),
+  getAgentGitDiff: (agentId: string, target?: import('@workspace/core/contracts').AgentGitDiffTarget) => ipc.invoke(ipcChannels.getAgentGitDiff, agentId, target),
   getAgentGitWorkflow: (agentId: string) => ipc.invoke(ipcChannels.getAgentGitWorkflow, agentId),
   listAgentTasks: (agentId: string) => ipc.invoke(ipcChannels.listAgentTasks, agentId),
   cancelAgentTask: (agentId: string, taskId: string) => ipc.invoke(ipcChannels.cancelAgentTask, agentId, taskId),
@@ -69,9 +69,9 @@ const api: CodexClawApi = {
   chooseSourceFolder: () => ipc.invoke(ipcChannels.chooseSourceFolder),
   listSourceFolders: (input?: SourceFolderListInput) => ipc.invoke(ipcChannels.listSourceFolders, input),
   listSourceRepositories: (remoteConnectionId?: string) => ipc.invoke(ipcChannels.listSourceRepositories, remoteConnectionId),
-  cloneSourceRepository: (input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => ipc.invoke(ipcChannels.cloneSourceRepository, input),
-  createSourceRepository: (input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => ipc.invoke(ipcChannels.createSourceRepository, input),
-  createProject: (input: import('@codex-claw/core/contracts').CreateProjectInput) => ipc.invoke(ipcChannels.createProject, input),
+  cloneSourceRepository: (input: import('@workspace/core/contracts').CloneSourceRepositoryInput) => ipc.invoke(ipcChannels.cloneSourceRepository, input),
+  createSourceRepository: (input: import('@workspace/core/contracts').CreateSourceRepositoryInput) => ipc.invoke(ipcChannels.createSourceRepository, input),
+  createProject: (input: import('@workspace/core/contracts').CreateProjectInput) => ipc.invoke(ipcChannels.createProject, input),
   listSourceBranches: (repoPath: string, remoteConnectionId?: string) => ipc.invoke(ipcChannels.listSourceBranches, repoPath, remoteConnectionId),
   listSourceWorktrees: (repoPath: string, remoteConnectionId?: string) => ipc.invoke(ipcChannels.listSourceWorktrees, repoPath, remoteConnectionId),
   suggestSourceWorktreePath: (input: Pick<CreateSourceWorktreeInput, 'branchName' | 'repoPath' | 'remoteConnectionId'>) => ipc.invoke(ipcChannels.suggestSourceWorktreePath, input),
@@ -171,7 +171,7 @@ const api: CodexClawApi = {
   browserGetZoom: (agentId: string, browserId: string) => ipc.invoke(ipcChannels.browserGetZoom, agentId, browserId),
   browserSetZoom: (agentId: string, browserId: string, percent: number) => ipc.invoke(ipcChannels.browserSetZoom, agentId, browserId, percent),
   browserCopyScreenshot: (agentId: string, browserId: string, rect?: BrowserBounds) => ipc.invoke(ipcChannels.browserCopyScreenshot, agentId, browserId, rect),
-  browserSetBounds: (agentId: string, browserId: string, bounds: import('@codex-claw/core/contracts').BrowserViewportBounds) => ipc.invoke(ipcChannels.browserSetBounds, agentId, browserId, bounds),
+  browserSetBounds: (agentId: string, browserId: string, bounds: import('@workspace/core/contracts').BrowserViewportBounds) => ipc.invoke(ipcChannels.browserSetBounds, agentId, browserId, bounds),
   browserSetVisible: (agentId: string, browserId: string, visible: boolean) => ipc.invoke(ipcChannels.browserSetVisible, agentId, browserId, visible),
   browserSetAnnotationMode: (agentId: string, browserId: string, enabled: boolean) => ipc.invoke(ipcChannels.browserSetAnnotationMode, agentId, browserId, enabled),
   browserResolveAnnotation: (token: string, comment: string | null) => ipc.invoke(ipcChannels.browserResolveAnnotation, token, comment),
@@ -189,5 +189,5 @@ const api: CodexClawApi = {
   },
 };
 
-contextBridge.exposeInMainWorld('codexClaw', api);
+contextBridge.exposeInMainWorld('app', api);
 exposeCodexNativeRendererApi(contextBridge, ipcRenderer);

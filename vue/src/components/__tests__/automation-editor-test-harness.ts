@@ -1,4 +1,5 @@
-import type { Automation, SourceRepository, Team, WorkIntegrationConnection, WorkSource } from '@codex-claw/core/contracts';
+import { product } from '@workspace/core/product';
+import type { Automation, SourceRepository, Team, WorkIntegrationConnection, WorkSource } from '@workspace/core/contracts';
 import { mount } from '@vue/test-utils';
 import { ElButton, ElOption, ElSelect, ElSwitch } from 'element-plus';
 import AutomationEditor from '../AutomationEditor.vue';
@@ -29,8 +30,8 @@ export function mountEditor(
       sourceRepositories: overrides.sourceRepositories ?? sourceRepositories(),
       teams: overrides.teams ?? [
         {
-          id: 'team-codex-claw',
-          name: 'Codex Claw',
+          id: 'team-app',
+          name: `${product.name}`,
           avatar: 'CC',
           color: '#1B4FB2',
           agentIds: [],
@@ -51,11 +52,11 @@ export function automation(overrides: Partial<Automation> = {}): Automation {
     repositories: [
       {
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       },
     ],
-    teamId: 'team-codex-claw',
+    teamId: 'team-app',
     selectionPrompt: 'Pick ready bugs.',
     assignmentPrompt: 'Fix the issue and run tests.',
     schedule: { intervalMinutes: 60 },
@@ -70,11 +71,11 @@ export function workRepositories(): WorkSource[] {
   return [
     {
       provider: 'github',
-      id: 'nbonamy/codex-claw',
+      id: 'nbonamy/agent-workspace',
       owner: 'nbonamy',
-      name: 'codex-claw',
-      fullName: 'nbonamy/codex-claw',
-      url: 'https://github.com/nbonamy/codex-claw',
+      name: 'agent-workspace',
+      fullName: 'nbonamy/agent-workspace',
+      url: 'https://github.com/nbonamy/agent-workspace',
       isPrivate: true,
     },
     {
@@ -92,9 +93,9 @@ export function workRepositories(): WorkSource[] {
 export function sourceRepositories(): SourceRepository[] {
   return [
     {
-      name: 'codex-claw',
-      path: '/Users/nbonamy/src/codex-claw',
-      remoteIdentity: 'github.com/nbonamy/codex-claw',
+      name: 'agent-workspace',
+      path: '/Users/nbonamy/src/agent-workspace',
+      remoteIdentity: 'github.com/nbonamy/agent-workspace',
       worktrees: [],
     },
     {

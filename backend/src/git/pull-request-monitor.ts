@@ -1,4 +1,4 @@
-import type { AgentGitPullRequest, AppSnapshot } from '@codex-claw/core/contracts';
+import type { AgentGitPullRequest, AppSnapshot } from '@workspace/core/contracts';
 
 type PullRequestReader = {
   getPullRequest(repository: string, number: number): Promise<AgentGitPullRequest | null>;

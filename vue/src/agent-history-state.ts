@@ -2,9 +2,9 @@ import type {
   AgentHistoryLoadResult,
   AppSnapshot,
   MainToRendererEvent,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { computed, ref } from 'vue';
-import { codexClawApi } from './platform-api';
+import { appApi } from './platform-api';
 
 export function createAgentHistoryState(options: {
   adoptSnapshot: (snapshot: AppSnapshot) => void;
@@ -43,12 +43,12 @@ export function createAgentHistoryState(options: {
 
   async function hydrate(agentId: string): Promise<void> {
     const agent = options.getSnapshot().agents.find((candidate) => candidate.id === agentId);
-    if (!agent?.backendSession || !codexClawApi?.loadConversationHistory || hydratingAgentIds.value.has(agent.id)) {
+    if (!agent?.backendSession || !appApi?.loadConversationHistory || hydratingAgentIds.value.has(agent.id)) {
       return;
     }
     markHydrating(agent.id, true);
     try {
-      options.adoptSnapshot(await codexClawApi.loadConversationHistory(agent.id));
+      options.adoptSnapshot(await appApi.loadConversationHistory(agent.id));
       options.synchronizeComposerSelection(agent.id);
     } catch (error) {
       failedAgentIds.value = new Set(failedAgentIds.value).add(agent.id);
@@ -68,12 +68,12 @@ export function createAgentHistoryState(options: {
   }
 
   async function loadOlder(agentId: string): Promise<void> {
-    if (!codexClawApi?.loadOlderAgentHistory || loadingOlderAgentIds.value.has(agentId)) return;
+    if (!appApi?.loadOlderAgentHistory || loadingOlderAgentIds.value.has(agentId)) return;
     const next = new Set(loadingOlderAgentIds.value);
     next.add(agentId);
     loadingOlderAgentIds.value = next;
     try {
-      const result = await codexClawApi.loadOlderAgentHistory(agentId) as AgentHistoryLoadResult;
+      const result = await appApi.loadOlderAgentHistory(agentId) as AgentHistoryLoadResult;
       hasOlderByAgentId.value = { ...hasOlderByAgentId.value, [agentId]: result.hasOlder };
     } finally {
       const remaining = new Set(loadingOlderAgentIds.value);

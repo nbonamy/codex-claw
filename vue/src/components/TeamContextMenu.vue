@@ -15,7 +15,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { Team } from '@codex-claw/core/contracts';
+import type { Team } from '@workspace/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { ExternalLinkIcon, PencilIcon, Trash2Icon, X } from '../shared/icons/app-icons';

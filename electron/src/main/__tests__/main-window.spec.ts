@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 import {
@@ -14,20 +15,20 @@ describe('main window options', () => {
     expect(createMainWindowOptions(false).webPreferences?.devTools).toBe(true);
   });
 
-  it('admits only isolated Claw browser guests with no preload or Node access', () => {
+  it(`admits only isolated ${product.name} browser guests with no preload or Node access`, () => {
     const deny = { preventDefault: vi.fn() };
     const preferences = {
       preload: '/tmp/untrusted.js', nodeIntegration: true, sandbox: false, webviewTag: true,
     };
     secureBrowserGuestAttachment(deny, preferences, {
-      src: 'about:blank', partition: 'persist:codex-claw-browser-agent-one', preload: '/tmp/untrusted.js', allowpopups: '',
+      src: 'about:blank', partition: 'persist:agent-workspace-browser-agent-one', preload: '/tmp/untrusted.js', allowpopups: '',
     });
     expect(deny.preventDefault).not.toHaveBeenCalled();
     expect(preferences).toMatchObject({ nodeIntegration: false, sandbox: true, webviewTag: false });
     expect(preferences).not.toHaveProperty('preload');
 
     const reject = { preventDefault: vi.fn() };
-    secureBrowserGuestAttachment(reject, {}, { src: 'https://example.com', partition: 'persist:codex-claw-browser-agent-one' });
+    secureBrowserGuestAttachment(reject, {}, { src: 'https://example.com', partition: 'persist:agent-workspace-browser-agent-one' });
     expect(reject.preventDefault).toHaveBeenCalledOnce();
     reject.preventDefault.mockClear();
     secureBrowserGuestAttachment(reject, {}, { src: 'about:blank', partition: 'persist:untrusted' });
@@ -89,11 +90,11 @@ describe('main window options', () => {
   it('opens safe external URLs in the system browser while denying the popup', () => {
     const opened: string[] = [];
 
-    expect(handleExternalWindowOpen('https://github.com/nbonamy/codex-claw/issues/12', (url) => {
+    expect(handleExternalWindowOpen('https://github.com/nbonamy/agent-workspace/issues/12', (url) => {
       opened.push(url);
     })).toStrictEqual({ action: 'deny' });
 
-    expect(opened).toStrictEqual(['https://github.com/nbonamy/codex-claw/issues/12']);
+    expect(opened).toStrictEqual(['https://github.com/nbonamy/agent-workspace/issues/12']);
   });
 
   it('denies non-http window opens without opening them externally', () => {

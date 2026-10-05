@@ -1,8 +1,8 @@
-import { approvalAgentRequest } from '@codex-claw/core/agent-request';
+import { approvalAgentRequest } from '@workspace/core/agent-request';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { ClawBackendServer } from '../server';
+import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import type { AgentGitService } from '../git/agent-git-service';
 import { CodexBackendDriver } from '../codex/codex-driver';
@@ -11,7 +11,7 @@ import {
   createTestSnapshot,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
   afterEach(() => vi.useRealTimers());
 
   it('coalesces active workspace changes during a turn and refreshes again at completion', async () => {
@@ -24,11 +24,11 @@ describe('ClawBackendServer', () => {
         id: 'agent-dina',
         teamId: 'team-test',
         name: 'Dina',
-        folder: '/Users/nbonamy/src/codex-claw',
+        folder: '/Users/nbonamy/src/agent-workspace',
         workspace: {
-          kind: 'git', folder: '/Users/nbonamy/src/codex-claw', repositoryName: 'codex-claw',
-          repositoryRoot: '/Users/nbonamy/src/codex-claw', branch: 'main', isLinkedWorktree: false,
-          primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw', updatedAt: '',
+          kind: 'git', folder: '/Users/nbonamy/src/agent-workspace', repositoryName: 'agent-workspace',
+          repositoryRoot: '/Users/nbonamy/src/agent-workspace', branch: 'main', isLinkedWorktree: false,
+          primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace', updatedAt: '',
         },
         backend: 'codex',
         status: { type: 'working' },
@@ -50,7 +50,7 @@ describe('ClawBackendServer', () => {
     ];
     let emitEvent: (event: BackendEvent) => void = () => undefined;
     const getGitStatus = vi.fn().mockResolvedValue({
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       branch: 'main',
       ahead: 0,
       behind: 0,
@@ -74,7 +74,7 @@ describe('ClawBackendServer', () => {
       },
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -91,7 +91,7 @@ describe('ClawBackendServer', () => {
       payload: {
         messageId: 'assistant-turn-test',
         itemId: 'edit-file',
-        path: '/Users/nbonamy/src/codex-claw/README.md',
+        path: '/Users/nbonamy/src/agent-workspace/README.md',
         action: 'edit',
         status: 'completed',
       },
@@ -192,7 +192,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'working' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -214,7 +214,7 @@ describe('ClawBackendServer', () => {
       close: async () => undefined,
     };
     const events: unknown[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -257,7 +257,7 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'working' },
       createdAt: '2026-06-13T00:00:00.000Z',
@@ -274,7 +274,7 @@ describe('ClawBackendServer', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as CodexSurfaceAgentAdapter;
     const driver = new CodexBackendDriver(adapter);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -325,7 +325,7 @@ describe('ClawBackendServer', () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const onEvent = vi.fn();
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -360,7 +360,7 @@ describe('ClawBackendServer', () => {
   it('defers high-frequency turn metadata persistence until completion', async () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -391,7 +391,7 @@ describe('ClawBackendServer', () => {
   it('persists subagent state as soon as semantic activity arrives', async () => {
     const snapshot = createTestSnapshot();
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({ version: 'test-version', pid: 123, snapshot, saveSnapshot });
+    const server = new AppBackendServer({ version: 'test-version', pid: 123, snapshot, saveSnapshot });
 
     server.emitEvent({
       agentId: 'agent-dina',
@@ -462,14 +462,14 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
     const events: unknown[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -504,14 +504,14 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
     }];
     const events: unknown[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,

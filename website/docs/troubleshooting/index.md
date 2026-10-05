@@ -15,7 +15,7 @@ Development builds have additional runtime and SDK requirements described in the
 ## A provider will not connect
 
 1. Open **Settings → Codex** or **Settings → Claude Code** for the failing engine.
-2. Check the selected setup location. A successful login in your normal command-line environment does not authenticate a separate Claw setup.
+2. Check the selected setup location. A successful login in your normal command-line environment does not authenticate a separate Korus setup.
 3. Complete the authentication flow for that selected location. A detected engine and a connected account are separate states.
 4. Confirm the engine is enabled. The initial **Continue** button needs at least one installed, connected, enabled engine.
 
@@ -23,13 +23,13 @@ See the [Codex](../providers/codex) or [Claude Code](../providers/claude-code) g
 
 ## My previous conversations are missing after changing setup
 
-Check whether you changed **Location** between **Separate Claw chats** and **Use existing setup**. Those environments have different provider history and authentication. The location-switch flow can remove the affected local Claw agents and Quick Chats after you acknowledge it; it does not migrate their history into the new location.
+Check whether you changed **Location** between **Separate Korus chats** and **Use existing setup**. Those environments have different provider history and authentication. The location-switch flow can remove the affected local Korus agents and Quick Chats after you acknowledge it; it does not migrate their history into the new location.
 
 Read the [provider setup overview](../providers/) before making another change. Preserve any repository edits independently of the conversation history.
 
-## GitHub works in another app but not in Claw
+## GitHub works in another app but not in Korus
 
-Provider authentication and Claw's GitHub integration are separate connections. Open **Settings → Integrations** and complete Claw's GitHub authorization. Check that the authorized account can access the intended repository.
+Provider authentication and Korus's GitHub integration are separate connections. Open **Settings → Integrations** and complete Korus's GitHub authorization. Check that the authorized account can access the intended repository.
 
 If you skipped GitHub during onboarding, local folder tasks still work. Connect GitHub when you need repository browsing, issue and pull-request intake, or Automations.
 
@@ -57,7 +57,7 @@ Enable the capability in **Settings → Plugins**, then check **Settings → Gen
 
 ## Work stops when the app closes
 
-Check **Settings → General → Keep Codex Claw ready in the background** and its reported daemon status. Distinguish closing the desktop window from intentionally stopping the background service.
+Check **Settings → General → Keep Korus ready in the background** and its reported daemon status. Distinguish closing the desktop window from intentionally stopping the background service.
 
 When you return, inspect the conversation for an approval, question, or provider error before submitting the same instruction again. Preventing sleep while agents run is a separate General setting.
 

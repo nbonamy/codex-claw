@@ -101,10 +101,10 @@ describe('backend driver helpers', () => {
 function agent(backend: Agent['backend']): Agent {
   return {
     id: 'agent-dina',
-    teamId: 'team-claw',
+    teamId: 'team-app',
     name: 'Dina',
     avatar: 'DI',
-    folder: '/tmp/claw',
+    folder: '/tmp/app',
     backend,
     backendDefaults: backend === 'codex' ? { kind: 'codex' } : { kind: 'claude' },
     status: { type: 'idle' },

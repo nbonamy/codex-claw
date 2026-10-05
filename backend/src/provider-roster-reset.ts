@@ -1,6 +1,6 @@
-import type { AgentBackend, AppSnapshot } from '@codex-claw/core/contracts';
-import { closeAgentInSnapshot } from '@codex-claw/core/agent-manager';
-import { AppError } from '@codex-claw/core/app-error';
+import type { AgentBackend, AppSnapshot } from '@workspace/core/contracts';
+import { closeAgentInSnapshot } from '@workspace/core/agent-manager';
+import { AppError } from '@workspace/core/app-error';
 
 export function localProviderAgents(snapshot: AppSnapshot, backend: AgentBackend) {
   const remoteTeams = new Set(snapshot.teams.filter(team => team.remoteConnectionId).map(team => team.id));

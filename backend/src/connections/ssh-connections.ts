@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { access, readFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import type { AddSshConnectionInput, ClaudeAuthentication, RemoteConnection, SshHostCandidate } from '@codex-claw/core/contracts';
-import { createEntityId } from '@codex-claw/core/ids';
+import type { AddSshConnectionInput, ClaudeAuthentication, RemoteConnection, SshHostCandidate } from '@workspace/core/contracts';
+import { createEntityId } from '@workspace/core/ids';
 import { backendProviderTokensFilePath } from '../state';
 import { remoteCodexVersionCommand } from './remote-codex-install';
 import { remoteClaudeAuthenticationCommand, remoteClaudeInstallCommand, remoteClaudeVersionCommand } from './remote-claude-install';
@@ -26,8 +27,8 @@ export type SshConnectionDependencies = {
   providerTokensFilePath?: string;
 };
 
-const remoteClawdPath = '~/.codex-claw/clawd.mjs';
-const remoteProviderTokensPath = '~/.codex-claw/provider-tokens.json';
+const remoteDaemonPath = `~/${product.homeDirectory}/daemon.mjs`;
+const remoteProviderTokensPath = `~/${product.homeDirectory}/provider-tokens.json`;
 const connectTimeoutMs = 15_000;
 
 export class SshConnectionService {
@@ -63,16 +64,16 @@ export class SshConnectionService {
     };
 
     try {
-      await this.installRemoteClawd(next.host);
+      await this.installRemoteDaemon(next.host);
       await this.syncRemoteProviderTokens(next.host);
-      const clawdVersion = await this.remoteClawdVersion(next.host);
+      const daemonVersion = await this.remoteDaemonVersion(next.host);
       const codexVersion = await this.remoteCodexVersion(next.host, connection.codexVersion).catch(() => undefined);
       const claudeVersion = await this.remoteClaudeVersion(next.host).catch(() => undefined);
-      const runtimeVersions = [`clawd ${clawdVersion}`, ...(codexVersion ? [`Codex ${codexVersion}`] : []), ...(claudeVersion ? [`Claude ${claudeVersion}`] : [])];
+      const runtimeVersions = [`daemon ${daemonVersion}`, ...(codexVersion ? [`Codex ${codexVersion}`] : []), ...(claudeVersion ? [`Claude ${claudeVersion}`] : [])];
       next = {
         ...next,
         status: 'ready',
-        ...(clawdVersion ? { clawdVersion } : {}),
+        ...(daemonVersion ? { daemonVersion } : {}),
         codexVersion,
         detail: `Ready (${runtimeVersions.join(', ')})`,
         installedAt: checkedAt,
@@ -95,11 +96,11 @@ export class SshConnectionService {
   }
 
   async inspectVersions(connection: RemoteConnection): Promise<RemoteConnection> {
-    const [clawdVersion, codexVersion] = await Promise.all([
-      this.remoteClawdVersion(connection.host),
+    const [daemonVersion, codexVersion] = await Promise.all([
+      this.remoteDaemonVersion(connection.host),
       this.remoteCodexVersion(connection.host, connection.codexVersion).catch(() => undefined),
     ]);
-    const runtimeVersions = [`clawd ${clawdVersion}`, `Codex ${codexVersion || 'unknown'}`];
+    const runtimeVersions = [`daemon ${daemonVersion}`, `Codex ${codexVersion || 'unknown'}`];
     let claudeWarning = '';
     {
       try {
@@ -108,7 +109,7 @@ export class SshConnectionService {
         claudeWarning = `; Claude unavailable: ${error instanceof Error ? error.message : String(error)}`;
       }
     }
-    return { ...connection, clawdVersion, codexVersion,
+    return { ...connection, daemonVersion, codexVersion,
       detail: `Ready (${runtimeVersions.join(', ')})${claudeWarning}` };
   }
 
@@ -149,23 +150,23 @@ export class SshConnectionService {
     return /^codex-cli\s+(\S+)/u.exec(result.stdout.trim())?.[1] ?? '';
   }
 
-  private async installRemoteClawd(host: string): Promise<void> {
-    const localClawd = await this.resolveLocalClawdScript();
+  private async installRemoteDaemon(host: string): Promise<void> {
+    const localDaemon = await this.resolveLocalDaemonScript();
     await this.run('ssh', [
       '-o',
       'BatchMode=yes',
       '-o',
       'ConnectTimeout=10',
       host,
-      'mkdir -p ~/.codex-claw',
+      `mkdir -p ~/${product.homeDirectory}`,
     ]);
     await this.run('scp', [
       '-o',
       'BatchMode=yes',
       '-o',
       'ConnectTimeout=10',
-      localClawd,
-      `${host}:~/.codex-claw/clawd.mjs.tmp`,
+      localDaemon,
+      `${host}:~/${product.homeDirectory}/daemon.mjs.tmp`,
     ]);
     await this.run('ssh', [
       '-o',
@@ -173,7 +174,7 @@ export class SshConnectionService {
       '-o',
       'ConnectTimeout=10',
       host,
-      `mv ~/.codex-claw/clawd.mjs.tmp ${remoteClawdPath} && chmod 600 ${remoteClawdPath}`,
+      `mv ~/${product.homeDirectory}/daemon.mjs.tmp ${remoteDaemonPath} && chmod 600 ${remoteDaemonPath}`,
     ]);
   }
 
@@ -202,7 +203,7 @@ export class SshConnectionService {
       '-o',
       'ConnectTimeout=10',
       localProviderTokens,
-      `${host}:~/.codex-claw/provider-tokens.json.tmp`,
+      `${host}:~/${product.homeDirectory}/provider-tokens.json.tmp`,
     ]);
     await this.run('ssh', [
       '-o',
@@ -210,25 +211,25 @@ export class SshConnectionService {
       '-o',
       'ConnectTimeout=10',
       host,
-      `mv ~/.codex-claw/provider-tokens.json.tmp ${remoteProviderTokensPath} && chmod 600 ${remoteProviderTokensPath}`,
+      `mv ~/${product.homeDirectory}/provider-tokens.json.tmp ${remoteProviderTokensPath} && chmod 600 ${remoteProviderTokensPath}`,
     ]);
   }
 
-  private async remoteClawdVersion(host: string): Promise<string> {
+  private async remoteDaemonVersion(host: string): Promise<string> {
     const result = await this.run('ssh', [
       '-o',
       'BatchMode=yes',
       '-o',
       'ConnectTimeout=10',
       host,
-      `node ${remoteClawdPath} --version`,
+      `node ${remoteDaemonPath} --version`,
     ]);
-    return result.stdout.trim().replace(/^clawd\s+/u, '');
+    return result.stdout.trim().replace(/^daemon\s+/u, '');
   }
 
-  private async resolveLocalClawdScript(): Promise<string> {
+  private async resolveLocalDaemonScript(): Promise<string> {
     const candidates = [
-      path.join(this.deps.assetsPath ?? process.env.CODEX_CLAW_ASSETS_PATH ?? path.resolve(process.cwd(), 'assets'), 'clawd', 'clawd.mjs'),
+      path.join(this.deps.assetsPath ?? process.env.APP_ASSETS_PATH ?? path.resolve(process.cwd(), 'assets'), 'daemon', 'daemon.mjs'),
       this.deps.argv?.[1] ?? process.argv[1],
     ].filter((candidate): candidate is string => Boolean(candidate && candidate.endsWith('.mjs')));
 
@@ -241,7 +242,7 @@ export class SshConnectionService {
       }
     }
 
-    throw new Error('No bundled clawd script was found to install on the remote host.');
+    throw new Error('No bundled daemon script was found to install on the remote host.');
   }
 
   private run(command: string, args: string[]): Promise<ExecResult> {
@@ -298,8 +299,8 @@ export function sshStdioTransport(host: string, codexVersion?: string): RemoteCo
     args: [
       host,
       codexVersion
-        ? `CODEX_CLAW_BUNDLED_CODEX_PATH="$HOME/.codex-claw/codex/${codexVersion}/bin/codex" exec node ${remoteClawdPath} --stdio`
-        : `node ${remoteClawdPath} connect || exec node ${remoteClawdPath} --stdio`,
+        ? `APP_BUNDLED_CODEX_PATH="$HOME/${product.homeDirectory}/codex/${codexVersion}/bin/codex" exec node ${remoteDaemonPath} --stdio`
+        : `node ${remoteDaemonPath} connect || exec node ${remoteDaemonPath} --stdio`,
     ],
   };
 }

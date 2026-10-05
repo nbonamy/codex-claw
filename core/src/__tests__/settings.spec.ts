@@ -150,26 +150,26 @@ describe('settings contracts', () => {
   it('normalizes and updates repository icons by canonical repository root', () => {
     expect(normalizeGeneralSettings({
       repositoryIcons: {
-        ' /src/codex-claw ': ' 🦞 ',
+        ' /src/agent-workspace ': ' 🦞 ',
         '': '🚫',
         '/src/invalid': 12,
       },
-    }).repositoryIcons).toStrictEqual({ '/src/codex-claw': '🦞' });
+    }).repositoryIcons).toStrictEqual({ '/src/agent-workspace': '🦞' });
 
     const snapshot = createEmptySnapshot();
     updateSettingsInSnapshot(snapshot, {
-      general: { repositoryIcons: { '/src/codex-claw': '🦞' } },
+      general: { repositoryIcons: { '/src/agent-workspace': '🦞' } },
     });
-    expect(snapshot.general.repositoryIcons).toStrictEqual({ '/src/codex-claw': '🦞' });
+    expect(snapshot.general.repositoryIcons).toStrictEqual({ '/src/agent-workspace': '🦞' });
   });
 
   it('migrates credential-bearing repository icon keys to canonical remote identities', () => {
     expect(normalizeGeneralSettings({
       repositoryIcons: {
-        'https://oauth2:secret@github.com/openai/codex-claw.git': '🦞',
+        'https://oauth2:secret@github.com/openai/agent-workspace.git': '🦞',
       },
     }).repositoryIcons).toStrictEqual({
-      'remote:github.com/openai/codex-claw': '🦞',
+      'remote:github.com/openai/agent-workspace': '🦞',
     });
   });
 

@@ -1,8 +1,8 @@
-import type { CodexClawApi } from '@codex-claw/core/contracts';
+import type { AppApi } from '@workspace/core/contracts';
 
 declare global {
   interface Window {
-    codexClaw?: CodexClawApi;
+    app?: AppApi;
   }
 }
 

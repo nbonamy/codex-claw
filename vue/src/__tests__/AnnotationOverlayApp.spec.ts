@@ -10,8 +10,8 @@ describe('AnnotationOverlayApp', () => {
     window.history.replaceState({}, '', '/?token=annotation-1&description=Save&anchor=%7B%22x%22%3A20%2C%22y%22%3A30%2C%22width%22%3A40%2C%22height%22%3A50%7D');
     const browserResolveAnnotation = vi.fn().mockResolvedValue(undefined);
     vi.resetModules();
-    const { configureClawClient } = await import('../platform-api');
-    configureClawClient({
+    const { configureAppClient } = await import('../platform-api');
+    configureAppClient({
       api: { browserResolveAnnotation } as never,
       platform: 'desktop',
     });
@@ -35,8 +35,8 @@ describe('AnnotationOverlayApp', () => {
     window.history.replaceState({}, '', '/?anchor=not-json');
     const browserResolveAnnotation = vi.fn();
     vi.resetModules();
-    const { configureClawClient } = await import('../platform-api');
-    configureClawClient({
+    const { configureAppClient } = await import('../platform-api');
+    configureAppClient({
       api: { browserResolveAnnotation } as never,
       platform: 'desktop',
     });

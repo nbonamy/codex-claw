@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { Agent } from '@codex-claw/core/contracts';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { Agent } from '@workspace/core/contracts';
 import type { DelegatedWorkReportPort } from '../../agents/delegated-work-report-service';
 import type { AgentGitService } from '../agent-git-service';
 import { AgentGitWorkflowService, parseAgentGitRequest } from '../agent-git-workflow-service';

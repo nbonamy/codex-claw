@@ -7,7 +7,7 @@
       </div>
       <button
         v-if="openSelectedCount && canRemediate"
-        class="claw-button claw-button--primary"
+        class="app-button app-button--primary"
         type="button"
         :disabled="busy"
         @click="fixSelected"
@@ -16,7 +16,7 @@
       </button>
       <button
         v-else-if="canRerunReview"
-        class="claw-button claw-button--primary"
+        class="app-button app-button--primary"
         type="button"
         :disabled="busy"
         @click="rerunReview"
@@ -44,8 +44,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Mission, MissionReviewFinding } from '@codex-claw/core/missions';
-import type { MissionExecutionInput } from '@codex-claw/core/mission-execution';
+import type { Mission, MissionReviewFinding } from '@workspace/core/missions';
+import type { MissionExecutionInput } from '@workspace/core/mission-execution';
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 
 const props = defineProps<{

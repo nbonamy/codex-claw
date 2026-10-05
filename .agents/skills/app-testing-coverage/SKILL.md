@@ -1,9 +1,9 @@
 ---
-name: codex-claw-testing-coverage
-description: Use when adding tests, fixing failing tests, raising coverage, changing IPC/app contracts, testing Vue components in isolation, or verifying Codex Claw desktop behavior.
+name: app-testing-coverage
+description: Use when adding tests, fixing failing tests, raising coverage, changing IPC/app contracts, testing Vue components in isolation, or verifying Korus desktop behavior.
 ---
 
-# Codex Claw Testing And Coverage
+# Korus Testing And Coverage
 
 Use this skill when adding tests, fixing failing tests, raising coverage, or
 changing contracts.
@@ -21,7 +21,7 @@ owning public seam, the test does not belong.
 - Match test scope to risk.
 - Use focused tests while iterating, then run the full relevant gate.
 - For provider integration, fake the public Codex app SDK or Claude Agent SDK
-  and exercise the real Claw adapter/backend. For application integration, fake
+  and exercise the real Korus adapter/backend. For application integration, fake
   the unified backend and exercise real app state and representative mounted UI.
   Use the fixtures and ownership rules in `docs/testing.md`.
 - For provider-independent services, test their own external boundary: Electron

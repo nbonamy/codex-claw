@@ -3,7 +3,7 @@ import { defineComponent, h, reactive } from 'vue';
 import { describe, expect, it } from 'vitest';
 import { ElOption, ElSelect } from 'element-plus';
 import 'element-plus/theme-chalk/el-select.css';
-import type { WorkIntegrationConnection, WorkProviderKind } from '@codex-claw/core/contracts';
+import type { WorkIntegrationConnection, WorkProviderKind } from '@workspace/core/contracts';
 import BacklogSourceSelector from '../BacklogSourceSelector.vue';
 import { useBacklogProviders } from '../backlog-providers';
 

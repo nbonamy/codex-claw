@@ -1,6 +1,6 @@
-import type { Agent } from '@codex-claw/core/contracts';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
-import { agentConversationId, type PlanReviewResponse } from '@codex-claw/core/plan-review';
+import type { Agent } from '@workspace/core/contracts';
+import type { BackendEvent } from '@workspace/core/backend-driver';
+import { agentConversationId, type PlanReviewResponse } from '@workspace/core/plan-review';
 
 /** App-owned decisions; provider transcripts remain owned by their adapters. */
 export class AgentPlanReviewService {

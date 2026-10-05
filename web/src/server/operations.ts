@@ -1,11 +1,12 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
-import type { ClientRequestResponse } from '@codex-claw/core/contracts';
-import type { UpdateSettingsInput } from '@codex-claw/core/contracts';
-import { splitSettingsInput } from '@codex-claw/core/client-preferences';
-import type { ClawSnapshotGetResult } from '@codex-claw/core/backend-protocol/rpc';
+import { product } from '@workspace/core/product';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { agentResponseFromClientResponse } from '@workspace/core/agent-request';
+import type { ClientRequestResponse } from '@workspace/core/contracts';
+import type { UpdateSettingsInput } from '@workspace/core/contracts';
+import { splitSettingsInput } from '@workspace/core/client-preferences';
+import type { AppSnapshotGetResult } from '@workspace/core/backend-protocol/rpc';
 
-export type ClawBackendPort = {
+export type AppBackendPort = {
   request<Result>(method: string, params?: unknown): Promise<Result>;
 };
 
@@ -150,8 +151,8 @@ const desktopOnlyOperations = new Set([
   'openScreenRecordingSettings', 'quit', 'reloadRenderer', 'restartApp', 'setDaemonEnabled', 'setDockBadgeCount',
 ]);
 
-export async function invokeClawWebOperation(
-  backend: ClawBackendPort,
+export async function invokeAppWebOperation(
+  backend: AppBackendPort,
   operation: string,
   args: unknown[],
 ): Promise<unknown> {
@@ -160,7 +161,7 @@ export async function invokeClawWebOperation(
     let result: unknown;
     if (Object.keys(policy).length) result = await backend.request(backendMethods.settingsUpdate, { input: policy });
     if (Object.keys(preferences).length) result = await backend.request(backendMethods.clientPreferencesUpdate, { input: preferences });
-    return result ?? (await backend.request<ClawSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
+    return result ?? (await backend.request<AppSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
   }
   if (operation === 'checkRemoteConnection') {
     return backend.request(args[1] === true ? backendMethods.connectionsRuntimeInspect : backendMethods.connectionsRuntimeSync, { connectionId: args[0] });
@@ -170,10 +171,10 @@ export async function invokeClawWebOperation(
     return backend.request(input.remoteTeamId ? backendMethods.teamConnect : backendMethods.teamCreate, { input });
   }
   if (operation === 'getSnapshot') {
-    return (await backend.request<ClawSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
+    return (await backend.request<AppSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
   }
   if (operation === 'getSnapshotState') {
-    const state = await backend.request<ClawSnapshotGetResult>(backendMethods.snapshotGet);
+    const state = await backend.request<AppSnapshotGetResult>(backendMethods.snapshotGet);
     return {
       snapshot: state.snapshot,
       lastBackendEventSeq: state.lastEventSeq,
@@ -184,16 +185,16 @@ export async function invokeClawWebOperation(
     return snapshotForLocation(backend, backendMethods.snapshotAutomationsGet, args[0]);
   }
   if (desktopOnlyOperations.has(operation)) {
-    throw new Error(`'${operation}' is not available in Claw Web.`);
+    throw new Error(`'${operation}' is not available in ${product.name} Web.`);
   }
   const definition = directOperations[operation];
-  if (!definition) throw new Error(`Unknown Claw web operation: ${operation}`);
+  if (!definition) throw new Error(`Unknown ${product.name} web operation: ${operation}`);
   return backend.request(definition[0], definition[1]?.(args));
 }
 
-async function snapshotForLocation(backend: ClawBackendPort, method: string, location: unknown): Promise<unknown> {
+async function snapshotForLocation(backend: AppBackendPort, method: string, location: unknown): Promise<unknown> {
   if (isRecord(location) && location.kind === 'remote') return backend.request(method, { location });
-  return (await backend.request<ClawSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
+  return (await backend.request<AppSnapshotGetResult>(backendMethods.snapshotGet)).snapshot;
 }
 
 function named(...names: string[]): ParamsFactory {

@@ -17,36 +17,36 @@ import type {
 } from '../contracts';
 import { isAppSnapshot, isClientState } from '../snapshot-guards';
 
-export type { ClawBackendEvent } from './events';
+export type { AppBackendEvent } from './events';
 
-export type ClawRpcId = string | number;
+export type AppRpcId = string | number;
 
-export type ClawRpcRequest = {
+export type AppRpcRequest = {
   jsonrpc: '2.0';
-  id: ClawRpcId;
+  id: AppRpcId;
   method: string;
   params?: unknown;
 };
 
-export type ClawRpcNotification = {
+export type AppRpcNotification = {
   jsonrpc: '2.0';
   method: string;
   params?: unknown;
 };
 
-export type ClawRpcError = {
+export type AppRpcError = {
   code: number;
   message: string;
   data?: unknown;
 };
 
-export type ClawRpcResponse =
-  | { jsonrpc: '2.0'; id: ClawRpcId | null; result: unknown }
-  | { jsonrpc: '2.0'; id: ClawRpcId | null; error: ClawRpcError };
+export type AppRpcResponse =
+  | { jsonrpc: '2.0'; id: AppRpcId | null; result: unknown }
+  | { jsonrpc: '2.0'; id: AppRpcId | null; error: AppRpcError };
 
-export type ClawRpcMessage = ClawRpcRequest | ClawRpcNotification | ClawRpcResponse;
+export type AppRpcMessage = AppRpcRequest | AppRpcNotification | AppRpcResponse;
 
-export const clawRpcErrorCodes = {
+export const appRpcErrorCodes = {
   parseError: -32700,
   invalidRequest: -32600,
   methodNotFound: -32601,
@@ -56,20 +56,20 @@ export const clawRpcErrorCodes = {
   timeout: -32001,
 } as const;
 
-export type ClawBackendHealth = {
+export type AppBackendHealth = {
   ok: true;
-  name: 'clawd';
+  name: 'daemon';
   version: string;
   pid: number;
 };
 
-export type ClawSnapshotGetResult = {
+export type AppSnapshotGetResult = {
   snapshot: AppSnapshot;
   lastEventSeq: number;
   clientState: ClientState;
 };
 
-export type ClawBackendRequestMap = {
+export type AppBackendRequestMap = {
   [backendMethods.agentVisualizeStart]: {
     params: { agentId: string; input?: import('../visualize').StartVisualizeInput };
     result: AppSnapshot;
@@ -120,11 +120,11 @@ export type ClawBackendRequestMap = {
   };
   [backendMethods.backendHealthGet]: {
     params: undefined;
-    result: ClawBackendHealth;
+    result: AppBackendHealth;
   };
   [backendMethods.snapshotGet]: {
     params: undefined;
-    result: ClawSnapshotGetResult;
+    result: AppSnapshotGetResult;
   };
   [backendMethods.clientStateGet]: {
     params: undefined;
@@ -180,44 +180,44 @@ export type ClawBackendRequestMap = {
   };
 };
 
-export type ClawBackendRequestMethod = keyof ClawBackendRequestMap;
-export type ClawBackendRequestParams<Method extends ClawBackendRequestMethod> = ClawBackendRequestMap[Method]['params'];
-export type ClawBackendRequestResult<Method extends ClawBackendRequestMethod> = ClawBackendRequestMap[Method]['result'];
+export type AppBackendRequestMethod = keyof AppBackendRequestMap;
+export type AppBackendRequestParams<Method extends AppBackendRequestMethod> = AppBackendRequestMap[Method]['params'];
+export type AppBackendRequestResult<Method extends AppBackendRequestMethod> = AppBackendRequestMap[Method]['result'];
 
-export type ClawBackendRequestPort = {
+export type AppBackendRequestPort = {
   request<Result>(method: string, params?: unknown): Promise<Result>;
 };
 
-export function requestClawBackend<Method extends ClawBackendRequestMethod>(
-  client: ClawBackendRequestPort,
+export function requestAppBackend<Method extends AppBackendRequestMethod>(
+  client: AppBackendRequestPort,
   method: Method,
-  ...args: ClawBackendRequestParams<Method> extends undefined
+  ...args: AppBackendRequestParams<Method> extends undefined
     ? [params?: undefined]
-    : [params: ClawBackendRequestParams<Method>]
-): Promise<ClawBackendRequestResult<Method>> {
-  return client.request<ClawBackendRequestResult<Method>>(method, args[0]);
+    : [params: AppBackendRequestParams<Method>]
+): Promise<AppBackendRequestResult<Method>> {
+  return client.request<AppBackendRequestResult<Method>>(method, args[0]);
 }
 
-export function isClawSnapshotGetResult(value: unknown): value is ClawSnapshotGetResult {
+export function isAppSnapshotGetResult(value: unknown): value is AppSnapshotGetResult {
   return isRecord(value) &&
     isAppSnapshot(value.snapshot) &&
     typeof value.lastEventSeq === 'number' &&
     isClientState(value.clientState);
 }
 
-export function isClawRpcRequest(message: ClawRpcMessage): message is ClawRpcRequest {
+export function isAppRpcRequest(message: AppRpcMessage): message is AppRpcRequest {
   return 'id' in message && 'method' in message;
 }
 
-export function isClawRpcNotification(message: ClawRpcMessage): message is ClawRpcNotification {
+export function isAppRpcNotification(message: AppRpcMessage): message is AppRpcNotification {
   return !('id' in message) && 'method' in message;
 }
 
-export function isClawRpcResponse(message: ClawRpcMessage): message is ClawRpcResponse {
+export function isAppRpcResponse(message: AppRpcMessage): message is AppRpcResponse {
   return 'id' in message && ('result' in message || 'error' in message);
 }
 
-export function createClawRpcResult(id: ClawRpcId | null, result: unknown): ClawRpcResponse {
+export function createAppRpcResult(id: AppRpcId | null, result: unknown): AppRpcResponse {
   return {
     jsonrpc: '2.0',
     id,
@@ -225,19 +225,19 @@ export function createClawRpcResult(id: ClawRpcId | null, result: unknown): Claw
   };
 }
 
-export function createClawRpcRequest(id: ClawRpcId, method: string, params?: unknown): ClawRpcRequest {
+export function createAppRpcRequest(id: AppRpcId, method: string, params?: unknown): AppRpcRequest {
   return params === undefined
     ? { jsonrpc: '2.0', id, method }
     : { jsonrpc: '2.0', id, method, params };
 }
 
-export function createClawRpcNotification(method: string, params?: unknown): ClawRpcNotification {
+export function createAppRpcNotification(method: string, params?: unknown): AppRpcNotification {
   return params === undefined
     ? { jsonrpc: '2.0', method }
     : { jsonrpc: '2.0', method, params };
 }
 
-export function createClawRpcError(id: ClawRpcId | null, code: number, message: string, data?: unknown): ClawRpcResponse {
+export function createAppRpcError(id: AppRpcId | null, code: number, message: string, data?: unknown): AppRpcResponse {
   return {
     jsonrpc: '2.0',
     id,
@@ -245,19 +245,19 @@ export function createClawRpcError(id: ClawRpcId | null, code: number, message: 
   };
 }
 
-export function parseClawRpcMessage(input: unknown): ClawRpcMessage {
+export function parseAppRpcMessage(input: unknown): AppRpcMessage {
   if (!isRecord(input) || input.jsonrpc !== '2.0') {
-    throw new ClawRpcValidationError('Invalid JSON-RPC message.');
+    throw new AppRpcValidationError('Invalid JSON-RPC message.');
   }
 
   if ('method' in input) {
     if (typeof input.method !== 'string' || input.method.length === 0) {
-      throw new ClawRpcValidationError('JSON-RPC method must be a non-empty string.');
+      throw new AppRpcValidationError('JSON-RPC method must be a non-empty string.');
     }
 
     if ('id' in input) {
-      if (!isClawRpcId(input.id)) {
-        throw new ClawRpcValidationError('JSON-RPC request id must be a string or number.');
+      if (!isAppRpcId(input.id)) {
+        throw new AppRpcValidationError('JSON-RPC request id must be a string or number.');
       }
 
       return {
@@ -276,13 +276,13 @@ export function parseClawRpcMessage(input: unknown): ClawRpcMessage {
   }
 
   if ('id' in input && ('result' in input || 'error' in input)) {
-    if (input.id !== null && !isClawRpcId(input.id)) {
-      throw new ClawRpcValidationError('JSON-RPC response id must be a string, number, or null.');
+    if (input.id !== null && !isAppRpcId(input.id)) {
+      throw new AppRpcValidationError('JSON-RPC response id must be a string, number, or null.');
     }
 
     if ('error' in input) {
       if (!isRecord(input.error) || typeof input.error.code !== 'number' || typeof input.error.message !== 'string') {
-        throw new ClawRpcValidationError('JSON-RPC error response is malformed.');
+        throw new AppRpcValidationError('JSON-RPC error response is malformed.');
       }
 
       return {
@@ -303,13 +303,13 @@ export function parseClawRpcMessage(input: unknown): ClawRpcMessage {
     };
   }
 
-  throw new ClawRpcValidationError('JSON-RPC message must be a request, notification, or response.');
+  throw new AppRpcValidationError('JSON-RPC message must be a request, notification, or response.');
 }
 
-export class ClawRpcValidationError extends Error {
+export class AppRpcValidationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'ClawRpcValidationError';
+    this.name = 'AppRpcValidationError';
   }
 }
 
@@ -317,6 +317,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isClawRpcId(value: unknown): value is ClawRpcId {
+function isAppRpcId(value: unknown): value is AppRpcId {
   return typeof value === 'string' || typeof value === 'number';
 }

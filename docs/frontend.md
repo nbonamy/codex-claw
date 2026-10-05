@@ -1,6 +1,6 @@
 # Frontend
 
-Codex Claw's renderer is Vue 3 with TypeScript and Element Plus. This is a
+Korus's renderer is Vue 3 with TypeScript and Element Plus. This is a
 working guide for consistent implementation. Feature behavior and its history
 belong in tests; backend and process ownership belong in the architecture docs.
 
@@ -132,7 +132,7 @@ component is single-use.
 | Pointer-positioned context menu overlay | `AppContextMenu` | `vue/src/shared/menu/AppContextMenu.vue` |
 | Application launcher and icon catalog | `OpenInControl` | `vue/src/shared/OpenInControl.vue` |
 | Product glyphs, including GitHub | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
-| Dialog chrome and footer actions | `.claw-dialog`, `.claw-button` | `vue/src/styles/base.css` |
+| Dialog chrome and footer actions | `.app-dialog`, `.app-button` | `vue/src/styles/base.css` |
 | Form dialog structure and fields | `FormDialog`, `FormDialogField` | `vue/src/shared/dialog/` |
 | Searchable keyboard command palettes | `QuickOpenDialog` | `vue/src/shared/QuickOpenDialog.vue` |
 | Voice-enabled multiline input | `VoiceTextarea` | `vue/src/shared/VoiceTextarea.vue` |
@@ -160,17 +160,17 @@ creation dialogs must reuse it rather than read backend settings independently.
 
 Use `CodexConversationPane` from `@codex-app-sdk/vue` as the complete
 conversation and composer surface. Extend it through its controller, slots, and
-typed actions. Keep Claw's wrapper limited to app-state mapping and product
+typed actions. Keep Korus's wrapper limited to app-state mapping and product
 routing; the SDK retains its leaf UI, CSS, attachment, clipboard, and
 transcription code. A generic Codex interaction defect is an SDK defect: add the
 behavior and regression there, then keep only the host wiring and a boundary
-regression in Claw. Do not compensate with a second Claw-owned message,
+regression in Korus. Do not compensate with a second Korus-owned message,
 optimistic-state, paging, queue, or turn-mutation implementation.
 
 Codex panes receive the SDK-owned snapshot and invoke targeted SDK bridge
 operations for the pane's conversation. Claude panes receive the Claude host's
 provider snapshot. Never add a global message list or a provider-neutral
-conversation reducer to `app-state.ts`; Claw-only overlays should read the
+conversation reducer to `app-state.ts`; Korus-only overlays should read the
 provider frame or consume an explicit coordination projection.
 
 Split layouts contain equal conversation panes, never parent/child agents.
@@ -199,7 +199,7 @@ follow [Custom MCP Tools](custom-tools.md).
 - Form dialogs compose `FormDialog` and `FormDialogField`: a title and optional
   subtitle, one padded semantic body, labels above controls, and a divided
   footer. Form content adds no second outer gutter.
-- Footer actions use `.claw-button`: dismiss is tertiary, alternatives are
+- Footer actions use `.app-button`: dismiss is tertiary, alternatives are
   secondary, and at most one action is primary.
 - Searchable compact pickers use the filter as the complete top row. The body
   starts with loading, error, empty, or results; the accessible label carries
@@ -253,7 +253,7 @@ follow [Custom MCP Tools](custom-tools.md).
   is available. Timing may smooth completion, but it must not imply that a
   backend phase has completed before it actually has.
 - The in-app browser uses a sandboxed `<webview>` inside the workspace DOM, so
-  Claw menus and dialogs remain above the visible page in the usual stacking
+  Korus menus and dialogs remain above the visible page in the usual stacking
   order. Do not hide the page to expose an overlay. The renderer owns only the
   element and layout; Electron main validates its guest and owns navigation.
 - Commit an async result only while its request identity still matches the
@@ -284,11 +284,11 @@ is the default read-only view, with pan active; Edit unlocks editing without
 switching renderers. Once imported, `Visualization.canvas` is authoritative. `ExcalidrawCanvas.vue` owns
 save scheduling and selection persistence; `excalidraw-editor.ts` isolates the
 React SDK, browser-only Mermaid import, SVG sanitization/rasterization, exports,
-and editor cleanup. Claw's existing conversation handles requests for changes; the canvas has no
+and editor cleanup. Korus's existing conversation handles requests for changes; the canvas has no
 separate composer. The agent reads the saved selection through its canvas tools.
 
 Canvas elements, binary assets, selection, revision, and a bounded PNG preview
-persist through clawd's app-owned save method. No hosted editor or browser-only
+persist through daemon's app-owned save method. No hosted editor or browser-only
 database owns the document. Renderer saves include the Visualize session ID and
 expected revision; final saves can finish after closing the pane. MCP operations
 remain gated by the owning open conversation. Conflicting revisions are rejected
@@ -296,7 +296,7 @@ without replacing local edits. Agent batches enter editor history as one immedia
 undo unit; history itself is editor-local and resets when the editor remounts.
 
 Git-workspace diagrams are stored under the primary worktree's repository identity
-in Claw's state, not under the agent that created them. Linked worktree agents
+in Korus's state, not under the agent that created them. Linked worktree agents
 share the library; pane visibility, suggestions, selection, and tool authorization
 remain conversation-scoped.
 

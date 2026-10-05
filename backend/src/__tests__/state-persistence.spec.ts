@@ -1,17 +1,18 @@
+import { product } from '@workspace/core/product';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { AppStateStore } from '../persistence/store';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { isAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import { closeAgentInSnapshot, updateWorkItemAssignmentInSnapshot } from '@codex-claw/core/agent-manager';
-import { ClawBackendServer } from '../server';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import { isAppSnapshot } from '@workspace/core/snapshot-guards';
+import { closeAgentInSnapshot, updateWorkItemAssignmentInSnapshot } from '@workspace/core/agent-manager';
+import { AppBackendServer } from '../server';
 import { AutomationRunner } from '../automations/runner';
-import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot } from '@codex-claw/core/settings';
-import { projectClientSnapshot } from '@codex-claw/core/client-preferences';
-import type { RemoteConnection } from '@codex-claw/core/contracts';
+import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot } from '@workspace/core/settings';
+import { projectClientSnapshot } from '@workspace/core/client-preferences';
+import type { RemoteConnection } from '@workspace/core/contracts';
 
 let tempDir: string | null = null;
 
@@ -35,10 +36,10 @@ describe('state persistence', () => {
       createWorktree: async input => { expect(input.repoPath).toBe('/remote/code'); return { name: input.branchName, path: '/remote/code-worktree' }; },
       sendPrompt: async () => {}, saveSnapshot: () => persistence.save(snapshot), notifySnapshotUpdated: () => {},
     });
-    const remote = new ClawBackendServer({ version: 'test', snapshot, automationRunner: runner, saveSnapshot: value => persistence.save(value) });
+    const remote = new AppBackendServer({ version: 'test', snapshot, automationRunner: runner, saveSnapshot: value => persistence.save(value) });
     const localSnapshot = createInitialSnapshot();
     localSnapshot.remoteConnections.connections = [readyRemoteConnection()];
-    const server = new ClawBackendServer({ version: 'test', snapshot: localSnapshot, remoteClients: {
+    const server = new AppBackendServer({ version: 'test', snapshot: localSnapshot, remoteClients: {
       request: async (_connection: unknown, method: string, params: unknown) => {
         const response = await remote.handleMessage({ jsonrpc: '2.0', id: 'forwarded', method, params });
         if (!response || !('result' in response)) throw new Error('Remote request failed');
@@ -66,12 +67,12 @@ describe('state persistence', () => {
       expect(snapshot.automations).toHaveLength(1);
     } finally { await server.close(); await remote.close(); }
   });
-  it('assigns, reassigns, persists and clears Linear work with its full reference and independent Claw status', async () => {
+  it(`assigns, reassigns, persists and clears Linear work with its full reference and independent ${product.name} status`, async () => {
     const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();
     const item = { provider: 'linear', id: 'linear:uuid', sourceId: 'linear:team', sourceName: 'Engineering', number: 12,
       identifier: 'ENG-12', title: 'Repair login', body: 'Reproduction steps', url: 'https://linear.app/acme/issue/ENG-12' };
-    const server = new ClawBackendServer({ version: 'test', snapshot, saveSnapshot: value => persistence.save(value) });
+    const server = new AppBackendServer({ version: 'test', snapshot, saveSnapshot: value => persistence.save(value) });
     try {
       for (const agent of snapshot.agents.slice(0, 2)) {
         const response = await server.handleMessage({ jsonrpc: '2.0', id: 'assign', method: 'agent/workItem/assign', params: { agentId: agent.id, item } });
@@ -110,7 +111,7 @@ describe('state persistence', () => {
     const restored = snapshotFromPersistedState(legacy);
     expect(restored.general.providerHomes?.codex).toMatchObject({ isolated: true, shareSkills: enabled });
     expect(persistedStateFromSnapshot(restored).general).not.toHaveProperty('shareCodexSkillsAndPlugins');
-    const newer = { isolated: true, shareSkills: !enabled, homePath: '/claw/codex-home' };
+    const newer = { isolated: true, shareSkills: !enabled, homePath: '/app/codex-home' };
     const reloaded = snapshotFromPersistedState({ ...legacy, general: { ...legacy.general, providerHomes: { codex: newer } } });
     expect(reloaded.general.providerHomes?.codex).toEqual(newer);
   });
@@ -169,7 +170,7 @@ describe('state persistence', () => {
 
     expect(restored.teams).toStrictEqual(createEmptySnapshot().teams);
     expect(restored.agents).toStrictEqual([]);
-    expect(restored.activeTeamId).toBe('team-codex-claw');
+    expect(restored.activeTeamId).toBe('team-app');
     expect(restored.activeAgentId).toBeNull();
   });
 
@@ -242,10 +243,10 @@ describe('state persistence', () => {
     const home = await tempHome();
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0];
-    agent.folder = '/projects/claw-feature';
+    agent.folder = '/projects/app-feature';
     agent.workspace = {
-      kind: 'git', folder: agent.folder, repositoryName: 'claw', repositoryRoot: agent.folder,
-      branch: 'feature', isLinkedWorktree: true, primaryWorktreeRoot: '/projects/claw', updatedAt: agent.updatedAt,
+      kind: 'git', folder: agent.folder, repositoryName: 'app', repositoryRoot: agent.folder,
+      branch: 'feature', isLinkedWorktree: true, primaryWorktreeRoot: '/projects/app', updatedAt: agent.updatedAt,
     };
     agent.visualize = {
       id: 'visualize-feature', conversationRef: null, isOpen: true, suggestions: [],
@@ -254,17 +255,17 @@ describe('state persistence', () => {
         createdAt: agent.createdAt, updatedAt: agent.updatedAt }],
       selectedVisualizationId: 'diagram-feature', createdAt: agent.createdAt, updatedAt: agent.updatedAt,
     };
-    snapshot.repositoryVisualizations = { '/projects/claw': agent.visualize.visualizations };
+    snapshot.repositoryVisualizations = { '/projects/app': agent.visualize.visualizations };
     await writeFile(path.join(home, 'state.json'), JSON.stringify(persistedStateFromSnapshot(snapshot)), 'utf8');
 
     const loaded = await new AppStateStore(home).load();
-    expect(loaded.repositoryVisualizations?.['/projects/claw']).toStrictEqual(agent.visualize.visualizations);
+    expect(loaded.repositoryVisualizations?.['/projects/app']).toStrictEqual(agent.visualize.visualizations);
     expect(isAppSnapshot(loaded)).toBe(true);
-    expect(loaded.agents[0].visualize?.visualizations).toBe(loaded.repositoryVisualizations?.['/projects/claw']);
+    expect(loaded.agents[0].visualize?.visualizations).toBe(loaded.repositoryVisualizations?.['/projects/app']);
     closeAgentInSnapshot(loaded, agent.id);
     await new AppStateStore(home).save(loaded);
     const reloaded = await new AppStateStore(home).load();
-    expect(reloaded.repositoryVisualizations?.['/projects/claw'])
+    expect(reloaded.repositoryVisualizations?.['/projects/app'])
       .toStrictEqual(agent.visualize.visualizations);
     expect(reloaded.agents.some(candidate => candidate.id === agent.id)).toBe(false);
   });
@@ -366,11 +367,11 @@ describe('state persistence', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].pullRequest = {
       provider: 'github',
-      repository: 'nbonamy/codex-claw',
+      repository: 'nbonamy/agent-workspace',
       branch: 'feat/pr-monitoring',
       number: 42,
       title: 'Monitor pull requests',
-      url: 'https://github.com/nbonamy/codex-claw/pull/42',
+      url: 'https://github.com/nbonamy/agent-workspace/pull/42',
       draft: false,
       headSha: 'abc123',
       state: 'merged',
@@ -391,13 +392,13 @@ describe('state persistence', () => {
     snapshot.agents[0].name = null;
     snapshot.agents[0].workspace = {
       kind: 'git',
-      folder: '/Users/nbonamy/src/codex-claw-feature',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/Users/nbonamy/src/codex-claw-feature',
+      folder: '/Users/nbonamy/src/agent-workspace-feature',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace-feature',
       branch: 'feat/work-routing',
       isLinkedWorktree: true,
-      primaryWorktreeRoot: '/Users/nbonamy/src/codex-claw',
-      originUrl: 'github.com:nbonamy/codex-claw.git',
+      primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace',
+      originUrl: 'github.com:nbonamy/agent-workspace.git',
       updatedAt: '2026-08-27T12:00:00.000Z',
     };
     const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
@@ -560,9 +561,9 @@ describe('state persistence', () => {
       hasSubmittedPrompt: true,
     };
     snapshot.workBacklog.assignments = {
-      'github:nbonamy/codex-claw#12': {
+      'github:nbonamy/agent-workspace#12': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
+        itemId: 'nbonamy/agent-workspace#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
         policy: 'review',
@@ -581,7 +582,7 @@ describe('state persistence', () => {
       expect(data).not.toHaveProperty('appServer');
     }
     expect(written.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
-    expect(written.activeTeamId).toBe('team-codex-claw');
+    expect(written.activeTeamId).toBe('team-app');
     const writtenAgent = (written.agents as Array<Record<string, unknown>>)[0];
     expect(writtenAgent.engine).toStrictEqual({
       kind: 'codex',
@@ -627,9 +628,9 @@ describe('state persistence', () => {
     });
     expect(writtenAgent).not.toHaveProperty('assignedWorkItems');
     expect(written.workAssignments).toStrictEqual({
-      'github:nbonamy/codex-claw#12': {
+      'github:nbonamy/agent-workspace#12': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
+        itemId: 'nbonamy/agent-workspace#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
         policy: 'review',
@@ -720,22 +721,22 @@ describe('state persistence', () => {
     (persisted.agents[0] as Record<string, unknown>).assignedWorkItems = [
       {
         provider: 'github',
-        id: 'nbonamy/codex-claw#12',
-        sourceId: 'nbonamy/codex-claw',
-        sourceName: 'nbonamy/codex-claw',
+        id: 'nbonamy/agent-workspace#12',
+        sourceId: 'nbonamy/agent-workspace',
+        sourceName: 'nbonamy/agent-workspace',
         number: 12,
         title: 'Fix cockpit drag target',
-        url: 'https://github.com/nbonamy/codex-claw/issues/12',
+        url: 'https://github.com/nbonamy/agent-workspace/issues/12',
         assignedAt: '2026-06-09T13:00:00.000Z',
       },
       {
         provider: 'github',
-        id: 'nbonamy/codex-claw#12',
-        sourceId: 'nbonamy/codex-claw',
-        sourceName: 'nbonamy/codex-claw',
+        id: 'nbonamy/agent-workspace#12',
+        sourceId: 'nbonamy/agent-workspace',
+        sourceName: 'nbonamy/agent-workspace',
         number: 12,
         title: 'Duplicate should be dropped',
-        url: 'https://github.com/nbonamy/codex-claw/issues/12',
+        url: 'https://github.com/nbonamy/agent-workspace/issues/12',
         assignedAt: '2026-06-09T13:01:00.000Z',
       },
       {
@@ -753,10 +754,10 @@ describe('state persistence', () => {
 
     expect(restored.agents[0]).toStrictEqual({
       id: 'agent-dina',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       name: 'Dina',
       avatar: 'DI',
-      folder: '~/src/codex-claw',
+      folder: '~/src/agent-workspace',
       backend: 'codex',
       backendDefaults: {
         kind: 'codex',
@@ -809,9 +810,9 @@ describe('state persistence', () => {
     expect(restored.backendRuntimes).toStrictEqual(createEmptySnapshot().backendRuntimes);
     expect(restored.accountRateLimits).toStrictEqual(snapshot.accountRateLimits);
     expect(restored.workBacklog.assignments).toStrictEqual({
-      'github:nbonamy/codex-claw#12': {
+      'github:nbonamy/agent-workspace#12': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
+        itemId: 'nbonamy/agent-workspace#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-09T13:00:00.000Z',
         policy: 'review',
@@ -831,7 +832,7 @@ describe('state persistence', () => {
       }],
       providerConfigurations: {
         github: {
-          sourceId: 'nbonamy/codex-claw',
+          sourceId: 'nbonamy/agent-workspace',
           assigneeLogin: 'nbonamy',
           tagName: 'bug',
         },
@@ -842,9 +843,9 @@ describe('state persistence', () => {
         },
       },
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: 'agent-dina',
           assignedAt: '2026-06-09T13:00:00.000Z',
           policy: 'complete',
@@ -867,7 +868,7 @@ describe('state persistence', () => {
       }],
       providerConfigurations: {
         github: {
-          sourceId: 'nbonamy/codex-claw',
+          sourceId: 'nbonamy/agent-workspace',
           assigneeLogin: 'nbonamy',
           tagName: 'bug',
         },
@@ -878,9 +879,9 @@ describe('state persistence', () => {
         },
       },
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: 'agent-dina',
           assignedAt: '2026-06-09T13:00:00.000Z',
           policy: 'complete',
@@ -897,14 +898,14 @@ describe('state persistence', () => {
     const restored = snapshotFromPersistedState(persisted);
     expect(restored.workBacklog).toStrictEqual(snapshot.workBacklog);
 
-    const assignment = persisted.workBacklog!.assignments['github:nbonamy/codex-claw#12']!;
+    const assignment = persisted.workBacklog!.assignments['github:nbonamy/agent-workspace#12']!;
     const { automationId, automationExecutionId, ...legacyAssignment } = assignment;
     const restoredLegacy = snapshotFromPersistedState({
       ...persisted,
       workBacklog: {
         ...persisted.workBacklog,
         assignments: {
-          'github:nbonamy/codex-claw#12': {
+          'github:nbonamy/agent-workspace#12': {
             ...legacyAssignment,
             loopId: automationId,
             loopExecutionId: automationExecutionId,
@@ -926,12 +927,12 @@ describe('state persistence', () => {
       user: 'nicolas',
       port: 2222,
       status: 'ready',
-      detail: 'Ready (clawd 0.1.0)',
+      detail: 'Ready (daemon 0.1.0)',
       sourceFolderPath: '~/src',
       transport: {
         type: 'ssh-stdio',
         command: 'ssh',
-        args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+        args: ['devbox', `node ~/${product.homeDirectory}/daemon.mjs --stdio`],
       },
       installedAt: '2026-06-14T10:00:00.000Z',
       lastCheckedAt: '2026-06-14T10:00:00.000Z',
@@ -958,17 +959,17 @@ describe('state persistence', () => {
         providerConfigurations: {},
         providerSettings: {},
         assignments: {
-          'github:nbonamy/codex-claw#12': {
+          'github:nbonamy/agent-workspace#12': {
             provider: 'github',
-            itemId: 'nbonamy/codex-claw#12',
+            itemId: 'nbonamy/agent-workspace#12',
             agentId: 'agent-closed',
             assignedAt: '2026-06-09T13:00:00.000Z',
             status: 'completed',
             completedAt: '2026-06-09T13:30:00.000Z',
           },
-          'github:nbonamy/codex-claw#13': {
+          'github:nbonamy/agent-workspace#13': {
             provider: 'github',
-            itemId: 'nbonamy/codex-claw#13',
+            itemId: 'nbonamy/agent-workspace#13',
             agentId: 'agent-working-gone',
             assignedAt: '2026-06-09T13:00:00.000Z',
             status: 'working',
@@ -988,10 +989,10 @@ describe('state persistence', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       }],
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
       selectionPrompt: 'Pick regressions that are ready to fix.',
       assignmentPrompt: 'Start by reproducing the issue.',
       schedule: { intervalMinutes: 60 },
@@ -1009,9 +1010,9 @@ describe('state persistence', () => {
         createdAgents: [{
           agentId: 'agent-dina',
           agentName: 'Dina',
-          workItemId: 'github:nbonamy/codex-claw#12',
+          workItemId: 'github:nbonamy/agent-workspace#12',
           workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/12',
+          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
           conversationRef: { backend: 'codex', threadId: 'thread-dina' },
         }],
       }, {
@@ -1023,9 +1024,9 @@ describe('state persistence', () => {
         createdAgents: [{
           agentId: 'agent-jesse',
           agentName: 'Jesse',
-          workItemId: 'github:nbonamy/codex-claw#13',
+          workItemId: 'github:nbonamy/agent-workspace#13',
           workItemTitle: 'Fix automation timestamps',
-          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/13',
+          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/13',
         }],
       }],
     }];
@@ -1054,7 +1055,7 @@ describe('state persistence', () => {
         ],
         providerConfigurations: {
           github: {
-            sourceId: ' nbonamy/codex-claw ',
+            sourceId: ' nbonamy/agent-workspace ',
             assigneeLogin: ' nbonamy ',
             tagName: ' bug ',
           },
@@ -1067,9 +1068,9 @@ describe('state persistence', () => {
           jira: { oauthClientId: 'jira-client-id' },
         },
         assignments: {
-          'github:nbonamy/codex-claw#12': {
+          'github:nbonamy/agent-workspace#12': {
             provider: 'github',
-            itemId: 'nbonamy/codex-claw#12',
+            itemId: 'nbonamy/agent-workspace#12',
             agentId: 'missing-agent',
             assignedAt: '2026-06-09T13:00:00.000Z',
           },
@@ -1091,7 +1092,7 @@ describe('state persistence', () => {
       }],
       providerConfigurations: {
         github: {
-          sourceId: 'nbonamy/codex-claw',
+          sourceId: 'nbonamy/agent-workspace',
           assigneeLogin: 'nbonamy',
           tagName: 'bug',
         },
@@ -1107,12 +1108,12 @@ describe('state persistence', () => {
 
   it('drops invalid persisted plan state', () => {
     const restored = snapshotFromPersistedState({
-      teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: ['agent-dina'] }],
+      teams: [{ id: 'team-app', name: product.name, agentIds: ['agent-dina'] }],
       agents: [{
         id: 'agent-dina',
-        teamId: 'team-codex-claw',
+        teamId: 'team-app',
         name: 'Dina',
-        folder: '~/src/codex-claw',
+        folder: '~/src/agent-workspace',
         backend: 'codex',
         backendSession: { kind: 'codex', threadId: 'thread-dina' },
         plan: {
@@ -1126,7 +1127,7 @@ describe('state persistence', () => {
         createdAt: '2026-06-05T00:00:00.000Z',
         updatedAt: '2026-06-05T00:00:00.000Z',
       }],
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
       activeAgentId: 'agent-dina',
       theme: defaultThemeSettings,
     });
@@ -1140,12 +1141,12 @@ describe('state persistence', () => {
 
   it('drops invalid persisted context usage', () => {
     const restored = snapshotFromPersistedState({
-      teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: ['agent-dina'] }],
+      teams: [{ id: 'team-app', name: product.name, agentIds: ['agent-dina'] }],
       agents: [{
         id: 'agent-dina',
-        teamId: 'team-codex-claw',
+        teamId: 'team-app',
         name: 'Dina',
-        folder: '~/src/codex-claw',
+        folder: '~/src/agent-workspace',
         backend: 'codex',
         backendSession: { kind: 'codex', threadId: 'thread-dina' },
         contextUsage: {
@@ -1161,7 +1162,7 @@ describe('state persistence', () => {
         createdAt: '2026-06-05T00:00:00.000Z',
         updatedAt: '2026-06-05T00:00:00.000Z',
       }],
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
       activeAgentId: 'agent-dina',
       theme: defaultThemeSettings,
     });
@@ -1171,19 +1172,19 @@ describe('state persistence', () => {
 
   it('drops backend sessions and defaults that do not match the agent backend', () => {
     const restored = snapshotFromPersistedState({
-      teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: ['agent-dina'] }],
+      teams: [{ id: 'team-app', name: product.name, agentIds: ['agent-dina'] }],
       agents: [{
         id: 'agent-dina',
-        teamId: 'team-codex-claw',
+        teamId: 'team-app',
         name: 'Dina',
-        folder: '~/src/codex-claw',
+        folder: '~/src/agent-workspace',
         backend: 'claude',
         backendSession: { kind: 'codex', threadId: 'thread-dina' },
         backendDefaults: { kind: 'codex', model: 'gpt-5.1-codex' },
         createdAt: '2026-06-05T00:00:00.000Z',
         updatedAt: '2026-06-05T00:00:00.000Z',
       }],
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
       activeAgentId: 'agent-dina',
       theme: defaultThemeSettings,
     });
@@ -1223,8 +1224,8 @@ describe('state persistence', () => {
   it('repairs team membership and selected agent when persisted ids drift', async () => {
     const home = await tempHome();
     await writeFile(path.join(home, 'state.json'), JSON.stringify({
-      teams: [{ id: 'team-codex-claw', name: 'Codex Claw', agentIds: [] }],
-      agents: [{ id: 'agent-jules', teamId: 'team-codex-claw', name: 'Jules', folder: '/tmp/jules', createdAt: 'now', updatedAt: 'now' }],
+      teams: [{ id: 'team-app', name: product.name, agentIds: [] }],
+      agents: [{ id: 'agent-jules', teamId: 'team-app', name: 'Jules', folder: '/tmp/jules', createdAt: 'now', updatedAt: 'now' }],
       activeTeamId: 'missing-team',
       activeAgentId: 'missing-agent',
       theme: defaultThemeSettings,
@@ -1233,7 +1234,7 @@ describe('state persistence', () => {
     const restored = await new AppStateStore(home).load();
 
     expect(restored.activeAgentId).toBe('agent-jules');
-    expect(restored.activeTeamId).toBe('team-codex-claw');
+    expect(restored.activeTeamId).toBe('team-app');
     expect(restored.teams[0].color).toBe('#1B4FB2');
     expect(restored.teams[0].agentIds).toStrictEqual(['agent-jules']);
     expect(restored.agents[0].lastActivityAt).toBe('now');
@@ -1272,7 +1273,7 @@ describe('state persistence', () => {
       claudeCodeEnabled: true,
       agentListCompact: true,
       cockpitAgentViewMode: 'recent',
-      collapsedRepositoryKeys: ['remote:github.com/nbonamy/codex-claw'],
+      collapsedRepositoryKeys: ['remote:github.com/nbonamy/agent-workspace'],
       modelFavorites: [{
         backend: 'codex',
         modelId: 'gpt-5.6-terra',
@@ -1280,10 +1281,10 @@ describe('state persistence', () => {
         serviceTier: 'priority',
       }],
       savedPromptDrafts: [],
-      providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/claw/codex-home" } },
+      providerHomes: { codex: { isolated: true, shareSkills: false, homePath: "/app/codex-home" } },
       sessionCompressionWarningEnabled: false,
       worktreeInitializationMode: 'repository',
-      repositoryIcons: { '/src/codex-claw': '🦞' },
+      repositoryIcons: { '/src/agent-workspace': '🦞' },
       appshots: {
         hotkey: 'option',
         destination: 'active-agent',
@@ -1302,18 +1303,18 @@ describe('state persistence', () => {
     const persisted = persistedStateFromSnapshot(snapshot);
     persisted.agents[0]!.workspace = {
       kind: 'git',
-      folder: '/src/codex-claw',
-      repositoryName: 'codex-claw',
-      repositoryRoot: '/src/codex-claw',
+      folder: '/src/agent-workspace',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/src/agent-workspace',
       branch: 'main',
       isLinkedWorktree: false,
-      primaryWorktreeRoot: '/src/codex-claw',
-      originUrl: 'https://oauth2:secret@github.com/openai/codex-claw.git?token=secret',
+      primaryWorktreeRoot: '/src/agent-workspace',
+      originUrl: 'https://oauth2:secret@github.com/openai/agent-workspace.git?token=secret',
       updatedAt: '2026-08-29T00:00:00.000Z',
     };
 
     expect(snapshotFromPersistedState(persisted).agents[0]?.workspace).toMatchObject({
-      originUrl: 'https://github.com/openai/codex-claw.git',
+      originUrl: 'https://github.com/openai/agent-workspace.git',
     });
   });
 
@@ -1333,7 +1334,7 @@ describe('state persistence', () => {
     snapshot.sourceFolder = {
       path: '~/src',
       initialized: true,
-      recentRepoNames: ['codex-claw', 'skwad'],
+      recentRepoNames: ['agent-workspace', 'skwad'],
     };
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
@@ -1344,17 +1345,17 @@ describe('state persistence', () => {
   it('drops persisted work assignments whose local agent no longer exists', () => {
     const snapshot = createInitialSnapshot();
     snapshot.workBacklog.assignments = {
-      'github:nbonamy/codex-claw#12': {
+      'github:nbonamy/agent-workspace#12': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
+        itemId: 'nbonamy/agent-workspace#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-14T10:00:00.000Z',
         policy: 'review',
         status: 'inProgress',
       },
-      'github:nbonamy/codex-claw#13': {
+      'github:nbonamy/agent-workspace#13': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#13',
+        itemId: 'nbonamy/agent-workspace#13',
         agentId: 'agent-closed',
         assignedAt: '2026-06-14T11:00:00.000Z',
         policy: 'review',
@@ -1365,7 +1366,7 @@ describe('state persistence', () => {
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
     expect(restored.workBacklog.assignments).toStrictEqual({
-      'github:nbonamy/codex-claw#12': snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12'],
+      'github:nbonamy/agent-workspace#12': snapshot.workBacklog.assignments['github:nbonamy/agent-workspace#12'],
     });
   });
 
@@ -1375,9 +1376,9 @@ describe('state persistence', () => {
     snapshot.teams[0].remoteConnectionId = 'connection-devbox';
     snapshot.teams[0].remoteTeamId = 'team-remote';
     snapshot.workBacklog.assignments = {
-      'github:nbonamy/codex-claw#12': {
+      'github:nbonamy/agent-workspace#12': {
         provider: 'github',
-        itemId: 'nbonamy/codex-claw#12',
+        itemId: 'nbonamy/agent-workspace#12',
         agentId: 'agent-dina',
         assignedAt: '2026-06-14T10:00:00.000Z',
         policy: 'review',
@@ -1403,12 +1404,12 @@ describe('state persistence', () => {
           id: 'team-remote-pointer',
           name: 'Remote Pointer',
           remoteConnectionId: 'connection-devbox',
-          remoteTeamId: 'team-codex-claw',
+          remoteTeamId: 'team-app',
           agentIds: ['agent-stale-remote'],
           activeAgentId: 'agent-stale-remote',
         },
         {
-          id: 'team-codex-claw',
+          id: 'team-app',
           name: 'Local',
           agentIds: ['agent-local'],
           activeAgentId: 'agent-local',
@@ -1426,7 +1427,7 @@ describe('state persistence', () => {
         },
         {
           id: 'agent-local',
-          teamId: 'team-codex-claw',
+          teamId: 'team-app',
           name: 'Local',
           folder: '/Users/nicolas/src/local',
           backend: 'codex',
@@ -1434,16 +1435,16 @@ describe('state persistence', () => {
           updatedAt: '2026-06-14T10:00:00.000Z',
         },
       ],
-      activeTeamId: 'team-codex-claw',
+      activeTeamId: 'team-app',
       activeAgentId: 'agent-local',
       remoteConnections: { connections: [readyRemoteConnection()] },
       theme: defaultThemeSettings,
     });
 
     expect(restored.teams.find((team) => team.id === 'team-remote-pointer')?.agentIds).toStrictEqual([]);
-    expect(restored.teams.find((team) => team.id === 'team-codex-claw')?.agentIds).toStrictEqual(['agent-local']);
+    expect(restored.teams.find((team) => team.id === 'team-app')?.agentIds).toStrictEqual(['agent-local']);
     expect(restored.agents.map((agent) => agent.id)).toStrictEqual(['agent-local']);
-    expect(restored.activeTeamId).toBe('team-codex-claw');
+    expect(restored.activeTeamId).toBe('team-app');
     expect(restored.activeAgentId).toBe('agent-local');
   });
 
@@ -1497,7 +1498,7 @@ describe('state persistence', () => {
       agents: [{
         id: 'agent-remote',
         name: 'Remote',
-        folder: '/home/nicolas/src/codex-claw',
+        folder: '/home/nicolas/src/agent-workspace',
         backend: 'codex',
         createdAt: '2026-06-14T10:00:00.000Z',
         updatedAt: '2026-06-14T10:00:00.000Z',
@@ -1522,20 +1523,20 @@ describe('state persistence', () => {
       sourceFolder: {
         path: 42,
         initialized: 'yes',
-        recentRepoNames: [' codex-claw ', '', 12, 'skwad', 'codex-claw'],
+        recentRepoNames: [' agent-workspace ', '', 12, 'skwad', 'agent-workspace'],
       },
     });
 
     expect(restored.sourceFolder).toStrictEqual({
       path: '',
       initialized: false,
-      recentRepoNames: ['codex-claw', 'skwad'],
+      recentRepoNames: ['agent-workspace', 'skwad'],
     });
   });
 });
 
 async function tempHome(): Promise<string> {
-  tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-state-'));
+  tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-state-'));
   return tempDir;
 }
 
@@ -1549,7 +1550,7 @@ function readyRemoteConnection(): RemoteConnection {
     transport: {
       type: 'ssh-stdio' as const,
       command: 'ssh',
-      args: ['devbox', 'node ~/.codex-claw/clawd.mjs --stdio'],
+      args: ['devbox', `node ~/${product.homeDirectory}/daemon.mjs --stdio`],
     },
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',

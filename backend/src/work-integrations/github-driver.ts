@@ -1,5 +1,5 @@
-import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemLabel, WorkItemPage, WorkItemQuery, WorkSource } from '@codex-claw/core/contracts';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import type { AgentGitPullRequest, GlobalWorkItemQuery, WorkItem, WorkItemLabel, WorkItemPage, WorkItemQuery, WorkSource } from '@workspace/core/contracts';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
 import { runtimeGitHubOAuthClientId } from '../runtime-config';
 import type { WorkProviderDeviceAuthorization, WorkProviderDeviceTokenResult, WorkProviderDriver } from './types';
 
@@ -19,7 +19,7 @@ export class GitHubWorkProviderDriver implements WorkProviderDriver {
 
   async startAuthorization(): Promise<WorkProviderDeviceAuthorization> {
     if (!this.configured()) {
-      throw new Error('GitHub OAuth is not configured. Add a GitHub OAuth app client ID in Settings or set CODEX_CLAW_GITHUB_CLIENT_ID.');
+      throw new Error('GitHub OAuth is not configured. Add a GitHub OAuth app client ID in Settings or set APP_GITHUB_CLIENT_ID.');
     }
 
     const response = await githubOAuthRequest(`${GITHUB_OAUTH_BASE_URL}/device/code`, {

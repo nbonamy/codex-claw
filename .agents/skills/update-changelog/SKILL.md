@@ -1,6 +1,6 @@
 ---
 name: update-changelog
-description: Audit Codex Claw and its live sibling codex-app-sdk Git histories, curate the current CHANGELOG.md Unreleased section from user-visible outcomes, and return an evidence-backed semantic-version recommendation. Use only when Nicolas explicitly asks to update, audit, or prepare the changelog or when the prepare-release skill invokes it; never use during ordinary implementation, review, handoff, commit, or push work.
+description: Audit Korus and its live sibling codex-app-sdk Git histories, curate the current CHANGELOG.md Unreleased section from user-visible outcomes, and return an evidence-backed semantic-version recommendation. Use only when Nicolas explicitly asks to update, audit, or prepare the changelog or when the prepare-release skill invokes it; never use during ordinary implementation, review, handoff, commit, or push work.
 ---
 
 # Update Changelog
@@ -11,7 +11,7 @@ history when this skill is explicitly invoked.
 
 ## 1. Require clean release inputs
 
-Codex Claw consumes the live sibling checkout at `../codex-app-sdk`. Before any
+Korus consumes the live sibling checkout at `../codex-app-sdk`. Before any
 mutation, require both repositories to be clean:
 
 ```bash
@@ -30,7 +30,7 @@ Read `<current-version>` from the root `package.json`.
 
 ## 2. Resolve trustworthy audit baselines
 
-Prefer `v<current-version>` as the Codex Claw baseline:
+Prefer `v<current-version>` as the Korus baseline:
 
 ```bash
 git rev-parse --verify "refs/tags/v<current-version>"
@@ -44,7 +44,7 @@ git log -n 1 --format=%H -S "## [<current-version>]" -- CHANGELOG.md
 
 Stop and ask Nicolas if neither baseline exists.
 
-Read the SDK baseline from the current Claw release tag annotation:
+Read the SDK baseline from the current Korus release tag annotation:
 
 ```bash
 git for-each-ref "refs/tags/v<current-version>" --format='%(contents)' \
@@ -53,7 +53,7 @@ git for-each-ref "refs/tags/v<current-version>" --format='%(contents)' \
 
 Require exactly one full commit SHA and verify it exists in the SDK repository.
 For a legacy tag without provenance, infer the SDK baseline from the tag's
-creation time. If the current release has no tag, use the resolved Claw
+creation time. If the current release has no tag, use the resolved Korus
 baseline commit time instead:
 
 ```bash
@@ -70,8 +70,8 @@ no trustworthy SDK baseline can be resolved.
 Inspect all first-parent commits and aggregate diffs:
 
 ```bash
-git log --first-parent --reverse --format='%h %s' <claw-baseline>..HEAD
-git diff --stat <claw-baseline>..HEAD
+git log --first-parent --reverse --format='%h %s' <app-baseline>..HEAD
+git diff --stat <app-baseline>..HEAD
 git -C ../codex-app-sdk log --first-parent --reverse --format='%h %s' \
   <sdk-baseline>..<sdk-head>
 git -C ../codex-app-sdk diff --stat <sdk-baseline>..<sdk-head>
@@ -79,7 +79,7 @@ git -C ../codex-app-sdk diff --stat <sdk-baseline>..<sdk-head>
 
 Use commit titles only for discovery. Inspect relevant diffs when the outcome
 is ambiguous, especially SDK chat behavior, controls, shortcuts, rendering,
-responsiveness, memory use, and reliability that ship inside Claw.
+responsiveness, memory use, and reliability that ship inside Korus.
 
 Compare the discovered outcomes with the existing `## Unreleased` section,
 but do not trust incremental notes as complete. Curate one release-level view:
@@ -131,14 +131,14 @@ git status --short
 git -C ../codex-app-sdk status --short
 ```
 
-Only `CHANGELOG.md` may be modified in Claw; the SDK must remain clean and at
+Only `CHANGELOG.md` may be modified in Korus; the SDK must remain clean and at
 `<sdk-head>`. Review the complete changelog diff.
 
 Return a concise audit result for Nicolas or the calling release skill:
 
 - current version and exact recommended version, or `no release`;
 - semantic-version rationale tied to concrete user-visible outcomes;
-- Claw baseline and `HEAD`;
+- Korus baseline and `HEAD`;
 - SDK baseline and `<sdk-head>`, noting any inferred baseline;
 - whether `CHANGELOG.md` changed;
 - the reviewed release-note section.

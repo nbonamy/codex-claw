@@ -1,6 +1,6 @@
-import { agentFolder } from '@codex-claw/core/agent-folder';
-import { updateAgentWorkspace } from '@codex-claw/core/agent-manager';
-import type { Agent, AgentGitStatus, AgentWorkspaceIdentity, AppSnapshot } from '@codex-claw/core/contracts';
+import { agentFolder } from '@workspace/core/agent-folder';
+import { updateAgentWorkspace } from '@workspace/core/agent-manager';
+import type { Agent, AgentGitStatus, AgentWorkspaceIdentity, AppSnapshot } from '@workspace/core/contracts';
 
 export type AgentWorkspaceServiceOptions = {
   applyGitStatus: (agentId: string, status: AgentGitStatus) => void;

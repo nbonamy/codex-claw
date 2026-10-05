@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexClawApi } from '@codex-claw/core/contracts';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import type { AppApi } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { AppController } from '../app-controller';
 import { createBackendClient, fakeAppLifecycle } from './app-controller-test-harness';
 
@@ -25,13 +25,13 @@ vi.mock('electron', () => ({
 }));
 
 describe('provider sign-out IPC', () => {
-  it('carries sign-out from the real preload API to clawd with the selected engine and host', async () => {
+  it('carries sign-out from the real preload API to daemon with the selected engine and host', async () => {
     const result = { kind: 'claude', connected: false, state: { loggedIn: false } };
     const request = vi.fn().mockResolvedValue(result);
     const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }), fakeAppLifecycle());
     controller.registerIpcHandlers();
     await import('../../preload/index');
-    const api = bridge.exposed.get('codexClaw') as CodexClawApi;
+    const api = bridge.exposed.get('app') as AppApi;
     await expect(api.disconnectProvider('claude', 'wall-e')).resolves.toEqual(result);
     expect(request).toHaveBeenLastCalledWith('provider/disconnect', { backend: 'claude', remoteConnectionId: 'wall-e' });
     request.mockRejectedValueOnce(new Error('Sign-out failed'));

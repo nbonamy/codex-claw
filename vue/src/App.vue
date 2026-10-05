@@ -239,7 +239,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@workspace/core/contracts';
 import AppShell from './components/AppShell.vue';
 import type { AgentConversationActions } from './components/use-agent-conversation';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
@@ -249,7 +249,7 @@ import SessionCompressionDialog from './components/SessionCompressionDialog.vue'
 import { useAppState } from './app-state';
 import ConfettiOverlay from './shared/confetti/ConfettiOverlay.vue';
 import { applyAppTheme, subscribeToSystemAppearance } from './theme/apply-theme';
-import { clawHostCapabilities, codexClawApi } from './platform-api';
+import { appHostCapabilities, appApi } from './platform-api';
 import { localizedErrorMessage } from './i18n/errors';
 
 const { t } = useI18n();
@@ -504,7 +504,7 @@ let unsubscribeSystemAppearance: (() => void) | null = null;
 let unsubscribeUpdateStatus: (() => void) | null = null;
 
 async function installUpdate(): Promise<void> {
-  await codexClawApi?.installUpdate?.();
+  await appApi?.installUpdate?.();
 }
 
 async function requestCloseAgent(agentId: string): Promise<void> {
@@ -655,16 +655,16 @@ onMounted(() => {
   void loadSnapshot();
   void loadBackendModels();
   void loadOpenInApplications();
-  const updateStatusPromise = clawHostCapabilities.appUpdates
-    ? codexClawApi?.getUpdateStatus?.()
+  const updateStatusPromise = appHostCapabilities.appUpdates
+    ? appApi?.getUpdateStatus?.()
     : undefined;
   if (updateStatusPromise) {
     void updateStatusPromise.then((status) => {
       updateStatus.value = status;
     });
   }
-  unsubscribeUpdateStatus = clawHostCapabilities.appUpdates
-    ? codexClawApi?.onUpdateStatusChanged?.((status) => {
+  unsubscribeUpdateStatus = appHostCapabilities.appUpdates
+    ? appApi?.onUpdateStatusChanged?.((status) => {
       updateStatus.value = status;
     }) ?? null
     : null;

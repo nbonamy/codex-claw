@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import product from '../../core/src/product.json' with { type: 'json' };
+
 import { spawnSync } from 'node:child_process';
 import { copyFile, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -9,9 +11,9 @@ import { createCodexSurface } from '@codex-app-sdk/backend';
 
 const scriptFolder = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptFolder, '..', '..');
-const defaultStatePath = path.join(homedir(), '.codex-claw', 'roster.json');
-const defaultCodexHome = path.join(homedir(), '.codex-claw', 'codex-home');
-const stateArchiveEntries = ['.codex-claw/roster.json', '.codex-claw/state.json'];
+const defaultStatePath = path.join(homedir(), product.homeDirectory, 'roster.json');
+const defaultCodexHome = path.join(homedir(), product.homeDirectory, 'codex-home');
+const stateArchiveEntries = [`${product.homeDirectory}/roster.json`, `${product.homeDirectory}/state.json`];
 
 export function parseRecoveryArguments(argv) {
   const args = [...argv];
@@ -61,8 +63,8 @@ export function stateWithRecoveredThread(currentState, agentId, recoveredThreadI
 async function main() {
   const { backupPath, agentFolder, dryRun } = parseRecoveryArguments(process.argv.slice(2));
   await stat(backupPath);
-  const statePath = process.env.CODEX_CLAW_STATE_PATH?.trim() || defaultStatePath;
-  const codexHome = process.env.CODEX_CLAW_CODEX_HOME?.trim() || defaultCodexHome;
+  const statePath = process.env.APP_STATE_PATH?.trim() || defaultStatePath;
+  const codexHome = process.env.APP_CODEX_HOME?.trim() || defaultCodexHome;
   const currentState = JSON.parse(await readFile(statePath, 'utf8'));
   const backupState = readBackupState(backupPath);
   const { currentAgent, currentThreadId, recoveredThreadId } = agentRecovery(
@@ -79,7 +81,7 @@ async function main() {
     return;
   }
 
-  assertClawStopped();
+  assertAppStopped();
   const codexCommand = await resolveCodexCommand(statePath);
   const surface = createCodexSurface({
     autoSelectFirstConversation: false,
@@ -153,21 +155,22 @@ function codexThreadId(agent, source) {
   return threadId;
 }
 
-function assertClawStopped() {
+function assertAppStopped() {
   const result = spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
   if (result.status !== 0) {
-    throw new Error(`Could not verify that Codex Claw is stopped: ${result.stderr.trim()}`);
+    throw new Error(`Could not verify that ${product.name} is stopped: ${result.stderr.trim()}`);
   }
   const active = result.stdout.split('\n').filter((line) => (
     !line.includes('recover-compressed-session.mjs')
     && (
-      line.includes('/Codex Claw.app/Contents/MacOS/Codex Claw')
-      || line.includes('/dist/clawd.mjs')
+      line.includes(`/${product.name}.app/Contents/MacOS/${product.name}`)
+      || line.includes(`/${product.name}.app/Contents/Resources/daemon/daemon.mjs`)
+      || line.includes('/dist/daemon.mjs')
       || line.includes('/scripts/dev.mjs')
     )
   ));
   if (active.length > 0) {
-    throw new Error('Codex Claw is still running. Quit the release build and npm run dev before recovery.');
+    throw new Error(`${product.name} is still running. Quit the release build and npm run dev before recovery.`);
   }
 }
 

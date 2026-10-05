@@ -40,7 +40,7 @@ const sdkRoots = new Set(localDependencies.map(({ packageDirectory }) => {
   return path.resolve(packageDirectory, '..', '..');
 }));
 if (sdkRoots.size !== 1) {
-  throw new Error('Codex Claw workspaces resolve scoped SDK packages from different repositories.');
+  throw new Error('Workspaces resolve scoped SDK packages from different repositories.');
 }
 
 const sdkRoot = [...sdkRoots][0];

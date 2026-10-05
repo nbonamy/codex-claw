@@ -2,7 +2,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getLocalClaudeAuthentication, logoutLocalClaude } from './authentication';
 import { getClaudeAccountUsage } from './account-usage';
-import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '@codex-claw/core/agent-request';
+import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '@workspace/core/agent-request';
 import type {
   AccountRateLimits,
   Agent,
@@ -20,17 +20,17 @@ import type {
   RendererToolPart,
   SendPromptOptions,
   ThreadGoal,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import {
   createClaudeConversationReplica,
   type ClaudeConversationReplica,
-} from '@codex-claw/core/claude-conversation-replica';
-import { createUserMessage } from '@codex-claw/core/claude-conversation-transcript';
-import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@codex-claw/core/backend-driver';
+} from '@workspace/core/claude-conversation-replica';
+import { createUserMessage } from '@workspace/core/claude-conversation-transcript';
+import { type AgentBackendDriver, type BackendCodeReviewInput, type BackendCodeReviewResult, type BackendConversationResumeResult, type BackendEvent, type BackendPermissionModeResult, type BackendSendResult } from '@workspace/core/backend-driver';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
-import { agentScopedMcpUrl, clawMcpUrlForAgent } from '../mcp/codex-config';
-import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
+import { agentScopedMcpUrl, appMcpUrlForAgent } from '../mcp/codex-config';
+import { appDeveloperInstructions, type AgentEffectInstructionSettings } from '../mcp/agent-prompts';
 import { ClaudeAgentSdkTransport } from './agent-sdk-transport';
 import {
   type ClaudePermissionRequest,
@@ -100,7 +100,7 @@ type UnsequencedClaudeConversationEvent<Event extends ClaudeConversationEvent = 
     : never;
 type ClaudeHistoryLoader = (agent: Agent) => Promise<ClaudeTranscriptHistory | null>;
 type ClaudeBackendDriverOptions = {
-  clawMcpServerUrl?: string | null;
+  appMcpServerUrl?: string | null;
   hostedMcpServerUrls?: () => Readonly<Record<string, string>>;
   homeDir?: string;
   pluginSettings?: () => AppPluginSettings;
@@ -114,7 +114,7 @@ type ClaudeReviewTurnConfiguration = {
 };
 
 export class ClaudeConversationHost implements AgentBackendDriver {
-  async authenticate(request: import('@codex-claw/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@codex-claw/core/contracts/provider-setup').ProviderAuthentication> {
+  async authenticate(request: import('@workspace/core/contracts/provider-setup').ProviderAuthenticationAction): Promise<import('@workspace/core/contracts/provider-setup').ProviderAuthentication> {
     if (request.action === 'cancel') throw new Error('Manage Claude authentication through its CLI.');
     const state = await (request.action === 'logout' ? logoutLocalClaude() : getLocalClaudeAuthentication());
     return { kind: 'claude', connected: state.loggedIn, state };
@@ -168,7 +168,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return this.catalog.listSkills(agent);
   }
 
-  async generateText(_agent: Agent, input: import('@codex-claw/core/backend-driver').BackendTextGenerationInput) {
+  async generateText(_agent: Agent, input: import('@workspace/core/backend-driver').BackendTextGenerationInput) {
     if (!this.transport.generateText) throw new Error('Claude text generation is unavailable.');
     return this.transport.generateText(input);
   }
@@ -210,9 +210,9 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       const started = await this.sendPromptWithConfiguration(reviewer, input.prompt, {}, {
       mcpServerUrl: input.reviewMcpServerUrl,
       allowedTools: [
-        'mcp__codex_claw__report_finding',
-        'mcp__codex_claw__update_finding',
-        'mcp__codex_claw__delete_finding',
+        'mcp__workspace__report_finding',
+        'mcp__workspace__update_finding',
+        'mcp__workspace__delete_finding',
       ],
       });
       targetTurnId = started.turnId ?? null;
@@ -269,7 +269,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return /^\/(?:compact|goal)(?:\s+.*)?$/s.test(prompt) ? this.sendPrompt(agent, prompt) : null;
   }
 
-  async setGoal(agent: Agent, objective: string): Promise<import('@codex-claw/core/backend-driver').BackendGoalResult> {
+  async setGoal(agent: Agent, objective: string): Promise<import('@workspace/core/backend-driver').BackendGoalResult> {
     const condition = objective.trim();
     if (!condition || condition === 'clear') throw new Error('Enter a goal condition.');
     const now = Date.now() / 1000;
@@ -280,7 +280,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     return { backendSession: started.backendSession, goal };
   }
 
-  async clearGoal(agent: Agent): Promise<import('@codex-claw/core/backend-driver').BackendGoalResult> {
+  async clearGoal(agent: Agent): Promise<import('@workspace/core/backend-driver').BackendGoalResult> {
     if (this.activeTurnsByAgentId.has(agent.id)) await this.interrupt(agent);
     const started = await this.sendPromptWithConfiguration(agent, '/goal clear', { recordUserMessage: false }, undefined, true);
     this.goalRefreshIds.delete(agent.id);
@@ -337,7 +337,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         prompt,
         options,
         existingSessionId,
-        this.driverOptions.clawMcpServerUrl,
+        this.driverOptions.appMcpServerUrl,
         this.driverOptions.hostedMcpServerUrls?.(),
         this.driverOptions.pluginSettings?.(),
         {
@@ -568,7 +568,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     };
   }
 
-  async forkConversation(agent: Agent, targetAgent: Agent, turnId?: string): Promise<import('@codex-claw/core/backend-driver').BackendConversationForkResult> {
+  async forkConversation(agent: Agent, targetAgent: Agent, turnId?: string): Promise<import('@workspace/core/backend-driver').BackendConversationForkResult> {
     const sessionId = claudeSessionId(agent);
     if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
     if (this.activeTurnsByAgentId.has(agent.id) || this.forkingAgentIds.has(agent.id)) throw new Error('Claude must be idle before forking.');
@@ -853,7 +853,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
           '',
           {},
           sessionId,
-          this.driverOptions.clawMcpServerUrl,
+          this.driverOptions.appMcpServerUrl,
           this.driverOptions.hostedMcpServerUrls?.(),
           this.driverOptions.pluginSettings?.(),
           {
@@ -1458,7 +1458,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
     }
   }
 
-  private emitConversation(input: UnsequencedClaudeConversationEvent, resolution?: import('@codex-claw/core/agent-request').AgentRequestOutcome): void {
+  private emitConversation(input: UnsequencedClaudeConversationEvent, resolution?: import('@workspace/core/agent-request').AgentRequestOutcome): void {
     const revision = this.nextConversationRevision(input.agentId);
     const event = {
       ...input,
@@ -1554,14 +1554,14 @@ function claudeTurnParams(
   prompt: string,
   options: SendPromptOptions,
   existingSessionId: string | null,
-  clawMcpServerUrl: string | null | undefined,
+  appMcpServerUrl: string | null | undefined,
   hostedMcpServerUrls: Readonly<Record<string, string>> | undefined,
   pluginSettings?: AppPluginSettings,
   effects: AgentEffectInstructionSettings = {},
 ): ClaudeTurnParams {
   const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
-  const mcpServerUrl = clawMcpServerUrl ? clawMcpUrlForAgent(clawMcpServerUrl, agent) : null;
+  const mcpServerUrl = appMcpServerUrl ? appMcpUrlForAgent(appMcpServerUrl, agent) : null;
   return {
     ownerId: agent.id,
     cwd: claudeWorkingDirectory(agent),
@@ -1570,7 +1570,7 @@ function claudeTurnParams(
     model: options.model ?? defaults?.model ?? null,
     effort: claudeEffort(options.reasoningEffort ?? defaults?.reasoningEffort),
     permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
-    appendSystemPrompt: codexClawDeveloperInstructions(agent, pluginSettings, effects),
+    appendSystemPrompt: appDeveloperInstructions(agent, pluginSettings, effects),
     mcpServerUrl,
     hostedMcpServerUrls: Object.fromEntries(
       Object.entries(hostedMcpServerUrls ?? {}).map(([serverId, serverUrl]) => [
@@ -1578,7 +1578,7 @@ function claudeTurnParams(
         agentScopedMcpUrl(serverUrl, agent.id),
       ]),
     ),
-    allowedTools: mcpServerUrl ? ['mcp__codex_claw__*'] : [],
+    allowedTools: mcpServerUrl ? ['mcp__workspace__*'] : [],
     ...(options.attachments?.length ? { attachments: [...options.attachments] } : {}),
   };
 }

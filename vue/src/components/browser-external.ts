@@ -1,4 +1,4 @@
-import { clawPlatformActions } from '../platform-api';
+import { appPlatformActions } from '../platform-api';
 
 export function externalBrowserUrl(url: string): string | null {
   try {
@@ -11,6 +11,6 @@ export function externalBrowserUrl(url: string): string | null {
 
 export async function openInExternalBrowser(url: string): Promise<void> {
   const target = externalBrowserUrl(url);
-  if (!target || !clawPlatformActions.openExternal) return;
-  await clawPlatformActions.openExternal(target);
+  if (!target || !appPlatformActions.openExternal) return;
+  await appPlatformActions.openExternal(target);
 }

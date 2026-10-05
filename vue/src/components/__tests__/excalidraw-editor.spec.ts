@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Visualization } from '@codex-claw/core/visualize';
+import type { Visualization } from '@workspace/core/visualize';
 const root = vi.hoisted(() => ({ render: vi.fn(), unmount: vi.fn() }));
 vi.mock('react-dom/client', () => ({ createRoot: () => root }));
 const convert = vi.hoisted(() => vi.fn());

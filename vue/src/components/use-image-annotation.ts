@@ -4,7 +4,7 @@ import {
   type CodexComposerState,
   type CodexRendererSendMessageOptions,
 } from '@codex-app-sdk/vue';
-import type { RendererPromptAttachment, RendererSendPromptOptions } from '@codex-claw/core/contracts';
+import type { RendererPromptAttachment, RendererSendPromptOptions } from '@workspace/core/contracts';
 import { computed, reactive, ref } from 'vue';
 import { translate } from '../i18n';
 import type { ImageAnnotationSavePayload } from './ImageAnnotationDialog.vue';
@@ -47,7 +47,7 @@ export function useImageAnnotation(options: {
   ));
   const fileName = computed(() => {
     const name = target.value?.attachment.name;
-    if (!name) return 'codex-claw-annotated.png';
+    if (!name) return 'agent-workspace-annotated.png';
     return `${name.replace(/\.[^.]+$/, '') || 'image'}-annotated.png`;
   });
   const activeCounts = computed<Readonly<Record<string, number>>>(() => {

@@ -54,7 +54,7 @@ describe('AppDataList', () => {
         }],
         rows: [{
           id: 'run-1',
-          ticket: 'github:nbonamy/codex-claw#12',
+          ticket: 'github:nbonamy/agent-workspace#12',
           startedAt: 'Jun 9, 10:47 PM',
         }],
       },
@@ -64,7 +64,7 @@ describe('AppDataList', () => {
     expect(wrapper.text()).toContain('Recent executions');
     expect(wrapper.text()).toContain('Ticket');
     expect(wrapper.text()).toContain('Started');
-    expect(wrapper.text()).toContain('github:nbonamy/codex-claw#12');
+    expect(wrapper.text()).toContain('github:nbonamy/agent-workspace#12');
     expect(wrapper.findAll('[role="columnheader"]')).toHaveLength(2);
     expect(wrapper.find('[data-align="end"]').text()).toBe('Started');
   });

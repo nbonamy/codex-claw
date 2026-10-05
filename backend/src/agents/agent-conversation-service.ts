@@ -1,12 +1,12 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import type {
   Agent,
   AppSnapshot,
   BackendConversationRef,
   BackendSession,
-} from '@codex-claw/core/contracts';
-import type { BackendEvent, BackendTurnActionResult } from '@codex-claw/core/backend-driver';
-import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
+} from '@workspace/core/contracts';
+import type { BackendEvent, BackendTurnActionResult } from '@workspace/core/backend-driver';
+import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@workspace/core/conversation-title';
 import { warnMain } from '../log';
 
 export type AgentConversationServiceOptions = {

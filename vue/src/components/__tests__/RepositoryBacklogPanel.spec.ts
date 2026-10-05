@@ -1,17 +1,17 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Agent, WorkItem } from '@codex-claw/core/contracts';
+import type { Agent, WorkItem } from '@workspace/core/contracts';
 import { i18n } from '../../i18n';
 import RepositoryBacklogPanel from '../RepositoryBacklogPanel.vue';
 import { createClientApiMock } from '../../test/client-api-mock';
-import { codexClawApi, configureClawClient } from '../../platform-api';
+import { appApi, configureAppClient } from '../../platform-api';
 import { backlogConnectionsKey } from '../backlog-providers';
 
 describe('RepositoryBacklogPanel', () => {
   it('shows native Linear details, filters by the viewer and resets details when the source changes', async () => {
     const { api } = createClientApiMock();
-    configureClawClient({ platform: 'desktop', api });
+    configureAppClient({ platform: 'desktop', api });
     api.listWorkSources.mockResolvedValue(['a', 'b'].map(id => ({ provider: 'linear', id: `linear:${id}`, owner: id, name: id, fullName: id, url: 'https://linear.app', isPrivate: true })));
     const item = workItem({ provider: 'linear', id: 'linear:issue', sourceId: 'linear:a', identifier: 'ENG-12', nativeState: 'Started', body: 'Repair login', assignedToViewer: true, assignees: ['Alex'] });
     api.listWorkItems.mockResolvedValue([item]);
@@ -26,7 +26,7 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.findAll('[role="radio"]')).toHaveLength(1);
     await wrapper.get('.repository-backlog__item-actions').trigger('click');
     expect(wrapper.get('.work-item-detail').text()).toContain('Repair login');
-    await wrapper.get('.work-item-assignment-picker .claw-button--primary').trigger('click');
+    await wrapper.get('.work-item-assignment-picker .app-button--primary').trigger('click');
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ item, target: 'duplicate', action: 'fix', workspace: { kind: 'worktree', branchName: 'fix/eng-12' } }));
     const guard = startWorkAction.mock.calls[0]![0].isCurrent;
     await wrapper.get('[aria-label="Team / project"] select').setValue('linear:b');
@@ -39,11 +39,11 @@ describe('RepositoryBacklogPanel', () => {
     expect(guard()).toBe(false);
     await wrapper.get('[aria-label="Backlog provider"] select').setValue('github');
     expect(wrapper.findAll('[role="radio"]')).toHaveLength(2);
-    configureClawClient();
+    configureAppClient();
   });
   beforeEach(() => {
     const { api } = createClientApiMock();
-    configureClawClient({ platform: 'desktop', api });
+    configureAppClient({ platform: 'desktop', api });
     window.localStorage.clear();
   });
 
@@ -51,7 +51,7 @@ describe('RepositoryBacklogPanel', () => {
     const wrapper = await mountPanel({
       items: [
         workItem(),
-        workItem({ id: 'nbonamy/codex-claw#21', kind: 'pullRequest', number: 21, title: 'Ship backlog workspace' }),
+        workItem({ id: 'nbonamy/agent-workspace#21', kind: 'pullRequest', number: 21, title: 'Ship backlog workspace' }),
       ],
     });
 
@@ -72,18 +72,18 @@ describe('RepositoryBacklogPanel', () => {
       items: [
         workItem(),
         workItem({
-          id: 'nbonamy/codex-claw#21',
+          id: 'nbonamy/agent-workspace#21',
           kind: 'pullRequest',
           number: 21,
           title: 'Ship backlog workspace',
-          url: 'https://github.com/nbonamy/codex-claw/pull/21',
+          url: 'https://github.com/nbonamy/agent-workspace/pull/21',
         }),
       ],
     });
 
     const issueLink = wrapper.get('.repository-backlog__item-title');
     expect(issueLink.attributes()).toMatchObject({
-      href: 'https://github.com/nbonamy/codex-claw/issues/12',
+      href: 'https://github.com/nbonamy/agent-workspace/issues/12',
       target: '_blank',
       rel: 'noopener noreferrer',
     });
@@ -92,7 +92,7 @@ describe('RepositoryBacklogPanel', () => {
     await wrapper.get('[role="radio"][aria-checked="false"]').trigger('click');
 
     const pullRequestLink = wrapper.get('.repository-backlog__item-title');
-    expect(pullRequestLink.attributes('href')).toBe('https://github.com/nbonamy/codex-claw/pull/21');
+    expect(pullRequestLink.attributes('href')).toBe('https://github.com/nbonamy/agent-workspace/pull/21');
     expect(wrapper.findAll('[aria-label^="Work item actions"]')).toHaveLength(1);
   });
 
@@ -109,9 +109,9 @@ describe('RepositoryBacklogPanel', () => {
   it('groups assigned work by lifecycle status', async () => {
     const wrapper = await mountPanel({
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: agent.id,
           assignedAt: '2026-08-12T00:00:00.000Z',
           policy: 'review',
@@ -128,9 +128,9 @@ describe('RepositoryBacklogPanel', () => {
     const note = 'Investigation complete: the reconnect race happens after restart.\nThe backend response arrives after the client closes.';
     const wrapper = await mountPanel({
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: agent.id,
           assignedAt: '2026-08-12T00:00:00.000Z',
           policy: 'review',
@@ -154,9 +154,9 @@ describe('RepositoryBacklogPanel', () => {
     const otherAgent = { ...agent, id: 'agent-jesse', name: 'Jesse' };
     const wrapper = await mountPanel({
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: otherAgent.id,
           assignedAt: '2026-08-12T00:00:00.000Z',
           policy: 'review',
@@ -183,7 +183,7 @@ describe('RepositoryBacklogPanel', () => {
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     await wrapper.findAll('.repository-backlog__assignment-menu [role="menuitem"]')[1]!.trigger('click');
-    expect(clearAssignmentAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/codex-claw#12' }));
+    expect(clearAssignmentAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/agent-workspace#12' }));
   });
 
   it('opens an assigned item owner from the row without intercepting its GitHub link or actions menu', async () => {
@@ -191,9 +191,9 @@ describe('RepositoryBacklogPanel', () => {
     const otherAgent = { ...agent, id: 'agent-jesse', name: 'Jesse' };
     const wrapper = await mountPanel({
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: otherAgent.id,
           assignedAt: '2026-08-12T00:00:00.000Z',
           policy: 'review',
@@ -221,9 +221,9 @@ describe('RepositoryBacklogPanel', () => {
     const showAgentAction = vi.fn();
     const wrapper = await mountPanel({
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: agent.id,
           assignedAt: '2026-08-12T00:00:00.000Z',
           policy: 'complete',
@@ -254,9 +254,9 @@ describe('RepositoryBacklogPanel', () => {
     const wrapper = await mountPanel({
       agents: [agent, otherAgent],
       assignments: {
-        'github:nbonamy/codex-claw#12': {
+        'github:nbonamy/agent-workspace#12': {
           provider: 'github',
-          itemId: 'nbonamy/codex-claw#12',
+          itemId: 'nbonamy/agent-workspace#12',
           agentId: otherAgent.id,
           assignedAt: '2026-08-12T00:00:00.000Z',
           policy: 'review',
@@ -274,14 +274,14 @@ describe('RepositoryBacklogPanel', () => {
     expect(clearAssignmentAction).not.toHaveBeenCalled();
     expect(closeAgentAction).not.toHaveBeenCalled();
 
-    await wrapper.findAll('.repository-backlog__clear-dialog .claw-button')[0]!.trigger('click');
-    expect(clearAssignmentAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/codex-claw#12' }));
+    await wrapper.findAll('.repository-backlog__clear-dialog .app-button')[0]!.trigger('click');
+    expect(clearAssignmentAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'nbonamy/agent-workspace#12' }));
     expect(closeAgentAction).not.toHaveBeenCalled();
 
     clearAssignmentAction.mockClear();
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
     await wrapper.findAll('.repository-backlog__assignment-menu [role="menuitem"]')[1]!.trigger('click');
-    await wrapper.findAll('.repository-backlog__clear-dialog .claw-button')[1]!.trigger('click');
+    await wrapper.findAll('.repository-backlog__clear-dialog .app-button')[1]!.trigger('click');
     expect(clearAssignmentAction).not.toHaveBeenCalled();
     expect(closeAgentAction).toHaveBeenCalledWith(otherAgent.id);
   });
@@ -307,7 +307,7 @@ describe('RepositoryBacklogPanel', () => {
     const wrapper = await mountPanel({
       items: [
         workItem(),
-        workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Completed backlog work', state: 'closed' }),
+        workItem({ id: 'nbonamy/agent-workspace#13', number: 13, title: 'Completed backlog work', state: 'closed' }),
       ],
     });
 
@@ -319,7 +319,7 @@ describe('RepositoryBacklogPanel', () => {
     await nextTick();
     await wrapper.get('.repository-backlog__filter-menu footer button').trigger('click');
 
-    expect(window.localStorage.getItem('repositoryBacklogFilters:github:undefined:nbonamy/codex-claw')).toBe(JSON.stringify({
+    expect(window.localStorage.getItem('repositoryBacklogFilters:github:undefined:nbonamy/agent-workspace')).toBe(JSON.stringify({
       state: 'closed',
       assignee: 'all',
       label: '',
@@ -329,7 +329,7 @@ describe('RepositoryBacklogPanel', () => {
     const restored = await mountPanel({
       items: [
         workItem(),
-        workItem({ id: 'nbonamy/codex-claw#13', number: 13, title: 'Completed backlog work', state: 'closed' }),
+        workItem({ id: 'nbonamy/agent-workspace#13', number: 13, title: 'Completed backlog work', state: 'closed' }),
       ],
     });
     expect(restored.text()).not.toContain('Fix backlog assignment');
@@ -340,7 +340,7 @@ describe('RepositoryBacklogPanel', () => {
   });
 
   it('ignores invalid or unavailable saved filter defaults', async () => {
-    window.localStorage.setItem('repositoryBacklogFilters:github:undefined:nbonamy/codex-claw', JSON.stringify({
+    window.localStorage.setItem('repositoryBacklogFilters:github:undefined:nbonamy/agent-workspace', JSON.stringify({
       state: 'invalid',
       assignee: 'invalid',
       label: 'not-in-this-repository',
@@ -364,13 +364,13 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-12');
     expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[0]!.classes()).toContain('is-selected');
 
-    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .app-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith({
       action: 'fix',
       isCurrent: expect.any(Function),
       backend: 'codex',
-      item: expect.objectContaining({ id: 'nbonamy/codex-claw#12' }),
+      item: expect.objectContaining({ id: 'nbonamy/agent-workspace#12' }),
       target: 'duplicate',
       workspace: { branchName: 'fix/gh-12', kind: 'worktree' },
     });
@@ -390,9 +390,9 @@ describe('RepositoryBacklogPanel', () => {
     const wrapper = await mountPanel({ startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
-    await wrapper.get('.repository-backlog__start-work .claw-button--tertiary').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .app-button--tertiary').trigger('click');
 
-    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'custom', item: expect.objectContaining({ id: 'nbonamy/codex-claw#12' }), isCurrent: expect.any(Function) }));
+    expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'custom', item: expect.objectContaining({ id: 'nbonamy/agent-workspace#12' }), isCurrent: expect.any(Function) }));
   });
 
   it('dispatches issue investigation without using the fix prompt', async () => {
@@ -400,7 +400,7 @@ describe('RepositoryBacklogPanel', () => {
     const wrapper = await mountPanel({ startWorkAction });
 
     await wrapper.get('[aria-label="Work item actions #12"]').trigger('click');
-    await wrapper.get('.repository-backlog__start-work .claw-button--secondary').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .app-button--secondary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'investigate' }));
   });
@@ -415,7 +415,7 @@ describe('RepositoryBacklogPanel', () => {
     await wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.trigger('click');
     expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.classes()).toContain('is-selected');
     expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-12');
-    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .app-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
       target: 'current',
@@ -436,7 +436,7 @@ describe('RepositoryBacklogPanel', () => {
     expect(wrapper.text()).toContain('Review');
     expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('feature/backlog-workspace');
     expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[0]!.classes()).toContain('is-selected');
-    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .app-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
       action: 'review',
@@ -457,7 +457,7 @@ describe('RepositoryBacklogPanel', () => {
     await wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.trigger('click');
 
     expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('feature/current-pr');
-    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+    await wrapper.get('.repository-backlog__start-work .app-button--primary').trigger('click');
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
       action: 'review',
       target: 'current',
@@ -475,8 +475,8 @@ describe('RepositoryBacklogPanel', () => {
     await wrapper.get('[role="radio"][aria-checked="false"]').trigger('click');
     await wrapper.get('[aria-label="Work item actions #23"]').trigger('click');
     expect(wrapper.text()).not.toContain('The pull request branch is unavailable');
-    expect(wrapper.get('.repository-backlog__start-work .claw-button--primary').attributes('disabled')).toBeUndefined();
-    await wrapper.get('.repository-backlog__start-work .claw-button--primary').trigger('click');
+    expect(wrapper.get('.repository-backlog__start-work .app-button--primary').attributes('disabled')).toBeUndefined();
+    await wrapper.get('.repository-backlog__start-work .app-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'review' }));
   });
@@ -509,12 +509,12 @@ async function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBackl
     agents: [agent],
     assignments: {},
     branch: 'main',
-    repositoryId: 'nbonamy/codex-claw',
+    repositoryId: 'nbonamy/agent-workspace',
     startWorkAction: vi.fn().mockResolvedValue(undefined),
     visible: true,
     ...componentOverrides,
   } as InstanceType<typeof RepositoryBacklogPanel>['$props'];
-  const api = codexClawApi!;
+  const api = appApi!;
   const load = vi.mocked(api.listWorkItems).getMockImplementation();
   vi.mocked(api.listWorkItems).mockImplementation(async (provider, id, location, query) => provider === 'github' ? [...items] : await load!(provider, id, location, query));
   const sources = vi.mocked(api.listWorkSources).getMockImplementation();
@@ -542,7 +542,7 @@ const agent: Agent = {
   id: 'agent-dina',
   name: 'Dina',
   avatar: 'DI',
-  folder: '/Users/nbonamy/src/codex-claw',
+  folder: '/Users/nbonamy/src/agent-workspace',
   backend: 'codex',
   backendDefaults: { kind: 'codex' },
   status: { type: 'idle' },
@@ -553,13 +553,13 @@ const agent: Agent = {
 function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw#12',
+    id: 'nbonamy/agent-workspace#12',
     kind: 'issue',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 12,
     title: 'Fix backlog assignment',
-    url: 'https://github.com/nbonamy/codex-claw/issues/12',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/12',
     state: 'open',
     labels: [{ name: 'bug', color: 'ff0000' }],
     createdAt: '2026-08-11T00:00:00.000Z',

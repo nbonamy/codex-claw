@@ -1,6 +1,6 @@
 # Third-party notices
 
-The Codex Claw TTS helper uses FluidAudio 0.15.5 and the Kokoro 82M Core ML
+The App TTS helper uses FluidAudio 0.15.5 and the Kokoro 82M Core ML
 model. FluidAudio and the model weights are distributed under the Apache
 License 2.0. A copy of that license is available in this repository's root
 `LICENSE` file.

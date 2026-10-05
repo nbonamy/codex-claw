@@ -1,6 +1,6 @@
-import { approvalOutcome } from '@codex-claw/core/agent-request';
+import { approvalOutcome } from '@workspace/core/agent-request';
 import { describe, expect, it } from 'vitest';
-import { decodeClawBackendEvent } from '../backend-protocol/events';
+import { decodeAppBackendEvent } from '../backend-protocol/events';
 import { updateAgentFolder } from '../agent-manager';
 import {
   applyMainEventToSnapshot,
@@ -21,7 +21,7 @@ describe('snapshot reducer', () => {
       payload: { delta: 'ignored without agent' },
       occurredAt: '2026-06-05T00:00:01.000Z',
     } as unknown as MainToRendererEvent);
-    expect(() => decodeClawBackendEvent({
+    expect(() => decodeAppBackendEvent({
       seq: 2,
       agentId: 'agent-dina',
       backend: 'codex',

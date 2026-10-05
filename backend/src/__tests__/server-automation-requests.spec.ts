@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { ClawBackendServer } from '../server';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
 import {
   createTestSnapshot,
@@ -9,7 +9,7 @@ import {
   createTextMessage,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('reads stored automation conversation messages after cleanup removes the agent', async () => {
     const snapshot = createTestSnapshot();
@@ -21,8 +21,8 @@ describe('ClawBackendServer', () => {
       updatedAt: '2026-06-13T00:00:00.000Z',
       repositories: [{
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       }],
       teamId: 'team-test',
       schedule: { intervalMinutes: 60 },
@@ -36,9 +36,9 @@ describe('ClawBackendServer', () => {
         createdAgents: [{
           agentId: 'agent-cleaned-up',
           agentName: 'Cleaned Up',
-          workItemId: 'github:nbonamy/codex-claw#5',
+          workItemId: 'github:nbonamy/agent-workspace#5',
           workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
+          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/5',
           conversationRef: { backend: 'codex', threadId: 'thread-cleaned-up' },
         }],
       }],
@@ -56,7 +56,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -92,8 +92,8 @@ describe('ClawBackendServer', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/home/nicolas/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/home/nicolas/src/agent-workspace',
       }],
       teamId: 'team-remote',
       schedule: { intervalMinutes: 60 },
@@ -125,7 +125,7 @@ describe('ClawBackendServer', () => {
       close: vi.fn().mockResolvedValue(undefined),
     };
     const events: unknown[] = [];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -134,7 +134,7 @@ describe('ClawBackendServer', () => {
     });
     const location = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
     const createInput = {
-      repositories: [{ provider: 'github' as const, sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/home/nicolas/src/codex-claw' }],
+      repositories: [{ provider: 'github' as const, sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/home/nicolas/src/agent-workspace' }],
       teamId: 'team-remote',
       schedule: { intervalMinutes: 60 },
     };
@@ -156,7 +156,7 @@ describe('ClawBackendServer', () => {
       id: 'remote-backlog-configure',
       method: 'workProvider/backlog/configure',
       params: {
-        input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } },
+        input: { provider: 'github', configuration: { sourceId: 'nbonamy/agent-workspace' } },
         location,
       },
     })).resolves.toMatchObject({ result: remoteSnapshot });
@@ -216,7 +216,7 @@ describe('ClawBackendServer', () => {
       3,
       snapshot.remoteConnections.connections[0],
       'workProvider/backlog/configure',
-      { ...{ input: { provider: 'github', configuration: { sourceId: 'nbonamy/codex-claw' } } }, _clientId: 'remote-controller' },
+      { ...{ input: { provider: 'github', configuration: { sourceId: 'nbonamy/agent-workspace' } } }, _clientId: 'remote-controller' },
       expect.any(Function),
     );
     expect(remoteClients.request).toHaveBeenNthCalledWith(
@@ -274,7 +274,7 @@ describe('ClawBackendServer', () => {
       runAll: vi.fn().mockResolvedValue(undefined),
       runAutomation: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -287,8 +287,8 @@ describe('ClawBackendServer', () => {
       enabled: true,
       repositories: [{
         provider: 'github',
-        sourceId: 'nbonamy/codex-claw',
-        executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+        sourceId: 'nbonamy/agent-workspace',
+        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
       }],
       teamId: 'team-test',
       schedule: { intervalMinutes: 60 },

@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PRIMARY_BROWSER_ID } from '@codex-claw/core/contracts';
+import { PRIMARY_BROWSER_ID } from '@workspace/core/contracts';
 import { registerInAppBrowserTools, type InAppBrowserClient } from '../browser-tools';
 import { STRUCTURED_TOOL_RESULT_NOTICE } from '../tool-result';
 

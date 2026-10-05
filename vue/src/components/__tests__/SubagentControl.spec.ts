@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import SubagentControl from '../SubagentControl.vue';
-import type { AgentSubagentTree } from '@codex-claw/core/contracts';
+import type { AgentSubagentTree } from '@workspace/core/contracts';
 import { i18n } from '../../i18n';
 
 const tree: AgentSubagentTree = {

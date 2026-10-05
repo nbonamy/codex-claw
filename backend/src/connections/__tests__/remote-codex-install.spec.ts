@@ -1,18 +1,19 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { bundledCodexVersion } from '@codex-claw/core/codex-release';
+import { bundledCodexVersion } from '@workspace/core/codex-release';
 import { remoteCodexInstallCommand } from '../remote-codex-install';
 
 const temporaryRoots: string[] = [];
 afterEach(() => { for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
-describe('Claw-owned remote Codex installation', () => {
+describe(`${product.name}-owned remote Codex installation`, () => {
   function fixture(checksumValid: boolean) {
-    const root = mkdtempSync(path.join(tmpdir(), 'claw-runtime-test-'));
+    const root = mkdtempSync(path.join(tmpdir(), 'app-runtime-test-'));
     temporaryRoots.push(root);
     const source = path.join(root, 'source');
     mkdirSync(path.join(source, 'bin'), { recursive: true });
@@ -29,7 +30,7 @@ curl() {
   cp "$source_file" "$last_arg"
 }
 `;
-    const command = mocks + remoteCodexInstallCommand().replace('$HOME/.codex-claw/codex', `${root}/managed`);
+    const command = mocks + remoteCodexInstallCommand().replace(`$HOME/${product.homeDirectory}/codex`, `${root}/managed`);
     return { root, command, binary: path.join(root, 'managed', bundledCodexVersion, 'bin/codex') };
   }
 

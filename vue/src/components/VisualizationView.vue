@@ -36,7 +36,7 @@
 import { computed, ref, watch } from 'vue';
 import { sanitizeSvg } from './visualization-svg';
 import { renderMermaidSVG } from 'beautiful-mermaid';
-import type { Visualization } from '@codex-claw/core/visualize';
+import type { Visualization } from '@workspace/core/visualize';
 import { translate } from '../i18n';
 import { visualizationRenderKey } from './visualization-render-key';
 

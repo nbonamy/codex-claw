@@ -14,7 +14,7 @@ describe('source repository discovery', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-source-'));
+    tempDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-source-'));
   });
 
   afterEach(async () => {

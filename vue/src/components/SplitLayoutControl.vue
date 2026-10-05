@@ -3,7 +3,7 @@
     trigger="click"
     placement="bottom-end"
     :width="220"
-    popper-class="claw-popover"
+    popper-class="app-popover"
     :show-arrow="false"
     v-model:visible="open"
   >

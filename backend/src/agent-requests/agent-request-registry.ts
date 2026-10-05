@@ -1,5 +1,5 @@
-import type { Agent, AgentBackend, AppSnapshot, BackendPublishedEvent } from '@codex-claw/core/contracts';
-import type { AgentRequest, AgentRequestResponse } from '@codex-claw/core/agent-request';
+import type { Agent, AgentBackend, AppSnapshot, BackendPublishedEvent } from '@workspace/core/contracts';
+import type { AgentRequest, AgentRequestResponse } from '@workspace/core/agent-request';
 
 export type AgentRequestOwner = { kind: 'driver'; backend: AgentBackend; remoteConnectionId?: string };
 
@@ -8,7 +8,7 @@ export type AgentRequestRegistryOptions = {
   remoteConnectionIdForAgent: (agent: Pick<Agent, 'teamId'>) => string | null;
 };
 
-/** Tracks the backend or remote clawd responsible for each pending client request. */
+/** Tracks the backend or remote daemon responsible for each pending client request. */
 export class AgentRequestRegistry {
   private readonly owners = new Map<string, AgentRequestOwner>();
   private readonly requests = new Map<string, AgentRequest>();

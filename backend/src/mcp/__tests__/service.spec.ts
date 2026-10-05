@@ -1,20 +1,21 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver, BackendEvent } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import type { Agent, AppSnapshot, Automation, BackendPublishedEvent } from '@codex-claw/core/contracts';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { createQuickChatInSnapshot } from '@codex-claw/core/agent-manager';
-import { projectWorkspaceSidebar } from '@codex-claw/core/workspace-sidebar';
+import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import type { Agent, AppSnapshot, Automation, BackendPublishedEvent } from '@workspace/core/contracts';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
+import { createQuickChatInSnapshot } from '@workspace/core/agent-manager';
+import { projectWorkspaceSidebar } from '@workspace/core/workspace-sidebar';
 import { BackendDriverRpc } from '../../driver-rpc';
 import { VisualizeService } from '../../visualize-service';
 import { WorktreeManager } from '../../worktrees/worktree-manager';
-import { ClawMcpService } from '../service';
+import { AppMcpService } from '../service';
 import { HostedMcpGateway } from '../hosted-mcp-gateway';
 import { structuredToolResult } from '../tool-result';
 import { createVisualizeToolModuleProvider } from '../visualize-tools';
 
-describe('ClawMcpService', () => {
-  let service: ClawMcpService | null = null;
+describe('AppMcpService', () => {
+  let service: AppMcpService | null = null;
 
   afterEach(async () => {
     await service?.stop();
@@ -24,13 +25,13 @@ describe('ClawMcpService', () => {
   it('offers create-project only to Quick Chats and routes the handoff through the shared project operation', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    createQuickChatInSnapshot(snapshot, { teamId: 'team-codex-claw' }, undefined, 'agent-quick-chat', { select: false });
+    createQuickChatInSnapshot(snapshot, { teamId: 'team-app' }, undefined, 'agent-quick-chat', { select: false });
     const createProject = vi.fn().mockResolvedValue({
       repository: { name: 'new-product', path: '/src/new-product', worktrees: [] },
       agent: { ...snapshot.agents[0], id: 'agent-project', name: null, folder: '/src/new-product' },
       promptSubmitted: true,
     });
-    service = new ClawMcpService({ snapshot, createProject });
+    service = new AppMcpService({ snapshot, createProject });
     const url = await service.start();
 
     const ordinaryTools = await postJson(agentUrl(url, 'agent-dina'), {
@@ -63,7 +64,7 @@ describe('ClawMcpService', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: unknown[] = [];
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
     const response = await postJson(agentUrl(url, 'agent-dina'), {
@@ -83,7 +84,7 @@ describe('ClawMcpService', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: any[] = [];
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
     await callTool(url, 'agent-dina', 'set-status', { status: 'Running verification' });
@@ -122,7 +123,7 @@ describe('ClawMcpService', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: any[] = [];
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
     await callTool(url, 'agent-dina', 'set-status', { status: 'Considering delegation' });
@@ -163,7 +164,7 @@ describe('ClawMcpService', () => {
   it('adds only model-owned finding actions to a scoped review context', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    service = new ClawMcpService({ snapshot });
+    service = new AppMcpService({ snapshot });
     const ordinaryUrl = await service.start();
     const reportFinding = vi.fn().mockResolvedValue({ id: 'finding-1' });
     const updateFinding = vi.fn().mockResolvedValue({ id: 'finding-1', status: 'fixed' });
@@ -249,7 +250,7 @@ describe('ClawMcpService', () => {
   });
 
   it('serves health and debug routes while rejecting invalid HTTP and MCP requests', async () => {
-    service = new ClawMcpService({ snapshot: createInitialSnapshot() });
+    service = new AppMcpService({ snapshot: createInitialSnapshot() });
     const mcpUrl = await service.start();
     await expect(service.start()).resolves.toBe(mcpUrl);
     const origin = new URL(mcpUrl).origin;
@@ -311,7 +312,7 @@ describe('ClawMcpService', () => {
       },
       fetch: fetchUpstream,
     });
-    service = new ClawMcpService({ snapshot: createInitialSnapshot(), hostedMcpGateway });
+    service = new AppMcpService({ snapshot: createInitialSnapshot(), hostedMcpGateway });
     const mcpUrl = await service.start();
     expect(service.hostedMcpServerUrls()).toStrictEqual({
       github: `${new URL(mcpUrl).origin}/mcp/providers/github`,
@@ -337,7 +338,7 @@ describe('ClawMcpService', () => {
     await expect(fetch(`${service.hostedMcpServerUrls().github}`, { method: 'POST' })).resolves.toMatchObject({ status: 400 });
   });
 
-  it('serves Claw collaboration tools from clawd and delivers teammate messages through backend drivers', async () => {
+  it(`serves ${product.name} collaboration tools from daemon and delivers teammate messages through backend drivers`, async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: unknown[] = [];
@@ -345,7 +346,7 @@ describe('ClawMcpService', () => {
       backendSession: { kind: 'codex', threadId: 'thread-jesse' },
       turnId: 'turn-jesse',
     });
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
     const url = await service.start();
     const dinaUrl = agentUrl(url, 'agent-dina');
@@ -395,7 +396,7 @@ describe('ClawMcpService', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     let active = true;
     const onSetMissionTitle = vi.fn().mockResolvedValue({ success: true, title: 'Add team billing' });
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot,
       missionTools: {
         contextForAgent: agentId => active && agentId === 'agent-dina'
@@ -447,7 +448,7 @@ describe('ClawMcpService', () => {
   it('attaches a mode-specific tool module through the service extension seam', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot,
       toolModuleProviders: [{
         id: 'design',
@@ -484,7 +485,7 @@ describe('ClawMcpService', () => {
       persist: async () => undefined,
       publish: () => undefined,
     });
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot,
       toolModuleProviders: [createVisualizeToolModuleProvider(visualize)],
     });
@@ -526,7 +527,7 @@ describe('ClawMcpService', () => {
       backendSession: { kind: 'codex', threadId: 'thread-jesse' },
       turnId: 'turn-jesse',
     });
-    service = new ClawMcpService({ snapshot });
+    service = new AppMcpService({ snapshot });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
 
     service.sendMessage('agent-dina', 'agent-jesse', 'Debug menu delivery');
@@ -545,7 +546,7 @@ describe('ClawMcpService', () => {
     recipient.handoff = { operationId: 'handoff', backend: 'claude', sourceAgentId: recipient.id, sourceTitle: 'Jesse', sourceRef: { backend: 'codex', threadId: 'original' }, phase: 'closing' };
     const events: BackendEvent[] = [];
     const sendPrompt = vi.fn();
-    service = new ClawMcpService({ snapshot, onEvent: event => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: event => events.push(event) });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
     service.sendMessage('agent-dina', recipient.id, 'Keep this requirement.');
     await vi.waitFor(() => expect(events).toContainEqual(expect.objectContaining({
@@ -566,7 +567,7 @@ describe('ClawMcpService', () => {
       backendSession: { kind: 'codex', threadId: 'thread-jesse' },
       turnId: 'turn-active',
     });
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ steerPrompt })]])));
     const url = await service.start();
 
@@ -593,7 +594,7 @@ describe('ClawMcpService', () => {
       backendSession: { kind: 'codex', threadId: 'thread-next' },
       turnId: 'turn-next',
     });
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
     const url = await service.start();
 
@@ -637,7 +638,7 @@ describe('ClawMcpService', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const events: any[] = [];
     const sendPrompt = vi.fn().mockRejectedValue(new Error('transport disconnected'));
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     service.setDriverRpc(new BackendDriverRpc(new Map([['codex', createDriver({ sendPrompt })]])));
     const url = await service.start();
 
@@ -657,7 +658,7 @@ describe('ClawMcpService', () => {
     const status = vi.fn().mockResolvedValue({ available: true, accessibilityTrusted: true, platform: 'darwin' });
     const execute = vi.fn().mockResolvedValue({ ok: true, result: { apps: [] } });
     const stop = vi.fn().mockResolvedValue({ stopped: true });
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot: createInitialSnapshot(),
       computerUse: {
         execute,
@@ -695,7 +696,7 @@ describe('ClawMcpService', () => {
   });
 
   it('omits Computer Use tools when the capability is disabled', async () => {
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot: createInitialSnapshot(),
       computerUse: {
         execute: vi.fn(),
@@ -719,7 +720,7 @@ describe('ClawMcpService', () => {
   it('routes in-app browser inspection and debugging tools through the desktop client port', async () => {
     const open = vi.fn().mockResolvedValue({ url: 'https://example.com/', title: 'Example', canGoBack: false, canGoForward: false });
     const execute = vi.fn().mockResolvedValue({ url: 'https://example.com', title: 'Example', element: { tag: 'button' } });
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot: createInitialSnapshot(),
       browser: { open, execute },
     });
@@ -741,7 +742,7 @@ describe('ClawMcpService', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.claudeCodeEnabled = true;
     const events: any[] = [];
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
     const callerUrl = agentUrl(url, 'agent-dina');
 
@@ -792,7 +793,7 @@ describe('ClawMcpService', () => {
       name: 'New Agent',
       backend: 'claude',
       folder: '/tmp/new-agent',
-      teamId: 'team-codex-claw',
+      teamId: 'team-app',
     }));
 
     const missingRepo = await postJson(callerUrl, {
@@ -859,7 +860,7 @@ describe('ClawMcpService', () => {
       primaryWorktreeRoot: '/tmp/codex-sdk',
       updatedAt: '2026-09-02T14:00:00.000Z',
     });
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot,
       onEvent: (event) => events.push(event),
       resolveWorkspaceIdentity,
@@ -946,7 +947,7 @@ describe('ClawMcpService', () => {
       model: 'gpt-5.6-sol',
       reasoningEffort: 'high',
     };
-    service = new ClawMcpService({ snapshot });
+    service = new AppMcpService({ snapshot });
     const url = await service.start();
 
     await callTool(url, 'agent-dina', 'create-agent', {
@@ -976,7 +977,7 @@ describe('ClawMcpService', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.celebrationsEnabled = false;
     const events: Array<{ type?: string }> = [];
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
     const response = await callTool(url, 'agent-dina', 'finish_turn', {
@@ -1001,7 +1002,7 @@ describe('ClawMcpService', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.activeAgentId = 'agent-dina';
     const events: Array<{ type?: string }> = [];
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
     const response = await callTool(url, 'agent-jesse', 'finish_turn', {
@@ -1025,7 +1026,7 @@ describe('ClawMcpService', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const queueSpokenAnnouncement = vi.fn().mockResolvedValue({ queued: true });
-    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    service = new AppMcpService({ snapshot, queueSpokenAnnouncement });
     const url = await service.start();
 
     const disabled = await callTool(url, 'agent-dina', 'set-status', {
@@ -1091,7 +1092,7 @@ describe('ClawMcpService', () => {
     snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = true;
     snapshot.activeAgentId = 'agent-dina';
     const queueSpokenAnnouncement = vi.fn().mockResolvedValue({ queued: true });
-    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    service = new AppMcpService({ snapshot, queueSpokenAnnouncement });
     const url = await service.start();
 
     service.recordPromptInputMethod('agent-dina', 'typed');
@@ -1128,7 +1129,7 @@ describe('ClawMcpService', () => {
     snapshot.general.spokenAnnouncementsOnlyForDictatedPrompts = false;
     snapshot.activeAgentId = 'agent-dina';
     const queueSpokenAnnouncement = vi.fn().mockRejectedValue(new Error('helper crashed'));
-    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    service = new AppMcpService({ snapshot, queueSpokenAnnouncement });
     const url = await service.start();
 
     const failed = await callTool(url, 'agent-dina', 'finish_turn', {
@@ -1156,7 +1157,7 @@ describe('ClawMcpService', () => {
       queued: false,
       reason: 'suppressed',
     });
-    service = new ClawMcpService({ snapshot, queueSpokenAnnouncement });
+    service = new AppMcpService({ snapshot, queueSpokenAnnouncement });
     const url = await service.start();
 
     const response = await callTool(url, 'agent-dina', 'set-status', {
@@ -1173,7 +1174,7 @@ describe('ClawMcpService', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     delete (snapshot.general as Partial<typeof snapshot.general>).celebrationsEnabled;
     const events: Array<{ type?: string }> = [];
-    service = new ClawMcpService({ snapshot, onEvent: (event) => events.push(event) });
+    service = new AppMcpService({ snapshot, onEvent: (event) => events.push(event) });
     const url = await service.start();
 
     const response = await callTool(url, 'agent-dina', 'finish_turn', {
@@ -1190,16 +1191,16 @@ describe('ClawMcpService', () => {
   it('updates only the caller-owned assignment and requires blocked context', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12'] = {
+    snapshot.workBacklog.assignments['github:nbonamy/agent-workspace#12'] = {
       provider: 'github',
-      itemId: 'nbonamy/codex-claw#12',
+      itemId: 'nbonamy/agent-workspace#12',
       agentId: 'agent-dina',
       assignedAt: '2026-06-15T01:00:00.000Z',
       policy: 'review',
       status: 'inProgress',
     };
     const events: any[] = [];
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot,
       now: () => new Date('2026-06-15T01:30:48.802Z'),
       onEvent: (event) => events.push(event),
@@ -1207,13 +1208,13 @@ describe('ClawMcpService', () => {
     const url = await service.start();
 
     const missingNote = await callTool(url, 'agent-dina', 'update-work-item', {
-      workItemId: 'github:nbonamy/codex-claw#12',
+      workItemId: 'github:nbonamy/agent-workspace#12',
       status: 'blocked',
     });
     expect(missingNote.result.isError).toBe(true);
 
     const blocked = await callTool(url, 'agent-dina', 'update-work-item', {
-      workItemId: 'github:nbonamy/codex-claw#12',
+      workItemId: 'github:nbonamy/agent-workspace#12',
       status: 'blocked',
       note: 'Need access to the private fixture',
     });
@@ -1221,7 +1222,7 @@ describe('ClawMcpService', () => {
       status: 'blocked',
       note: 'Need access to the private fixture',
     });
-    expect(snapshot.workBacklog.assignments['github:nbonamy/codex-claw#12']).toMatchObject({
+    expect(snapshot.workBacklog.assignments['github:nbonamy/agent-workspace#12']).toMatchObject({
       status: 'blocked',
       note: 'Need access to the private fixture',
       updatedAt: '2026-06-15T01:30:48.802Z',
@@ -1234,29 +1235,29 @@ describe('ClawMcpService', () => {
       createdAgents: [{
         agentId: 'agent-one',
         agentName: 'One',
-        workItemId: 'github:nbonamy/codex-claw#5',
+        workItemId: 'github:nbonamy/agent-workspace#5',
         workItemTitle: 'Fix first issue',
-        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/5',
+        workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/5',
       }, {
         agentId: 'agent-two',
         agentName: 'Two',
-        workItemId: 'github:nbonamy/codex-claw#6',
+        workItemId: 'github:nbonamy/agent-workspace#6',
         workItemTitle: 'Fix second issue',
-        workItemUrl: 'https://github.com/nbonamy/codex-claw/issues/6',
+        workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/6',
       }],
     });
-    service = new ClawMcpService({
+    service = new AppMcpService({
       snapshot,
       now: () => new Date('2026-06-15T01:30:48.802Z'),
     });
     const url = await service.start();
 
-    await markWorkItemCompleted(url, 'agent-one', 'github:nbonamy/codex-claw#5');
+    await markWorkItemCompleted(url, 'agent-one', 'github:nbonamy/agent-workspace#5');
 
     expect(snapshot.agents.map((agent) => agent.id)).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
     expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({ status: 'working' });
 
-    await markWorkItemCompleted(url, 'agent-two', 'github:nbonamy/codex-claw#6');
+    await markWorkItemCompleted(url, 'agent-two', 'github:nbonamy/agent-workspace#6');
 
     expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({
       status: 'completed',
@@ -1274,7 +1275,7 @@ describe('ClawMcpService', () => {
     });
     expect(snapshot.agents.map((agent) => agent.id)).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
     expect(snapshot.teams[0]?.agentIds).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
-    expect(snapshot.teams.map((team) => team.id)).toContain('team-codex-claw');
+    expect(snapshot.teams.map((team) => team.id)).toContain('team-app');
   });
 });
 
@@ -1356,7 +1357,7 @@ function createAutomationSnapshot(input: {
 }): AppSnapshot {
   const snapshot = createEmptySnapshot();
   snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-  const targetTeamId = 'team-codex-claw';
+  const targetTeamId = 'team-app';
   const createdAgentIds = input.createdAgents.map((createdAgent) => createdAgent.agentId);
   snapshot.teams[0] = {
     ...snapshot.teams[0]!,
@@ -1374,8 +1375,8 @@ function createAutomationSnapshot(input: {
     updatedAt: '2026-06-15T01:00:00.000Z',
     repositories: [{
       provider: 'github',
-      sourceId: 'nbonamy/codex-claw',
-      executionRepositoryPath: '/Users/nbonamy/src/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
+      executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
     }],
     teamId: targetTeamId,
     schedule: { intervalMinutes: 60 },

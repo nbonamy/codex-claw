@@ -1,3 +1,4 @@
+import { product } from '../product';
 import { describe, expect, it } from 'vitest';
 import type { AppSnapshot } from '../contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '../snapshot-construction';
@@ -12,18 +13,18 @@ describe('snapshot construction', () => {
     expect(createInitialSnapshot()).toStrictEqual({
       ...expectedEmptySnapshot(),
       teams: [{
-        id: 'team-codex-claw',
-        name: 'Codex Claw',
-        avatar: 'CC',
+        id: 'team-app',
+        name: product.name,
+        avatar: product.name.slice(0, 2).toUpperCase(),
         color: '#1B4FB2',
         agentIds: ['agent-dina', 'agent-jesse'],
       }],
       agents: [{
         id: 'agent-dina',
-        teamId: 'team-codex-claw',
+        teamId: 'team-app',
         name: 'Dina',
         avatar: 'DI',
-        folder: '~/src/codex-claw',
+        folder: '~/src/agent-workspace',
         backend: 'codex',
         backendDefaults: { kind: 'codex' },
         status: { type: 'idle' },
@@ -31,10 +32,10 @@ describe('snapshot construction', () => {
         updatedAt: '2026-06-05T00:00:00.000Z',
       }, {
         id: 'agent-jesse',
-        teamId: 'team-codex-claw',
+        teamId: 'team-app',
         name: 'Jesse',
         avatar: 'JE',
-        folder: '~/src/codex-claw',
+        folder: '~/src/agent-workspace',
         backend: 'codex',
         backendDefaults: { kind: 'codex' },
         status: { type: 'idle' },
@@ -121,15 +122,15 @@ describe('snapshot construction', () => {
 function expectedEmptySnapshot(): AppSnapshot {
   return {
     teams: [{
-      id: 'team-codex-claw',
-      name: 'Codex Claw',
-      avatar: 'CC',
+      id: 'team-app',
+      name: product.name,
+      avatar: product.name.slice(0, 2).toUpperCase(),
       color: '#1B4FB2',
       agentIds: [],
     }],
     agents: [],
     automations: [],
-    activeTeamId: 'team-codex-claw',
+    activeTeamId: 'team-app',
     activeAgentId: null,
     queuedPrompts: [],
     backendApprovals: {},
@@ -195,7 +196,7 @@ function expectedEmptySnapshot(): AppSnapshot {
       recentRepoNames: [],
     },
     theme: {
-      id: 'codex-claw-light',
+      id: 'app-light',
       mode: 'system',
       uiFontSize: 14,
       chatFontSize: 15,

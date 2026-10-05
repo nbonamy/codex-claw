@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,8 +9,8 @@ describe('FileMissionArtifactStore', () => {
   const roots: string[] = [];
   afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 
-  it('writes canonical stage artifacts under the Claw-owned mission home and reads them back', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'claw-mission-artifacts-'));
+  it(`writes canonical stage artifacts under the ${product.name}-owned mission home and reads them back`, async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'app-mission-artifacts-'));
     roots.push(root);
     const store = new FileMissionArtifactStore(async missionId => path.join(root, missionId));
 
@@ -20,7 +21,7 @@ describe('FileMissionArtifactStore', () => {
   });
 
   it('rejects traversal, unknown stages, empty content, and oversized artifacts', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'claw-mission-artifacts-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'app-mission-artifacts-'));
     roots.push(root);
     const store = new FileMissionArtifactStore(async missionId => path.join(root, missionId));
 

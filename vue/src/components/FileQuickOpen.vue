@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AgentFileSearchItem } from '@codex-claw/core/contracts';
+import type { AgentFileSearchItem } from '@workspace/core/contracts';
 import { computed } from 'vue';
 import { FileTextIcon } from '../shared/icons/app-icons';
 import QuickOpenDialog from '../shared/QuickOpenDialog.vue';

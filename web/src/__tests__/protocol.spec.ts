@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it } from 'vitest';
-import { encodeClawWebMessage, parseClawWebClientMessage, parseClawWebServerMessage } from '../protocol';
+import { encodeAppWebMessage, parseAppWebClientMessage, parseAppWebServerMessage } from '../protocol';
 
-describe('Claw web protocol', () => {
+describe(`${product.name} web protocol`, () => {
   it('accepts versioned requests and responses', () => {
     const event = {
       seq: 1,
@@ -10,25 +11,25 @@ describe('Claw web protocol', () => {
       payload: { backend: 'codex' as const, status: 'running' as const },
       occurredAt: '2026-09-04T00:00:00.000Z',
     };
-    expect(parseClawWebClientMessage({ version: 1, type: 'request', id: '1', operation: 'getSnapshot', args: [] }))
+    expect(parseAppWebClientMessage({ version: 1, type: 'request', id: '1', operation: 'getSnapshot', args: [] }))
       .toMatchObject({ operation: 'getSnapshot' });
-    expect(parseClawWebServerMessage({ version: 1, type: 'ready', userId: 'local-single-user' }))
+    expect(parseAppWebServerMessage({ version: 1, type: 'ready', userId: 'local-single-user' }))
       .toMatchObject({ type: 'ready' });
-    expect(parseClawWebServerMessage({ version: 1, type: 'response', id: '2', ok: true }))
+    expect(parseAppWebServerMessage({ version: 1, type: 'response', id: '2', ok: true }))
       .toMatchObject({ type: 'response', ok: true });
-    expect(parseClawWebServerMessage({ version: 1, type: 'response', id: '3', ok: false, error: 'bad' }))
+    expect(parseAppWebServerMessage({ version: 1, type: 'response', id: '3', ok: false, error: 'bad' }))
       .toMatchObject({ type: 'response', ok: false, error: 'bad' });
     const eventMessage = {
       version: 1,
       type: 'event',
       event,
     } as const;
-    const parsedEvent = parseClawWebServerMessage(eventMessage);
+    const parsedEvent = parseAppWebServerMessage(eventMessage);
     expect(parsedEvent).toBe(eventMessage);
     expect(parsedEvent).toMatchObject({ type: 'event' });
     if (parsedEvent.type !== 'event') throw new Error('Expected a web event.');
     expect(parsedEvent.event).toBe(event);
-    expect(encodeClawWebMessage({
+    expect(encodeAppWebMessage({
       version: 1,
       type: 'request',
       id: '4',
@@ -38,11 +39,11 @@ describe('Claw web protocol', () => {
   });
 
   it('rejects malformed and future-version frames', () => {
-    expect(() => parseClawWebClientMessage({ version: 2, type: 'request' })).toThrow('Invalid Claw web request');
-    expect(() => parseClawWebClientMessage({ version: 1, type: 'request', id: 1, operation: 'x', args: [] }))
-      .toThrow('Malformed Claw web request');
-    expect(() => parseClawWebServerMessage({ version: 1, type: 'response', id: '1', ok: false }))
-      .toThrow('Malformed Claw web response');
+    expect(() => parseAppWebClientMessage({ version: 2, type: 'request' })).toThrow(`Invalid ${product.name} web request`);
+    expect(() => parseAppWebClientMessage({ version: 1, type: 'request', id: 1, operation: 'x', args: [] }))
+      .toThrow(`Malformed ${product.name} web request`);
+    expect(() => parseAppWebServerMessage({ version: 1, type: 'response', id: '1', ok: false }))
+      .toThrow(`Malformed ${product.name} web response`);
   });
 
   it('decodes web events deeply without exposing malformed payload values', () => {
@@ -74,7 +75,7 @@ describe('Claw web protocol', () => {
 
     const diagnostics = malformedEvents.map((event) => {
       try {
-        parseClawWebServerMessage({ version: 1, type: 'event', event });
+        parseAppWebServerMessage({ version: 1, type: 'event', event });
       } catch (error) {
         return error instanceof Error ? error.message : String(error);
       }

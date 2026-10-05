@@ -1,4 +1,4 @@
-import type { AgentGitDiffSection } from '@codex-claw/core/contracts';
+import type { AgentGitDiffSection } from '@workspace/core/contracts';
 
 export type SidePanelBaseState = {
   title: string;
@@ -29,8 +29,8 @@ export type SidePanelImageState = SidePanelBaseState & {
 
 export type SidePanelGitDiffState = SidePanelBaseState & {
   kind: 'gitDiff';
-  target?: import('@codex-claw/core/contracts').AgentGitDiffTarget;
-  summary?: import('@codex-claw/core/contracts').AgentGitDiffSummary;
+  target?: import('@workspace/core/contracts').AgentGitDiffTarget;
+  summary?: import('@workspace/core/contracts').AgentGitDiffSummary;
   diff: string;
   sections?: AgentGitDiffSection[];
 };

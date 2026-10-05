@@ -1,5 +1,5 @@
-import type { WorkProviderKind } from '@codex-claw/core/contracts';
-import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
+import type { WorkProviderKind } from '@workspace/core/contracts';
+import { workProviderDefinition, workProviderKinds } from '@workspace/core/work-providers';
 
 export type HostedMcpServerId = WorkProviderKind;
 
@@ -36,7 +36,7 @@ const forwardedRequestHeaders = [
 ] as const;
 
 /**
- * Keeps hosted MCP transport and credentials inside clawd. Backend harnesses
+ * Keeps hosted MCP transport and credentials inside daemon. Backend harnesses
  * connect to a loopback URL and never receive the provider access token.
  */
 export class HostedMcpGateway {
@@ -48,11 +48,11 @@ export class HostedMcpGateway {
     this.fetch = options.fetch ?? fetch;
   }
 
-  enabledServerUrls(clawMcpServerUrl: string): Partial<Record<HostedMcpServerId, string>> {
+  enabledServerUrls(appMcpServerUrl: string): Partial<Record<HostedMcpServerId, string>> {
     return Object.fromEntries(
       hostedMcpServers
         .filter(({ provider }) => this.credentials.isConnected(provider))
-        .map(({ id }) => [id, hostedMcpServerUrl(clawMcpServerUrl, id)]),
+        .map(({ id }) => [id, hostedMcpServerUrl(appMcpServerUrl, id)]),
     ) as Partial<Record<HostedMcpServerId, string>>;
   }
 
@@ -101,8 +101,8 @@ export class HostedMcpGateway {
   }
 }
 
-export function hostedMcpServerUrl(clawMcpServerUrl: string, serverId: HostedMcpServerId): string {
-  const url = new URL(clawMcpServerUrl);
+export function hostedMcpServerUrl(appMcpServerUrl: string, serverId: HostedMcpServerId): string {
+  const url = new URL(appMcpServerUrl);
   url.pathname = `/mcp/providers/${serverId}`;
   url.search = '';
   return url.toString();

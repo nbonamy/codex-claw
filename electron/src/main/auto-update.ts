@@ -1,7 +1,8 @@
 import { type App, autoUpdater } from 'electron';
-import type { DesktopUpdateStatus } from '@codex-claw/core/contracts';
+import type { DesktopUpdateStatus } from '@workspace/core/contracts';
+import { product } from '@workspace/core/product';
 
-const DEFAULT_UPDATE_BASE_URL = 'https://codex-claw.nabocorp.com/desktop/releases';
+const DEFAULT_UPDATE_BASE_URL = product.updateBaseUrl;
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 type DesktopAutoUpdater = {

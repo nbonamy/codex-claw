@@ -1,10 +1,11 @@
+import { product } from '@workspace/core/product';
 import { registerMissionIpcHandlers } from './mission-ipc';
-import type { MissionReviewDebugState, MissionStage } from '@codex-claw/core/missions';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { agentResponseFromClientResponse } from '@codex-claw/core/agent-request';
-import { projectClientSnapshot, splitSettingsInput } from '@codex-claw/core/client-preferences';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { encodedAppError } from '@codex-claw/core/app-error';
+import type { MissionReviewDebugState, MissionStage } from '@workspace/core/missions';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { agentResponseFromClientResponse } from '@workspace/core/agent-request';
+import { projectClientSnapshot, splitSettingsInput } from '@workspace/core/client-preferences';
+import { requireAgentFolder } from '@workspace/core/agent-folder';
+import { encodedAppError } from '@workspace/core/app-error';
 import { mainT } from './i18n';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, net, powerMonitor, protocol, shell } from 'electron';
 import path from 'node:path';
@@ -12,21 +13,21 @@ import { CodexElectronAttachmentRegistry, registerCodexNativeIpc, TypedIpcMain }
 import { AgentActivityPowerSaveBlocker } from './agent-activity-power-save-blocker';
 import { initializeMainLogging, installProcessErrorLogging, logMain, warnMain } from './log';
 import { createMainWindow } from './main-window';
-import { createRuntimeClawBackendClient, type ClawBackendClientPort } from './backend-client';
-import { getClawdDaemonStatus, refreshClawdDaemon, setClawdDaemonEnabled } from './daemon-launch-agent';
-import { ensureCurrentClawdDaemonForStartup } from './daemon-startup-maintenance';
-import { isClawSnapshotGetResult, type ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
-import { decodeAppSnapshot, isClientState, type DecodedAppSnapshot } from '@codex-claw/core/snapshot-guards';
-import { applyMainEventToSnapshot, replaceAppSnapshot } from '@codex-claw/core/snapshot';
-import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type ClawdDaemonStatus, type ClaudeAuthentication, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationListInput, type ConversationResumeTarget, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkSource } from '@codex-claw/core/contracts';
-import { ipcChannels, type CodexClawIpcRequests } from '@codex-claw/core/ipc';
+import { createRuntimeAppBackendClient, type AppBackendClientPort } from './backend-client';
+import { getDaemonStatus, refreshDaemon, setDaemonEnabled } from './daemon-launch-agent';
+import { ensureCurrentDaemonForStartup } from './daemon-startup-maintenance';
+import { isAppSnapshotGetResult, type AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
+import { decodeAppSnapshot, isClientState, type DecodedAppSnapshot } from '@workspace/core/snapshot-guards';
+import { applyMainEventToSnapshot, replaceAppSnapshot } from '@workspace/core/snapshot';
+import { spokenAnnouncementVoices, type AddSshConnectionInput, type AgentFilePreviewResult, type AgentFileSearchItem, type ApprovalPreset, type AppCommand, type AppPluginStatus, type AppSnapshot, type BackendConnectionState, type BackendModelOption, type BackendPluginSummary, type BackendSkillSummary, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type DaemonStatus, type ClaudeAuthentication, type ClientRequestResponse, type CodexAuthentication, type CodexChatGptLogin, type CodexResourceSharingStatus, type ConversationListInput, type ConversationResumeTarget, type ConversationSummary, type CreateAgentInput, type CreateAutomationInput, type CreateQuickChatInput, type CreateSourceWorktreeInput, type CreateTeamInput, type ClientState, type DesktopUpdateStatus, type DevicePairingSession, type DevicePairingStatus, type DuplicateAgentOptions, type AutomationLocation, type MainToRendererEvent, type MoveAgentToTeamInput, type OpenInApplication, type OpenInApplicationCatalog, type PairedDevice, type RendererMessage, type RendererSendPromptOptions, type RendererSnapshotState, type ReorderAgentsInput, type ReorderRepositoriesInput, type ReorderTeamsInput, type SendPromptOptions, type SetCodexResourceSharingInput, type SourceFolderListing, type SourceFolderListInput, type SourceRepository, type SourceWorktree, type SpokenAnnouncementQueueResult, type SpokenAnnouncementVoice, type SshHostCandidate, type SystemPermissionsStatus, type UpdateAgentInput, type UpdateAutomationInput, type UpdateRemoteConnectionInput, type UpdateSettingsInput, type UpdateTeamInput, type WorkBacklogConfigurationInput, type WorkItem, type WorkProviderConnectResult, type WorkProviderKind, type WorkSource } from '@workspace/core/contracts';
+import { ipcChannels, type AppIpcRequests } from '@workspace/core/ipc';
 import { sendAppCommand, sendRendererEvent } from './ipc-events';
 import { installAppMenu, type AppMenuCallbacks, type DebugCodeReviewScenario } from './app-menu';
-import type { ThreadFlagId } from '@codex-claw/core/thread-flags';
+import type { ThreadFlagId } from '@workspace/core/thread-flags';
 import { DesktopAutoUpdateService } from './auto-update';
 import { BrowserPane, browserPaneKey } from './browser-pane';
 import { launchChatGptApp } from './chatgpt-app';
-import { appCommandFromDeepLink, codexClawDeepLinkScheme, deepLinksFromArgv } from './deep-links';
+import { appCommandFromDeepLink, appDeepLinkScheme, deepLinksFromArgv } from './deep-links';
 import { ManualUpdateCheckController } from './manual-update-check';
 import { AppshotsKeyMonitor } from './appshots-key-monitor';
 import { captureAppshot as captureFrontmostAppshot } from './appshots';
@@ -63,7 +64,7 @@ export class AppController {
   private readonly localMediaRegistry = new LocalMediaRegistry();
   private lastBackendEventSeq = 0;
   private clientEventSeq = 0;
-  private backendEventBuffer: ClawBackendEvent[] | null = null;
+  private backendEventBuffer: AppBackendEvent[] | null = null;
   private backendSynchronization: Promise<AppSnapshot> | null = null;
   private readonly transientSnapshots = new Set<AppSnapshot>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -88,18 +89,18 @@ export class AppController {
     this.syncPowerSaveBlocker();
   };
   private powerSourceListenersInstalled = false;
-  private readonly backendClient: ClawBackendClientPort | null;
+  private readonly backendClient: AppBackendClientPort | null;
   private readonly policyAwareSpokenAnnouncements: PolicyAwareSpokenAnnouncementQueue;
 
   constructor(
     initialSnapshot: AppSnapshot | null = null,
-    backendClient: ClawBackendClientPort | null | undefined = undefined,
+    backendClient: AppBackendClientPort | null | undefined = undefined,
     private readonly appLifecycle: AppLifecycle = app,
     private readonly startupMaintenance: StartupMaintenance = async () => undefined,
     private readonly openExternal: (url: string) => Promise<unknown> = (url) => shell.openExternal(url),
     private readonly appshotsKeyMonitor: AppshotsKeyMonitor | null = null,
-    private readonly daemonStatusLoader: () => Promise<ClawdDaemonStatus> = () => getClawdDaemonStatus(),
-    private readonly daemonRefresher: () => Promise<ClawdDaemonStatus> = () => refreshClawdDaemon(),
+    private readonly daemonStatusLoader: () => Promise<DaemonStatus> = () => getDaemonStatus(),
+    private readonly daemonRefresher: () => Promise<DaemonStatus> = () => refreshDaemon(),
     private readonly openInProvider: OpenInProvider = createOpenInProvider(),
     private readonly badgeApplication: BadgeApplication = app,
     private readonly spokenAnnouncements: SpokenAnnouncementQueuePort = createRuntimeSpokenAnnouncementQueue({
@@ -121,7 +122,7 @@ export class AppController {
         scope: this.snapshot?.general.spokenAnnouncementScope ?? 'selected',
       }),
     );
-    this.backendClient = backendClient ?? createRuntimeClawBackendClient({
+    this.backendClient = backendClient ?? createRuntimeAppBackendClient({
       browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
       browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
       spokenAnnouncements: this.policyAwareSpokenAnnouncements,
@@ -176,7 +177,7 @@ export class AppController {
       {},
       this.nativeAttachmentRegistry,
     );
-    const ipc = new TypedIpcMain<CodexClawIpcRequests>(ipcMain);
+    const ipc = new TypedIpcMain<AppIpcRequests>(ipcMain);
     ipc.handle(ipcChannels.getSnapshot, () => this.getSnapshot());
     ipc.handle(ipcChannels.getSnapshotState, () => this.getSnapshotState());
 
@@ -229,7 +230,7 @@ export class AppController {
       return this.configureWorkBacklog(input, location);
     });
 
-    ipc.handle(ipcChannels.listGlobalWorkItems, async (_event, provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery) => {
+    ipc.handle(ipcChannels.listGlobalWorkItems, async (_event, provider: WorkProviderKind, location?: AutomationLocation, query?: import('@workspace/core/contracts').GlobalWorkItemQuery) => {
       return this.listGlobalWorkItems(provider, location, query);
     });
 
@@ -237,11 +238,11 @@ export class AppController {
       return this.listAssignedWorkItems(provider, location);
     });
 
-    ipc.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery) => {
+    ipc.handle(ipcChannels.listWorkItems, async (_event, provider: WorkProviderKind, repositoryId: string, location?: AutomationLocation, query?: import('@workspace/core/contracts').WorkItemQuery) => {
       return this.listWorkItems(provider, repositoryId, location, query);
     });
 
-    ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string, backend?: import('@codex-claw/core/contracts').AgentBackend) => {
+    ipc.handle(ipcChannels.listBackendModels, async (_event, agentId: string, backend?: import('@workspace/core/contracts').AgentBackend) => {
       return this.listBackendModels(agentId, backend);
     });
 
@@ -292,7 +293,7 @@ export class AppController {
       return this.listSourceRepositories(remoteConnectionId);
     });
 
-    ipc.handle(ipcChannels.cloneSourceRepository, async (_event, input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput) => {
+    ipc.handle(ipcChannels.cloneSourceRepository, async (_event, input: import('@workspace/core/contracts').CloneSourceRepositoryInput) => {
       try {
         return await this.cloneSourceRepository(input);
       } catch (error) {
@@ -300,7 +301,7 @@ export class AppController {
       }
     });
 
-    ipc.handle(ipcChannels.createSourceRepository, async (_event, input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput) => {
+    ipc.handle(ipcChannels.createSourceRepository, async (_event, input: import('@workspace/core/contracts').CreateSourceRepositoryInput) => {
       try {
         return await this.createSourceRepository(input);
       } catch (error) {
@@ -308,7 +309,7 @@ export class AppController {
       }
     });
 
-    ipc.handle(ipcChannels.createProject, async (_event, input: import('@codex-claw/core/contracts').CreateProjectInput) => {
+    ipc.handle(ipcChannels.createProject, async (_event, input: import('@workspace/core/contracts').CreateProjectInput) => {
       try {
         return await this.createProject(input);
       } catch (error) {
@@ -434,7 +435,7 @@ export class AppController {
     ipc.handle(ipcChannels.forkAgent, async (_event, agentId: string, turnId?: string) => {
       return this.forkAgent(agentId, turnId);
     });
-    ipc.handle(ipcChannels.handoffAgent, async (_event, agentId: string, input: import('@codex-claw/core/agent-handoff').AgentHandoffInput) => {
+    ipc.handle(ipcChannels.handoffAgent, async (_event, agentId: string, input: import('@workspace/core/agent-handoff').AgentHandoffInput) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentHandoff, { agentId, input }));
     });
 
@@ -544,37 +545,37 @@ export class AppController {
       return this.setAgentPermissionMode(agentId, mode);
     });
 
-    ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@codex-claw/core/plan-review').PlanReviewResponse) => {
+    ipc.handle(ipcChannels.respondToPlanReview, async (_event, agentId: string, response: import('@workspace/core/plan-review').PlanReviewResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPlanReviewRespond, { agentId, response }));
     });
-    ipc.handle(ipcChannels.startVisualize, async (_event, agentId: string, input?: import('@codex-claw/core/visualize').StartVisualizeInput) => (
+    ipc.handle(ipcChannels.startVisualize, async (_event, agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizeStart, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.setVisualizeOpen, async (_event, agentId: string, input: import('@codex-claw/core/visualize').SetVisualizeOpenInput) => (
+    ipc.handle(ipcChannels.setVisualizeOpen, async (_event, agentId: string, input: import('@workspace/core/visualize').SetVisualizeOpenInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizeOpenSet, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.generateVisualizationSuggestion, async (_event, agentId: string, input: import('@codex-claw/core/visualize').GenerateVisualizationSuggestionInput) => (
+    ipc.handle(ipcChannels.generateVisualizationSuggestion, async (_event, agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizationSuggestionGenerate, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.selectVisualization, async (_event, agentId: string, input: import('@codex-claw/core/visualize').SelectVisualizationInput) => (
+    ipc.handle(ipcChannels.selectVisualization, async (_event, agentId: string, input: import('@workspace/core/visualize').SelectVisualizationInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizationSelect, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.deleteVisualization, async (_event, agentId: string, input: import('@codex-claw/core/visualize').DeleteVisualizationInput) => (
+    ipc.handle(ipcChannels.deleteVisualization, async (_event, agentId: string, input: import('@workspace/core/visualize').DeleteVisualizationInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentVisualizationDelete, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.saveVisualizationCanvas, (_event, agentId: string, input: import('@codex-claw/core/visualize-canvas').SaveCanvasInput) => (
+    ipc.handle(ipcChannels.saveVisualizationCanvas, (_event, agentId: string, input: import('@workspace/core/visualize-canvas').SaveCanvasInput) => (
       this.requireBackendClient().request(backendMethods.agentVisualizationCanvasSave, { agentId, input })
     ));
     ipc.handle(ipcChannels.readVisualizationAsset, (_event, agentId: string, visualizationId: string) => (
       this.requireBackendClient().request(backendMethods.agentVisualizationAssetGet, { agentId, visualizationId })
     ));
-    ipc.handle(ipcChannels.startCodeReview, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewStartInput) => (
+    ipc.handle(ipcChannels.startCodeReview, async (_event, agentId: string, input: import('@workspace/core/code-review').CodeReviewStartInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewStart, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.decideCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDecisionInput) => (
+    ipc.handle(ipcChannels.decideCodeReviewFinding, async (_event, agentId: string, input: import('@workspace/core/code-review').CodeReviewDecisionInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingDecide, { agentId, input }))
     ));
-    ipc.handle(ipcChannels.discussCodeReviewFinding, async (_event, agentId: string, input: import('@codex-claw/core/code-review').CodeReviewDiscussionInput) => (
+    ipc.handle(ipcChannels.discussCodeReviewFinding, async (_event, agentId: string, input: import('@workspace/core/code-review').CodeReviewDiscussionInput) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFindingDiscuss, { agentId, input }))
     ));
     ipc.handle(ipcChannels.submitCodeReviewRound, async (_event, agentId: string, sessionId: string) => (
@@ -589,7 +590,7 @@ export class AppController {
     ipc.handle(ipcChannels.reviewCodeAgain, async (_event, agentId: string, sessionId: string) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewAgain, { agentId, sessionId }))
     ));
-    ipc.handle(ipcChannels.respondToThreadFlag, async (_event, agentId: string, response: import('@codex-claw/core/thread-flags').ThreadFlagResponse) => {
+    ipc.handle(ipcChannels.respondToThreadFlag, async (_event, agentId: string, response: import('@workspace/core/thread-flags').ThreadFlagResponse) => {
       return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentThreadFlagRespond, { agentId, response }));
     });
     ipc.handle(ipcChannels.sendPrompt, (_event, agentId: string, prompt: string, options?: RendererSendPromptOptions) => {
@@ -731,7 +732,7 @@ export class AppController {
     const preview = this.spokenAnnouncements.queueWithCompletion({
       agentId: `settings-preview:${voice}`,
       phase: 'start',
-      text: 'Codex Claw is on it—sharp claws, clean code.',
+      text: `${product.name} is ready. Let's build something.`,
       voice,
     });
     await preview.completion;
@@ -749,10 +750,10 @@ export class AppController {
       this.subscribeToBackendClient();
       await this.synchronizeBackendState();
       this.setConnectionState({ status: 'connected' });
-      logMain('clawd', 'connected to backend', { version: health.version, pid: health.pid });
+      logMain('daemon', 'connected to backend', { version: health.version, pid: health.pid });
     } catch (error) {
       this.handleBackendDisconnect(error instanceof Error ? error : new Error(String(error)));
-      warnMain('clawd', 'failed to connect to backend process', {
+      warnMain('daemon', 'failed to connect to backend process', {
         detail: error instanceof Error ? error.message : String(error),
       });
     }
@@ -844,7 +845,7 @@ export class AppController {
     return location?.kind === 'remote' ? snapshot : this.adoptBackendSnapshot(snapshot);
   }
 
-  private async listWorkItems(provider: WorkProviderKind, sourceId: string, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
+  private async listWorkItems(provider: WorkProviderKind, sourceId: string, location?: AutomationLocation, query?: import('@workspace/core/contracts').WorkItemQuery): Promise<WorkItem[]> {
     return this.requireBackendClient().request(backendMethods.workProviderItemsList, {
       provider,
       sourceId,
@@ -853,7 +854,7 @@ export class AppController {
     });
   }
 
-  private async listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: import('@codex-claw/core/contracts').GlobalWorkItemQuery): Promise<import('@codex-claw/core/contracts').WorkItemPage> {
+  private async listGlobalWorkItems(provider: WorkProviderKind, location?: AutomationLocation, query?: import('@workspace/core/contracts').GlobalWorkItemQuery): Promise<import('@workspace/core/contracts').WorkItemPage> {
     return this.requireBackendClient().request(backendMethods.workProviderGlobalItemsList, {
       provider,
       ...(location ? { location } : {}),
@@ -932,7 +933,7 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.clientRepositoryOrderUpdate, { input }));
   }
 
-  private async closeAgent(agentId: string, input?: import('@codex-claw/core/contracts').AgentCloseInput): Promise<AppSnapshot> {
+  private async closeAgent(agentId: string, input?: import('@workspace/core/contracts').AgentCloseInput): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentDelete, {
       agentId,
       ...(input ? { input } : {}),
@@ -1018,7 +1019,7 @@ export class AppController {
     return this.requireBackendClient().request(backendMethods.claudeAuthenticationGet, remoteConnectionId === undefined ? undefined : { connectionId: remoteConnectionId });
   }
 
-  private startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<import('@codex-claw/core/contracts').CodexChatGptDeviceCodeLogin> {
+  private startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<import('@workspace/core/contracts').CodexChatGptDeviceCodeLogin> {
     if (typeof remoteConnectionId !== 'string' || !remoteConnectionId.trim()) throw new Error('A remote connection is required.');
     return this.requireBackendClient().request(backendMethods.codexChatGptDeviceCodeLoginStart, { remoteConnectionId });
   }
@@ -1040,12 +1041,12 @@ export class AppController {
     return this.requireBackendClient().request(backendMethods.codexLogout);
   }
 
-  private async getDaemonStatus(): Promise<ClawdDaemonStatus> {
+  private async getDaemonStatus(): Promise<DaemonStatus> {
     return this.daemonStatusLoader();
   }
 
-  private async setDaemonEnabled(enabled: boolean): Promise<ClawdDaemonStatus> {
-    return setClawdDaemonEnabled(enabled);
+  private async setDaemonEnabled(enabled: boolean): Promise<DaemonStatus> {
+    return setDaemonEnabled(enabled);
   }
 
   private async restartApp(): Promise<void> {
@@ -1076,7 +1077,7 @@ export class AppController {
       try {
         await this.daemonRefresher();
       } catch (error) {
-        warnMain('clawd', 'failed to restart background backend after resource sharing changed', {
+        warnMain('daemon', 'failed to restart background backend after resource sharing changed', {
           detail: error instanceof Error ? error.message : String(error),
         });
       }
@@ -1156,7 +1157,7 @@ export class AppController {
   }
 
   private async adoptBackendMutationSnapshot(nextSnapshot: AppSnapshot): Promise<AppSnapshot> {
-    if (!this.snapshot) throw new Error('clawd snapshot is not available.');
+    if (!this.snapshot) throw new Error('daemon snapshot is not available.');
     const previousDebugThreadFlags = this.debugThreadFlagState();
     replaceAppSnapshot(this.snapshot, nextSnapshot);
     this.policyAwareSpokenAnnouncements.refresh();
@@ -1170,7 +1171,7 @@ export class AppController {
       return withRendererMediaUrls(await this.synchronizeBackendState(), this.localMediaRegistry);
     }
     if (this.snapshot) return withRendererMediaUrls(this.snapshot, this.localMediaRegistry);
-    throw new Error('clawd snapshot is not available.');
+    throw new Error('daemon snapshot is not available.');
   }
 
   private async getSnapshotState(): Promise<RendererSnapshotState> {
@@ -1338,7 +1339,7 @@ export class AppController {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentPermissionModeUpdate, { agentId, mode }));
   }
 
-  private async listBackendModels(agentId: string, backend?: import('@codex-claw/core/contracts').AgentBackend): Promise<BackendModelOption[]> {
+  private async listBackendModels(agentId: string, backend?: import('@workspace/core/contracts').AgentBackend): Promise<BackendModelOption[]> {
     return this.requireBackendClient().request(backendMethods.agentModelsList, { agentId, ...(backend ? { backend } : {}) });
   }
 
@@ -1466,19 +1467,19 @@ export class AppController {
     return this.requireBackendClient().request(backendMethods.sourceRepositoriesList, remoteConnectionId ? { remoteConnectionId } : undefined);
   }
 
-  private async cloneSourceRepository(input: import('@codex-claw/core/contracts').CloneSourceRepositoryInput): Promise<SourceRepository> {
+  private async cloneSourceRepository(input: import('@workspace/core/contracts').CloneSourceRepositoryInput): Promise<SourceRepository> {
     return this.requireBackendClient().request<SourceRepository>(backendMethods.sourceRepositoryClone, { input });
   }
 
-  private async createSourceRepository(input: import('@codex-claw/core/contracts').CreateSourceRepositoryInput): Promise<SourceRepository> {
+  private async createSourceRepository(input: import('@workspace/core/contracts').CreateSourceRepositoryInput): Promise<SourceRepository> {
     return this.requireBackendClient().request<SourceRepository>(backendMethods.sourceRepositoryCreate, { input });
   }
 
-  private async createProject(input: import('@codex-claw/core/contracts').CreateProjectInput): Promise<AppSnapshot> {
+  private async createProject(input: import('@workspace/core/contracts').CreateProjectInput): Promise<AppSnapshot> {
     return this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.projectCreate, { input }));
   }
 
-  private async listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<import('@codex-claw/core/contracts').SourceBranch[]> {
+  private async listSourceBranches(repoPath: string, remoteConnectionId?: string): Promise<import('@workspace/core/contracts').SourceBranch[]> {
     return this.requireBackendClient().request(backendMethods.sourceBranchesList, {
       repoPath,
       ...(remoteConnectionId ? { remoteConnectionId } : {}),
@@ -1537,7 +1538,7 @@ export class AppController {
     this.backendEventBuffer ??= [];
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const backendState = await this.requireBackendClient().request<unknown>(backendMethods.snapshotGet);
-      if (!isClawSnapshotGetResult(backendState)) throw new Error('clawd returned an invalid snapshot.');
+      if (!isAppSnapshotGetResult(backendState)) throw new Error('daemon returned an invalid snapshot.');
 
       let synchronizedSnapshot = backendState.snapshot;
       this.snapshot = synchronizedSnapshot;
@@ -1564,13 +1565,13 @@ export class AppController {
         this.syncPowerSaveBlocker();
         return synchronizedSnapshot;
       }
-      warnMain('clawd', 'backend event gap detected while synchronizing', {
+      warnMain('daemon', 'backend event gap detected while synchronizing', {
         attempt: attempt + 1,
         lastEventSeq: this.lastBackendEventSeq,
       });
     }
     this.backendEventBuffer = null;
-    throw new Error('Unable to obtain a consistent clawd snapshot after repeated event gaps.');
+    throw new Error('Unable to obtain a consistent daemon snapshot after repeated event gaps.');
   }
 
   private async refreshClientStateFromBackend(): Promise<void> {
@@ -1578,9 +1579,9 @@ export class AppController {
     this.syncPowerSaveBlocker();
   }
 
-  private requireBackendClient(): ClawBackendClientPort {
+  private requireBackendClient(): AppBackendClientPort {
     if (!this.backendClient) {
-      throw new Error('clawd backend is not connected.');
+      throw new Error('daemon backend is not connected.');
     }
     return this.backendClient;
   }
@@ -1752,7 +1753,7 @@ export class AppController {
       }));
   }
 
-  private populateDebugVisualize(scenario: import('@codex-claw/core/visualize').VisualizeDebugScenario): void {
+  private populateDebugVisualize(scenario: import('@workspace/core/visualize').VisualizeDebugScenario): void {
     const agentId = this.snapshot?.activeAgentId;
     if (!agentId || !this.backendClient || app?.isPackaged) return;
 
@@ -1785,7 +1786,7 @@ export class AppController {
       });
   }
 
-  private emitBackendEvent(event: ClawBackendEvent): void {
+  private emitBackendEvent(event: AppBackendEvent): void {
     if (event.type === 'snapshot.updated') event = { ...event, payload: projectClientSnapshot(event.payload, 'desktop') };
     if (event.snapshot) event = { ...event, snapshot: projectClientSnapshot(event.snapshot, 'desktop') };
     if (this.backendEventBuffer) {
@@ -1794,7 +1795,7 @@ export class AppController {
     }
     if (event.seq <= this.lastBackendEventSeq) return;
     if (event.seq !== this.lastBackendEventSeq + 1) {
-      warnMain('clawd', 'backend event sequence gap; synchronizing snapshot', {
+      warnMain('daemon', 'backend event sequence gap; synchronizing snapshot', {
         expected: this.lastBackendEventSeq + 1,
         received: event.seq,
       });
@@ -1807,7 +1808,7 @@ export class AppController {
     this.applyBackendEvent(event, true);
   }
 
-  private applyBackendEvent(event: ClawBackendEvent, notifyRenderer: boolean): void {
+  private applyBackendEvent(event: AppBackendEvent, notifyRenderer: boolean): void {
     const previousDebugThreadFlags = this.debugThreadFlagState();
     const rendererEvent = eventForRenderer(event);
     const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
@@ -1835,7 +1836,7 @@ export class AppController {
 
   private handleBackendDisconnect(error?: Error): void {
     if (this.shuttingDown) return;
-    warnMain('clawd', 'backend connection lost', {
+    warnMain('daemon', 'backend connection lost', {
       detail: error?.message ?? 'unknown error',
       lastEventSeq: this.lastBackendEventSeq,
     });
@@ -1863,10 +1864,10 @@ export class AppController {
       this.reconnectAttempt = 0;
       this.setConnectionState({ status: 'connected' });
       this.emitSnapshotToRenderer(snapshot);
-      logMain('clawd', 'reconnected to backend', { version: health.version, pid: health.pid });
+      logMain('daemon', 'reconnected to backend', { version: health.version, pid: health.pid });
     } catch (error) {
       this.reconnectAttempt += 1;
-      warnMain('clawd', 'backend reconnect failed', {
+      warnMain('daemon', 'backend reconnect failed', {
         attempt: this.reconnectAttempt,
         detail: error instanceof Error ? error.message : String(error),
       });
@@ -1980,13 +1981,13 @@ export function startMainApp(): void {
     null,
     undefined,
     app,
-    ensureCurrentClawdDaemonForStartup,
+    ensureCurrentDaemonForStartup,
     (url) => shell.openExternal(url),
     new AppshotsKeyMonitor(),
   );
   const autoUpdateService = new DesktopAutoUpdateService({
     app,
-    updateBaseUrl: process.env.CODEX_CLAW_UPDATE_BASE_URL,
+    updateBaseUrl: process.env.APP_UPDATE_BASE_URL,
     onStatusChanged: (status) => controller.setDesktopUpdateStatus(status),
   });
   controller.setAutoUpdateService(autoUpdateService);
@@ -2017,9 +2018,9 @@ export function startMainApp(): void {
   void app.whenReady().then(async () => {
     controller.installLocalMediaProtocol();
     if (app.isPackaged) {
-      app.setAsDefaultProtocolClient(codexClawDeepLinkScheme);
+      app.setAsDefaultProtocolClient(appDeepLinkScheme);
     } else if (process.argv[1]) {
-      app.setAsDefaultProtocolClient(codexClawDeepLinkScheme, process.execPath, [path.resolve(process.argv[1])]);
+      app.setAsDefaultProtocolClient(appDeepLinkScheme, process.execPath, [path.resolve(process.argv[1])]);
     }
     try {
       await controller.initialize();
@@ -2086,11 +2087,11 @@ function isRemoteAutomationLocation(location: AutomationLocation | undefined): l
   return location?.kind === 'remote' && location.remoteConnectionId.trim().length > 0;
 }
 
-function eventForRenderer(event: ClawBackendEvent): MainToRendererEvent {
+function eventForRenderer(event: AppBackendEvent): MainToRendererEvent {
   return { ...event, source: 'backend' };
 }
 
-function decodeSnapshotFromBackendEvent(event: ClawBackendEvent): DecodedAppSnapshot | null {
+function decodeSnapshotFromBackendEvent(event: AppBackendEvent): DecodedAppSnapshot | null {
   const sideChannelSnapshot = decodeAppSnapshot(event.snapshot);
   if (sideChannelSnapshot) return sideChannelSnapshot;
   if (event.type !== 'snapshot.updated') return null;

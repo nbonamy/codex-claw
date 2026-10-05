@@ -17,13 +17,13 @@ import {
   IconSitemap as SitemapIcon,
   IconUsers as UsersIcon,
 } from '@tabler/icons-vue';
-import { clawMcpToolName, clawToolName, presentClawToolTitle } from './tool-title-presenter';
+import { appMcpToolName, appToolName, presentAppToolTitle } from './tool-title-presenter';
 
 type Translate = CodexToolTitlePresenterContext['translate'];
 type ToolIcon = Exclude<CodexToolPresentation['icon'], null | undefined>;
 type AgentNameResolver = (identifier: string) => string | undefined;
 
-// The linked SDK and Claw resolve Vue through separate package roots during
+// The linked SDK and App resolve Vue through separate package roots during
 // typechecking, while Vite dedupes them at runtime. Keep that cast at this one
 // host boundary instead of leaking it through the resolver.
 const icons = {
@@ -80,10 +80,10 @@ const TASK_TOOLS = new Set(['wait-tasks', 'complete-task', 'cancel-task']);
 const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-project', 'create-worktree', 'list-repos', 'list-worktrees']);
 const HIDDEN_HOUSEKEEPING_TOOLS = new Set(['set-status', 'finish-turn']);
 
-export const isClawToolVisible: CodexToolVisibility = (toolCall) =>
-  !HIDDEN_HOUSEKEEPING_TOOLS.has(clawToolName(toolCall.function, toolCall.kind, toolCall.metadata) ?? '');
+export const isAppToolVisible: CodexToolVisibility = (toolCall) =>
+  !HIDDEN_HOUSEKEEPING_TOOLS.has(appToolName(toolCall.function, toolCall.kind, toolCall.metadata) ?? '');
 
-export function presentClawTool(
+export function presentAppTool(
   context: CodexToolPresentationContext,
   translate: Translate,
   resolveAgentName?: AgentNameResolver,
@@ -97,11 +97,11 @@ export function presentClawTool(
     return { icon: icons.computerUse, title: translate(`chat.tool.mcp.cuaRepl.${phase}`) };
   }
 
-  const tool = clawMcpToolName(context.kind, context.metadata);
-  const icon = tool ? clawToolIcon(tool) : undefined;
+  const tool = appMcpToolName(context.kind, context.metadata);
+  const icon = tool ? appToolIcon(tool) : undefined;
   if (!icon) return undefined;
 
-  const title = presentClawToolTitle({
+  const title = presentAppToolTitle({
     descriptor: context.descriptor,
     toolCall: context.toolCall,
     translate,
@@ -112,11 +112,11 @@ export function presentClawTool(
   };
 }
 
-export function provideClawToolPresentation(translate: Translate, resolveAgentName?: AgentNameResolver): void {
-  provideCodexToolPresentation((context) => presentClawTool(context, translate, resolveAgentName));
+export function provideAppToolPresentation(translate: Translate, resolveAgentName?: AgentNameResolver): void {
+  provideCodexToolPresentation((context) => presentAppTool(context, translate, resolveAgentName));
 }
 
-function clawToolIcon(tool: string): ToolIcon | undefined {
+function appToolIcon(tool: string): ToolIcon | undefined {
   if (BROWSER_TOOLS.has(tool)) return icons.browser;
   if (COMPUTER_USE_TOOLS.has(tool)) return icons.computerUse;
   if (MESSAGE_TOOLS.has(tool)) return icons.messages;

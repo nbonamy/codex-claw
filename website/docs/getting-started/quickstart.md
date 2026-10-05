@@ -1,20 +1,20 @@
 ---
-description: Install Claw, connect a provider, and complete a small repository task.
+description: Install Korus, connect a provider, and complete a small repository task.
 ---
 
 # Quickstart
 
 Start with one repository, one agent, and a small change you can review.
 
-## Install Claw
+## Install Korus
 
-[Download Codex Claw for macOS](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg), move it to Applications, and launch it. The desktop download supports Apple silicon.
+[Download Korus for macOS](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg), move it to Applications, and launch it. The desktop download supports Apple silicon.
 
 See [Installation](./installation) for requirements.
 
 ## Choose your provider's setup
 
-On the first-run screen, select **Customize** beneath Codex or Claude Code. Choose **Separate Claw chats** for its own setup environment, or **Use existing setup** to reuse the provider environment already on your computer. Configure each engine separately.
+On the first-run screen, select **Customize** beneath Codex or Claude Code. Choose **Separate Korus chats** for its own setup environment, or **Use existing setup** to reuse the provider environment already on your computer. Configure each engine separately.
 
 Use **Connect Codex** or **Connect Claude Code** and complete that engine's authentication steps. Once at least one engine is connected and enabled, select **Continue**. You can manage these choices later in **Settings → Codex** or **Settings → Claude Code**.
 

@@ -2,7 +2,7 @@ import { defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ElMessageBox } from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
-import type { VisualizationAsset, VisualizeSession } from '@codex-claw/core/visualize';
+import type { VisualizationAsset, VisualizeSession } from '@workspace/core/visualize';
 import VisualizePanel from '../VisualizePanel.vue';
 
 vi.mock('../ExcalidrawCanvas.vue', () => ({ default: defineComponent({ props: ['visualization', 'imageSource'], template: '<div class="editor-canvas">{{ visualization.title }} canvas<img v-if="imageSource" :src="imageSource" /></div>' }) }));

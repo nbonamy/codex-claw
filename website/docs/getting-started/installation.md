@@ -1,34 +1,34 @@
 ---
-description: Download and install the Codex Claw desktop app.
+description: Download and install the Korus desktop app.
 ---
 
 # Installation
 
-The desktop release is available for **macOS on Apple silicon**. Linux x64 support is experimental; Computer Use and Appshots are macOS-only.
+The desktop release is available for **macOS on Apple silicon**. Linux x64 support is experimental; Computer Use and Screenshots are macOS-only.
 
 ## Install on macOS
 
 1. [Download the macOS DMG](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg).
-2. Open the DMG and move Codex Claw to Applications.
-3. Launch Codex Claw. The first-run screen checks your coding engines and offers **Connect Codex**, **Connect Claude Code**, and **Customize** for each one.
+2. Open the DMG and move Korus to Applications.
+3. Launch Korus. The first-run screen checks your coding engines and offers **Connect Codex**, **Connect Claude Code**, and **Customize** for each one.
 4. Choose how each engine should store its setup before connecting it. Follow the steps below, then open a repository.
 
 ## Choose separate or existing provider setup
 
-Claw can keep its provider setup separate from your existing command-line tools. On the first-run screen, click **Customize** beneath the engine you want to configure.
+Korus can keep its provider setup separate from your existing command-line tools. On the first-run screen, click **Customize** beneath the engine you want to configure.
 
 | Choice | Use it when |
 | --- | --- |
-| **Separate Claw chats** | You want Claw's chats and provider sign-in kept in a separate setup environment. |
-| **Use existing setup** | You want Claw to use the provider environment already configured on this computer. |
+| **Separate Korus chats** | You want Korus's chats and provider sign-in kept in a separate setup environment. |
+| **Use existing setup** | You want Korus to use the provider environment already configured on this computer. |
 
 This choice is independent for Codex and Claude Code. Selecting an existing Codex setup does not select an existing Claude setup, and signing in to one engine does not authenticate the other.
 
-Follow the [provider setup overview](../providers/) before changing an existing setup. It explains skills and plugin sharing, the selected provider location, and what happens to Claw conversations when you switch locations later.
+Follow the [provider setup overview](../providers/) before changing an existing setup. It explains skills and plugin sharing, the selected provider location, and what happens to Korus conversations when you switch locations later.
 
 ## Connect at least one engine
 
-Claw does not include a separate model subscription. Connect a provider account with access to the engine you want to use.
+Korus does not include a separate model subscription. Connect a provider account with access to the engine you want to use.
 
 1. Use **Connect Codex** for the OpenAI sign-in flow, or **Connect Claude Code** for its provider-specific authentication steps.
 2. Confirm the engine is connected and enabled. The first-run **Continue** action becomes available when at least one installed engine is connected and enabled; connecting both is optional.

@@ -1,22 +1,23 @@
+import { product } from '@workspace/core/product';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { backendRequestTimeoutMs } from '@codex-claw/core/backend-protocol/request-timeout';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { backendRequestTimeoutMs } from '@workspace/core/backend-protocol/request-timeout';
 import {
-  decodeClawBackendEvent,
-  type ClawBackendEvent,
-} from '@codex-claw/core/backend-protocol/events';
+  decodeAppBackendEvent,
+  type AppBackendEvent,
+} from '@workspace/core/backend-protocol/events';
 import {
-  createClawRpcError,
-  clawRpcErrorCodes,
-  isClawRpcNotification,
-  isClawRpcRequest,
-  isClawRpcResponse,
-  parseClawRpcMessage,
-  type ClawRpcId,
-  type ClawRpcResponse,
-} from '@codex-claw/core/backend-protocol/rpc';
+  createAppRpcError,
+  appRpcErrorCodes,
+  isAppRpcNotification,
+  isAppRpcRequest,
+  isAppRpcResponse,
+  parseAppRpcMessage,
+  type AppRpcId,
+  type AppRpcResponse,
+} from '@workspace/core/backend-protocol/rpc';
 
-export type ClawWebBackendProcessOptions = {
+export type AppWebBackendProcessOptions = {
   command: string;
   args: string[];
   cwd?: string;
@@ -29,20 +30,20 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
-export class ClawWebBackendProcess {
+export class AppWebBackendProcess {
   private child: ChildProcessWithoutNullStreams | null = null;
   private stdoutBuffer = '';
   private sequence = 0;
-  private readonly pending = new Map<ClawRpcId, PendingRequest>();
-  private readonly eventListeners = new Set<(event: ClawBackendEvent) => void>();
+  private readonly pending = new Map<AppRpcId, PendingRequest>();
+  private readonly eventListeners = new Set<(event: AppBackendEvent) => void>();
 
-  constructor(private readonly options: ClawWebBackendProcessOptions) {}
+  constructor(private readonly options: AppWebBackendProcessOptions) {}
 
   async start(): Promise<void> {
     if (this.child) return;
     const child = spawn(this.options.command, this.options.args, {
       cwd: this.options.cwd,
-      env: { ...process.env, ...this.options.env, CODEX_CLAW_HOST: 'web' },
+      env: { ...process.env, ...this.options.env, APP_HOST: 'web' },
       stdio: 'pipe',
     });
     this.child = child;
@@ -51,14 +52,14 @@ export class ClawWebBackendProcess {
     child.once('error', (error) => this.disconnect(child, error));
     child.once('exit', (code, signal) => this.disconnect(
       child,
-      new Error(`clawd exited (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`),
+      new Error(`daemon exited (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`),
     ));
     await this.request(backendMethods.backendHealthGet);
   }
 
   request<Result>(method: string, params?: unknown): Promise<Result> {
     const child = this.child;
-    if (!child) return Promise.reject(new Error('Claw web backend is not running.'));
+    if (!child) return Promise.reject(new Error(`${product.name} web backend is not running.`));
     const requestTimeoutMs = backendRequestTimeoutMs(method);
     const id = ++this.sequence;
     const message = params === undefined
@@ -67,7 +68,7 @@ export class ClawWebBackendProcess {
     const result = new Promise<Result>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`clawd request timed out: ${method}`));
+        reject(new Error(`daemon request timed out: ${method}`));
       }, requestTimeoutMs);
       this.pending.set(id, { resolve: (value) => resolve(value as Result), reject, timeout });
     });
@@ -75,7 +76,7 @@ export class ClawWebBackendProcess {
     return result;
   }
 
-  onEvent(listener: (event: ClawBackendEvent) => void): () => void {
+  onEvent(listener: (event: AppBackendEvent) => void): () => void {
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
   }
@@ -83,7 +84,7 @@ export class ClawWebBackendProcess {
   async close(): Promise<void> {
     const child = this.child;
     this.child = null;
-    this.rejectPending(new Error('Claw web backend closed.'));
+    this.rejectPending(new Error(`${product.name} web backend closed.`));
     if (!child || child.killed) return;
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(resolve, 5_000);
@@ -109,19 +110,19 @@ export class ClawWebBackendProcess {
   private handleLine(line: string): void {
     let message;
     try {
-      message = parseClawRpcMessage(JSON.parse(line));
+      message = parseAppRpcMessage(JSON.parse(line));
     } catch (error) {
-      process.stderr.write(`Ignored invalid clawd response: ${error instanceof Error ? error.message : String(error)}\n`);
+      process.stderr.write(`Ignored invalid daemon response: ${error instanceof Error ? error.message : String(error)}\n`);
       return;
     }
-    if (isClawRpcNotification(message)) {
+    if (isAppRpcNotification(message)) {
       if (message.method === backendMethods.backendEventNotify) {
-        let event: ClawBackendEvent;
+        let event: AppBackendEvent;
         try {
-          event = decodeClawBackendEvent(message.params);
+          event = decodeAppBackendEvent(message.params);
         } catch (error) {
           process.stderr.write(
-            `Ignored malformed clawd event notification: ${error instanceof Error ? error.message : 'Invalid backend event notification.'}\n`,
+            `Ignored malformed daemon event notification: ${error instanceof Error ? error.message : 'Invalid backend event notification.'}\n`,
           );
           return;
         }
@@ -129,15 +130,15 @@ export class ClawWebBackendProcess {
       }
       return;
     }
-    if (isClawRpcRequest(message)) {
-      this.writeResponse(createClawRpcError(
+    if (isAppRpcRequest(message)) {
+      this.writeResponse(createAppRpcError(
         message.id,
-        clawRpcErrorCodes.methodNotFound,
-        `Client method '${message.method}' is unavailable in Claw Web.`,
+        appRpcErrorCodes.methodNotFound,
+        `Client method '${message.method}' is unavailable in ${product.name} Web.`,
       ));
       return;
     }
-    if (!isClawRpcResponse(message) || message.id === null) return;
+    if (!isAppRpcResponse(message) || message.id === null) return;
     const pending = this.pending.get(message.id);
     if (!pending) return;
     clearTimeout(pending.timeout);
@@ -146,7 +147,7 @@ export class ClawWebBackendProcess {
     else pending.resolve(message.result);
   }
 
-  private writeResponse(response: ClawRpcResponse): void {
+  private writeResponse(response: AppRpcResponse): void {
     this.child?.stdin.write(`${JSON.stringify(response)}\n`);
   }
 

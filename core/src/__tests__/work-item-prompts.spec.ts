@@ -23,7 +23,7 @@ describe('work item prompts', () => {
       body: '  Reproduce, fix, and verify.  ',
     }), { assignment: '  Add a regression test.  ' });
 
-    expect(prompt).toContain('Work item ID: github:nbonamy/codex-claw#42');
+    expect(prompt).toContain('Work item ID: github:nbonamy/agent-workspace#42');
     expect(prompt).toContain('status `readyForReview`');
     expect(prompt).toContain('Labels: bug');
     expect(prompt).toContain('Author: nicolas');
@@ -78,12 +78,12 @@ describe('work item prompts', () => {
 function workItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
     provider: 'github',
-    id: 'nbonamy/codex-claw#42',
-    sourceId: 'nbonamy/codex-claw',
-    sourceName: 'nbonamy/codex-claw',
+    id: 'nbonamy/agent-workspace#42',
+    sourceId: 'nbonamy/agent-workspace',
+    sourceName: 'nbonamy/agent-workspace',
     number: 42,
     title: 'Keep queued messages visible',
-    url: 'https://github.com/nbonamy/codex-claw/issues/42',
+    url: 'https://github.com/nbonamy/agent-workspace/issues/42',
     state: 'open',
     labels: [],
     createdAt: '2026-08-02T00:00:00.000Z',

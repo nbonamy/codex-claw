@@ -1,6 +1,6 @@
 # Promotional videos
 
-This folder contains editable, scripted Codex Claw product films. Follow the repository-root `AGENTS.md` as well as these film-specific conventions.
+This folder contains editable, scripted Korus product films. Follow the repository-root `AGENTS.md` as well as these film-specific conventions.
 
 ## Before building a film
 

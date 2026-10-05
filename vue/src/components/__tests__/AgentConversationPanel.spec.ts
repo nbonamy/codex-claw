@@ -1,9 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { computed, shallowReactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import { claudeBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { createClaudeConversationReplica } from '@codex-claw/core/claude-conversation-replica';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import { claudeBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { createClaudeConversationReplica } from '@workspace/core/claude-conversation-replica';
 import { createAgentComposerState } from '../../agent-composer-state';
 import type { AgentConversationView } from '../../app-state';
 import { claudeConversationSnapshot } from '../../test/claude-conversation-fixtures';

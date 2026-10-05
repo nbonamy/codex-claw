@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import type {
   CodexNativeRendererApi,
@@ -6,9 +7,9 @@ import type { SurfaceMessage } from '@codex-app-sdk/core/surface';
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { AppCommand, CodexClawApi } from '@codex-claw/core/contracts';
-import { workItemAssignmentPrompt, workItemComposerPrompt } from '@codex-claw/core/work-item-prompts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { AppCommand, AppApi } from '@workspace/core/contracts';
+import { workItemAssignmentPrompt, workItemComposerPrompt } from '@workspace/core/work-item-prompts';
 import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
 import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
@@ -42,7 +43,7 @@ afterEach(() => {
   window.localStorage.removeItem('cockpitGlobalScope:github');
   window.sessionStorage.clear();
   document.body.innerHTML = '';
-  delete window.codexClaw;
+  delete window.app;
   delete (window as Window & { codexAppSdkNative?: CodexNativeRendererApi }).codexAppSdkNative;
 });
 
@@ -271,7 +272,8 @@ describe('AppShell workspace and plans', () => {
 
   it('opens Files as a right-side explorer pane and keeps it open beside previews', async () => {
     const previewAgentFile = vi.fn().mockImplementation(async (_agentId: string, path: string) => ({
-      path, size: 8, kind: 'text' as const, content: path === 'README.md' ? '# Claw\n' : 'export {};\n',
+      path, size: 8, kind: 'text' as const, content: path === 'README.md' ? `# ${product.name}
+` : 'export {};\n',
     }));
     const wrapper = mountShell({
       agentFiles: [
@@ -360,13 +362,13 @@ describe('AppShell workspace and plans', () => {
     const browserOpen = vi.fn().mockResolvedValue({ url: '', title: '', canGoBack: false, canGoForward: false });
     const browserClose = vi.fn().mockResolvedValue(undefined);
     const browserSetVisible = vi.fn().mockResolvedValue(undefined);
-    window.codexClaw = {
+    window.app = {
       browserOpen,
       browserSetBounds: vi.fn().mockResolvedValue(undefined),
       browserSetVisible,
       browserClose,
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ snapshot });
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
@@ -404,7 +406,7 @@ describe('AppShell workspace and plans', () => {
     });
     let listener: (command: AppCommand) => void = () => undefined;
     const browserOpen = vi.fn().mockResolvedValue({ url: 'https://example.com/', title: 'Example', canGoBack: false, canGoForward: false });
-    window.codexClaw = {
+    window.app = {
       onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => {
         listener = nextListener;
         return () => undefined;
@@ -414,7 +416,7 @@ describe('AppShell workspace and plans', () => {
       browserSetVisible: vi.fn().mockResolvedValue(undefined),
       browserClose: vi.fn().mockResolvedValue(undefined),
       onEvent: vi.fn(() => vi.fn()),
-    } as Partial<CodexClawApi> as CodexClawApi;
+    } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ realConversationPane: true });
 
     listener({ type: 'open-browser', agentId: 'agent-jesse', browserId: 'primary', url: 'https://example.com' });
@@ -449,10 +451,10 @@ describe('AppShell workspace and plans', () => {
       },
       updatedAt: '2026-06-05T00:00:00.000Z',
     };
-    let resolveDiff!: (diff: import('@codex-claw/core/contracts').AgentGitDiff) => void;
+    let resolveDiff!: (diff: import('@workspace/core/contracts').AgentGitDiff) => void;
     const getAgentGitDiff = vi.fn((_agentId: string, target?: object) => {
       structuredClone(target);
-      return new Promise<import('@codex-claw/core/contracts').AgentGitDiff>((resolve) => { resolveDiff = resolve; });
+      return new Promise<import('@workspace/core/contracts').AgentGitDiff>((resolve) => { resolveDiff = resolve; });
     });
     const wrapper = mount(AppShell, {
       props: {
@@ -494,11 +496,11 @@ describe('AppShell workspace and plans', () => {
 
   it('keeps linked backlog work available and routes repository work through the selected workspace', async () => {
     const snapshot = createInitialSnapshot();
-    snapshot.agents[0]!.name = 'codex-claw';
+    snapshot.agents[0]!.name = 'agent-workspace';
     snapshot.agentGitStatuses['agent-dina'] = {
-      folder: '/Users/nbonamy/src/codex-claw',
-      repository: 'codex-claw',
-      githubRepository: 'nbonamy/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
+      repository: 'agent-workspace',
+      githubRepository: 'nbonamy/agent-workspace',
       branch: 'main',
       ahead: 0,
       behind: 0,
@@ -510,8 +512,8 @@ describe('AppShell workspace and plans', () => {
       updatedAt: '2026-08-12T00:00:00.000Z',
     };
     const item = workItem();
-    snapshot.agents[0]!.workspace = { kind: 'git', folder: '/workspace/codex-claw', repositoryName: 'codex-claw', repositoryRoot: '/workspace/codex-claw', primaryWorktreeRoot: '/workspace/codex-claw', branch: 'main', isLinkedWorktree: false, updatedAt: 'now' };
-    const unresolvedPullRequest = workItem({ kind: 'pullRequest', number: 44, id: 'nbonamy/codex-claw#44' });
+    snapshot.agents[0]!.workspace = { kind: 'git', folder: '/workspace/agent-workspace', repositoryName: 'agent-workspace', repositoryRoot: '/workspace/agent-workspace', primaryWorktreeRoot: '/workspace/agent-workspace', branch: 'main', isLinkedWorktree: false, updatedAt: 'now' };
+    const unresolvedPullRequest = workItem({ kind: 'pullRequest', number: 44, id: 'nbonamy/agent-workspace#44' });
     const resolvedPullRequest = { ...unresolvedPullRequest, branchName: 'feature/resolved-pr-44' };
     const loadWorkItems = vi.fn()
       .mockResolvedValueOnce([resolvedPullRequest]);
@@ -589,7 +591,7 @@ describe('AppShell workspace and plans', () => {
     });
 
     const workspace = wrapper.getComponent({ name: 'RightWorkspacePanel' });
-    const reviewPullRequest = workItem({ branchName: 'feature/pull-request-42', kind: 'pullRequest', number: 42, id: 'nbonamy/codex-claw#42' });
+    const reviewPullRequest = workItem({ branchName: 'feature/pull-request-42', kind: 'pullRequest', number: 42, id: 'nbonamy/agent-workspace#42' });
     createAgentGitBranch.mockClear();
     assignWorkItemAction.mockClear();
 
@@ -601,7 +603,7 @@ describe('AppShell workspace and plans', () => {
     });
 
     expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', {
-      name: 'codex-claw #42',
+      name: 'agent-workspace #42',
       select: false,
     });
     expect(createAgentGitBranch).toHaveBeenCalledWith('agent-reviewer', {
@@ -616,7 +618,7 @@ describe('AppShell workspace and plans', () => {
       prompt: workItemAssignmentPrompt(reviewPullRequest, { action: 'review' }),
     });
 
-    const issue = workItem({ id: 'nbonamy/codex-claw#24', number: 24 });
+    const issue = workItem({ id: 'nbonamy/agent-workspace#24', number: 24 });
     duplicateAgentAction.mockClear();
     await workspace.props('startRepositoryWork')({
       action: 'fix',
@@ -626,11 +628,11 @@ describe('AppShell workspace and plans', () => {
     });
 
     expect(duplicateAgentAction).toHaveBeenCalledWith('agent-dina', {
-      name: 'codex-claw #24',
+      name: 'agent-workspace #24',
       select: false,
     });
 
-    const currentPullRequest = workItem({ branchName: 'feature/pull-request-43', kind: 'pullRequest', number: 43, id: 'nbonamy/codex-claw#43' });
+    const currentPullRequest = workItem({ branchName: 'feature/pull-request-43', kind: 'pullRequest', number: 43, id: 'nbonamy/agent-workspace#43' });
     createAgentGitBranch.mockClear();
     assignWorkItemAction.mockClear();
 
@@ -663,7 +665,7 @@ describe('AppShell workspace and plans', () => {
       workspace: { kind: 'current' },
     });
 
-    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/codex-claw', undefined, {
+    expect(loadWorkItems).toHaveBeenCalledWith('github', 'nbonamy/agent-workspace', undefined, {
       kind: 'pullRequest',
       state: 'all',
     });

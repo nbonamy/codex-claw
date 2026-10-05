@@ -1,17 +1,18 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { homedir } from 'node:os';
 import { ClaudeBackendDriver } from '../claude-driver';
 import type { ClaudeSdkMessage } from '../protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../transport';
-import type { Agent } from '@codex-claw/core/contracts';
-import type { BackendEvent } from '@codex-claw/core/backend-driver';
-import { createClaudeConversationReplica, type ClaudeConversationReplica } from '@codex-claw/core/claude-conversation-replica';
+import type { Agent } from '@workspace/core/contracts';
+import type { BackendEvent } from '@workspace/core/backend-driver';
+import { createClaudeConversationReplica, type ClaudeConversationReplica } from '@workspace/core/claude-conversation-replica';
 import { claudeTranscriptToRendererMessages } from '../transcript-history-adapter';
 
 const agent: Agent = {
   id: 'agent-claude',
   name: 'Claude Pal',
-  folder: '/Users/nbonamy/src/codex-claw',
+  folder: '/Users/nbonamy/src/agent-workspace',
   backend: 'claude',
   backendDefaults: { kind: 'claude' },
   status: { type: 'idle' },
@@ -166,12 +167,12 @@ describe('ClaudeBackendDriver', () => {
       backendOptions: { kind: 'claude', permissionMode: 'acceptEdits' },
     });
     expect(transport.startTurn).toHaveBeenCalledWith(expect.objectContaining({
-      cwd: '/Users/nbonamy/src/codex-claw',
+      cwd: '/Users/nbonamy/src/agent-workspace',
       prompt: 'hello claude',
       sessionId: undefined,
       model: 'claude-sonnet-4-5',
       permissionMode: 'acceptEdits',
-      appendSystemPrompt: expect.stringContaining('Your Codex Claw agent ID is agent-claude.'),
+      appendSystemPrompt: expect.stringContaining(`Your ${product.name} agent ID is agent-claude.`),
     }), expect.any(Function), expect.any(Function), expect.any(Function));
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-1' });
@@ -236,7 +237,7 @@ describe('ClaudeBackendDriver', () => {
           kind: 'command',
           title: 'npm test',
           status: 'running',
-          input: { command: 'npm test', cwd: '/Users/nbonamy/src/codex-claw' },
+          input: { command: 'npm test', cwd: '/Users/nbonamy/src/agent-workspace' },
         }),
       },
     }));
@@ -548,7 +549,7 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.closeSession).toHaveBeenLastCalledWith('claude-session-second');
   });
 
-  it('preserves Claude transcripts when a Claw agent retires its conversation', async () => {
+  it(`preserves Claude transcripts when a ${product.name} agent retires its conversation`, async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
 
@@ -611,10 +612,10 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.close).toHaveBeenCalledOnce();
   });
 
-  it('passes Claw MCP config and allows Claw MCP tools by default', async () => {
+  it(`passes ${product.name} MCP config and allows ${product.name} MCP tools by default`, async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport, async () => null, {
-      clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+      appMcpServerUrl: 'http://127.0.0.1:4321/mcp',
       hostedMcpServerUrls: () => ({
         github: 'http://127.0.0.1:4321/mcp/providers/github',
       }),
@@ -629,8 +630,8 @@ describe('ClaudeBackendDriver', () => {
       hostedMcpServerUrls: {
         github: 'http://127.0.0.1:4321/mcp/providers/github?agentId=agent-claude',
       },
-      allowedTools: ['mcp__codex_claw__*'],
-      appendSystemPrompt: expect.stringContaining('Use the codex_claw MCP server for agent collaboration.'),
+      allowedTools: ['mcp__workspace__*'],
+      appendSystemPrompt: expect.stringContaining('Use the workspace MCP server for agent collaboration.'),
     });
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain(
       'call set-status exactly once as your very first action',
@@ -641,7 +642,7 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).not.toContain('call celebrate');
     expect(transport.startTurn.mock.calls[0]?.[0].appendSystemPrompt).toContain('<context>\nMission contract\n</context>');
     const developerInstructions = transport.startTurn.mock.calls[0]![0].appendSystemPrompt!;
-    expect(developerInstructions.indexOf('Use the codex_claw MCP server'))
+    expect(developerInstructions.indexOf('Use the workspace MCP server'))
       .toBeLessThan(developerInstructions.indexOf('<context>'));
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-mcp' });
     await expect(sendResult).resolves.toMatchObject({
@@ -652,7 +653,7 @@ describe('ClaudeBackendDriver', () => {
   it('uses the review tool context for a reviewer chat follow-up', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport, async () => null, {
-      clawMcpServerUrl: 'http://127.0.0.1:4321/mcp',
+      appMcpServerUrl: 'http://127.0.0.1:4321/mcp',
     });
     const reviewer: Agent = {
       ...agent,
@@ -667,7 +668,7 @@ describe('ClaudeBackendDriver', () => {
     const result = driver.sendPrompt(reviewer, 'I found another issue');
     expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
-      allowedTools: ['mcp__codex_claw__*'],
+      allowedTools: ['mcp__workspace__*'],
     });
     transport.resolveDone();
     await result;
@@ -684,7 +685,7 @@ describe('ClaudeBackendDriver', () => {
     driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const review = driver.runCodeReview(reviewerAgent, {
-      cwd: '/Users/nbonamy/src/codex-claw',
+      cwd: '/Users/nbonamy/src/agent-workspace',
       prompt: 'Review the current diff.',
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
     });
@@ -693,9 +694,9 @@ describe('ClaudeBackendDriver', () => {
       prompt: 'Review the current diff.',
       mcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-1',
       allowedTools: [
-        'mcp__codex_claw__report_finding',
-        'mcp__codex_claw__update_finding',
-        'mcp__codex_claw__delete_finding',
+        'mcp__workspace__report_finding',
+        'mcp__workspace__update_finding',
+        'mcp__workspace__delete_finding',
       ],
       model: 'opus',
       effort: 'xhigh',
@@ -716,7 +717,7 @@ describe('ClaudeBackendDriver', () => {
     ]));
 
     const clarification = driver.runCodeReview(reviewerAgent, {
-      cwd: '/Users/nbonamy/src/codex-claw',
+      cwd: '/Users/nbonamy/src/agent-workspace',
       prompt: 'Clarify this finding.',
       reviewMcpServerUrl: 'http://127.0.0.1:4321/mcp?agentId=agent-claude&reviewContextId=review-2',
       reviewerSession: result.reviewerSession,
@@ -943,7 +944,7 @@ describe('ClaudeBackendDriver', () => {
     await vi.waitFor(() => expect(transport.readContextUsage).toHaveBeenCalledOnce());
     expect(transport.readContextUsage).toHaveBeenCalledWith(expect.objectContaining({
       ownerId: 'agent-claude',
-      cwd: '/Users/nbonamy/src/codex-claw',
+      cwd: '/Users/nbonamy/src/agent-workspace',
       sessionId: 'claude-session-existing',
     }));
     expect(transport.readContextUsage.mock.calls[0]?.[0]).not.toHaveProperty('prompt');
@@ -1058,7 +1059,7 @@ describe('ClaudeBackendDriver', () => {
     await expect(driver.resumeConversation(agent, {
       ref: {
         backend: 'claude',
-        folder: '/Users/nbonamy/src/codex-claw',
+        folder: '/Users/nbonamy/src/agent-workspace',
         sessionId: 'claude-session-existing',
       },
       storageState: 'active',
@@ -1073,7 +1074,7 @@ describe('ClaudeBackendDriver', () => {
     }));
     expect(historyLoader).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-claude',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backendSession: {
         kind: 'claude',
         sessionId: 'claude-session-existing',
@@ -1353,7 +1354,7 @@ describe('ClaudeBackendDriver', () => {
           kind: 'command',
           title: 'Bash',
           status: 'running',
-          input: { cwd: '/Users/nbonamy/src/codex-claw' },
+          input: { cwd: '/Users/nbonamy/src/agent-workspace' },
         }),
       },
     }));
@@ -1369,7 +1370,7 @@ describe('ClaudeBackendDriver', () => {
           phase: 'running',
           params: { target: 'npm test' },
         }),
-        input: { command: 'npm test', cwd: '/Users/nbonamy/src/codex-claw' },
+        input: { command: 'npm test', cwd: '/Users/nbonamy/src/agent-workspace' },
       }),
     }));
   });

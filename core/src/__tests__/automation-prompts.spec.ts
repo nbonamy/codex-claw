@@ -16,10 +16,10 @@ describe('automation prompts', () => {
   it('includes every selected repository, the criteria, and eligible work item details', () => {
     const prompt = automationSelectionPrompt(automation(), [workItem(12), workItem(14, 'nbonamy/witsy')]);
 
-    expect(prompt).toContain('nbonamy/codex-claw (local clone: /src/codex-claw)');
+    expect(prompt).toContain('nbonamy/agent-workspace (local clone: /src/agent-workspace)');
     expect(prompt).toContain('nbonamy/witsy (local clone: /src/witsy)');
     expect(prompt).toContain('Only bugs labeled ready');
-    expect(prompt).toContain('ID: github:nbonamy/codex-claw#12');
+    expect(prompt).toContain('ID: github:nbonamy/agent-workspace#12');
     expect(prompt).toContain('ID: github:nbonamy/witsy#14');
   });
 
@@ -47,10 +47,10 @@ function automation(): Automation {
     name: 'Ready bugs',
     enabled: true,
     repositories: [
-      { provider: 'github', sourceId: 'nbonamy/codex-claw', executionRepositoryPath: '/src/codex-claw' },
+      { provider: 'github', sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/src/agent-workspace' },
       { provider: 'github', sourceId: 'nbonamy/witsy', executionRepositoryPath: '/src/witsy' },
     ],
-    teamId: 'team-codex-claw',
+    teamId: 'team-app',
     selectionPrompt: 'Only bugs labeled ready',
     assignmentPrompt: 'Run focused tests.',
     schedule: { intervalMinutes: 60 },
@@ -60,7 +60,7 @@ function automation(): Automation {
   };
 }
 
-function workItem(number: number, repositoryId = 'nbonamy/codex-claw'): WorkItem {
+function workItem(number: number, repositoryId = 'nbonamy/agent-workspace'): WorkItem {
   return {
     provider: 'github',
     id: `${repositoryId}#${number}`,

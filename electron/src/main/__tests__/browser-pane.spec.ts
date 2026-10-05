@@ -79,7 +79,7 @@ const electronMocks = vi.hoisted(() => {
     }
   }
 
-  function createGuest(owner: { webContents: object }, id: number, partition = 'persist:codex-claw-browser-agent-one') {
+  function createGuest(owner: { webContents: object }, id: number, partition = 'persist:agent-workspace-browser-agent-one') {
     const guest = new WebContentsMock(id);
     guest.hostWebContents = owner.webContents;
     guest.session = fromPartition(partition);
@@ -166,8 +166,8 @@ describe('browser pane helpers', () => {
   });
 
   it('opens existing workspace files while rejecting escapes and symlinks outside the workspace', async () => {
-    const workspace = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-browser-workspace-'));
-    const outside = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-browser-outside-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-browser-workspace-'));
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-browser-outside-'));
     const localFile = path.join(workspace, 'preview.html');
     const outsideFile = path.join(outside, 'secret.html');
     const linkedFile = path.join(workspace, 'linked-secret.html');
@@ -203,7 +203,7 @@ describe('browser pane helpers', () => {
   });
 
   it('opens a bounded external visualization as a sandboxed data document without weakening file navigation', async () => {
-    const scratch = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualization-'));
+    const scratch = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-visualization-'));
     const visualizationPath = path.join(scratch, 'chart.html');
     const outsideFile = path.join(scratch, 'secret.txt');
     await writeFile(visualizationPath, '<section id="chart">Chart</section><script>document.body.dataset.ready = "yes"</script>');
@@ -214,7 +214,7 @@ describe('browser pane helpers', () => {
         webContents: {},
         isDestroyed: vi.fn(() => false),
       };
-      const guest = electronMocks.createGuest(browserWindow, 12, 'codex-claw-visualization-agent-one');
+      const guest = electronMocks.createGuest(browserWindow, 12, 'agent-workspace-visualization-agent-one');
       const pane = new BrowserPane({ onAnnotation: vi.fn() });
 
       await expect(pane.openVisualization(
@@ -244,7 +244,7 @@ describe('browser pane helpers', () => {
   });
 
   it('rejects non-HTML, symlinked, and oversized visualization files', async () => {
-    const scratch = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-visualization-invalid-'));
+    const scratch = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-visualization-invalid-'));
     const textPath = path.join(scratch, 'notes.txt');
     const htmlPath = path.join(scratch, 'large.html');
     const linkedPath = path.join(scratch, 'linked.html');
@@ -327,7 +327,7 @@ describe('browser pane helpers', () => {
     };
     const pane = new BrowserPane({ onAnnotation: vi.fn() });
     electronMocks.createGuest({ webContents: {} }, 23);
-    electronMocks.createGuest(browserWindow, 24, 'persist:codex-claw-browser-agent-two');
+    electronMocks.createGuest(browserWindow, 24, 'persist:agent-workspace-browser-agent-two');
 
     await expect(pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project', 23)).rejects.toThrow('not attached');
     await expect(pane.open(browserWindow as never, 'agent-one', 'primary', 'https://example.com', '/tmp/project', 24)).rejects.toThrow('not attached');

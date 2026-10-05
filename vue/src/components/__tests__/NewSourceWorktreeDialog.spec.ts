@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import type { SourceRepository } from '@codex-claw/core/contracts';
+import type { SourceRepository } from '@workspace/core/contracts';
 import NewSourceWorktreeDialog from '../NewSourceWorktreeDialog.vue';
 
 describe('NewSourceWorktreeDialog', () => {
@@ -14,7 +14,7 @@ describe('NewSourceWorktreeDialog', () => {
   it('starts new branches from the selected repository branch with the default first', async () => {
     const createWorktree = vi.fn().mockResolvedValue({
       name: 'feature-session',
-      path: '/Users/nbonamy/src/codex-claw-feature-session',
+      path: '/Users/nbonamy/src/agent-workspace-feature-session',
     });
     const wrapper = mountDialog({
       branches: [
@@ -34,11 +34,11 @@ describe('NewSourceWorktreeDialog', () => {
 
     wrapper.getComponent({ name: 'ElSelect' }).vm.$emit('update:modelValue', 'release');
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/session');
-    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .app-button--primary').trigger('click');
     await flushPromises();
 
     expect(createWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/session',
       baseBranch: 'release',
     });
@@ -48,27 +48,27 @@ describe('NewSourceWorktreeDialog', () => {
     const chooseDestination = vi.fn();
     const createWorktree = vi.fn().mockResolvedValue({
       name: 'fix-source-folder',
-      path: '/Users/nbonamy/src/codex-claw-fix-source-folder',
+      path: '/Users/nbonamy/src/agent-workspace-fix-source-folder',
     });
     const wrapper = mountDialog({ chooseDestination, createWorktree });
-    expect(wrapper.find('.claw-form-dialog__footer-left').exists()).toBe(false);
+    expect(wrapper.find('.app-form-dialog__footer-left').exists()).toBe(false);
 
-    expect(wrapper.findAll('.claw-dialog__footer .claw-button').map((button) => button.classes())).toStrictEqual([
-      ['claw-button', 'claw-button--tertiary'],
-      ['claw-button', 'claw-button--primary'],
+    expect(wrapper.findAll('.app-dialog__footer .app-button').map((button) => button.classes())).toStrictEqual([
+      ['app-button', 'app-button--tertiary'],
+      ['app-button', 'app-button--primary'],
     ]);
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('Fix/source folder!!');
     await flushPromises();
 
-    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/codex-claw-fix-source-folder');
+    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/agent-workspace-fix-source-folder');
 
-    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .app-button--primary').trigger('click');
     await flushPromises();
 
     expect(chooseDestination).not.toHaveBeenCalled();
     expect(createWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'Fix/source folder!!',
     });
     const progress = wrapper.getComponent({ name: 'StagedOperationProgress' });
@@ -78,7 +78,7 @@ describe('NewSourceWorktreeDialog', () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted('created')).toStrictEqual([[{
       name: 'fix-source-folder',
-      path: '/Users/nbonamy/src/codex-claw-fix-source-folder',
+      path: '/Users/nbonamy/src/agent-workspace-fix-source-folder',
     }]]);
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
   });
@@ -92,14 +92,14 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/progress');
     await flushPromises();
-    await wrapper.get('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.get('.new-source-worktree-dialog .app-button--primary').trigger('click');
 
     expect(wrapper.find('.new-source-worktree-dialog__branch-input').exists()).toBe(false);
     expect(wrapper.getComponent({ name: 'WorkspaceProvisioningProgressDialog' }).props('operation')).toMatchObject({
       mode: 'single',
       progress: {
         state: 'running',
-        repositoryName: 'codex-claw',
+        repositoryName: 'agent-workspace',
         createWorktree: true,
         branchName: 'feature/progress',
       },
@@ -107,7 +107,7 @@ describe('NewSourceWorktreeDialog', () => {
     const progress = wrapper.getComponent({ name: 'StagedOperationProgress' });
     expect(progress.props()).toMatchObject({
       state: 'running',
-      title: 'Building an isolated home in codex-claw…',
+      title: 'Building an isolated home in agent-workspace…',
     });
     expect(progress.text()).toContain('Creating isolated worktree');
     expect(progress.text()).toContain('feature/progress');
@@ -115,7 +115,7 @@ describe('NewSourceWorktreeDialog', () => {
     expect(progress.text()).toContain('Starting agent session');
     expect(progress.text()).toContain('Finishing agent setup');
 
-    resolveCreation({ name: 'feature/progress', path: '/tmp/codex-claw-feature-progress' });
+    resolveCreation({ name: 'feature/progress', path: '/tmp/agent-workspace-feature-progress' });
     await flushPromises();
 
     expect(progress.props('state')).toBe('success');
@@ -125,7 +125,7 @@ describe('NewSourceWorktreeDialog', () => {
 
     expect(wrapper.emitted('created')).toStrictEqual([[{
       name: 'feature/progress',
-      path: '/tmp/codex-claw-feature-progress',
+      path: '/tmp/agent-workspace-feature-progress',
     }]]);
   });
 
@@ -139,19 +139,19 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
     await flushPromises();
-    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/codex-claw-feature-source-folder');
+    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/agent-workspace-feature-source-folder');
 
     await wrapper.get('.new-source-worktree-dialog__folder-picker').trigger('click');
     await flushPromises();
 
-    expect(chooseDestination).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw-feature-source-folder');
+    expect(chooseDestination).toHaveBeenCalledWith('/Users/nbonamy/src/agent-workspace-feature-source-folder');
     expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/custom/worktree');
 
-    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .app-button--primary').trigger('click');
     await flushPromises();
 
     expect(createWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/source-folder',
       destinationPath: '/Users/nbonamy/custom/worktree',
     });
@@ -164,7 +164,7 @@ describe('NewSourceWorktreeDialog', () => {
     await wrapper.get('.new-source-worktree-dialog__folder-picker').trigger('click');
     await flushPromises();
 
-    expect(chooseDestination).toHaveBeenCalledWith('/Users/nbonamy/src/codex-claw-worktree');
+    expect(chooseDestination).toHaveBeenCalledWith('/Users/nbonamy/src/agent-workspace-worktree');
     expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('');
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
@@ -172,7 +172,7 @@ describe('NewSourceWorktreeDialog', () => {
     await wrapper.get('.new-source-worktree-dialog__folder-picker').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/codex-claw-feature-source-folder');
+    expect(wrapper.get<HTMLInputElement>('.new-source-worktree-dialog__folder-input').element.value).toBe('/Users/nbonamy/src/agent-workspace-feature-source-folder');
   });
 
   it('resets state when reopened and surfaces creation failures', async () => {
@@ -182,7 +182,7 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/broken');
     await flushPromises();
-    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .app-button--primary').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain('worktree failed');
@@ -205,7 +205,7 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.findComponent({ name: 'ElDialog' }).vm.$emit('update:modelValue', false);
     await wrapper.get('.new-source-worktree-dialog__folder-picker').trigger('click');
-    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .app-button--primary').trigger('click');
 
     expect(wrapper.emitted('close')).toStrictEqual([[]]);
     expect(chooseDestination).not.toHaveBeenCalled();
@@ -216,7 +216,7 @@ describe('NewSourceWorktreeDialog', () => {
     const chooseDestination = vi.fn().mockResolvedValue(null);
     const createWorktree = vi.fn().mockResolvedValue({
       name: 'source-folder',
-      path: '/Users/nbonamy/src/codex-claw-source-folder',
+      path: '/Users/nbonamy/src/agent-workspace-source-folder',
     });
     const wrapper = mountDialog({ chooseDestination, createWorktree });
 
@@ -224,11 +224,11 @@ describe('NewSourceWorktreeDialog', () => {
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/source-folder');
     await flushPromises();
-    await wrapper.find('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.find('.new-source-worktree-dialog .app-button--primary').trigger('click');
     await flushPromises();
 
     expect(createWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/source-folder',
     });
   });
@@ -236,34 +236,34 @@ describe('NewSourceWorktreeDialog', () => {
   it('asks before reusing an existing worktree', async () => {
     const createWorktree = vi.fn().mockResolvedValue({
       name: 'feature/existing',
-      path: '/Users/nbonamy/src/codex-claw-feature-existing',
+      path: '/Users/nbonamy/src/agent-workspace-feature-existing',
     });
     const wrapper = mountDialog({
       branches: [{
         name: 'feature/existing',
         isDefault: false,
-        worktreePath: '/Users/nbonamy/src/codex-claw-feature-existing',
+        worktreePath: '/Users/nbonamy/src/agent-workspace-feature-existing',
       }],
       createWorktree,
     });
 
     await wrapper.get('.new-source-worktree-dialog__branch-input').setValue('feature/existing');
-    await wrapper.get('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.get('.new-source-worktree-dialog .app-button--primary').trigger('click');
 
     expect(createWorktree).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('Worktree already exists');
-    expect(wrapper.text()).toContain('/Users/nbonamy/src/codex-claw-feature-existing');
+    expect(wrapper.text()).toContain('/Users/nbonamy/src/agent-workspace-feature-existing');
 
-    await wrapper.get('.new-source-worktree-dialog .claw-button--primary').trigger('click');
+    await wrapper.get('.new-source-worktree-dialog .app-button--primary').trigger('click');
     await flushPromises();
 
     expect(createWorktree).toHaveBeenCalledWith({
-      repoPath: '/Users/nbonamy/src/codex-claw',
+      repoPath: '/Users/nbonamy/src/agent-workspace',
       branchName: 'feature/existing',
       reuseExisting: true,
     });
     expect(wrapper.emitted('created')).toStrictEqual([[
-      { name: 'feature/existing', path: '/Users/nbonamy/src/codex-claw-feature-existing' },
+      { name: 'feature/existing', path: '/Users/nbonamy/src/agent-workspace-feature-existing' },
     ]]);
   });
 });
@@ -287,8 +287,8 @@ function mountDialog(overrides: Partial<{
         return `${parent}/${repoName}-${slug}`;
       }),
       repo: {
-        name: 'codex-claw',
-        path: '/Users/nbonamy/src/codex-claw',
+        name: 'agent-workspace',
+        path: '/Users/nbonamy/src/agent-workspace',
         worktrees: [],
       },
       visible: true,

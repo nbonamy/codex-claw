@@ -1,5 +1,5 @@
-import type { WorkProviderKind } from '@codex-claw/core/contracts';
-import type { WorkIntegrationTokenStore, WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import type { WorkProviderKind } from '@workspace/core/contracts';
+import type { WorkIntegrationTokenStore, WorkProviderToken } from '@workspace/core/work-integration-tokens';
 
 export class MemoryWorkIntegrationTokenStore implements WorkIntegrationTokenStore {
   private readonly tokens = new Map<WorkProviderKind, WorkProviderToken>();

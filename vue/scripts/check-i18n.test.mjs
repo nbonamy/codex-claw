@@ -1,3 +1,4 @@
+import product from '../../core/src/product.json' with { type: 'json' };
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -50,7 +51,7 @@ test('reports literal template copy but allows bindings and the product name', (
       <section>
         Literal copy
         <button aria-label="Literal label">{{ translated }}</button>
-        <img :alt="translatedAlt" title="Codex Claw">
+        <img :alt="translatedAlt" title="${product.name}">
       </section>
     </template>
   `), {

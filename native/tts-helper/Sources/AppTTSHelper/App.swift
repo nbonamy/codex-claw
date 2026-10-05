@@ -3,7 +3,7 @@ import FluidAudio
 import Foundation
 
 @main
-struct CodexClawTTSHelper {
+struct AppTTSHelper {
   static func main() async {
     var requestId: String?
     do {

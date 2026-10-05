@@ -1,14 +1,15 @@
+import { product } from '@workspace/core/product';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
-import { threadFlagIds } from '@codex-claw/core/thread-flags';
-import type { ClawMcpAgentCoordinator } from './agent-coordinator';
+import { threadFlagIds } from '@workspace/core/thread-flags';
+import type { AppMcpAgentCoordinator } from './agent-coordinator';
 import { CHECK_INBOX_PROMPT } from './agent-prompts';
-import { loggedToolResult, type ClawMcpToolModuleProvider } from './tool-modules';
+import { loggedToolResult, type AppMcpToolModuleProvider } from './tool-modules';
 import { taskContractSchema } from '../persistence/task-schema';
 
 export function createCollaborationToolModuleProvider(
-  coordinator: ClawMcpAgentCoordinator,
-): ClawMcpToolModuleProvider {
+  coordinator: AppMcpAgentCoordinator,
+): AppMcpToolModuleProvider {
   return {
     id: 'collaboration',
     resolve: ({ agentId }) => ({
@@ -25,7 +26,7 @@ export function createCollaborationToolModuleProvider(
 
 function registerCollaborationTools(
   server: McpServer,
-  coordinator: ClawMcpAgentCoordinator,
+  coordinator: AppMcpAgentCoordinator,
   callerAgentId: string,
   allowProposedActions: boolean,
 ): void {
@@ -118,10 +119,10 @@ function registerCollaborationTools(
   }
 
   server.registerTool('update-work-item', {
-    description: 'Update the lifecycle of a backlog work item assigned to you through Codex Claw. Use blocked with a note when you need help, inProgress when work resumes, readyForReview when the user can review the outcome, or completed when the assignment explicitly requires completion.',
+    description: `Update the lifecycle of a backlog work item assigned to you through ${product.name}. Use blocked with a note when you need help, inProgress when work resumes, readyForReview when the user can review the outcome, or completed when the assignment explicitly requires completion.`,
     inputSchema: {
       workItemId: z.string().describe('Exact Work item ID from the assignment prompt, for example github:owner/repo#123.'),
-      status: z.enum(['blocked', 'completed', 'inProgress', 'readyForReview']).describe('New Claw assignment lifecycle status.'),
+      status: z.enum(['blocked', 'completed', 'inProgress', 'readyForReview']).describe(`New ${product.name} assignment lifecycle status.`),
       note: z.string().optional().describe('Concise context for the user. Required when status is blocked.'),
     },
   }, ({ workItemId, status, note }) => loggedToolResult('update-work-item', {
@@ -161,7 +162,7 @@ function registerCollaborationTools(
   }, () => coordinator.createSourceWorktree(callerAgentId, { repoPath, branchName, destinationPath })));
 
   server.registerTool('create-agent', {
-    description: 'Create a new Codex Claw co-agent in your team, optionally in an isolated worktree. Model and reasoning effort inherit from the caller when the backend matches unless explicitly overridden. Provide an initial prompt to start the co-agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.',
+    description: `Create a new ${product.name} co-agent in your team, optionally in an isolated worktree. Model and reasoning effort inherit from the caller when the backend matches unless explicitly overridden. Provide an initial prompt to start the co-agent immediately. Use list-repos to find another configured repository before delegating cross-repository work.`,
     inputSchema: {
       requestId: z.string().trim().min(1).max(200).optional().describe('Required in task mode. Reuse the same stable ID when retrying this creation call.'),
       task: taskContractSchema.optional().describe('Durable assignment contract. Requires prompt and requestId. Returns taskId after startup acceptance, not task completion; inspect or wait with wait-tasks.'),
@@ -174,7 +175,7 @@ function registerCollaborationTools(
       branchName: z.string().optional().describe('Branch name for the new worktree. Required when createWorktree is true.'),
       destinationPath: z.string().optional().describe('Optional destination path for the new worktree.'),
       prompt: z.string().optional().describe('Optional initial request shown to the user. Keep it concise and put detailed handoff instructions in instructions. Starts the agent and waits until the handoff is accepted.'),
-      instructions: z.string().optional().describe('Optional full handoff: context, decisions, constraints, and acceptance criteria. Requires prompt. Claw wraps this in <context> for the agent, hidden from the displayed request; do not include secrets.'),
+      instructions: z.string().optional().describe(`Optional full handoff: context, decisions, constraints, and acceptance criteria. Requires prompt. ${product.name} wraps this in <context> for the agent, hidden from the displayed request; do not include secrets.`),
     },
   }, ({ name, backend, model, reasoningEffort, repoPath, createWorktree, branchName, destinationPath, prompt, instructions, task, requestId }) => loggedToolResult('create-agent', {
     agentId: callerAgentId,
@@ -196,7 +197,7 @@ function registerCollaborationTools(
   })));
 
   server.registerTool('display-markdown', {
-    description: 'Display Markdown in the Codex Claw side panel. Provide exactly one of path or markdown. Use path for Markdown files in your agent folder; use markdown for inline generated content.',
+    description: `Display Markdown in the ${product.name} side panel. Provide exactly one of path or markdown. Use path for Markdown files in your agent folder; use markdown for inline generated content.`,
     inputSchema: {
       path: z.string().optional().describe('Markdown file path relative to your agent folder, or an absolute path inside it.'),
       markdown: z.string().optional().describe('Inline Markdown content to display.'),

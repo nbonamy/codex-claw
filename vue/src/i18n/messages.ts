@@ -1,11 +1,12 @@
+import { product } from '@workspace/core/product';
 import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
     workAuthorization: {
       copyCode: 'Copy {provider} device code {code}', step2: 'Step 2: Open {provider}',
-      pasteCode: '{provider} will ask for the code. Paste it there, authorize Codex Claw, then come back here.',
-      open: 'Open {provider}', finish: 'Codex Claw will finish the connection automatically once {provider} approves it.',
+      pasteCode: `{provider} will ask for the code. Paste it there, authorize ${product.name}, then come back here.`,
+      open: 'Open {provider}', finish: `${product.name} will finish the connection automatically once {provider} approves it.`,
       waiting: 'Waiting for {provider} authorization',
     },
     automationSources: { connect: 'Connect {provider} in Settings before saving an automation.', noSources: 'No accessible backlog sources.', codeRepositoryFor: 'Code repository for {source}', refresh: 'Refresh' },
@@ -30,7 +31,7 @@ export const messages = {
       disconnect: 'Disconnect', disconnected: 'Disconnected', apiKey: 'API key', subscription: 'Claude subscription', amazonBedrock: 'Amazon Bedrock',
       enabled: 'Enable engine',
       updateFailedTitle: 'Engine status unchanged',
-      lastEngineTitle: 'Claw needs an active engine',
+      lastEngineTitle: `${product.name} needs an active engine`,
       lastEngine: 'To turn this engine off, first connect or enable another one.',
       updateFailed: 'Could not update engine status. Please try again.',
       required: 'Connect or enable an engine in Settings to start new work.',
@@ -39,9 +40,9 @@ export const messages = {
     engineSetup: {
       title: 'Location',
       confirmTitle: 'Change conversation setup?',
-      warning: 'This will remove all {count} local {provider} agents, including Quick Chats, from Claw.',
-      historyPreserved: 'Their conversation files will remain in the previous setup. Switching back will not restore these agents in Claw.',
-      acknowledgment: 'I understand that my current agents and Quick Chats will be removed from Claw and will not return if I switch back.',
+      warning: `This will remove all {count} local {provider} agents, including Quick Chats, from ${product.name}.`,
+      historyPreserved: `Their conversation files will remain in the previous setup. Switching back will not restore these agents in ${product.name}.`,
+      acknowledgment: `I understand that my current agents and Quick Chats will be removed from ${product.name} and will not return if I switch back.`,
       removeAndSwitch: 'Remove agents and switch',
     },
     split: {
@@ -225,7 +226,7 @@ export const messages = {
         deleteExecution: 'Delete Execution',
         deleteAutomation: 'Delete Automation',
         deviceFallback: 'This device',
-        deviceRevokeDetail: '{device} will no longer be able to connect to this Claw instance.',
+        deviceRevokeDetail: `{device} will no longer be able to connect to this ${product.name} instance.`,
         imageToAnnotate: 'Image to annotate',
         inProgress: 'In progress',
         installAvailable: 'Install is available in packaged macOS builds.',
@@ -304,14 +305,14 @@ export const messages = {
       switchShortcut: 'Switch to {session} with Command {number}',
       unread: 'Unread activity',
       workspaceSessions: 'Workspace sessions',
-      welcome: 'Welcome to Codex Claw',
+      welcome: `Welcome to ${product.name}`,
       welcomeDetail: 'Choose a source to start a session',
     },
     pullRequestCleanup: {
       mergedTitle: 'PR #{number} was merged',
-      mergedDetail: 'Claw can close this agent and remove its worktree and local branch.',
+      mergedDetail: `${product.name} can close this agent and remove its worktree and local branch.`,
       closedTitle: 'PR #{number} was closed',
-      closedDetail: 'This PR was not merged. Claw can still close this agent and remove its worktree and local branch. The remote branch will be kept.',
+      closedDetail: `This PR was not merged. ${product.name} can still close this agent and remove its worktree and local branch. The remote branch will be kept.`,
       later: 'Later',
       action: 'Close agent & clean up',
     },
@@ -330,7 +331,7 @@ export const messages = {
       codexConnecting: 'Connecting to Codex app-server.',
       codexNotConnected: 'Codex backend is not connected yet.',
       connected: '{backend} backend connected.',
-      restarting: 'Restarting clawd…',
+      restarting: 'Restarting daemon…',
     },
     permissions: {
       approval: {
@@ -340,7 +341,7 @@ export const messages = {
         },
         automatic: {
           label: 'Approve for me',
-          description: 'Let Claw approve safe tool calls for the active session.',
+          description: `Let ${product.name} approve safe tool calls for the active session.`,
         },
         fullAccess: {
           label: 'Full access',
@@ -371,7 +372,7 @@ export const messages = {
       },
     },
     workProvider: {
-      linearAuthorizationExpired: 'Linear authorization expired. Open authorization on the same computer as Claw and try again.',
+      linearAuthorizationExpired: `Linear authorization expired. Open authorization on the same computer as ${product.name} and try again.`,
       authorizationCancelled: '{provider} authorization was cancelled.',
       authorizationExpired: '{provider} authorization expired. Reconnect to continue.',
       authorizationPending: '{provider} authorization is still pending.',
@@ -413,8 +414,8 @@ export const messages = {
     },
     repositories: {
       githubOnboarding: {
-        authorizeDetail: 'Copy the one-time code, authorize Codex Claw on GitHub, then return here.',
-        authorizeTitle: 'Authorize Codex Claw',
+        authorizeDetail: `Copy the one-time code, authorize ${product.name} on GitHub, then return here.`,
+        authorizeTitle: `Authorize ${product.name}`,
         connect: 'Connect GitHub',
         connecting: 'Connecting…',
         detail: 'Connect your account to browse and clone repositories available to you, including private repositories.',
@@ -628,18 +629,18 @@ export const messages = {
       allLabels: 'All labels',
     },
     auth: {
-      signInTitleProduct: 'Codex Claw,',
+      signInTitleProduct: `${product.name},`,
       signInTitleDetailFirst: 'a home for your',
       signInTitleDetailSecond: 'coding agents.',
-      signInDescription: 'By default, Codex Claw keeps its chats separate from your existing agent chats and reuses your skills. You can customize this for Codex and Claude Code individually.',
+      signInDescription: `By default, ${product.name} keeps its chats separate from your existing agent chats and reuses your skills. You can customize this for Codex and Claude Code individually.`,
       detected: 'Detected',
       checking: 'Checking…',
       connected: 'Connected',
       customize: 'Customize',
       customizeProvider: 'Customize {provider}',
       conversations: 'Conversations',
-      separateExplanation: 'A separate setup keeps Claw chats in their own home and requires its own sign-in.',
-      separateChats: 'Separate Claw chats',
+      separateExplanation: `A separate setup keeps ${product.name} chats in their own home and requires its own sign-in.`,
+      separateChats: `Separate ${product.name} chats`,
       existingSetup: 'Use existing setup',
       shareSkills: 'Reuse my existing skills',
       setupLocked: 'This provider already has chats. Its setup cannot be changed here.',
@@ -661,14 +662,14 @@ export const messages = {
       cancel: 'Cancel sign-in',
       githubTitle: 'Connect GitHub.',
       githubTitleDetailFirst: 'Bring your work',
-      githubTitleDetailSecond: 'into Codex Claw.',
-      githubAuthorizationTitle: 'Authorize Codex Claw',
+      githubTitleDetailSecond: `into ${product.name}.`,
+      githubAuthorizationTitle: `Authorize ${product.name}`,
       githubConnect: 'Connect GitHub',
       githubConnecting: 'Connecting…',
       githubSkip: 'Skip for now',
       completeTitle: "You're all set.",
-      completeDetail: 'Codex Claw is ready.',
-      completeAction: 'Start using Codex Claw',
+      completeDetail: `${product.name} is ready.`,
+      completeAction: `Start using ${product.name}`,
     },
     chat: {
       composerActions: { review: 'Review', delegate: 'Delegate', visualize: 'Visualize' },
@@ -877,7 +878,7 @@ export const messages = {
             failed: 'Could not use Computer',
             running: 'Using Computer',
           },
-          codexClaw: {
+          app: {
             broadcastMessage: {
               completed: 'Broadcast message',
               failed: 'Failed broadcasting message',

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { WorkProviderToken } from '@codex-claw/core/work-integration-tokens';
+import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
 import { GitHubWorkProviderDriver } from '../github-driver';
 
 afterEach(() => {
@@ -124,23 +124,23 @@ describe('GitHubWorkProviderDriver', () => {
   it('normalizes repositories and issue items from GitHub responses', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(jsonResponse([{
-        full_name: 'nbonamy/codex-claw',
-        html_url: 'https://github.com/nbonamy/codex-claw',
+        full_name: 'nbonamy/agent-workspace',
+        html_url: 'https://github.com/nbonamy/agent-workspace',
         private: true,
         updated_at: '2026-06-09T12:00:00.000Z',
       }]))
       .mockResolvedValueOnce(jsonResponse([{
-        repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+        repository_url: 'https://api.github.com/repos/nbonamy/agent-workspace',
         updated_at: '2026-06-09T12:45:00.000Z',
       }, {
-        repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+        repository_url: 'https://api.github.com/repos/nbonamy/agent-workspace',
         pull_request: {},
         updated_at: '2026-06-09T13:00:00.000Z',
       }]))
       .mockResolvedValueOnce(jsonResponse([{
         number: 12,
         title: 'Fix cockpit drag target',
-        html_url: 'https://github.com/nbonamy/codex-claw/issues/12',
+        html_url: 'https://github.com/nbonamy/agent-workspace/issues/12',
         state: 'open',
         body: 'Make issue assignment feel obvious.',
         user: { login: 'nbonamy' },
@@ -151,7 +151,7 @@ describe('GitHubWorkProviderDriver', () => {
       }, {
         number: 13,
         title: 'This is a pull request',
-        html_url: 'https://github.com/nbonamy/codex-claw/pull/13',
+        html_url: 'https://github.com/nbonamy/agent-workspace/pull/13',
         pull_request: {},
         created_at: '2026-06-09T12:00:00.000Z',
         updated_at: '2026-06-09T12:30:00.000Z',
@@ -159,7 +159,7 @@ describe('GitHubWorkProviderDriver', () => {
       .mockResolvedValueOnce(jsonResponse([{
         number: 13,
         title: 'This is a pull request',
-        html_url: 'https://github.com/nbonamy/codex-claw/pull/13',
+        html_url: 'https://github.com/nbonamy/agent-workspace/pull/13',
         state: 'open',
         head: { ref: 'feature/backlog-workspace' },
         created_at: '2026-06-09T12:00:00.000Z',
@@ -177,11 +177,11 @@ describe('GitHubWorkProviderDriver', () => {
 
     await expect(driver.listSources(token)).resolves.toStrictEqual([{
       provider: 'github',
-      id: 'nbonamy/codex-claw',
+      id: 'nbonamy/agent-workspace',
       owner: 'nbonamy',
-      name: 'codex-claw',
-      fullName: 'nbonamy/codex-claw',
-      url: 'https://github.com/nbonamy/codex-claw',
+      name: 'agent-workspace',
+      fullName: 'nbonamy/agent-workspace',
+      url: 'https://github.com/nbonamy/agent-workspace',
       isPrivate: true,
       updatedAt: '2026-06-09T12:00:00.000Z',
       workItemsUpdatedAt: '2026-06-09T13:00:00.000Z',
@@ -189,16 +189,16 @@ describe('GitHubWorkProviderDriver', () => {
     expect(fetch).toHaveBeenNthCalledWith(2,
       'https://api.github.com/issues?filter=all&state=open&sort=updated&direction=desc&per_page=100',
       expect.any(Object));
-    await expect(driver.listItems(token, 'nbonamy/codex-claw')).resolves.toStrictEqual([{
+    await expect(driver.listItems(token, 'nbonamy/agent-workspace')).resolves.toStrictEqual([{
       provider: 'github',
-      id: 'nbonamy/codex-claw#12',
+      id: 'nbonamy/agent-workspace#12',
       kind: 'issue',
-      sourceId: 'nbonamy/codex-claw',
-      sourceName: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
+      sourceName: 'nbonamy/agent-workspace',
       assignedToViewer: false,
       number: 12,
       title: 'Fix cockpit drag target',
-      url: 'https://github.com/nbonamy/codex-claw/issues/12',
+      url: 'https://github.com/nbonamy/agent-workspace/issues/12',
       state: 'open',
       authorName: 'nbonamy',
       assignees: ['nbonamy', 'dina'],
@@ -208,22 +208,22 @@ describe('GitHubWorkProviderDriver', () => {
       updatedAt: '2026-06-09T12:30:00.000Z',
     }, {
       provider: 'github',
-      id: 'nbonamy/codex-claw#13',
+      id: 'nbonamy/agent-workspace#13',
       kind: 'pullRequest',
       branchName: 'feature/backlog-workspace',
-      sourceId: 'nbonamy/codex-claw',
-      sourceName: 'nbonamy/codex-claw',
+      sourceId: 'nbonamy/agent-workspace',
+      sourceName: 'nbonamy/agent-workspace',
       assignedToViewer: false,
       number: 13,
       title: 'This is a pull request',
-      url: 'https://github.com/nbonamy/codex-claw/pull/13',
+      url: 'https://github.com/nbonamy/agent-workspace/pull/13',
       state: 'open',
       labels: [],
       createdAt: '2026-06-09T12:00:00.000Z',
       updatedAt: '2026-06-09T12:30:00.000Z',
     }]);
     expect(fetch).toHaveBeenLastCalledWith(
-      'https://api.github.com/repos/nbonamy/codex-claw/pulls?state=open&per_page=100',
+      'https://api.github.com/repos/nbonamy/agent-workspace/pulls?state=open&per_page=100',
       expect.any(Object),
     );
   });
@@ -232,7 +232,7 @@ describe('GitHubWorkProviderDriver', () => {
     const fetch = vi.fn().mockResolvedValue(jsonResponse([{
       number: 13,
       title: 'Review backlog workspace',
-      html_url: 'https://github.com/nbonamy/codex-claw/pull/13',
+      html_url: 'https://github.com/nbonamy/agent-workspace/pull/13',
       state: 'closed',
       head: { ref: 'feature/review-backlog' },
       created_at: '2026-06-09T12:00:00.000Z',
@@ -242,10 +242,10 @@ describe('GitHubWorkProviderDriver', () => {
     const driver = new GitHubWorkProviderDriver('client-id');
     const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
 
-    await expect(driver.listItems(token, 'nbonamy/codex-claw', { kind: 'pullRequest', state: 'closed' }))
+    await expect(driver.listItems(token, 'nbonamy/agent-workspace', { kind: 'pullRequest', state: 'closed' }))
       .resolves.toEqual([expect.objectContaining({ kind: 'pullRequest', state: 'closed' })]);
     expect(fetch).toHaveBeenCalledWith(
-      'https://api.github.com/repos/nbonamy/codex-claw/pulls?state=closed&per_page=100',
+      'https://api.github.com/repos/nbonamy/agent-workspace/pulls?state=closed&per_page=100',
       expect.any(Object),
     );
   });
@@ -253,8 +253,8 @@ describe('GitHubWorkProviderDriver', () => {
   it('keeps repositories available when recent work-item enrichment fails', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(jsonResponse([{
-        full_name: 'nbonamy/codex-claw',
-        html_url: 'https://github.com/nbonamy/codex-claw',
+        full_name: 'nbonamy/agent-workspace',
+        html_url: 'https://github.com/nbonamy/agent-workspace',
         private: true,
         updated_at: '2026-06-09T12:00:00.000Z',
       }]))
@@ -265,11 +265,11 @@ describe('GitHubWorkProviderDriver', () => {
 
     await expect(driver.listSources(token)).resolves.toStrictEqual([{
       provider: 'github',
-      id: 'nbonamy/codex-claw',
+      id: 'nbonamy/agent-workspace',
       owner: 'nbonamy',
-      name: 'codex-claw',
-      fullName: 'nbonamy/codex-claw',
-      url: 'https://github.com/nbonamy/codex-claw',
+      name: 'agent-workspace',
+      fullName: 'nbonamy/agent-workspace',
+      url: 'https://github.com/nbonamy/agent-workspace',
       isPrivate: true,
       updatedAt: '2026-06-09T12:00:00.000Z',
     }]);
@@ -279,8 +279,8 @@ describe('GitHubWorkProviderDriver', () => {
     const fetch = vi.fn().mockResolvedValue(jsonResponse([{
       number: 24,
       title: 'Guide global backlog loading',
-      html_url: 'https://github.com/nbonamy/codex-claw/issues/24',
-      repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+      html_url: 'https://github.com/nbonamy/agent-workspace/issues/24',
+      repository_url: 'https://api.github.com/repos/nbonamy/agent-workspace',
       state: 'open',
       assignees: [{ login: 'nbonamy' }],
       labels: [],
@@ -292,7 +292,7 @@ describe('GitHubWorkProviderDriver', () => {
     const token = { provider: 'github' as const, accessToken: 'secret', tokenType: 'bearer', connectedAt: 'now' };
 
     await expect(driver.listAssignedItems(token)).resolves.toEqual([
-      expect.objectContaining({ sourceId: 'nbonamy/codex-claw', number: 24, assignees: ['nbonamy'] }),
+      expect.objectContaining({ sourceId: 'nbonamy/agent-workspace', number: 24, assignees: ['nbonamy'] }),
     ]);
     expect(fetch).toHaveBeenCalledWith(
       'https://api.github.com/issues?filter=assigned&state=open&per_page=100',
@@ -305,8 +305,8 @@ describe('GitHubWorkProviderDriver', () => {
       .mockResolvedValueOnce(jsonResponse([{
       number: 24,
       title: 'Page the cockpit backlog',
-      html_url: 'https://github.com/nbonamy/codex-claw/issues/24',
-      repository_url: 'https://api.github.com/repos/nbonamy/codex-claw',
+      html_url: 'https://github.com/nbonamy/agent-workspace/issues/24',
+      repository_url: 'https://api.github.com/repos/nbonamy/agent-workspace',
       state: 'open',
       labels: [],
       created_at: '2026-08-13T12:00:00.000Z',
@@ -325,7 +325,7 @@ describe('GitHubWorkProviderDriver', () => {
       cursor: '2',
       pageSize: 50,
     })).resolves.toStrictEqual({
-      items: [expect.objectContaining({ sourceId: 'nbonamy/codex-claw', number: 24 })],
+      items: [expect.objectContaining({ sourceId: 'nbonamy/agent-workspace', number: 24 })],
       nextCursor: '3',
     });
     expect(fetch).toHaveBeenCalledTimes(1);

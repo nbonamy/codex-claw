@@ -36,8 +36,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Agent, Team } from '@codex-claw/core/contracts';
-import { agentDisplayName } from '@codex-claw/core/agent-display';
+import type { Agent, Team } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import QuickOpenDialog, { type QuickOpenItem } from '../shared/QuickOpenDialog.vue';

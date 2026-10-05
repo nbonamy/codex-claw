@@ -6,10 +6,10 @@ import type {
   WorkItemPage,
   WorkSource,
   WorkProviderKind,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useBacklogProviders } from './backlog-providers';
-import { isWorkProviderKind, workProviderDefinition } from '@codex-claw/core/work-providers';
+import { isWorkProviderKind, workProviderDefinition } from '@workspace/core/work-providers';
 
 type CockpitBacklogConfiguration = {
   assigneeLogin: string | null;

@@ -1,12 +1,12 @@
-import type { Agent, AppPluginSettings } from '@codex-claw/core/contracts';
-import { defaultPluginSettings } from '@codex-claw/core/settings';
-import { workProviderDefinition, workProviderKinds } from '@codex-claw/core/work-providers';
+import type { Agent, AppPluginSettings } from '@workspace/core/contracts';
+import { defaultPluginSettings } from '@workspace/core/settings';
+import { workProviderDefinition, workProviderKinds } from '@workspace/core/work-providers';
 import type { CodexThreadStartExtension } from '@codex-app-sdk/backend';
-import { codexClawDeveloperInstructions, type AgentEffectInstructionSettings } from './agent-prompts';
+import { appDeveloperInstructions, type AgentEffectInstructionSettings } from './agent-prompts';
 
 const chatGptGitHubConnectorId = 'connector_76869538009648d5b282a4bb21c3d157';
 
-export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettings = defaultPluginSettings): string[] {
+export function buildAppMcpConfigOverrides(pluginSettings: AppPluginSettings = defaultPluginSettings): string[] {
   return [
     configOverride('features.apply_patch_streaming_events', true),
     configOverride('features.memories', true),
@@ -21,7 +21,7 @@ export function buildCodexClawMcpConfigOverrides(pluginSettings: AppPluginSettin
   ];
 }
 
-export function buildCodexClawThreadConfig(
+export function buildAppThreadConfig(
   agent: Agent,
   mcpServerUrl: string | null,
   pluginSettings: AppPluginSettings = defaultPluginSettings,
@@ -34,8 +34,8 @@ export function buildCodexClawThreadConfig(
 
   return {
     config: {
-      'mcp_servers.codex_claw.url': clawMcpUrlForAgent(mcpServerUrl, agent),
-      'mcp_servers.codex_claw.default_tools_approval_mode': 'approve',
+      'mcp_servers.workspace.url': appMcpUrlForAgent(mcpServerUrl, agent),
+      'mcp_servers.workspace.default_tools_approval_mode': 'approve',
       ...Object.fromEntries(
         Object.entries(hostedMcpServerUrls).map(([serverId, serverUrl]) => [
           `mcp_servers.${serverId}.url`,
@@ -49,7 +49,7 @@ export function buildCodexClawThreadConfig(
         ? { 'mcp_servers.node_repl.enabled': true }
         : {}),
     },
-    developerInstructions: codexClawDeveloperInstructions(agent, pluginSettings, effects),
+    developerInstructions: appDeveloperInstructions(agent, pluginSettings, effects),
   };
 }
 
@@ -59,7 +59,7 @@ export function agentScopedMcpUrl(serverUrl: string, agentId: string): string {
   return url.toString();
 }
 
-export function clawMcpUrlForAgent(serverUrl: string, agent: Agent): string {
+export function appMcpUrlForAgent(serverUrl: string, agent: Agent): string {
   const url = new URL(agentScopedMcpUrl(serverUrl, agent.id));
   if (agent.codeReview?.reviewerAgentId === agent.id && agent.codeReview.status !== 'finished') {
     url.searchParams.set('reviewContextId', agent.codeReview.id);

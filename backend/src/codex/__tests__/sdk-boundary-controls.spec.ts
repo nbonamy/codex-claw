@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it } from 'vitest';
 import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
 
-describe('Codex SDK → Claw backend controls', () => {
+describe(`Codex SDK → ${product.name} backend controls`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
   const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });
@@ -64,7 +65,7 @@ describe('Codex SDK → Claw backend controls', () => {
 
   it('maps remote pairing timestamps and enforces provider remote-control requirements in its result', async () => {
     const { driver, surface } = setup();
-    const status = { status: 'connected' as const, serverName: 'Claw', installationId: 'install', environmentId: 'environment' };
+    const status = { status: 'connected' as const, serverName: product.name, installationId: 'install', environmentId: 'environment' };
     surface.readRemoteControlStatus.mockResolvedValue(status);
     surface.readConfigRequirements.mockResolvedValue({ allowRemoteControl: false } as NonNullable<Awaited<ReturnType<typeof surface.readConfigRequirements>>>);
     await expect(driver.getRemoteControlStatus()).resolves.toStrictEqual({ ...status, allowRemoteControl: false });

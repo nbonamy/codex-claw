@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import type { DelegatedTask, TaskContract, TaskResultInput } from '@codex-claw/core/delegated-task';
+import type { DelegatedTask, TaskContract, TaskResultInput } from '@workspace/core/delegated-task';
 
 const text = z.string().trim().min(1);
 export const taskContractSchema = z.strictObject({ title: text.max(200), doneWhen: text.max(4000) }) satisfies z.ZodType<TaskContract>;

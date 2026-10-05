@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { Excalidraw, MainMenu, CaptureUpdateAction, bumpVersion, convertToExcalidrawElements, exportToCanvas, restoreElements, sceneCoordsToViewportCoords } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI, BinaryFiles, AppState, ExcalidrawProps } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement, FileId } from '@excalidraw/excalidraw/element/types';
-import type { CanvasDocument, CanvasElement } from '@codex-claw/core/visualize-canvas';
-import type { Visualization } from '@codex-claw/core/visualize';
+import type { CanvasDocument, CanvasElement } from '@workspace/core/visualize-canvas';
+import type { Visualization } from '@workspace/core/visualize';
 import { sanitizeSvg } from './visualization-svg';
 import '@excalidraw/excalidraw/index.css';
 

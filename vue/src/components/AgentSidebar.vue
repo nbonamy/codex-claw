@@ -165,7 +165,7 @@
               placement="bottom-end"
               trigger="click"
               :width="220"
-              popper-class="claw-popover agent-sidebar__repository-session-menu-popover"
+              popper-class="app-popover agent-sidebar__repository-session-menu-popover"
               @update:visible="setRepositorySessionMenuVisible(group, $event)"
             >
               <template #reference>
@@ -325,12 +325,12 @@
 </template>
 
 <script setup lang="ts">
-import type { Mission } from '@codex-claw/core/missions';
-import { missionWorkflow } from '@codex-claw/core/mission-workflows';
+import type { Mission } from '@workspace/core/missions';
+import { missionWorkflow } from '@workspace/core/mission-workflows';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, ReorderRepositoriesInput, SourceBranch, Team } from '@codex-claw/core/contracts';
-import { projectWorkspaceSidebar, type WorkspaceSidebarGroup, type WorkspaceSidebarSession } from '@codex-claw/core/workspace-sidebar';
+import type { Agent, OpenInApplication, OpenInApplicationCatalog, ReorderAgentsInput, ReorderRepositoriesInput, SourceBranch, Team } from '@workspace/core/contracts';
+import { projectWorkspaceSidebar, type WorkspaceSidebarGroup, type WorkspaceSidebarSession } from '@workspace/core/workspace-sidebar';
 import {
   AlertTriangleIcon,
   FolderIcon,
@@ -344,9 +344,9 @@ import {
 import AgentContextMenu from './AgentContextMenu.vue';
 import BackendIcon from './BackendIcon.vue';
 import { useBackendChoices } from './backend-selection';
-import { backendDisplayName } from '@codex-claw/core/backend-driver';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 import MissionContextMenu from './MissionContextMenu.vue';
-import { defaultBackendCapabilities } from '@codex-claw/core/backend-capabilities';
+import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
 import StartWorkMenu from './StartWorkMenu.vue';

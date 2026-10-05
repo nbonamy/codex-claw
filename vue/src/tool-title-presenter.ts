@@ -77,12 +77,12 @@ const TOOL_KEYS: Record<string, string> = {
   'update-finding': 'updateFinding',
 };
 
-export function presentClawToolTitle({
+export function presentAppToolTitle({
   descriptor,
   toolCall,
   translate,
 }: CodexToolTitlePresenterContext, resolveAgentName?: AgentNameResolver): string | undefined {
-  const tool = clawToolName(toolCall.function, toolCall.kind, toolCall.metadata, descriptor?.params?.tool);
+  const tool = appToolName(toolCall.function, toolCall.kind, toolCall.metadata, descriptor?.params?.tool);
   if (!tool) return undefined;
 
   const key = TOOL_KEYS[tool];
@@ -90,34 +90,34 @@ export function presentClawToolTitle({
 
   const args = isRecord(toolCall.args) ? toolCall.args : {};
   const phase = toolPhase(descriptor?.phase, toolCall.state);
-  return translate(`chat.tool.mcp.codexClaw.${key}.${phase}`, {
+  return translate(`chat.tool.mcp.app.${key}.${phase}`, {
     target: toolTarget(tool, args, toolCall.result, phase, resolveAgentName),
   });
 }
 
-export function clawToolName(
+export function appToolName(
   functionName: string,
   kind?: string,
   metadata?: Readonly<Record<string, unknown>>,
   descriptorTool?: unknown,
 ): string | undefined {
-  const metadataTool = clawMcpToolName(kind, metadata);
+  const metadataTool = appMcpToolName(kind, metadata);
   if (metadataTool) return metadataTool;
 
   const rawName = typeof descriptorTool === 'string' ? descriptorTool : functionName;
-  const toolName = rawName.startsWith('mcp__codex_claw__')
-    ? rawName.slice('mcp__codex_claw__'.length)
-    : /^(?:codex_claw)[._](.+)$/.exec(rawName)?.[1];
+  const toolName = rawName.startsWith('mcp__workspace__')
+    ? rawName.slice('mcp__workspace__'.length)
+    : /^(?:workspace)[._](.+)$/.exec(rawName)?.[1];
   if (!toolName) return undefined;
 
   return toolName.replaceAll('_', '-');
 }
 
-export function clawMcpToolName(
+export function appMcpToolName(
   kind?: string,
   metadata?: Readonly<Record<string, unknown>>,
 ): string | undefined {
-  if (kind !== 'mcp' || metadata?.server !== 'codex_claw' || typeof metadata.tool !== 'string') {
+  if (kind !== 'mcp' || metadata?.server !== 'workspace' || typeof metadata.tool !== 'string') {
     return undefined;
   }
   const tool = metadata.tool.trim().replaceAll('_', '-');

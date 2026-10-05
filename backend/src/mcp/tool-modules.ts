@@ -4,35 +4,35 @@ import { logMain, warnMain } from '../log';
 import { McpToolError } from './agent-coordinator';
 import { errorToolResult, structuredToolResult } from './tool-result';
 
-export type ClawMcpToolRequest = {
+export type AppMcpToolRequest = {
   agentId: string;
   url: URL;
 };
 
-export type ClawMcpToolModule = {
+export type AppMcpToolModule = {
   id: string;
   owns?: {
     proposedActions?: true;
   };
-  register(server: McpServer, surface: ClawMcpToolSurface): void;
+  register(server: McpServer, surface: AppMcpToolSurface): void;
 };
 
-type ClawMcpToolSurface = {
+type AppMcpToolSurface = {
   proposedActions: boolean;
 };
 
-export type ClawMcpToolModuleProvider = {
+export type AppMcpToolModuleProvider = {
   id: string;
-  resolve(request: ClawMcpToolRequest): ClawMcpToolModule | undefined;
+  resolve(request: AppMcpToolRequest): AppMcpToolModule | undefined;
 };
 
-export function resolveClawMcpToolModules(
-  providers: readonly ClawMcpToolModuleProvider[],
-  request: ClawMcpToolRequest,
-): ClawMcpToolModule[] {
+export function resolveAppMcpToolModules(
+  providers: readonly AppMcpToolModuleProvider[],
+  request: AppMcpToolRequest,
+): AppMcpToolModule[] {
   const providerIds = new Set<string>();
   const moduleIds = new Set<string>();
-  const modules: ClawMcpToolModule[] = [];
+  const modules: AppMcpToolModule[] = [];
 
   for (const provider of providers) {
     if (providerIds.has(provider.id)) throw new Error(`Duplicate MCP tool module provider '${provider.id}'.`);
@@ -47,8 +47,8 @@ export function resolveClawMcpToolModules(
   return modules;
 }
 
-export function registerClawMcpToolModules(server: McpServer, modules: readonly ClawMcpToolModule[]): void {
-  const surface: ClawMcpToolSurface = {
+export function registerAppMcpToolModules(server: McpServer, modules: readonly AppMcpToolModule[]): void {
+  const surface: AppMcpToolSurface = {
     proposedActions: !modules.some(module => module.owns?.proposedActions),
   };
   for (const module of modules) module.register(server, surface);

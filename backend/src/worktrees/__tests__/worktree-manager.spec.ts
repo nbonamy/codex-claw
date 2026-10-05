@@ -10,7 +10,7 @@ describe('WorktreeManager', () => {
   let worktreePath: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(os.tmpdir(), 'claw-worktree-manager-'));
+    root = await mkdtemp(path.join(os.tmpdir(), 'app-worktree-manager-'));
     repositoryPath = path.join(root, 'repo');
     worktreePath = path.join(root, 'repo-feature');
     await mkdir(repositoryPath);

@@ -1,18 +1,19 @@
+import { product } from '@workspace/core/product';
 import path from 'node:path';
 import { mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import type { AppSnapshot } from '@codex-claw/core/contracts';
-import type { DelegatedTask } from '@codex-claw/core/delegated-task';
+import type { AppSnapshot } from '@workspace/core/contracts';
+import type { DelegatedTask } from '@workspace/core/delegated-task';
 import { AppStateStore } from './persistence/store';
 import { logMain } from './log';
 
-const CODEX_CLAW_HOME_ENV = 'CODEX_CLAW_HOME';
+const APP_HOME_ENV = 'APP_HOME';
 let store: AppStateStore | null = null;
 let storeHome: string | null = null;
 
 export function backendHomeDir(): string {
-  const configured = process.env[CODEX_CLAW_HOME_ENV]?.trim();
-  return configured || path.join(homedir(), '.codex-claw');
+  const configured = process.env[APP_HOME_ENV]?.trim();
+  return configured || path.join(homedir(), product.homeDirectory);
 }
 
 /** The file the app used before roster.json and settings.json; migrated and retired on first start. */
@@ -43,7 +44,7 @@ export async function deleteBackendMissionHome(missionId: string): Promise<void>
   await rm(backendMissionHomeDir(missionId), { recursive: true, force: true });
 }
 
-/** Claw-owned default Codex home; provider setup may select an existing home instead. */
+/** App-owned default Codex home; provider setup may select an existing home instead. */
 export function backendCodexHomeDir(): string {
   return path.join(backendHomeDir(), 'codex-home');
 }
@@ -55,7 +56,7 @@ export async function ensureBackendCodexHome(): Promise<string> {
 }
 
 export function backendSocketPath(): string {
-  return path.join(backendHomeDir(), 'clawd.sock');
+  return path.join(backendHomeDir(), 'daemon.sock');
 }
 
 export async function loadBackendSnapshot(): Promise<AppSnapshot> {

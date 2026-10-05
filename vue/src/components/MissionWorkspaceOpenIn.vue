@@ -9,7 +9,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Agent, OpenInApplication, OpenInApplicationCatalog } from '@codex-claw/core/contracts';
+import type { Agent, OpenInApplication, OpenInApplicationCatalog } from '@workspace/core/contracts';
 import { effectiveOpenInApplication } from '../shared/open-in';
 import OpenInControl from '../shared/OpenInControl.vue';
 

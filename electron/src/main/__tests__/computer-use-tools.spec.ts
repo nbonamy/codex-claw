@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,7 +10,7 @@ describe('Computer Use desktop helper', () => {
   let pilotPath: string;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-claw-computer-use-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-workspace-computer-use-'));
     pilotPath = path.join(tempDir, 'pilot');
     fs.writeFileSync(pilotPath, `#!/usr/bin/env node
 let input = '';
@@ -206,8 +207,8 @@ process.stdin.on('data', (chunk) => {
       appPath: '/unused',
       isPackaged: true,
       platform: 'darwin',
-      resourcesPath: '/Applications/Codex Claw.app/Contents/Resources',
-    })).toBe('/Applications/Codex Claw.app/Contents/Resources/Codex Claw Computer Use.app');
+      resourcesPath: `/Applications/${product.name}.app/Contents/Resources`,
+    })).toBe(`/Applications/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`);
   });
 
   function options() {

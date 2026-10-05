@@ -1,4 +1,4 @@
-import { canonicalGitRemoteIdentity } from '@codex-claw/core/git-remote';
+import { canonicalGitRemoteIdentity } from '@workspace/core/git-remote';
 import type {
   CloneSourceRepositoryInput,
   SourceBranch,
@@ -6,7 +6,7 @@ import type {
   Team,
   WorkIntegrationConnection,
   WorkSource,
-} from '@codex-claw/core/contracts';
+} from '@workspace/core/contracts';
 import { computed, ref, watch } from 'vue';
 
 type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';

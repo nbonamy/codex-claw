@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    class="claw-dialog agent-avatar-crop-dialog"
+    class="app-dialog agent-avatar-crop-dialog"
     :model-value="visible"
     :teleported="false"
     width="320px"
@@ -9,8 +9,8 @@
     @update:model-value="onVisibilityChanged"
   >
     <template #header>
-      <div class="claw-dialog__header">
-        <h2 class="claw-dialog__title">{{ title }}</h2>
+      <div class="app-dialog__header">
+        <h2 class="app-dialog__title">{{ title }}</h2>
       </div>
     </template>
 
@@ -41,10 +41,10 @@
     </div>
 
     <template #footer>
-      <div class="claw-dialog__footer">
-        <button class="claw-button claw-button--tertiary" type="button" @click="emit('cancel')">{{ $t('surface.agentAvatarCropDialog.cancel') }}</button>
+      <div class="app-dialog__footer">
+        <button class="app-button app-button--tertiary" type="button" @click="emit('cancel')">{{ $t('surface.agentAvatarCropDialog.cancel') }}</button>
         <button
-          class="claw-button claw-button--primary"
+          class="app-button app-button--primary"
           type="button"
           @click="apply"
         > {{ $t('surface.agentAvatarCropDialog.useImage') }} </button>

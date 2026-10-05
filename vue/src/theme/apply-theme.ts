@@ -1,4 +1,4 @@
-import type { AppThemeSettings } from '@codex-claw/core/contracts';
+import type { AppThemeSettings } from '@workspace/core/contracts';
 import { effectiveTheme } from './themes';
 
 const mediaQuery = typeof window !== 'undefined'
@@ -55,7 +55,7 @@ function applyCodexThemeTokens(
     ? colors['--color-surface-low']
     : colors['--color-surface-lowest'];
   const tokens: Record<string, string | undefined> = {
-    '--codex-app-surface-color': colors['--color-surface'],
+    '--app-surface-color': colors['--color-surface'],
     '--codex-background-color': colors['--color-surface'],
     '--codex-border-color': colors['--color-outline-variant'],
     '--codex-hover-color': colors['--color-surface-low'],

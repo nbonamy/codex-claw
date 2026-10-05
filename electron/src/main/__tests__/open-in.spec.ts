@@ -93,7 +93,7 @@ describe('Open In', () => {
   });
 
   it('only resolves files contained by the canonical agent folder', async () => {
-    tempDirectory = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-open-in-'));
+    tempDirectory = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-open-in-'));
     const project = path.join(tempDirectory, 'project');
     const outside = path.join(tempDirectory, 'outside.ts');
     await mkdir(path.join(project, 'src'), { recursive: true });

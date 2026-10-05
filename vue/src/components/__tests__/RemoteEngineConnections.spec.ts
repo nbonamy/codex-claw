@@ -1,7 +1,8 @@
+import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { RemoteConnection } from '@codex-claw/core/contracts';
-import { configureClawClient } from '../../platform-api';
+import type { RemoteConnection } from '@workspace/core/contracts';
+import { configureAppClient } from '../../platform-api';
 import { createClientApiMock } from '../../test/client-api-mock';
 import RemoteEngineConnections from '../RemoteEngineConnections.vue';
 import { ElSwitch } from 'element-plus';
@@ -10,7 +11,7 @@ const connection: RemoteConnection = {
   id: 'wall-e', host: 'wall-e', name: 'wall-e', kind: 'ssh', status: 'ready', createdAt: '', updatedAt: '',
 };
 
-afterEach(() => { configureClawClient(undefined); document.body.innerHTML = ''; });
+afterEach(() => { configureAppClient(undefined); document.body.innerHTML = ''; });
 
 describe('RemoteEngineConnections', () => {
   it('toggles an authenticated remote engine from cached status without another auth check', async () => {
@@ -18,7 +19,7 @@ describe('RemoteEngineConnections', () => {
     const engine = { backend: 'claude' as const, installed: true, connected: true, checking: false, enabled: true };
     api.getProviderConnections.mockResolvedValue([engine]);
     api.setProviderEnabled.mockResolvedValueOnce([{ ...engine, enabled: false }]).mockResolvedValue([engine]);
-    configureClawClient({ platform: 'desktop', api });
+    configureAppClient({ platform: 'desktop', api });
     const wrapper = mount(RemoteEngineConnections, { props: { connection }, global: { components: { ElSwitch } } });
     await flushPromises();
     await wrapper.get('[role="switch"]').trigger('click');
@@ -39,7 +40,7 @@ describe('RemoteEngineConnections', () => {
     const engine = { backend, installed: true, connected: true, checking: false, enabled: false };
     api.getProviderConnections.mockResolvedValueOnce([engine]).mockResolvedValue([{ ...engine, connected: false }]);
     api.disconnectProvider.mockRejectedValueOnce(new Error('private CLI output')).mockResolvedValue({ kind: 'claude', connected: false, state: { loggedIn: false } });
-    configureClawClient({ platform: 'desktop', api });
+    configureAppClient({ platform: 'desktop', api });
     const wrapper = mount(RemoteEngineConnections, { props: { connection } });
     await flushPromises();
     await wrapper.get('.settings-row__control button').trigger('click');
@@ -62,9 +63,9 @@ describe('RemoteEngineConnections', () => {
     api.getProviderConnections.mockResolvedValueOnce(missing).mockResolvedValue([
       missing[0]!, { ...missing[1]!, installed: true },
     ]);
-    api.installProvider.mockResolvedValue({ backend: 'claude', installed: true, locked: false, isolated: true, shareSkills: true, homePath: '/remote/claw/claude-home' });
-    api.getClaudeAuthentication.mockResolvedValue({ loggedIn: false, configDirectory: '/remote/claw/claude-home' });
-    configureClawClient({ platform: 'desktop', api });
+    api.installProvider.mockResolvedValue({ backend: 'claude', installed: true, locked: false, isolated: true, shareSkills: true, homePath: '/remote/app/claude-home' });
+    api.getClaudeAuthentication.mockResolvedValue({ loggedIn: false, configDirectory: '/remote/app/claude-home' });
+    configureAppClient({ platform: 'desktop', api });
     const wrapper = mount(RemoteEngineConnections, { props: { connection } });
     await flushPromises();
 
@@ -79,17 +80,17 @@ describe('RemoteEngineConnections', () => {
     expect(api.getClaudeAuthentication).toHaveBeenCalledWith('wall-e');
     await wrapper.findAll('button').find(button => button.text() === 'Connect Claude')!.trigger('click');
     await flushPromises();
-    expect(document.body.textContent).toContain("CLAUDE_CONFIG_DIR='/remote/claw/claude-home' claude auth login --console");
+    expect(document.body.textContent).toContain("CLAUDE_CONFIG_DIR='/remote/app/claude-home' claude auth login --console");
     wrapper.unmount();
   });
 
   it('shows the remote update error without inventing an available engine and lets users retry', async () => {
     const { api } = createClientApiMock();
-    api.getProviderConnections.mockRejectedValueOnce(new Error('Update Claw on wall-e to report connected engines.')).mockResolvedValue([]);
-    configureClawClient({ platform: 'desktop', api });
+    api.getProviderConnections.mockRejectedValueOnce(new Error(`Update ${product.name} on wall-e to report connected engines.`)).mockResolvedValue([]);
+    configureAppClient({ platform: 'desktop', api });
     const wrapper = mount(RemoteEngineConnections, { props: { connection } });
     await flushPromises();
-    expect(wrapper.get('[role="alert"]').text()).toContain('Update Claw on wall-e');
+    expect(wrapper.get('[role="alert"]').text()).toContain(`Update ${product.name} on wall-e`);
     expect(wrapper.text()).not.toContain('Connect Codex');
     await wrapper.get('button').trigger('click');
     await flushPromises();

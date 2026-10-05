@@ -7,29 +7,29 @@ const ports = vi.hoisted(() => {
   });
   return { socket: client(), process: client(), mode: 'auto', command: null as object | null };
 });
-vi.mock('../backend-socket-client', () => ({ ClawBackendSocketClient: class { constructor() { return ports.socket; } } }));
-vi.mock('../backend-process-client', () => ({ ClawBackendProcessClient: class { constructor() { return ports.process; } } }));
+vi.mock('../backend-socket-client', () => ({ AppBackendSocketClient: class { constructor() { return ports.socket; } } }));
+vi.mock('../backend-process-client', () => ({ AppBackendProcessClient: class { constructor() { return ports.process; } } }));
 vi.mock('../runtime-config', () => ({
-  runtimeClawdBackendMode: () => ports.mode, runtimeClawdCommand: () => ports.command,
-  runtimeClawdSocketPath: () => '/test/clawd.sock', runtimeClawdWatchFile: () => undefined,
+  runtimeDaemonBackendMode: () => ports.mode, runtimeDaemonCommand: () => ports.command,
+  runtimeDaemonSocketPath: () => '/test/daemon.sock', runtimeDaemonWatchFile: () => undefined,
 }));
 vi.mock('../client-request-handlers', () => ({ createRuntimeClientRequestHandlers: () => ({}) }));
-import { createRuntimeClawBackendClient } from '../backend-client';
+import { createRuntimeAppBackendClient } from '../backend-client';
 
 beforeEach(() => {
   vi.resetAllMocks();
   ports.mode = 'auto';
-  ports.command = { command: 'node', args: ['/test/clawd.mjs'], env: {} };
+  ports.command = { command: 'node', args: ['/test/daemon.mjs'], env: {} };
   for (const port of [ports.socket, ports.process]) {
     port.start.mockResolvedValue(undefined);
     port.close.mockResolvedValue(undefined);
-    port.health.mockResolvedValue({ ok: true, name: 'clawd', version: 'test', pid: 123 });
+    port.health.mockResolvedValue({ ok: true, name: 'daemon', version: 'test', pid: 123 });
   }
 });
 
 describe('runtime backend selection', () => {
   it('uses a healthy daemon, routes requests and subscriptions, and reselects after close', async () => {
-    const client = createRuntimeClawBackendClient()!;
+    const client = createRuntimeAppBackendClient()!;
     expect(() => client.request('snapshot/get')).toThrow('not connected');
     await client.start();
     ports.socket.request.mockResolvedValue({ snapshot: 'daemon' });
@@ -59,7 +59,7 @@ describe('runtime backend selection', () => {
 
   it('cleans up a connected but unhealthy daemon before falling back to the bundled process', async () => {
     ports.socket.health.mockRejectedValue(new Error('wrong protocol'));
-    const client = createRuntimeClawBackendClient()!;
+    const client = createRuntimeAppBackendClient()!;
     await client.start();
     expect(ports.socket.close.mock.invocationCallOrder[0]).toBeLessThan(ports.process.start.mock.invocationCallOrder[0]!);
     ports.process.request.mockResolvedValue('bundled');
@@ -70,7 +70,7 @@ describe('runtime backend selection', () => {
   it('propagates a bundled startup failure and allows a later fresh attempt', async () => {
     ports.socket.start.mockRejectedValue(new Error('no daemon'));
     ports.process.start.mockRejectedValueOnce(new Error('spawn failed'));
-    const client = createRuntimeClawBackendClient()!;
+    const client = createRuntimeAppBackendClient()!;
     await expect(client.start()).rejects.toThrow('spawn failed');
     expect(() => client.request('snapshot/get')).toThrow('not connected');
     await client.start();
@@ -81,16 +81,16 @@ describe('runtime backend selection', () => {
 
   it('honors explicit existing and bundled modes and handles absent bundled runtimes', async () => {
     ports.mode = 'existing';
-    await createRuntimeClawBackendClient()!.start();
+    await createRuntimeAppBackendClient()!.start();
     expect(ports.socket.start).toHaveBeenCalledOnce();
     expect(ports.process.start).not.toHaveBeenCalled();
     ports.mode = 'bundled';
-    await createRuntimeClawBackendClient()!.start();
+    await createRuntimeAppBackendClient()!.start();
     expect(ports.process.start).toHaveBeenCalledOnce();
     ports.command = null;
-    expect(createRuntimeClawBackendClient()).toBeNull();
+    expect(createRuntimeAppBackendClient()).toBeNull();
     ports.mode = 'auto';
-    await createRuntimeClawBackendClient()!.start();
+    await createRuntimeAppBackendClient()!.start();
     expect(ports.socket.start).toHaveBeenCalledTimes(2);
   });
 });

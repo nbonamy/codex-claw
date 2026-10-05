@@ -65,7 +65,7 @@ test("visitors can open documentation from the header at desktop and phone width
         `Download fits at ${width}px`,
       );
       await docs.click();
-      await page.locator("h1#claw-documentation").waitFor();
+      await page.getByRole("heading", { level: 1 }).waitFor();
       assert.equal(new URL(page.url()).pathname, "/docs/");
     }
   } finally {

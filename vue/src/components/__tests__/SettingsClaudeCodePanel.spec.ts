@@ -6,7 +6,7 @@ import { ElSwitch } from 'element-plus';
 describe('SettingsClaudeCodePanel', () => {
   it('groups account, location, and enable in that order and keeps the enable toggle available', async () => {
     const setEnabled = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mount(SettingsClaudeCodePanel, { props: { setEnabled, home: { homePath: '/claw/claude-home', isolated: true, shareSkills: true } }, global: { components: { ElSwitch } } });
+    const wrapper = mount(SettingsClaudeCodePanel, { props: { setEnabled, home: { homePath: '/app/claude-home', isolated: true, shareSkills: true } }, global: { components: { ElSwitch } } });
     expect(wrapper.findAll('.settings-section')).toHaveLength(1);
     expect(wrapper.findAll('.settings-row__copy strong').map(row => row.text())).toEqual(['Account', 'Location', 'Enable engine']);
     await wrapper.get('button').trigger('click');

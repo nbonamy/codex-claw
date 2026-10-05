@@ -1,9 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
-import type { WorkItem, WorkSource } from '@codex-claw/core/contracts';
-import { workItemAssignmentKey } from '@codex-claw/core/work-assignments';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { WorkItem, WorkSource } from '@workspace/core/contracts';
+import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import BacklogView from '../BacklogView.vue';
 import CockpitWorkInbox from '../CockpitWorkInbox.vue';
 import { useCockpitBacklog } from '../use-cockpit-backlog';
@@ -14,10 +14,10 @@ describe('BacklogView', () => {
     const snapshot = reactive(createInitialSnapshot());
     snapshot.workBacklog.connections = [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected', accountLabel: 'Alex · Acme' }];
     const linearItem: WorkItem = { ...item(24), provider: 'linear', id: 'linear:uuid', identifier: 'ENG-24', sourceId: 'linear:team', title: 'Linear issue', body: 'Linear details', nativeState: 'Started' };
-    let resolveOld!: (page: import('@codex-claw/core/contracts').WorkItemPage) => void;
+    let resolveOld!: (page: import('@workspace/core/contracts').WorkItemPage) => void;
     const load = vi.fn(async (_query, provider) => provider === 'linear'
       ? { items: [linearItem], totalItems: 1 }
-      : new Promise<import('@codex-claw/core/contracts').WorkItemPage>(resolve => { resolveOld = resolve; }));
+      : new Promise<import('@workspace/core/contracts').WorkItemPage>(resolve => { resolveOld = resolve; }));
     const source = { ...repository('team', '2026-01-01'), provider: 'linear' as const, id: 'linear:team', name: 'Engineering', fullName: 'Engineering' };
     const Harness = defineComponent({ setup() {
       const state = useCockpitBacklog({ getSnapshot: () => snapshot, configure: async input => { snapshot.workBacklog.providerConfigurations[input.provider] = { sourceId: input.configuration.sourceId ?? undefined }; }, confirmLoadAll: async () => true, getWorkBacklogError: () => null, getWorkBacklogStatus: () => 'loaded', getWorkItemsByRepository: () => ({ 'linear:linear:team': [linearItem] }), getWorkRepositories: provider => provider === 'linear' ? [source] : [repository('repo', '2026-01-01')], loadGlobalWorkItems: load, loadWorkItems: async () => {}, loadWorkRepositories: async () => {} });
@@ -182,9 +182,9 @@ describe('BacklogView', () => {
 
     inbox.vm.$emit('select-assigned-agent', 'agent-dina');
 
-    expect(wrapper.emitted('select-agent')).toStrictEqual([[{ agentId: 'agent-dina', teamId: 'team-codex-claw' }]]);
+    expect(wrapper.emitted('select-agent')).toStrictEqual([[{ agentId: 'agent-dina', teamId: 'team-app' }]]);
     expect(inbox.props('startWorkAction')).toBe(startWorkItemsAction);
-    expect(inbox.props('defaultTeamId')).toBe('team-codex-claw');
+    expect(inbox.props('defaultTeamId')).toBe('team-app');
   });
 
   it('summarizes assignments as clickable working, blocked, and review filters', async () => {
@@ -265,5 +265,5 @@ function repository(name: string, updatedAt: string, workItemsUpdatedAt?: string
 }
 
 function item(number: number): WorkItem {
-  return { provider: 'github', id: `nbonamy/codex-claw#${number}`, sourceId: 'nbonamy/codex-claw', sourceName: 'nbonamy/codex-claw', number, title: `Work item ${number}`, url: `https://github.com/nbonamy/codex-claw/issues/${number}`, state: 'open', labels: [], createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z' };
+  return { provider: 'github', id: `nbonamy/agent-workspace#${number}`, sourceId: 'nbonamy/agent-workspace', sourceName: 'nbonamy/agent-workspace', number, title: `Work item ${number}`, url: `https://github.com/nbonamy/agent-workspace/issues/${number}`, state: 'open', labels: [], createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z' };
 }

@@ -1,4 +1,4 @@
-import type { AppCommand } from '@codex-claw/core/contracts';
+import type { AppCommand } from '@workspace/core/contracts';
 
 export const cycleTeamsAccelerator = 'Command+`';
 

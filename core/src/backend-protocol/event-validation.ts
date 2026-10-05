@@ -1,7 +1,8 @@
+import { product } from '../product';
 export type EventValueValidator = (value: unknown, path: string) => void;
 
 export function failEventValidation(path: string, reason: string): never {
-  throw new Error(`Invalid Claw backend event at ${path}: ${reason}.`);
+  throw new Error(`Invalid ${product.name} backend event at ${path}: ${reason}.`);
 }
 
 export function expectRecord(

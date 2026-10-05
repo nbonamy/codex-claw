@@ -6,7 +6,7 @@ import { copyPackagedNativeDependencies } from '../package-native-dependencies';
 
 describe('copyPackagedNativeDependencies', () => {
   it('copies the allowlisted hoisted native package and its loader into the packaged app', () => {
-    const fixture = mkdtempSync(path.join(tmpdir(), 'codex-claw-native-dependencies-'));
+    const fixture = mkdtempSync(path.join(tmpdir(), 'agent-workspace-native-dependencies-'));
     const sourceNodeModules = path.join(fixture, 'source');
     const buildPath = path.join(fixture, 'build');
     for (const dependency of ['autolib', 'node-gyp-build']) {
@@ -28,7 +28,7 @@ describe('copyPackagedNativeDependencies', () => {
   });
 
   it('fails packaging when a required native dependency is unavailable', () => {
-    const fixture = mkdtempSync(path.join(tmpdir(), 'codex-claw-native-dependencies-'));
+    const fixture = mkdtempSync(path.join(tmpdir(), 'agent-workspace-native-dependencies-'));
 
     expect(() => copyPackagedNativeDependencies(
       path.join(fixture, 'build'),
@@ -38,7 +38,7 @@ describe('copyPackagedNativeDependencies', () => {
   });
 
   it('does not package macOS automation dependencies on Linux', () => {
-    const fixture = mkdtempSync(path.join(tmpdir(), 'codex-claw-native-dependencies-'));
+    const fixture = mkdtempSync(path.join(tmpdir(), 'agent-workspace-native-dependencies-'));
     const buildPath = path.join(fixture, 'build');
 
     copyPackagedNativeDependencies(buildPath, path.join(fixture, 'missing'), 'linux');

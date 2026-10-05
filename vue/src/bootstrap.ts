@@ -1,5 +1,5 @@
 import { createApp } from 'vue';
-import type { ClawClient } from '@codex-claw/core/client';
+import type { AppClient } from '@workspace/core/client';
 import ElementPlus from 'element-plus';
 import 'element-plus/dist/index.css';
 import '@codex-app-sdk/vue/styles.css';
@@ -10,16 +10,18 @@ import App from './App.vue';
 import AnnotationOverlayApp from './AnnotationOverlayApp.vue';
 import { i18n } from './i18n';
 import { applyRendererPlatform } from './renderer-platform';
-import { configureClawClient } from './platform-api';
+import { configureAppClient } from './platform-api';
+import { product } from '@workspace/core/product';
 
-export type MountClawVueAppOptions = {
-  client: ClawClient;
+export type MountAppVueAppOptions = {
+  client: AppClient;
   surface?: 'annotation-overlay' | 'main';
   target?: Element | string;
 };
 
-export function mountClawVueApp(options: MountClawVueAppOptions) {
-  configureClawClient(options.client);
+export function mountAppVueApp(options: MountAppVueAppOptions) {
+  document.title = product.name;
+  configureAppClient(options.client);
   applyRendererPlatform(document.documentElement, navigator.platform, navigator.userAgent);
 
   const surface = options.surface

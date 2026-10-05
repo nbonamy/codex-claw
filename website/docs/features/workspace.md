@@ -56,9 +56,9 @@ In a repository backlog, search by issue identifier or title and use the state, 
 2. Choose the coding engine for a new agent.
 3. Select **Investigate**, **Fix**, or **Custom** to prepare your own prompt.
 
-From the global Backlog, select items and start work, choose the destination **Team** and coding engine, and choose a **Code repository** for Linear. Each selected item starts a separate agent in a worktree. Claw does not infer a local clone from the Linear team or project name.
+From the global Backlog, select items and start work, choose the destination **Team** and coding engine, and choose a **Code repository** for Linear. Each selected item starts a separate agent in a worktree. Korus does not infer a local clone from the Linear team or project name.
 
-Assigned items link back to their agent. Claw's assignment and completion status tracks the agent's work; it does not by itself change an issue's status in Linear or GitHub, merge a pull request, or deploy code. Ask explicitly when you want an external issue updated.
+Assigned items link back to their agent. Korus's assignment and completion status tracks the agent's work; it does not by itself change an issue's status in Linear or GitHub, merge a pull request, or deploy code. Ask explicitly when you want an external issue updated.
 
 ## Commit and deliver
 

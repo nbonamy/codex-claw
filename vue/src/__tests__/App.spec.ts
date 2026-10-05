@@ -5,17 +5,17 @@ import AppShell from '../components/AppShell.vue';
 import AgentCloseDialog from '../components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from '../components/PullRequestCleanupDialog.vue';
 import SessionCompressionDialog from '../components/SessionCompressionDialog.vue';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { setElectronTestClient } from '../test/client';
 
 afterEach(() => {
-  delete window.codexClaw;
+  delete window.app;
 });
 
 describe('App', () => {
   it('opens a plan review from a backend domain event without a panel request', async () => {
     const snapshot = createInitialSnapshot();
-    let emitEvent!: (event: import('@codex-claw/core/contracts').MainToRendererEvent) => void;
+    let emitEvent!: (event: import('@workspace/core/contracts').MainToRendererEvent) => void;
     setElectronTestClient({
       getSnapshot: vi.fn().mockResolvedValue(snapshot),
       onEvent: (listener) => { emitEvent = listener; return () => undefined; },
@@ -346,11 +346,11 @@ describe('App', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.pullRequest = {
       provider: 'github',
-      repository: 'nbonamy/codex-claw',
+      repository: 'nbonamy/agent-workspace',
       branch: 'feat/merged',
       number: 7,
       title: 'Merged work',
-      url: 'https://github.com/nbonamy/codex-claw/pull/7',
+      url: 'https://github.com/nbonamy/agent-workspace/pull/7',
       draft: false,
       headSha: 'abc123',
       state: 'closed',

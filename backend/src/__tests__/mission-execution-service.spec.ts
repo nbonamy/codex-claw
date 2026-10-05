@@ -1,9 +1,10 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import { createMission, updateMission, type MissionArtifacts, type MissionStage } from '@codex-claw/core/missions';
+import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import { createMission, updateMission, type MissionArtifacts, type MissionStage } from '@workspace/core/missions';
 import { MissionService } from '../mission-service';
 import { MissionExecutionService } from '../mission-execution-service';
 import { FileMissionArtifactStore } from '../mission-artifact-store';
@@ -16,7 +17,7 @@ function setup() {
   const store = new MissionService(snapshot, persisted);
   const artifactContents = new Map<string, string>();
   const ports = { snapshot, missions: store, publish: vi.fn().mockResolvedValue(undefined), reportImplementationStartProgress: vi.fn(), validateRepository: vi.fn().mockResolvedValue(undefined),
-    ensureMissionHome: vi.fn().mockResolvedValue('/claw/missions/mission'),
+    ensureMissionHome: vi.fn().mockResolvedValue('/app/missions/mission'),
     readArtifact: vi.fn(async (_missionId: string, stage: MissionStage) => artifactContents.get(stage) ?? ''),
     writeArtifact: vi.fn(async (_missionId: string, stage: MissionStage, content: string) => { artifactContents.set(stage, content); return { size: content.length }; }),
     createWorktree: vi.fn(async ({ repoPath, branchName }: { repoPath: string; branchName: string }) => ({ name: branchName, path: `${repoPath}-${branchName.replace('/', '-')}` })),
@@ -27,7 +28,7 @@ function setup() {
     startRemediation: vi.fn().mockResolvedValue(undefined),
     ensureStageSkills: vi.fn(async (_missionId: string, stage) => [{
       name: `mission-${stage}`,
-      path: `/claw/missions/mission/skills/mission-${stage}/SKILL.md`,
+      path: `/app/missions/mission/skills/mission-${stage}/SKILL.md`,
     }]),
     interrupt: vi.fn().mockResolvedValue(undefined) };
   const service = new MissionExecutionService(ports);
@@ -51,16 +52,16 @@ describe('mission execution', () => {
     const workerId = h.current().execution!.runs.at(-1)!.workerId!;
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
-    const { createClawMcpServer } = await import('../mcp/tools');
+    const { createAppMcpServer } = await import('../mcp/tools');
     const { createMissionToolModuleProvider } = await import('../mcp/mission-tools');
     const { createCollaborationToolModuleProvider } = await import('../mcp/collaboration-tools');
     const coordinator = {
       missionContext: (id: string) => h.service.contextForAgent(id),
       listMissionArtifacts: (id: string) => h.service.listArtifacts(id),
       submitMissionResult: (id: string, input: Parameters<typeof h.service.submit>[1]) => h.service.submit(id, input),
-    } as unknown as import('../mcp/agent-coordinator').ClawMcpAgentCoordinator;
+    } as unknown as import('../mcp/agent-coordinator').AppMcpAgentCoordinator;
     const callTool = async (name: string, args: Record<string, unknown> = {}) => {
-      const server = createClawMcpServer({ agentId: workerId, url: new URL(`http://localhost/mcp?agentId=${workerId}`) }, [createCollaborationToolModuleProvider(coordinator), createMissionToolModuleProvider(coordinator)]);
+      const server = createAppMcpServer({ agentId: workerId, url: new URL(`http://localhost/mcp?agentId=${workerId}`) }, [createCollaborationToolModuleProvider(coordinator), createMissionToolModuleProvider(coordinator)]);
       const client = new Client({ name: 'mission-lifecycle-repro', version: '1' });
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       try {
@@ -289,7 +290,7 @@ describe('mission execution', () => {
 
   it('re-runs Review with real artifact storage and requires a fresh artifact after remediation', async ({ onTestFinished }) => {
     const h = setup();
-    const root = await mkdtemp(path.join(tmpdir(), 'claw-review-rerun-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'app-review-rerun-'));
     onTestFinished(() => rm(root, { recursive: true, force: true }));
     const artifacts = new FileMissionArtifactStore(async missionId => path.join(root, missionId));
     h.ports.readArtifact.mockImplementation((id, stage) => artifacts.read(id, stage));
@@ -386,7 +387,7 @@ describe('mission execution', () => {
     await h.service.recoverInterruptedRuns();
     expect(h.current().artifacts.review.findings?.[0]?.remediation.state).toBe('open');
   });
-  it('replaces an active installed workflow skill with the Claw-owned Mission skill', async () => {
+  it(`replaces an active installed workflow skill with the ${product.name}-owned Mission skill`, async () => {
     const h = setup(); await h.configure();
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
     await h.store.change(h.current().id, mission => {
@@ -396,7 +397,7 @@ describe('mission execution', () => {
     await h.service.refreshOwnedSkills();
 
     expect(h.current().execution!.runs[0]!.skills).toStrictEqual([
-      { name: 'mission-requirements', path: '/claw/missions/mission/skills/mission-requirements/SKILL.md' },
+      { name: 'mission-requirements', path: '/app/missions/mission/skills/mission-requirements/SKILL.md' },
     ]);
   });
 
@@ -460,9 +461,9 @@ describe('mission execution', () => {
     expect(h.ports.createWorktree).not.toHaveBeenCalled();
     expect(h.snapshot.agents.slice(0, 2)).toStrictEqual(h.originalAgents);
     const worker = h.snapshot.agents.find(agent => agent.id === run.workerId)!;
-    expect(worker).toMatchObject({ folder: '/claw/missions/mission', backend: h.originalAgents[0]!.backend, status: { type: 'idle' } });
+    expect(worker).toMatchObject({ folder: '/app/missions/mission', backend: h.originalAgents[0]!.backend, status: { type: 'idle' } });
     expect(worker).not.toHaveProperty('backendSession');
-    expect(run.skills).toStrictEqual([{ name: 'mission-requirements', path: '/claw/missions/mission/skills/mission-requirements/SKILL.md' }]);
+    expect(run.skills).toStrictEqual([{ name: 'mission-requirements', path: '/app/missions/mission/skills/mission-requirements/SKILL.md' }]);
     const instructions = h.service.developerInstructionsForAgent(run.workerId!);
     expect(instructions).toMatch(/^<context>\n/);
     expect(instructions).toContain(h.originalAgents[0]!.folder);
@@ -503,11 +504,11 @@ describe('mission execution', () => {
     expect(h.current().execution!.runs[0]!.status).toBe('accepted');
     expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'preparing', workerId: run.workerId });
     await h.service.waitForLaunches();
-    expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'running', workerId: run.workerId, skills: [{ name: 'mission-tickets', path: '/claw/missions/mission/skills/mission-tickets/SKILL.md' }] });
+    expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'running', workerId: run.workerId, skills: [{ name: 'mission-tickets', path: '/app/missions/mission/skills/mission-tickets/SKILL.md' }] });
     expect(h.service.contextForAgent(run.workerId!)).toEqual({ missionId: mission.id, runId: h.current().execution!.runs[1]!.id, stage: 'tickets' });
     expect(h.service.developerInstructionsForAgent(run.workerId!)).toContain('Continue as the same Mission orchestrator');
     expect(h.ports.refreshConversationContext).toHaveBeenCalledWith(worker);
-    expect(h.ports.continueStage).toHaveBeenCalledWith(run.workerId, expect.stringContaining('assigned Claw Mission skill'));
+    expect(h.ports.continueStage).toHaveBeenCalledWith(run.workerId, expect.stringContaining(`assigned ${product.name} Mission skill`));
   });
 
   it('persists live ticket drafts in the Mission artifact and submits those exact drafts for review', async () => {
@@ -774,8 +775,8 @@ describe('mission execution', () => {
     await h.command({ action: 'run' }); await h.service.waitForLaunches();
     const workerId = h.current().execution!.runs[0]!.workerId!;
 
-    await expect(h.service.attachRepository(workerId, '/claw/missions/mission')).rejects.toThrow('represented');
-    expect(h.ports.validateRepository).not.toHaveBeenCalledWith('/claw/missions/mission');
+    await expect(h.service.attachRepository(workerId, '/app/missions/mission')).rejects.toThrow('represented');
+    expect(h.ports.validateRepository).not.toHaveBeenCalledWith('/app/missions/mission');
     await expect(h.service.attachRepository(workerId, h.originalAgents[0]!.folder!)).resolves.toMatchObject({
       success: true, repoPath: h.originalAgents[0]!.folder,
     });
@@ -803,7 +804,7 @@ describe('mission execution', () => {
     h.snapshot.teams[1]!.agentIds.push(moved.id);
 
     await expect(h.command({ action: 'configure', teamId: 'team-other', memberIds: [moved.id] })).rejects.toThrow('local team');
-    expect(h.current().teamId).toBe('team-codex-claw');
+    expect(h.current().teamId).toBe('team-app');
   });
 
   it('keeps the backlog reviewable when an affected repository worktree cannot be created', async () => {
@@ -859,7 +860,7 @@ describe('mission execution', () => {
     await expect(h.command({ action: 'run' })).rejects.toThrow('existing run');
     const id = h.current().execution!.runs[0]!.id;
     await h.command({ action: 'cancel', runId: id });
-    release('/claw/missions/mission'); await h.service.waitForLaunches();
+    release('/app/missions/mission'); await h.service.waitForLaunches();
     expect(h.current().execution!.workspace).toBeUndefined();
     h.ports.ensureMissionHome.mockRejectedValueOnce(new Error('Mission home unavailable'));
     await h.command({ action: 'run' }); await h.service.waitForLaunches();

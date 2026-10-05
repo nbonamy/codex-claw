@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { computed } from 'vue';
-import type { AppshotHotkey, AppshotSettings, UpdateSettingsInput } from '@codex-claw/core/contracts';
+import type { AppshotHotkey, AppshotSettings, UpdateSettingsInput } from '@workspace/core/contracts';
 import { PhotoIcon } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';

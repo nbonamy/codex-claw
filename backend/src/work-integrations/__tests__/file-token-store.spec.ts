@@ -8,7 +8,7 @@ describe('FileWorkIntegrationTokenStore', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(path.join(os.tmpdir(), 'codex-claw-backend-token-store-'));
+    tmpDir = await mkdtemp(path.join(os.tmpdir(), 'agent-workspace-backend-token-store-'));
   });
 
   afterEach(async () => {

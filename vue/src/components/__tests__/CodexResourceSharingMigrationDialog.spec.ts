@@ -10,8 +10,8 @@ describe('CodexResourceSharingMigrationDialog', () => {
     expect(document.body.textContent).toContain('Share skills and plugins with ChatGPT?');
     const buttons = [...document.body.querySelectorAll('button')];
     expect(buttons.map((button) => [...button.classList])).toStrictEqual([
-      ['claw-button', 'claw-button--tertiary'],
-      ['claw-button', 'claw-button--primary'],
+      ['app-button', 'app-button--tertiary'],
+      ['app-button', 'app-button--primary'],
     ]);
     buttons.find((button) => button.textContent?.includes('Keep isolated'))?.click();
     buttons.find((button) => button.textContent?.includes('Migrate'))?.click();

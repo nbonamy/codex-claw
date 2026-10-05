@@ -1,11 +1,11 @@
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createMission } from '@codex-claw/core/missions';
-import { createEmptySnapshot, createInitialSnapshot } from '@codex-claw/core/snapshot-construction';
-import type { AgentGitWorkflow } from '@codex-claw/core/contracts';
+import { createMission } from '@workspace/core/missions';
+import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot-construction';
+import type { AgentGitWorkflow } from '@workspace/core/contracts';
 import { conversationControllerActions, conversationControllerState, mountShell, workItem } from './app-shell-test-harness';
 
-const missionStorageKey = 'codexClaw.activeMissionId';
+const missionStorageKey = 'app.activeMissionId';
 
 function prepareMissionLead(mission: ReturnType<typeof createMission>, workerId: string): void {
   mission.execution!.runs.push({

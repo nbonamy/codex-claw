@@ -8,7 +8,7 @@
       title-id="settings-general-behavior-title"
     >
       <SettingsRow
-        v-if="clawHostCapabilities.daemonManagement"
+        v-if="appHostCapabilities.daemonManagement"
         as="label"
         :title="$t('surface.settingsGeneralPanel.preventSleepWhileAgentsRun')"
         :description="$t('surface.settingsGeneralPanel.keepThisComputerAwakeWhileAnAgentIsActive')"
@@ -22,9 +22,9 @@
         </template>
       </SettingsRow>
       <SettingsRow
-        v-if="clawHostCapabilities.daemonManagement"
+        v-if="appHostCapabilities.daemonManagement"
         as="label"
-        :title="$t('surface.settingsGeneralPanel.keepCodexClawReadyInTheBackground')"
+        :title="$t('surface.settingsGeneralPanel.keepAppReadyInTheBackground')"
         :description="daemonDescription"
         :error="daemonStatusError"
       >
@@ -52,7 +52,7 @@
             <el-switch
               :model-value="daemonEnabled"
               :disabled="daemonSwitchDisabled"
-              :aria-label="$t('surface.settingsGeneralPanel.keepCodexClawReadyInTheBackground')"
+              :aria-label="$t('surface.settingsGeneralPanel.keepAppReadyInTheBackground')"
               @update:model-value="updateDaemonEnabled"
             />
           </span>
@@ -173,7 +173,7 @@
           <SettingsRow
             as="label"
             :title="$t('surface.settingsGeneralPanel.onlySpeakWhileFocused')"
-            :description="$t('surface.settingsGeneralPanel.silenceAcknowledgmentsWhileCodexClawIsInTheBackground')"
+            :description="$t('surface.settingsGeneralPanel.silenceAcknowledgmentsWhileAppIsInTheBackground')"
           >
             <template #control>
               <el-switch
@@ -188,7 +188,7 @@
     </SettingsSection>
 
     <SettingsSection
-      v-if="clawHostCapabilities.nativeFileDialogs && showSourceFolderSetting"
+      v-if="appHostCapabilities.nativeFileDialogs && showSourceFolderSetting"
       :title="$t('surface.settingsGeneralPanel.sourceFolder')"
       title-id="settings-general-source-title"
     >
@@ -221,7 +221,7 @@
     </SettingsSection>
 
     <SettingsSection
-      v-if="clawHostCapabilities.systemPermissions"
+      v-if="appHostCapabilities.systemPermissions"
       :title="$t('surface.settingsGeneralPanel.systemPermissions')"
       title-id="settings-general-permissions-title"
     >
@@ -289,13 +289,13 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, ClawdDaemonStatus, SourceFolderState, SpokenAnnouncementScope, SpokenAnnouncementVoice, SystemPermissionsStatus, UpdateSettingsInput } from '@codex-claw/core/contracts';
-import { defaultSourceFolderState } from '@codex-claw/core/settings';
+import type { AppGeneralSettings, DaemonStatus, SourceFolderState, SpokenAnnouncementScope, SpokenAnnouncementVoice, SystemPermissionsStatus, UpdateSettingsInput } from '@workspace/core/contracts';
+import { defaultSourceFolderState } from '@workspace/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsRow from './SettingsRow.vue';
 import SettingsSection from './SettingsSection.vue';
 import { ChevronDown, Circle, ShieldCheckIcon } from '../shared/icons/app-icons';
-import { clawHostCapabilities, codexClawApi } from '../platform-api';
+import { appHostCapabilities, appApi } from '../platform-api';
 
 const defaultPermissionsStatus: SystemPermissionsStatus = {
   platform: 'unknown',
@@ -311,7 +311,7 @@ const defaultPermissionsStatus: SystemPermissionsStatus = {
 
 const props = defineProps<{
   chooseSourceFolder?: () => Promise<string | null>;
-  daemonStatus?: ClawdDaemonStatus | null;
+  daemonStatus?: DaemonStatus | null;
   daemonStatusError?: string | null;
   getSystemPermissions?: () => Promise<SystemPermissionsStatus>;
   openAccessibilitySettings?: () => Promise<SystemPermissionsStatus>;
@@ -382,7 +382,7 @@ const daemonDescription = computed(() => {
   if (props.daemonStatus?.supported === false) {
     return props.daemonStatus.detail ?? translate('dynamic.misc.installAvailable');
   }
-  return translate('surface.settingsGeneralPanel.startTheCodexClawAgentToKeepYourAutomationsRunning');
+  return translate('surface.settingsGeneralPanel.startTheAppAgentToKeepYourAutomationsRunning');
 });
 const accessibilityGranted = computed(() => permissions.value?.accessibility.trusted ?? false);
 const showAccessibilityGrantButton = computed(() => permissions.value?.accessibility.required === true && !accessibilityGranted.value);
@@ -404,7 +404,7 @@ const accessibilityDescription = computed(() => {
     return translate('surface.settingsGeneralPanel.computerUseDoesNotNeedThisPermissionOnThisPlatform');
   }
 
-  return translate('surface.settingsGeneralPanel.requiredForComputerUseToInspectAndClickCodexClaw');
+  return translate('surface.settingsGeneralPanel.requiredForComputerUseToInspectAndClickApp');
 });
 const screenRecordingStatusLabel = computed(() => {
   if (!permissions.value) {
@@ -426,7 +426,7 @@ const screenRecordingDescription = computed(() => {
 });
 
 onMounted(() => {
-  if (clawHostCapabilities.systemPermissions) void loadPermissions();
+  if (appHostCapabilities.systemPermissions) void loadPermissions();
 });
 
 async function loadPermissions(): Promise<void> {
@@ -485,15 +485,15 @@ function clearSourceFolder(): void {
 }
 
 async function getSystemPermissions(): Promise<SystemPermissionsStatus> {
-  return codexClawApi?.getSystemPermissions?.() ?? defaultPermissionsStatus;
+  return appApi?.getSystemPermissions?.() ?? defaultPermissionsStatus;
 }
 
 async function openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
-  return codexClawApi?.openAccessibilitySettings?.() ?? defaultPermissionsStatus;
+  return appApi?.openAccessibilitySettings?.() ?? defaultPermissionsStatus;
 }
 
 async function openScreenRecordingSettings(): Promise<SystemPermissionsStatus> {
-  return codexClawApi?.openScreenRecordingSettings?.() ?? defaultPermissionsStatus;
+  return appApi?.openScreenRecordingSettings?.() ?? defaultPermissionsStatus;
 }
 
 function updatePreventSleep(value: boolean | string | number): void {
@@ -549,7 +549,7 @@ async function previewVoice(): Promise<void> {
   voicePreviewError.value = null;
   previewingVoice.value = true;
   try {
-    const result = await codexClawApi?.previewSpokenAnnouncementVoice?.(
+    const result = await appApi?.previewSpokenAnnouncementVoice?.(
       props.settings.spokenAnnouncementVoice,
     );
     if (!result?.queued) {
@@ -579,9 +579,9 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
   try {
     await ElMessageBox.confirm(
       enabled
-        ? translate('surface.settingsGeneralPanel.codexClawNeedsToRestartToConnectToTheBackgroundAgent')
-        : translate('surface.settingsGeneralPanel.codexClawNeedsToRestartToUseTheInAppAgent'),
-      translate('surface.settingsGeneralPanel.restartCodexClaw'),
+        ? translate('surface.settingsGeneralPanel.appNeedsToRestartToConnectToTheBackgroundAgent')
+        : translate('surface.settingsGeneralPanel.appNeedsToRestartToUseTheInAppAgent'),
+      translate('surface.settingsGeneralPanel.restartApp'),
       {
         cancelButtonText: translate('common.later'),
         confirmButtonText: translate('dynamic.misc.restartNow'),

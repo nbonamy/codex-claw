@@ -1,25 +1,25 @@
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import path from 'node:path';
-import { sendAgentPrompt } from '@codex-claw/core/agent-chat-service';
-import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@codex-claw/core/contracts';
-import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@codex-claw/core/conversation-title';
-import { requireAgentFolder } from '@codex-claw/core/agent-folder';
-import { createAgentFromInput } from '@codex-claw/core/agent-manager';
-import { updateAutomationExecutionAgentConversationInSnapshot } from '@codex-claw/core/automation-manager';
-import { automationSelectionOutputSchema, automationSelectionPrompt, parseAutomationSelection } from '@codex-claw/core/automation-prompts';
-import type { AgentBackendDriver, BackendSendResult } from '@codex-claw/core/backend-driver';
-import type { ClawBackendEvent } from '@codex-claw/core/backend-protocol/rpc';
+import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
+import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@workspace/core/contracts';
+import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@workspace/core/conversation-title';
+import { requireAgentFolder } from '@workspace/core/agent-folder';
+import { createAgentFromInput } from '@workspace/core/agent-manager';
+import { updateAutomationExecutionAgentConversationInSnapshot } from '@workspace/core/automation-manager';
+import { automationSelectionOutputSchema, automationSelectionPrompt, parseAutomationSelection } from '@workspace/core/automation-prompts';
+import type { AgentBackendDriver, BackendSendResult } from '@workspace/core/backend-driver';
+import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
 import { BackendDriverRpc, createBackendDriver, createDefaultBackendDrivers, type BackendDriverRegistryOptions } from './driver-rpc';
 import { ProviderSetup } from './provider-setup';
-import { RemoteClawdClientManager } from './connections/remote-clawd-client';
+import { RemoteDaemonClientManager } from './connections/remote-daemon-client';
 import { SshConnectionService } from './connections/ssh-connections';
 import { AutomationRunner } from './automations/runner';
 import { RuntimeScheduler } from './scheduling/runtime-scheduler';
-import { ClawMcpService } from './mcp/service';
+import { AppMcpService } from './mcp/service';
 import { HostedMcpGateway } from './mcp/hosted-mcp-gateway';
 import { runtimeGitHubOAuthClientId, runtimeLinearOAuthSettings } from './runtime-config';
 import { LinearWorkProviderDriver } from './work-integrations/linear-driver';
-import { ClawBackendServer } from './server';
+import { AppBackendServer } from './server';
 import { backendCodexHomeDir, backendProviderTokensFilePath, backupProviderSetup, deleteBackendMissionHome, ensureBackendCodexHome, ensureBackendMissionHome, loadBackendSnapshot, saveBackendSnapshot } from './state';
 import { FileWorkIntegrationTokenStore } from './work-integrations/file-token-store';
 import { GitHubWorkProviderDriver } from './work-integrations/github-driver';
@@ -35,27 +35,27 @@ import { createVisualizeToolModuleProvider } from './mcp/visualize-tools';
 import { DurableTaskService } from './agents/durable-task-service';
 import { createTaskToolModuleProvider } from './mcp/task-tools';
 import { loadBackendTasks, saveBackendTasks } from './state';
-import { conversationRefFromAgent } from '@codex-claw/core/conversation-ref';
-import type { RendererMessage } from '@codex-claw/core/contracts';
+import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
+import type { RendererMessage } from '@workspace/core/contracts';
 
-type ClawdClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
+type DaemonClientRequest = <Result>(method: string, params?: unknown) => Promise<Result>;
 
-export type ClawdRuntimeOptions = {
-  emitEvent(event: ClawBackendEvent): void;
+export type DaemonRuntimeOptions = {
+  emitEvent(event: AppBackendEvent): void;
   features?: {
     computerUse?: boolean;
     embeddedBrowser?: boolean;
   };
-  requestClient: ClawdClientRequest;
+  requestClient: DaemonClientRequest;
   version: string;
 };
 
-export type ClawdRuntime = {
-  server: ClawBackendServer;
+export type DaemonRuntime = {
+  server: AppBackendServer;
   stop(): Promise<void>;
 };
 
-export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<ClawdRuntime> {
+export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promise<DaemonRuntime> {
   const computerUseAvailable = options.features?.computerUse !== false;
   const embeddedBrowserAvailable = options.features?.embeddedBrowser !== false;
   const snapshot = await loadBackendSnapshot();
@@ -91,7 +91,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   });
   await workIntegrations.hydrateConnections();
   const hostedMcpGateway = new HostedMcpGateway({ credentials: workIntegrations });
-  let server!: ClawBackendServer;
+  let server!: AppBackendServer;
   const tasks: DurableTaskService = new DurableTaskService({
     tasks: savedTasks,
     save: saveBackendTasks,
@@ -110,7 +110,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     persist: () => saveBackendSnapshot(snapshot),
     publish: () => server?.emitEvent({ type: 'snapshot.updated', payload: snapshot }),
   });
-  const mcpService: ClawMcpService = new ClawMcpService({
+  const mcpService: AppMcpService = new AppMcpService({
     tasks,
     persistSnapshot: () => saveBackendSnapshot(snapshot),
     missionTools: {
@@ -147,7 +147,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
   });
   const mcpServerUrl = await mcpService.start();
   const driverOptions: BackendDriverRegistryOptions = {
-    clawMcpServerUrl: mcpServerUrl,
+    appMcpServerUrl: mcpServerUrl,
     hostedMcpServerUrls: () => mcpService.hostedMcpServerUrls(),
     generalSettings: snapshot.general,
     pluginSettings,
@@ -248,7 +248,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     runOnStart: true,
     run: () => pullRequestMonitor.check(),
   });
-  server = new ClawBackendServer({
+  server = new AppBackendServer({
     tasks,
     providerSetup,
     version: options.version,
@@ -273,7 +273,7 @@ export async function createClawdRuntime(options: ClawdRuntimeOptions): Promise<
     codeReviewTools: mcpService,
     workIntegrations,
     automationRunner,
-    remoteClients: new RemoteClawdClientManager({
+    remoteClients: new RemoteDaemonClientManager({
       requestHandlers: {
         [backendMethods.clientExternalOpen]: (params) => options.requestClient(backendMethods.clientExternalOpen, params),
         [backendMethods.clientSpokenAnnouncementQueue]: (params) => options.requestClient(backendMethods.clientSpokenAnnouncementQueue, params),

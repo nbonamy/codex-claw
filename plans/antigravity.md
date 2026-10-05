@@ -2,10 +2,10 @@
 
 ## Objective
 
-Add **Google Antigravity** as a first-class coding agent backend in Codex Claw
+Add **Google Antigravity** as a first-class coding agent backend in Korus
 alongside OpenAI Codex and Claude Code. The integration uses a native TypeScript
 stdio transport to drive the Antigravity CLI (`agy`) over bidirectional
-`stream-json`, providing full parity with Claw features: multi-turn chat, live
+`stream-json`, providing full parity with Korus features: multi-turn chat, live
 streaming, reasoning blocks, tool approvals, Plan Mode, Goals, and team MCP
 collaboration.
 
@@ -14,7 +14,7 @@ Vue Renderer (Shared Conversation Pane)
        ↓ Typed Preload IPC
 Electron Main (AppController)
        ↓ JSON-RPC
-clawd Daemon
+daemon Daemon
        ↓ AntigravityBackendDriver
 AntigravityCliTransport (stdio stream-json)
        ↓
@@ -36,17 +36,17 @@ agy child process (cwd: agent workspace)
 3. **Rich Conversation & Artifacts**:
    - Render Gemini reasoning / thinking deltas in collapsible thought cards.
    - Streamed tool calls (`run_command`, `write_to_file`, `replace_file_content`,
-     `browser_subagent`) render as native Claw tool cards and authoritative file
+     `browser_subagent`) render as native Korus tool cards and authoritative file
      activity.
    - Turn-level approvals prompt the user with diffs and parameters before
      execution.
 4. **Plan Mode & Goals**:
-   - Plan Mode captures proposed markdown plans into Claw's native
+   - Plan Mode captures proposed markdown plans into Korus's native
      `ConversationPlanPanel`.
    - Thread goals (`/goal`) autonomously coordinate multi-step implementation
      until verification passes.
 5. **Team Collaboration**:
-   - Inject Claw's built-in MCP server (`codex_claw`) into Antigravity's
+   - Inject Korus's built-in MCP server (`workspace`) into Antigravity's
      configuration so Antigravity agents can collaborate with Codex and Claude
      teammates seamlessly.
 
@@ -56,14 +56,14 @@ agy child process (cwd: agent workspace)
 
 - **Electron Main**: Remains the desktop adapter and IPC bridge; unaware of
   Antigravity protocol specifics.
-- **clawd Daemon**: Owns the Antigravity child process lifecycle, stdio streams,
+- **daemon Daemon**: Owns the Antigravity child process lifecycle, stdio streams,
   session persistence, and event adaptation.
 - **Renderer**: Consumes normalized app-owned `RendererMessage`s and conversation
   snapshots through the existing `CodexConversationPane` controller.
 
 ### Transport: Bidirectional `stream-json`
 
-Instead of introducing third-party npm packages or a Python daemon, `clawd`
+Instead of introducing third-party npm packages or a Python daemon, `daemon`
 spawns `agy` in long-running streaming mode:
 
 ```bash
@@ -110,7 +110,7 @@ agy --input-format stream-json --output-format stream-json --conversation <sessi
 
 - [ ] Implement `AntigravityConversationHost` and `AntigravityBackendDriver`
   conforming to `AgentBackendDriver`.
-- [ ] Map incoming Antigravity stream events to Claw conversation events:
+- [ ] Map incoming Antigravity stream events to Korus conversation events:
   - Text tokens $\rightarrow$ `message.delta`.
   - Thinking deltas $\rightarrow$ reasoning blocks.
   - Tool invocations $\rightarrow$ `approval.requested` or executed tool cards.
@@ -172,6 +172,6 @@ agy --input-format stream-json --output-format stream-json --conversation <sessi
 - Antigravity appears in `BackendSelector` when enabled in settings.
 - Agents can be created with Antigravity across all standard entry points.
 - Multi-turn conversation streams text, thoughts, and tool cards in real time.
-- Plan Mode, Goals, and tool approvals work natively in the Claw UI.
-- Antigravity agents can discover and message teammates via Claw MCP.
+- Plan Mode, Goals, and tool approvals work natively in the Korus UI.
+- Antigravity agents can discover and message teammates via Korus MCP.
 - Coverage threshold $\ge 85\%$ is maintained across all modified packages.

@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import { computed, ref } from 'vue';
 import { describe, expect, it } from 'vitest';
 import { ElOption, ElSelect } from 'element-plus';
-import type { AgentBackend } from '@codex-claw/core/contracts';
+import type { AgentBackend } from '@workspace/core/contracts';
 import BackendSelector from '../BackendSelector.vue';
 import { backendChoicesKey } from '../backend-selection';
 

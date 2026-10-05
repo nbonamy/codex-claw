@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentBackendDriver } from '@codex-claw/core/backend-driver';
-import { codexBackendCapabilities } from '@codex-claw/core/backend-capabilities';
-import { backendMethods } from '@codex-claw/core/backend-protocol/methods';
-import { ClawBackendServer } from '../server';
+import type { AgentBackendDriver } from '@workspace/core/backend-driver';
+import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import { AppBackendServer } from '../server';
 import { BackendDriverRpc } from '../driver-rpc';
-import { createMission } from '@codex-claw/core/missions';
+import { createMission } from '@workspace/core/missions';
 import {
   createTestSnapshot,
   readyRemoteConnection,
@@ -12,13 +12,13 @@ import {
   createRemoteTeamSnapshot,
 } from './server-test-fixtures';
 
-describe('ClawBackendServer', () => {
+describe('AppBackendServer', () => {
 
   it('owns team mutations', async () => {
     const snapshot = createTestSnapshot();
     const events: unknown[] = [];
     const saveSnapshot = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -124,7 +124,7 @@ describe('ClawBackendServer', () => {
       onEvent: () => () => undefined,
       close: async () => undefined,
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       snapshot,
       driverRpc: new BackendDriverRpc(new Map([['codex', driver]])),
@@ -162,7 +162,7 @@ describe('ClawBackendServer', () => {
     snapshot.teams.push({ id: 'team-keep', name: 'Keep', color: '#7158D4', agentIds: [retainedAgent.id] });
     const retainedMission = createMission(snapshot, { outcome: 'Retained', workflowType: 'shapeAndShipFeature', teamId: 'team-keep', orchestratorMemberId: retainedAgent.id });
     const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({ version: 'test-version', snapshot, deleteMissionHome });
+    const server = new AppBackendServer({ version: 'test-version', snapshot, deleteMissionHome });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'delete-mission-team', method: backendMethods.teamDelete, params: { teamId: 'team-test' },
@@ -183,7 +183,7 @@ describe('ClawBackendServer', () => {
     snapshot.teams[0]!.agentIds.push(agent.id);
     const mission = createMission(snapshot, { outcome: 'Keep work', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: agent.id });
     const deleteMissionHome = vi.fn().mockResolvedValue(undefined);
-    const server = new ClawBackendServer({ version: 'test-version', snapshot, deleteMissionHome });
+    const server = new AppBackendServer({ version: 'test-version', snapshot, deleteMissionHome });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'delete-last-team', method: backendMethods.teamDelete, params: { teamId: 'team-test' },
@@ -208,7 +208,7 @@ describe('ClawBackendServer', () => {
     const second = createMission(snapshot, { outcome: 'Second', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: agent.id });
     const events: Array<{ type: string; payload?: unknown }> = [];
     const deleteMissionHome = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Disk unavailable'));
-    const server = new ClawBackendServer({ version: 'test-version', snapshot, deleteMissionHome, onEvent: event => events.push(event) });
+    const server = new AppBackendServer({ version: 'test-version', snapshot, deleteMissionHome, onEvent: event => events.push(event) });
 
     await expect(server.handleMessage({
       jsonrpc: '2.0', id: 'delete-team-partial', method: backendMethods.teamDelete, params: { teamId: 'team-test' },
@@ -233,13 +233,13 @@ describe('ClawBackendServer', () => {
       id: 'agent-dina',
       teamId: 'team-test',
       name: 'Dina',
-      folder: '/Users/nbonamy/src/codex-claw',
+      folder: '/Users/nbonamy/src/agent-workspace',
       backend: 'codex',
       status: { type: 'idle' },
       createdAt: '2026-06-05T00:00:00.000Z',
       updatedAt: '2026-06-05T00:00:00.000Z',
     }];
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -273,7 +273,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn().mockResolvedValue(remoteSnapshot),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -336,7 +336,7 @@ describe('ClawBackendServer', () => {
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -397,7 +397,7 @@ describe('ClawBackendServer', () => {
       }),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -445,7 +445,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn().mockResolvedValue(createRemoteTeamSnapshot()),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,
@@ -489,7 +489,7 @@ describe('ClawBackendServer', () => {
       request: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    const server = new ClawBackendServer({
+    const server = new AppBackendServer({
       version: 'test-version',
       pid: 123,
       snapshot,

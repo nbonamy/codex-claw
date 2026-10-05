@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Agent, BackendSkillSummary } from '@codex-claw/core/contracts';
-import { agentFolder } from '@codex-claw/core/agent-folder';
+import type { Agent, BackendSkillSummary } from '@workspace/core/contracts';
+import { agentFolder } from '@workspace/core/agent-folder';
 import { claudeConfigDirectory } from './config-directory';
 
 type ClaudeSkillScope = 'project' | 'user';
