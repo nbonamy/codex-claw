@@ -4,6 +4,47 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.27.0] - 2026-10-05
+
+### New features
+
+- Automatic code review can now review, fix, and verify findings over multiple
+  rounds with an independent Codex or Claude reviewer. Configure the priority
+  threshold and round limit; Korus reports fixed and remaining findings back
+  to the original conversation. Local commits after each fix round are optional
+  and off by default. Enabling them includes existing reviewed working changes;
+  automatic review never pushes or merges.
+- Choose the independent reviewer's provider, model, and reasoning effort.
+  Korus remembers these selections and automatic-review settings. Current-thread
+  reviews keep the working agent's model and remain available in manual mode.
+- Completed reviews save a report with findings, priorities, verification
+  evidence, and round session references. Handoffs show a concise outcome in
+  chat while keeping detailed results in context.
+
+### Improvements and fixes
+
+- Reviewers must explicitly confirm their finding count before a round can
+  finish, preventing an unfinished inspection from appearing clean. Claude
+  reviewers can access the review tools and inherit the configured approval
+  defaults. Retrying a failed review preserves its settings.
+- Claude file-edit approvals now describe the requested action and show the
+  before/after text or replacement contents. The sidebar's Input state clears
+  after the last pending approval is resolved, and review tools have clearer
+  activity labels.
+- Conversations recover missed completion events after reconnecting instead of
+  remaining stuck on Thinking. Completed Codex turns without an assistant
+  message show Empty response, and conversation history loading indicators stay
+  synchronized.
+- Pasting text into the Codex composer now preserves native undo and redo.
+- Mission workspaces now share chat's header, sidebar control, surface styling,
+  and shadow, with aligned workflow and conversation subheaders. The agent
+  sidebar keeps a usable minimum width, and long project names truncate without
+  displacing their icons.
+- Opening Review from the command or composer menu clears the conversation's
+  ready-for-review flag.
+- The website's review preview now illustrates findings and fix selection, and
+  responsive cards no longer overlap at narrower widths.
+
 ## [0.26.2] - 2026-10-05
 
 ### Improvements
