@@ -40,6 +40,10 @@ This leaves the engine's enabled preference and existing conversations intact;
 service errors and usage limits do not imply logout. Claude Code still owns
 credential renewal and sign-in. Failed turns remain valid conversation snapshots
 across the backend transport and history refresh.
+Before admitting new work, the daemon re-probes an installed engine last observed
+disconnected. A login completed externally can therefore make the next retry
+succeed without first refreshing Settings. Healthy observations remain cached;
+this is not continuous authentication polling or Korus-owned token renewal.
 
 First-run onboarding offers Codex and Claude independently and requires an
 explicit Continue after at least one authenticates. Local Claude status is

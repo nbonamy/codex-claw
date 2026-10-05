@@ -1,177 +1,526 @@
 # Antigravity Provider Integration
 
-## Objective
+Status: Phase 0 executed on 2026-10-05 against both CLI and Google's ACP runtime,
+following source review of T3 and Synara. **Select ACP for implementation**:
+live personal OAuth, approvals, session-scoped MCP, cold history replay and
+cancellation work. Extended assessment also resolves attachments, skills,
+planning, workflow mechanics and unsupported conversation controls below.
+This is transport qualification, not production readiness.
+No Korus provider has been implemented.
+Repository baseline: `3ec19e49`.
 
-Add **Google Antigravity** as a first-class coding agent backend in Korus
-alongside OpenAI Codex and Claude Code. The integration uses a native TypeScript
-stdio transport to drive the Antigravity CLI (`agy`) over bidirectional
-`stream-json`, providing full parity with Korus features: multi-turn chat, live
-streaming, reasoning blocks, tool approvals, Plan Mode, Goals, and team MCP
-collaboration.
+## Objective and scope
+
+Add Google Antigravity as a first-class provider alongside Codex and Claude Code,
+with an honest capability surface rather than assumed feature parity. Keep the
+provider's native authentication and execution harness. Do not silently substitute
+Gemini API billing or a custom agent loop.
+
+The selected transport is native TypeScript driving Google's `antigravity-acp`
+runtime over ACP. The CLI probes below remain valid evidence for `agy` 1.2.17,
+not a verdict on all Antigravity transports. T3's implementation supplies concrete
+approval, per-session MCP, profile-isolation and cancellation mechanisms, now
+exercised below. Native `session/load` supplies cold transcript hydration; the
+Antigravity provider host must own replay normalization and its conversation replica.
 
 ```text
-Vue Renderer (Shared Conversation Pane)
-       ↓ Typed Preload IPC
-Electron Main (AppController)
-       ↓ JSON-RPC
-daemon Daemon
-       ↓ AntigravityBackendDriver
-AntigravityCliTransport (stdio stream-json)
-       ↓
-agy child process (cwd: agent workspace)
+Vue shared conversation UI + Antigravity-owned replica
+    -> app-owned client contracts (Electron preload or Web transport)
+    -> daemon (backend/): driver + Antigravity conversation host
+    -> ACP transport: Google's antigravity-acp runtime
 ```
 
-## Product Model & User Experience
+Electron stays a desktop adapter. Provider frames travel in app-owned routing
+envelopes; the generic app reducer must not become a transcript reducer. Keep
+Codex conversation behavior SDK-owned. Antigravity protocol interpretation and
+persistence belong to its provider host, not renderer branches or Electron.
 
-1. **Provider Selection**:
-   - Offer Antigravity alongside Codex and Claude in `BackendSelector` when enabled.
-   - Available across New Agent, Worktree session, Project creation, Quick Chat,
-     Missions, and Code Review.
-   - Respect the pre-prompt backend switch on fresh, empty conversations.
-2. **Composer & Settings**:
-   - Model dropdown lists supported Gemini models (e.g. Gemini 2.5 Flash, Pro)
-     and thinking budgets.
-   - Expose Antigravity permission policies (`always-proceed`, `request-review`,
-     `strict`) through capability-driven menus.
-3. **Rich Conversation & Artifacts**:
-   - Render Gemini reasoning / thinking deltas in collapsible thought cards.
-   - Streamed tool calls (`run_command`, `write_to_file`, `replace_file_content`,
-     `browser_subagent`) render as native Korus tool cards and authoritative file
-     activity.
-   - Turn-level approvals prompt the user with diffs and parameters before
-     execution.
-4. **Plan Mode & Goals**:
-   - Plan Mode captures proposed markdown plans into Korus's native
-     `ConversationPlanPanel`.
-   - Thread goals (`/goal`) autonomously coordinate multi-step implementation
-     until verification passes.
-5. **Team Collaboration**:
-   - Inject Korus's built-in MCP server (`workspace`) into Antigravity's
-     configuration so Antigravity agents can collaborate with Codex and Claude
-     teammates seamlessly.
+## Phase 0: measured CLI evidence (not ACP)
 
-## Architecture
+### Runtime and method
 
-### Process & Boundaries
+- Initially, both shell lookup and Korus's actual `resolveRuntimeExecutable('agy')`
+  returned no CLI. The desktop app was present; that is not a CLI installation.
+- Downloaded the official darwin/arm64 1.2.17 artifact to a temporary directory
+  and verified its SHA-512 against Google's release manifest. Did not run the
+  global installer or modify shell profiles.
+- Nicolas then installed `agy`. All model/session probes below used
+  `/Users/nbonamy/.local/bin/agy`, version **1.2.17**; Korus's runtime discovery
+  subsequently resolved that path.
+- Used `gemini-3.8-flash-low`, default `request-review` permissions, scratch cwd
+  `/tmp/korus-antigravity-phase0.ACP1s1`, a 30-second CLI timeout, and a bounded
+  parent-process timeout. No dangerous-skip flag, credential extraction,
+  user-global settings changes, app restart, or real-project edits were used.
+- Authentication worked with the existing native login. This proves an
+  authenticated request, not first-run login, expiry recovery, or isolated auth.
+- Workspace isolation is **not home isolation**: the CLI saved probe sessions in
+  its normal `~/.gemini/antigravity-cli/conversations/` directory. An exploratory
+  `ANTIGRAVITY_APP_DATA_DIR` override did not redirect that conversation storage;
+  it must not be treated as a supported isolation contract.
 
-- **Electron Main**: Remains the desktop adapter and IPC bridge; unaware of
-  Antigravity protocol specifics.
-- **daemon Daemon**: Owns the Antigravity child process lifecycle, stdio streams,
-  session persistence, and event adaptation.
-- **Renderer**: Consumes normalized app-owned `RendererMessage`s and conversation
-  snapshots through the existing `CodexConversationPane` controller.
+### Results
 
-### Transport: Bidirectional `stream-json`
+| Boundary | Observed result | Integration consequence |
+| --- | --- | --- |
+| Model discovery | `agy models` returned 14 tab-separated ID/name rows, including Gemini and non-Gemini models | Discover the catalog; do not hardcode Gemini 2.5 or infer provider identity from a model brand |
+| Two turns in one process | One `init`, streamed `step_update`, two `SUCCESS` results; second turn recalled a synthetic marker | Sequential chat is viable; send the next prompt after `result` |
+| Resume in a new process | Explicit `--conversation` retained the ID and recalled the marker | Provider context resume works; never use workspace-global `--continue` for agent routing |
+| Resume output | Only new steps streamed, not the earlier user/assistant transcript | Resume is not transcript hydration |
+| Approval/control input | `control_request` produced `ERROR`, exit 2, before a model turn | Do not implement approval replies or cancellation as invented stdin controls |
+| Image input block | `image` block rejected explicitly as non-text, exit 1 | Native multimodal stream input is unavailable in this version |
+| CLI slash input | `/model` returned `ERROR`, exit 2 | Use catalog/launch options, not TUI commands sent as prompts |
+| Harmless command permission | `run_command` for `/usr/bin/printf PHASE0_COMMAND_OK` was denied; result was `SUCCESS`, empty response, `denied_actions: [{action: "command", display_name: "RunCommand"}]`, exit 0 | Check denied actions and tool errors independently of process/result success; never silently broaden permissions |
+| Workspace MCP discovery | Scratch `.agents/mcp_config.json` launched the dummy stdio server; an independent loopback recorder observed `initialize`, `notifications/initialized`, and `tools/list` | Workspace configuration and tool discovery work; this is not per-agent identity isolation |
+| Workspace MCP permission | Read-only local probe tool attempt produced `denied_actions` for `mcp`, empty response, `SUCCESS`, exit 0; recorder saw no `tools/call` | Default headless mode cannot complete a permission-gated MCP call; no successful Korus collaboration is claimed |
+| Active-turn cancellation | SIGINT on first streamed text returned `status: "ERROR"`, `error: "interrupted"`, exit 1 | Track the host's targeted cancellation intent; do not rely exclusively on a native `INTERRUPTED` status |
+| Resume after cancellation | Fresh process with the interrupted ID returned `RECOVERED_PHASE0` successfully | Text-generation cancellation is recoverable; subprocess/tool cancellation remains untested |
+| Plan launch | `--mode plan` accepted; a two-step plan streamed as ordinary `agent_response` text without tools or file writes | Launch mode exists; structured proposed-plan events, edit prohibition, approval, and switching back remain unproven |
+| Reasoning | Tool/cancellation runs counted thinking tokens, but captured stream records had no thought-text payload | Do not promise reasoning cards based on usage counters |
 
-Instead of introducing third-party npm packages or a Python daemon, `daemon`
-spawns `agy` in long-running streaming mode:
+Local smoke identifiers for tracing (not production defaults):
 
-```bash
-agy --input-format stream-json --output-format stream-json --conversation <sessionId>
+- Sequential chat/resume: `fe3f457c-d4de-4227-8d85-4b2dfd520dd1`.
+- Command denial: `7fb4ce3b-bf4e-44fd-8e7e-52d4d69488c7`.
+- Plan: `ca8a740b-cc4b-4064-8c08-e63425bf2e3f`.
+- Interrupt/recovery: `167de5e5-45e3-4cac-88e9-ae52290e5ba3`.
+- Independently observed MCP discovery/denial: `d61bcdb2-7d90-4b9c-bdac-6687d8c808ab`.
+
+### Protocol details the adapter must preserve
+
+Measured launch:
+
+```sh
+agy --input-format stream-json --output-format stream-json \
+  --model gemini-3.8-flash-low --print-timeout 30s
 ```
 
-- **Outbound**: User prompts, in-flight steering, and permission approval responses
-  are written as NDJSON lines to `stdin`.
-- **Inbound**: Incremental text tokens, reasoning deltas, tool call proposals,
-  and completion events are read line-by-line from `stdout`.
-- **Interrupt**: Handled cleanly via SIGINT or control cancel messages.
-- **Resumption**: Reconnects to persisted sessions using `--conversation <id>`
-  stored in `BackendSession`.
+Each input is one JSON line, for example:
 
-## Implementation Phases
+```json
+{"event":"user","message":{"content":"Remember marker KORUS_PHASE0_7H4Q. Reply with the marker only; do not use tools."}}
+```
 
-### Phase 1: Shared Contracts & Settings (`core/`)
+Read stdout while stdin stays open. Wait for `result`, then send a recall prompt.
+After the second result, close stdin; relaunch with `--conversation <id>` to
+check recall across processes. Use only a fresh scratch workspace and harmless
+prompts. The temporary `probe.mjs` used for this investigation is not a maintained
+repository test or a prerequisite for implementation.
 
-- [ ] Extend `AgentBackend` union with `'antigravity'` in `core/src/contracts/shared.ts`.
-- [ ] Define Antigravity `BackendSession`:
-  ```ts
-  | {
-      kind: 'antigravity';
-      sessionId: string;
-      model?: string;
-      reasoningEffort?: ReasoningEffort;
-    }
-  ```
-- [ ] Define Antigravity `BackendDefaults` (model, reasoning budget, permission mode).
-- [ ] Update `core/src/agent-backends.ts` to include `antigravityEnabled` in settings
-  and provider resolution.
-- [ ] Add `antigravityEnabled` and optional binary override path to `AppGeneralSettings`.
+- `init.conversation_id` is **not** the observed shape: the ID is top-level
+  `conversation_id`, alongside `init` containing model, cwd, tools, permissions.
+- Step identity is `(conversation_id, step_index)`; updates have state/type,
+  optional `text_delta`, and optional `tool_info`. The same step can receive
+  multiple active deltas and a final update. Do not append a duplicate message
+  from `result.response` after already rendering its streamed text.
+- Result usage and `num_turns` remained cumulative across process resume
+  (1, 2, then 3). They are not per-turn counters. Duration also spans more than
+  the current prompt; do not use it as a current-turn wall-clock measurement.
+- Denied MCP activity can have a `DONE` tool step yet a result-level denial.
+  Normalize denied actions explicitly so an empty completion cannot hide them.
+- CLI help advertises `--mode accept-edits|plan` and effort
+  `low|medium|high|xhigh|max`. The web headless guide lists fewer effort levels
+  and a different default timeout. Verify supported model/effort combinations;
+  help text alone does not prove every combination works.
 
-### Phase 2: Antigravity CLI Transport (`backend/src/antigravity/transport.ts`)
+### CLI-only gates and decision
 
-- [ ] Implement `AntigravityCliTransport` managing child process lifecycle.
-- [ ] Handle stdio NDJSON framing (buffering, line splitting, JSON validation).
-- [ ] Implement robust error recovery on process exit or malformed output.
-- [ ] Support runtime discovery for `agy` across standard system paths (`PATH`,
-  `~/.gemini/antigravity-cli/`, and user overrides).
-- [ ] Implement turn cancellation and interrupt handling.
+1. **Approval capability:** interactive approval callbacks are unavailable over
+   the tested CLI protocol. A constrained CLI integration must advertise
+   `approvals: false` and surface policy denials. Do not default to dangerous
+   bypass or fake an approval dialog that cannot answer the runtime.
+2. **MCP identity/config isolation:** documented workspace/global configuration
+   is not safe for persisting per-agent credentials or identities when multiple
+   Korus agents share a folder. Prove a per-process configuration mechanism, a
+   supported private home, or a stable proxy whose caller identity is supplied
+   through a verified per-process channel. A local dummy-server probe is not proof of two-agent
+   identity isolation or a successful authenticated Korus MCP call.
+3. **History hydration:** the probe conversation has a native `.db` file, but no
+   supported machine-readable history API was established. Do not assume its
+   private storage format is a public contract or silently introduce an app-global
+   transcript store. Resolve restart/history ownership before rollout.
+4. **Plans, goals, and steering:** keep native goals and steering disabled until
+   an actual supported contract is demonstrated. Plan launch alone is not the
+   full Korus plan artifact/review lifecycle. Text-only files as context would
+   also need an explicit secure adapter; native image blocks are rejected.
+5. **Auth and process lifecycle:** prove first-run/disconnected handling,
+   credential expiry, process failure, tool-child cancellation, and concurrent
+   agent isolation before enabling the provider broadly.
 
-### Phase 3: Conversation Host & Driver (`backend/src/antigravity/`)
+**CLI decision:** do not implement the original full-parity CLI design. Text chat
+is feasible, but its approval gap is real. The source comparison below supersedes
+CLI as the preferred transport candidate; ACP must receive its own live probes.
+The Python SDK is an alternative to evaluate, not an approved replacement: it
+documents approval callbacks and storage configuration, but its documented
+authentication is API-key/Vertex-based rather than proven CLI subscription reuse.
 
-- [ ] Implement `AntigravityConversationHost` and `AntigravityBackendDriver`
-  conforming to `AgentBackendDriver`.
-- [ ] Map incoming Antigravity stream events to Korus conversation events:
-  - Text tokens $\rightarrow$ `message.delta`.
-  - Thinking deltas $\rightarrow$ reasoning blocks.
-  - Tool invocations $\rightarrow$ `approval.requested` or executed tool cards.
-  - Turn completion $\rightarrow$ `turn.completed` with token usage metrics.
-- [ ] Map approvals: respond to tool permission requests over `stdin`.
-- [ ] Implement Plan Mode: capture planning instructions and stream proposed plan
-  deltas to `turn.proposedPlanCompleted`.
-- [ ] Implement Goals: handle `setGoal` and `clearGoal` via `/goal` workflows.
-- [ ] Implement `listModels` and `listSkills` (discovering from `.agents/skills/`
-  and global `~/.gemini/config/skills/`).
-- [ ] Transcript hydration: restore historical sessions from Antigravity logs.
+### Primary sources (checked 2026-10-05)
 
-### Phase 4: UI & App Integration (`vue/`)
+- [Headless protocol](https://antigravity.google/docs/cli/headless/): sequential
+  text input, stream events, unsupported controls, resume, permission denials.
+- [CLI reference](https://antigravity.google/docs/cli/reference): interactive
+  commands and settings; TUI behavior is not automatically a headless API.
+- [Installation/auth](https://antigravity.google/docs/cli/install/),
+  [installer](https://antigravity.google/cli/install.sh), and
+  [darwin/arm64 manifest](https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/darwin_arm64.json):
+  native runtime provenance and auth flow. The fetched installer itself supports
+  `--dir`; do not assume flags listed on the website match that script.
+- [CLI configuration](https://antigravity.google/docs/cli/using/): settings under
+  `~/.gemini/antigravity-cli/settings.json`, distinct from desktop-app data.
+- [MCP](https://antigravity.google/docs/mcp/): `.agents/mcp_config.json` and
+  `~/.gemini/config/mcp_config.json`, `mcpServers`, `serverUrl`/headers or stdio.
+- [Resume](https://antigravity.google/docs/cli/commands/resume/): conversation
+  selection/cache; not a documented transcript export API.
+- [Skills migration](https://www.antigravity.google/docs/cli/gcli-migration/):
+  `.agents/skills/` and `~/.gemini/antigravity-cli/skills/`.
+- [Plan](https://antigravity.google/docs/plan/): interactive planning/artifacts.
+- [Python SDK](https://antigravity.google/docs/sdk/overview/),
+  [policies](https://antigravity.google/docs/sdk/policies/), and
+  [lifecycle](https://antigravity.google/docs/sdk/lifecycle/): alternative
+  embedding contracts; not exercised in this phase.
 
-- [ ] Add Antigravity to `BackendSelector.vue` when enabled.
-- [ ] Update creation dialogs (`AgentDialog`, `NewSourceWorktreeDialog`,
-  `NewProjectDialog`, `RepositoryAcquireDialog`, `CodeReviewPanel`).
-- [ ] Add Antigravity section in Settings (toggle, status probe, default model,
-  permission posture).
-- [ ] Wire composer model/effort dropdown to Antigravity model catalog.
+## T3 and Synara code comparison (2026-10-05)
 
-### Phase 5: Verification & Hardening
+This is source evidence, not a new live-provider qualification. Neither app was
+started, neither repository was edited, and their test suites were not run.
+Checked remote `main` identities without moving either local checkout:
 
-- [ ] Scripted mock transport harness for testing multi-turn sessions, streaming,
-  approvals, and interrupts.
-- [ ] Unit tests for protocol parsing, event translation, and tool adapters.
-- [ ] Component tests for `BackendSelector` and dialog flows with Antigravity.
-- [ ] End-to-end multi-agent scenario: Antigravity agent collaborating with Codex
-  and Claude teammates via MCP.
-- [ ] Meet or exceed the mandatory $\ge 85\%$ test coverage threshold.
+- T3: `54b6b667f340c03132e9fc2cb2c3d657571442a2`. Its local checkout was older
+  (`4ee6bfd5`); key files were fetched at the current remote commit.
+- Synara: `a83a6248b1f66541d7233f206ce450f72f80da5f`. Its local checkout was
+  `cb760d5b`; the current Antigravity adapter and MCP injection source were
+  fetched and matched the inspected local files byte-for-byte.
 
-## Testing Strategy
+### T3: official ACP runtime, not CLI stream-json
 
-### Core & Contracts
-- Snapshot defaults, migrations, and schema validation.
-- Backend resolution and capability negotiation.
+T3's Antigravity driver uses Google's separately distributed ACP runtime. Current
+source pins 1.3.0. This is not the Python SDK/API-key alternative discussed above;
+its default authentication method is `oauth-personal`. Google's
+[Zed integration documentation](https://antigravity.google/docs/ide/extensions/zed/)
+also documents personal Google-account authentication, and the
+[official ACP registry entry](https://github.com/agentclientprotocol/registry/blob/dc55a34900fdd60e5e97c1cbd7825c5a1df673fc/antigravity-acp/agent.json)
+identifies Google as author and supplies Google-hosted binaries.
 
-### Backend & Stdio Protocol
-- NDJSON framing, backpressure, and broken-pipe recovery.
-- Mock CLI tests verifying prompt delivery, live token streaming, and SIGINT interrupt.
-- Approval grant/deny roundtrips.
-- Session resume and history hydration.
+| Concern | T3 mechanism | Consequence for Korus |
+| --- | --- | --- |
+| Approvals | ACP `session/request_permission`; Antigravity permission mapping supports default, auto-edit and yolo. Client filesystem callbacks enable file-content approval flows | Native approval integration is a credible ACP path; the CLI limitation is not provider-wide |
+| MCP | Session-scoped `mcpServers`; a stdio-to-HTTP bridge receives session endpoint/authorization through its environment | Do not write caller identities into shared workspace/global MCP config |
+| Profile isolation | `GEMINI_HOME` points to a managed provider-instance profile; `AGY_ACP_FORCE_FILE_STORAGE=1`; runtime temp directories are separately owned | Concrete isolation mechanism to validate; do not assume CLI shares these runtime semantics |
+| Resume/history | Antigravity explicitly prefers `session/resume` without replay; T3 retains its own UI transcript. Generic ACP code also has a capability-gated `session/load` snapshot path | Resume does not remove Korus's hydration obligation; investigate native replay separately before choosing persistence |
+| Cancellation | `session/cancel`, wait for active prompt settlement, bounded timeout with process shutdown | Prefer native cancellation with terminal-event ownership and a process fallback |
 
-### Vue & Components
-- `BackendSelector` conditional rendering when Antigravity is enabled/disabled.
-- Pre-prompt backend switching on fresh agents.
-- Composer model selection and reasoning budget binding.
+Exact T3 sources, pinned to the inspected remote revision:
 
-## Commit Checkpoints
+- [Runtime release/provenance](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/provider/antigravityRelease.ts).
+- [ACP flavor and permission mode](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/provider/acp/AntigravityAcpSupport.ts#L43).
+- [Private profile environment](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/provider/antigravityAuthSupport.ts#L220).
+- [Antigravity resume and file callbacks](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/orchestration-v2/Adapters/AntigravityAdapterV2.ts#L166).
+- [Shared ACP orchestration and MCP injection](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/orchestration-v2/Adapters/AcpAdapterV2.ts).
+- [ACP request and cancellation lifecycle](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/provider/acp/AcpSessionRuntime.ts).
+- [Durable UI message projections](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/orchestration-v2/ProjectionStore.ts#L2234)
+  and [capability-gated history snapshot loading](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/orchestration-v2/Adapters/AcpAdapterV2.ts#L7755).
 
-- `chore: add antigravity shared contracts, backend types, and settings`
-- `feat: implement antigravity stdio stream-json transport`
-- `feat: implement antigravity conversation host and backend driver`
-- `feat: add antigravity to backend selector, creation dialogs, and settings`
-- `test: add unit, contract, and component tests for antigravity provider`
+Existing tests cover native approval choices and filesystem confinement in the
+Antigravity adapter, plus MCP setup and cancellation draining in the shared ACP
+adapter. They were inspected as source evidence, not executed here:
+[Antigravity tests](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/orchestration-v2/Adapters/AntigravityAdapterV2.test.ts#L74),
+[ACP tests](https://github.com/pingdotgg/t3code/blob/54b6b667f340c03132e9fc2cb2c3d657571442a2/apps/server/src/orchestration-v2/Adapters/AcpAdapterV2.test.ts#L3482).
 
-## Definition of Done
+### Synara: CLI workaround with explicit tradeoffs
 
-- Antigravity appears in `BackendSelector` when enabled in settings.
-- Agents can be created with Antigravity across all standard entry points.
-- Multi-turn conversation streams text, thoughts, and tool cards in real time.
-- Plan Mode, Goals, and tool approvals work natively in the Korus UI.
-- Antigravity agents can discover and message teammates via Korus MCP.
-- Coverage threshold $\ge 85\%$ is maintained across all modified packages.
+Synara uses `agy -p` per turn, with explicit conversation resume. It rejects
+non-full-access sessions and passes `--dangerously-skip-permissions`; request
+responses are unsupported. It does **not** solve native CLI interactive approvals.
+
+It installs a user-global capture plugin under the Antigravity CLI home. Hooks
+capture lifecycle/tool events to a per-run file, and the adapter tails
+`brain/<conversation-id>/.system_generated/logs/transcript.jsonl`, including
+thinking/tool records absent from the minimal stdout stream. This is a richer
+CLI integration, but introduces plugin lifecycle and native-transcript coupling.
+Cold adapter startup initializes an empty in-memory turn list, and subsequent
+dispatch skips already-existing transcript bytes; that alone is not full history
+hydration. Synara also maintains app-owned persisted message projections.
+
+Its MCP configuration contains no session bearer: a stable stdio proxy receives
+the endpoint and a one-shot bootstrap value from each process, exchanges that
+value for a session credential, and keeps the bearer in memory. This directly
+addresses the same-folder identity problem without per-agent config rewrites.
+Cancellation combines gateway cancellation, owned process-tree teardown and
+idempotent turn settlement, including a fallback when no process remains.
+
+Sources:
+
+- [Approval rejection](https://github.com/Emanuele-web04/synara/blob/a83a6248b1f66541d7233f206ce450f72f80da5f/apps/server/src/provider/Layers/AntigravityAdapter.ts#L2237),
+  [launch flags](https://github.com/Emanuele-web04/synara/blob/a83a6248b1f66541d7233f206ce450f72f80da5f/apps/server/src/provider/Layers/AntigravityAdapter.ts#L2499),
+  [capture plugin](https://github.com/Emanuele-web04/synara/blob/a83a6248b1f66541d7233f206ce450f72f80da5f/apps/server/src/provider/Layers/AntigravityAdapter.ts#L518),
+  [skip prior transcript](https://github.com/Emanuele-web04/synara/blob/a83a6248b1f66541d7233f206ce450f72f80da5f/apps/server/src/provider/Layers/AntigravityAdapter.ts#L1760),
+  [cancellation](https://github.com/Emanuele-web04/synara/blob/a83a6248b1f66541d7233f206ce450f72f80da5f/apps/server/src/provider/Layers/AntigravityAdapter.ts#L2690).
+- [Secret-free plugin / per-process MCP bridge](https://github.com/Emanuele-web04/synara/blob/a83a6248b1f66541d7233f206ce450f72f80da5f/apps/server/src/agentGateway/mcpInjection.ts#L217).
+- [Persisted message projections (local inspected revision)](https://github.com/Emanuele-web04/synara/blob/cb760d5b5eace10c3e823feb8dc5a39748f0c67e/apps/server/src/persistence/Layers/ProjectionThreadMessages.ts#L36).
+
+### Transport decision
+
+Use the T3-style **official ACP integration**, not Synara's mandatory-full-access
+CLI path. Source inspection identified the protocol; the live probes below
+establish its main behavior. Do not copy either app's transcript architecture.
+
+Treat replayed tool records as history, not instructions to re-execute effects.
+Keep all normalization and any agreed durable cache inside the Antigravity host;
+preserve the Codex SDK boundary.
+
+## Phase 0: live ACP evidence (2026-10-05)
+
+### Runtime, authentication and scope
+
+- Downloaded Google's darwin/arm64 ACP **1.3.0**, matching the current T3 pin,
+  into `/tmp/korus-acp-phase0.uKZcYN/runtime`. Verified registry SHA-256
+  `7cd97045f7b4fe81175a107cdf16f9c51484e3c78a5162cae415338bb6aa5b88`.
+  Launched `agy_acp_server.par` with its matching `localharness_external`;
+  no global installation, API key or custom agent loop.
+- Fresh `GEMINI_HOME`, `AGY_ACP_FORCE_FILE_STORAGE=1`, private runtime temp
+  directory, and ambient Google API-key/project credentials removed from child
+  environment. Nicolas completed native personal OAuth in the browser. A later
+  process returned `{}` from `authenticate` without another login.
+- ACP resolved settings, native credential storage and conversations under the
+  private profile. **Not a full filesystem sandbox:** the harness also logged an
+  embedded `webm_encoder` install/update under `~/.gemini/antigravity/bin`.
+  Do not claim that `GEMINI_HOME` confines every auxiliary runtime write.
+- Only scratch files and read-only dummy MCP tools were used. Permission mode
+  stayed `default`; responses selected native `allow_once` / `reject_once`,
+  never yolo or allow-always. File callbacks restricted paths to the scratch
+  workspace. No Korus app restart or production MCP identity was involved.
+- Bounded Node probes live in that temporary directory (`probe.mjs`, `live.mjs`,
+  `mcp.mjs`). They are investigation artifacts, not maintained regression tests.
+
+### Observed contracts
+
+| Boundary | Live result | Implementation consequence |
+| --- | --- | --- |
+| Initialization | Version 1.3.0 reports numeric protocol 2 but `agentInfo` / `agentCapabilities`, the v1 wire shape | Negotiate using response shape as T3 does; do not switch to `auth/login` based on the integer alone |
+| Login | Fresh-profile OAuth completed; session creation and subsequent authenticated prompts succeeded | Native personal-account auth works independently of CLI login; keep tokens provider-owned |
+| Model/mode discovery | 11 native model choices; `default`, `auto_edit`, `yolo` modes; model IDs encode effort; `plan` and `logout` commands advertised | Use the ACP catalog, not the CLI's different 14-model list; advertised commands are not proof of full feature behavior |
+| Fresh chat | Streamed `ACP_RECALL_58QH`; prompt settled with `stopReason: end_turn` | Native text streaming and terminal prompt response both matter |
+| Cold resume | New process, same native session, no history chunks; next prompt recalled the marker | `session/resume` restores model context without rendering old messages |
+| Cold load | Another new process replayed both user prompts and assistant replies through `session/update` | Use supported `session/load` for initial hydration; no private database parsing is required for the measured history |
+| File allow | `session/request_permission` supplied path, diff and native choices; allow produced `fs/write_text_file`, completed tool and exact `FILE_ALLOW` bytes on disk | Approval UI can show the actual edit, then answer the native request |
+| File deny | Same native approval path with reject; no write callback and no target file; model returned `denied` | Rejection actually prevents this edit, not merely changes UI status |
+| Command allow/deny | Same harmless `/usr/bin/printf ACP_COMMAND_OK` requested twice; native allow yielded completed tool and output; native deny yielded failed tool and `denied` | Preserve execute approvals and final tool failure even when prompt ends normally |
+| MCP session scoping | Resumed A and fresh B shared cwd and server name but separate env sentinels; dummy servers independently recorded `tools/call`; returned A/B identities matched; repeated with both prompts outstanding concurrently | Supply each session's bridge environment in `mcpServers`; no shared workspace configuration rewrite |
+| Cancel/recover | Notification `session/cancel` during streamed text settled the original prompt with `stopReason: cancelled`; next prompt in the same process returned `ACP_RECOVERED` | Await cancelled prompt settlement before accepting another turn; retain bounded process fallback |
+| Cold history after tools | 33 replay updates included user/assistant text, successful/denied edits, commands and MCP; no permission/file callbacks and no extra MCP invocation | Hydrate from native replay without re-executing effects |
+
+**Replay caveat:** live tool IDs (hex IDs) changed to `call_<number>` on cold
+load. A denied tool was initially replayed as a completed `tool_call`, followed
+by a failed `tool_call_update`. Build a fresh provider replica from ordered replay,
+apply subsequent status updates, and atomically replace the prior snapshot. Do
+not merge live and replayed tools by ID, freeze the first terminal-looking record,
+or let historical failures change the current turn's running state. Real-provider
+captures demonstrate why the adapter needs meaningful replay regression fixtures.
+
+Primary native conversation: `b555f636-5f80-478f-bcea-da8c5bd6fb53`.
+Second MCP conversation: `f658ffbb-8b58-46bf-97ff-67a583d568f2`.
+Local JSONL logs preserve protocol evidence without credential contents; native
+credentials remain in the private profile and must never enter repository fixtures.
+Independent assertions over ten logged ACP runs passed: no recorded RPC errors,
+exact allowed-file bytes, denied-file absence, recalled marker, cancelled-then-normal
+prompt settlement, four actual MCP calls split equally across A/B, and 33 cold
+replay updates without host requests. The allowed file's modification time stayed
+unchanged through replay. No probe/runtime/helper processes remained afterward.
+
+### Qualification boundary
+
+The former CLI blockers no longer block starting the ACP provider implementation.
+Implement text chat, discovered models/modes, native permissions, isolated MCP,
+load/resume and cancellation behind the provider host. The extended assessment
+below resolves the remaining capability questions: support measured attachments,
+skills and adapted planning; disable absent native goal/steer/fork/turn-mutation
+controls. Production gates still include auth expiry/relogin, crashed runtime
+and tool-child cleanup, long-history replay fidelity, real Korus MCP authentication
+and mounted conversation/approval UI. These are implementation acceptance gates,
+not reasons to defer selecting the transport.
+
+## Completed capability assessment: ACP 1.3.0
+
+The following replaces the earlier "not qualified" comparison. **Available**
+means the native runtime provides the behavior, not that Korus has implemented
+its adapter. **Absent** is scoped to this shipped ACP runtime, not all Google
+Antigravity products. App-owned workflows remain integration work, not unknown
+native capabilities.
+
+| Capability | Conclusion | Evidence / adapter requirement |
+| --- | --- | --- |
+| Text, tools, approvals, history, resume, cancellation | Available | Initial live qualification above |
+| Model and effort selection | Available as model configuration | `session/set_config_option` changed model to `gemini-3.8-flash-low`; next prompt completed. Effort is encoded in model IDs, not an independent numeric thinking budget |
+| Permission mode selection | Available | `session/set_mode` accepted `auto_edit`, then `default`; no yolo execution used |
+| Image attachments | Available | Direct PNG block correctly identified red left half and blue right half; prompt requested no tools and no tool requests occurred |
+| Audio attachments | Available | Direct WAV block transcribed the synthetic English sentence exactly. An earlier default-voice fixture was poorly transcribed; format acceptance is not a transcription-quality guarantee |
+| Text/source attachments | Available | Embedded text resource returned its exact hidden marker without file/tool access |
+| PDF attachments | Available via trusted local resource links; embedded PDF blobs unsupported | `resource_link` returned the PDF's exact marker. Identical document as embedded blob was ignored and model reported no attachment; parser only handles image/audio blobs |
+| Skills | Available | Model discovered and read `.agents/skills/phase0-evidence/SKILL.md`, returning its marker (not supplied in prompt or skill description) |
+| Planning | Native `/plan` primitive; Korus artifact UI needs adaptation | Shipped parser converts `/plan` into a native `SlashCommand`; live probe wrote `PLAN.md`, requested native approval, acknowledged the selected choice and stopped without implementation. Output is ordinary text/file tools, not structured ACP `plan` events |
+| Questions / choices | Available | Planning emitted `session/request_permission` with `interaction_*` ID, question title and two native option IDs; selected approval was acknowledged. Distinguish this from a tool-permission request |
+| Goals | Absent | No goal API or configuration; main agent behavior is `INTERACTIVE`; `/goal` is ordinary model text. A marker response to it does not establish a goal lifecycle |
+| Active steering | Absent; concurrent same-session prompt unsafe | Live overlapping prompts produced a native `Concurrent receive_steps()` error and still `end_turn` replies. Serialize turns. An explicit cancel-then-send action is possible using the proven cancellation path, not native steering |
+| Native conversation fork | Absent | Not advertised; live `session/fork` returned `{}` without a child ID. Shipped adapter inherits an empty base stub; this is not successful forking |
+| Edit/retry/delete historical turns | Absent | No implementation in the shipped adapter; attempted mutation RPCs returned method-not-found. Do not rewrite provider databases to fabricate support |
+| Manual context compaction | Absent as a native control | `/compact` generated ordinary summary text and retained the marker; parser has no compact command and adapter has no compact RPC/event. Internal automatic compaction exists in SDK source but is not a manual-control contract |
+| Context usage | Available | Live `usage_update` carries used tokens and context size; do not equate this with subscription quota or billing |
+| Reviews and fix rounds | Required native mechanics available; Korus integration absent | Live model reported a finding through dummy MCP `report_finding`, confirmed `findingCount: 1`, wrote corrected source, read it back, then confirmed `findingCount: 0`. Independent server ledger and disk bytes verified; not a run of Korus `CodeReviewService` |
+| Missions, delegation, automations | Korus-owned integration, not native ACP features | Proven session-scoped MCP, independent sessions, turn completion and approvals supply the required transport. Existing backend unions still accept only Codex/Claude; these product flows cannot run with Antigravity until implemented |
+| Plugin catalog, remote-control pairing, service tiers, explicit thinking budget, subscription quota | No corresponding exposed ACP adapter interface | Do not inherit CLI/IDE capabilities or expose Codex-specific controls. Native model/skill discovery and context usage remain separate |
+| Archive / replace with summary | No native archival or replacement operation | Korus could retain/archive its own references or create an explicit new session from a summary; that would be product behavior, not a provider-native mutation |
+| Authentication renewal | Native-owned implementation | Shipped credential manager checks validity and silently refreshes before falling back to interactive login. Live login and cached reuse passed; expiry was source-audited, not induced by editing credentials |
+
+### Evidence and important negative controls
+
+- Additional runs are recorded in `/tmp/korus-acp-phase0.uKZcYN/assess-*.jsonl`.
+  Inputs are generated synthetic media/text and disposable workspace files. No
+  personal attachment or production account data was sent as prompt context.
+- The initial long planning probe exposed a **probe-client** bug: inbound server
+  request IDs can equal outstanding client request IDs. Dispatch must distinguish
+  requests by `method` before matching responses. Fixed the scratch probe and
+  reran planning; discarded the prematurely settled run. Protect this bidirectional
+  RPC contract in the production adapter's tests.
+- T3's `supportsCompaction` is not proof: its ACP adapter sends `/compact` text
+  and can synthesize a compaction-completed item after a normal end-turn. The
+  actual Antigravity parser only recognizes native `/plan` (plus separate logout
+  handling). Do not copy that false-positive completion inference.
+- A normal end-turn response is likewise not enough to classify overlapping
+  prompts as supported steering. The live stream contained an explicit connection
+  error even though both prompt calls eventually returned end-turn.
+- PDF resource links read files on the provider host. Korus must resolve trusted
+  attachment references and transfer remote-host files through its existing
+  attachment boundary; never accept arbitrary renderer paths or assume a Mac
+  file URL exists on a remote daemon.
+- Independent assertions passed for exact image/audio/text/PDF/skill fixture
+  results, PDF-blob rejection, absent-method responses, the concurrent-prompt
+  failure, ordered review-tool ledger counts (1 then 0), executable corrected
+  addition, persisted plan and native approval without source implementation.
+  All probe/runtime processes terminated. Repository changes remain docs-only;
+  no application suite was run because no production code changed.
+
+### First-party implementation provenance
+
+The checksum-pinned official executable contains uncompressed Python source in
+local ZIP records, although `unzip` cannot find a central directory. The read-only
+`embedded.mjs` scratch inspector scans ZIP header bytes `50 4b 03 04`, validates the
+stored-entry method, filename and length, and reads source bytes without running
+them. This is shipped source inspection, not behavior inferred from generic ACP
+schema or invented method names.
+
+Under `google3/cloud/developer_experience/antigravity_extensions/acp_server/`:
+
+- `server.py:1161–1179,1237–1360`: command parsing and attachment conversion.
+- `server.py:1561` and bundled `google3/third_party/py/acp/interfaces.py:291–302`:
+  adapter inheritance and empty fork stub.
+- `server.py:4093–4099,4879–4995`: interactive agent behavior and question choices.
+- `oauth/credential_manager.py:493–539,570–608`: reuse, refresh and login fallback.
+- Bundled `google/antigravity/types.py` defines only `PLAN` in
+  `BuiltinSlashCommandName`; `conversation/conversation.py:94–122` waits/drains
+  previous work rather than providing a steering operation.
+
+Public cross-checks: [ACP content contracts](https://agentclientprotocol.com/protocol/v1/content),
+[Google ACP authentication](https://antigravity.google/docs/ide/extensions/zed/),
+and [Google skills](https://antigravity.google/docs/skills/). The shipped ACP
+implementation and live probes take precedence over documentation for a different
+Antigravity surface.
+
+## Current-code integration map
+
+| Concern | Current owner and required work |
+| --- | --- |
+| Backend identity | Extend `core/src/contracts/shared.ts` (`AgentBackend`) and `core/src/backend-driver.ts` (display name/driver contract as needed) |
+| Sessions/defaults/capabilities | Provider branches live in `core/src/contracts/backend.ts`, not `shared.ts`; use explicit unsupported capabilities |
+| Authentication | Extend `contracts/provider-setup.ts` and its runtime validators; installation, authentication, enablement, and runtime health remain separate |
+| Settings and persistence | Reuse `providerEnabled`/`providerHomes`; update `core/src/settings.ts`, snapshot guards, model/permission preferences, and snapshot/session decoders. No `antigravityEnabled` flag |
+| Availability | `core/src/agent-backends.ts` already filters live `providerConnections`; preserve explicit-provider failure and host-local availability |
+| Factory/lifecycle | Register in `backend/src/driver-rpc.ts` and `provider-lifecycle.ts`; use `resolveRuntimeExecutable`/`withDiscoveredRuntimePath`, not ad hoc PATH scans |
+| Authentication recovery | Reuse `ProviderConnections.observe`, credential-free `provider.authenticationChanged`, and disconnected-provider re-probing at new-work admission; never persist a login observation as enablement |
+| Conversation ownership | Antigravity host + provider-specific snapshot/events/replica; route via `core/src/contracts/events.ts` and app-owned transport envelopes, without copying the entire Claude reducer by default |
+| Selection UI | `BackendSelector.vue` already consumes dynamic choices; preserve dialog markup where sufficient. Update `backend-selection.ts` persisted-choice validation and remaining two-provider assumptions |
+| Conversation UI | Add icon, provider snapshot binding, identity, requests and capability projections in the existing app-state/provider host path and `use-agent-conversation.ts`; a null-coalescing snapshot addition alone is insufficient |
+| Settings UI | Extend settings navigation/panel using `SettingsEngineConnectionRow`, backend display names, and i18n |
+| Workflows | Audit `core/src/code-review.ts`, MCP backend validators, automations, Mission roles, remote-host routing and fresh-agent switching. Generic selectors do not prove these contracts accept a third provider |
+| MCP namespace | Use product metadata for new provider configuration/instructions. Claude currently uses `product.mcpServerName`; Codex retains `workspace`. Do not change existing namespaces as part of this work |
+
+## Remaining implementation phases
+
+### Phase 1: contracts and lifecycle
+
+- [x] Qualify ACP for the measured text/permissions/MCP/history/cancellation scope.
+- [ ] Extend backend/session/default/auth unions and all owning runtime decoders.
+- [ ] Extend generic settings normalization, connected choices, and remembered
+  selections without silently falling back from an explicitly selected provider.
+- [ ] Register discovery, installation, configured home, and connection observation.
+- [ ] Add contract tests for roundtrip persistence, unavailable-provider rejection,
+  disconnected retry, and cross-provider default isolation in this same milestone.
+
+### Phase 2: selected transport and a minimal conversation slice
+
+- [ ] Spawn the qualified ACP runtime without a shell; implement request/response,
+  notification framing, bounded buffering, session routing and process cleanup.
+- [ ] Implement proven prompt/resume/load semantics, permission responses and
+  native cancellation with bounded teardown fallback.
+- [ ] Surface tool denials, protocol errors and unexpected exit. CLI-specific
+  `denied_actions` handling applies only if a CLI fallback is explicitly chosen.
+- [ ] Add transport-boundary tests with captured sanitized protocol shapes;
+  test success, denial, split lines, EOF, interruption and stale completion races.
+
+### Phase 3: provider host, history and collaboration
+
+- [ ] Implement the provider-owned host/replica and bounded revisioned transport.
+- [ ] Hydrate through native `session/load`, rebuild the provider replica atomically
+  despite changed replay tool IDs, and validate session identity; prove reload
+  does not lose or duplicate streamed messages or re-execute tools.
+- [ ] Add safely scoped MCP configuration and normal/review-session tool discovery.
+- [ ] Verify two agents sharing a workspace retain separate MCP identities and
+  sessions; test reconnection and credential/config cleanup at the owning seam.
+- [ ] Enable reviews/Missions only after their required MCP and lifecycle
+  contracts work, including review round completion and session disposal.
+
+### Phase 4: UI and capability hardening
+
+- [ ] Add backend icon, settings panel/navigation/i18n, conversation binding and
+  model/effort options; reuse creation dialogs and shared controls.
+- [ ] Map the assessed capability matrix explicitly: native goals, steering,
+  forks and historical turn mutations stay disabled; enable measured attachments,
+  approvals and adapted planning. Test the Korus plan preview/confirmation flow
+  against native artifact writes and question choices before advertising it.
+- [ ] Mount representative selection, Settings, permission-denial and restart
+  flows. Verify persisted choices and unsupported-control behavior through UI.
+- [ ] Exercise the actual provider boundary and one desktop/Web consumer flow.
+
+## Verification and commit checkpoints
+
+Every behavior milestone includes its tests; do not postpone them to a final
+test-only commit. Keep native provider smoke tests opt-in and normal tests
+deterministic. Apply `docs/testing.md`'s Test Value Gate, focused tests and affected
+typechecks while iterating. Preserve exactly **85% statement coverage** gates
+across all five workspaces, with full tests/coverage before release.
+
+Coherent local checkpoints (commit/push only when authorized):
+
+1. `chore: refresh antigravity integration plan with phase zero evidence`
+2. `feat: add antigravity provider contracts and lifecycle`
+3. `feat: add antigravity streaming transport and terminal handling`
+4. `feat: add antigravity conversation history and scoped collaboration`
+5. `feat: add antigravity settings and conversation ui`
+
+## Completion criteria and learnings
+
+The provider is done only when available selection, streaming, resume/hydration,
+safe collaboration and truthful capabilities work across the supported entry
+points. First-class does not mean every provider has identical features.
+
+Phase 0 learnings:
+
+- Inspect the installed binary as well as current official docs; even flags and
+  timeout defaults differ. Record the tested version with each conclusion.
+- Separate successful model context resume from durable UI transcript recovery.
+- An exit code of zero can conceal tool denials and an empty assistant response.
+- Test MCP identity isolation and home routing before committing to the transport.
+- Check competitor implementation code early: a provider's CLI limitation may
+  not apply to its official embedded transport. Then exercise that transport,
+  rather than treating the competitor's source or advertised capabilities as proof.
+- Stable session IDs do not imply stable tool IDs across cold history replay.
+- Keep feasibility failures visible instead of replacing them with prompt-based
+  imitations or unapproved API billing. No production feature code changed here.

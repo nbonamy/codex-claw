@@ -125,10 +125,15 @@ sizes. `AppShell` provides the connected choices once through `backend-selection
 dialogs do not read settings independently.
 `daemon` owns connection observations and publishes them in snapshots. Observations
 are not persisted. Installation and authentication are checked once per backend
-startup and cached for that process. Reading status, opening Settings, sending
-prompts, and provider errors do not trigger another check. Explicit connection,
-installation, or home/runtime changes update the cache. External changes are not
-monitored. Remote hosts report their own connections;
+startup and cached for that process. Routine status reads and healthy-provider
+admission reuse that observation. Explicit connection, installation, or
+home/runtime changes refresh it. Provider-reported authentication failures update
+the observation immediately through `provider.authenticationChanged`, without
+changing the saved enabled preference. New-work admission re-probes installed
+engines last observed disconnected (the requested engine, or eligible candidates
+when no engine was specified), so a login completed outside Korus can be detected
+on retry. External changes are not continuously monitored. Remote hosts report
+their own connections;
 they do not inherit local provider settings.
 
 Manual choices are remembered per client and host. An unavailable remembered
@@ -148,8 +153,10 @@ no available engines shows setup even for an existing workspace. Setup can enabl
 an already-authenticated engine without another sign-in, and returning users go
 straight back to their workspace after Continue. Disabling preserves histories, drafts, queues,
 and running turns, while preventing new work. Pending Korus prompts resume when
-the engine is enabled again. External auth loss surfaces as a request failure;
-an explicit connection action refreshes the cached authentication state.
+the engine is enabled again. A provider-reported auth failure disconnects its
+runtime observation immediately; an explicit connection action or subsequent
+new-work admission can refresh a disconnected observation. Provider runtimes
+still own credential renewal and sign-in.
 
 `core/agent-backends` owns connected-provider resolution and fresh-agent
 eligibility. Selected providers travel through app-owned contracts to existing
