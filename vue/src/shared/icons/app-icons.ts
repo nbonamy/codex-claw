@@ -1,11 +1,12 @@
 export { default as GitHubIcon } from './GitHubIcon.vue';
 export { default as LinearIcon } from './LinearIcon.vue';
 export { default as BacklogIcon } from './BacklogIcon.vue';
+export { default as ProductMarkIcon } from './ProductMarkIcon.vue';
 
 export {
   IconAffiliate as AffiliateIcon,
   IconAlertTriangle as AlertTriangleIcon,
-  IconAutomation as AutomationIcon,
+  IconClockHour8 as ClockHour8Icon,
   IconArrowBackUp as ArrowBackUpIcon,
   IconArrowRight as ArrowRightIcon,
   IconArrowUpRight as ArrowUpRightIcon,
@@ -71,7 +72,6 @@ export {
   IconTextWrap as TextWrapIcon,
   IconTextWrapDisabled as TextWrapDisabledIcon,
   IconTrash as Trash2Icon,
-  IconUserCircle as UserCircleIcon,
   IconViewportShort as ViewportShortIcon,
   IconVolume as VolumeIcon,
   IconVolumeOff as VolumeOffIcon,

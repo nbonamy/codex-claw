@@ -154,7 +154,7 @@ describe('SettingsMenu', () => {
     expect(wrapper.emitted('quit')).toStrictEqual([[]]);
   });
 
-  it('omits the Codex account header', async () => {
+  it('keeps the product mark with or without a Codex account and omits its header', async () => {
     const wrapper = mountMenu(undefined, {
       account: { type: 'chatgpt', email: 'nico@example.com', planType: 'pro' },
     });
@@ -163,6 +163,11 @@ describe('SettingsMenu', () => {
     expect(wrapper.text()).not.toContain('nico@example.com');
     expect(wrapper.text()).not.toContain('pro');
     expect(wrapper.get('[aria-label="Account menu"]').element).toBeInstanceOf(HTMLElement);
+    expect(wrapper.get('[aria-label="Account menu"] .product-mark-icon').attributes('aria-hidden')).toBe('true');
+    await wrapper.setProps({ account: null });
+    const mark = wrapper.get('[aria-label="Settings menu"] .product-mark-icon');
+    expect(mark.attributes('fill')).toBe('none');
+    expect(mark.attributes('stroke')).toBe('currentColor');
   });
 
   it('marks the trigger active when settings is selected', () => {

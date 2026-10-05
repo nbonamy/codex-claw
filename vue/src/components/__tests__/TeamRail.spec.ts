@@ -229,6 +229,7 @@ describe('TeamRail', () => {
 
     await wrapper.get('[aria-label="Automations"]').trigger('click');
 
+    expect(wrapper.get('[aria-label="Automations"] svg').classes()).toContain('tabler-icon-clock-hour-8');
     expect(wrapper.get('[aria-label="Automations"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Automations"]').classes()).toContain('team-rail__automations--active');
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');

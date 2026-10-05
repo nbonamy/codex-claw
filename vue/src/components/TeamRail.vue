@@ -99,7 +99,7 @@
           :aria-pressed="automationsActive"
           @click="emit('select-automations')"
         >
-          <AutomationIcon
+          <ClockHour8Icon
             class="team-rail__automations-icon"
             aria-hidden="true"
           />
@@ -138,7 +138,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@workspace/core/contracts';
 import { defaultTeamColor } from '@workspace/core/team-colors';
 import { teamInitials } from '@workspace/core/team-manager';
-import { AutomationIcon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
+import { ClockHour8Icon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
@@ -457,6 +457,10 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 .team-rail__backlog svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
+}
+
+:deep() .settings-menu__trigger svg {
+  transform: scale(0.9);
 }
 
 .team-rail__team::before,

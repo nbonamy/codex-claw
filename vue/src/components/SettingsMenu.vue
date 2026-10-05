@@ -14,8 +14,7 @@
         :aria-label="account ? $t('surface.settingsMenu.accountMenu') : $t('surface.settingsMenu.settingsMenu')"
         :aria-pressed="active"
       >
-        <UserCircleIcon v-if="account" aria-hidden="true" />
-        <SettingsIcon v-else aria-hidden="true" />
+        <ProductMarkIcon aria-hidden="true" />
       </button>
     </template>
 
@@ -58,7 +57,7 @@ import { computed, ref, watch } from 'vue';
 import type { AccountRateLimitWindow, AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount } from '@workspace/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import { BrandSpeedTest, QuitIcon, SettingsIcon, SparklesIcon, UserCircleIcon } from '../shared/icons/app-icons';
+import { BrandSpeedTest, ProductMarkIcon, QuitIcon, SettingsIcon, SparklesIcon } from '../shared/icons/app-icons';
 import { appHostCapabilities, appApi } from '../platform-api';
 
 const props = withDefaults(defineProps<{
