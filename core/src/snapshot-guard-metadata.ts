@@ -479,7 +479,7 @@ function isProviderSettings(value: unknown): boolean {
 }
 
 function isWorkProviderSettings(value: unknown): boolean {
-  return isRecord(value) && optional(value, 'oauthClientId', isString) && optional(value, 'oauthCallbackUri', isString);
+  return isRecord(value) && optional(value, 'oauthClientId', isString);
 }
 
 function isWorkBacklogAssignment(value: unknown): boolean {

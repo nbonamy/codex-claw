@@ -67,7 +67,6 @@ describe('runtime config', () => {
         APP_BACKEND_COMMAND: 'daemon',
         APP_GITHUB_CLIENT_ID: ' github-client-id ',
         APP_LINEAR_CLIENT_ID: ' linear-client-id ',
-        APP_LINEAR_CALLBACK_URI: ' http://127.0.0.1:45678/oauth/linear/callback ',
       },
     })).toStrictEqual({
       command: 'daemon',
@@ -77,7 +76,6 @@ describe('runtime config', () => {
         APP_HOME: path.join(homedir(), `${product.homeDirectory}`),
         APP_GITHUB_CLIENT_ID: 'github-client-id',
         APP_LINEAR_CLIENT_ID: 'linear-client-id',
-        APP_LINEAR_CALLBACK_URI: 'http://127.0.0.1:45678/oauth/linear/callback',
         HOME: homedir(),
       },
     });

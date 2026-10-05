@@ -988,8 +988,7 @@ function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | nul
   }
 
   const oauthClientId = optionalTrimmedString(value.oauthClientId) ?? '';
-  const oauthCallbackUri = optionalTrimmedString(value.oauthCallbackUri);
-  return oauthClientId || oauthCallbackUri ? { ...(oauthClientId ? { oauthClientId } : {}), ...(oauthCallbackUri ? { oauthCallbackUri } : {}) } : null;
+  return oauthClientId ? { oauthClientId } : null;
 }
 
 function cloneAutomation(automation: Automation): Automation {

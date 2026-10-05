@@ -27,18 +27,15 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
   constructor(private readonly settings: () => WorkProviderSettings) {}
 
   configured(): boolean {
-    return Boolean(this.settings().oauthClientId?.trim() && this.settings().oauthCallbackUri?.trim());
+    return Boolean(this.settings().oauthClientId?.trim());
   }
 
   async startAuthorization(): Promise<WorkProviderDeviceAuthorization> {
     this.cancelAuthorization();
     const settings = this.settings();
     const clientId = settings.oauthClientId?.trim();
-    if (!clientId || !settings.oauthCallbackUri) throw new Error('Linear OAuth is not configured for this build.');
-    const callback = new URL(settings.oauthCallbackUri);
-    if (callback.protocol !== 'http:' || callback.hostname !== '127.0.0.1' || !callback.port || callback.username || callback.password || callback.search || callback.hash) {
-      throw new Error(`Linear callback must be an http://127.0.0.1:PORT/path URL registered with Linear. Open authorization on the same computer as ${product.name}.`);
-    }
+    if (!clientId) throw new Error('Linear OAuth is not configured for this build.');
+    const callback = new URL('http://127.0.0.1:5173/api/auth/callback/linear');
     const attempt: Attempt = {
       id: randomBytes(32).toString('base64url'),
       state: randomBytes(32).toString('base64url'),
@@ -87,7 +84,7 @@ export class LinearWorkProviderDriver implements WorkProviderDriver {
       });
     } catch {
       if (this.attempt === attempt) this.cancelAuthorization();
-      throw new Error('Cannot open the registered Linear callback port. Close the conflicting application or register another callback URL and retry.');
+      throw new Error('Cannot open the Linear callback port (5173). Close the application using that port and try again.');
     }
     if (this.attempt !== attempt) {
       this.closeListener(attempt);

@@ -16,7 +16,6 @@ export type WorkIntegrationConnection = {
 
 export type WorkProviderSettings = {
   oauthClientId?: string;
-  oauthCallbackUri?: string;
 };
 
 export type WorkBacklogAssignmentPolicy = 'complete' | 'review';

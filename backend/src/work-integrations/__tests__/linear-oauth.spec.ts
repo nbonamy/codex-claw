@@ -23,17 +23,13 @@ afterEach(async () => {
 });
 
 async function setup() {
-  const listener = createServer();
-  await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
-  const address = listener.address() as { port: number };
-  await new Promise<void>(resolve => listener.close(() => resolve()));
-  const callbackUri = `http://127.0.0.1:${address.port}/oauth/linear/callback`;
+  const callbackUri = 'http://127.0.0.1:5173/api/auth/callback/linear';
   const snapshot = createInitialSnapshot();
   const directory = await mkdtemp(path.join(tmpdir(), 'app-linear-test-'));
   temporaryDirectories.push(directory);
   const tokenPath = path.join(directory, 'tokens.json');
   const tokenStore = new FileWorkIntegrationTokenStore(tokenPath);
-  const driver = new LinearWorkProviderDriver(() => ({ oauthClientId: 'public-client', oauthCallbackUri: callbackUri }));
+  const driver = new LinearWorkProviderDriver(() => ({ oauthClientId: 'public-client' }));
   const options = { drivers: [driver, new GitHubWorkProviderDriver('github-client')], getSnapshot: () => snapshot, saveSnapshot: async () => {}, tokenStore };
   const manager = new WorkIntegrationManager(options);
   managers.push(manager);
@@ -71,13 +67,11 @@ describe('Linear OAuth through manager and HTTP callback', () => {
     expect(await tokenStore.get('linear')).toMatchObject({ accessToken: 'access-secret' });
   });
 
-  it('surfaces missing setup, rejects non-loopback callbacks, and permits retry after a callback port conflict', async () => {
+  it('surfaces missing setup and permits retry after a callback port conflict', async () => {
     const { manager, snapshot, callbackUri, options } = await setup();
     const unconfigured = new WorkIntegrationManager({ ...options, drivers: [new LinearWorkProviderDriver(() => ({}))] });
     expect((await unconfigured.connect('linear')).authorization).toBeUndefined();
     expect(snapshot.workBacklog.connections.find(c => c.provider === 'linear')).toMatchObject({ status: 'notConfigured', detail: expect.stringContaining('client ID') });
-    const invalid = new LinearWorkProviderDriver(() => ({ oauthClientId: 'public', oauthCallbackUri: 'https://example.com/callback' }));
-    await expect(invalid.startAuthorization()).rejects.toThrow('127.0.0.1');
     const blocker = createServer();
     await new Promise<void>(resolve => blocker.listen(Number(new URL(callbackUri).port), '127.0.0.1', resolve));
     try {
@@ -221,7 +215,7 @@ describe('Linear OAuth through manager and HTTP callback', () => {
     const url = new URL(result.authorization!.verificationUri);
     expect(url.origin + url.pathname).toBe('https://linear.app/oauth/authorize');
     expect(url.searchParams.get('scope')).toBe('read,write');
-    expect(url.searchParams.get('redirect_uri')).toBe(callbackUri);
+    expect(url.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:5173/api/auth/callback/linear');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(await tokenStore.get('linear')).toBeNull();
     expect((await fetch(`${callbackUri}?state=${url.searchParams.get('state')}&code=accepted`)).status).toBe(200);
@@ -229,6 +223,7 @@ describe('Linear OAuth through manager and HTTP callback', () => {
     const exchange = upstream.mock.calls.find(([target]) => String(target).endsWith('/oauth/token'))!;
     const body = new URLSearchParams(String(exchange[1]?.body));
     expect(body.get('client_secret')).toBeNull();
+    expect(body.get('redirect_uri')).toBe('http://127.0.0.1:5173/api/auth/callback/linear');
     expect(body.get('code')).toBe('accepted');
     expect(createHash('sha256').update(body.get('code_verifier')!).digest('base64url')).toBe(url.searchParams.get('code_challenge'));
     expect(await tokenStore.get('linear')).toMatchObject({ provider: 'linear', accessToken: 'access-secret', refreshToken: 'refresh-secret', accountLabel: 'Alex · Example' });

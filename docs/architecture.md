@@ -1070,11 +1070,10 @@ operations. Browsing does not infer a code repository from Linear names.
 
 Linear uses the app's public OAuth client ID from `APP_LINEAR_CLIENT_ID`,
 which can also be baked into the backend build from the repository `.env`.
-The registered callback defaults to
-`http://127.0.0.1:5173/api/auth/callback/linear`; an optional
-`APP_LINEAR_CALLBACK_URI` overrides it at runtime or build time.
-Nonempty legacy `workBacklog.providerSettings.linear` values remain compatible
-and take precedence; blank saved values fall through to app defaults.
+The callback is fixed to `http://127.0.0.1:5173/api/auth/callback/linear`
+and cannot be customized through settings, environment, or build configuration.
+Nonempty saved `workBacklog.providerSettings.linear.oauthClientId` values
+take precedence; blank saved client IDs fall through to app defaults.
 Settings exposes connection controls, with no client ID or callback fields.
 No client secret or API key is used.
 

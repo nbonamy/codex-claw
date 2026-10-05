@@ -33,7 +33,7 @@ async function setup() {
   await seed('linear');
   const manager = new WorkIntegrationManager({
     drivers: [new GitHubWorkProviderDriver('github-public'), new LinearWorkProviderDriver(() => ({
-      oauthClientId: 'linear-public', oauthCallbackUri: 'http://127.0.0.1:4567/oauth/callback',
+      oauthClientId: 'linear-public',
     }))],
     tokenStore, getSnapshot: () => snapshot, saveSnapshot: async () => {},
   });

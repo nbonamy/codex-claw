@@ -124,7 +124,6 @@ function runtimeDaemonEnv(deps: RuntimeDaemonConfigDeps): NodeJS.ProcessEnv {
   const env = deps.env ?? process.env;
   const githubClientId = env.APP_GITHUB_CLIENT_ID?.trim();
   const linearClientId = env.APP_LINEAR_CLIENT_ID?.trim();
-  const linearCallbackUri = env.APP_LINEAR_CALLBACK_URI?.trim();
   const bundledCodexPath = runtimeBundledCodexPath(deps);
   const runtimePath = !deps.env || env.PATH ? discoveredRuntimePath(deps) : '';
   const home = env.HOME?.trim() || (deps.homedir ?? homedir)();
@@ -137,7 +136,6 @@ function runtimeDaemonEnv(deps: RuntimeDaemonConfigDeps): NodeJS.ProcessEnv {
     ...(runtimePath ? { PATH: runtimePath } : {}),
     ...(githubClientId ? { APP_GITHUB_CLIENT_ID: githubClientId } : {}),
     ...(linearClientId ? { APP_LINEAR_CLIENT_ID: linearClientId } : {}),
-    ...(linearCallbackUri ? { APP_LINEAR_CALLBACK_URI: linearCallbackUri } : {}),
   };
 }
 

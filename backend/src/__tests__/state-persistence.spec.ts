@@ -95,12 +95,12 @@ describe('state persistence', () => {
     const persistence = new AppStateStore(await tempHome());
     const snapshot = createEmptySnapshot();
     snapshot.workBacklog.providerSettings.github = { oauthClientId: 'github-client' };
-    updateSettingsInSnapshot(snapshot, { workProviders: { linear: { oauthClientId: ' linear-client ', oauthCallbackUri: ' http://127.0.0.1:45678/oauth/linear/callback ' } } });
+    updateSettingsInSnapshot(snapshot, { workProviders: { linear: { oauthClientId: ' linear-client ' } } });
     snapshot.workBacklog.connections.push({ provider: 'linear', status: 'connected', accountLabel: 'Alex' });
     snapshot.workBacklog.providerConfigurations = { github: { sourceId: 'owner/repo' }, linear: { sourceId: 'linear:team:project', assigneeLogin: 'Alex', tagName: 'bug' } };
     await persistence.save(snapshot);
     const restored = await persistence.load();
-    expect(restored.workBacklog.providerSettings).toEqual({ github: { oauthClientId: 'github-client' }, linear: { oauthClientId: 'linear-client', oauthCallbackUri: 'http://127.0.0.1:45678/oauth/linear/callback' } });
+    expect(restored.workBacklog.providerSettings).toEqual({ github: { oauthClientId: 'github-client' }, linear: { oauthClientId: 'linear-client' } });
     expect(restored.workBacklog.connections).toContainEqual({ provider: 'linear', status: 'connected', accountLabel: 'Alex' });
     expect(restored.workBacklog.providerConfigurations).toEqual(snapshot.workBacklog.providerConfigurations);
     expect(isAppSnapshot(restored)).toBe(true);

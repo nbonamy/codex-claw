@@ -103,7 +103,7 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
       ...snapshot.workBacklog.providerSettings[provider],
       ...input.workProviders[provider],
     });
-    if (settings.oauthClientId || settings.oauthCallbackUri) {
+    if (settings.oauthClientId) {
       snapshot.workBacklog.providerSettings[provider] = settings;
     } else {
       delete snapshot.workBacklog.providerSettings[provider];
@@ -339,8 +339,7 @@ function normalizeWorkProviderSettings(value: unknown): WorkProviderSettings {
   }
 
   const oauthClientId = normalizeOptionalString(value.oauthClientId);
-  const oauthCallbackUri = normalizeOptionalString(value.oauthCallbackUri);
-  return { ...(oauthClientId ? { oauthClientId } : {}), ...(oauthCallbackUri ? { oauthCallbackUri } : {}) };
+  return oauthClientId ? { oauthClientId } : {};
 }
 
 function normalizeRecentRepoNames(value: unknown): string[] {
