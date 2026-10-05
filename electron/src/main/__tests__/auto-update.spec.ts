@@ -27,7 +27,6 @@ function createService(options: {
     onStatusChanged: (status) => statuses.push(status),
     platform: options.platform ?? 'darwin',
     setIntervalFn,
-    updateBaseUrl: 'https://updates.example.test/releases',
   });
 
   return { service, statuses, updater, setIntervalFn };
@@ -66,7 +65,7 @@ describe('desktop auto-update', () => {
 
     expect(updater.setFeedURL).toHaveBeenCalledWith({
       serverType: 'json',
-      url: 'https://updates.example.test/releases/darwin/arm64/RELEASES.json',
+      url: 'https://meetkorus.dev/desktop/releases/darwin/arm64/RELEASES.json',
     });
     expect(updater.checkForUpdates).toHaveBeenCalledOnce();
     expect(setIntervalFn).toHaveBeenCalledWith(expect.any(Function), 60 * 60 * 1000);

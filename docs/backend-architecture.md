@@ -855,7 +855,7 @@ from the Korus menu. Development builds and unsupported platforms report updates
 as disabled.
 
 The feed is served at
-`https://codex-claw.nabocorp.com/desktop/releases/<platform>/<arch>/RELEASES.json`
+`https://meetkorus.dev/desktop/releases/<platform>/<arch>/RELEASES.json`
 by default. Set `APP_UPDATE_BASE_URL` for another HTTPS host. A release
 publish uses `npm run publish:macos` after a signed `npm run make`; the script
 uploads the ZIP, manifest, and DMG through SSH using

@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg"><strong>Download for macOS</strong></a>
+  <a href="https://meetkorus.dev/desktop/downloads/korus-macos-arm64.dmg"><strong>Download for macOS</strong></a>
   ·
-  <a href="https://codex-claw.nabocorp.com">Website</a>
+  <a href="https://meetkorus.dev">Website</a>
   ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -74,7 +74,7 @@ background work alive and restores the durable state when you return.
 
 The current desktop release supports macOS on Apple silicon.
 
-1. [Download the latest DMG](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg).
+1. [Download the latest DMG](https://meetkorus.dev/desktop/downloads/korus-macos-arm64.dmg).
 2. Move Korus to Applications and launch it.
 3. Connect Codex, Claude Code, or both, then choose Continue. Only one connected
    engine is required. Claude Code supports subscription or API-key setup.
