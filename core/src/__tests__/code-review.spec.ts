@@ -99,6 +99,8 @@ describe('code review ledger', () => {
     expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'anchored' })).toBe(false);
     const automatic = { scope: { type: 'uncommitted' }, threadMode: 'independent', model: 'review-model', reasoningEffort: 'high', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } };
     expect(isCodeReviewStartInput(automatic)).toBe(true);
+    for (const autoCommit of [true, false]) expect(isCodeReviewStartInput({ ...automatic, automation: { ...automatic.automation, autoCommit } })).toBe(true);
+    for (const autoCommit of ['true', 1, null]) expect(isCodeReviewStartInput({ ...automatic, automation: { ...automatic.automation, autoCommit } })).toBe(false);
     expect(isCodeReviewStartInput({ ...automatic, threadMode: 'current' })).toBe(false);
     for (const maxRounds of [0, 11, 1.5, '3']) expect(isCodeReviewStartInput({ ...automatic, automation: { ...automatic.automation, maxRounds } })).toBe(false);
     expect(isCodeReviewStartInput({ ...automatic, model: {} })).toBe(false);

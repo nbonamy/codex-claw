@@ -144,21 +144,28 @@ describe(`Claude Agent SDK → ${product.name} backend`, () => {
     await vi.waitFor(() => expect(snapshot.agents[0]!.status.type).toBe('idle'));
   });
 
-  it.each(['Edit', `mcp__${product.mcpServerName}__set-status`])('preserves %s approval identity and leaves Input only after the last response', async (toolName) => {
+  it.each([
+    { toolName: 'Edit', input: { file_path: 'src/main.ts', old_string: 'obsolete();', new_string: '' }, summary: 'Edit file src/main.ts?', preview: 'Before:\nobsolete();\n\nAfter:\n(empty)' },
+    { toolName: 'Edit', input: { file_path: 'src/main.ts', old_string: 'const enabled = false;\nstart();', new_string: 'const enabled = true;\nstart();', replace_all: true }, summary: 'Replace all matches in src/main.ts?', preview: 'Before:\nconst enabled = false;\nstart();\n\nAfter:\nconst enabled = true;\nstart();' },
+    { toolName: 'Write', input: { file_path: 'src/main.ts', content: 'const enabled = true;\nstart();' }, summary: 'Write file src/main.ts?', preview: 'New contents (replaces any existing file contents):\nconst enabled = true;\nstart();' },
+    { toolName: 'NotebookEdit', input: { notebook_path: 'notebook.ipynb', new_source: 'print(1)' }, summary: 'Edit notebook notebook.ipynb?', preview: '{\n  "notebook_path": "notebook.ipynb",\n  "new_source": "print(1)"\n}' },
+    { toolName: `mcp__${product.mcpServerName}__set-status`, input: { status: 'Working' }, summary: 'Provider title', preview: '{\n  "status": "Working"\n}' },
+  ])('preserves $toolName approval context and leaves Input only after the last response', async ({ toolName, input, summary, preview }) => {
     const { sdk, driver, server, snapshot, events } = setup();
     const pending = driver.sendPrompt(agent(), 'edit');
     await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
     sdk.emit({ type: 'system', subtype: 'init', session_id: 'session-a' });
     await pending;
-    const permission = sdk.options[0]!.canUseTool!(toolName, { file_path: '/tmp/project/file.ts' }, {
-      signal: new AbortController().signal, toolUseID: 'edit-item', requestId: 'permission',
+    const permission = sdk.options[0]!.canUseTool!(toolName, input, {
+      signal: new AbortController().signal, toolUseID: 'edit-item', requestId: 'permission', title: toolName.startsWith('mcp__') ? 'Provider title' : 'src/main.ts',
     });
     await vi.waitFor(() => expect(events.some((event) => event.type === 'agentRequest.created')).toBe(true));
     expect(snapshot.agentRequests?.['claude-a']).toMatchObject([{ id: 'permission', kind: 'toolConfirmation', conversationId: 'session-a' }]);
     const isMcp = toolName.startsWith('mcp__');
     expect(events).toContainEqual(expect.objectContaining({ type: 'claude.conversationEventReceived', payload: expect.objectContaining({ event: expect.objectContaining({
       type: 'approval.requested', payload: expect.objectContaining({ payload: { confirmation: expect.objectContaining({
-        integrationId: isMcp ? product.mcpServerName : 'claude', toolName: isMcp ? 'set-status' : 'Edit',
+        integrationId: isMcp ? product.mcpServerName : 'claude', toolName: isMcp ? 'set-status' : toolName,
+        summary, argumentsPreview: preview,
       }) } }),
     }) }) }));
     const secondPermission = sdk.options[0]!.canUseTool!('Read', { file_path: '/tmp/project/another.ts' }, {

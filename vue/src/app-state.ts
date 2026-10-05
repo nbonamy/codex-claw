@@ -517,7 +517,18 @@ export function useAppState() {
     });
     return rendererSynchronization;
   }
-  synchronizeRendererSnapshotRequest = () => synchronizeRendererSnapshot(true);
+  synchronizeRendererSnapshotRequest = async () => {
+    await synchronizeRendererSnapshot(true);
+    // App snapshots cannot repair provider events skipped by the global
+    // sequence fence. Refresh every cached pane from its conversation owner,
+    // including split panes and inactive agents, before trusting those frames.
+    for (const agentId of Object.keys(codexConversationFramesByAgentId.value)) {
+      invalidateAndRecoverCodexConversation(agentId);
+    }
+    for (const agentId of Object.keys(claudeConversationFramesByAgentId.value)) {
+      invalidateAndRecoverClaudeConversation(agentId);
+    }
+  };
 
   async function performRendererSynchronization(preserveActiveSelection: boolean): Promise<void> {
     bufferedMainEvents ??= [];
@@ -1979,6 +1990,13 @@ function subscribeToMainEvents(): void {
 }
 
 function handleMainEvent(event: MainToRendererEvent, adoptSnapshot = true): void {
+  if (event.type === 'snapshot.updated' && event.source === 'client') {
+    // Electron repaired a transport gap upstream. Its product snapshot does
+    // not include conversations, and no later event may arrive on a silent turn.
+    void synchronizeRendererSnapshotRequest?.().catch((error) => {
+      connectionState.value = { status: 'error', detail: error instanceof Error ? error.message : String(error) };
+    });
+  }
   if (event.type === 'client.connectionChanged') {
     const wasConnected = connectionState.value.status === 'connected';
     connectionState.value = event.payload;

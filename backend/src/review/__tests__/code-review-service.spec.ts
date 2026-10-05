@@ -153,37 +153,48 @@ describe('CodeReviewService', () => {
     expect(restored.deleted).toEqual([]);
   });
 
-  it('automatically fixes, commits and re-reviews while other agents remain active in the folder', async () => {
+  it.each([undefined, false, true])('fixes and re-reviews with other agents active, committing only when opted in (%s)', async autoCommit => {
     let findingId = '';
+    let fixed = false;
     const test = harness([
       async handlers => { findingId = (await handlers.reportFinding({ priority: 'p2', title: 'Fix authorization', body: 'An unauthorized write is possible.' })).id; return { text: 'Found a defect.', findingCount: 1 }; },
-      async handlers => { await handlers.updateFinding({ findingId, status: 'fixed', evidence: 'npm test: authorization regression and full suite passed' }); return { text: 'Fixed and verified.' }; },
+      async handlers => { fixed = true; await handlers.updateFinding({ findingId, status: 'fixed', evidence: 'npm test: authorization regression and literal </context> handling passed' }); return { text: 'Fixed and verified.' }; },
       async () => ({ text: 'No actionable findings.', findingCount: 0 }),
     ]);
     test.git.inspect.mockImplementation(async () => test.git.commit.mock.calls.length
       ? { head: 'c'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'committed' }
-      : { head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' });
+      : { head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: fixed ? 'fixed' : 'initial' });
     test.owner.status = { type: 'working' };
     test.snapshot.agents.push({ ...agent('another-worker'), status: { type: 'awaitingInput' } });
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent', backend: 'codex', model: 'review-model', reasoningEffort: 'high',
-      automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 },
+      automation: { enabled: true, maxPriority: 'p2', maxRounds: 3, ...(autoCommit !== undefined ? { autoCommit } : {}) },
     });
     expect(reviewer(test, session).backendDefaults).toMatchObject({ model: 'review-model', reasoningEffort: 'high' });
     await vi.waitFor(() => expect(test.deleted).toHaveLength(1));
-    expect(test.git.commit).toHaveBeenCalledOnce();
+    expect(test.git.commit).toHaveBeenCalledTimes(autoCommit ? 1 : 0);
+    expect(session.automation).toMatchObject({ fingerprint: autoCommit ? 'committed' : 'fixed', head: (autoCommit ? 'c' : 'b').repeat(40), commits: autoCommit ? ['c'.repeat(40)] : [] });
     expect(session.rounds).toHaveLength(2);
     expect(test.turns[2]?.reviewerSession).toBeUndefined();
     expect(test.turns[2]?.prompt).toContain('a'.repeat(40));
-    expect(test.handoffs[0]?.content).toContain('c'.repeat(40));
+    expect(test.handoffs[0]?.content).toContain(autoCommit ? 'c'.repeat(40) : 'Local commits: none');
+    expect(test.turns[1]?.prompt).toContain('Do not commit, stage, push, merge');
+    expect(test.turns[1]?.prompt).toContain(autoCommit ? 'workflow owns the local commit after validation' : 'Leave all fixes uncommitted');
+    if (!autoCommit) expect(test.turns[1]?.prompt).not.toContain('workflow owns the local commit after validation');
     expect(test.handoffs[0]?.content).toContain('authorization regression');
     expect(test.handoffs[0]?.content).toContain(`/reports/${session.id}.md`);
+    const [context, visible] = test.handoffs[0]!.content.split('</context>');
+    expect(visible?.trim()).toBe(`Automatic review completed. 1 finding fixed. No findings remain.${autoCommit ? '' : ' Fixes left uncommitted.'}`);
+    expect(context).toMatch(/^<context>\n/);
+    expect(context).toContain('literal &lt;/context&gt; handling');
+    expect(context).toContain(`/reports/${session.id}.md`);
     expect(session.rounds[0]?.reviewerSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
     expect(session.rounds[0]?.summary).toBe('Found a defect.');
     expect(session.rounds[1]?.summary).toBe('No actionable findings.');
     expect(test.saveReport).toHaveBeenCalledTimes(2);
     expect(test.saveReport.mock.invocationCallOrder[0]).toBeLessThan(test.resetReviewer.mock.invocationCallOrder[0]!);
     expect(test.snapshot.general.codeReviewDefaults).toMatchObject({ backend: 'codex', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 }, providers: { codex: { model: 'review-model', reasoningEffort: 'high' } } });
+    expect(test.snapshot.general.codeReviewDefaults?.automation.autoCommit).toBe(autoCommit);
   });
 
   it('keeps the reviewer and pauses automatic completion when saving its report fails', async () => {
@@ -194,6 +205,7 @@ describe('CodeReviewService', () => {
     expect(test.deleted).toEqual([]);
     expect(reviewer(test, session).backendSession).toEqual({ kind: 'codex', threadId: 'review-thread-1' });
     expect(session.automation?.reason).toContain('Report disk is full');
+    expect(test.handoffs[0]?.content.split('</context>')[1]).not.toContain('No review findings to report');
   });
 
   it('keeps a review open if new findings arrive while its report is being saved', async () => {
@@ -224,12 +236,20 @@ describe('CodeReviewService', () => {
     expect(session.status).toBe('ready');
   });
 
-  it('does not automatically remediate priorities outside the selected threshold', async () => {
-    const test = harness([async handlers => { await handlers.reportFinding({ priority: 'p3', title: 'Polish diagnostics', body: 'A minor problem.' }); return { text: '', findingCount: 1 }; }]);
-    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } });
+  it.each([
+    { priorities: [], maxPriority: 'p2', outcome: 'No review findings to report.' },
+    { priorities: ['p3'], maxPriority: 'p2', outcome: 'No P0–P2 findings. 1 P3 finding remains.' },
+    { priorities: ['p2', 'p3'], maxPriority: 'p1', outcome: 'No P0–P1 findings. 1 P2 finding, 1 P3 finding remain.' },
+  ] as const)('reports $outcome without remediating outside the selected threshold', async ({ priorities, maxPriority, outcome }) => {
+    const test = harness([async handlers => {
+      for (const priority of priorities) await handlers.reportFinding({ priority, title: 'Polish diagnostics', body: 'A minor problem.' });
+      return { text: '', findingCount: priorities.length };
+    }]);
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority, maxRounds: 3 } });
     await vi.waitFor(() => expect(test.deleted).toHaveLength(1));
     expect(test.git.commit).not.toHaveBeenCalled();
-    expect(test.handoffs[0]?.content).toContain('P3');
+    expect(test.handoffs[0]?.content.split('</context>')[1]?.trim()).toBe(`Automatic review completed. ${outcome}`);
+    expect(test.handoffs[0]?.content).not.toContain('Fixes left uncommitted');
     expect(session.rounds[0]?.findings[0]?.decision.state).not.toBe('rejected');
   });
 
@@ -242,11 +262,12 @@ describe('CodeReviewService', () => {
     ]);
     if (failure === 'commit') test.git.commit.mockRejectedValue(new Error('Commit hook failed.'));
     else test.git.commit.mockResolvedValue({ head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial', commit: 'c'.repeat(40) });
-    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 } });
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3, autoCommit: true } });
     await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
     expect(test.deleted).toEqual([]);
     expect(test.handoffs).toHaveLength(1);
     expect(test.handoffs[0]?.content).toContain('not an approval to ship');
+    expect(test.handoffs[0]?.content.split('</context>')[1]?.trim()).toMatch(/^Automatic review paused; it is not an approval to ship\./);
     expect(session.automation?.reason).toMatch(failure === 'validation' ? /Validation evidence/ : failure === 'commit' ? /Commit hook/ : /remains unresolved/);
     if (failure === 'validation') expect(test.git.commit).not.toHaveBeenCalled();
     expect(test.turns).toHaveLength(failure === 'repeated' ? 3 : 2);
@@ -340,19 +361,30 @@ describe('CodeReviewService', () => {
     expect(test.git.commit).not.toHaveBeenCalled();
     expect(test.handoffs).toHaveLength(2);
   });
-  it('uses a selected reviewer backend without copying the source provider settings', async () => {
+  it('uses the selected reviewer provider defaults without copying the source provider settings', async () => {
     const test = harness([]);
     test.snapshot.general.claudeCodeEnabled = true;
+    test.snapshot.general.providerApprovalDefaults = { claude: 'auto' };
+    test.snapshot.general.providerModelDefaults = { claude: { model: 'sonnet', reasoningEffort: 'high', serviceTier: null } };
     test.owner.backendDefaults = { kind: 'codex', model: 'codex-model', reasoningEffort: 'high' };
     const session = test.service.start(test.owner, {
       scope: { type: 'uncommitted' }, threadMode: 'independent', backend: 'claude',
     });
-    expect(reviewer(test, session)).toMatchObject({ backend: 'claude', backendDefaults: { kind: 'claude' } });
-    expect(reviewer(test, session).backendDefaults).toStrictEqual({ kind: 'claude' });
+    expect(reviewer(test, session)).toMatchObject({ backend: 'claude' });
+    expect(reviewer(test, session).backendDefaults).toStrictEqual({ kind: 'claude', model: 'sonnet', userSelectedModel: true, reasoningEffort: 'high', permissionMode: 'auto' });
     await vi.waitFor(() => expect(test.turns).toHaveLength(1));
     expect(test.turns[0]!.prompt).toContain(`mcp__${product.mcpServerName}__report_finding`);
     expect(test.turns[0]!.prompt).toContain(`mcp__${product.mcpServerName}__finish_review_round`);
     expect(test.turns[0]!.prompt).not.toContain('mcp__workspace__');
+  });
+  it.each([undefined, 'default'] as const)('inherits saved Claude permissions unless the source has an explicit mode (%s)', async permissionMode => {
+    const test = harness([async () => ({ text: '', findingCount: 0 })]);
+    test.snapshot.general.providerApprovalDefaults = { claude: 'auto' };
+    test.owner.backend = 'claude';
+    test.owner.backendDefaults = { kind: 'claude', model: 'opus', ...(permissionMode ? { permissionMode } : {}) };
+    const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
+    expect(reviewer(test, session).backendDefaults).toMatchObject({ kind: 'claude', model: 'opus', permissionMode: permissionMode ?? 'auto' });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
   });
   it('creates an independent reviewer as a normal adjacent agent for the same workspace', async () => {
     const test = harness([async () => ({ text: '', findingCount: 0 })]);
@@ -444,7 +476,7 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([{
       from: visibleReviewer.id,
       to: test.owner.id,
-      content: `Independent review completed. No code changes were made.\nReview report: /reports/${session.id}.md`,
+      content: `<context>\nIndependent review completed. No review findings to report.\nReview report: /reports/${session.id}.md\n</context>\n\nIndependent review completed. No review findings to report.`,
     }]);
   });
 
@@ -726,7 +758,7 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([{
       from: visibleReviewer.id,
       to: test.owner.id,
-      content: `Independent review completed.\n- P0 — Authorize before writing\nNo reply to the reviewer is needed.\nReview report: /reports/${session.id}.md`,
+      content: `<context>\nIndependent review completed. 1 finding fixed. 1 P3 finding remains.\n- P0 — Authorize before writing\nNo reply to the reviewer is needed.\nReview report: /reports/${session.id}.md\n</context>\n\nIndependent review completed. 1 finding fixed. 1 P3 finding remains.`,
     }]);
   });
 
@@ -870,7 +902,7 @@ describe('CodeReviewService', () => {
     expect(test.handoffs).toStrictEqual([{
       from: visibleReviewer.id,
       to: test.owner.id,
-      content: `Independent review completed.\n- P2 — First\n- P2 — Second\nNo reply to the reviewer is needed.\nReview report: /reports/${session.id}.md`,
+      content: `<context>\nIndependent review completed. 2 findings fixed. No findings remain.\n- P2 — First\n- P2 — Second\nNo reply to the reviewer is needed.\nReview report: /reports/${session.id}.md\n</context>\n\nIndependent review completed. 2 findings fixed. No findings remain.`,
     }]);
   });
 

@@ -94,6 +94,17 @@ describe('CodeReviewPanel', () => {
     await flushPromises();
     const dialog = body.get('[role="dialog"]');
     expect(dialog.text()).toContain('Never pushes or merges');
+    expect(dialog.findAll('[aria-label="Fix priorities"] option').map(option => [option.attributes('value'), option.text()])).toEqual([
+      ['p0', 'Only critical findings (P0)'],
+      ['p1', 'Critical and high (P0 and P1)'],
+      ['p2', 'Critical, high and medium (P0 to P2)'],
+      ['p3', 'All findings (P0 to P3)'],
+    ]);
+    const commitToggle = dialog.get<HTMLInputElement>('[aria-label="Commit after each fix round"]');
+    expect(commitToggle.element.checked).toBe(false);
+    expect(dialog.text()).toContain('Leave changes uncommitted');
+    await commitToggle.setValue(true);
+    expect(dialog.text()).toContain('Includes existing uncommitted changes');
     await dialog.get('[aria-label="Fix priorities"] select').setValue('p1');
     await dialog.get('[aria-label="Maximum review rounds"]').setValue(5);
     await dialog.get('[aria-label="Maximum review rounds"]').trigger('change');
@@ -107,13 +118,13 @@ describe('CodeReviewPanel', () => {
     await body.get('[role="dialog"]').findAll('button').find(button => button.text() === 'Done')!.trigger('click');
     await wrapper.get('.code-review-panel__start').trigger('click');
     expect(actions.startReview).toHaveBeenCalledWith('owner', expect.objectContaining({
-      automation: { enabled: true, maxPriority: 'p1', maxRounds: 5 },
+      automation: { enabled: true, maxPriority: 'p1', maxRounds: 5, autoCommit: true },
     }));
   });
 
   it('restores automatic settings and provider-specific model and effort, and clears unsupported effort on backend switch', async () => {
     const { wrapper, actions } = mountPanel(undefined, undefined, true, {
-      backend: 'codex', automation: { enabled: true, maxPriority: 'p1', maxRounds: 4 },
+      backend: 'codex', automation: { enabled: true, maxPriority: 'p1', maxRounds: 4, autoCommit: true },
       providers: { codex: { model: 'codex-model', reasoningEffort: 'high' }, claude: { model: 'claude-model' } },
     });
     await flushPromises();
@@ -121,6 +132,7 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.get<HTMLSelectElement>('[aria-label="Review model"] select').element.value).toBe('codex-model');
     expect(wrapper.get<HTMLSelectElement>('[aria-label="Review effort"] select').element.value).toBe('high');
     expect(wrapper.findAll('[role="radio"]').find(radio => radio.text().includes('Current thread'))!.attributes('disabled')).toBeDefined();
+    expect(wrapper.findAll('[role="radio"]').find(radio => radio.text().includes('Current thread'))!.text()).toContain('Not available for automatic reviews');
     await wrapper.get('.backend-selector select').setValue('claude');
     await flushPromises();
     expect(wrapper.get('[aria-label="Review effort"] select').attributes('disabled')).toBeDefined();
@@ -128,7 +140,7 @@ describe('CodeReviewPanel', () => {
     await wrapper.get('.code-review-panel__start').trigger('click');
     expect(actions.startReview).toHaveBeenLastCalledWith('owner', {
       scope: { type: 'uncommitted' }, threadMode: 'independent', backend: 'claude', model: 'claude-model',
-      automation: { enabled: true, maxPriority: 'p1', maxRounds: 4 },
+      automation: { enabled: true, maxPriority: 'p1', maxRounds: 4, autoCommit: true },
     });
     await flushPromises();
     await wrapper.get('.backend-selector select').setValue('codex');
@@ -136,6 +148,12 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.get<HTMLSelectElement>('[aria-label="Review effort"] select').element.value).toBe('high');
     await wrapper.get('.code-review-panel__start').trigger('click');
     expect(actions.startReview).toHaveBeenLastCalledWith('owner', expect.objectContaining({ backend: 'codex', model: 'codex-model', reasoningEffort: 'high' }));
+    await flushPromises();
+    await wrapper.get('[role="switch"]').setValue(false);
+    const currentThread = wrapper.findAll('[role="radio"]').find(radio => radio.text().includes('Current thread'))!;
+    expect(currentThread.text()).toContain('Existing context');
+    expect(currentThread.text()).not.toContain('Not available for automatic reviews');
+    expect(currentThread.attributes('disabled')).toBeUndefined();
   });
 
   it('exposes a stop action without manual remediation controls while automation owns the review', async () => {
@@ -188,7 +206,7 @@ describe('CodeReviewPanel', () => {
       scope: { type: 'uncommitted' },
       backend: 'codex',
       threadMode: 'independent',
-      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3 },
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3, autoCommit: false },
     });
   });
 
@@ -224,7 +242,7 @@ describe('CodeReviewPanel', () => {
     expect(actions.startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'branch', baseRef: 'origin/main' },
       threadMode: 'current',
-      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3 },
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3, autoCommit: false },
     });
   });
 
@@ -259,7 +277,7 @@ describe('CodeReviewPanel', () => {
       scope: { type: 'branch', baseRef: 'origin/main' },
       threadMode: 'independent',
       backend: 'codex',
-      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3 },
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3, autoCommit: false },
     });
   });
 
@@ -510,9 +528,9 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('Reviewer unavailable.');
   });
 
-  it('retries a paused automatic review as automatic with its settings', async () => {
+  it.each([undefined, false, true])('retries a paused automatic review with its commit choice (%s)', async autoCommit => {
     const failed = session([], 'failed');
-    failed.automation = { enabled: true, maxPriority: 'p1', maxRounds: 4, state: 'paused', baseRef: 'a'.repeat(40), commits: [], reason: 'Paused.' };
+    failed.automation = { enabled: true, maxPriority: 'p1', maxRounds: 4, autoCommit, state: 'paused', baseRef: 'a'.repeat(40), commits: [], reason: 'Paused.' };
     const { wrapper } = mountPanel(failed);
     const startReview = vi.fn(async () => ({} as AppSnapshot));
     await wrapper.setProps({ startReview });
@@ -522,7 +540,7 @@ describe('CodeReviewPanel', () => {
 
     expect(startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'branch', baseRef: 'a'.repeat(40) }, threadMode: 'independent',
-      automation: { enabled: true, maxPriority: 'p1', maxRounds: 4 },
+      automation: { enabled: true, maxPriority: 'p1', maxRounds: 4, autoCommit: autoCommit ?? false },
     });
   });
 

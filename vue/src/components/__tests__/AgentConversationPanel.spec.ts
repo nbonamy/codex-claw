@@ -121,12 +121,14 @@ describe('AgentConversationPanel', () => {
     }, global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } } });
     expect(wrapper.get('.chat-rich-text-editor').text()).toBe('Keep the split draft');
     view.claudeSnapshot = replica.apply({ type: 'approval.requested', backend: 'claude', agentId: agent.id, seq: 1, occurredAt: '2026-10-03T00:00:00Z', turnId: 'turn-1', payload: {
-      id: 'permission', kind: 'confirm_tool', payload: { confirmation: { integrationId: 'claude', integrationName: 'Claude', toolName: 'Edit', summary: 'Edit this file?', argumentsPreview: '{}', allowAlways: true } },
+      id: 'permission', kind: 'confirm_tool', payload: { confirmation: { integrationId: 'claude', integrationName: 'Claude', toolName: 'Edit', summary: 'Edit file src/main.ts?', argumentsPreview: 'Before:\nstart(false);\n\nAfter:\nstart(true);', allowAlways: true } },
     } });
     await flushPromises();
     const footer = wrapper.get('.codex-conversation-pane__footer');
     expect(wrapper.findAll('.chat-tool-confirmation')).toHaveLength(1);
-    expect(footer.text()).toContain('Edit this file?');
+    expect(footer.text()).toContain('Edit file src/main.ts?');
+    await footer.get('details > summary').trigger('click');
+    expect(footer.get('.chat-tool-confirmation__details-body').text()).toBe('Before:\nstart(false);\n\nAfter:\nstart(true);');
     expect(footer.findAll('button').map(button => button.text())).toEqual(['Allow', 'Always allow', 'Deny']);
     await footer.findAll('button')[1]!.trigger('click');
     await flushPromises();

@@ -1604,7 +1604,7 @@ const splitActions = computed<AgentConversationActions | undefined>(() => props.
     if (visualize && !options?.attachments?.length) {
       return startVisualizeForAgent(agentId, visualize[1]?.trim() ? { prompt: visualize[1].trim() } : undefined);
     }
-    if (prompt.trim() === '/review' && !options?.attachments?.length) { openRightWorkspaceTab('codeReview', agentId); return; }
+    if (prompt.trim() === '/review' && !options?.attachments?.length) return openCodeReviewForAgent(agentId);
     const clarification = pendingReviewClarification.value;
     if (clarification?.agentId === agentId && !options?.attachments?.length) {
       await props.discussCodeReviewFinding(agentId, { sessionId: clarification.sessionId, roundId: clarification.roundId, findingId: clarification.findingId, question: prompt });
@@ -1634,6 +1634,16 @@ const {
 
 function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {
   openRightWorkspaceTabLocal(tab, agentId);
+}
+
+async function openCodeReviewForAgent(agentId: string): Promise<void> {
+  const agent = props.snapshot.agents.find(candidate => candidate.id === agentId);
+  if (agent?.threadFlags?.ready_for_review) {
+    const response: ThreadFlagResponse = { id: 'ready_for_review', action: 'execute' };
+    if (props.agentConversationActions) await props.agentConversationActions.threadFlag(agentId, response);
+    else if (currentAgent.value?.id === agentId) await props.respondToThreadFlagAction?.(response);
+  }
+  openRightWorkspaceTab('codeReview', agentId);
 }
 
 async function startVisualizeForAgent(agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput): Promise<void> {
@@ -2128,7 +2138,7 @@ const conversationPaneActions: CodexConversationPaneActions = {
 
 async function runConversationMenuCommand(agentId: string, command: ConversationMenuCommand): Promise<void> {
   try {
-    if (command === 'review') { openRightWorkspaceTab('codeReview', agentId); return; }
+    if (command === 'review') return await openCodeReviewForAgent(agentId);
     if (command === 'visualize') return await startVisualizeForAgent(agentId);
     await backendSwitch.settled();
     if (props.agentConversationActions) await props.agentConversationActions.send(agentId, '/delegate');
@@ -2825,9 +2835,8 @@ function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): voi
     const direction = visualizeCommand[1]?.trim();
     return startVisualizeForAgent(currentAgent.value.id, direction ? { prompt: direction } : undefined);
   }
-  if (prompt.trim() === '/review' && !options?.attachments?.length) {
-    openRightWorkspaceTab('codeReview');
-    return Promise.resolve();
+  if (prompt.trim() === '/review' && !options?.attachments?.length && currentAgent.value) {
+    return openCodeReviewForAgent(currentAgent.value.id);
   }
   const clarification = pendingReviewClarification.value;
   if (

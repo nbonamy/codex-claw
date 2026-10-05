@@ -1162,10 +1162,10 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       kind: 'confirm_tool',
       payload: {
         confirmation: {
-          argumentsPreview: formatPermissionArguments(request.input),
+          argumentsPreview: formatPermissionArguments(request),
           integrationId: mcp?.server ?? 'claude',
           integrationName: isAppMcpServerName(mcp?.server) ? product.name : mcp?.server ?? 'Claude',
-          summary: request.title ?? request.description ?? request.displayName ?? `Claude wants to use ${request.toolName}.`,
+          summary: permissionSummary(request),
           toolName: mcp?.tool ?? request.toolName,
           allowConversation: request.allowConversation,
           allowAlways: request.allowAlways,
@@ -1642,7 +1642,24 @@ function finalAssistantTextDelta(activeTurn: ActiveClaudeTurn, text: string): st
   return text;
 }
 
-function formatPermissionArguments(input: Record<string, unknown>): string {
+function permissionSummary(request: ClaudePermissionRequest): string {
+  const filePath = request.input.file_path ?? request.input.notebook_path ?? request.blockedPath;
+  if (typeof filePath === 'string' && filePath.trim()) {
+    if (request.toolName === 'Edit') return `${request.input.replace_all === true ? 'Replace all matches in' : 'Edit file'} ${filePath}?`;
+    if (request.toolName === 'Write') return `Write file ${filePath}?`;
+    if (request.toolName === 'NotebookEdit') return `Edit notebook ${filePath}?`;
+  }
+  return request.title ?? request.description ?? request.displayName ?? `Claude wants to use ${request.toolName}.`;
+}
+
+function formatPermissionArguments(request: ClaudePermissionRequest): string {
+  const { input, toolName } = request;
+  if (toolName === 'Edit' && typeof input.old_string === 'string' && typeof input.new_string === 'string') {
+    return `Before:\n${input.old_string || '(empty)'}\n\nAfter:\n${input.new_string || '(empty)'}`;
+  }
+  if (toolName === 'Write' && typeof input.content === 'string') {
+    return `New contents (replaces any existing file contents):\n${input.content || '(empty)'}`;
+  }
   try {
     return JSON.stringify(input, null, 2);
   } catch {

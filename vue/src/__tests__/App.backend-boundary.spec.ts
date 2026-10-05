@@ -12,6 +12,74 @@ beforeEach(clearFirstRunOnboardingStage);
 afterEach(() => { delete window.app; });
 
 describe('Unified backend → mounted application', () => {
+  it.each(['backend gap', 'desktop recovery'])('settles a silent completed report after %s without another user prompt', async (recovery) => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backendSession = { kind: 'codex', threadId: 'thread-1' };
+    const { api, emit, emitSequenced } = installBackendFixture(snapshot);
+    const wrapper = mount(App);
+    await flushPromises();
+    const report = { id: 'report', role: 'user' as const, status: 'complete' as const, turnId: 'report-turn', parts: [{ type: 'text' as const, text: 'Automatic review completed. No review findings to report.' }] };
+    const messages = [report, { id: 'silent-report', role: 'assistant' as const, status: 'streaming' as const, turnId: 'report-turn', parts: [] }];
+    emit({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: agent.id, threadId: 'thread-1', payload: {
+      revision: 1, snapshot: codexConversationSnapshot(messages, { busy: true, activeTurnId: 'report-turn' }),
+    } });
+    await flushPromises();
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(true);
+
+    // The app snapshot covers the missing completion's global sequence, but
+    // intentionally carries no provider transcript. Recover it from its owner.
+    api.getSnapshotState.mockResolvedValue({ snapshot, lastBackendEventSeq: 55, connection: { status: 'connected' } });
+    api.loadConversationHistory.mockImplementation(async () => {
+      emitSequenced({ seq: 56, occurredAt: '2026-10-05T19:05:26Z', type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: agent.id, threadId: 'thread-1', payload: {
+        revision: 4, snapshot: codexConversationSnapshot([report], { turns: [{
+          id: 'report-turn', status: 'completed', error: null, willRetry: false,
+          startedAt: '2026-10-05T19:05:19Z', completedAt: '2026-10-05T19:05:26Z', durationMs: 6930,
+        }] }),
+      } });
+      return snapshot;
+    });
+    if (recovery === 'backend gap') {
+      emitSequenced({ seq: 55, occurredAt: '2026-10-05T19:05:26Z', type: 'agent.statusChanged', agentId: agent.id, payload: { type: 'idle' } });
+    } else {
+      emitSequenced({ seq: 1, source: 'client', occurredAt: '2026-10-05T19:05:26Z', type: 'snapshot.updated', payload: snapshot });
+    }
+    await flushPromises();
+    expect(wrapper.find('.chat-message__thinking').exists()).toBe(false);
+    expect(wrapper.get('.chat-message__empty-response').text()).toBe('Empty response');
+    expect(wrapper.text()).toContain(report.parts[0]!.text);
+    expect(wrapper.find('button[aria-label="Send prompt"]').exists()).toBe(true);
+    expect(api.sendPrompt).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('opens /review and consumes only existing review readiness (flag present: %s)', async (ready) => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    const agent = snapshot.agents[0]!;
+    agent.threadFlags = { delegate_to_worktree: true, ...(ready ? { ready_for_review: true } : {}) };
+    const { api } = installBackendFixture(snapshot);
+    const cleared = structuredClone(snapshot);
+    cleared.agents[0]!.threadFlags = { delegate_to_worktree: true };
+    api.respondToThreadFlag.mockResolvedValue(cleared);
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    editor.element.textContent = '/review';
+    await editor.trigger('input');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    if (ready) expect(api.respondToThreadFlag).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      id: 'ready_for_review', action: 'execute',
+    });
+    else expect(api.respondToThreadFlag).not.toHaveBeenCalled();
+    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+    expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(false);
+    expect(wrapper.find('.thread-flag-affordance').exists()).toBe(true);
+    expect(api.sendPrompt).not.toHaveBeenCalled();
+  });
+
   it('handles app-owned thread flag execution, dismissal, and review routing through the client seam', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
@@ -250,7 +318,7 @@ describe('Unified backend → mounted application', () => {
     await flushPromises();
 
     expect(api.startCodeReview).toHaveBeenCalledExactlyOnceWith(agent.id, {
-      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3 },
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3, autoCommit: false },
       backend: 'codex',
       scope: { type: 'uncommitted' },
       threadMode: 'independent',

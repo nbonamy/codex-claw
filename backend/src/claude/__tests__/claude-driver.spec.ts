@@ -784,7 +784,7 @@ describe('ClaudeBackendDriver', () => {
             argumentsPreview: '{\n  "file_path": "/tmp/project/a.ts"\n}',
             integrationId: 'claude',
             integrationName: 'Claude',
-            summary: 'Claude wants to edit a.ts',
+            summary: 'Edit file /tmp/project/a.ts?',
             toolName: 'Edit',
             allowConversation: true,
             allowAlways: false,

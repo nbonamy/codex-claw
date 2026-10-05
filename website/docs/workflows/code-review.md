@@ -28,13 +28,18 @@ Choose the scope deliberately. If the feature is committed on a branch, reviewin
 Enable **Automatic remediation** to run the review/fix/verify loop without
 selecting findings or starting each round yourself. Choose the highest priority
 to fix (P0–P2 by default) and the maximum number of review rounds (3 by default,
-including the final verification review). Korus remembers these choices too.
+including the final verification review). **Configure** also offers **Commit
+after each fix round**, off by default. Korus remembers these choices too.
 
 Automatic mode uses an independent reviewer and a fresh conversation for each
 review round. After remediation, the reviewer must record validation evidence
-for every fix. Korus then commits the reviewed working changes and fixes locally
-and reviews again against the original fixed Git baseline. It never pushes or
-merges. Start from the repository root; the reviewed scope includes its existing
+for every fix. With commits disabled, Korus leaves the fixes uncommitted for you
+to inspect and commit. With commits enabled, Korus creates a local commit after
+each validated fix round, including existing uncommitted changes in the reviewed
+workspace—not just the fixes. The reviewer is instructed not to stage or commit
+in either mode; Korus owns the optional commit step. Both modes review again
+against the original fixed Git baseline. Neither pushes nor merges.
+Start from the repository root; the reviewed scope includes its existing
 staged, unstaged, and untracked files. Other active agents do not block automatic
 review. Avoid editing the same files concurrently: Git safety checks can still
 pause the review when the branch, HEAD, or expected working changes no longer match.

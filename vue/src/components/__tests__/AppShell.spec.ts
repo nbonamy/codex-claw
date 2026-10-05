@@ -1221,7 +1221,7 @@ describe('AppShell authentication and conversation', () => {
     await flushPromises();
 
     expect(startCodeReview).toHaveBeenCalledExactlyOnceWith(source.id, {
-      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3 },
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3, autoCommit: false },
       backend: 'codex',
       scope: { type: 'uncommitted' },
       threadMode: 'independent',

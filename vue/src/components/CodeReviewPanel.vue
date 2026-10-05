@@ -288,7 +288,10 @@
         <FormDialogField :label="t('automaticReview.rounds')">
           <el-input-number v-model="maxRounds" :aria-label="t('automaticReview.rounds')" :min="1" :max="10" :step="1" :precision="0" :disabled="busy" />
         </FormDialogField>
-        <p class="app-form-dialog__help">{{ t('automaticReview.independent') }} {{ t('automaticReview.consent') }}</p>
+        <FormDialogField :label="t('automaticReview.autoCommit')" :help="t(autoCommit ? 'automaticReview.commitConsent' : 'automaticReview.noCommit')">
+          <el-switch v-model="autoCommit" :aria-label="t('automaticReview.autoCommit')" :disabled="busy" />
+        </FormDialogField>
+        <p class="app-form-dialog__help">{{ t('automaticReview.independent') }} {{ t('automaticReview.noPublish') }}</p>
       </div>
       <template #footer>
         <button type="button" class="app-button app-button--primary" @click="automaticSettingsOpen = false">{{ t('automaticReview.done') }}</button>
@@ -366,6 +369,7 @@ const automatic = ref(remembered?.automation.enabled ?? false);
 const automaticSettingsOpen = ref(false);
 const maxPriority = ref<CodeReviewPriority>(remembered?.automation.maxPriority ?? 'p2');
 const maxRounds = ref(remembered?.automation.maxRounds ?? 3);
+const autoCommit = ref(remembered?.automation.autoCommit ?? false);
 const reviewModel = ref('');
 const reviewEffort = ref('');
 const reviewModels = ref<BackendModelOption[]>([]);
@@ -410,6 +414,7 @@ watch(() => props.agent.id, () => {
   automatic.value = latest?.automation.enabled ?? false;
   maxPriority.value = latest?.automation.maxPriority ?? 'p2';
   maxRounds.value = latest?.automation.maxRounds ?? 3;
+  autoCommit.value = latest?.automation.autoCommit ?? false;
 });
 const selectedRoundId = ref("");
 const session = computed(() => props.agent.codeReview ?? null);
@@ -436,9 +441,11 @@ const branchDescription = computed(() => hasBranchChanges.value && branchScope.v
       base: branchScope.value.baseRef,
     })
   : t("surface.codeReviewPanel.branchUnavailable"));
-const currentThreadDescription = computed(() => currentThreadAvailable.value
-  ? t("surface.codeReviewPanel.currentThreadDescription")
-  : t("surface.codeReviewPanel.currentThreadUnavailable"));
+const currentThreadDescription = computed(() => automatic.value
+  ? t('automaticReview.currentThreadUnavailable')
+  : currentThreadAvailable.value
+    ? t("surface.codeReviewPanel.currentThreadDescription")
+    : t("surface.codeReviewPanel.currentThreadUnavailable"));
 const selectedRound = computed(
   () =>
     session.value?.rounds.find((round) => round.id === selectedRoundId.value) ??
@@ -606,7 +613,7 @@ function startSelectedReview(): void {
     ...(threadMode.value === 'independent' ? { backend: reviewBackend.value } : {}),
     ...(threadMode.value === 'independent' && reviewModel.value ? { model: reviewModel.value } : {}),
     ...(threadMode.value === 'independent' && reviewEffort.value ? { reasoningEffort: reviewEffort.value } : {}),
-    automation: { enabled: automatic.value, maxPriority: maxPriority.value, maxRounds: maxRounds.value ?? 3 },
+    automation: { enabled: automatic.value, maxPriority: maxPriority.value, maxRounds: maxRounds.value ?? 3, autoCommit: autoCommit.value },
   }));
 }
 
@@ -621,7 +628,7 @@ function retryReview(): void {
   void run(() => props.startReview(props.agent.id, {
     scope: automation?.baseRef ? { type: 'branch', baseRef: automation.baseRef } : reviewScope,
     threadMode: review.threadMode,
-    ...(automation ? { automation: { enabled: true, maxPriority: automation.maxPriority, maxRounds: automation.maxRounds } } : {}),
+    ...(automation ? { automation: { enabled: true, maxPriority: automation.maxPriority, maxRounds: automation.maxRounds, autoCommit: automation.autoCommit ?? false } } : {}),
   }));
 }
 

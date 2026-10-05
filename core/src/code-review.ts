@@ -21,6 +21,8 @@ export type CodeReviewAutomationSettings = {
   enabled: boolean;
   maxPriority: CodeReviewPriority;
   maxRounds: number;
+  /** Local commits require explicit opt-in; omitted settings leave changes uncommitted. */
+  autoCommit?: boolean;
 };
 
 export type CodeReviewPreferences = {
@@ -241,6 +243,7 @@ export function isCodeReviewStartInput(value: unknown): value is CodeReviewStart
 
 export function isCodeReviewAutomationSettings(value: unknown): value is CodeReviewAutomationSettings {
   return isRecord(value) && typeof value.enabled === 'boolean' && isPriority(value.maxPriority)
+    && (value.autoCommit === undefined || typeof value.autoCommit === 'boolean')
     && Number.isInteger(value.maxRounds) && Number(value.maxRounds) >= 1 && Number(value.maxRounds) <= 10;
 }
 

@@ -123,6 +123,11 @@ therefore never replayed after reconnect or renderer reload. The selected
 conversation is restored separately through `agent/conversation/load`, which
 publishes a bounded provider snapshot followed by revisioned provider events.
 This keeps the synchronization barrier bounded even for very long threads.
+After a global event-sequence recovery, the renderer also invalidates cached
+provider frames and requests fresh conversation snapshots, including inactive
+and split-pane conversations. Electron's client-origin `snapshot.updated`
+signals the same recovery when the gap was repaired upstream. An app snapshot
+alone cannot replace a missed provider completion event.
 
 ## Client To `daemon`: Core
 
@@ -134,7 +139,7 @@ This keeps the synchronization barrier bounded even for very long threads.
 | `agent/request/respond` | `{ response: AgentRequestResponse }` | `AppSnapshot` | Answers a pending normalized approval/question/confirmation using a typed outcome. Include `agentId`; an untargeted response is accepted only when its request ID is unambiguous. |
 | `agent/planReview/respond` | `{ agentId, response: { reviewId, resolution, feedback? } }` | `AppSnapshot` | Accept, revise, or cancel the identified pending review. Revision requires feedback; failures retain the pending review. |
 | `agent/threadFlag/respond` | `{ agentId, response: { id, action } }` | `AppSnapshot` | Executes or dismisses an active typed thread flag. Executing `delegate_to_worktree` submits the fixed delegation prompt; `ready_for_review` clears readiness so the requesting client can enter review. |
-| `agent/codeReview/start` | `{ agentId, input: { scope, threadMode, backend?, model?, reasoningEffort?, automation? } }` | `AppSnapshot` | Starts a review for uncommitted work or a branch. Optional model/effort override reviewer defaults. `automation: { enabled, maxPriority, maxRounds }` opts an independent reviewer into bounded review/fix/validate/local-commit rounds against a frozen Git baseline; no push or merge. Last-used choices persist in `general.codeReviewDefaults`, with model/effort per provider. The reviewer owns the durable ledger. Automatic reviews pause on restart or failure, retaining files and commits for inspection. Discarding a running automatic review pauses it instead of deleting its reviewer; clients then interrupt the provider. |
+| `agent/codeReview/start` | `{ agentId, input: { scope, threadMode, backend?, model?, reasoningEffort?, automation? } }` | `AppSnapshot` | Starts a review for uncommitted work or a branch. Optional model/effort override reviewer defaults. `automation: { enabled, maxPriority, maxRounds, autoCommit? }` opts an independent reviewer into bounded review/fix/validate rounds against a frozen Git baseline; no push or merge. Only `autoCommit: true` permits Korus to commit after each validated fix round; false or omitted leaves changes uncommitted and updates the working-tree checkpoint. The reviewer is instructed never to stage or commit in either mode. Last-used choices persist in `general.codeReviewDefaults`, with model/effort per provider. The reviewer owns the durable ledger. Automatic reviews pause on restart or failure, retaining files and commits for inspection. Discarding a running automatic review pauses it instead of deleting its reviewer; clients then interrupt the provider. |
 | `agent/codeReview/finding/decide` | `{ agentId, input }` | `AppSnapshot` | Includes or excludes a stable finding from remediation. Findings start selected; decisions are not remediation statuses. |
 | `agent/codeReview/finding/discuss` | `{ agentId, input }` | `AppSnapshot` | Adds a finding-linked prompt and continues the visible reviewer conversation for its response while retaining the exchange in the structured ledger. |
 | `agent/codeReview/round/submit` | `{ agentId, sessionId }` | `AppSnapshot` | Maps deselected findings to `skipped` and selected findings to `pending`, then sends every selected finding in one remediation turn in the same reviewer conversation. Each finding becomes `fixed` when the reviewer calls `update_finding` after its remediation. |

@@ -243,7 +243,7 @@ export class CodeReviewService {
       if (session.threadMode === 'independent') {
         const target = this.options.snapshot.agents.find((candidate) => candidate.id === session.targetAgentId);
         await this.options.deleteReviewer(agent, target
-          ? { targetAgentId: target.id, content: `${reviewHandoff(session)}\nReview report: ${reportPath}` }
+          ? { targetAgentId: target.id, content: reviewHandoff(session, reportPath) }
           : undefined, true);
         this.closeReviewToolContext(session);
         return;
@@ -484,13 +484,16 @@ export class CodeReviewService {
         }
         if (session.automation?.state === 'running') {
           if (findings.some(finding => finding.remediation.state !== 'fixed' || !finding.remediation.evidence?.trim())) {
-            throw new Error('Validation evidence is missing. Inspect the fixes before committing.');
+            throw new Error('Validation evidence is missing. Inspect the fixes before continuing.');
           }
-          const beforeCommit = await this.assertReviewWorkspace(agent, session, false);
+          let checkpoint = await this.assertReviewWorkspace(agent, session, false);
           if (session.automation.state !== 'running' || agent.codeReview !== session) return;
-          const committed = await this.git.commit(agent.folder!, beforeCommit, round.number);
-          Object.assign(session.automation, { head: committed.head, branch: committed.branch, fingerprint: committed.fingerprint });
-          if (committed.commit) session.automation.commits.push(committed.commit);
+          if (session.automation.autoCommit === true) {
+            const committed = await this.git.commit(agent.folder!, checkpoint, round.number);
+            checkpoint = committed;
+            if (committed.commit) session.automation.commits.push(committed.commit);
+          }
+          Object.assign(session.automation, { head: checkpoint.head, branch: checkpoint.branch, fingerprint: checkpoint.fingerprint });
           await this.options.changed();
           if (session.automation.state !== 'running' || agent.codeReview !== session) return;
         }
@@ -605,7 +608,7 @@ export class CodeReviewService {
     const previous = this.options.snapshot.general.codeReviewDefaults;
     this.options.snapshot.general.codeReviewDefaults = {
       backend: reviewer.backend,
-      automation: input.automation ?? { enabled: false, maxPriority: previous?.automation.maxPriority ?? 'p2', maxRounds: previous?.automation.maxRounds ?? 3 },
+      automation: input.automation ?? { enabled: false, maxPriority: previous?.automation.maxPriority ?? 'p2', maxRounds: previous?.automation.maxRounds ?? 3, ...(previous?.automation.autoCommit !== undefined ? { autoCommit: previous.automation.autoCommit } : {}) },
       providers: { ...previous?.providers, [reviewer.backend]: {
         ...(input.model ? { model: input.model } : {}), ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
       } },
@@ -792,12 +795,10 @@ export class CodeReviewService {
       folder: target.folder ?? '',
       avatar: target.avatar,
       backend,
-      backendDefaults: {
-        ...sourceDefaults,
-        kind: backend,
-      },
       teamId: target.teamId,
     }, { select: false, afterAgentId: target.id });
+    // Start from the selected provider's saved defaults, then inherit compatible source overrides.
+    if (sourceDefaults) reviewer.backendDefaults = { ...reviewer.backendDefaults, ...sourceDefaults };
     if (target.workspace) reviewer.workspace = structuredClone(target.workspace);
     if (target.openInApplication) reviewer.openInApplication = target.openInApplication;
     const gitStatus = this.options.snapshot.agentGitStatuses[target.id];
@@ -843,17 +844,25 @@ export class CodeReviewService {
   }
 }
 
-function reviewHandoff(session: CodeReviewSession): string {
+function reviewHandoff(session: CodeReviewSession, reportPath?: string): string {
+  const report = reviewReport(session);
+  const summary = report.split('\n')[0]!;
+  const details = [report, ...(reportPath ? [`Review report: ${reportPath}`] : [])].join('\n');
+  return `<context>\n${details.replace(/<\/context>/giu, '&lt;/context&gt;')}\n</context>\n\n${summary}`;
+}
+
+function reviewReport(session: CodeReviewSession): string {
   const latestFindings = new Map<string, CodeReviewFinding>();
   for (const round of session.rounds) {
     for (const finding of round.findings) latestFindings.set(finding.id, finding);
   }
   const remediated = [...latestFindings.values()].filter((finding) => finding.remediation.state === 'fixed');
+  const remaining = [...latestFindings.values()].filter(finding => finding.remediation.state !== 'fixed');
+  const headline = reviewOutcomeSummary(session, remediated.length, remaining);
   if (session.automation) {
     const auto = session.automation;
-    const remaining = [...latestFindings.values()].filter(finding => finding.remediation.state !== 'fixed');
     return [
-      auto.state === 'completed' ? 'Automatic review completed.' : 'Automatic review paused; it is not an approval to ship.',
+      headline,
       `${session.rounds.length} review round(s). Priority threshold: ${auto.maxPriority.toUpperCase()}.`,
       ...(auto.reason ? [auto.reason] : []),
       ...remediated.map(finding => `- Fixed ${finding.priority.toUpperCase()} — ${finding.title}\n  Verification: ${finding.remediation.state === 'fixed' ? finding.remediation.evidence ?? 'Not recorded' : ''}`),
@@ -862,10 +871,33 @@ function reviewHandoff(session: CodeReviewSession): string {
       'No reply to the reviewer is needed.',
     ].join('\n');
   }
-  if (remediated.length === 0) return 'Independent review completed. No code changes were made.';
-  const summary = ['Independent review completed.',
+  if (remediated.length === 0) return headline;
+  const summary = [headline,
     ...remediated.map((finding) => `- ${finding.priority.toUpperCase()} — ${finding.title.replace(/\s+/g, ' ').trim()}`)];
   return [...summary, 'No reply to the reviewer is needed.'].join('\n');
+}
+
+function reviewOutcomeSummary(session: CodeReviewSession, fixedCount: number, remaining: CodeReviewFinding[]): string {
+  const auto = session.automation;
+  const completed = !auto || auto.state === 'completed';
+  const parts = [auto
+    ? completed ? 'Automatic review completed.' : 'Automatic review paused; it is not an approval to ship.'
+    : 'Independent review completed.'];
+  if (fixedCount) parts.push(`${fixedCount} finding${fixedCount === 1 ? '' : 's'} fixed.`);
+  if (remaining.length) {
+    if (auto && completed && remaining.every(finding => finding.priority > auto.maxPriority)) {
+      parts.push(`No ${auto.maxPriority === 'p0' ? 'P0' : `P0–${auto.maxPriority.toUpperCase()}`} findings.`);
+    }
+    const counts = (['p0', 'p1', 'p2', 'p3'] as const).flatMap(priority => {
+      const count = remaining.filter(finding => finding.priority === priority).length;
+      return count ? [`${count} ${priority.toUpperCase()} finding${count === 1 ? '' : 's'}`] : [];
+    });
+    parts.push(`${counts.join(', ')} ${remaining.length === 1 ? 'remains' : 'remain'}.`);
+  } else if (completed) {
+    parts.push(fixedCount ? 'No findings remain.' : 'No review findings to report.');
+  }
+  if (auto && auto.autoCommit !== true && fixedCount) parts.push('Fixes left uncommitted.');
+  return parts.join(' ');
 }
 
 function reviewPrompt(session: CodeReviewSession, mcpServerName: string): string {
@@ -914,7 +946,7 @@ Round: ${round.number}
 ${findingContext}
 
 Keep the changes focused and add or update behavior-level tests when appropriate. Immediately after each individual finding is fixed and verified, call update_finding with its id and status "fixed" before moving to the next finding. Do not wait until all findings are fixed to update their statuses. Include concise verification evidence when useful.
-${session.automation ? 'Automatic remediation: run the relevant tests and checks. Every fixed finding MUST include evidence naming the commands and results (or a specific reason a check does not apply). If validation fails or a fix needs a product decision, leave the finding unresolved and explain the blocker. Do not commit, stage, push, merge, change branches, or discard changes: the review workflow owns the local commit after validation. Preserve unrelated files; no background work may remain when this turn ends.' : ''}
+${session.automation ? `Automatic remediation: run the relevant tests and checks. Every fixed finding MUST include evidence naming the commands and results (or a specific reason a check does not apply). If validation fails or a fix needs a product decision, leave the finding unresolved and explain the blocker. Do not commit, stage, push, merge, change branches, or discard changes. ${session.automation.autoCommit === true ? 'Auto-commit is enabled: the review workflow owns the local commit after validation.' : 'Auto-commit is disabled. Leave all fixes uncommitted; the review workflow will not stage or commit them.'} Preserve unrelated files; no background work may remain when this turn ends.` : ''}
 </context>`;
 }
 
