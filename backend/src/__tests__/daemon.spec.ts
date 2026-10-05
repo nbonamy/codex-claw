@@ -1,4 +1,5 @@
 import { mkdtemp } from 'node:fs/promises';
+import { product } from '@workspace/core/product';
 import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -9,6 +10,7 @@ import { LocalSocketRpcServer } from '../socket-server';
 
 describe('daemon entrypoint', () => {
   const originalExitCode = process.exitCode;
+  const originalTitle = process.title;
   const originalStdoutWrite = process.stdout.write;
   const originalStderrWrite = process.stderr.write;
   let socketServer: LocalSocketRpcServer | null = null;
@@ -17,6 +19,7 @@ describe('daemon entrypoint', () => {
     await socketServer?.stop();
     socketServer = null;
     process.exitCode = originalExitCode;
+    process.title = originalTitle;
     process.stdout.write = originalStdoutWrite;
     process.stderr.write = originalStderrWrite;
   });
@@ -31,7 +34,8 @@ describe('daemon entrypoint', () => {
     await main(['--version']);
 
     expect(DAEMON_VERSION).toBe(backendPackage.version);
-    expect(writes.join('')).toBe(`daemon ${backendPackage.version}\n`);
+    expect(writes.join('')).toBe(`${product.daemonName} ${backendPackage.version}\n`);
+    expect(process.title).toBe(product.daemonName);
   });
 
   it('rejects --state-dir so APP_HOME is the only state-home override', async () => {
@@ -60,7 +64,7 @@ describe('daemon entrypoint', () => {
     await main([]);
 
     expect(process.exitCode).toBe(1);
-    expect(writes.join('')).toContain('Usage: daemon --stdio | serve | connect | --version');
+    expect(writes.join('')).toContain(`Usage: ${product.daemonName} --stdio | serve | connect | --version`);
   });
 
   it('bridges daemon connect stdio to a running daemon socket', async () => {

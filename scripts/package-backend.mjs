@@ -1,4 +1,5 @@
-import { copyFile, mkdir, readFile, rm, stat } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readFile, rm, stat } from 'node:fs/promises';
+import product from '../core/src/product.json' with { type: 'json' };
 import { builtinModules } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,9 +11,12 @@ const backendBundle = path.join(backendDistDir, 'daemon.mjs');
 const backendSourceMap = path.join(backendDistDir, 'daemon.mjs.map');
 
 await assertFile(backendBundle);
+await assertFile(path.join(backendDistDir, product.daemonName));
 await assertSelfContainedBackendBundle(backendBundle);
 await mkdir(resourcesDir, { recursive: true });
 await copyFile(backendBundle, path.join(resourcesDir, 'daemon.mjs'));
+await copyFile(path.join(backendDistDir, product.daemonName), path.join(resourcesDir, product.daemonName));
+await chmod(path.join(resourcesDir, product.daemonName), 0o755);
 await rm(path.join(resourcesDir, 'node'), { force: true });
 await rm(path.join(resourcesDir, 'node.exe'), { force: true });
 

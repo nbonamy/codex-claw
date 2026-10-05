@@ -97,7 +97,7 @@ describe('daemon launch agent', () => {
       execFileSync: vi.fn(() => {
         throw new Error('login shell unavailable');
       }),
-      existsSync: (filePath) => filePath === `/Applications/${product.name}.app/Contents/Resources/daemon/daemon.mjs` ||
+      existsSync: (filePath) => filePath === `/Applications/${product.name}.app/Contents/Resources/daemon/${product.daemonName}` ||
         filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
       getuid: () => 501,
       homedir: () => '/Users/nicolas',
@@ -124,7 +124,7 @@ describe('daemon launch agent', () => {
     );
 
     const plist = writeFile.mock.calls[0][1] as string;
-    expect(plist).toContain(`<string>/Applications/${product.name}.app/Contents/Resources/daemon/daemon.mjs</string>`);
+    expect(plist).toContain(`<string>/Applications/${product.name}.app/Contents/Resources/daemon/${product.daemonName}</string>`);
     expect(plist).toContain('<string>serve</string>');
     expect(plist).toContain('<key>APP_HOME</key>');
     expect(plist).toContain(`<string>/Users/nicolas/${product.homeDirectory}</string>`);
@@ -150,7 +150,7 @@ describe('daemon launch agent', () => {
   });
 
   it('resolves the packaged daemon version through the runtime command', async () => {
-    const execFile = vi.fn().mockResolvedValue({ stdout: 'daemon 0.2.0\n' });
+    const execFile = vi.fn().mockResolvedValue({ stdout: `${product.daemonName} 0.2.0\n` });
 
     await expect(getResolvedDaemonVersion({
       defaultApp: false,
@@ -161,14 +161,14 @@ describe('daemon launch agent', () => {
       execFileSync: vi.fn(() => {
         throw new Error('login shell unavailable');
       }),
-      existsSync: (filePath) => filePath === `/Applications/${product.name}.app/Contents/Resources/daemon/daemon.mjs` ||
+      existsSync: (filePath) => filePath === `/Applications/${product.name}.app/Contents/Resources/daemon/${product.daemonName}` ||
         filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
       homedir: () => '/Users/nicolas',
       resourcesPath: `/Applications/${product.name}.app/Contents/Resources`,
     })).resolves.toBe('0.2.0');
 
     expect(execFile).toHaveBeenCalledWith('/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node', [
-      `/Applications/${product.name}.app/Contents/Resources/daemon/daemon.mjs`,
+      `/Applications/${product.name}.app/Contents/Resources/daemon/${product.daemonName}`,
       '--version',
     ]);
   });

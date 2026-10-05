@@ -103,7 +103,7 @@ function packagedDaemonCommand(deps: RuntimeDaemonConfigDeps): RuntimeDaemonComm
   }
 
   const runtimeDir = path.join(resourcesPath, 'daemon');
-  const bundlePath = path.join(runtimeDir, 'daemon.mjs');
+  const bundlePath = path.join(runtimeDir, product.daemonName);
   const fileExists = deps.existsSync ?? existsSync;
   if (!fileExists(bundlePath)) {
     return null;

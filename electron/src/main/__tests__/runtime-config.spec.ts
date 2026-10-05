@@ -131,7 +131,7 @@ describe('runtime config', () => {
       execFileSync: vi.fn(() => {
         throw new Error('login shell unavailable');
       }),
-      existsSync: (filePath) => filePath === '/app/resources/daemon/daemon.mjs' ||
+      existsSync: (filePath) => filePath === `/app/resources/daemon/${product.daemonName}` ||
         filePath === '/app/resources/codex/codex' ||
         filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
       homedir: () => '/Users/nicolas',
@@ -139,7 +139,7 @@ describe('runtime config', () => {
     })).toStrictEqual({
       command: '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
       args: [
-        '/app/resources/daemon/daemon.mjs',
+        `/app/resources/daemon/${product.daemonName}`,
         '--stdio',
       ],
       env: {
@@ -183,7 +183,7 @@ describe('runtime config', () => {
       execFileSync: vi.fn(() => {
         throw new Error('login shell unavailable');
       }),
-      existsSync: (filePath) => filePath === '/app/resources/daemon/daemon.mjs',
+      existsSync: (filePath) => filePath === `/app/resources/daemon/${product.daemonName}`,
       resourcesPath: '/app/resources',
     })).toBeNull();
   });

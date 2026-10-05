@@ -1,3 +1,4 @@
+import { product } from '@workspace/core/product';
 import { describe, expect, it, vi } from 'vitest';
 import type { AppSnapshot, SystemPermissionsStatus } from '@workspace/core/contracts';
 import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
@@ -72,7 +73,7 @@ describe('AppBackendServer', () => {
       id: 'health-1',
       result: {
         ok: true,
-        name: 'daemon',
+        name: product.daemonName,
         version: 'test-version',
         pid: 123,
       },

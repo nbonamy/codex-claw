@@ -58,7 +58,7 @@ export const appRpcErrorCodes = {
 
 export type AppBackendHealth = {
   ok: true;
-  name: 'daemon';
+  name: string;
   version: string;
   pid: number;
 };

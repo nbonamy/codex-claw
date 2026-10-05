@@ -1,4 +1,4 @@
-import { product } from '@workspace/core/product';
+import { product, parseDaemonVersion } from '@workspace/core/product';
 import { access, readFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { homedir } from 'node:os';
@@ -69,7 +69,7 @@ export class SshConnectionService {
       const daemonVersion = await this.remoteDaemonVersion(next.host);
       const codexVersion = await this.remoteCodexVersion(next.host, connection.codexVersion).catch(() => undefined);
       const claudeVersion = await this.remoteClaudeVersion(next.host).catch(() => undefined);
-      const runtimeVersions = [`daemon ${daemonVersion}`, ...(codexVersion ? [`Codex ${codexVersion}`] : []), ...(claudeVersion ? [`Claude ${claudeVersion}`] : [])];
+      const runtimeVersions = [`${product.daemonName} ${daemonVersion}`, ...(codexVersion ? [`Codex ${codexVersion}`] : []), ...(claudeVersion ? [`Claude ${claudeVersion}`] : [])];
       next = {
         ...next,
         status: 'ready',
@@ -100,7 +100,7 @@ export class SshConnectionService {
       this.remoteDaemonVersion(connection.host),
       this.remoteCodexVersion(connection.host, connection.codexVersion).catch(() => undefined),
     ]);
-    const runtimeVersions = [`daemon ${daemonVersion}`, `Codex ${codexVersion || 'unknown'}`];
+    const runtimeVersions = [`${product.daemonName} ${daemonVersion}`, `Codex ${codexVersion || 'unknown'}`];
     let claudeWarning = '';
     {
       try {
@@ -224,7 +224,9 @@ export class SshConnectionService {
       host,
       `node ${remoteDaemonPath} --version`,
     ]);
-    return result.stdout.trim().replace(/^daemon\s+/u, '');
+    const version = parseDaemonVersion(result.stdout);
+    if (!version) throw new Error('Remote daemon returned an invalid version.');
+    return version;
   }
 
   private async resolveLocalDaemonScript(): Promise<string> {

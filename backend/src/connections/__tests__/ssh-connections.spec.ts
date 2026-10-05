@@ -88,7 +88,7 @@ Host bad;alias
       status: 'ready',
       daemonVersion: '0.1.0',
       codexVersion: bundledCodexVersion,
-      detail: `Ready (daemon 0.1.0, Codex ${bundledCodexVersion})`,
+      detail: `Ready (${product.daemonName} 0.1.0, Codex ${bundledCodexVersion})`,
       transport: sshStdioTransport('devbox'),
       installedAt: '2026-06-14T10:00:00.000Z',
       lastCheckedAt: '2026-06-14T10:00:00.000Z',
@@ -136,7 +136,7 @@ Host bad;alias
         return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       }
       if (command === 'ssh' && remoteCommand.includes('--version')) {
-        return { stdout: 'daemon 0.21.1\n', stderr: '' };
+        return { stdout: `${product.daemonName} 0.21.1\n`, stderr: '' };
       }
       return { stdout: '', stderr: '' };
     });
@@ -150,7 +150,7 @@ Host bad;alias
 
     expect(connection).toMatchObject({
       status: 'ready',
-      detail: `Ready (daemon 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`,
+      detail: `Ready (${product.daemonName} 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`,
     });
     expect(run).not.toHaveBeenCalledWith('ssh', expect.arrayContaining([
       'devbox', expect.stringContaining('https://claude.ai/install.sh'),
@@ -167,7 +167,7 @@ Host bad;alias
         throw new Error('Codex not installed');
       }
       if (command === 'ssh' && remoteCommand.includes('--version')) {
-        return { stdout: 'daemon 0.21.1\n', stderr: '' };
+        return { stdout: `${product.daemonName} 0.21.1\n`, stderr: '' };
       }
       return { stdout: '', stderr: '' };
     });
@@ -181,7 +181,7 @@ Host bad;alias
 
     expect(connection).toMatchObject({
       status: 'ready',
-      detail: 'Ready (daemon 0.21.1, Claude 2.1.283)',
+      detail: `Ready (${product.daemonName} 0.21.1, Claude 2.1.283)`,
       transport: sshStdioTransport('devbox'),
     });
   });
@@ -268,7 +268,7 @@ Host bad;alias
   it('reports the remote Claude version during read-only inspection when enabled', async () => {
     const run = vi.fn(async (_command: string, args: string[]) => {
       const command = args.at(-1) ?? '';
-      if (command.startsWith('node ')) return { stdout: 'daemon 0.21.1\n', stderr: '' };
+      if (command.startsWith('node ')) return { stdout: `${product.daemonName} 0.21.1\n`, stderr: '' };
       if (command.includes('codex')) return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       return { stdout: '2.1.283 (Claude Code)\n', stderr: '' };
     });
@@ -277,14 +277,14 @@ Host bad;alias
 
     const inspected = await service.inspectVersions(connection);
 
-    expect(inspected.detail).toBe(`Ready (daemon 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`);
+    expect(inspected.detail).toBe(`Ready (${product.daemonName} 0.21.1, Codex ${bundledCodexVersion}, Claude 2.1.283)`);
     expect(run.mock.calls.some(([, args]) => (args.at(-1) ?? '').includes('claude.ai/install.sh'))).toBe(false);
   });
 
   it('keeps the connection ready when read-only inspection finds no Claude CLI', async () => {
     const run = vi.fn(async (_command: string, args: string[]) => {
       const command = args.at(-1) ?? '';
-      if (command.startsWith('node ')) return { stdout: 'daemon 0.21.1\n', stderr: '' };
+      if (command.startsWith('node ')) return { stdout: `${product.daemonName} 0.21.1\n`, stderr: '' };
       if (command.includes('codex')) return { stdout: `codex-cli ${bundledCodexVersion}\n`, stderr: '' };
       throw new Error('Claude Code is not installed.');
     });
@@ -293,7 +293,7 @@ Host bad;alias
 
     await expect(service.inspectVersions(connection)).resolves.toMatchObject({
       status: 'ready',
-      detail: `Ready (daemon 0.21.1, Codex ${bundledCodexVersion}); Claude unavailable: Claude Code is not installed.`,
+      detail: `Ready (${product.daemonName} 0.21.1, Codex ${bundledCodexVersion}); Claude unavailable: Claude Code is not installed.`,
     });
   });
 

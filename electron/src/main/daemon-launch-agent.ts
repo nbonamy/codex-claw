@@ -1,4 +1,4 @@
-import { product } from '@workspace/core/product';
+import { product, parseDaemonVersion } from '@workspace/core/product';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
 import net from 'node:net';
@@ -106,7 +106,7 @@ export async function getResolvedDaemonVersion(
   }
 
   const result = await (dependencies.execFile ?? execFile)(command.command, versionArgsFromRuntimeArgs(command.args));
-  return parseDaemonVersion(result.stdout);
+  return parseDaemonVersion(result.stdout?.toString() ?? '');
 }
 
 async function uninstallDaemon(
@@ -304,10 +304,4 @@ function versionArgsFromRuntimeArgs(args: string[]): string[] {
   }
 
   return [...args, '--version'];
-}
-
-function parseDaemonVersion(stdout: string | Buffer | undefined): string | null {
-  const output = stdout?.toString().trim() ?? '';
-  const match = /^daemon\s+(.+)$/u.exec(output);
-  return match?.[1]?.trim() || null;
 }

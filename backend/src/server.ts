@@ -1,4 +1,5 @@
 import { isWorkProviderKind } from '@workspace/core/work-providers';
+import { product } from '@workspace/core/product';
 import { readWorktreeHead } from './git-worktrees';
 import type { DurableTaskService } from './agents/durable-task-service';
 import { ProviderConnections } from './provider-connections';
@@ -696,7 +697,7 @@ export class AppBackendServer {
       case backendMethods.backendHealthGet:
         return createAppRpcResult(message.id, {
           ok: true,
-          name: 'daemon',
+          name: product.daemonName,
           version: this.version,
           pid: this.pid,
         });

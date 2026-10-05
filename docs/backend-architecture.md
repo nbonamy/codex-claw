@@ -12,6 +12,21 @@ payloads; historical design alternatives below explain the extraction decisions.
 This document records backend process, transport, packaging, and security
 decisions. `daemon` runs separately from Electron main.
 
+The public executable and process name is **`korusd`**, defined by
+`product.daemonName` in `core/src/product.json`. Backend builds generate
+`backend/dist/korusd`, an executable Node launcher beside the internal
+`daemon.mjs` bundle. Desktop packaging copies both to `Resources/daemon/`;
+Electron uses its discovered Node runtime to execute the launcher. The same
+Node installation requirement applies as before. The launcher is not installed
+globally on `PATH`.
+
+Use `backend/dist/korusd --version`, `--stdio`, `serve`, or `connect` when
+running the built backend directly. SSH deployments still transport the
+self-contained `daemon.mjs` module and invoke it with Node; it reports the same
+public name. Internal source filenames, RPC methods, log/socket paths, npm
+scripts, and launchd labels remain brand-neutral. Version discovery accepts the
+previous `daemon` CLI prefix while existing installations are upgraded.
+
 `daemon` is not a replacement for Codex app-server. It is the Korus product
 backend: the app-owned process that orchestrates Codex app-server, Claude Code,
 Korus MCP, git, file previews, backlog automations, work integrations, and persistent
