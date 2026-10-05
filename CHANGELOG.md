@@ -1,6 +1,6 @@
 # Changelog
 
-All notable Codex Claw changes are recorded here.
+All notable Korus changes are recorded here.
 
 ## Unreleased
 
@@ -19,7 +19,7 @@ All notable Codex Claw changes are recorded here.
 - Use Hand off from an agent's context menu or the Agent menu to continue its
   work with a new Codex or Claude agent in the same workspace. Choose the
   engine and model, optionally add instructions, and let the current agent
-  write a handoff note before Claw closes it and starts its replacement.
+  write a handoff note before Korus closes it and starts its replacement.
   Hand off is available for idle workspace agents after pending work is resolved.
 - Identify each agent's engine by hovering over the sidebar or focusing it
   with the keyboard. Icons appear beside the right-aligned status without
@@ -34,7 +34,7 @@ All notable Codex Claw changes are recorded here.
 - Selecting an agent focuses its composer, including after a cold conversation
   finishes loading. Clicking controls in another split pane keeps their focus.
 - Merging a worktree no longer reports failure just because its remote-tracking
-  branch is behind. If branch or worktree cleanup cannot finish, Claw reports
+  branch is behind. If branch or worktree cleanup cannot finish, Korus reports
   the successful merge separately from the cleanup warning.
 
 ## [0.25.0] - 2026-10-03
@@ -46,13 +46,13 @@ All notable Codex Claw changes are recorded here.
   while switching teams, and one shared artifact sidebar follows the focused
   agent without closing when that agent has no open tabs.
 - Use Codex, Claude Code, or both. Setup detects installed engines, offers
-  installation and sign-in, and lets each engine use a separate Claw home or
+  installation and sign-in, and lets each engine use a separate Korus home or
   its existing setup. New setups separate chats while reusing existing skills.
   Engine pickers appear only when more than one engine is available.
 - Manage each engine's account, conversation location, skill sharing, and
   enabled status in Settings, with engine connection controls on SSH hosts too.
   Changing conversation location requires explicit acknowledgment before
-  removing that engine's local agents and Quick Chats from Claw.
+  removing that engine's local agents and Quick Chats from Korus.
 - See Codex and Claude subscription usage together in the user menu, including
   remaining allowance and reset times. API-billed Claude accounts have no
   subscription quota row.
@@ -79,7 +79,7 @@ All notable Codex Claw changes are recorded here.
   backend instead of silently remaining off.
 - Engine connection checks are cached for the session and refreshed by explicit
   connection or setup actions. Startup returns to setup when no engine is
-  available, and Claw prevents disabling the last active engine.
+  available, and Korus prevents disabling the last active engine.
 - Claude authentication, saved conversations, skills, plans, and personalized
   instructions follow the configured Claude home. Codex personalization also
   follows its selected home.
@@ -92,7 +92,7 @@ All notable Codex Claw changes are recorded here.
 
 - App state migrates automatically from `state.json` to separate roster,
   settings, and visualization files after creating a verified backup. Older
-  Claw builds cannot open the migrated state directly; downgrading requires
+  Korus builds cannot open the migrated state directly; downgrading requires
   restoring the pre-migration backup.
 - Closing a Quick Chat now deletes its provider session, with archive as a
   fallback when deletion is unavailable. Closing a regular agent still archives
@@ -246,7 +246,7 @@ All notable Codex Claw changes are recorded here.
 
 - Creating a project from a Quick Chat now shows progress through folder
   creation, agent setup, and the first prompt.
-- In-app browser pages remain visible beneath Claw menus and dialogs instead
+- In-app browser pages remain visible beneath Korus menus and dialogs instead
   of disappearing when an overlay opens. The empty browser surface is white
   and no longer shows a loading message.
 - Tool-opened browser pages now keep the requested URL in the address bar,
@@ -257,7 +257,7 @@ All notable Codex Claw changes are recorded here.
 - Selecting `/goal` opens a composer mode for the objective rather than sending
   an empty goal immediately. Slash-menu keyboard selection now distinguishes
   Tab completion from Enter activation.
-- The conversation shows “Working” when hidden Claw tool activity is the only
+- The conversation shows “Working” when hidden Korus tool activity is the only
   visible sign of an active turn, and skill reads show the skill name instead
   of `SKILL.md`.
 
@@ -265,7 +265,7 @@ All notable Codex Claw changes are recorded here.
 
 ### New features
 
-- Turn a Quick Chat into a project on request. Codex Claw creates the
+- Turn a Quick Chat into a project on request. Codex Korus creates the
   folder and a project agent, hands over the conversation's decisions, and
   keeps the original Quick Chat available.
 
@@ -273,8 +273,8 @@ All notable Codex Claw changes are recorded here.
 
 - Projects can use ordinary folders without Git. New projects start with an
   empty folder, and folder agents stay separate from Quick chats.
-- Quick Chats can access Claw tools, including project creation.
-- Codex Claw uses its own Computer Use tools instead of the bundled alternative;
+- Quick Chats can access Korus tools, including project creation.
+- Codex Korus uses its own Computer Use tools instead of the bundled alternative;
   older Computer Use calls also have readable activity labels.
 - Workspace tabs keep a stable height when labels appear or collapse, and
   multi-target tool titles display their overflow count consistently.
@@ -353,7 +353,7 @@ All notable Codex Claw changes are recorded here.
 - Missions now belong to their team. Closing a team also removes its Missions
   and workers while leaving Mission worktrees on disk, with the effect stated
   in the confirmation dialog.
-- Restarting Codex Claw restores the selected Mission workspace instead of
+- Restarting Codex Korus restores the selected Mission workspace instead of
   showing its lead as an ordinary agent thread.
 
 ## [0.20.0] - 2026-09-22
@@ -403,11 +403,11 @@ All notable Codex Claw changes are recorded here.
 - File links in conversations can now preview files anywhere on the agent's
   local or remote host, including shared instructions and other resources
   outside the repository.
-- `/compact` is passed through to Codex instead of opening Claw's retired
+- `/compact` is passed through to Codex instead of opening Korus's retired
   session-compression dialog. Slash-command suggestions now appear only when
   `/` is the first character in the prompt.
 - Delegation instructions now distinguish engine-native subagents from separate
-  Claw co-agents, asking for clarification when a request is ambiguous.
+  Korus co-agents, asking for clarification when a request is ambiguous.
 - The selected agent row preserves the sidebar's translucent background.
 
 ## [0.19.4] - 2026-09-18
@@ -449,8 +449,8 @@ All notable Codex Claw changes are recorded here.
   activity, and switch teams automatically when needed.
 - Remote teams can now create Git projects, browse existing folders, and clone
   GitHub repositories directly on their devbox. Connection settings detect
-  mismatched Claw and Codex versions, upgrade both managed runtimes together,
-  and support ChatGPT device-code sign-in without moving tokens through Claw.
+  mismatched Korus and Codex versions, upgrade both managed runtimes together,
+  and support ChatGPT device-code sign-in without moving tokens through Korus.
 - Personalization settings can edit the global developer instructions used by
   Codex or Claude, with an explicit option to replace both. Git settings now
   accept custom guidance for generated commit messages and pull request titles
@@ -511,8 +511,8 @@ All notable Codex Claw changes are recorded here.
 ### New features
 
 - Connected GitHub accounts now give Codex and Claude agents access to
-  GitHub's hosted MCP tools through Claw-managed, automatically refreshed
-  credentials. Claw avoids duplicate GitHub tool surfaces while preserving the
+  GitHub's hosted MCP tools through Korus-managed, automatically refreshed
+  credentials. Korus avoids duplicate GitHub tool surfaces while preserving the
   ChatGPT connector as a fallback when its own GitHub connection is unavailable.
 - Create an empty Git-backed project directly from the Add Project menu.
 - Choose which changes to review from the agent header: the current branch,
@@ -584,10 +584,10 @@ All notable Codex Claw changes are recorded here.
   foreground-only behavior, previews, and a global mute shortcut are available
   in Settings.
 - Delegated Git work can now report back to its parent agent when creating a
-  pull request or merging directly. Claw asks the worker for a final handoff,
+  pull request or merging directly. Korus asks the worker for a final handoff,
   shows the handoff phase in progress, and lets the operation continue in the
   background.
-- Claw now tracks pull requests created for agents and flags them when they are
+- Korus now tracks pull requests created for agents and flags them when they are
   merged or closed, with guided cleanup for the agent, worktree, and local
   branch while preserving work from unmerged pull requests.
 
@@ -616,7 +616,7 @@ All notable Codex Claw changes are recorded here.
 
 - Resumed goals now continue running across restarts, remain visibly marked as
   working between turns, and leave the composer shelf once complete.
-- Claw agents now receive explicit guidance for single-call worktree
+- Korus agents now receive explicit guidance for single-call worktree
   delegation, persistent Markdown presentation, and meaningful celebrations,
   making those existing workflows more reliable to invoke.
 
@@ -657,7 +657,7 @@ All notable Codex Claw changes are recorded here.
 ### New features
 
 - Starting work from an issue or pull request now shows a staged preparation
-  view while Codex Claw creates the branch or isolated worktree, starts the
+  view while Codex Korus creates the branch or isolated worktree, starts the
   session, and hands over the work context.
 - Inline conversation images now open or focus a reusable image workspace tab,
   while the explicit maximize control opens the stock fullscreen viewer.
@@ -680,7 +680,7 @@ All notable Codex Claw changes are recorded here.
 
 ### New features
 
-- Loops are now Automations throughout Codex Claw, with existing saved loops,
+- Loops are now Automations throughout Codex Korus, with existing saved loops,
   execution history, and work assignments migrated automatically.
 - GitHub can now be connected directly from first-run onboarding or the
   repository picker through a secure browser authorization flow.
@@ -729,7 +729,7 @@ All notable Codex Claw changes are recorded here.
   compact controls for starting work where it belongs.
 - Projects can now be added from a local folder, a GitHub repository, or a
   repository URL, then opened from a branch, pull request, or issue without
-  leaving Claw.
+  leaving Korus.
 - Repository work can now continue in an existing session on a branch or start
   in a new isolated session and worktree, with branch-aware worktree creation
   and assignment directly from the Sessions workflow.
@@ -744,11 +744,11 @@ All notable Codex Claw changes are recorded here.
 - Long conversations now synchronize with bounded snapshot and transcript
   payloads, keep retry progress out of durable history, and use Codex 0.151.0's
   stable image-aware compaction support to reclaim substantially more context.
-- Fast mode now remains enabled for a conversation after Claw restarts.
+- Fast mode now remains enabled for a conversation after Korus restarts.
 - Agent editing is now limited to an optional display name, while unnamed
   sessions consistently use their branch or conversation title.
 - ChatGPT integrations now offer to quit an already-running normal instance
-  before relaunching it with Claw's isolated Codex home.
+  before relaunching it with Korus's isolated Codex home.
 - Cockpit now shows unread indicators for teams containing unread sessions,
   native Edit menu actions are restored, subagent conversations recover from
   oversized-history failures, and recalled prompts no longer depend on browser
@@ -817,7 +817,7 @@ All notable Codex Claw changes are recorded here.
 
 ### Improvements and fixes
 
-- Conversation titles now stay aligned with Claw agent names, including agent
+- Conversation titles now stay aligned with Korus agent names, including agent
   renames, and closing an agent archives its Codex conversation.
 - Git status refreshes are now limited to meaningful active-agent and Git
   lifecycle events, avoiding redundant background requests and stale results.
@@ -875,7 +875,7 @@ All notable Codex Claw changes are recorded here.
 
 ### Improvements and fixes
 
-- What’s New now lets you browse notes from every previous Codex Claw release.
+- What’s New now lets you browse notes from every previous Codex Korus release.
 
 ## [0.8.0] - 2026-08-09
 
@@ -921,7 +921,7 @@ All notable Codex Claw changes are recorded here.
 
 ### New features
 
-- Codex Claw now shares ChatGPT's installed skills and plugins by default,
+- Codex Korus now shares ChatGPT's installed skills and plugins by default,
   explicitly asks existing installs before migrating their resource folders,
   and provides a General → Advanced setting for fresh or copied isolation.
 - The prompt composer now grows with longer messages until twelve lines are
@@ -948,7 +948,7 @@ All notable Codex Claw changes are recorded here.
 
 ### New features
 
-- Codex Claw now bundles its local Codex app-server executable, while remote
+- Codex Korus now bundles its local Codex app-server executable, while remote
   agents continue using the Codex installation on their remote host.
 - Existing Codex conversations can now be forked into a new agent from the
   agent menu or from a specific user or assistant message.
@@ -1040,12 +1040,12 @@ All notable Codex Claw changes are recorded here.
 
 ### New features
 
-- Added macOS update checks, a Codex Claw menu action, a downloaded-update
+- Added macOS update checks, a Codex Korus menu action, a downloaded-update
   badge, and install-and-relaunch flow.
 - Added the signed desktop release publishing workflow and update feed.
 - Added live file activity in conversations and clickable file targets for
   reads, edits, and creates.
-- Published the Codex Claw landing page with release downloads and product
+- Published the Codex Korus landing page with release downloads and product
   documentation.
 
 ### Improvements and fixes
@@ -1073,10 +1073,10 @@ All notable Codex Claw changes are recorded here.
   applications.
 - Git workspace review, source previews, streamlined agent setup, compact agent
   lists, and a refined native macOS shell.
-- ChatGPT authentication, mobile device pairing, Fast mode, and clearer Claw
+- ChatGPT authentication, mobile device pairing, Fast mode, and clearer Korus
   tool presentation.
 - Per-agent drafts, attachments, queues, model settings, and side-panel state.
-- Prompt automation through the `codex-claw://` deep-link protocol.
+- Prompt automation through the `codex-Korus://` deep-link protocol.
 - Sender labels and cleaner message bubbles for agent-to-agent collaboration.
 
 ### Improvements and fixes
@@ -1098,9 +1098,9 @@ All notable Codex Claw changes are recorded here.
 
 ### New features
 
-- Always-on background agents through the `clawd` daemon, including automatic
+- Always-on background agents through the `Korusd` daemon, including automatic
   daemon upgrades when the desktop app is updated.
-- SSH connections to remote Claw instances with remote teams, agents, loops,
+- SSH connections to remote Korus instances with remote teams, agents, loops,
   and work integrations.
 - Conversation history and resume, source and Git diff previews, agent Git
   statistics, and repository worktree selection.
