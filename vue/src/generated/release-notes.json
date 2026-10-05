@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.26.0",
+  "currentVersion": "0.26.1",
   "releases": [
+    {
+      "version": "0.26.1",
+      "releasedAt": "2026-10-04",
+      "sourceSha256": "3a3587fd201dd5db9431af2aa8caf57eb018847c3461ba399a6f55227248483f",
+      "markdown": "### Improvements\n\n- Refreshed the team rail with a clock icon for Automations and a compact,\n  outlined Korus logo for the menu.\n- The background daemon now identifies itself as `korusd` and includes a\n  matching executable launcher. Existing daemon version output remains\n  recognized during upgrades."
+    },
     {
       "version": "0.26.0",
       "releasedAt": "2026-10-04",

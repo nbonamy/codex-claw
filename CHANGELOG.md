@@ -4,6 +4,16 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.26.1] - 2026-10-04
+
+### Improvements
+
+- Refreshed the team rail with a clock icon for Automations and a compact,
+  outlined Korus logo for the menu.
+- The background daemon now identifies itself as `korusd` and includes a
+  matching executable launcher. Existing daemon version output remains
+  recognized during upgrades.
+
 ## [0.26.0] - 2026-10-04
 
 ### New features
