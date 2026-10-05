@@ -5,7 +5,10 @@ const response = await fetch(
 if (!response.ok) throw new Error("Product metadata could not be loaded.");
 export const product = await response.json();
 
-const replace = (value) => value.replaceAll("__PRODUCT_NAME__", product.name);
+const replace = (value) =>
+  value
+    .replaceAll("__PRODUCT_NAME__", product.name)
+    .replaceAll("__PRODUCT_WEBSITE_HOST__", new URL(product.websiteUrl).host);
 const textNodes = document.createTreeWalker(document, NodeFilter.SHOW_TEXT);
 while (textNodes.nextNode()) {
   textNodes.currentNode.textContent = replace(

@@ -1,27 +1,27 @@
 :root {
-  --vp-c-brand-1: #2b57d9;
-  --vp-c-brand-2: #2449b7;
-  --vp-c-brand-3: #2b57d9;
-  --vp-c-brand-soft: #e8edff;
+  --vp-c-brand-1: #5f71a5;
+  --vp-c-brand-2: #505f8b;
+  --vp-c-brand-3: #5f71a5;
+  --vp-c-brand-soft: #eff1f8;
   --vp-c-bg: #ffffff;
-  --vp-c-bg-alt: #f8f9fb;
-  --vp-c-text-1: #15171d;
-  --vp-c-text-2: #646a76;
-  --vp-c-divider: #e8eaf0;
+  --vp-c-bg-alt: #f9f9fa;
+  --vp-c-text-1: #17181b;
+  --vp-c-text-2: #696c71;
+  --vp-c-divider: #eaebee;
   --vp-font-family-base: "Inter", ui-sans-serif, system-ui, sans-serif;
   --vp-sidebar-width: 272px;
 }
 
 .dark {
-  --vp-c-brand-1: #95afff;
-  --vp-c-brand-2: #7798f4;
-  --vp-c-brand-3: #5579df;
-  --vp-c-brand-soft: #273453;
-  --vp-c-bg: #16181e;
-  --vp-c-bg-alt: #1c1f27;
-  --vp-c-text-1: #edeef3;
-  --vp-c-text-2: #afb5c2;
-  --vp-c-divider: #303440;
+  --vp-c-brand-1: #b5bfdf;
+  --vp-c-brand-2: #9daacf;
+  --vp-c-brand-3: #7e8db6;
+  --vp-c-brand-soft: #343946;
+  --vp-c-bg: #18191c;
+  --vp-c-bg-alt: #1f2124;
+  --vp-c-text-1: #efeff1;
+  --vp-c-text-2: #b5b7bc;
+  --vp-c-divider: #35363b;
 }
 
 .VPNavBarTitle .logo {

@@ -8,7 +8,7 @@ The desktop release is available for **macOS on Apple silicon**. Linux x64 suppo
 
 ## Install on macOS
 
-1. [Download the macOS DMG](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg).
+1. [Download the macOS DMG](__PRODUCT_DOWNLOAD_URL__).
 2. Open the DMG and move Korus to Applications.
 3. Launch Korus. The first-run screen checks your coding engines and offers **Connect Codex**, **Connect Claude Code**, and **Customize** for each one.
 4. Choose how each engine should store its setup before connecting it. Follow the steps below, then open a repository.

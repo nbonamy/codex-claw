@@ -13,7 +13,13 @@ for (const path of ["styles.css", "script.js", "assets"]) {
 const landing = await readFile(new URL("index.html", source), "utf8");
 await writeFile(
   new URL("index.html", output),
-  landing.replaceAll("__PRODUCT_NAME__", product.name),
+  landing
+    .replaceAll("__PRODUCT_NAME__", product.name)
+    .replaceAll("__PRODUCT_WEBSITE_URL__", product.websiteUrl)
+    .replaceAll(
+      "__PRODUCT_DOWNLOAD_PATH__",
+      `/desktop/downloads/${product.downloadFileName}`,
+    ),
 );
 await cp(new URL("docs/.vitepress/dist/", source), new URL("docs/", output), {
   recursive: true,

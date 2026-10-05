@@ -1,6 +1,6 @@
 # Korus website
 
-This contains the static landing page and VitePress documentation for [codex-claw.nabocorp.com](https://codex-claw.nabocorp.com).
+This contains the static landing page and VitePress documentation for [meetkorus.dev](https://meetkorus.dev).
 
 ## Local preview
 
@@ -13,8 +13,9 @@ python3 -m http.server 4173 --directory dist/website
 Then open <http://127.0.0.1:4173>.
 
 Product metadata comes from `core/src/product.json`. The landing-page build
-expands `__PRODUCT_NAME__`; VitePress reads the same definition. Preview the
-built artifact so the name and documentation are both available.
+expands the product name, canonical URL, and download path; VitePress reads the
+same definition, including `__PRODUCT_DOWNLOAD_URL__` in guide links. Preview
+the built artifact so the name and documentation are both available.
 
 ## Documentation
 
@@ -53,6 +54,11 @@ its base path and standard `.html` page URLs, so nginx needs no SPA rewrite
 for documentation routes.
 
 ## Product preview
+
+The visual identity uses warm off-white, charcoal, and restrained slate-blue
+accents. Films keep charcoal title cards and the same quiet accent palette;
+green and red communicate success and defects. Shared film branding comes
+from `videos/product.mjs`, including the closing URL from product metadata.
 
 The hero currently uses a lightweight HTML and CSS product composition. It is deliberately structured as a replaceable media frame so a current release screenshot can take over later without changing the page narrative.
 
@@ -148,7 +154,17 @@ certificate if this is the first deploy, and installs the matching nginx site on
 
 Override `APP_WEBSITE_HOST`, `APP_WEBSITE_ROOT`, or `APP_NGINX_CONFIG` when needed. The remote account must be able to run `sudo install`, `sudo nginx -t`, and `sudo systemctl reload nginx`.
 
-Desktop releases use the same host and are published with:
+The domain and storage root come from `core/src/product.json`; nginx templates
+are rendered outside the public artifact. Joshua serves the website, downloads,
+and releases from `/var/www/korus/{site,downloads,releases}`. Certificate renewal
+uses `/var/www/korus/site` as its webroot.
+
+The public installer is `korus-macos-arm64.dmg`, and desktop updates use
+`https://meetkorus.dev/desktop/releases`. Publish the installer before deploying
+the website; the deployment helper checks that it exists before uploading.
+Landing-page and guide download links follow `product.downloadFileName`.
+
+Desktop releases are published separately with:
 
 ```bash
 npm run publish

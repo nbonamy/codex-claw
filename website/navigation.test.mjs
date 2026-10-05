@@ -44,6 +44,13 @@ test("visitors can open documentation from the header at desktop and phone width
     for (const width of [1440, 761, 760, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(origin);
+      for (const selector of [".hero-copy", ".hero h1", ".hero-lede"]) {
+        const bounds = await page.locator(selector).boundingBox();
+        assert.ok(
+          bounds.x >= 0 && bounds.x + bounds.width <= width,
+          `Hero copy fits at ${width}px: ${selector}`,
+        );
+      }
       const header = page.getByRole("banner");
       const docs = header.getByRole("link", { name: "Docs", exact: true });
       assert.equal(

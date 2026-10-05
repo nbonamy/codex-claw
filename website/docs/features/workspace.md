@@ -13,7 +13,7 @@ Use its **+** menu to open **Files**, **Changes**, **Review**, **Visualize**, or
 Ask the agent to display Markdown in the side panel when a guide, report, or proposal should remain visible:
 
 ```text
-Show the migration proposal in the side panel so we can discuss each step.
+Show the implementation proposal in the side panel so we can discuss each step.
 ```
 
 Plans and displayed documents have their own tabs. Keep the artifact open while discussing revisions so feedback refers to a concrete result.

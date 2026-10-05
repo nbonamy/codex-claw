@@ -40,12 +40,51 @@ test("the built website has reachable documentation pages, anchors, and assets",
     assert.ok(
       landing.querySelector(".brand").textContent.includes(product.name),
     );
-    assert.ok(!landing.documentElement.outerHTML.includes("__PRODUCT_NAME__"));
+    assert.doesNotMatch(landing.documentElement.outerHTML, /__PRODUCT_\w+__/);
+    assert.equal(
+      landing.querySelector('link[rel="canonical"]').href,
+      `${origin}/`,
+    );
+    assert.equal(
+      landing.querySelector('meta[property="og:url"]').content,
+      `${origin}/`,
+    );
+    for (const selector of [
+      'meta[property="og:image"]',
+      'meta[name="twitter:image"]',
+    ]) {
+      const image = new URL(landing.querySelector(selector).content);
+      assert.equal(
+        image.origin,
+        origin,
+        "Social cards use the public website origin",
+      );
+      assert.ok(await stat(new URL(image.pathname.slice(1), artifact)));
+    }
     assert.ok(
       landing.querySelector('a[href="/docs/"]'),
       "Landing page links to the docs",
     );
     const home = documents.get("docs/index.html").window.document;
+    const downloadPath = `/desktop/downloads/${product.downloadFileName}`;
+    const downloads = [...landing.querySelectorAll("a[download]")];
+    assert.ok(downloads.length > 0);
+    for (const link of downloads) {
+      assert.equal(new URL(link.href).pathname, downloadPath);
+    }
+    for (const [path, dom] of documents) {
+      for (const link of dom.window.document.querySelectorAll("a[href]")) {
+        const url = new URL(link.href);
+        if (url.pathname.startsWith("/desktop/downloads/")) {
+          assert.equal(
+            url.pathname,
+            downloadPath,
+            `${path}: current installer name`,
+          );
+          assert.equal(url.origin, origin, `${path}: public download origin`);
+        }
+      }
+    }
     assert.ok(
       [...home.querySelectorAll("main a[href]")].some(
         (link) =>

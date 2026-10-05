@@ -8,7 +8,7 @@ Start with one repository, one agent, and a small change you can review.
 
 ## Install Korus
 
-[Download Korus for macOS](https://codex-claw.nabocorp.com/desktop/downloads/codex-claw-macos-arm64.dmg), move it to Applications, and launch it. The desktop download supports Apple silicon.
+[Download Korus for macOS](__PRODUCT_DOWNLOAD_URL__), move it to Applications, and launch it. The desktop download supports Apple silicon.
 
 See [Installation](./installation) for requirements.
 

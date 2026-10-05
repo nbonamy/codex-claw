@@ -6,21 +6,23 @@
     <meta name="theme-color" content="#f4f3ef" />
     <meta
       name="description"
-      content="Build with Codex, Claude Code, or both. __PRODUCT_NAME__ brings your agents, repositories, and remote teams into one native workspace, from idea to delivery."
+      content="From idea to delivery. __PRODUCT_NAME__ orchestrates software engineering workflows through agents, connecting planning, implementation, and review while you guide the decisions."
     />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
-      content="__PRODUCT_NAME__ — Codex and Claude Code, one team."
+      content="__PRODUCT_NAME__ — From idea to delivery."
     />
     <meta
       property="og:description"
-      content="Use Codex, Claude Code, or both. Direct your agents across repositories and machines, review their work, and ship from one native workspace."
+      content="Software engineering, orchestrated. Connect planning, implementation, and review through agents—with you in control of key decisions."
     />
-    <meta property="og:url" content="https://codex-claw.nabocorp.com/" />
+    <link rel="canonical" href="__PRODUCT_WEBSITE_URL__/" />
+    <link rel="icon" type="image/png" href="assets/app-icon.png" />
+    <meta property="og:url" content="__PRODUCT_WEBSITE_URL__/" />
     <meta
       property="og:image"
-      content="https://codex-claw.nabocorp.com/assets/og.png"
+      content="__PRODUCT_WEBSITE_URL__/assets/og.png?v=workflow-1"
     />
     <meta
       property="og:image:alt"
@@ -29,16 +31,16 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:image"
-      content="https://codex-claw.nabocorp.com/assets/og.png"
+      content="__PRODUCT_WEBSITE_URL__/assets/og.png?v=workflow-1"
     />
-    <title>__PRODUCT_NAME__ — Codex and Claude Code, one team.</title>
+    <title>__PRODUCT_NAME__ — From idea to delivery.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=0.25.0-docs-2" />
+    <link rel="stylesheet" href="styles.css?v=korus-workflow-2" />
   </head>
   <body>
     <header class="site-header shell">
@@ -48,15 +50,15 @@
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
         <a href="#sessions">Workflows</a>
-        <a href="#routing">Work routing</a>
-        <a href="#workspace">Workspace</a>
+        <a href="#routing">Start work</a>
+        <a href="#workspace">Review</a>
         <a href="#automations">Automations</a>
       </nav>
       <div class="header-actions">
         <a class="header-docs" href="/docs/">Docs</a>
         <a
           class="header-cta"
-          href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+          href="__PRODUCT_DOWNLOAD_PATH__"
           aria-label="Download for macOS"
           download
           >Download<span class="header-platform"> for macOS</span>
@@ -68,22 +70,24 @@
     <main id="top">
       <section class="hero shell">
         <div class="hero-copy reveal">
-          <p class="eyebrow"><span class="pulse"></span> Codex + Claude Code</p>
-          <h1>Build with agents.<br /><em>From idea to delivery.</em></h1>
+          <p class="eyebrow">
+            <span class="pulse"></span> Software engineering, orchestrated.
+          </p>
+          <h1>From idea<br /><em>to delivery.</em></h1>
           <p class="hero-lede">
-            Run Codex and Claude Code side by side—or use either on its own.
-            Organize agents across repositories and machines, review their work,
-            and carry ideas through to delivery in one native workspace.
+            __PRODUCT_NAME__ orchestrates software engineering workflows through
+            agents. Planning, implementation, review, and delivery stay
+            connected—with you in control of the decisions that matter.
           </p>
           <div class="hero-actions">
             <a
               class="button button-primary"
-              href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+              href="__PRODUCT_DOWNLOAD_PATH__"
               download
               >Download for macOS <span aria-hidden="true">→</span></a
             >
             <a class="text-link" href="#sessions"
-              >Explore the workspace <span aria-hidden="true">↓</span></a
+              >See how work flows <span aria-hidden="true">↓</span></a
             >
           </div>
           <div class="hero-meta" aria-label="Product details">
@@ -125,7 +129,7 @@
                   </div>
                   <div class="session-group">
                     <div class="session-group__head">
-                      <span>🦞</span><strong>example-project</strong><b>＋</b>
+                      <span>⌘</span><strong>example-project</strong><b>＋</b>
                     </div>
                     <div class="session-item">
                       <i>⑂</i><span>main</span><b class="status-dot idle"></b>
@@ -158,7 +162,7 @@
                 </aside>
                 <section class="conversation-preview">
                   <header class="conversation-preview__header">
-                    <span>🦞</span>
+                    <span>⌘</span>
                     <strong>fix/gh-286</strong>
                     <small>fix/gh-286 @ example-project</small>
                     <b><i></i> Working</b>
@@ -169,7 +173,7 @@
                     </div>
                     <div class="assistant-turn">
                       <div class="assistant-turn__label">
-                        <span>🦞</span><strong>Codex</strong>
+                        <span>⌘</span><strong>Codex</strong>
                       </div>
                       <p>
                         I found the restore race. I’m keeping the selected
@@ -209,7 +213,7 @@
           </div>
           <div class="product-visual__caption">
             <span><i></i> 4 sessions active</span>
-            <span>Repository-grouped · branch-aware · durable</span>
+            <span>Agents do the work. You guide it forward.</span>
           </div>
         </div>
       </section>
@@ -224,77 +228,90 @@
 
       <section id="sessions" class="story shell">
         <div class="story-heading reveal">
-          <p class="section-kicker">01 / Software workflows</p>
+          <p class="section-kicker">01 / One connected workflow</p>
           <h2>
-            Keep the work moving.<br /><span>Keep the outcome in view.</span>
+            More than a conversation.<br /><span>Work that moves forward.</span>
           </h2>
           <p>
-            Start with a question or take a Mission from requirements to
-            delivery. Choose Codex or Claude Code for each agent, with
-            conversations and artifacts that keep the work in context.
+            Software work doesn’t end when an agent answers. Missions connect
+            requirements, tickets, implementation, and review in one workflow.
+            Agents carry out the work; __PRODUCT_NAME__ coordinates its progress
+            and handoffs, with artifacts you can inspect along the way.
           </p>
         </div>
         <div class="session-story">
           <div
             class="session-map reveal"
-            aria-label="Repository-grouped sessions"
+            aria-label="Illustrative Mission progressing from requirements to delivery"
           >
             <div class="session-map__top">
-              <span>Sessions</span><b>＋ Start work</b>
+              <span>Mission / Add team invitations</span><b>In progress</b>
             </div>
             <div class="session-map__repo">
               <header>
-                <span>🦞</span><strong>example-project</strong
-                ><small>3 sessions</small>
+                <span>◎</span><strong>From idea to delivery</strong
+                ><small>WORKFLOW</small>
               </header>
-              <div><i>⑂</i><strong>main</strong><span>Ready</span></div>
-              <div class="active">
-                <i>⑂</i><strong>fix/gh-286</strong><span>Working</span>
+              <div>
+                <i>✓</i><strong>Requirements</strong><span>Approved</span>
               </div>
               <div>
-                <i>⑂</i><strong>feat/onboarding</strong><span>Unread</span>
+                <i>✓</i><strong>Tickets</strong><span>Ready to build</span>
               </div>
+              <div class="active">
+                <i>⑂</i><strong>Implementation</strong><span>Working</span>
+              </div>
+              <div><i>◌</i><strong>Review</strong><span>Up next</span></div>
+              <div><i>↗</i><strong>Ship</strong><span>When ready</span></div>
             </div>
             <div class="session-map__repo">
               <header>
-                <span>⚙️</span><strong>codex-app-sdk</strong
-                ><small>1 session</small>
+                <span>▤</span><strong>The work stays visible</strong
+                ><small>ARTIFACTS</small>
               </header>
-              <div><i>⑂</i><strong>main</strong><span>Ready</span></div>
+              <div>
+                <i>✓</i><strong>Requirements &amp; tickets</strong
+                ><span>Available</span>
+              </div>
+              <div>
+                <i>⑂</i><strong>Code changes</strong><span>In progress</span>
+              </div>
             </div>
             <div class="session-map__repo quick">
               <header>
-                <span>◌</span><strong>Quick Chats</strong
-                ><small>folderless</small>
+                <span>↳</span><strong>You guide the decisions</strong
+                ><small>HUMAN + AGENTS</small>
               </header>
               <div>
-                <i>↳</i><strong>Release naming</strong><span>Ready</span>
+                <i>✓</i><strong>Scope approved · implementation underway</strong
+                ><span></span>
               </div>
             </div>
           </div>
           <div class="session-principles">
             <article class="session-principle reveal">
               <span>01</span>
-              <h3>Shape a Mission</h3>
+              <h3>Shape the work</h3>
               <p>
-                Take a feature through requirements, tickets, implementation,
-                review, and shipping, with artifacts and progress along the way.
+                Work through the requirements with an agent, refine the scope,
+                and approve a plan before implementation begins.
               </p>
             </article>
             <article class="session-principle reveal delay-1">
               <span>02</span>
-              <h3>Work in the repo</h3>
+              <h3>Connect the stages</h3>
               <p>
-                Jump straight into a session for a focused task. Branches and
-                worktrees keep parallel changes connected to their repositories.
+                Let the workflow coordinate execution and handoffs. Context,
+                progress, and artifacts stay with the work as it moves forward.
               </p>
             </article>
             <article class="session-principle reveal delay-2">
               <span>03</span>
-              <h3>Explore an idea</h3>
+              <h3>Stay in control</h3>
               <p>
-                Quick Chats give you room to reason, research, and ask questions
-                before there is a repository or implementation to work on.
+                Inspect what agents produce, guide the next step, and make the
+                decisions that need your judgment. Orchestrated doesn’t mean
+                unattended.
               </p>
             </article>
           </div>
@@ -304,20 +321,20 @@
       <section id="routing" class="routing-section">
         <div class="shell routing-grid">
           <div class="routing-copy reveal">
-            <p class="section-kicker">02 / GitHub work routing</p>
+            <p class="section-kicker">02 / Start where you are</p>
             <h2>
-              Turn an issue into<br /><span>the right kind of session.</span>
+              An idea. An issue.<br /><span>Work already in motion.</span>
             </h2>
             <p>
-              Browse Issues from the repository you are already in. Then choose
-              whether the work belongs in an existing conversation or deserves
-              its own isolated lane.
+              Talk through an idea in Quick Chat, pick up a GitHub issue, or
+              jump into an existing repository. Use a Mission for a multi-stage
+              change or work directly with an agent for a focused task.
             </p>
             <div class="routing-note">
-              <span>GitHub connected</span>
+              <span>The right space for the work</span>
               <p>
-                Issues, pull requests, and branches become real entry points—not
-                links you copy into a prompt.
+                Continue with existing context or create an isolated worktree.
+                Parallel work gets its own space without losing the path back.
               </p>
             </div>
           </div>
@@ -383,13 +400,14 @@
         <div class="shell git-grid">
           <div class="git-copy reveal">
             <p class="section-kicker section-kicker-light">
-              03 / Native work, end to end
+              03 / Review through delivery
             </p>
-            <h2>Review the work.<br /><em>Carry it through.</em></h2>
+            <h2>Review. Refine.<br /><em>Bring it home.</em></h2>
             <p>
-              Inspect changes, discuss findings, and choose what to fix. Review
-              supports another round as the code evolves, while Git keeps the
-              path to a pull request or merge within reach.
+              A first pass isn’t the finish line. Inspect findings, send
+              selected issues back for fixes, and review again. Keep the path
+              from implementation to a pull request or merge in the same
+              workspace.
             </p>
             <ul>
               <li>Review with the current agent or an independent reviewer</li>
@@ -403,7 +421,8 @@
             aria-label="__PRODUCT_NAME__ Git review preview"
           >
             <div class="git-panel-head">
-              <span>Review</span><small>fix/gh-286 <i>·</i> example-project</small
+              <span>Review</span
+              ><small>fix/gh-286 <i>·</i> example-project</small
               ><button type="button" tabindex="-1">Git actions⌄</button>
             </div>
             <div class="git-stats">
@@ -485,12 +504,12 @@
             </div>
           </div>
           <div class="automations-copy reveal delay-1">
-            <p class="section-kicker">04 / Repeatable intake</p>
-            <h2>Repeat the intake.<br /><span>Keep work moving.</span></h2>
+            <p class="section-kicker">04 / Repeatable work</p>
+            <h2>Make the repeatable<br /><span>automatic.</span></h2>
             <p>
-              Automations watch a source, apply clear criteria, and route work
-              to a dedicated agent. Run history keeps every execution
-              inspectable.
+              Set the criteria once. Automations watch for matching work and
+              route it to an agent, so recurring intake doesn’t need the same
+              manual handoff every time. Run history keeps execution visible.
             </p>
             <small
               >Use Automations for recurring intake alongside Missions and
@@ -503,14 +522,14 @@
       <section class="more shell">
         <div class="section-heading reveal">
           <div>
-            <p class="section-kicker">05 / A connected workspace</p>
+            <p class="section-kicker">05 / The workspace behind the workflow</p>
             <h2>
-              See the work clearly.<br /><span>Move it forward together.</span>
+              Agents, context, and tools.<br /><span>Working together.</span>
             </h2>
           </div>
           <p>
-            Explore a design, delegate implementation, and return to the
-            decisions that need you. The workspace keeps each part connected.
+            Choose your agents, explore a design, and follow parallel work. The
+            supporting tools are here when the workflow needs them.
           </p>
         </div>
         <div class="capability-grid">
@@ -518,13 +537,24 @@
             <span class="capability-label">COCKPIT</span>
             <h3>See working, waiting, unread, and ready at a glance.</h3>
             <p>
-              Team and global Cockpit views show where your attention is useful
-              without replacing the repository and session model.
+              See progress across your teams and spot the work that needs a
+              decision. Pick up the thread without checking every conversation.
             </p>
             <div class="tool-stream" aria-hidden="true">
               <span><i>●</i> 4 sessions working</span
               ><span><i>✓</i> 2 ready for review</span
               ><span class="running"><i></i> 1 needs attention</span>
+            </div>
+          </article>
+          <article class="capability reveal delay-1">
+            <span class="capability-label">YOUR CHOICE OF AGENTS</span>
+            <h3>Codex, Claude Code—or both.</h3>
+            <p>
+              Choose the engine for each agent. Keep their work together in one
+              workspace, across local repositories and remote teams.
+            </p>
+            <div class="tab-preview" aria-hidden="true">
+              <span>Codex</span><span>Claude Code</span>
             </div>
           </article>
           <article class="capability reveal delay-1">
@@ -547,7 +577,7 @@
               agent's workspace and progress in view.
             </p>
             <div class="agent-stack" aria-hidden="true">
-              <span>🦞</span><span>⚙️</span><span>🛠️</span><i>3 active</i>
+              <span>⌘</span><span>⚙️</span><span>🛠️</span><i>3 active</i>
             </div>
           </article>
           <article class="capability reveal delay-1">
@@ -582,16 +612,14 @@
           <p class="eyebrow">
             <span class="pulse"></span> Free to use. Your choice of engine.
           </p>
-          <h2>
-            Bring your next idea.<br /><em>Build it with __PRODUCT_NAME__.</em>
-          </h2>
+          <h2>Your next idea.<br /><em>All the way to delivery.</em></h2>
           <p>
             Connect Codex, Claude Code, or both. Available for macOS on Apple
             silicon, with experimental Linux x64 support.
           </p>
           <a
             class="button button-primary"
-            href="/desktop/downloads/codex-claw-macos-arm64.dmg"
+            href="__PRODUCT_DOWNLOAD_PATH__"
             download
             >Download for macOS <span aria-hidden="true">↓</span></a
           >
@@ -609,7 +637,7 @@
           ><strong>__PRODUCT_NAME__</strong></span
         ></a
       >
-      <span>Built for people shipping with agents.</span>
+      <span>Software engineering, orchestrated.</span>
       <span class="mono">© <span id="year"></span> nabocorp</span>
     </footer>
     <script src="script.js"></script>

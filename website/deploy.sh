@@ -3,20 +3,44 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST="${APP_WEBSITE_HOST:-joshua}"
-REMOTE_ROOT="${APP_WEBSITE_ROOT:-/var/www/codex-claw}"
-NGINX_CONFIG="${APP_NGINX_CONFIG:-/etc/nginx/sites-available/codex-claw.nabocorp.com.conf}"
-NGINX_BOOTSTRAP_CONFIG="/etc/nginx/sites-available/codex-claw.nabocorp.com.bootstrap.conf"
+DOMAIN="$(node -p "new URL(require('$ROOT_DIR/../core/src/product.json').websiteUrl).hostname")"
+REMOTE_ROOT="${APP_WEBSITE_ROOT:-$(node -p "require('$ROOT_DIR/../core/src/product.json').deploymentRoot")}"
+DOWNLOAD_FILE="$(node -p "require('$ROOT_DIR/../core/src/product.json').downloadFileName")"
+NGINX_CONFIG="${APP_NGINX_CONFIG:-/etc/nginx/sites-available/$DOMAIN.conf}"
+NGINX_BOOTSTRAP_CONFIG="/etc/nginx/sites-available/$DOMAIN.bootstrap.conf"
+TEMP_DIR="$(mktemp -d)"
+trap 'rm -f "$TEMP_DIR/nginx.conf" "$TEMP_DIR/nginx-bootstrap.conf"; rmdir "$TEMP_DIR"' EXIT
+
+# Keep generated server configuration outside the public website artifact.
+for template in nginx.conf nginx-bootstrap.conf; do
+  node --input-type=module - "$ROOT_DIR/$template" "$TEMP_DIR/$template" "$DOMAIN" "$REMOTE_ROOT" <<'NODE'
+import { readFileSync, writeFileSync } from 'node:fs';
+const [source, target, domain, root] = process.argv.slice(2);
+if (!/^[a-z0-9.-]+$/.test(domain) || !/^\/[a-zA-Z0-9/_-]+$/.test(root)) {
+  throw new Error('Invalid website host or deployment root');
+}
+writeFileSync(target, readFileSync(source, 'utf8')
+  .replaceAll('__WEBSITE_HOST__', domain)
+  .replaceAll('__DEPLOYMENT_ROOT__', root));
+NODE
+done
+
+# Never switch the public download links ahead of the actual release artifact.
+if ! ssh "$HOST" "test -s '$REMOTE_ROOT/downloads/$DOWNLOAD_FILE'"; then
+  echo "Website deployment blocked: publish $REMOTE_ROOT/downloads/$DOWNLOAD_FILE first." >&2
+  exit 1
+fi
 
 npm --prefix "$ROOT_DIR/.." run build:website
 
 echo "Deploying website to ${HOST}:${REMOTE_ROOT}"
 ssh "$HOST" "sudo mkdir -p '$REMOTE_ROOT/site' && sudo chown -R \"\$(id -un):\$(id -gn)\" '$REMOTE_ROOT'"
 tar -czf - -C "$ROOT_DIR/../dist/website" . | ssh "$HOST" "tar -xzf - -C '$REMOTE_ROOT/site'"
-if ! ssh "$HOST" "test -f /etc/letsencrypt/live/codex-claw.nabocorp.com/fullchain.pem"; then
+if ! ssh "$HOST" "sudo test -f '/etc/letsencrypt/live/$DOMAIN/fullchain.pem'"; then
   echo "No TLS certificate found; provisioning one with Certbot"
-  scp "$ROOT_DIR/nginx-bootstrap.conf" "$HOST:/tmp/codex-claw.nabocorp.com.bootstrap.conf"
-  ssh "$HOST" "sudo install -m 0644 /tmp/codex-claw.nabocorp.com.bootstrap.conf '$NGINX_BOOTSTRAP_CONFIG' && sudo ln -sfn '$NGINX_BOOTSTRAP_CONFIG' /etc/nginx/sites-enabled/codex-claw.nabocorp.com.conf && sudo nginx -t && sudo systemctl reload nginx && sudo certbot certonly --webroot -w '$REMOTE_ROOT/site' -d codex-claw.nabocorp.com --non-interactive --agree-tos --register-unsafely-without-email && sudo rm -f /tmp/codex-claw.nabocorp.com.bootstrap.conf '$NGINX_BOOTSTRAP_CONFIG'"
+  scp "$TEMP_DIR/nginx-bootstrap.conf" "$HOST:/tmp/$DOMAIN.bootstrap.conf"
+  ssh "$HOST" "sudo install -m 0644 '/tmp/$DOMAIN.bootstrap.conf' '$NGINX_BOOTSTRAP_CONFIG' && sudo ln -sfn '$NGINX_BOOTSTRAP_CONFIG' '/etc/nginx/sites-enabled/$DOMAIN.conf' && sudo nginx -t && sudo systemctl reload nginx && sudo certbot certonly --webroot -w '$REMOTE_ROOT/site' -d '$DOMAIN' --non-interactive --agree-tos --register-unsafely-without-email"
 fi
-scp "$ROOT_DIR/nginx.conf" "$HOST:/tmp/codex-claw.nabocorp.com.conf"
-ssh "$HOST" "sudo install -m 0644 /tmp/codex-claw.nabocorp.com.conf '$NGINX_CONFIG' && sudo ln -sfn '$NGINX_CONFIG' /etc/nginx/sites-enabled/codex-claw.nabocorp.com.conf && sudo nginx -t && sudo systemctl reload nginx && sudo rm -f /tmp/codex-claw.nabocorp.com.conf"
-echo "Deployed: https://codex-claw.nabocorp.com"
+scp "$TEMP_DIR/nginx.conf" "$HOST:/tmp/$DOMAIN.conf"
+ssh "$HOST" "sudo install -m 0644 '/tmp/$DOMAIN.conf' '$NGINX_CONFIG' && sudo ln -sfn '$NGINX_CONFIG' '/etc/nginx/sites-enabled/$DOMAIN.conf' && sudo nginx -t && sudo systemctl reload nginx && sudo rm -f '/tmp/$DOMAIN.conf' '/tmp/$DOMAIN.bootstrap.conf' '$NGINX_BOOTSTRAP_CONFIG'"
+echo "Deployed: https://$DOMAIN"

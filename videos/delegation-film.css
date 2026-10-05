@@ -27,18 +27,18 @@
   gap: 12px;
 }
 .delegate-iteration__heading span {
-  color: #6485c4;
+  color: #818ea7;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
 }
 .delegate-iteration__heading strong {
-  color: #25354d;
+  color: #313741;
   font-size: 12px;
 }
 .delegate-iteration__heading small {
   margin-left: auto;
-  color: #7b8798;
+  color: #84898f;
   font-size: 10px;
 }
 .delegate-iteration__stage {
@@ -56,23 +56,23 @@
   height: 3px;
   overflow: hidden;
   border-radius: 3px;
-  background: #e8edf6;
+  background: #eceef2;
 }
 .delegate-iteration__track i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #447ad1;
+  background: #6e84a7;
 }
 .delegate-iteration > p {
   margin: 0;
-  color: #8290a3;
+  color: #8c9299;
   font-size: 10px;
   text-align: center;
 }
 .delegate-iteration__later {
   margin: 46px 0 24px;
-  color: #6485c4;
+  color: #818ea7;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -113,14 +113,14 @@
 .delegation-dialog {
   width: 514px;
   padding: 24px 27px;
-  border: 1px solid #d9e0ec;
+  border: 1px solid #dfe2e6;
   border-radius: 13px;
   background: #fff;
   box-shadow: 0 22px 70px rgb(11 31 67 / 22%);
   transform-origin: 50% 50%;
 }
 .delegation-dialog__eyebrow {
-  color: #1b4fb2;
+  color: #485d85;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -128,13 +128,13 @@
 }
 .delegation-dialog h3 {
   margin: 7px 0 5px;
-  color: #1b2436;
+  color: #23272e;
   font-size: 20px;
   font-weight: 660;
 }
 .delegation-dialog__subtitle {
   margin: 0 0 20px;
-  color: #6e7889;
+  color: #767a81;
   font-size: 11px;
 }
 .delegation-steps {
@@ -150,7 +150,7 @@
   border-radius: 8px;
 }
 .delegation-step.is-active {
-  background: #f1f5fd;
+  background: #f5f6f9;
 }
 .delegation-step__icon {
   display: grid;
@@ -158,17 +158,17 @@
   height: 27px;
   flex: none;
   place-items: center;
-  border: 1px solid #d7dfef;
+  border: 1px solid #dee1e8;
   border-radius: 50%;
-  color: #95a0b2;
+  color: #9ea2a9;
   background: #fff;
   font-size: 12px;
   font-weight: 700;
 }
 .delegation-step.is-active .delegation-step__icon {
-  border-color: #a9c0f4;
-  color: #1b4fb2;
-  background: #e3edff;
+  border-color: #c0c9de;
+  color: #485d85;
+  background: #ebeff7;
 }
 .delegation-step.is-complete .delegation-step__icon {
   border-color: #a8e4cc;
@@ -180,40 +180,40 @@
   gap: 3px;
 }
 .delegation-step__copy strong {
-  color: #2e3440;
+  color: #33363b;
   font-size: 11px;
   font-weight: 630;
 }
 .delegation-step__copy small {
-  color: #8b94a4;
+  color: #93969d;
   font-size: 10px;
 }
 .delegation-step.is-active .delegation-step__copy strong {
-  color: #1b4fb2;
+  color: #485d85;
 }
 .delegation-dialog__track {
   height: 5px;
   overflow: hidden;
   margin-top: 19px;
   border-radius: 6px;
-  background: #e7eefa;
+  background: #edf0f4;
 }
 .delegation-dialog__track i {
   display: block;
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #1b4fb2, #66a7ff);
+  background: linear-gradient(90deg, #485d85, #94aed1);
 }
 .delegation-dialog__footer {
   display: flex;
   justify-content: space-between;
   margin-top: 11px;
-  color: #7d8796;
+  color: #84898e;
   font-size: 10px;
 }
 .delegation-dialog__footer b {
-  color: #1b4fb2;
+  color: #485d85;
 }
 .delegate-user {
   width: fit-content;
@@ -221,8 +221,8 @@
   margin: 0 0 14px auto;
   padding: 11px 13px;
   border-radius: 9px 9px 3px 9px;
-  color: #293746;
-  background: #edf3ff;
+  color: #32373d;
+  background: #f2f5fa;
   font-size: 11px;
   line-height: 1.45;
 }
@@ -232,21 +232,21 @@
   margin: 0 0 15px;
 }
 .delegate-message strong {
-  color: #174995;
+  color: #3d516f;
   font-size: 10px;
 }
 .delegate-message p {
   margin: 0;
-  color: #303642;
+  color: #35383d;
   font-size: 11px;
   line-height: 1.48;
 }
 .delegate-tool {
   width: fit-content;
   padding: 8px 10px;
-  border: 1px solid #dce3ed;
+  border: 1px solid #e1e4e8;
   border-radius: 6px;
-  color: #52606f;
+  color: #5b6066;
   background: #fff;
   font-size: 10px;
 }
@@ -266,11 +266,11 @@
   gap: 4px;
   margin: 17px 0 0 auto;
   padding: 6px;
-  border: 1px solid #dce2ec;
+  border: 1px solid #e1e3e7;
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 10px 25px rgb(19 39 75 / 12%);
-  color: #546071;
+  color: #5d6168;
   font-size: 10px;
 }
 .delegate-git-menu span {
@@ -278,8 +278,8 @@
   border-radius: 5px;
 }
 .delegate-git-menu .is-selected {
-  color: #1b4fb2;
-  background: #edf3ff;
+  color: #485d85;
+  background: #f2f5fa;
   font-weight: 700;
 }
 .delegate-merge-dialog {
@@ -295,16 +295,16 @@
   display: grid;
   gap: 5px;
   padding: 11px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid #e1e4e9;
   border-radius: 7px;
   font-size: 10px;
 }
 .delegate-merge-dialog__option.is-selected {
-  border-color: #1b4fb2;
-  background: #f0f5ff;
+  border-color: #485d85;
+  background: #f5f7fb;
 }
 .delegate-merge-dialog__option small {
-  color: #7c8797;
+  color: #84898f;
   font-size: 9px;
 }
 .delegate-merge-dialog__switch {
@@ -312,17 +312,17 @@
   align-items: center;
   gap: 10px;
   margin-top: 11px;
-  color: #485363;
+  color: #50555b;
   font-size: 10px;
 }
 .delegate-merge-dialog__switch i {
   width: 25px;
   height: 15px;
   border-radius: 12px;
-  background: #c9d1de;
+  background: #cfd3d8;
 }
 .delegate-merge-dialog__switch.is-on i {
-  background: #1b4fb2;
+  background: #485d85;
 }
 .delegate-merge-dialog__switch i::after {
   display: block;
@@ -349,5 +349,5 @@
 }
 .delegate-merge-dialog__actions span:last-child {
   color: #fff;
-  background: #1b4fb2;
+  background: #485d85;
 }

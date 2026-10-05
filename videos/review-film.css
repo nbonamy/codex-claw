@@ -36,8 +36,8 @@
 .review-workspace__header > span {
   padding: 5px 9px;
   border-radius: 20px;
-  color: #1e4b97;
-  background: #eff4ff;
+  color: #425473;
+  background: #f4f6fa;
   font-size: 10px;
 }
 .review-workspace__main {
@@ -67,8 +67,8 @@
   height: 27px;
   place-items: center;
   border-radius: 8px;
-  color: #1b4fb2;
-  background: #eaf1ff;
+  color: #485d85;
+  background: #f0f3f9;
   font-size: 15px;
 }
 .review-conversation > header > div {
@@ -109,8 +109,8 @@
   font-size: 11px;
 }
 .review-composer.is-typing {
-  border-color: #86a8ed;
-  box-shadow: 0 0 0 3px #eff4ff;
+  border-color: #a5b3ce;
+  box-shadow: 0 0 0 3px #f4f6fa;
   color: #141414;
 }
 .review-composer b {
@@ -121,7 +121,7 @@
   place-items: center;
   border-radius: 5px;
   color: #fff;
-  background: #1b4fb2;
+  background: #485d85;
   font-size: 12px;
 }
 .review-pane {
@@ -149,8 +149,8 @@
   place-items: center;
   margin: auto;
   border-radius: 13px;
-  color: #1b4fb2;
-  background: #eff4ff;
+  color: #485d85;
+  background: #f4f6fa;
   font-size: 27px;
 }
 .review-pane--dormant strong {
@@ -179,8 +179,8 @@
   height: 45px;
   place-items: center;
   border-radius: 12px;
-  color: #1b4fb2;
-  background: #eff4ff;
+  color: #485d85;
+  background: #f4f6fa;
   font-size: 24px;
 }
 .review-setup__intro h3 {
@@ -218,12 +218,12 @@
   text-align: center;
 }
 .review-setup__option.is-selected {
-  border-color: #1b4fb2;
-  background: #eff4ff;
-  box-shadow: inset 0 0 0 1px #1b4fb2;
+  border-color: #485d85;
+  background: #f4f6fa;
+  box-shadow: inset 0 0 0 1px #485d85;
 }
 .review-setup__option b {
-  color: #1b4fb2;
+  color: #485d85;
   font-size: 17px;
 }
 .review-setup__option strong {
@@ -241,7 +241,7 @@
   padding: 7px 12px;
   border-radius: 6px;
   color: #fff;
-  background: #1b4fb2;
+  background: #485d85;
   font-size: 10px;
   font-weight: 650;
 }
@@ -277,8 +277,8 @@
 .review-session__header > span {
   padding: 5px 8px;
   border-radius: 20px;
-  color: #1e4b97;
-  background: #eff4ff;
+  color: #425473;
+  background: #f4f6fa;
   font-size: 9px;
 }
 .review-rounds {
@@ -293,8 +293,8 @@
   padding-bottom: 10px;
 }
 .review-rounds .is-active {
-  border-bottom: 2px solid #1b4fb2;
-  color: #1b4fb2;
+  border-bottom: 2px solid #485d85;
+  color: #485d85;
   font-weight: 650;
 }
 .review-session__body {
@@ -324,8 +324,8 @@
 .review-working__spinner {
   width: 35px;
   height: 35px;
-  border: 3px solid #dbe6fb;
-  border-top-color: #1b4fb2;
+  border: 3px solid #e5e9f1;
+  border-top-color: #485d85;
   border-radius: 50%;
   transform: rotate(20deg);
 }
@@ -343,8 +343,8 @@
   margin-top: 6px;
   padding: 6px 10px;
   border-radius: 20px;
-  color: #1b4fb2;
-  background: #eff4ff;
+  color: #485d85;
+  background: #f4f6fa;
   font-size: 10px;
 }
 .review-totals {
@@ -380,7 +380,7 @@
   background: #fff;
 }
 .review-finding.is-fixing {
-  border-color: #8eaff4;
+  border-color: #adbad5;
 }
 .review-finding.is-fixed {
   border-color: #b7e6d2;
@@ -408,8 +408,8 @@
 .review-finding__state {
   padding: 4px 6px;
   border-radius: 15px;
-  color: #1e4b97;
-  background: #eff4ff;
+  color: #425473;
+  background: #f4f6fa;
   font-size: 9px;
 }
 .review-finding.is-fixed .review-finding__state {
@@ -420,7 +420,7 @@
   width: 22px;
   height: 12px;
   border-radius: 20px;
-  background: #1b4fb2;
+  background: #485d85;
 }
 .review-finding__switch::after {
   display: block;
@@ -440,7 +440,7 @@
   font-size: 10px;
 }
 .review-finding__detail a {
-  color: #1b4fb2;
+  color: #485d85;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   text-decoration: none;
 }
@@ -465,7 +465,7 @@
   height: 6px;
   overflow: hidden;
   border-radius: 6px;
-  background: #e7eaf0;
+  background: #eaebed;
 }
 .review-fix-progress__track i {
   display: block;
@@ -501,7 +501,7 @@
   font-size: 11px;
 }
 .review-message > strong i {
-  color: #1b4fb2;
+  color: #485d85;
   font-style: normal;
 }
 .review-message p {
@@ -531,7 +531,7 @@
   padding: 10px 13px;
   border-radius: 9px;
   color: #262626;
-  background: #eff4ff;
+  background: #f4f6fa;
   font-size: 11px;
 }
 .review-diff {

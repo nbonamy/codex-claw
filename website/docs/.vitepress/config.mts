@@ -7,6 +7,16 @@ export default defineConfig({
   title: product.name,
   description: `Set up your coding agents, coordinate work, and review the results in ${product.name}.`,
   base: "/docs/",
+  markdown: {
+    config(md) {
+      md.core.ruler.before("normalize", "product-download", (state) => {
+        state.src = state.src.replaceAll(
+          "__PRODUCT_DOWNLOAD_URL__",
+          `${product.websiteUrl}/desktop/downloads/${product.downloadFileName}`,
+        );
+      });
+    },
+  },
   // These assets are already owned by the public landing page.
   vite: { publicDir: fileURLToPath(new URL("../../assets", import.meta.url)) },
   head: [["link", { rel: "icon", href: "/docs/app-icon.png" }]],
