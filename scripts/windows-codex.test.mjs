@@ -87,7 +87,7 @@ test('rejects modified archive bytes before extracting or replacing an existing 
 });
 
 for (const invalid of ['wrongMachine', 'missingHelper', 'wrongVersion']) {
-  test(`rejects a package with ${invalid} before replacing the previous installation`, async () => {
+  test(`rejects a package with ${invalid} and preserves the previous installation`, async () => {
     const { root, options, dependencies } = fixture('x64', { [invalid]: true });
     try {
       mkdirSync(options.outputDir);
@@ -130,6 +130,66 @@ for (const installationFails of [false, true]) {
     } finally {
       t.mock.restoreAll();
       remove(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('retries locked directory moves and executes Codex only after promotion', async (t) => {
+  const { root, options, dependencies } = fixture();
+  const rename = fs.renameSync;
+  const attempts = new Map();
+  const executions = [];
+  mkdirSync(options.outputDir);
+  writeFileSync(path.join(options.outputDir, 'previous'), 'keep until promoted');
+  t.mock.method(fs, 'renameSync', (source, destination) => {
+    const count = (attempts.get(source) ?? 0) + 1;
+    attempts.set(source, count);
+    if (count <= 2) throw Object.assign(new Error('operation not permitted'), { code: 'EPERM', path: source, dest: destination });
+    return rename(source, destination);
+  });
+  try {
+    const executable = await prepareWindowsCodex(options, {
+      ...dependencies,
+      execFileSync: (command, args, runOptions) => {
+        if (command !== 'tar') executions.push(command);
+        return dependencies.execFileSync(command, args, runOptions);
+      },
+    });
+    assert.equal(executable, path.join(options.outputDir, 'bin/codex.exe'));
+    assert.deepEqual(executions, [executable]);
+    assert.equal(readFileSync(executable).toString('ascii', 0, 2), 'MZ');
+    assert.equal(attempts.get(options.outputDir), 3);
+    assert.equal(attempts.size, 2);
+  } finally {
+    t.mock.restoreAll();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const rollbackFails of [false, true]) {
+  test(`failed promotion ${rollbackFails ? 'retains the backup if rollback also fails' : 'restores the previous installation'}`, async (t) => {
+    const { root, options, dependencies } = fixture();
+    const rename = fs.renameSync;
+    const promotionError = Object.assign(new Error('promotion I/O error'), { code: 'EIO' });
+    const rollbackError = Object.assign(new Error('rollback I/O error'), { code: 'EIO' });
+    let previousDir;
+    mkdirSync(options.outputDir);
+    writeFileSync(path.join(options.outputDir, 'previous'), 'keep');
+    t.mock.method(console, 'warn', () => {});
+    t.mock.method(fs, 'renameSync', (source, destination) => {
+      if (source === options.outputDir) previousDir = destination;
+      if (path.basename(source) === 'package') throw promotionError;
+      if (rollbackFails && source === previousDir) throw rollbackError;
+      return rename(source, destination);
+    });
+    try {
+      await assert.rejects(prepareWindowsCodex(options, dependencies), error => rollbackFails
+        ? error instanceof AggregateError && error.errors[0] === promotionError && error.errors[1] === rollbackError
+        : error === promotionError);
+      assert.equal(readFileSync(path.join(rollbackFails ? previousDir : options.outputDir, 'previous'), 'utf8'), 'keep');
+    } finally {
+      t.mock.restoreAll();
+      rmSync(root, { recursive: true, force: true });
     }
   });
 }

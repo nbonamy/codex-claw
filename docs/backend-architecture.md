@@ -37,8 +37,11 @@ helpers and clean-machine smoke tests must also pass on each target OS. Linux
 uses the official glibc Node builds, not a universal musl-compatible binary.
 
 Windows Codex preparation downloads the pinned version's complete official
-package and verifies its release SHA-256, package manifest, executable
-architectures, and reported CLI version before replacing an existing copy.
+package and verifies its release SHA-256, package manifest, and executable
+architectures before promotion. It checks the reported CLI version from the
+final location, since running staged binaries can lock their directory on
+Windows. Directory moves retry transient locks; failed validation rolls back
+the previous installation, retaining recovery files if rollback is blocked.
 Keep its `bin/`, `codex-path/`, and `codex-resources/` layout intact; the Windows
 desktop launches `resources/codex/bin/codex.exe`. macOS/Linux retain their
 existing bundled executable paths. Development invokes the parent npm CLI
