@@ -77,7 +77,9 @@ async function shareCodexResources(paths: CodexResourceSharingPaths): Promise<vo
     await mkdir(sharedPath, { recursive: true, mode: 0o700 });
     if (await isLinkTo(appPath, sharedPath)) continue;
     await rm(appPath, { recursive: true, force: true });
-    await symlink(path.relative(paths.appCodexHome, sharedPath), appPath, 'dir');
+    // Windows directory junctions do not require symlink privileges or Developer Mode.
+    await symlink(process.platform === 'win32' ? path.resolve(sharedPath) : path.relative(paths.appCodexHome, sharedPath),
+      appPath, process.platform === 'win32' ? 'junction' : 'dir');
   }
 }
 

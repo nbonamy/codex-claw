@@ -1,5 +1,4 @@
 import {
-  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -76,16 +75,15 @@ describe('local SDK build', () => {
     const sourceScript = path.resolve(__dirname, '../../../../scripts/build-sdk.mjs');
     const fixtureScript = path.join(scriptDirectory, 'build-sdk.mjs');
     writeFileSync(fixtureScript, readFileSync(sourceScript));
-    const npmExecutable = path.join(fakeBinDirectory, process.platform === 'win32' ? 'npm.cmd' : 'npm');
-    writeFileSync(npmExecutable, process.platform === 'win32' ? '@exit /b 0\r\n' : '#!/bin/sh\nexit 0\n');
-    chmodSync(npmExecutable, 0o755);
+    const npmExecutable = path.join(fakeBinDirectory, 'npm-cli.cjs');
+    writeFileSync(npmExecutable, 'process.exit(0);\n');
 
     const result = spawnSync(process.execPath, [fixtureScript], {
       cwd: appRoot,
       encoding: 'utf8',
       env: {
         ...process.env,
-        PATH: `${fakeBinDirectory}${path.delimiter}${process.env.PATH ?? ''}`,
+        npm_execpath: npmExecutable,
       },
     });
 
