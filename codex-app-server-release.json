@@ -24,6 +24,12 @@
       "arch": "x64",
       "archive": "codex-package-x86_64-pc-windows-msvc.tar.gz",
       "sha256": "a174a1c8c0405076c7cc56534fa8d6760b83ce175526ddd20d1a182e33d9ebdb"
+    },
+    {
+      "platform": "win32",
+      "arch": "arm64",
+      "archive": "codex-package-aarch64-pc-windows-msvc.tar.gz",
+      "sha256": "27594bdcad324d66aa49b9957e019daa593f2c4fc52600f61edc569373ad9718"
     }
   ]
 }

@@ -52,23 +52,21 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 
 electronDev.on('exit', (code) => {
   if (!shuttingDown) {
-    shutdown(`electron exited with code ${code ?? 'null'}`);
+    shutdown(`electron exited with code ${code ?? 'null'}`, code ?? 1);
   }
 });
 
 backendWatch.on('exit', (code) => {
   if (!shuttingDown) {
-    shutdown(`backend watch exited with code ${code ?? 'null'}`);
+    shutdown(`backend watch exited with code ${code ?? 'null'}`, code || 1);
   }
 });
 
 function start(command, args, options) {
-  if (command === 'npm') {
-    if (!process.env.npm_execpath) throw new Error('Run development through npm run dev.');
-    args = [process.env.npm_execpath, ...args];
-    command = process.execPath;
-  }
-  const child = spawn(command, args, {
+  // npm.cmd requires a shell on Windows. Use the CLI selected by the parent
+  // npm invocation through Node, preserving arguments and paths with spaces.
+  const npmCli = command === 'npm' ? process.env.npm_execpath : undefined;
+  const child = spawn(npmCli ? process.execPath : command, npmCli ? [npmCli, ...args] : args, {
     cwd: options.cwd,
     env: {
       ...process.env,
@@ -82,7 +80,7 @@ function start(command, args, options) {
   });
   child.once('error', (error) => {
     console.error(`[dev:${options.name}] ${error.message}`);
-    shutdown(`${options.name} failed`);
+    shutdown(`${options.name} failed`, 1);
   });
   return child;
 }
@@ -90,6 +88,7 @@ function start(command, args, options) {
 function run(command, args) {
   return new Promise((resolve, reject) => {
     const child = start(command, args, { cwd: rootDir, name: command });
+    child.once('error', reject);
     child.once('exit', (code) => {
       code === 0 ? resolve() : reject(new Error(`${command} ${args.join(' ')} exited with ${code}`));
     });
@@ -106,15 +105,16 @@ async function waitForFile(filePath) {
   throw new Error(`Timed out waiting for ${filePath}`);
 }
 
-function shutdown(reason) {
+function shutdown(reason, exitCode = 0) {
   if (shuttingDown) {
     return;
   }
 
   shuttingDown = true;
+  process.exitCode = exitCode;
   console.log(`[dev] stopping: ${reason}`);
   for (const child of children) {
     child.kill();
   }
-  setTimeout(() => process.exit(0), 250).unref();
+  setTimeout(() => process.exit(exitCode), 250).unref();
 }

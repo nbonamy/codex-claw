@@ -507,6 +507,7 @@ export class AppController {
     ipc.handle(ipcChannels.getUpdateStatus, () => this.desktopUpdateStatus);
     ipc.handle(ipcChannels.installUpdate, () => this.requestInstallUpdate());
     ipc.handle(ipcChannels.setDockBadgeCount, (_event, count: number) => this.setDockBadgeCount(count));
+    ipc.handle(ipcChannels.setMenuBarVisible, (_event, visible) => this.setMenuBarVisible(visible));
 
     ipc.handle(ipcChannels.getDaemonStatus, () => this.getDaemonStatus());
 
@@ -663,6 +664,13 @@ export class AppController {
       throw new Error('Dock badge count must be a non-negative integer.');
     }
     this.badgeApplication.setBadgeCount(count);
+  }
+
+  setMenuBarVisible(visible: boolean): void {
+    if (typeof visible !== 'boolean') throw new Error('Menu bar visibility must be a boolean.');
+    if (process.platform === 'darwin' || !this.mainWindow || this.mainWindow.isDestroyed()) return;
+    this.mainWindow.setAutoHideMenuBar(!visible);
+    this.mainWindow.setMenuBarVisibility(visible);
   }
 
   createWindow(): void {

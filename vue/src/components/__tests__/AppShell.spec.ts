@@ -384,8 +384,10 @@ describe('AppShell authentication and conversation', () => {
     let resolveConnections!: (value: []) => void;
     const getCodexAuthentication = vi.fn();
     const getClaudeAuthentication = vi.fn();
+    const setMenuBarVisible = vi.fn().mockResolvedValue(undefined);
     window.app = {
       getCodexAuthentication, getClaudeAuthentication,
+      setMenuBarVisible,
       getProviderConnections: vi.fn().mockReturnValue(new Promise((resolve) => {
         resolveConnections = resolve;
       })),
@@ -396,6 +398,7 @@ describe('AppShell authentication and conversation', () => {
 
     expect(wrapper.find('.codex-login').exists()).toBe(false);
     expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--auth-gated');
+    expect(setMenuBarVisible).toHaveBeenLastCalledWith(true);
 
     resolveConnections([]);
     await flushPromises();
@@ -483,6 +486,7 @@ describe('AppShell authentication and conversation', () => {
     vi.useFakeTimers();
     const snapshot = createInitialSnapshot();
     snapshot.agents = [];
+    const setMenuBarVisible = vi.fn().mockResolvedValue(undefined);
     const getCodexAuthentication = vi.fn()
       .mockResolvedValueOnce({
         account: null,
@@ -496,12 +500,14 @@ describe('AppShell authentication and conversation', () => {
       });
     window.app = {
       getCodexAuthentication,
+      setMenuBarVisible,
       startCodexChatGptLogin: vi.fn().mockResolvedValue(undefined),
       updateSettings: vi.fn().mockResolvedValue(snapshot),
     } as Partial<AppApi> as AppApi;
 
     const wrapper = mountShell({ snapshot });
     await flushPromises();
+    expect(setMenuBarVisible).toHaveBeenLastCalledWith(false);
     await wrapper.get('.codex-login .el-button').trigger('click');
     await flushPromises();
     vi.advanceTimersByTime(1000);
@@ -515,6 +521,7 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.find('.codex-login').exists()).toBe(false);
     expect(wrapper.get('.github-onboarding').text()).toContain('Connect GitHub.');
     expect(wrapper.get('.app-shell').classes()).toContain('app-shell--auth-gated');
+    expect(setMenuBarVisible).toHaveBeenLastCalledWith(false);
 
     await wrapper.setProps({
       snapshot: {
@@ -535,12 +542,14 @@ describe('AppShell authentication and conversation', () => {
 
     expect(wrapper.find('.github-onboarding').exists()).toBe(false);
     expect(wrapper.get('.onboarding-complete').text()).toContain("You're all set.");
+    expect(setMenuBarVisible).toHaveBeenLastCalledWith(false);
     expect(useConfetti().bursts.value).toHaveLength(1);
 
     await wrapper.get('.onboarding-complete .el-button').trigger('click');
 
     expect(wrapper.find('.onboarding-complete').exists()).toBe(false);
     expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--auth-gated');
+    expect(setMenuBarVisible).toHaveBeenLastCalledWith(true);
     wrapper.unmount();
   });
 

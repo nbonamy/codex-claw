@@ -40,10 +40,23 @@ Node builds, not a universal musl-compatible binary.
 
 `codex-app-server-release.json` pins official Codex package archive SHA-256s.
 Preparation verifies the hash, architecture and executable version on the native
-build host. Windows preserves the upstream `bin/codex.exe`, `codex-path`, and
-`codex-resources` layout, including sandbox helpers and DLLs. macOS retains
-upstream Codex signatures. Computer Use, Screenshots and Apple speech/TTS helpers
+build host. macOS retains upstream Codex signatures.
+Computer Use, Screenshots and Apple speech/TTS helpers
 remain macOS-only; packaging another OS does not enable those capabilities.
+
+Windows Codex preparation downloads the pinned version's complete official
+package and verifies its pinned SHA-256, package manifest, and executable
+architectures before promotion. It reuses cached packages matching those pins
+and checks the reported CLI version from the final location, since running
+staged binaries can lock their directory on Windows. Directory moves retry
+transient locks; failed validation rolls back the previous installation,
+retaining recovery files if rollback is blocked. Keep its `bin/`, `codex-path/`,
+and `codex-resources/` layout intact, including sandbox helpers and DLLs; the
+Windows desktop launches `resources/codex/bin/codex.exe`. macOS/Linux retain
+their existing bundled executable paths. Development invokes the parent npm CLI
+through Node to avoid Windows command-shim execution and quoting issues.
+Windows ARM64 remains available for experimental development; it is not part of
+the initial GitHub build matrix.
 
 ## GitHub desktop releases
 

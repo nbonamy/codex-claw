@@ -32,6 +32,19 @@ export function selectCodexReleaseTarget(config, platform, arch) {
 }
 
 export function hasExpectedExecutableArchitecture(executablePath, target, dependencies = {}) {
+  if (target.platform === 'win32') {
+    const descriptor = fs.openSync(executablePath, 'r');
+    try {
+      const dosHeader = Buffer.alloc(64);
+      if (fs.readSync(descriptor, dosHeader, 0, 64, 0) !== 64 || dosHeader.toString('ascii', 0, 2) !== 'MZ') return false;
+      const peHeader = Buffer.alloc(6);
+      if (fs.readSync(descriptor, peHeader, 0, 6, dosHeader.readUInt32LE(60)) !== 6
+        || peHeader.readUInt32LE(0) !== 0x4550) return false;
+      return peHeader.readUInt16LE(4) === (target.arch === 'x64' ? 0x8664 : 0xaa64);
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  }
   if (target.platform === 'darwin') {
     const run = dependencies.execFileSync ?? execFileSync;
     const architectures = run('lipo', ['-archs', executablePath], { encoding: 'utf8' })
@@ -40,17 +53,6 @@ export function hasExpectedExecutableArchitecture(executablePath, target, depend
     if (!architectures.includes(target.arch === 'x64' ? 'x86_64' : target.arch)) return false;
     dependencies.verifyDarwinSignature?.(executablePath);
     return true;
-  }
-
-  if (target.platform === 'win32') {
-    const descriptor = fs.openSync(executablePath, 'r');
-    try {
-      const dos = Buffer.alloc(64);
-      if (fs.readSync(descriptor, dos, 0, 64, 0) !== 64 || dos.toString('ascii', 0, 2) !== 'MZ') return false;
-      const pe = Buffer.alloc(6);
-      if (fs.readSync(descriptor, pe, 0, 6, dos.readUInt32LE(60)) !== 6 || pe.readUInt32LE(0) !== 0x4550) return false;
-      return pe.readUInt16LE(4) === (target.arch === 'x64' ? 0x8664 : 0xaa64);
-    } finally { fs.closeSync(descriptor); }
   }
 
   const header = (dependencies.readElfHeader ?? readElfHeader)(executablePath);

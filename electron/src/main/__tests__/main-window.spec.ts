@@ -51,9 +51,21 @@ describe('main window options', () => {
     });
     expect(createMainWindowOptions(false, undefined, 'win32')).toMatchObject({
       backgroundColor: '#061c2a',
-      titleBarStyle: 'hidden',
+      titleBarStyle: 'default',
+      autoHideMenuBar: true,
     });
     expect(createMainWindowOptions(false, undefined, 'win32').vibrancy).toBeUndefined();
+  });
+
+  it.each(['linux', 'win32'] as const)('keeps the native %s title bar and window controls available before onboarding', (platform) => {
+    expect(createMainWindowOptions(false, undefined, platform)).toMatchObject({
+      titleBarStyle: 'default',
+      autoHideMenuBar: true,
+    });
+    expect(createMainWindowOptions(true, undefined, platform)).toMatchObject({
+      titleBarStyle: 'default',
+      autoHideMenuBar: true,
+    });
   });
 
   it('accepts persisted bounds with maximized state', () => {

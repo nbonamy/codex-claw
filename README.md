@@ -122,7 +122,7 @@ Settings shows each engine's account, conversation location, and enabled state.
 
 Requirements:
 
-- macOS arm64, or experimental Windows x64 / Linux x64/arm64;
+- macOS arm64, or experimental Linux/Windows x64/arm64 for development;
 - Node 22.23.3 and npm 10.9.4 (the CI toolchain);
 - network access to download the pinned Codex app-server on the first build;
 
@@ -137,6 +137,13 @@ release dependency boundary. No sibling checkout is required. SDK contributors
 can explicitly set `CODEX_APP_SDK_SOURCE=1` for development source aliases.
 Install Electron once before running parallel tests: its lazy first-import
 download can otherwise race across workers on a clean checkout.
+
+On Windows, run development from PowerShell with Node and npm installed. The
+launcher invokes npm through Node, so it does not require a Unix shell or direct
+execution of `npm.cmd`. Preparing Codex requires `tar.exe` on `PATH` (included
+with current Windows versions). It downloads and verifies the full Windows
+Codex package, including its supporting executables and resources. Native
+Windows startup remains experimental until exercised on the target machine.
 
 Focused project gates:
 
