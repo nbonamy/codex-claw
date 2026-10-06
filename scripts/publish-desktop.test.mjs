@@ -5,6 +5,9 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { publishDesktop } from './publish-desktop.mjs';
 
+const changelog = '# Changelog\n\n## [0.28.0] - 2026-10-07\n\n- Newer changes.\n\n## [0.27.0] - 2026-10-05\n\n### Fixes\n\n- Restored saved chats.\n';
+const notes = '### Fixes\n\n- Restored saved chats.';
+
 // Publication policy against a fake gh, not proof of GitHub Actions or network behavior.
 function setup(t, release) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'publication-policy-'));
@@ -31,29 +34,39 @@ function setup(t, release) {
 
 test('a new release is staged as a draft, filled with every installer, then published as a prerelease', async t => {
   const f = setup(t, null);
-  await publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'prerelease', run: f.run });
+  await publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'prerelease', changelog, run: f.run });
   assert.deepEqual(f.verbs(), ['view', 'create', 'view', 'upload', 'edit', 'view']);
   assert.equal(f.remote.calls.find(call => call[1] === 'upload').filter(arg => arg.endsWith('.exe')).length, 1);
   assert.deepEqual(f.remote.release, { isDraft: false, isPrerelease: true });
+  const create = f.remote.calls.find(call => call[1] === 'create');
+  assert.equal(create[create.indexOf('--notes') + 1], notes);
 });
 
 test('latest publishes a leftover draft without recreating it', async t => {
   const f = setup(t, { isDraft: true, isPrerelease: true });
-  await publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'latest', run: f.run });
+  await publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'latest', changelog, run: f.run });
   assert.ok(!f.verbs().includes('create'));
   assert.ok(f.remote.calls.find(call => call[1] === 'edit').includes('--latest'));
   assert.deepEqual(f.remote.release, { isDraft: false, isPrerelease: false });
+  const edit = f.remote.calls.find(call => call[1] === 'edit');
+  assert.equal(edit[edit.indexOf('--notes') + 1], notes);
 });
 
 test('an already published release is never modified', async t => {
   const f = setup(t, { isDraft: false, isPrerelease: false });
-  await assert.rejects(publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'prerelease', run: f.run }), /already published/);
+  await assert.rejects(publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'prerelease', changelog, run: f.run }), /already published/);
   assert.deepEqual(f.verbs(), ['view']);
 });
 
 test('nothing is staged when a platform is incomplete', async t => {
   const f = setup(t, null);
   fs.rmSync(path.join(f.directory, 'desktop-linux-x64', 'linux-x64.rpm'));
-  await assert.rejects(publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'latest', run: f.run }), /Missing \.rpm artifact for linux-x64/);
+  await assert.rejects(publishDesktop({ directory: f.directory, tag: 'v0.27.0', channel: 'latest', changelog, run: f.run }), /Missing \.rpm artifact for linux-x64/);
+  assert.deepEqual(f.remote.calls, []);
+});
+
+test('missing release notes stop publication before any GitHub change', async t => {
+  const f = setup(t, null);
+  await assert.rejects(publishDesktop({ directory: f.directory, tag: 'v0.29.0', channel: 'prerelease', changelog, run: f.run }), /Missing changelog notes/);
   assert.deepEqual(f.remote.calls, []);
 });
