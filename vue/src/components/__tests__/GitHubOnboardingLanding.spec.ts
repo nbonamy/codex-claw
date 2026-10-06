@@ -16,6 +16,17 @@ function mountLanding(props: Partial<InstanceType<typeof GitHubOnboardingLanding
 }
 
 describe('GitHubOnboardingLanding', () => {
+  it('shows connection failures and keeps the connect action available for retry', async () => {
+    const wrapper = mountLanding({ error: 'GitHub OAuth is not configured.' });
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('GitHub OAuth is not configured.');
+    await wrapper.get('.github-onboarding__actions .el-button').trigger('click');
+    expect(wrapper.emitted('connect')).toStrictEqual([[]]);
+
+    await wrapper.setProps({ error: null });
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+
   it('offers a skippable GitHub connection', async () => {
     const wrapper = mountLanding();
 

@@ -1,5 +1,7 @@
 import { product } from '@workspace/core/product';
 import path from 'node:path';
+import os from 'node:os';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { AppController, requiresSingleInstanceLock, shouldBlockDisplaySleep } from '../app-controller';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
@@ -356,12 +358,19 @@ describe('AppController', () => {
       open,
     };
 
-    await expect(openAgentPath(controller, 'agent-dina', 'finder', '/Users/nbonamy/src/skwad/README.md'))
-      .rejects.toThrow('only available for files inside');
+    const outsideDirectory = await mkdtemp(path.join(os.tmpdir(), 'open-in-controller-'));
+    try {
+      const outsideFile = path.join(outsideDirectory, 'outside.txt');
+      await writeFile(outsideFile, 'outside the project');
+      await expect(openAgentPath(controller, 'agent-dina', 'finder', outsideFile))
+        .rejects.toThrow('only available for files inside');
 
-    currentSnapshot(controller).teams[0].remoteConnectionId = 'connection-devbox';
-    await expect(openAgentPath(controller, 'agent-dina', 'finder')).rejects.toThrow('only available for local agents');
-    expect(open).not.toHaveBeenCalled();
+      currentSnapshot(controller).teams[0].remoteConnectionId = 'connection-devbox';
+      await expect(openAgentPath(controller, 'agent-dina', 'finder')).rejects.toThrow('only available for local agents');
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      await rm(outsideDirectory, { recursive: true, force: true });
+    }
   });
 });
 

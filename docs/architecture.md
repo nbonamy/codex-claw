@@ -482,6 +482,11 @@ that truly require Electron APIs. The main-window adapter persists normal
 window bounds and maximized state locally as they change, and restores them
 only when the bounds still intersect a connected display.
 
+Native menu visibility is client-local: the renderer calls `setMenuBarVisible`
+through preload when onboarding visibility changes, and Electron controls the
+Linux/Windows window menu without involving `daemon`. macOS retains its system
+menu; web clients do not expose this desktop operation.
+
 Screenshots are one such desktop effect. A passive native key monitor recognizes
 left-and-right modifier chords, while the bundled Computer Use helper captures
 the frontmost macOS window and reports its Screen Recording trust. Electron

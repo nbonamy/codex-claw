@@ -146,6 +146,7 @@ const api: AppApi = {
   openScreenRecordingSettings: () => ipc.invoke(ipcChannels.openScreenRecordingSettings),
   launchChatGptApp: (input) => ipc.invoke(ipcChannels.launchChatGptApp, input),
   quit: () => ipc.invoke(ipcChannels.quit),
+  setMenuBarVisible: (visible) => ipc.invoke(ipcChannels.setMenuBarVisible, visible),
   restartApp: () => ipc.invoke(ipcChannels.restartApp),
   reloadRenderer: () => ipc.invoke(ipcChannels.reloadRenderer),
   setAgentGoal: (agentId: string, objective: string) => ipc.invoke(ipcChannels.setAgentGoal, agentId, objective),

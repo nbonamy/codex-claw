@@ -127,7 +127,8 @@ export function createMainWindowOptions(
       }
     : {
         backgroundColor: '#061c2a',
-        titleBarStyle: 'hidden',
+        titleBarStyle: 'default',
+        autoHideMenuBar: true,
       };
 
   return {

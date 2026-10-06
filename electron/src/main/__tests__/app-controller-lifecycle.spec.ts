@@ -8,6 +8,7 @@ import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
 
 const native = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => any>(),
+  exposed: new Map<string, unknown>(),
   dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn() },
   shell: { openExternal: vi.fn(), beep: vi.fn() },
   factory: vi.fn(), createWindow: vi.fn(), maintenance: vi.fn(), capture: vi.fn(),
@@ -25,6 +26,10 @@ vi.mock('electron', async () => {
     ipcMain: {
       handle: (channel: string, handler: (...args: any[]) => any) => native.handlers.set(channel, handler),
       removeHandler: (channel: string) => native.handlers.delete(channel),
+    },
+    contextBridge: { exposeInMainWorld: (name: string, value: unknown) => native.exposed.set(name, value) },
+    ipcRenderer: {
+      invoke: async (channel: string, ...args: unknown[]) => native.handlers.get(channel)!({}, ...args),
     },
     powerMonitor: Object.assign(new EventEmitter(), { isOnBatteryPower: () => false }),
     powerSaveBlocker: { start: vi.fn(() => 1), stop: vi.fn() },
@@ -60,6 +65,7 @@ function windowFixture() {
     webContents: Object.assign(new EventEmitter(), { send: vi.fn(), reload: vi.fn() }),
     isDestroyed: vi.fn(() => false), isMinimized: vi.fn(() => false),
     isFocused: () => true, restore: vi.fn(), show: vi.fn(), focus: vi.fn(),
+    setAutoHideMenuBar: vi.fn(), setMenuBarVisibility: vi.fn(),
   });
 }
 function backendFixture() {
@@ -112,9 +118,31 @@ afterEach(async () => {
   app.removeAllListeners();
   powerMonitor.removeAllListeners();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('controller desktop lifecycle', () => {
+  it.each(['linux', 'win32', 'darwin'] as const)('applies menu visibility through the real preload bridge on %s without a backend request', async (platform) => {
+    const { controller, window, backend } = setup();
+    controller.createWindow();
+    vi.stubGlobal('process', Object.create(process, { platform: { value: platform } }));
+    await import('../../preload/index');
+    const api = native.exposed.get('app') as import('@workspace/core/contracts').AppApi;
+
+    await api.setMenuBarVisible(false);
+    await api.setMenuBarVisible(true);
+
+    expect(window.setAutoHideMenuBar.mock.calls).toStrictEqual(platform === 'darwin' ? [] : [[true], [false]]);
+    expect(window.setMenuBarVisibility.mock.calls).toStrictEqual(platform === 'darwin' ? [] : [[false], [true]]);
+    expect(backend.request).not.toHaveBeenCalled();
+
+    await expect(api.setMenuBarVisible('false' as unknown as boolean)).rejects.toThrow('must be a boolean');
+    expect(window.setMenuBarVisibility).toHaveBeenCalledTimes(platform === 'darwin' ? 0 : 2);
+    window.isDestroyed.mockReturnValue(true);
+    await api.setMenuBarVisible(false);
+    expect(window.setMenuBarVisibility).toHaveBeenCalledTimes(platform === 'darwin' ? 0 : 2);
+  });
+
   it('settles backend browser requests on replacement, timeout, IPC failure, and shutdown', async () => {
     const fixture = backendFixture();
     native.factory.mockReturnValue(fixture.backend);

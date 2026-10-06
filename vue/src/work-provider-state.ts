@@ -49,6 +49,12 @@ export function createWorkProviderState(options: WorkProviderStateOptions) {
       authorization.value = result.authorization ?? null;
       if (result.authorization) scheduleAuthorizationPoll(provider);
       else clearAuthorizationPoll(provider);
+      const current = result.snapshot.workBacklog.connections.find(value => value.provider === provider);
+      if (current?.status === 'notConfigured' || current?.status === 'error') {
+        status.value = 'error';
+        error.value = localizedText(current.detail, translate);
+        return;
+      }
       if (result.authorization?.flow === 'browser') {
         await appPlatformActions.openExternal?.(result.authorization.verificationUri);
         if (revision !== authorizationRevision) return;

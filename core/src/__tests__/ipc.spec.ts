@@ -336,5 +336,9 @@ describe('ipc channels', () => {
       .toEqualTypeOf<[count: number]>();
     expectTypeOf<AppIpcRequests[typeof ipcChannels.setDockBadgeCount]['result']>()
       .toEqualTypeOf<void>();
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.setMenuBarVisible]['args']>()
+      .toEqualTypeOf<[visible: boolean]>();
+    expectTypeOf<AppIpcRequests[typeof ipcChannels.setMenuBarVisible]['result']>()
+      .toEqualTypeOf<void>();
   });
 });
