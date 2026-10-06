@@ -11,6 +11,7 @@ type ClaudeSession = Extract<BackendSession, { kind: 'claude' }>;
 
 /** One provider block instead of three sibling fields that had to agree on `kind`. */
 type Engine =
+  | { kind: 'antigravity'; session?: { sessionId: string }; settings?: Omit<Extract<BackendDefaults, { kind: 'antigravity' }>, 'kind'> }
   | { kind: 'codex'; session?: { threadId: string }; settings?: Omit<CodexDefaults, 'kind'> }
   | { kind: 'claude'; session?: Omit<ClaudeSession, 'kind'>; settings?: Omit<ClaudeDefaults, 'kind'> };
 
@@ -144,6 +145,11 @@ function rosterAgentFrom(agent: PersistedAgent): RosterAgent {
 
 function persistedAgentFrom(agent: RosterAgent, teamId: string | undefined): PersistedAgent {
   const { engine, ...kept } = agent;
+  if (engine.kind === 'antigravity') return {
+    ...kept, ...(teamId ? { teamId } : {}), backend: 'antigravity',
+    ...(engine.session ? { backendSession: { kind: 'antigravity', ...engine.session } } : {}),
+    ...(engine.settings ? { backendDefaults: { kind: 'antigravity', ...engine.settings } } : {}),
+  };
   const session = engine.session;
   const settings = engine.settings;
   const backendSession: BackendSession | undefined = session
@@ -163,6 +169,11 @@ function persistedAgentFrom(agent: RosterAgent, teamId: string | undefined): Per
 
 function engineFrom(agent: PersistedAgent): Engine {
   const { backend, backendSession, backendDefaults } = agent;
+  if (backend === 'antigravity') return {
+    kind: 'antigravity',
+    ...(backendSession?.kind === 'antigravity' ? { session: withoutKind(backendSession) } : {}),
+    ...(backendDefaults?.kind === 'antigravity' ? { settings: withoutKind(backendDefaults) } : {}),
+  };
   if (backend === 'claude') {
     const session = backendSession?.kind === 'claude' ? withoutKind(backendSession) : undefined;
     const settings = backendDefaults?.kind === 'claude' ? withoutKind(backendDefaults) : undefined;

@@ -10,6 +10,7 @@ export type CodexApprovalPreset = ApprovalPreset;
 export type CodexApprovalsReviewer = 'user' | 'auto_review' | 'guardian_subagent';
 
 export type BackendSession =
+  | { kind: 'antigravity'; sessionId: string }
   | {
     kind: 'codex';
     threadId: string;
@@ -25,6 +26,7 @@ export type BackendSession =
   };
 
 export type BackendDefaults =
+  | { kind: 'antigravity'; model?: string; userSelectedModel?: boolean; permissionMode?: string; reasoningEffort?: ReasoningEffort }
   | {
     kind: 'codex';
     model?: string;

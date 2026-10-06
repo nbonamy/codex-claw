@@ -58,7 +58,7 @@ function expectSendPromptOptions(value: unknown, path: string): void {
   expectOptional(value, 'recordUserMessage', path, expectBoolean);
   expectOptional(value, 'backendOptions', path, (candidate, candidatePath) => {
     expectRecord(candidate, candidatePath);
-    expectLiteral(candidate.kind, ['codex', 'claude'], `${candidatePath}.kind`);
+    expectLiteral(candidate.kind, ['codex', 'claude', 'antigravity'], `${candidatePath}.kind`);
     if (candidate.kind === 'codex') {
       ['reasoningEffort', 'serviceTier'].forEach((key) => {
         expectOptional(candidate, key, candidatePath, (item, itemPath) =>

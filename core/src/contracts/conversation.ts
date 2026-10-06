@@ -48,6 +48,7 @@ export type AgentContextUsage = {
 };
 
 export type BackendConversationRef =
+  | { backend: 'antigravity'; folder: string | null; sessionId: string }
   | {
     backend: 'codex';
     threadId: string;
@@ -246,6 +247,7 @@ export type RendererSendPromptOptions = Omit<SendPromptOptions, 'attachments' | 
 };
 
 export type BackendPromptOptions =
+  | { kind: 'antigravity'; permissionMode?: string | null }
   | {
     kind: 'codex';
     reasoningEffort?: ReasoningEffort | null;

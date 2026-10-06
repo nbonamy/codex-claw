@@ -43,7 +43,7 @@ export function isAgentHandoff(value: unknown): value is AgentHandoff {
   const v = value as Record<string, unknown>;
   const ref = v.sourceRef as Record<string, unknown> | undefined;
   return typeof v.operationId === 'string' && v.operationId.length > 0 && v.operationId.length <= 128
-    && (v.backend === 'codex' || v.backend === 'claude')
+    && (v.backend === 'codex' || v.backend === 'claude' || v.backend === 'antigravity')
     && typeof v.sourceAgentId === 'string' && typeof v.sourceTitle === 'string'
     && ['preparing', 'closing', 'starting', 'complete', 'failed'].includes(String(v.phase))
     && (v.targetAgentId === undefined || typeof v.targetAgentId === 'string')

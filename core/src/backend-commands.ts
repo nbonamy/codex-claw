@@ -108,5 +108,6 @@ function worktreeDelegationCommands(backend: AgentBackend): BackendCommandSummar
 }
 
 export function defaultBackendCommands(backend: AgentBackend): BackendCommandSummary[] {
+  if (backend === 'antigravity') return [];
   return backend === 'claude' ? claudeBackendCommands : codexBackendCommands;
 }

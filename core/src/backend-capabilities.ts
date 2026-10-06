@@ -85,5 +85,17 @@ export const claudeBackendCapabilities: BackendCapabilities = {
 };
 
 export function defaultBackendCapabilities(backend: AgentBackend): BackendCapabilities {
+  if (backend === 'antigravity') return antigravityBackendCapabilities;
   return backend === 'claude' ? claudeBackendCapabilities : codexBackendCapabilities;
 }
+
+// Keep unimplemented app workflows unavailable until their owning integration is qualified.
+export const antigravityBackendCapabilities: BackendCapabilities = {
+  codeReview: false, planReview: false, questions: false, plugins: false,
+  conversationArchive: false, conversationResume: false, conversationReplaceWithSummary: false,
+  remoteControl: false, attachments: false, models: false, skills: false,
+  reasoningEffort: false, serviceTier: false, thinkingBudget: false,
+  planMode: 'unsupported', goals: false, steerPrompt: false, interrupt: false, history: false,
+  conversationFork: false, deleteTurn: false, editTurn: false, retryTurn: false,
+  approvals: false, approvalPresets: [],
+};

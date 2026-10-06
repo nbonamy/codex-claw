@@ -92,7 +92,7 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
   if (input.modelSelection) {
     const defaults = agent.backendDefaults?.kind === agent.backend
       ? agent.backendDefaults
-      : agent.backend === 'codex' ? { kind: 'codex' as const } : { kind: 'claude' as const };
+      : defaultBackendDefaults(agent.backend);
     const { reasoningEffort: _previousEffort, ...rest } = { reasoningEffort: undefined, ...defaults };
     agent.backendDefaults = {
       ...rest,
@@ -218,7 +218,7 @@ function clearAgentRuntimeState(agent: Agent): void {
 }
 
 function normalizedBackend(value: AgentBackend | undefined): AgentBackend {
-  return value === 'claude' ? 'claude' : 'codex';
+  return value ?? 'codex';
 }
 
 function applyProviderDefaults(snapshot: AppSnapshot, agent: Agent): void {
@@ -235,11 +235,13 @@ function applyProviderDefaults(snapshot: AppSnapshot, agent: Agent): void {
     agent.backendDefaults = approvalBackendDefaultsWithPreset(agent.backendDefaults, approvals.codex);
   } else if (agent.backend === 'claude' && approvals?.claude) {
     agent.backendDefaults = { ...agent.backendDefaults, kind: 'claude', permissionMode: approvals.claude };
+  } else if (agent.backend === 'antigravity' && approvals?.antigravity) {
+    agent.backendDefaults = { ...agent.backendDefaults, kind: 'antigravity', permissionMode: approvals.antigravity };
   }
 }
 
 function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {
-  return backend === 'claude' ? { kind: 'claude' } : { kind: 'codex' };
+  return { kind: backend };
 }
 
 function normalizedBackendDefaults(defaults: BackendDefaults | undefined, backend: AgentBackend): Agent['backendDefaults'] {

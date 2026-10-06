@@ -68,7 +68,7 @@ export type AppMcpServiceOptions = {
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
   agentCreation?: AgentCreationService;
-  createProject?: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude') => Promise<CreatedProject>;
+  createProject?: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude' | 'antigravity') => Promise<CreatedProject>;
   startAutomaticReview?: StartAutomaticReview;
   toolModuleProviders?: readonly AppMcpToolModuleProvider[];
 };

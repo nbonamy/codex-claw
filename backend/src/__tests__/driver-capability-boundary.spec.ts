@@ -3,7 +3,7 @@ import type { AgentBackendDriver } from '@workspace/core/backend-driver';
 import type { Agent } from '@workspace/core/contracts';
 import { claudeBackendCapabilities } from '@workspace/core/backend-capabilities';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
-import { BackendDriverRpc } from '../driver-rpc';
+import { BackendDriverRpc, createBackendDriver } from '../driver-rpc';
 
 const agent: Agent = { id: 'limited', name: 'Limited', folder: '/repo', backend: 'claude', status: { type: 'idle' }, createdAt: '', updatedAt: '' };
 
@@ -18,6 +18,9 @@ function fixture() {
 }
 
 describe('unified driver capability boundary', () => {
+  it('fails an explicitly selected unavailable Antigravity provider without creating Codex', () => {
+    expect(() => createBackendDriver('antigravity')).toThrow('Antigravity ACP integration is not available');
+  });
   it.each([
     [backendMethods.driverTextGenerate, { prompt: 'draft', cwd: '/repo' }],
     [backendMethods.driverConversationReplaceWithSummary, {}],

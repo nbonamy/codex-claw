@@ -9,7 +9,7 @@ export type CodeReviewScope =
 export type CodeReviewThreadMode = 'current' | 'independent';
 
 export type CodeReviewStartInput = {
-  backend?: 'codex' | 'claude';
+  backend?: 'codex' | 'claude' | 'antigravity';
   model?: string;
   reasoningEffort?: string;
   automation?: CodeReviewAutomationSettings;
@@ -26,9 +26,9 @@ export type CodeReviewAutomationSettings = {
 };
 
 export type CodeReviewPreferences = {
-  backend: 'codex' | 'claude';
+  backend: 'codex' | 'claude' | 'antigravity';
   automation: CodeReviewAutomationSettings;
-  providers: Partial<Record<'codex' | 'claude', { model?: string; reasoningEffort?: string }>>;
+  providers: Partial<Record<'codex' | 'claude' | 'antigravity', { model?: string; reasoningEffort?: string }>>;
 };
 
 export type CodeReviewAutomation = CodeReviewAutomationSettings & {
@@ -234,7 +234,7 @@ export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSe
 
 export function isCodeReviewStartInput(value: unknown): value is CodeReviewStartInput {
   return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode)
-    && (value.backend === undefined || value.backend === 'codex' || value.backend === 'claude')
+    && (value.backend === undefined || value.backend === 'codex' || value.backend === 'claude' || value.backend === 'antigravity')
     && optionalSelection(value.model) && optionalSelection(value.reasoningEffort)
     && (value.threadMode === 'independent' || (value.model === undefined && value.reasoningEffort === undefined))
     && (value.automation === undefined || (isCodeReviewAutomationSettings(value.automation)
@@ -248,9 +248,9 @@ export function isCodeReviewAutomationSettings(value: unknown): value is CodeRev
 }
 
 export function isCodeReviewPreferences(value: unknown): value is CodeReviewPreferences {
-  return isRecord(value) && (value.backend === 'codex' || value.backend === 'claude')
+  return isRecord(value) && (value.backend === 'codex' || value.backend === 'claude' || value.backend === 'antigravity')
     && isCodeReviewAutomationSettings(value.automation) && isRecord(value.providers)
-    && Object.entries(value.providers).every(([backend, selection]) => (backend === 'codex' || backend === 'claude')
+    && Object.entries(value.providers).every(([backend, selection]) => (backend === 'codex' || backend === 'claude' || backend === 'antigravity')
       && isRecord(selection) && optionalSelection(selection.model) && optionalSelection(selection.reasoningEffort));
 }
 
@@ -335,6 +335,7 @@ function isCodeReviewRound(value: unknown): value is CodeReviewRound {
 
 function isBackendSession(value: unknown): value is BackendSession {
   if (!isRecord(value)) return false;
+  if (value.kind === 'antigravity') return typeof value.sessionId === 'string';
   if (value.kind === 'codex') return typeof value.threadId === 'string';
   return value.kind === 'claude'
     && typeof value.sessionId === 'string'

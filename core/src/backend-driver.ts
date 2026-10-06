@@ -155,7 +155,7 @@ export function unsupportedBackendFeature(agent: Agent, feature: string): Error 
 }
 
 export function backendDisplayName(backend: AgentBackend): string {
-  return { codex: 'Codex', claude: 'Claude Code' }[backend];
+  return { codex: 'Codex', claude: 'Claude Code', antigravity: 'Antigravity' }[backend];
 }
 
 export function backendRuntimeFromSnapshot(snapshot: AppSnapshot, backend: AgentBackend): BackendRuntimeStatus {

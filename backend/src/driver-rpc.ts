@@ -1,4 +1,5 @@
 import { product } from '@workspace/core/product';
+import { isAgentBackend } from '@workspace/core/contracts/shared';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { expandWorktreeDelegationCommand } from './agents/worktree-delegation';
 import { handoffInProgress } from '@workspace/core/agent-handoff';
@@ -42,6 +43,7 @@ export function createDefaultBackendDrivers(options: BackendDriverRegistryOption
 }
 
 export function createBackendDriver(backend: AgentBackend, options: BackendDriverRegistryOptions = {}): AgentBackendDriver {
+  if (backend === 'antigravity') throw new Error('Antigravity ACP integration is not available yet.');
   if (backend === 'claude') return new ClaudeBackendDriver(undefined, undefined, {
     appMcpServerUrl: options.appMcpServerUrl ?? null,
     hostedMcpServerUrls: options.hostedMcpServerUrls,
@@ -621,7 +623,7 @@ function requireBackendAgentIdParams(params: unknown): { backend: AgentBackend; 
 }
 
 function requireBackend(value: unknown): AgentBackend {
-  if (value !== 'codex' && value !== 'claude') {
+  if (!isAgentBackend(value)) {
     throw new Error('Invalid backend.');
   }
   return value;

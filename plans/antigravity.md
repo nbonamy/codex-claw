@@ -446,6 +446,16 @@ Antigravity surface.
 
 ### Phase 1: contracts and lifecycle
 
+Implementation in progress (2026-10-06): added Antigravity identity/session/default
+contracts, persisted generic preferences and disk schema, with creation/switch and
+disk-roundtrip regressions. Unavailable driver creation fails explicitly; default
+capabilities and commands do not inherit Codex features. Lifecycle registration,
+authentication, remaining admission paths and complete provider UX are still pending.
+
+Validation so far: all five workspace tests plus script tests passed after refreshing
+the installed SDK build; affected contract/persistence tests and typechecks passed.
+This is foundation work, not shipped Antigravity support.
+
 - [x] Qualify ACP for the measured text/permissions/MCP/history/cancellation scope.
 - [ ] Extend backend/session/default/auth unions and all owning runtime decoders.
 - [ ] Extend generic settings normalization, connected choices, and remembered
@@ -455,6 +465,13 @@ Antigravity surface.
   disconnected retry, and cross-provider default isolation in this same milestone.
 
 ### Phase 2: selected transport and a minimal conversation slice
+
+Transport foundation in progress: duplex JSONL framing handles colliding inbound
+request IDs, split frames, bounded buffers, EOF and request timeouts. Deterministic
+tests launch a real child process that supplies sanitized ACP shapes. A fresh-home
+initialization using the qualified native runtime reported protocol 2, version 1.3.0
+and loadSession support. This proves initialization only; session/host workflows
+remain unimplemented.
 
 - [ ] Spawn the qualified ACP runtime without a shell; implement request/response,
   notification framing, bounded buffering, session routing and process cleanup.

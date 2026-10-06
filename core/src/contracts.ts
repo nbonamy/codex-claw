@@ -480,7 +480,7 @@ export type AppGeneralSettings = {
   providerModelDefaults?: Partial<Record<AgentBackend, AgentModelSelection>>;
   codeReviewDefaults?: import('./code-review').CodeReviewPreferences;
   /** Last explicitly selected approval mode; seeds new chats without changing existing ones. */
-  providerApprovalDefaults?: { codex?: ApprovalPreset; claude?: string };
+  providerApprovalDefaults?: { codex?: ApprovalPreset; claude?: string; antigravity?: string };
   agentListCompact: boolean;
   cockpitAgentViewMode: CockpitAgentViewMode;
   collapsedRepositoryKeys: string[];

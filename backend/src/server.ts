@@ -1,4 +1,5 @@
 import { isWorkProviderKind } from '@workspace/core/work-providers';
+import { isAgentBackend } from '@workspace/core/contracts/shared';
 import { product } from '@workspace/core/product';
 import { readWorktreeHead } from './git-worktrees';
 import type { DurableTaskService } from './agents/durable-task-service';
@@ -658,7 +659,7 @@ export class AppBackendServer {
       const remote = params?.remoteConnectionId || input.remoteConnectionId || this.snapshot.teams.find(team => team.id === teamId)?.remoteConnectionId;
       if (!remote && (message.method !== backendMethods.agentUpdate || input.backend !== undefined)) {
         try {
-          const requested = input.backend === 'codex' || input.backend === 'claude' ? input.backend : agent?.backend;
+          const requested = isAgentBackend(input.backend) ? input.backend : agent?.backend;
           await this.requireConnectedEngine(requested);
         } catch (error) {
           return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error));
@@ -1386,7 +1387,7 @@ export class AppBackendServer {
       case backendMethods.agentModelsList: {
         const agentId = requireAgentId(message.params);
         const backend = requireRecord(message.params).backend;
-        if (backend !== undefined && backend !== 'codex' && backend !== 'claude') throw new Error('Invalid model provider.');
+        if (backend !== undefined && !isAgentBackend(backend)) throw new Error('Invalid model provider.');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentModelsList, { agentId, ...(backend ? { backend } : {}) }, (agent) => {
           const modelAgent = backend ? { ...agent, backend: resolveAgentBackend(this.snapshot, backend), backendSession: undefined, backendDefaults: undefined } : agent;
           return this.handleAgentDriverRequest(modelAgent, backendMethods.driverModelsList, { agent: modelAgent });
@@ -2105,7 +2106,7 @@ export class AppBackendServer {
       }
       case backendMethods.providerEnabledSet: {
         const input = requireRecord(message.params);
-        if ((input.backend !== 'codex' && input.backend !== 'claude') || typeof input.enabled !== 'boolean') throw new Error('Invalid engine availability setting.');
+        if ((!isAgentBackend(input.backend)) || typeof input.enabled !== 'boolean') throw new Error('Invalid engine availability setting.');
         const connectionId = requireOptionalConnectionId(message.params);
         if (connectionId) {
           const providers = await this.remoteTeams.request(connectionId, message.method, { backend: input.backend, enabled: input.enabled });
@@ -2123,7 +2124,7 @@ export class AppBackendServer {
       }
       case backendMethods.providerUsageGet: {
         const backend = requireRecord(message.params).backend;
-        if (backend !== 'codex' && backend !== 'claude') throw new Error('Unknown provider.');
+        if (!isAgentBackend(backend)) throw new Error('Unknown provider.');
         if (!this.snapshot.providerConnections?.some(item => item.backend === backend && item.installed && item.connected && item.enabled !== false)) return createAppRpcResult(message.id, null);
         const result = await this.requireDriverRpc().handle(backendMethods.driverAccountRateLimitsGet, { backend }) as { supported: boolean; rateLimits?: import('@workspace/core/contracts').AccountRateLimits | null };
         const limits = result.supported ? result.rateLimits ?? null : this.snapshot.backendAccountRateLimits?.[backend] ?? (backend === 'codex' ? this.snapshot.accountRateLimits : undefined) ?? null;
@@ -2154,7 +2155,7 @@ export class AppBackendServer {
         }
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         const input = requireRecord(message.params);
-        if (input.backend !== 'codex' && input.backend !== 'claude') throw new Error('Unknown provider.');
+        if (!isAgentBackend(input.backend)) throw new Error('Unknown provider.');
         let result;
         if (message.method === backendMethods.providerInstall) result = await this.providerSetup.install(input.backend);
         else {
@@ -3186,7 +3187,7 @@ function requireQuickChatCreateInput(params: unknown): CreateQuickChatInput {
 }
 
 function requireAgentBackend(value: unknown): Agent['backend'] {
-  if (value !== 'codex' && value !== 'claude') throw new Error('Invalid agent backend.');
+  if (!isAgentBackend(value)) throw new Error('Invalid agent backend.');
   return value;
 }
 

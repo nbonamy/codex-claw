@@ -10,6 +10,7 @@ export const taskResultSchema = z.strictObject({
   caveats: z.array(text.max(500)).max(10),
 }) satisfies z.ZodType<TaskResultInput>;
 const session = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('antigravity'), sessionId: text }),
   z.strictObject({ kind: z.literal('codex'), threadId: text }),
   z.strictObject({
     kind: z.literal('claude'), sessionId: text, transport: z.enum(['stdio', 'websocket']),
@@ -20,7 +21,7 @@ const session = z.discriminatedUnion('kind', [
 const acceptance = z.strictObject({ backendSession: session, turnId: text.optional() });
 const taskSchema = z.strictObject({
   id: text, requestId: text.max(200), requestFingerprint: text,
-  parentAgentId: text, workerAgentId: text, backend: z.enum(['codex', 'claude']),
+  parentAgentId: text, workerAgentId: text, backend: z.enum(['codex', 'claude', 'antigravity']),
   assignment: taskContractSchema, prompt: text.max(100000), attemptId: text,
   workspace: z.strictObject({ repositoryPath: text, branchName: text.optional(), destinationPath: text.optional() }).optional(),
   state: z.enum(['preparing', 'running', 'needs-input', 'interrupted', 'failed', 'completed', 'cancelled']),

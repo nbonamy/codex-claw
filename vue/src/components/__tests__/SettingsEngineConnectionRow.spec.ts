@@ -5,6 +5,12 @@ import { ElMessageBox, ElSwitch } from 'element-plus';
 import SettingsEngineConnectionRow from '../SettingsEngineConnectionRow.vue';
 
 describe('SettingsEngineConnectionRow', () => {
+  it('renders a connected Antigravity account without inventing account metadata', () => {
+    const wrapper = mount(SettingsEngineConnectionRow, { props: { connected: true, enabled: true,
+      authentication: { kind: 'antigravity', connected: true, state: { loggedIn: true, homePath: '/private/home' } } } });
+    expect(wrapper.text()).not.toContain('/private/home');
+    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('true');
+  });
   afterEach(async () => {
     ElMessageBox.close();
     await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());

@@ -83,6 +83,11 @@ export function applyRuntimeEventToSnapshot(
 
   if (event.type === 'agent.conversationAttached') {
     const agent = findAgent(snapshot, event.agentId);
+    if (agent && event.backend === 'antigravity') {
+      agent.backend = 'antigravity';
+      agent.backendSession = { kind: 'antigravity', sessionId: event.conversationId };
+      return;
+    }
     if (agent && event.backend === 'claude') {
       agent.backend = 'claude';
       agent.backendSession = {

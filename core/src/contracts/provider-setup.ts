@@ -5,7 +5,8 @@ export type ProviderAuthenticationAction = { action: 'check' | 'cancel' | 'logou
 /** App-owned authentication metadata, cached only for the life of the host. */
 export type ProviderAuthentication =
   | { kind: 'codex'; connected: boolean; state: CodexAuthentication }
-  | { kind: 'claude'; connected: boolean; state: ClaudeAuthentication };
+  | { kind: 'claude'; connected: boolean; state: ClaudeAuthentication }
+  | { kind: 'antigravity'; connected: boolean; state: { loggedIn: boolean; homePath: string } };
 
 /** Runtime observation, never persisted as an enable/disable preference. */
 export type ProviderConnection = {
@@ -22,7 +23,7 @@ export type ProviderConnection = {
 export function isProviderConnection(value: unknown): value is ProviderConnection {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
-  return (candidate.backend === 'codex' || candidate.backend === 'claude')
+  return (candidate.backend === 'codex' || candidate.backend === 'claude' || candidate.backend === 'antigravity')
     && typeof candidate.installed === 'boolean' && typeof candidate.connected === 'boolean'
     && typeof candidate.checking === 'boolean' && (candidate.enabled === undefined || typeof candidate.enabled === 'boolean')
     && (candidate.error === undefined || typeof candidate.error === 'string')
@@ -32,6 +33,7 @@ export function isProviderConnection(value: unknown): value is ProviderConnectio
 export function isProviderAuthentication(value: unknown): value is ProviderAuthentication {
   if (!record(value) || typeof value.connected !== 'boolean' || !record(value.state)) return false;
   const state = value.state;
+  if (value.kind === 'antigravity') return typeof state.loggedIn === 'boolean' && typeof state.homePath === 'string';
   if (value.kind === 'claude') return typeof state.loggedIn === 'boolean'
     && (state.configDirectory === undefined || state.configDirectory === null || typeof state.configDirectory === 'string')
     && (state.account === undefined || (record(state.account) && ['subscription', 'apiKey'].includes(String(state.account.type))

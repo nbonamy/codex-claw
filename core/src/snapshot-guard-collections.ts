@@ -115,6 +115,7 @@ function isPromptSkill(value: unknown): boolean {
 
 function isBackendPromptOptions(value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (value.kind === 'antigravity') return optional(value, 'permissionMode', isNullableString);
   if (value.kind === 'codex') {
     return optional(value, 'reasoningEffort', isNullableString) &&
       optional(value, 'serviceTier', isNullableString) &&

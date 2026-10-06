@@ -62,12 +62,13 @@ function expectWorkspace(value: unknown, path: string): void {
 
 function expectBackendSession(value: unknown, path: string): void {
   expectRecord(value, path);
-  expectLiteral(value.kind, ['codex', 'claude'], `${path}.kind`);
+  expectLiteral(value.kind, ['codex', 'claude', 'antigravity'], `${path}.kind`);
   if (value.kind === 'codex') {
     expectString(value.threadId, `${path}.threadId`);
     return;
   }
   expectString(value.sessionId, `${path}.sessionId`);
+  if (value.kind === 'antigravity') return;
   expectLiteral(value.transport, ['stdio', 'websocket'], `${path}.transport`);
   ['transcriptSessionId', 'serverUrl', 'model', 'reasoningEffort'].forEach(
     (key) => expectOptional(value, key, path, expectString),
@@ -76,7 +77,7 @@ function expectBackendSession(value: unknown, path: string): void {
 
 function expectBackendDefaults(value: unknown, path: string): void {
   expectRecord(value, path);
-  expectLiteral(value.kind, ['codex', 'claude'], `${path}.kind`);
+  expectLiteral(value.kind, ['codex', 'claude', 'antigravity'], `${path}.kind`);
   ['model', 'reasoningEffort'].forEach((key) =>
     expectOptional(value, key, path, expectString),
   );
@@ -231,7 +232,7 @@ function expectAgentUpdate(value: unknown, path: string): void {
   );
   expectOptional(value, 'workspace', path, expectWorkspace);
   expectOptional(value, 'backend', path, (candidate, candidatePath) =>
-    expectLiteral(candidate, ['codex', 'claude'], candidatePath),
+    expectLiteral(candidate, ['codex', 'claude', 'antigravity'], candidatePath),
   );
   expectOptional(value, 'backendSession', path, expectBackendSession);
   expectOptional(value, 'backendDefaults', path, expectBackendDefaults);

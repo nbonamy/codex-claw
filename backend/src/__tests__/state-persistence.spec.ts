@@ -24,6 +24,26 @@ afterEach(async () => {
 });
 
 describe('state persistence', () => {
+  it('roundtrips Antigravity session identity and isolated provider preferences through disk', async () => {
+    const store = new AppStateStore(await tempHome());
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backend = 'antigravity';
+    agent.backendSession = { kind: 'antigravity', sessionId: 'native-acp-session' };
+    agent.backendDefaults = { kind: 'antigravity', model: 'gemini-3.8-flash-low', permissionMode: 'default' };
+    snapshot.general.providerHomes = { antigravity: { homePath: '/private/acp', isolated: true, shareSkills: false } };
+    snapshot.general.providerEnabled = { codex: true, antigravity: false };
+    snapshot.general.providerModelDefaults = { antigravity: { model: 'gemini-3.8-flash-low', reasoningEffort: null, serviceTier: null } };
+    snapshot.general.providerApprovalDefaults = { antigravity: 'auto_edit' };
+    await store.save(snapshot);
+    const restored = await store.load();
+    expect(isAppSnapshot(restored)).toBe(true);
+    expect(restored.agents.find(value => value.id === agent.id)).toMatchObject({ backend: 'antigravity', backendSession: agent.backendSession, backendDefaults: agent.backendDefaults });
+    expect(restored.general.providerHomes).toStrictEqual(snapshot.general.providerHomes);
+    expect(restored.general.providerEnabled).toStrictEqual(snapshot.general.providerEnabled);
+    expect(restored.general.providerModelDefaults).toStrictEqual(snapshot.general.providerModelDefaults);
+    expect(restored.general.providerApprovalDefaults).toStrictEqual(snapshot.general.providerApprovalDefaults);
+  });
   it('creates, updates and runs a remote Linear automation, then reloads its configuration, assignment and execution identity', async () => {
     const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();

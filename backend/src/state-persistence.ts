@@ -1044,7 +1044,7 @@ function sanitizeAutomation(value: unknown): Automation | null {
   return {
     id: value.id,
     name: value.name.trim() || 'Automation',
-    backend: value.backend === 'claude' ? 'claude' : 'codex',
+    backend: sanitizeBackend(value.backend) ?? 'codex',
     enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
     repositories,
     teamId,
@@ -1265,12 +1265,15 @@ function cloneThreadPlan(plan: ThreadPlan): ThreadPlan {
 }
 
 function sanitizeBackend(value: unknown): AgentBackend | null {
-  return value === 'codex' || value === 'claude' ? value : null;
+  return value === 'codex' || value === 'claude' || value === 'antigravity' ? value : null;
 }
 
 function sanitizeBackendSession(value: unknown, expectedBackend: AgentBackend): BackendSession | undefined {
   if (!isRecord(value) || typeof value.kind !== 'string') {
     return undefined;
+  }
+  if (value.kind === 'antigravity' && expectedBackend === 'antigravity' && typeof value.sessionId === 'string') {
+    return { kind: 'antigravity', sessionId: value.sessionId };
   }
 
   if (value.kind === 'codex') {
@@ -1307,6 +1310,12 @@ function sanitizeBackendDefaults(value: unknown, expectedBackend: AgentBackend):
   if (!isRecord(value) || typeof value.kind !== 'string') {
     return undefined;
   }
+  if (value.kind === 'antigravity' && expectedBackend === 'antigravity') return {
+    kind: 'antigravity',
+    ...(typeof value.model === 'string' ? { model: value.model } : {}),
+    ...(value.userSelectedModel === true ? { userSelectedModel: true } : {}),
+    ...(typeof value.permissionMode === 'string' ? { permissionMode: value.permissionMode } : {}),
+  };
 
   if (value.kind === 'codex') {
     const defaults = {
