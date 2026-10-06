@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -94,5 +95,41 @@ for (const invalid of ['wrongMachine', 'missingHelper', 'wrongVersion']) {
       await assert.rejects(prepareWindowsCodex(options, dependencies), /failed validation/);
       assert.equal(readFileSync(path.join(options.outputDir, 'previous'), 'utf8'), 'keep');
     } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+for (const installationFails of [false, true]) {
+  test(`locked staging cleanup preserves ${installationFails ? 'the original installation error' : 'a successful installation'}`, async (t) => {
+    const { root, options, dependencies } = fixture();
+    const remove = fs.rmSync;
+    const installationError = new Error('tar failed to extract the package');
+    const warnings = [];
+    let lockedDirectory;
+    t.mock.method(console, 'warn', (message) => warnings.push(message));
+    t.mock.method(fs, 'rmSync', (directory, removeOptions) => {
+      if (path.basename(directory).startsWith('.codex-')) {
+        lockedDirectory = directory;
+        throw Object.assign(new Error('Permission denied'), { code: 'EPERM', path: directory });
+      }
+      return remove(directory, removeOptions);
+    });
+    try {
+      const preparation = prepareWindowsCodex(options, installationFails ? {
+        ...dependencies,
+        execFileSync: () => { throw installationError; },
+      } : dependencies);
+      if (installationFails) {
+        await assert.rejects(preparation, error => error === installationError);
+      } else {
+        assert.equal(await preparation, path.join(options.outputDir, 'bin/codex.exe'));
+        assert.equal(readFileSync(path.join(options.outputDir, 'bin/codex.exe')).toString('ascii', 0, 2), 'MZ');
+      }
+      assert.equal(warnings.length, 1);
+      assert.ok(warnings[0].includes(lockedDirectory));
+      assert.match(warnings[0], /EPERM/);
+    } finally {
+      t.mock.restoreAll();
+      remove(root, { recursive: true, force: true });
+    }
   });
 }

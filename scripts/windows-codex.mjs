@@ -49,7 +49,14 @@ export async function prepareWindowsCodex({ config, arch, outputDir }, dependenc
       throw error;
     }
   } finally {
-    fs.rmSync(staging, { recursive: true, force: true });
+    try {
+      // Windows can retain temporary locks after executing or scanning files.
+      fs.rmSync(staging, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch (error) {
+      // Cleanup must neither fail an installed package nor mask the original
+      // extraction/validation error. Leave the directory available for cleanup.
+      console.warn(`[prepare-codex-app-server] Temporary files remain at ${staging}: ${error.code ?? error.message}`);
+    }
   }
   return executable;
 
