@@ -19,11 +19,11 @@ def main():
     parser.add_argument("film", default="delegation-film", nargs="?")
     parser.add_argument(
         "--output", type=Path,
-        default=Path.home() / "Downloads/korus-delegation-voices",
+        default=ROOT / "local/voice-comparison",
     )
     parser.add_argument("--voice", help="Generate only one profile")
     parser.add_argument("--references", type=Path,
-                        default=Path.home() / "Downloads/korus-voiceover-audition")
+                        default=ROOT / "local/voice-references")
     parser.add_argument(
         "--seed", type=int, help="Override the seed when auditioning a new take"
     )

@@ -18,6 +18,10 @@ vi.mock('@workspace/core/runtime-discovery', () => ({
   withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
 }));
 
+// Claude names project directories by replacing every non-alphanumeric character
+// (temp dirs on macOS CI contain underscores).
+const claudeProjectDirName = (folder: string) => folder.replace(/[^a-zA-Z0-9]/g, '-');
+
 describe('Claude configured home', () => {
   let root: string;
   let configDir: string;
@@ -47,7 +51,7 @@ describe('Claude configured home', () => {
     await mkdir(recordedCwd, { recursive: true });
     if (linkedWorkspace) await symlink(recordedCwd, agent.folder!, 'dir');
     // Claude records the physical cwd even when App opens the workspace through a symlink.
-    const projectDir = path.join(configDir, 'projects', recordedCwd.replaceAll(path.sep, '-'));
+    const projectDir = path.join(configDir, 'projects', claudeProjectDirName(recordedCwd));
     await mkdir(projectDir, { recursive: true });
     await writeFile(path.join(projectDir, `${sessionId}.jsonl`), JSON.stringify({
       type: 'user', uuid: 'saved-message', sessionId,
@@ -67,7 +71,7 @@ describe('Claude configured home', () => {
       ] } } });
       if (linkedWorkspace && restart === 0) {
         // Older CLI versions may also have left a copy under the logical path.
-        const legacyDir = path.join(configDir, 'projects', agent.folder!.replaceAll(path.sep, '-'));
+        const legacyDir = path.join(configDir, 'projects', claudeProjectDirName(agent.folder!));
         await mkdir(legacyDir, { recursive: true });
         await copyFile(path.join(projectDir, `${sessionId}.jsonl`), path.join(legacyDir, `${sessionId}.jsonl`));
       }
@@ -122,7 +126,7 @@ describe('Claude configured home', () => {
     const sessionId = '22222222-2222-4222-8222-222222222222';
     const cwd = path.join(root, 'repo');
     const paths = [configDir, path.join(root, 'personal', '.claude')].map(home =>
-      path.join(home, 'projects', cwd.replaceAll(path.sep, '-'), `${sessionId}.jsonl`));
+      path.join(home, 'projects', claudeProjectDirName(cwd), `${sessionId}.jsonl`));
     for (const file of paths) {
       await mkdir(path.dirname(file), { recursive: true });
       await writeFile(file, 'original\n');

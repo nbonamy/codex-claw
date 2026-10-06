@@ -18,7 +18,6 @@
     "package": "npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge package",
     "make": "npm run release-notes:check && npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge make",
     "check-publish:macos": "node ../scripts/publish-macos.mjs --check-only",
-    "publish:macos": "node ../scripts/github-release.mjs promote",
     "build": "npm run build:codex && npm run build:computer-use && npm run build:tts && tsc --noEmit && electron-forge package",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",

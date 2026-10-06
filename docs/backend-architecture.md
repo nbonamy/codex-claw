@@ -169,27 +169,24 @@ Git/GitHub tools.
 ## GitHub desktop releases
 
 `npm run prerelease` (or, for an explicitly approved stable release, `npm run
-latest`) is the only release command. It creates a missing remote `v<version>` tag
-at the pushed default-branch commit (clean checkout, HEAD matching the remote,
-version matching the tag), reuses an existing tag, and dispatches **one** workflow
-(`.github/workflows/desktop-build.yml`): quality, four native builds, publish.
-Never move a release tag.
+latest`) is the only release command. It requires a clean checkout of the default
+branch whose HEAD is pushed, creates the remote `v<version>` tag at HEAD (reusing
+one already at HEAD, refusing one elsewhere or an already published release),
+dispatches **one** workflow from that tag, and watches it to completion, printing
+one line per job state change. Never move a release tag.
 
-- The workflow runs from the default branch; quality and packaging check out the
-  exact tagged SHA. Publication uses the workflow's tooling commit, so release-tool
-  fixes never require moving the app's immutable tag.
-- Only the final job has contents-write permission. It verifies provenance and
-  checksums, attaches installers to a draft release, checks GitHub's asset digests,
-  then publishes the requested channel. Published assets are never overwritten; a
-  failed upload leaves a draft.
-- Receipts in `.release/` pin source SHA, workflow SHA, channel, request ID, run and
-  attempt. Re-running the same command resumes rather than redispatching; a
-  different channel starts a new run and rebuilt installers are not byte-identical.
-  Retry an unchanged failed run with `gh run rerun` (all jobs) and resume with
-  `--attempt N`; rerunning only failed jobs yields no complete artifact set.
-- Build-only validation: `npm run release:build -- --tag vX.Y.Z --state <file>`
-  selects `channel=none`. A run counts as published only after checking the
-  release's actual public visibility and asset URLs.
+- The workflow (`.github/workflows/desktop-build.yml`) is quality, four native
+  builds, publish. Because it is dispatched from the tag, the workflow, scripts and
+  app source all come from the same immutable commit; a release-tooling fix means a
+  new version.
+- Only the final job has contents-write permission. It requires every platform to
+  ship its full installer set, stages them on a draft release, then publishes the
+  requested channel. Published releases are never modified; an interrupted run
+  leaves a draft that a rerun completes.
+- Artifact names carry no run attempt, so `gh run rerun <id> --failed` yields a
+  complete set. Resume watching with `npm run release:watch -- <run-id>`.
+- Build-only validation: `npm run release:build` dispatches the current pushed
+  branch with `channel=none`, which skips the tag check and publication.
 - Install dependencies with `npm ci` and run `node node_modules/electron/install.js`
   before parallel tests or Forge (the lazy Electron download races between workers).
 - Account and OAuth client IDs are GitHub **Secrets**, not Actions variables, to

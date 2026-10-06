@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 import product from "../core/src/product.json" with { type: "json" };
@@ -37,6 +39,29 @@ test("the built website has reachable documentation pages, anchors, and assets",
   try {
     const landing = documents.get("index.html").window.document;
     assert.ok(landing.title.startsWith(product.name));
+    // The deployed films and captions must preserve the approved local exports.
+    const narrated = process.env.APP_NARRATED_FILMS
+      ? pathToFileURL(`${resolve(process.env.APP_NARRATED_FILMS)}/`)
+      : new URL("../videos/local/narrated/", import.meta.url);
+    const manifest = JSON.parse(
+      await readFile(new URL("narration.json", narrated), "utf8"),
+    );
+    for (const film of manifest.films) {
+      for (const [selector, attribute, filename] of [
+        [".film-cover", "href", film.video],
+        ["video track", "data-src", film.subtitles],
+      ]) {
+        const element = [...landing.querySelectorAll(selector)].find((node) =>
+          node.getAttribute(attribute)?.endsWith(`-${filename}`),
+        );
+        assert.ok(element, `${filename} is exposed by the built player`);
+        assert.deepEqual(
+          await readFile(new URL(element.getAttribute(attribute), artifact)),
+          await readFile(new URL(filename, narrated)),
+          `${filename} is published without changing the approved media`,
+        );
+      }
+    }
     assert.ok(
       landing.querySelector(".brand").textContent.includes(product.name),
     );

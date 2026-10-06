@@ -1,7 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFile, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -279,11 +278,7 @@ async function main() {
   const all = args.includes("--all");
   const output = resolve(
     args.find((arg) => arg !== "--all") ??
-      join(
-        homedir(),
-        "Downloads",
-        all ? "korus-narrated-videos" : "korus-delegation-voices",
-      ),
+      join(root, "local", all ? "narrated" : "voice-comparison"),
   );
   const script = JSON.parse(
     await readFile(join(root, "narration.json"), "utf8"),

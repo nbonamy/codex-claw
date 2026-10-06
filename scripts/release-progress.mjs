@@ -1,6 +1,5 @@
 import { cursorTo, moveCursor, clearScreenDown } from 'node:readline';
 import { stripVTControlCharacters } from 'node:util';
-import { requiredJobs } from './release-contract.mjs';
 
 function clean(text) {
   return stripVTControlCharacters(String(text)).replace(/[\x00-\x1f\x7f]/g, ' ');
@@ -14,13 +13,13 @@ function elapsed(start, end, now) {
 }
 
 // Only presentation lives here; run identity and success gates remain in the CLI.
-export function createReleaseProgress(output = process.stdout, jobNames = requiredJobs) {
+export function createReleaseProgress(output = process.stdout, jobNames) {
   const interactive = Boolean(output.isTTY && process.env.TERM !== 'dumb');
   let previousRows = 0;
   let previousKey = '';
   let lastWrite = 0;
   let frame = 0;
-  return (state, run, jobs, now = Date.now()) => {
+  return (title, run, jobs, now = Date.now()) => {
     const key = JSON.stringify([run.status, run.conclusion, jobs.map(job =>
       [job.name, job.status, job.conclusion, job.steps?.map(step => [step.name, step.status, step.conclusion])])]);
     if (!interactive && key === previousKey && now - lastWrite < 30_000) return;
@@ -28,10 +27,10 @@ export function createReleaseProgress(output = process.stdout, jobNames = requir
     lastWrite = now;
     const duration = elapsed(run.run_started_at, run.status === 'completed' ? run.updated_at : null, now);
     const rows = [
-      [`${state.tag} · attempt ${state.attempt} · ${run.conclusion || run.status}${duration ? ` · elapsed ${duration}` : ''}`, 36],
+      [`${title} · ${run.conclusion || run.status}${duration ? ` · elapsed ${duration}` : ''}`, 36],
       [run.html_url, 90],
     ];
-    for (const name of jobNames) {
+    for (const name of jobNames ?? jobs.map(job => job.name)) {
       const job = jobs.find(candidate => candidate.name === name);
       const status = job?.conclusion || job?.status || (run.status === 'completed' ? 'not run' : 'waiting');
       const active = status === 'in_progress';
