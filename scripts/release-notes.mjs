@@ -12,6 +12,7 @@ function readJson(filePath) {
 }
 
 export function extractReleaseSections(changelog) {
+  changelog = changelog.replaceAll('\r\n', '\n');
   const headingPattern = /^## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})\s*$/gm;
   const matches = [...changelog.matchAll(headingPattern)];
 
@@ -107,7 +108,7 @@ export function generateReleaseNotes(rootDir = ROOT) {
 }
 
 export function assertReleaseNotesCurrent(actual, expected) {
-  if (actual !== expected) {
+  if (actual.replaceAll('\r\n', '\n') !== expected.replaceAll('\r\n', '\n')) {
     throw new Error(`${RELEASE_NOTES_PATH} is stale. Run npm run release-notes:generate and review the result.`);
   }
 }

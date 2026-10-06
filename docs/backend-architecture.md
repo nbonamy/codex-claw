@@ -207,6 +207,17 @@ lock may be removed only after confirming no promotion still owns it. Retain the
 receipt and archived provenance for recovery; never claim success from CLI exit
 alone without checking the public download/feed after an authorized promotion.
 
+`npm run build` packages the desktop application without creating an installer.
+`npm run make` also creates distributable archives: Windows produces
+`korus-<version>-<arch>-setup.exe`, a full NuGet package and `RELEASES` under
+`electron/out/make/squirrel.windows/<arch>/`, alongside the ZIP archive required
+by the release workflow. With npm 12, the approved `electron-winstaller` install script selects
+the host's 7-Zip executable required to create the installer.
+Squirrel installer identity, executable names and icons come from product
+metadata and Forge configuration. The desktop handles Squirrel startup events
+before starting the application. Installer generation does not publish an
+update feed or enable Windows automatic updates.
+
 Use `backend/dist/korusd --version`, `--stdio`, `serve`, or `connect` when
 running the built backend directly. SSH deployments still transport the
 self-contained `daemon.mjs` module and invoke it with Node; it reports the same
