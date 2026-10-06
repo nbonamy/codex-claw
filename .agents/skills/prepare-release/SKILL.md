@@ -1,13 +1,13 @@
 ---
 name: prepare-release
-description: Prepare a Korus release by auditing changes, confirming version and prerelease/latest channel, and validating the release commit. Hand Nicolas one command that creates the tag, builds and publishes on GitHub. Use when asked to prepare or cut a release, including $prepare-release.
+description: Prepare and launch a Korus release by auditing changes, confirming version and prerelease/latest channel, validating and pushing the release commit, then running the single release command and reporting its progress. Use when asked to prepare or cut a release, including $prepare-release.
 ---
 
 # Prepare Release
 
 Read the GitHub desktop release section in `docs/backend-architecture.md` for
 commands, required environments/secrets, target limitations, and recovery.
-The build source is an immutable remote tag plus its resolved SHA. Dependencies
+The build source is an immutable remote tag. Dependencies
 come from published packages and `package-lock.json`, never a live sibling SDK.
 
 ## Audit and confirm version and channel
@@ -25,9 +25,9 @@ come from published packages and `package-lock.json`, never a live sibling SDK.
    an explicitly supplied choice; otherwise ask before preparing. Do not infer
    latest from "release" or "publish".
 
-Preparation and channel selection are not permission to publish. Unless Nicolas
-explicitly asks you to launch publication, prepare the release and hand him the
-single selected command to run himself.
+Nicolas's confirmation of the version and channel is the authorization to
+prepare, commit, push, and launch the release. Do not ask a second time. If he
+asked for local-only preparation, stop before pushing and hand him the command.
 
 ## Freeze and validate
 
@@ -53,37 +53,36 @@ including script tests, and 85% statements in each of the five workspaces.
 A failing gate blocks release. Only CHANGELOG.md, the six package manifests,
 package-lock.json, and vue/src/generated/release-notes.json may change.
 
-Use `app-dod` and review the staged diff. When committing is authorized,
-commit with `chore: release prep`. Report the audited SDK version and Git
+Use `app-dod` and review the staged diff, then commit with
+`chore: release prep`. Report the audited SDK version and Git
 provenance from the exact npm package, not the sibling HEAD.
-Tag creation belongs to the publication command, not preparation. If the user
-requested local-only preparation, stop here and report the local commit.
+Tag creation belongs to the release command, not preparation.
 
-## Push and hand off one command
+## Push, launch, and monitor
 
-Once pushing is authorized, push the release commit to the default branch and
-verify its remote SHA. For the confirmed channel, give Nicolas exactly one command:
+Push the release commit to the default branch and verify its remote SHA. Then run
+exactly one command for the confirmed channel:
 
 - Prerelease: `npm run prerelease`
 - Stable/latest: `npm run latest`
 
-Both infer `v<version>` from package.json, create the missing remote tag at the
-clean, pushed release commit, and run one GitHub workflow:
-quality → four platform builds → publish. The final job verifies and uploads
-the individual installers; there is no combined bundle or second workflow.
-The local command dispatches and monitors. Workflow tooling comes from the
-default branch; app source stays pinned to the immutable tag. The updated
-workflow must be pushed before handoff.
+It requires the clean, pushed default branch, creates the missing remote
+`v<version>` tag at HEAD, dispatches one GitHub workflow from that tag (quality →
+four platform builds → publish) and watches it. The final job stages the
+installers on a draft and publishes the channel; there is no second workflow.
 
-The receipt `.release/v<version>-<channel>.json` tracks the exact run and attempt.
-Repeating the same command resumes it. A different channel starts a separate
-run; published assets are immutable, so do not promise replacement of an
-existing release with rebuilt installers. Use the printed retry/resume commands
-for failed runs, with the explicit attempt. Never move the version tag.
+Run it in the background and follow its output, which has one line per job state
+change. Tell Nicolas when the run starts (with the run URL) and report each build
+finishing or failing, not every poll. If your session loses the process, resume with
+`npm run release:watch -- <run-id>`.
 
-Only when explicitly asked for build-only validation, use `release:build` with
-`--tag v<version>`. That path deliberately stops before publication. Local
-artifact download is a separate opt-in inspection action, not a release step.
+On failure, report the failed job and the log excerpt the command printed. Ask
+before retrying with `gh run rerun <run-id> --failed`, then resume watching. A
+published release is immutable: rebuilt installers cannot replace it, so a fix
+after publication means a new version. Never move the version tag.
+
+Only when explicitly asked for build-only validation, use `npm run release:build`;
+it dispatches the current pushed branch and never publishes.
 
 Prereleases stay manual-download-only. Latest enables macOS and installed
 Windows auto-updates; Linux and portable Windows remain manual. Coordinate the
@@ -94,7 +93,7 @@ report outstanding native checks honestly.
 ## Handoff
 
 Distinguish prepared, committed, pushed, built, draft-staged, native-tested,
-published prerelease, and promoted stable.
-Include version, commit/tag, SDK version/provenance, Actions run/attempt and URL,
-artifact location, gates, and outstanding target checks. Celebrate a completed
+published prerelease, and published stable.
+Include version, commit/tag, SDK version/provenance, Actions run URL, release URL,
+gates, and outstanding target checks. Celebrate a completed
 publication through `finish_turn`; preparation or staging alone is not publication.
