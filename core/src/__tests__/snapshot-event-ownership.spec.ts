@@ -47,6 +47,8 @@ const subagentEventTypes = [
 ] as const satisfies readonly SnapshotEventTypeOwnedBy<'subagent'>[];
 
 const rendererEventTypes = [
+  'antigravity.conversationSnapshotChanged',
+  'antigravity.conversationEventReceived',
   'provider.authenticationChanged',
   'client.connectionChanged',
   'remoteControl.statusChanged',

@@ -158,7 +158,7 @@ export class AcpConnection {
   }
 }
 
-export class AcpError extends Error {
+class AcpError extends Error {
   constructor(readonly code: number) { super(`Antigravity ACP request failed (${code}).`); }
 }
 

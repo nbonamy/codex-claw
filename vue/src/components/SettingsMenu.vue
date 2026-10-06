@@ -80,7 +80,7 @@ const popoverVisible = ref(false);
 const nowMs = ref(Date.now());
 const fetchedUsage = ref<Partial<Record<AgentBackend, AccountRateLimits | null>>>({});
 const usageErrors = ref<Partial<Record<AgentBackend, boolean>>>({});
-const quotaBackends = computed(() => props.enabledBackends.filter(backend => backend !== 'codex' || props.account?.type !== 'apiKey'));
+const quotaBackends = computed(() => props.enabledBackends.filter(backend => backend !== 'antigravity' && (backend !== 'codex' || props.account?.type !== 'apiKey')));
 watch([popoverVisible, () => quotaBackends.value.join(','), () => JSON.stringify(props.account)], ([visible], _previous, onCleanup) => {
   fetchedUsage.value = {};
   usageErrors.value = {};

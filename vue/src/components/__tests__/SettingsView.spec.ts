@@ -33,6 +33,7 @@ describe('SettingsView', () => {
       'Personalization',
       'Codex',
       'Claude Code',
+      'Antigravity',
       'Plugins',
       'Integrations',
       'Screenshots',

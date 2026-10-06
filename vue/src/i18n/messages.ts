@@ -3,6 +3,7 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    antigravity: { name: 'Antigravity', connect: 'Connect Antigravity', connected: 'Antigravity connected', enable: 'Enable Antigravity', remoteLogin: 'Sign in to Antigravity on the remote host, then retry the connection.' },
     automaticReview: {
       title: 'Automatic remediation', description: 'Review, fix, verify, and repeat with a fresh reviewer.',
       configure: 'Configure', done: 'Done',
@@ -349,6 +350,10 @@ export const messages = {
       restarting: 'Restarting daemon…',
     },
     permissions: {
+      antigravity: {
+        default: { label: 'Ask for approval', description: 'Antigravity asks before commands and file changes.' },
+        autoEdit: { label: 'Allow file edits', description: 'Allow native file edits; commands still use Antigravity approvals.' },
+      },
       approval: {
         ask: {
           label: 'Ask for approval',

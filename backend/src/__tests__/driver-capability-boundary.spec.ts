@@ -18,8 +18,12 @@ function fixture() {
 }
 
 describe('unified driver capability boundary', () => {
-  it('fails an explicitly selected unavailable Antigravity provider without creating Codex', () => {
-    expect(() => createBackendDriver('antigravity')).toThrow('Antigravity ACP integration is not available');
+  it('selects the Antigravity host explicitly and never creates Codex as a fallback', async () => {
+    const driver = createBackendDriver('antigravity');
+    try {
+      expect(driver.backend).toBe('antigravity');
+      expect(driver.getCapabilities({ ...agent, backend: 'antigravity' })).toMatchObject({ goals: false, conversationFork: false });
+    } finally { await driver.close(); }
   });
   it.each([
     [backendMethods.driverTextGenerate, { prompt: 'draft', cwd: '/repo' }],

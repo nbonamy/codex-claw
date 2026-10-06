@@ -1,6 +1,7 @@
 import { computed, inject, provide, ref, watch, type ComputedRef, type InjectionKey, type Ref } from 'vue';
 import { enabledAgentBackends, providerConnectionsForTeam } from '@workspace/core/agent-backends';
 import type { AgentBackend, AppSnapshot } from '@workspace/core/contracts';
+import { isAgentBackend } from '@workspace/core/contracts/shared';
 import type { ProviderConnection } from '@workspace/core/contracts/provider-setup';
 
 export const backendChoicesKey: InjectionKey<ComputedRef<AgentBackend[]>> = Symbol('backendChoices');
@@ -39,7 +40,7 @@ export function provideBackendChoices(snapshot: () => AppSnapshot, connect: () =
   try {
     const value: unknown = JSON.parse(localStorage.getItem(preferenceKey) ?? '{}');
     remembered.value = value && typeof value === 'object' && !Array.isArray(value)
-      ? Object.fromEntries(Object.entries(value).filter(([, backend]) => backend === 'codex' || backend === 'claude'))
+      ? Object.fromEntries(Object.entries(value).filter(([, backend]) => isAgentBackend(backend)))
       : {};
   } catch { remembered.value = {}; }
   provide(backendChoicesKey, computed(() => enabledAgentBackends({ providerConnections: providerConnectionsForTeam(snapshot()) })));

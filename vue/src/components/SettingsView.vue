@@ -47,6 +47,21 @@
           :settings="generalSettings"
           :update-settings="updateSettings"
         />
+        <SettingsAntigravityPanel
+          v-else-if="activeTab === 'antigravity'"
+          :connected="providerConnections?.some(engine => engine.backend === 'antigravity' && engine.connected)"
+          :authentication="providerConnections?.find(engine => engine.backend === 'antigravity')?.authentication"
+          :home="generalSettings.providerHomes?.antigravity"
+          :enabled="generalSettings.providerEnabled?.antigravity !== false"
+          :set-enabled="enabled => setProviderEnabled?.('antigravity', enabled)"
+          :busy="antigravityConnectionBusy"
+          :pending="antigravityLoginPending"
+          :error="antigravityConnectionError"
+          @customize="customizeProvider?.('antigravity')"
+          @connect="connectAntigravity"
+          @disconnect="disconnectProvider?.('antigravity')"
+          @cancel="cancelAntigravityLogin"
+        />
         <SettingsClaudeCodePanel
           v-else-if="activeTab === 'claude-code'"
           :connected="claudeConnected"
@@ -121,6 +136,7 @@ import { defaultGeneralSettings, defaultSourceFolderState } from '@workspace/cor
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsAppshotsPanel from './SettingsAppshotsPanel.vue';
 import SettingsClaudeCodePanel from './SettingsClaudeCodePanel.vue';
+import SettingsAntigravityPanel from './SettingsAntigravityPanel.vue';
 import SettingsCodexPanel from './SettingsCodexPanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
@@ -139,9 +155,9 @@ const appVersion = appPackage.version;
 withDefaults(defineProps<{
   codexConnected?: boolean;
   providerConnections?: ProviderConnection[];
-  customizeProvider?: (backend: 'codex' | 'claude') => unknown;
-  setProviderEnabled?: (backend: 'codex' | 'claude', enabled: boolean) => unknown;
-  disconnectProvider?: (backend: 'codex' | 'claude') => Promise<void>;
+  customizeProvider?: (backend: import('@workspace/core/contracts').AgentBackend) => unknown;
+  setProviderEnabled?: (backend: import('@workspace/core/contracts').AgentBackend, enabled: boolean) => unknown;
+  disconnectProvider?: (backend: import('@workspace/core/contracts').AgentBackend) => Promise<void>;
   claudeConnected?: boolean;
   codexConnectionBusy?: boolean;
   claudeConnectionBusy?: boolean;
@@ -150,6 +166,11 @@ withDefaults(defineProps<{
   claudeConnectionError?: string | null;
   connectCodex?: () => Promise<void>;
   connectClaude?: () => Promise<void>;
+  connectAntigravity?: () => Promise<void>;
+  cancelAntigravityLogin?: () => Promise<void>;
+  antigravityConnectionBusy?: boolean;
+  antigravityLoginPending?: boolean;
+  antigravityConnectionError?: string | null;
   cancelCodexLogin?: () => Promise<void>;
   activeTab?: SettingsTab;
   settings: AppThemeSettings;

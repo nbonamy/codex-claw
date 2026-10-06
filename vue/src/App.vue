@@ -8,6 +8,7 @@
     :unread-agent-ids="unreadAgentIds"
     :codex-conversation-snapshot="activeCodexConversationSnapshot"
     :claude-conversation-snapshot="activeClaudeConversationSnapshot"
+    :antigravity-conversation-snapshot="activeAntigravityConversationSnapshot"
     :is-loading="isLoading"
     :is-conversation-loading="isHydratingActiveAgentHistory"
     :is-conversation-load-failed="isActiveAgentHistoryFailed"
@@ -279,6 +280,7 @@ const {
   activeBackendCommands,
   activeCodexConversationSnapshot,
   activeClaudeConversationSnapshot,
+  activeAntigravityConversationSnapshot,
   agentConversationFor,
   prepareAgentConversation,
   backendPlugins,

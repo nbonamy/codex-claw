@@ -10,6 +10,7 @@ import type { Agent, AgentBackend, AppGeneralSettings, AppPluginSettings, Backen
 import { stat } from 'node:fs/promises';
 import { listAgentFolderFiles, previewAgentFolderFile, readAgentFolderFileChunk } from './agent-files';
 import { ClaudeBackendDriver } from './claude/claude-driver';
+import { AntigravityHost } from './antigravity/antigravity-host';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
 import { resolveCodexCommand } from './codex/codex-command';
@@ -39,11 +40,11 @@ type AppSurfaceOptions = Parameters<typeof createCodexSurface>[0] & {
 };
 
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
-  return new Map((['codex', 'claude'] as const).map(backend => [backend, createBackendDriver(backend, options)]));
+  return new Map((['codex', 'claude', 'antigravity'] as const).map(backend => [backend, createBackendDriver(backend, options)]));
 }
 
 export function createBackendDriver(backend: AgentBackend, options: BackendDriverRegistryOptions = {}): AgentBackendDriver {
-  if (backend === 'antigravity') throw new Error('Antigravity ACP integration is not available yet.');
+  if (backend === 'antigravity') return new AntigravityHost(options);
   if (backend === 'claude') return new ClaudeBackendDriver(undefined, undefined, {
     appMcpServerUrl: options.appMcpServerUrl ?? null,
     hostedMcpServerUrls: options.hostedMcpServerUrls,
@@ -145,7 +146,7 @@ export class BackendDriverRpc {
         const driver = this.requireDriver(backend);
         if (!driver.authenticate) throw new Error(`Authentication is unavailable for ${backend}.`);
         const action = record.action;
-        if (action !== 'check' && action !== 'cancel' && action !== 'logout') throw new Error('Invalid authentication action.');
+        if (action !== 'check' && action !== 'cancel' && action !== 'logout' && !(action === 'login' && backend === 'antigravity')) throw new Error('Invalid authentication action.');
         return driver.authenticate({ action, ...(record.loginId === undefined ? {} : { loginId: requireString(record.loginId, 'loginId') }) });
       }
       case backendMethods.driverAccountRateLimitsGet: {

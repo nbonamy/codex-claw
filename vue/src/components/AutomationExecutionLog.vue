@@ -275,7 +275,7 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     return typeof candidate.threadId === 'string' && candidate.threadId.trim().length > 0;
   }
 
-  return candidate.backend === 'claude' &&
+  return (candidate.backend === 'claude' || candidate.backend === 'antigravity') &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0 &&
     typeof candidate.folder === 'string' &&

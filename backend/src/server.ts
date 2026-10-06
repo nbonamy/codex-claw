@@ -600,7 +600,7 @@ export class AppBackendServer {
     return resolveAgentBackend(this.snapshot, backend);
   }
 
-  private async authenticateProvider(backend: Agent['backend'], action: 'check' | 'cancel' | 'logout' = 'check', loginId?: string): Promise<ProviderAuthentication> {
+  private async authenticateProvider(backend: Agent['backend'], action: 'check' | 'cancel' | 'logout' | 'login' = 'check', loginId?: string): Promise<ProviderAuthentication> {
     return await this.requireDriverRpc().handle(backendMethods.driverProviderAuthentication, { backend, action, ...(loginId ? { loginId } : {}) }) as ProviderAuthentication;
   }
 
@@ -1177,7 +1177,7 @@ export class AppBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         const value = requireRecord(params.input);
         const operationId = requireString(value.operationId, 'operationId');
-        if (!operationId.trim() || operationId.length > 128 || !['codex', 'claude'].includes(String(value.backend))) throw new Error('Invalid handoff request.');
+        if (!operationId.trim() || operationId.length > 128 || !isAgentBackend(value.backend)) throw new Error('Invalid handoff request.');
         if (value.instructions !== undefined && (typeof value.instructions !== 'string' || value.instructions.length > 4000)) throw new Error('Handoff instructions must be at most 4,000 characters.');
         const input: AgentHandoffInput = {
           operationId, backend: value.backend as Agent['backend'],
@@ -2093,6 +2093,15 @@ export class AppBackendServer {
         if (connectionId) return createAppRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method));
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         return createAppRpcResult(message.id, this.providerSetup.list());
+      }
+      case backendMethods.providerAuthenticate: {
+        const params = requireRecord(message.params);
+        const backend = requireAgentBackend(params.backend);
+        if (backend !== 'antigravity' || (params.action !== 'login' && params.action !== 'cancel')) throw new Error('Unsupported native authentication action.');
+        const authentication = await this.authenticateProvider(backend, params.action);
+        this.providerConnections?.observe(backend, authentication.connected, authentication);
+        await this.persistAndEmitSnapshot();
+        return createAppRpcResult(message.id, authentication);
       }
       case backendMethods.providerDisconnect: {
         const backend = requireAgentBackend(requireRecord(message.params).backend);
@@ -3709,7 +3718,7 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     return typeof candidate.threadId === 'string' && candidate.threadId.trim().length > 0;
   }
 
-  return candidate.backend === 'claude' &&
+  return (candidate.backend === 'claude' || candidate.backend === 'antigravity') &&
     (candidate.folder === null || (typeof candidate.folder === 'string' && candidate.folder.trim().length > 0)) &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;

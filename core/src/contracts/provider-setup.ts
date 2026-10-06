@@ -1,6 +1,6 @@
 import type { AgentBackend, ClaudeAuthentication, CodexAuthentication } from '../contracts';
 
-export type ProviderAuthenticationAction = { action: 'check' | 'cancel' | 'logout'; loginId?: string };
+export type ProviderAuthenticationAction = { action: 'check' | 'cancel' | 'logout' | 'login'; loginId?: string };
 
 /** App-owned authentication metadata, cached only for the life of the host. */
 export type ProviderAuthentication =

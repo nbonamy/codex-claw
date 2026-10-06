@@ -1,0 +1,176 @@
+import path from 'node:path';
+import type { AgentRequestResponse } from '@workspace/core/agent-request';
+import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from '@workspace/core/contracts/antigravity-conversation';
+import { AcpRuntime } from './acp-runtime';
+import { record } from './acp-connection';
+import { antigravityHome } from './runtime';
+import { AcpTranscript } from './transcript';
+import { permissionRequest } from './permissions';
+import { handleAcpFileRequest } from './filesystem';
+
+type SessionOptions = {
+  agentId: string; cwd: string; home?: string; sessionId?: string;
+  mcpServers: unknown[];
+  changed(event: AntigravityConversationEvent): void;
+  requestChanged?(event: AntigravityConversationEvent): void;
+  closed?(error: Error): void;
+};
+type PendingPermission = ReturnType<typeof permissionRequest> & { resolve(value: unknown): void };
+
+/** One agent owns one runtime/session. Concurrent prompts are rejected before ACP admission. */
+export class AcpSession {
+  private runtime!: AcpRuntime;
+  private transcript!: AcpTranscript;
+  private initialization: unknown[] = [];
+  private loading = true;
+  private disposed = false;
+  private interrupted = false;
+  private active?: Promise<void>;
+  private readonly pending = new Map<string, PendingPermission>();
+  private config: Record<string, unknown> = {};
+  private constructor(private readonly options: SessionOptions) {}
+
+  static async open(options: SessionOptions): Promise<AcpSession> {
+    const session = new AcpSession(options);
+    try {
+      session.runtime = await AcpRuntime.open({ cwd: options.cwd, home: options.home,
+        onRequest: (method, params) => session.request(method, params),
+        onNotification: (method, params) => session.notification(method, params),
+        onClose: error => session.closed(error),
+      });
+      await session.runtime.authenticate();
+      const result = await session.runtime.connection.request(options.sessionId ? 'session/load' : 'session/new', {
+        ...(options.sessionId ? { sessionId: options.sessionId } : {}), cwd: options.cwd, mcpServers: options.mcpServers,
+      }, 120_000);
+      if (!record(result)) throw new Error('Invalid Antigravity session response.');
+      const id = options.sessionId ?? result.sessionId;
+      if (typeof id !== 'string' || !id || (result.sessionId !== undefined && result.sessionId !== id)) throw new Error('Antigravity session identity mismatch.');
+      session.config = result;
+      session.transcript = new AcpTranscript(options.agentId, id, event => {
+        if (!session.loading) {
+          options.changed(event);
+          if (event.type === 'request.created' || event.type === 'request.resolved') options.requestChanged?.(event);
+        }
+      });
+      for (const params of session.initialization) session.update(params);
+      session.initialization = [];
+      session.transcript.finish('completed');
+      session.loading = false;
+      return session;
+    } catch (error) { await session.close(); throw error; }
+  }
+
+  get snapshot(): AntigravityConversationSnapshot { return this.transcript.replica.getSnapshot(); }
+  get configuration(): Record<string, unknown> { return this.config; }
+  get sessionId(): string { return this.snapshot.sessionId; }
+  get isClosed(): boolean { return this.disposed; }
+
+  prompt(text: string, content: unknown[] = [{ type: 'text', text }]): { turnId: string; completion: Promise<void> } {
+    if (this.disposed) throw new Error('Antigravity session is closed.');
+    if (this.active) throw new Error('Antigravity is still finishing the previous turn. Queue the next prompt.');
+    this.interrupted = false;
+    const turnId = this.transcript.start(text);
+    const completion = this.runtime.connection.request('session/prompt', { sessionId: this.sessionId, prompt: content }, 30 * 60_000)
+      .then(result => {
+        if (!record(result) || typeof result.stopReason !== 'string') throw new Error('Invalid Antigravity turn completion.');
+        const status = this.interrupted || result.stopReason === 'cancelled' ? 'interrupted'
+          : result.stopReason === 'end_turn' ? 'completed' : 'failed';
+        this.transcript.finish(status, status === 'failed' ? `Antigravity stopped: ${result.stopReason}.` : undefined);
+      }).catch(error => {
+        this.transcript.finish(this.interrupted ? 'interrupted' : 'failed', this.interrupted ? undefined : safeError(error));
+      }).finally(() => {
+        this.cancelPermissions();
+        if (this.active === completion) this.active = undefined;
+      });
+    this.active = completion;
+    return { turnId, completion };
+  }
+
+  async interrupt(expectedTurnId?: string): Promise<void> {
+    if (!this.active) return;
+    if (expectedTurnId && expectedTurnId !== this.snapshot.activeTurnId) throw new Error('Antigravity turn changed before cancellation.');
+    this.interrupted = true;
+    this.cancelPermissions();
+    this.runtime.connection.notify('session/cancel', { sessionId: this.sessionId });
+    const timer = setTimeout(() => { void this.runtime.close(); }, 5_000);
+    try { await this.active; } finally { clearTimeout(timer); }
+  }
+
+  respond(response: AgentRequestResponse): void {
+    if (response.agentId && response.agentId !== this.options.agentId) throw new Error('Antigravity request belongs to another agent.');
+    const pending = this.pending.get(response.id);
+    if (!pending) throw new Error('Antigravity request is no longer pending.');
+    const result = pending.answer(response);
+    this.pending.delete(response.id);
+    this.transcript.event({ type: 'request.resolved', payload: { id: response.id } });
+    pending.resolve(result);
+  }
+
+  async setModel(model: string): Promise<void> {
+    this.assertIdle();
+    const result = await this.runtime.connection.request('session/set_config_option', { sessionId: this.sessionId, configId: 'model', value: model });
+    if (record(result)) this.config = { ...this.config, ...result };
+  }
+
+  async setMode(modeId: string): Promise<void> {
+    this.assertIdle();
+    if (!['default', 'auto_edit'].includes(modeId)) throw new Error('Unsupported Antigravity permission mode.');
+    await this.runtime.connection.request('session/set_mode', { sessionId: this.sessionId, modeId });
+  }
+
+  async close(): Promise<void> {
+    this.disposed = true;
+    this.cancelPermissions();
+    await this.runtime?.close();
+    await this.active;
+  }
+
+  private assertIdle(): void {
+    if (this.disposed || this.active) throw new Error('Antigravity session must be idle to change settings.');
+  }
+
+  private notification(method: string, params: unknown): void {
+    if (method !== 'session/update') return;
+    if (!this.transcript) { this.initialization.push(params); return; }
+    this.update(params);
+  }
+
+  private update(params: unknown): void {
+    if (!record(params) || params.sessionId !== this.sessionId || !record(params.update)) throw new Error('Antigravity update identity mismatch.');
+    if (this.disposed) return;
+    this.transcript.update(params.update, this.loading);
+    if (params.update.sessionUpdate === 'config_option_update') this.config = { ...this.config, configOptions: params.update.configOptions };
+  }
+
+  private async request(method: string, params: unknown): Promise<unknown> {
+    if (!record(params) || !this.transcript || params.sessionId !== this.sessionId || this.disposed || this.loading) throw new Error('Antigravity client request is outside an active session.');
+    if (method === 'session/request_permission') {
+      if (!this.active) throw new Error('Antigravity permission request has no active turn.');
+      const pending = permissionRequest(params);
+      return new Promise(resolve => {
+        this.pending.set(pending.request.id, { ...pending, resolve });
+        this.transcript.event({ type: 'request.created', payload: { request: pending.request } });
+      });
+    }
+    if (!this.active) throw new Error('Antigravity file request has no active turn.');
+    return handleAcpFileRequest(method, params, [this.options.cwd,
+      path.join(this.options.home ?? antigravityHome(), 'antigravity-acp', 'brain', this.sessionId)]);
+  }
+
+  private closed(error: Error): void {
+    this.disposed = true;
+    this.cancelPermissions();
+    this.transcript?.finish(this.interrupted ? 'interrupted' : 'failed', this.interrupted ? undefined : safeError(error));
+    this.options.closed?.(error);
+  }
+
+  private cancelPermissions(): void {
+    for (const [id, pending] of this.pending) {
+      this.transcript?.event({ type: 'request.resolved', payload: { id } });
+      pending.resolve({ outcome: { outcome: 'cancelled' } });
+    }
+    this.pending.clear();
+  }
+}
+
+function safeError(error: unknown): string { return error instanceof Error ? error.message : 'Antigravity turn failed.'; }

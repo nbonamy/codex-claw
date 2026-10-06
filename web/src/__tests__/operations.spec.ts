@@ -73,6 +73,8 @@ describe(`${product.name} web operations`, () => {
     await invokeAppWebOperation({ request }, 'getProviderUsage', ['claude']);
     await invokeAppWebOperation({ request }, 'disconnectProvider', ['claude', 'wall-e']);
     await invokeAppWebOperation({ request }, 'disconnectProvider', ['codex']);
+    await invokeAppWebOperation({ request }, 'authenticateProvider', ['antigravity', 'login']);
+    await invokeAppWebOperation({ request }, 'authenticateProvider', ['antigravity', 'cancel']);
     expect(request.mock.calls).toEqual([
       [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
       [backendMethods.claudeAuthenticationGet, { connectionId: 'wall-e' }],
@@ -81,6 +83,8 @@ describe(`${product.name} web operations`, () => {
       [backendMethods.providerUsageGet, { backend: 'claude' }],
       [backendMethods.providerDisconnect, { backend: 'claude', remoteConnectionId: 'wall-e' }],
       [backendMethods.providerDisconnect, { backend: 'codex' }],
+      [backendMethods.providerAuthenticate, { backend: 'antigravity', action: 'login' }],
+      [backendMethods.providerAuthenticate, { backend: 'antigravity', action: 'cancel' }],
     ]);
   });
   it('maps allowlisted product operations to daemon methods', async () => {

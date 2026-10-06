@@ -66,12 +66,27 @@
             <button v-if="updatingProvider !== 'claude' && !claudeLoading" type="button" :disabled="continuing || Boolean(updatingProvider)" @click="emit('customize', 'claude')">{{ t('auth.customize') }}</button>
           </div>
           </div>
-          <el-button class="codex-login__continue" size="large" :loading="continuing" :disabled="Boolean(updatingProvider) || !(codexConnected && codexEnabled || claudeConnected && claudeEnabled)" @click="emit('continue')">
+          <div class="codex-login__provider">
+            <el-button size="large" :disabled="antigravityLoading || antigravityPending || (antigravityConnected && antigravityEnabled) || continuing || Boolean(updatingProvider)" @click="emit('connect-antigravity')">
+              <BackendIcon backend="antigravity" />
+              {{ t(antigravityConnected ? (antigravityEnabled ? 'antigravity.connected' : 'antigravity.enable') : 'antigravity.connect') }}
+            </el-button>
+            <div class="codex-login__detection">
+              <button v-if="antigravityPending" class="codex-login__cancel" type="button" @click="emit('cancel-antigravity')"><i class="codex-login__spinner" aria-hidden="true" />{{ t('auth.cancel') }}</button>
+              <template v-else>
+                <span v-if="updatingProvider === 'antigravity' || antigravityLoading" role="status">{{ t('auth.checking') }}</span>
+                <span v-else-if="antigravityConnected || detected('antigravity')"><CheckIcon aria-hidden="true" /> {{ t(antigravityConnected ? 'auth.connected' : 'auth.detected') }}</span>
+                <button type="button" :disabled="antigravityLoading || continuing || Boolean(updatingProvider)" @click="emit('customize', 'antigravity')">{{ t('auth.customize') }}</button>
+              </template>
+            </div>
+          </div>
+          <el-button class="codex-login__continue" size="large" :loading="continuing" :disabled="Boolean(updatingProvider) || !(codexConnected && codexEnabled || claudeConnected && claudeEnabled || antigravityConnected && antigravityEnabled)" @click="emit('continue')">
             {{ t('auth.continue') }}
           </el-button>
         </div>
         <p v-if="error" class="codex-login__error" role="alert">{{ error }}</p>
         <p v-if="claudeError" class="codex-login__error" role="alert">{{ claudeError }}</p>
+        <p v-if="antigravityError" class="codex-login__error" role="alert">{{ antigravityError }}</p>
         <p v-if="setupError" class="codex-login__error" role="alert">{{ setupError }}</p>
       </template>
     </div>
@@ -103,14 +118,20 @@ const props = withDefaults(defineProps<{
   codexEnabled?: boolean;
   claudeEnabled?: boolean;
   claudeLoading?: boolean;
+  antigravityConnected?: boolean;
+  antigravityEnabled?: boolean;
+  antigravityLoading?: boolean;
+  antigravityPending?: boolean;
+  antigravityError?: string | null;
   continuing?: boolean;
 }>(), {
   variant: 'sign-in',
   codexEnabled: true,
   claudeEnabled: true,
+  antigravityEnabled: true,
 });
 
-const emit = defineEmits<{ cancel: []; login: []; 'connect-claude': []; continue: []; customize: [backend: AgentBackend] }>();
+const emit = defineEmits<{ cancel: []; login: []; 'connect-claude': []; 'connect-antigravity': []; 'cancel-antigravity': []; continue: []; customize: [backend: AgentBackend] }>();
 const { t } = useI18n();
 const detected = (backend: AgentBackend) => props.providerSetup?.some(setup => setup.backend === backend && setup.installed);
 </script>

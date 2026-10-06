@@ -72,6 +72,15 @@ function expectTurnContext(
 
 function expectEventContext(event: EventRecord): void {
   switch (event.type) {
+    case 'antigravity.conversationSnapshotChanged':
+    case 'antigravity.conversationEventReceived': {
+      expectAgentBackend(event, 'antigravity');
+      expectRequiredString(event, 'backendSessionId');
+      const payload = event.payload as Record<string, unknown>;
+      const frame = (payload.event ?? payload.snapshot) as Record<string, unknown>;
+      if (frame.agentId !== event.agentId || frame.sessionId !== event.backendSessionId) failEventValidation('$.payload', 'expected the outer Antigravity identity');
+      return;
+    }
     case 'backend.statusChanged':
     case 'account.rateLimitsUpdated':
     case 'models.changed':

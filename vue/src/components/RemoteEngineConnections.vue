@@ -64,6 +64,7 @@ async function setEnabled(backend: AgentBackend, enabled: boolean) {
   if (expected === revision) engines.value = result;
 }
 async function connect(engine: ProviderConnection) {
+  if (!engine.connected && engine.backend === 'antigravity') { error.value = translate('antigravity.remoteLogin'); return; }
   if (!engine.connected) { signingIn.value = engine.backend; return; }
   busy.value = true;
   error.value = '';

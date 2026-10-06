@@ -52,5 +52,5 @@ export function isAgentHandoff(value: unknown): value is AgentHandoff {
     && (v.note === undefined || (typeof v.note === 'string' && v.note.length <= handoffNoteLimit))
     && (v.error === undefined || typeof v.error === 'string')
     && Boolean(ref && !Array.isArray(ref) && ((ref.backend === 'codex' && typeof ref.threadId === 'string')
-      || (ref.backend === 'claude' && typeof ref.sessionId === 'string' && (typeof ref.folder === 'string' || ref.folder === null))));
+      || ((ref.backend === 'claude' || ref.backend === 'antigravity') && typeof ref.sessionId === 'string' && (typeof ref.folder === 'string' || ref.folder === null))));
 }

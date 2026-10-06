@@ -1,4 +1,6 @@
 import { product } from '@workspace/core/product';
+import { createAntigravityConversationState } from './antigravity-conversation-state';
+import type { AntigravityConversationSnapshot } from '@workspace/core/contracts/antigravity-conversation';
 
 import { translate } from './i18n';
 import { localizedErrorMessage } from './i18n/errors';
@@ -72,6 +74,9 @@ const claudeConversationFramesByAgentId = ref<Record<string, {
 }>>({});
 const recoveringCodexConversationAgentIds = new Set<string>();
 const recoveringClaudeConversationAgentIds = new Set<string>();
+const antigravityConversations = createAntigravityConversationState(async agentId => {
+  if (appApi?.loadConversationHistory) adoptBackgroundSnapshot(await appApi.loadConversationHistory(agentId));
+});
 let agentSelectionRequestId = 0;
 let unsubscribeMainEvents: (() => void) | null = null;
 let bufferedMainEvents: MainToRendererEvent[] | null = null;
@@ -183,6 +188,7 @@ export type AgentConversationView = {
   agent: Agent;
   codexSnapshot: CodexConversationSnapshot | null;
   claudeSnapshot: ClaudeConversationSnapshot | null;
+  antigravitySnapshot?: AntigravityConversationSnapshot | null;
   composer: AgentComposerConfiguration;
   composerState: CodexComposerState;
   attachments: readonly CodexNativeAttachment[];
@@ -359,6 +365,7 @@ export function useAppState() {
     const sessionId = agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
     return {
       agent,
+      antigravitySnapshot: antigravityConversations.select(agent),
       codexSnapshot: agent.backend === 'codex' && agent.backendSession?.kind === 'codex' && codexFrame?.threadId === agent.backendSession.threadId
         ? codexFrame.snapshot : null,
       claudeSnapshot: agent.backend === 'claude' && claudeFrame && (!sessionId || claudeFrame.snapshot.sessionId === sessionId)
@@ -475,6 +482,7 @@ export function useAppState() {
     resetUnreadAgentIds();
     codexConversationFramesByAgentId.value = {};
     claudeConversationFramesByAgentId.value = {};
+    antigravityConversations.reset();
     recoveringCodexConversationAgentIds.clear();
     recoveringClaudeConversationAgentIds.clear();
     agentCreationProgress.value = null;
@@ -528,6 +536,7 @@ export function useAppState() {
     for (const agentId of Object.keys(claudeConversationFramesByAgentId.value)) {
       invalidateAndRecoverClaudeConversation(agentId);
     }
+    antigravityConversations.recoverAll();
   };
 
   async function performRendererSynchronization(preserveActiveSelection: boolean): Promise<void> {
@@ -1632,6 +1641,7 @@ export function useAppState() {
     activeCodexConversationSnapshot,
     activeClaudeConversationSnapshot,
     agentConversationFor,
+    activeAntigravityConversationSnapshot: computed(() => activeAgent.value ? antigravityConversations.select(activeAgent.value) : null),
     prepareAgentConversation,
     activeBackendCapabilities,
     modelCatalogStatus,
@@ -1838,7 +1848,7 @@ function emptyComposerState(): CodexComposerState {
 function plainConversationRef(ref: BackendConversationRef): BackendConversationRef {
   return ref.backend === 'codex'
     ? { backend: 'codex', threadId: ref.threadId }
-    : { backend: 'claude', folder: ref.folder, sessionId: ref.sessionId };
+    : { backend: ref.backend, folder: ref.folder, sessionId: ref.sessionId };
 }
 
 function plainDevicePairingSession(session: DevicePairingSession): DevicePairingSession {
@@ -2070,6 +2080,10 @@ function handleRendererOwnedMainEvent(event: RendererOnlySnapshotEvent): void {
       };
       return;
     }
+    case 'antigravity.conversationSnapshotChanged':
+    case 'antigravity.conversationEventReceived':
+      antigravityConversations.receive(event);
+      return;
     case 'claude.conversationSnapshotChanged': {
       const current = claudeConversationFramesByAgentId.value[event.agentId];
       if (current && current.revision >= event.payload.revision) return;
@@ -2299,6 +2313,7 @@ function pruneConversationFrames(): void {
         || frame.snapshot.sessionId === agent.backendSession.sessionId;
     }),
   );
+  antigravityConversations.reconcile([...agentsById.values()]);
 }
 
 function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'client.markdownDisplayRequested' }>): void {
@@ -2339,6 +2354,7 @@ function syncFileActivityFromMainEvent(event: Extract<RendererOnlySnapshotEvent,
 function agentNeedsHistory(agentId: string): boolean {
   const agent = snapshot.value.agents.find((candidate) => candidate.id === agentId);
   if (!agent?.backendSession) return false;
+  if (agent.backendSession.kind === 'antigravity') return !antigravityConversations.select(agent);
   return agent.backendSession.kind === 'codex'
     ? codexConversationFramesByAgentId.value[agentId]?.threadId !== agent.backendSession.threadId
     : claudeConversationFramesByAgentId.value[agentId]?.snapshot.sessionId !== agent.backendSession.sessionId;

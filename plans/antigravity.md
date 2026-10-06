@@ -476,8 +476,12 @@ Transport foundation in progress: duplex JSONL framing handles colliding inbound
 request IDs, split frames, bounded buffers, EOF and request timeouts. Deterministic
 tests launch a real child process that supplies sanitized ACP shapes. A fresh-home
 initialization using the qualified native runtime reported protocol 2, version 1.3.0
-and loadSession support. This proves initialization only; session/host workflows
-remain unimplemented.
+and loadSession support. The provider host now streams its own revisioned replica,
+handles native approvals/questions and cancellation, and atomically rebuilds history.
+Native prompt completion and cold replay passed using the qualified runtime and
+the existing probe login in place. Full workspace tests/typechecks passed. Scoped
+MCP bridge tests prove two child environments stay separate; actual review/Mission
+workflow integration remains pending.
 
 - [ ] Spawn the qualified ACP runtime without a shell; implement request/response,
   notification framing, bounded buffering, session routing and process cleanup.
@@ -501,6 +505,13 @@ remain unimplemented.
   contracts work, including review round completion and session disposal.
 
 ### Phase 4: UI and capability hardening
+
+The initial settings/onboarding/navigation, icon, native authentication actions,
+provider replica binding and model selector are implemented with mounted tests.
+An isolated branch Web client/daemon loaded the native model catalog. Attachments,
+planning and reviews remain gated while their owning integrations are completed.
+Full workspace tests and typechecks pass at this checkpoint; coverage and full
+native consumer verification are still pending.
 
 - [ ] Add backend icon, settings panel/navigation/i18n, conversation binding and
   model/effort options; reuse creation dialogs and shared controls.

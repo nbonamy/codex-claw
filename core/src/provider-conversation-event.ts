@@ -12,6 +12,7 @@ export function providerConversationEventView(
   event: MainToRendererEvent,
 ): ProviderConversationEventView {
   if (
+    event.type === 'antigravity.conversationEventReceived' ||
     event.type === 'codex.conversationEventReceived' ||
     event.type === 'claude.conversationEventReceived'
   ) {

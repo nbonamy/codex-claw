@@ -106,6 +106,7 @@ export const backendMethods = {
   driverAccountRateLimitsGet: 'driver/account/rateLimits/get',
   providerEnabledSet: 'provider/enabled/set',
   providerDisconnect: 'provider/disconnect',
+  providerAuthenticate: 'provider/authenticate',
   providerSetupConfigure: 'provider/setup/configure',
   providerInstall: 'provider/install',
   codexLoginCancel: 'codex/authentication/login/cancel',

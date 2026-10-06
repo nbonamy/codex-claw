@@ -27,6 +27,10 @@
         <BackendIcon backend="claude" monochrome />
         <span>{{ $t('surface.settingsSidebar.claudeCode') }}</span>
       </el-menu-item>
+      <el-menu-item index="antigravity">
+        <BackendIcon backend="antigravity" monochrome />
+        <span>{{ $t('antigravity.name') }}</span>
+      </el-menu-item>
       <el-menu-item index="plugins">
         <PuzzleIcon aria-hidden="true" />
         <span>{{ $t('surface.settingsSidebar.plugins') }}</span>
@@ -66,7 +70,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'personalization' || tab === 'git' || tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
+  if (tab === 'antigravity' || tab === 'personalization' || tab === 'git' || tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
     emit('select', tab);
   }
 }

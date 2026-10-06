@@ -19,6 +19,18 @@ function mountLanding(props: InstanceType<typeof CodexLoginLanding>['$props'] = 
 }
 
 describe('CodexLoginLanding', () => {
+  it('offers native Antigravity sign-in and can continue with it as the only connected engine', async () => {
+    const wrapper = mountLanding({ antigravityConnected: false });
+    await wrapper.findAll('button').find(button => button.text() === 'Connect Antigravity')!.trigger('click');
+    expect(wrapper.emitted('connect-antigravity')).toEqual([[]]);
+    await wrapper.setProps({ antigravityPending: true });
+    await wrapper.findAll('button').find(button => button.text() === 'Cancel sign-in')!.trigger('click');
+    expect(wrapper.emitted('cancel-antigravity')).toEqual([[]]);
+    await wrapper.setProps({ antigravityPending: false, antigravityConnected: true });
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeUndefined();
+    await wrapper.get('.codex-login__continue').trigger('click');
+    expect(wrapper.emitted('continue')).toEqual([[]]);
+  });
   it('offers independent customization and does not treat CLI detection as a connection', async () => {
     const wrapper = mountLanding({ providerSetup: [
       { backend: 'codex', installed: true, isolated: true, shareSkills: true, homePath: '/app/codex-home', locked: false },
@@ -30,7 +42,7 @@ describe('CodexLoginLanding', () => {
     expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
     await providers[1]!.get('.codex-login__detection button').trigger('click');
     expect(wrapper.emitted('customize')).toStrictEqual([['claude']]);
-    await wrapper.setProps({ codexConnected: true, claudeConnected: true });
+    await wrapper.setProps({ codexConnected: true, claudeConnected: true, antigravityConnected: true });
     for (const provider of providers) {
       expect(provider.get('.codex-login__detection span').text()).toBe('Connected');
       expect(provider.text()).not.toContain('Detected');

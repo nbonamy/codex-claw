@@ -21,6 +21,12 @@
       :codex-connected="codexConnected"
       :continuing="continuing"
       @connect-claude="connectClaude"
+      :antigravity-connected="antigravityConnected"
+      :antigravity-loading="antigravityLoading"
+      :antigravity-pending="antigravityPending"
+      :antigravity-error="antigravityError"
+      @connect-antigravity="connectAntigravity"
+      @cancel-antigravity="cancelAntigravityLogin"
       @refresh-claude="refreshClaude"
       @continue="continueWithProviders"
       :authentication="authentication"
@@ -126,6 +132,11 @@
         :claude-connection-error="claudeError ?? snapshot.providerConnections?.find(engine => engine.backend === 'claude')?.error"
         :connect-codex="startChatGptLogin"
         :connect-claude="connectClaude"
+        :connect-antigravity="connectAntigravity"
+        :cancel-antigravity-login="cancelAntigravityLogin"
+        :antigravity-connection-busy="antigravityLoading || snapshot.providerConnections?.some(engine => engine.backend === 'antigravity' && engine.checking)"
+        :antigravity-login-pending="antigravityPending"
+        :antigravity-connection-error="antigravityError ?? snapshot.providerConnections?.find(engine => engine.backend === 'antigravity')?.error"
         :disconnect-provider="disconnectProvider"
         :cancel-codex-login="cancelChatGptLogin"
         :active-tab="settingsActiveTab"
@@ -613,6 +624,8 @@ import { useSplitWorkspace } from './use-split-workspace';
 import type { AgentConversationActions } from './use-agent-conversation';
 import { conversationCommandMenuItems, conversationMenuCommand, type ConversationMenuCommand } from './conversation-command-menu';
 import { claudePaneClientRequests } from './claude-pane-client-requests';
+import { antigravityPaneClientRequests } from './antigravity-pane-client-requests';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 import type { AgentConversationView } from '../app-state';
 import MissionCodeReview from './MissionCodeReview.vue';
 import MissionShipBoard from './MissionShipBoard.vue';
@@ -695,6 +708,7 @@ const props = withDefaults(defineProps<{
   backendCapabilities?: BackendCapabilities;
   codexConversationSnapshot?: CodexConversationSnapshot | null;
   claudeConversationSnapshot?: ClaudeConversationSnapshot | null;
+  antigravityConversationSnapshot?: import('@workspace/core/contracts/antigravity-conversation').AntigravityConversationSnapshot | null;
   modelCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   skillCatalogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
   selectedModelId?: string | null;
@@ -1260,6 +1274,7 @@ const firstRunOnboarding = useFirstRunOnboarding({
 });
 const {
   claudeAuthentication, claudeConnected, claudeLoading, claudeError, claudeDialogVisible,
+  antigravityConnected, antigravityLoading, antigravityPending, antigravityError, connectAntigravity, cancelAntigravityLogin,
   providerSetup, customizedSetup, customizingProvider, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
   codexConnected, continuing, connectClaude, disconnectProvider, refreshClaude, continueWithProviders,
   authentication,
@@ -1818,7 +1833,7 @@ const currentAgentGitStatus = computed<AgentGitStatus | null>(() => {
 const conversationKey = computed(() => {
   const session = currentAgent.value?.backendSession;
   if (session?.kind === 'codex') return `codex:${session.threadId}`;
-  if (session?.kind === 'claude') return `claude:${session.sessionId}`;
+  if (session) return `${session.kind}:${session.sessionId}`;
   return currentAgent.value ? `agent:${currentAgent.value.id}` : 'no-agent';
 });
 const providerConversation = computed(() => (
@@ -1826,7 +1841,7 @@ const providerConversation = computed(() => (
     ? props.codexConversationSnapshot ?? null
     : currentAgent.value?.backend === 'claude'
       ? props.claudeConversationSnapshot ?? null
-      : null
+      : currentAgent.value?.backend === 'antigravity' ? props.antigravityConversationSnapshot ?? null : null
 ));
 const conversationMessages = computed(() => {
   const messages = providerConversation.value?.messages ?? [];
@@ -1834,7 +1849,7 @@ const conversationMessages = computed(() => {
   if (!fixture || fixture.agentId !== currentAgent.value?.id) return messages;
   return [...messages, fixture.message];
 });
-const conversationLatestTurnId = computed(() => providerConversation.value?.turnIds.at(-1) ?? null);
+const conversationLatestTurnId = computed(() => providerConversation.value?.turns.at(-1)?.id ?? null);
 function latestTurnIdForAgent(agentId: string): string | null {
   const view = props.agentConversationFor?.(agentId);
   return (view?.codexSnapshot ?? view?.claudeSnapshot)?.turnIds.at(-1) ?? null;
@@ -2026,6 +2041,7 @@ const conversationPaneState: CodexConversationPaneState = {
   thread: {
     get approvals() { return effectiveApprovals.value; },
     get clientRequests() {
+      if (currentAgent.value?.backend === 'antigravity' && props.antigravityConversationSnapshot) return antigravityPaneClientRequests(props.antigravityConversationSnapshot);
       return currentAgent.value?.backend === 'codex'
         ? props.codexConversationSnapshot?.clientRequests ?? []
         : claudePaneClientRequests(props.claudeConversationSnapshot);
@@ -2050,7 +2066,7 @@ const conversationPaneState: CodexConversationPaneState = {
     get attachments() { return props.composerAttachments; },
     get placeholder() {
       if (!currentAgent.value) return translate('surface.appShell.selectAnAgent');
-      const backend = currentAgent.value.backend === 'claude' ? translate('surface.appShell.claude') : translate('surface.appShell.codex');
+      const backend = backendDisplayName(currentAgent.value.backend);
       if (props.isSending) return `${backend} is working...`;
       if (activeSurface.value === 'mission' && selectedMission.value?.stage === 'requirements' && conversationMessages.value.length === 0) {
         return t('missions.describeWhatYouWantToBuild');

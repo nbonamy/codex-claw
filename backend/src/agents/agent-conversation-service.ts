@@ -196,7 +196,7 @@ function sameConversationRef(left: BackendConversationRef, right: BackendConvers
   return left.backend === right.backend && (
     left.backend === 'codex'
       ? right.backend === 'codex' && left.threadId === right.threadId
-      : right.backend === 'claude' && left.folder === right.folder && left.sessionId === right.sessionId
+      : right.backend === left.backend && left.folder === right.folder && left.sessionId === right.sessionId
   );
 }
 

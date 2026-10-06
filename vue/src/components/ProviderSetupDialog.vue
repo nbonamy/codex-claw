@@ -1,7 +1,7 @@
 <template>
-  <FormDialog :model-value="Boolean(setup)" :title="confirming ? t('engineSetup.confirmTitle') : t('auth.customizeProvider', { provider: setup?.backend === 'codex' ? 'Codex' : 'Claude Code' })" teleported @update:model-value="!$event && !busy && emit('close')">
+  <FormDialog :model-value="Boolean(setup)" :title="confirming ? t('engineSetup.confirmTitle') : t('auth.customizeProvider', { provider: providerName })" teleported @update:model-value="!$event && !busy && emit('close')">
     <div v-if="confirming" class="app-form-dialog provider-setup__confirmation">
-      <p>{{ t('engineSetup.warning', { count: setup?.affectedAgentIds?.length ?? 0, provider: setup?.backend === 'codex' ? 'Codex' : 'Claude Code' }) }}</p>
+      <p>{{ t('engineSetup.warning', { count: setup?.affectedAgentIds?.length ?? 0, provider: providerName }) }}</p>
       <p>{{ t('engineSetup.historyPreserved') }}</p>
       <el-checkbox v-model="acknowledged" :disabled="busy" class="provider-setup__acknowledgment">{{ t('engineSetup.acknowledgment') }}</el-checkbox>
       <p v-if="error" role="alert">{{ error }}</p>
@@ -26,13 +26,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 import { useI18n } from 'vue-i18n';
 import type { ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormDialogField from '../shared/dialog/FormDialogField.vue';
 
 const props = defineProps<{ setup: ProviderSetupStatus | null; busy: boolean; error: string | null; allowReset?: boolean }>();
+const providerName = computed(() => props.setup ? backendDisplayName(props.setup.backend) : '');
 const emit = defineEmits<{ close: []; save: [choice: ProviderSetupChange] }>();
 const { t } = useI18n();
 const isolated = ref(true);

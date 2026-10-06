@@ -1134,14 +1134,14 @@ function sanitizeBackendConversationRef(value: unknown): Partial<Pick<Automation
   }
 
   if (
-    value.backend === 'claude' &&
+    (value.backend === 'claude' || value.backend === 'antigravity') &&
     (value.folder === null || (typeof value.folder === 'string' && value.folder.trim())) &&
     typeof value.sessionId === 'string' &&
     value.sessionId.trim()
   ) {
     return {
       conversationRef: {
-        backend: 'claude',
+        backend: value.backend,
         folder: value.folder,
         sessionId: value.sessionId,
       },
