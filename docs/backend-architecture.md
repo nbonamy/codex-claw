@@ -16,9 +16,25 @@ The public executable and process name is **`korusd`**, defined by
 `product.daemonName` in `core/src/product.json`. Backend builds generate
 `backend/dist/korusd`, an executable Node launcher beside the internal
 `daemon.mjs` bundle. Desktop packaging copies both to `Resources/daemon/`;
-Electron uses its discovered Node runtime to execute the launcher. The same
-Node installation requirement applies as before. The launcher is not installed
-globally on `PATH`.
+Electron executes the launcher with a private Node runtime in
+`Resources/runtime/node` (`resources/runtime/node.exe` on Windows). Packaged
+desktop startup and the macOS background LaunchAgent do not require a system
+Node installation. The launcher is not installed globally on `PATH`.
+
+`node-runtime-release.json` pins the Node version and archive SHA-256 for macOS,
+Windows, and Linux, each with x64 and ARM64 targets. Forge prepares the runtime
+for its target platform/architecture after copying resources and before signing.
+The build downloads official Node archives, verifies pinned hashes (including
+cached archives), and ships only the executable, license notices, and release
+metadata. macOS signing includes the runtime with JIT entitlements. Runtime
+updates ship with app updates; development and explicitly configured backend
+commands still use their configured runtime. `npm run build:runtime --
+--platform=linux --arch=x64` prepares an individual target for inspection.
+
+This runtime matrix is not a claim that Windows/Linux desktop releases are
+ready: provider distribution, installer/update publishing, platform-specific
+helpers and clean-machine smoke tests must also pass on each target OS. Linux
+uses the official glibc Node builds, not a universal musl-compatible binary.
 
 Use `backend/dist/korusd --version`, `--stdio`, `serve`, or `connect` when
 running the built backend directly. SSH deployments still transport the

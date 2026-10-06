@@ -10,6 +10,7 @@ coverage/
 .app-dev/
 electron/.computer-use-artifacts/
 electron/.tts/
+electron/.runtime-cache/
 native/**/.build/
 
 # Rebuild promo video renders from videos/*.html and videos/render-mission-film.mjs.

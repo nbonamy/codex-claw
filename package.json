@@ -38,6 +38,7 @@
     "build:computer-use": "node scripts/prepare-computer-use.mjs",
     "build:computer-use:local": "node scripts/prepare-computer-use.mjs --local",
     "build:electron": "node scripts/build.mjs",
+    "build:runtime": "node scripts/prepare-node-runtime.mjs",
     "build:sdk": "node scripts/build-sdk.mjs",
     "build:tts": "node scripts/prepare-tts-helper.mjs",
     "build:web": "npm run build:sdk && npm run build -w @workspace/backend && npm run build -w @workspace/web",

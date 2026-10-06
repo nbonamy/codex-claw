@@ -1,4 +1,5 @@
 import { product } from '@workspace/core/product';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   shouldPreserveUpstreamCodexSignature,
@@ -58,6 +59,7 @@ describe('signDarwinBinaries', () => {
         `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
         `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
         `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
+        `/build/${product.name}.app/Contents/Resources/runtime/node`,
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -98,7 +100,13 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(3);
+    expect(execFileSync).toHaveBeenNthCalledWith(4, 'codesign', [
+      '--force', '--verbose', '--options', 'runtime', '--sign',
+      `Developer ID Application: ${product.name}`, '--timestamp', '--entitlements',
+      path.resolve(__dirname, '../Entitlements.darwin.plist'),
+      `/build/${product.name}.app/Contents/Resources/runtime/node`,
+    ], { stdio: 'inherit' });
+    expect(execFileSync).toHaveBeenCalledTimes(4);
   });
 
   it('supports the afterCopy app directory path used by older signing hooks', () => {
@@ -113,6 +121,7 @@ describe('signDarwinBinaries', () => {
         `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
         `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
         `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
+        `/build/${product.name}.app/Contents/Resources/runtime/node`,
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -131,7 +140,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(3);
+    expect(execFileSync).toHaveBeenCalledTimes(4);
   });
 
   it('supports the afterCopyExtraResources staging root before the app is renamed', () => {
@@ -146,6 +155,7 @@ describe('signDarwinBinaries', () => {
         '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/apple-speechanalyzer-cli',
         `/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/${product.name} Computer Use.app`,
         '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/app-tts-helper',
+        '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/runtime/node',
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -164,7 +174,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(3);
+    expect(execFileSync).toHaveBeenCalledTimes(4);
   });
 
   it('fails when a required helper has not been copied yet', () => {

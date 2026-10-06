@@ -12,6 +12,7 @@ import {
   signDarwinBinaries,
 } from './build/sign-binaries';
 import { copyPackagedNativeDependencies } from './build/package-native-dependencies';
+import { copyPackagedNodeRuntime } from './build/package-node-runtime';
 import { desktopMetadata } from './build/product-metadata';
 
 import dotenv from 'dotenv';
@@ -25,7 +26,7 @@ const appleSpeechHelperPath = path.resolve(
   '../node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli',
 );
 const extraResource = [
-  appleSpeechHelperPath,
+  ...(process.platform === 'darwin' ? [appleSpeechHelperPath] : []),
   'resources/daemon',
   'resources/codex',
   ...(process.platform === 'darwin' ? [`.computer-use/${product.name} Computer Use.app`] : []),
@@ -81,6 +82,7 @@ const config: ForgeConfig = {
     afterCopyExtraResources: [
       (buildPath: string, _electronVersion: string, platform: string, arch: string, callback: (error?: Error) => void) => {
         try {
+          copyPackagedNodeRuntime(buildPath, platform, arch);
           if (platform === 'darwin' && !skipMacSigning) {
             signDarwinBinaries(buildPath, arch);
           }

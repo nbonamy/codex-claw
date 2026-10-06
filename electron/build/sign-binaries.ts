@@ -50,6 +50,7 @@ export function signDarwinBinaries(
       'runtime',
       '--sign',
       identify,
+      ...(binary.label === 'Node runtime' ? ['--timestamp', '--entitlements', path.resolve(__dirname, 'Entitlements.darwin.plist')] : []),
       binary.path,
     ], {
       stdio: 'inherit',
@@ -95,9 +96,14 @@ function resolveDarwinBinaryPaths(
     label: 'TTS helper',
     path: path.join(resourcePath, 'app-tts-helper'),
   }));
+  const nodeRuntimePaths = resourcePaths.map((resourcePath) => ({
+    label: 'Node runtime',
+    path: path.join(resourcePath, 'runtime', 'node'),
+  }));
 
   const appleSpeechHelper = binaryPaths.find((binary) => existsSync(binary.path)) ?? binaryPaths[0];
   const computerUseHelper = computerUseAppPaths.find((binary) => existsSync(binary.path)) ?? computerUseAppPaths[0];
   const ttsHelper = ttsHelperPaths.find((binary) => existsSync(binary.path)) ?? ttsHelperPaths[0];
-  return [appleSpeechHelper, computerUseHelper, ttsHelper];
+  const nodeRuntime = nodeRuntimePaths.find((binary) => existsSync(binary.path)) ?? nodeRuntimePaths[0];
+  return [appleSpeechHelper, computerUseHelper, ttsHelper, nodeRuntime];
 }
