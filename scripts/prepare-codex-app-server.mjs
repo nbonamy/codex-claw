@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { prepareWindowsCodex } from './windows-codex.mjs';
 import {
   hasExpectedExecutableArchitecture,
   resolveInstalledExecutable,
@@ -18,7 +19,10 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 const installerUrl = 'https://releases.openai.com/codex/install.sh';
 
 const target = selectCodexReleaseTarget(config, process.platform, process.arch);
-if (hasExpectedRelease(outputPath, codeModeHostOutputPath)) {
+if (target.platform === 'win32') {
+  const executable = await prepareWindowsCodex({ config, arch: target.arch, outputDir });
+  console.log(`[prepare-codex-app-server] hosted Codex ${config.version} at ${path.relative(rootDir, executable)}`);
+} else if (hasExpectedRelease(outputPath, codeModeHostOutputPath)) {
   console.log(
     `[prepare-codex-app-server] Codex ${config.version} is already hosted at ${path.relative(rootDir, outputPath)}`,
   );

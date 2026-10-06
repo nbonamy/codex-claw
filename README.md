@@ -122,7 +122,7 @@ Settings shows each engine's account, conversation location, and enabled state.
 
 Requirements:
 
-- macOS arm64, or experimental Linux x64/arm64, with a current Node.js toolchain;
+- macOS arm64, or experimental Linux/Windows x64/arm64, with a current Node.js toolchain;
 - network access to download the pinned Codex app-server on the first build;
 - a sibling `codex-app-sdk` checkout.
 
@@ -137,6 +137,13 @@ checkout. Workspace manifests pin published package versions; removing the
 Check compatibility before switching dependency sources.
 Development additionally aliases SDK imports directly to sibling sources for
 hot reloads; build and package entrypoints rebuild the sibling SDK first.
+
+On Windows, run development from PowerShell with Node and npm installed. The
+launcher invokes npm through Node, so it does not require a Unix shell or direct
+execution of `npm.cmd`. Preparing Codex requires `tar.exe` on `PATH` (included
+with current Windows versions). It downloads and verifies the full Windows
+Codex package, including its supporting executables and resources. Native
+Windows startup remains experimental until exercised on the target machine.
 
 Focused project gates:
 

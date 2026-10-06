@@ -36,6 +36,14 @@ ready: provider distribution, installer/update publishing, platform-specific
 helpers and clean-machine smoke tests must also pass on each target OS. Linux
 uses the official glibc Node builds, not a universal musl-compatible binary.
 
+Windows Codex preparation downloads the pinned version's complete official
+package and verifies its release SHA-256, package manifest, executable
+architectures, and reported CLI version before replacing an existing copy.
+Keep its `bin/`, `codex-path/`, and `codex-resources/` layout intact; the Windows
+desktop launches `resources/codex/bin/codex.exe`. macOS/Linux retain their
+existing bundled executable paths. Development invokes the parent npm CLI
+through Node to avoid Windows command-shim execution and quoting issues.
+
 Use `backend/dist/korusd --version`, `--stdio`, `serve`, or `connect` when
 running the built backend directly. SSH deployments still transport the
 self-contained `daemon.mjs` module and invoke it with Node; it reports the same

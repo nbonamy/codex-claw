@@ -14,7 +14,7 @@ export function validateCodexReleaseConfig(value) {
   }
   for (const target of value.targets) {
     if (!target || typeof target !== 'object'
-      || !['darwin', 'linux'].includes(target.platform)
+      || !['darwin', 'linux', 'win32'].includes(target.platform)
       || !['arm64', 'x64'].includes(target.arch)) {
       throw new Error('Bundled Codex release contains an invalid target.');
     }
@@ -45,6 +45,19 @@ export function resolveInstalledExecutable(name, installBinDir, installHomeDir, 
 }
 
 export function hasExpectedExecutableArchitecture(executablePath, target, dependencies = {}) {
+  if (target.platform === 'win32') {
+    const descriptor = fs.openSync(executablePath, 'r');
+    try {
+      const dosHeader = Buffer.alloc(64);
+      if (fs.readSync(descriptor, dosHeader, 0, 64, 0) !== 64 || dosHeader.toString('ascii', 0, 2) !== 'MZ') return false;
+      const peHeader = Buffer.alloc(6);
+      if (fs.readSync(descriptor, peHeader, 0, 6, dosHeader.readUInt32LE(60)) !== 6
+        || peHeader.readUInt32LE(0) !== 0x4550) return false;
+      return peHeader.readUInt16LE(4) === (target.arch === 'x64' ? 0x8664 : 0xaa64);
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  }
   if (target.platform === 'darwin') {
     const run = dependencies.execFileSync ?? execFileSync;
     const architectures = run('lipo', ['-archs', executablePath], { encoding: 'utf8' })
