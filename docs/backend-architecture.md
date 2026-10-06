@@ -92,7 +92,7 @@ tags, and configure these secrets through the repository/environment settings:
 | --- | --- |
 | `BUILD_CERTIFICATE_BASE64` | Base64 PKCS#12 Developer ID Application certificate and private key |
 | `BUILD_CERTIFICATE_PASSWORD` | Password protecting that PKCS#12 export |
-| `IDENTIFY_DARWIN_CODE` | Full Developer ID Application signing identity |
+| `IDENTITY_DARWIN_CODE` | Full Developer ID Application signing identity |
 | `APPLE_ID` | Apple account used for notarization |
 | `APPLE_PASSWORD` | App-specific Apple notarization password |
 | `APPLE_TEAM_ID` | Apple Developer team ID |

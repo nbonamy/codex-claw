@@ -22,7 +22,7 @@ function cleanup() {
 }
 if (process.argv[2] === 'cleanup') cleanup();
 else {
-  for (const name of ['BUILD_CERTIFICATE_BASE64', 'BUILD_CERTIFICATE_PASSWORD', 'IDENTIFY_DARWIN_CODE', 'APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID']) {
+  for (const name of ['BUILD_CERTIFICATE_BASE64', 'BUILD_CERTIFICATE_PASSWORD', 'IDENTITY_DARWIN_CODE', 'APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID']) {
     if (!process.env[name]) throw new Error(`Missing signing configuration: ${name}`);
   }
   const directory = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'app-signing-'));

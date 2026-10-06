@@ -27,11 +27,11 @@ export function signDarwinBinaries(
   deps: SignDarwinBinariesDeps = {},
 ): void {
   const env = deps.env ?? process.env;
-  const identify = env.IDENTIFY_DARWIN_CODE;
+  const identity = env.IDENTITY_DARWIN_CODE;
   const logger = deps.logger ?? console;
 
-  if (!identify) {
-    logger.log('IDENTIFY_DARWIN_CODE not set, skipping macOS helper signing in afterCopyExtraResources');
+  if (!identity) {
+    logger.log('IDENTITY_DARWIN_CODE not set, skipping macOS helper signing in afterCopyExtraResources');
     return;
   }
 
@@ -49,7 +49,7 @@ export function signDarwinBinaries(
       '--options',
       'runtime',
       '--sign',
-      identify,
+      identity,
       ...(binary.label === 'Node runtime' ? ['--timestamp', '--entitlements', path.resolve(__dirname, 'Entitlements.darwin.plist')] : []),
       binary.path,
     ], {

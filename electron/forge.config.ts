@@ -56,7 +56,7 @@ const updateManifestBaseUrl = `${updateBaseUrl.replace(/\/+$/, '')}/darwin/${pro
 if (isDarwin && !skipMacSigning) {
   osxPackagerConfig = {
     osxSign: {
-      identity: process.env.IDENTIFY_DARWIN_CODE,
+      identity: process.env.IDENTITY_DARWIN_CODE,
       ignore: shouldPreserveUpstreamCodexSignature,
       optionsForFile: () => { return {
         hardenedRuntime: true,

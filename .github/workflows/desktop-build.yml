@@ -90,7 +90,7 @@ jobs:
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           BUILD_CERTIFICATE_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
-          IDENTIFY_DARWIN_CODE: ${{ secrets.IDENTIFY_DARWIN_CODE }}
+          IDENTITY_DARWIN_CODE: ${{ secrets.IDENTITY_DARWIN_CODE }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

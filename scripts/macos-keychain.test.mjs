@@ -24,7 +24,7 @@ if (operation === 'delete-keychain') fs.rmSync(args.at(-1));
     encoding: 'utf8', env: { ...process.env, PATH: root + path.delimiter + process.env.PATH,
       RUNNER_TEMP: root, npm_execpath: npm, APP_TRACE: trace, APP_FAILURE: failure,
       BUILD_CERTIFICATE_BASE64: Buffer.from('fixture').toString('base64'), BUILD_CERTIFICATE_PASSWORD: 'private-fixture-password',
-      IDENTIFY_DARWIN_CODE: 'fixture', APPLE_ID: 'fixture', APPLE_PASSWORD: 'private-fixture-password', APPLE_TEAM_ID: 'fixture' },
+      IDENTITY_DARWIN_CODE: 'fixture', APPLE_ID: 'fixture', APPLE_PASSWORD: 'private-fixture-password', APPLE_TEAM_ID: 'fixture' },
   });
   assert.equal(result.status, failure ? 1 : 0, result.stderr);
   const calls = fs.readFileSync(trace, 'utf8').trim().split('\n').map(JSON.parse);

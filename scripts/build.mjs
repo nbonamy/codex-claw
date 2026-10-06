@@ -28,7 +28,7 @@ function requireReleaseSigningConfiguration() {
     return;
   }
 
-  const required = ['IDENTIFY_DARWIN_CODE', 'APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID'];
+  const required = ['IDENTITY_DARWIN_CODE', 'APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID'];
   const missing = required.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     throw new Error(`A signed macOS build requires: ${missing.join(', ')}. Set APP_SKIP_SIGNING=1 only for an unsigned local build.`);
