@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   hasExpectedExecutableArchitecture,
   resolveInstalledExecutable,
@@ -11,6 +14,8 @@ const releaseConfig = {
   targets: [
     { platform: 'darwin', arch: 'arm64' },
     { platform: 'linux', arch: 'x64' },
+    { platform: 'win32', arch: 'x64' },
+    { platform: 'win32', arch: 'arm64' },
   ],
 };
 
@@ -23,6 +28,29 @@ describe('runtime artifacts', () => {
     expect(() => selectCodexReleaseTarget(releaseConfig, 'linux', 'arm64')).toThrow(
       'Bundled Codex 0.153.4 does not support linux/arm64.',
     );
+  });
+
+  it.each(['x64', 'arm64'])('accepts Windows %s targets and validates PE executable headers', (arch) => {
+    const target = selectCodexReleaseTarget(releaseConfig, 'win32', arch);
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'codex-pe-'));
+    const executable = path.join(directory, 'codex.exe');
+    try {
+      const bytes = Buffer.alloc(134);
+      bytes.write('MZ');
+      bytes.writeUInt32LE(128, 60);
+      bytes.write('PE\0\0', 128);
+      bytes.writeUInt16LE(arch === 'x64' ? 0x8664 : 0xaa64, 132);
+      writeFileSync(executable, bytes);
+      expect(hasExpectedExecutableArchitecture(executable, target)).toBe(true);
+      expect(hasExpectedExecutableArchitecture(executable, { platform: 'win32', arch: arch === 'x64' ? 'arm64' : 'x64' })).toBe(false);
+      writeFileSync(executable, bytes.subarray(0, 64));
+      expect(hasExpectedExecutableArchitecture(executable, target)).toBe(false);
+      bytes.write('XX', 128);
+      writeFileSync(executable, bytes);
+      expect(hasExpectedExecutableArchitecture(executable, target)).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('prefers the installer bin alias and falls back to the standalone release layout', () => {

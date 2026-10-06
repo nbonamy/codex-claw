@@ -12,6 +12,14 @@
     {
       "platform": "linux",
       "arch": "arm64"
+    },
+    {
+      "platform": "win32",
+      "arch": "x64"
+    },
+    {
+      "platform": "win32",
+      "arch": "arm64"
     }
   ]
 }
