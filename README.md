@@ -122,7 +122,7 @@ Settings shows each engine's account, conversation location, and enabled state.
 
 Requirements:
 
-- macOS arm64, or experimental Linux x64, with a current Node.js toolchain;
+- macOS arm64, or experimental Linux x64/arm64, with a current Node.js toolchain;
 - network access to download the pinned Codex app-server on the first build;
 - a sibling `codex-app-sdk` checkout.
 
