@@ -8,7 +8,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -92,7 +92,7 @@ export async function renderNarration({
     );
   await mkdir(dirname(outputPath), { recursive: true });
   const scratch = await mkdtemp(join(tmpdir(), "korus-narration-"));
-  // Final replacement stays on the output filesystem, including Downloads on another volume.
+  // Final replacement stays on the output filesystem, even for a custom volume.
   const outputScratch = await mkdtemp(join(dirname(outputPath), ".narration-"));
   try {
     const inputs = [];
@@ -199,7 +199,7 @@ export async function renderNarration({
 async function main() {
   const requested = process.argv[2] ?? "all";
   const output = resolve(
-    process.argv[3] ?? join(homedir(), "Downloads", "korus-voiceover-drafts"),
+    process.argv[3] ?? join(root, "local", "voiceover-drafts"),
   );
   const script = JSON.parse(
     await readFile(join(root, "narration.json"), "utf8"),

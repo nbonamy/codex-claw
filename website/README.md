@@ -96,7 +96,7 @@ done
 
 Then follow the **Calm American five-film exports** instructions below. The build
 uses the approved narrated MP4s, VTTs, and timing manifest from
-`~/Downloads/korus-narrated-videos` (override with `APP_NARRATED_FILMS`) plus the
+`videos/local/narrated/` (override with `APP_NARRATED_FILMS`) plus the
 ignored poster outputs in `videos/assets/`. Missing assets stop the build with
 an actionable error; it never falls back to silent videos. MP4s, VTTs, and posters are copied into
 `dist/website/media/` using content-hashed filenames to avoid stale caches.
@@ -144,14 +144,14 @@ After rendering the silent originals, generate all narrated drafts:
 
 ```bash
 node videos/render-narration.mjs
-npx vite ~/Downloads/korus-voiceover-drafts --host 127.0.0.1 --port 4187 --strictPort
+npx vite videos/local/voiceover-drafts --host 127.0.0.1 --port 4187 --strictPort
 ```
 
 Open <http://127.0.0.1:4187> for a five-film review player with clickable timed
 scripts and a **CC · Captions** toggle. Captions start off and your choice stays
 active when switching films; they are separate VTT tracks, not burned into the
 video. Narrated MP4s, captions, and the generated review
-page go directly into Downloads; none belongs in Git. Original video frames and
+page go into the ignored `videos/local/voiceover-drafts/` folder. Original video frames and
 silent exports remain unchanged. The exporter rejects speech that overruns its
 window instead of cutting it off or speeding it up.
 
@@ -175,11 +175,11 @@ uv pip install --python .app-dev/video-tts/bin/python -r videos/requirements-voi
 .app-dev/video-tts/bin/python videos/generate-local-narration.py
 .app-dev/video-tts/bin/python videos/check-local-narration.py
 node videos/render-voice-comparison.mjs
-npx vite ~/Downloads/korus-delegation-voices --host 127.0.0.1 --port 4189 --strictPort
+npx vite videos/local/voice-comparison --host 127.0.0.1 --port 4189 --strictPort
 ```
 
 Keep the approved `ming-american-male-raw.wav` and `ming-british-male-raw.wav`
-references in `~/Downloads/korus-voiceover-audition`, or pass `--references`.
+references in `videos/local/voice-references/`, or pass `--references`.
 Missing references fail explicitly; the generator never substitutes a descriptive
 prompt. Each film is generated in one uninterrupted reference-conditioned call.
 Never synthesize individual sentences independently: the same voice prompt and
@@ -206,7 +206,7 @@ screen is retained. To adjust pacing,
 rerun only `node videos/render-voice-comparison.mjs`, not voice generation.
 The assembler rejects stale
 alignment, failed voice checks, and extreme timing outliers. All generated WAVs, provenance
-JSON, MP4s, captions, and the comparison page stay in Downloads. Model caches and
+JSON, MP4s, captions, and the comparison page stay in the ignored `videos/local/voice-comparison/` folder. Model caches and
 the ignored virtual environment stay outside tracked source. The originals and
 the macOS drafts are untouched; the two-voice comparison is not deployed.
 Use Vite for the reviewer: its byte-range responses allow immediate video seeking;
@@ -220,20 +220,28 @@ the shared pacing pipeline (0.96× speech tempo, approved pause settings):
 
 ```bash
 for film in mission-film review-film delegation-film project-film visualize-film; do
-  .app-dev/video-tts/bin/python videos/generate-local-narration.py "$film" --voice american-male --output "$HOME/Downloads/korus-narrated-videos/$film" || break
-  .app-dev/video-tts/bin/python videos/check-local-narration.py --voice american-male --output "$HOME/Downloads/korus-narrated-videos/$film" || break
+  .app-dev/video-tts/bin/python videos/generate-local-narration.py "$film" --voice american-male --output "videos/local/narrated/$film" || break
+  .app-dev/video-tts/bin/python videos/check-local-narration.py --voice american-male --output "videos/local/narrated/$film" || break
 done
 node videos/render-voice-comparison.mjs --all
-npx vite ~/Downloads/korus-narrated-videos --host 127.0.0.1 --port 4190 --strictPort
+npx vite videos/local/narrated --host 127.0.0.1 --port 4190 --strictPort
 ```
 
 To preserve an already approved take, copy its `narration.wav`, `narration.json`,
 and `narration-aligned.json` into that film's `american-male` subfolder instead
 of regenerating it. The batch validates every film's script, voice, model,
 audio hash, and consistency check before rendering. MP4s, optional VTT captions,
-and the five-film review page are generated in `~/Downloads/korus-narrated-videos`.
+and the five-film review page are generated in `videos/local/narrated/`.
 Re-rendering pacing does not invoke speech synthesis. These files are local
 exports; producing them does not deploy or publish them.
+
+All working media stays inside the repository folder but outside Git:
+`videos/local/narrated/` holds the approved takes and final exports,
+`voice-references/` holds the approved audition WAVs, `voice-comparison/`
+and `voiceover-drafts/` hold earlier iterations, and `exports/` holds standalone
+deliverables. Paths are relative to `videos/local/`. Preserve the approved WAVs,
+their provenance/alignment JSON, and the reference WAVs when clearing rebuildable
+MP4s: re-rendering preserves the approved voice; synthesizing it again may not.
 
 ## Code Review product film
 

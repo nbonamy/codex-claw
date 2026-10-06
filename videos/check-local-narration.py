@@ -46,7 +46,7 @@ def align_words(cue_texts, words):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path,
-                        default=Path.home() / "Downloads/korus-delegation-voices")
+                        default=ROOT / "local/voice-comparison")
     parser.add_argument("--voice")
     args = parser.parse_args()
     settings = json.loads((ROOT / "local-voices.json").read_text())

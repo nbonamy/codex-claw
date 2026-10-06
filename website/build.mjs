@@ -1,7 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import product from "../core/src/product.json" with { type: "json" };
 import { resolveDownloads } from "./downloads.mjs";
 
@@ -27,7 +27,7 @@ const source = new URL("./", import.meta.url);
 const output = new URL("../dist/website/", import.meta.url);
 const narratedDirectory = resolve(
   process.env.APP_NARRATED_FILMS ??
-    join(homedir(), "Downloads", "korus-narrated-videos"),
+    fileURLToPath(new URL("../videos/local/narrated/", import.meta.url)),
 );
 const narration = JSON.parse(
   await readFile(join(narratedDirectory, "narration.json"), "utf8").catch(
