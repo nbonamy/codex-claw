@@ -5,8 +5,8 @@
     {
       "version": "0.27.2",
       "releasedAt": "2026-10-06",
-      "sourceSha256": "3ec3fbbcdae0d8b289b07e9114329eba2b9ca4b975502a04e4dc1618a8521e00",
-      "markdown": "### New features\n\n- Agents suggest useful follow-up prompts in the empty composer after finishing\n  a turn. Suggestions stay with their conversation without changing your draft\n  or sending anything automatically.\n\n### Improvements and fixes\n\n- Website download links follow the latest stable release for each platform."
+      "sourceSha256": "e40b8446d2818dab4d4c7d18c2d75109e9b61fe81509b3580b4332ac4d404514",
+      "markdown": "### New features\n\n- Agents suggest useful follow-up prompts in the empty composer after finishing\n  a turn. Suggestions stay with their conversation without changing your draft\n  or sending anything automatically.\n\n### Improvements and fixes\n\n- A redesigned macOS installer lets you double-click Korus to install and launch\n  it. Installations requiring administrator access are handed off to Finder\n  without changing the existing app.\n- Website download links follow the latest stable release for each platform."
     },
     {
       "version": "0.27.1",

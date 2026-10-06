@@ -14,6 +14,9 @@ All notable Korus changes are recorded here.
 
 ### Improvements and fixes
 
+- A redesigned macOS installer lets you double-click Korus to install and launch
+  it. Installations requiring administrator access are handed off to Finder
+  without changing the existing app.
 - Website download links follow the latest stable release for each platform.
 
 ## [0.27.1] - 2026-10-06
