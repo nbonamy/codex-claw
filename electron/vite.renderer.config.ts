@@ -2,7 +2,6 @@ import { excalidrawAssets } from '../vue/vite.excalidraw-assets';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { sdkSourceAliases, sdkSourceRoot } from '../vite.sdk-aliases';
 
 const useSdkSources = process.env.CODEX_APP_SDK_SOURCE === '1';
@@ -24,11 +23,6 @@ export default defineConfig({
       '@workspace/core': path.resolve(__dirname, '../core/src'),
       '@workspace/vue': path.resolve(__dirname, '../vue/src'),
       ...(useSdkSources ? sdkSourceAliases : {}),
-      // The sibling SDK's source CSS cannot resolve packages installed only in
-      // this workspace. Give PostCSS an absolute path, including its font base.
-      ...(useSdkSources ? {
-        'katex/dist/katex.min.css': createRequire(import.meta.url).resolve('katex/dist/katex.min.css'),
-      } : {}),
     },
     dedupe: ['vue'],
   },
