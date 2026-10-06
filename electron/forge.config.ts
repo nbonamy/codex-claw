@@ -14,9 +14,18 @@ import {
 import { copyPackagedNativeDependencies } from './build/package-native-dependencies';
 import { copyPackagedNodeRuntime } from './build/package-node-runtime';
 import { desktopMetadata, writePackagedDesktopIdentity } from './build/product-metadata';
+import { prepareNativePrebuilds } from './build/prepare-native-prebuilds';
 
 import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
+
+// Forge rebuilds dependencies before preStart, so prepare the selected dev
+// target as the config loads. Packaging prepares its explicit target below.
+prepareNativePrebuilds(
+  path.resolve(__dirname, '../node_modules'),
+  process.env.npm_config_platform || process.platform,
+  process.env.npm_config_arch || process.arch,
+);
 
 // macOS signing/notarization is release-only. Agents should set
 // APP_SKIP_SIGNING=1 for local package/build verification.
@@ -71,6 +80,11 @@ if (isDarwin && !skipMacSigning) {
 }
 
 const config: ForgeConfig = {
+  hooks: {
+    prePackage: async (_config, platform, arch) => {
+      prepareNativePrebuilds(path.resolve(__dirname, '../node_modules'), platform, arch);
+    },
+  },
   packagerConfig: {
     asar: true,
     icon: 'assets/icon',
