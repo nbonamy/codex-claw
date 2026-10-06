@@ -296,20 +296,16 @@ not infer CPU architecture; Linux always opens the explicit choices. Mobile,
 ChromeOS, and unknown browsers open all downloads. The chooser also works
 without JavaScript.
 
-Without `APP_WEBSITE_RELEASE_TAG`, downloads link to the repository's GitHub
-releases page. To expose a published release's installer links, provide its exact tag:
+Public download URLs use `/releases/latest/download/<filename>` so they follow
+GitHub's latest stable release without a version pin or website redeployment.
+The build queries the public latest-release API and verifies asset names,
+completed uploads, canonical URLs, and download responses before exposing links.
+Missing formats link to `/releases/latest`; if no stable release exists, all
+platforms fall back to `/releases`. API failures other than that missing-release
+case stop the build rather than silently publishing incomplete download choices.
 
-```bash
-APP_WEBSITE_RELEASE_TAG=vX.Y.Z npm run build:website
-APP_WEBSITE_RELEASE_TAG=vX.Y.Z ./website/deploy.sh
-```
-
-Replace `vX.Y.Z` with a real published tag. The build accepts published
-prereleases, rejects drafts or missing tags, and checks every exposed asset's
-exact filename, completed upload, public URL, and HTTP response. Missing
-platforms link to that release's page rather than an invented installer URL.
-Never use `/releases/latest` or `/latest/download`: they exclude prereleases.
-No app-version inference or automatic stable promotion is performed.
+Prereleases remain accessible on GitHub but never replace stable download
+targets. Stable promotion belongs to the release workflow, not the website.
 
 The website-owned asset mapping in `downloads.mjs` follows the release contract:
 `<slug>-macos-arm64.dmg`, `<slug>-win32-x64-setup.exe`,

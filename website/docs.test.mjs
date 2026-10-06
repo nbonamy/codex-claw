@@ -101,7 +101,11 @@ test("the built website has reachable documentation pages, anchors, and assets",
     );
     for (const link of downloads) {
       assert.ok(link.href.startsWith(`${product.repositoryUrl}/releases`));
-      assert.doesNotMatch(link.href, /\/latest(?:\/|$)/);
+      assert.doesNotMatch(
+        link.href,
+        /\/releases\/(?:tag|download)\//,
+        "Public download links must not pin a release version",
+      );
     }
     for (const [path, dom] of documents) {
       for (const link of dom.window.document.querySelectorAll("a[href]")) {

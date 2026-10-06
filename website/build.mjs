@@ -7,7 +7,6 @@ import { resolveDownloads } from "./downloads.mjs";
 
 const downloads = await resolveDownloads({
   product,
-  tag: process.env.APP_WEBSITE_RELEASE_TAG,
   verify: process.env.APP_WEBSITE_VERIFY_DOWNLOADS === "1",
 });
 

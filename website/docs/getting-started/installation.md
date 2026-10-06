@@ -23,7 +23,7 @@ Choose **x64** or **ARM64** to match your system, then select the **DEB**, **RPM
 
 ## Updates
 
-Install updates manually from GitHub Releases. Check the release notes and download the build for your platform and architecture.
+Packaged macOS and installed Windows apps receive stable releases through the app's updater. Linux, portable Windows, and prereleases use manual downloads from GitHub Releases. Choose the build for your platform and architecture.
 
 ## Choose separate or existing provider setup
 
