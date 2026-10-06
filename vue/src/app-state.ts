@@ -452,7 +452,7 @@ export function useAppState() {
     }
 
     const modes = backendCapabilitiesForAgent(agent).permissionModes ?? [];
-    const storedMode = agent.backendDefaults?.kind === 'claude'
+    const storedMode = agent.backendDefaults && 'permissionMode' in agent.backendDefaults
       ? agent.backendDefaults.permissionMode
       : undefined;
     if (storedMode && modes.some((option) => option.id === storedMode)) {

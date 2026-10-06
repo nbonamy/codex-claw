@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,10 @@ import { AntigravityHost } from '../antigravity-host';
 import { decodeAppBackendEvent } from '@workspace/core/backend-protocol/events';
 import type { Agent } from '@workspace/core/contracts';
 import type { BackendEvent } from '@workspace/core/backend-driver';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
+import { CodeReviewService } from '../../review/code-review-service';
+import { AgentCreationService } from '../../agents/agent-creation-service';
+import { AppMcpService } from '../../mcp/service';
 
 let root: string;
 const sessions: AcpSession[] = [];
@@ -24,15 +28,44 @@ beforeEach(async () => {
   await writeFile(path.join(root, 'runtime'), `#!/usr/bin/env node
 const rl=require('node:readline').createInterface({input:process.stdin});
 const send=v=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',...v})+'\\n');
-let sessionId=require('node:crypto').randomUUID(), promptId;
+const fs=require('node:fs'), catalogFile=require('node:path').join(process.env.GEMINI_HOME,'catalog.json');
+fs.mkdirSync(process.env.GEMINI_HOME,{recursive:true});
+const catalog=()=>fs.existsSync(catalogFile)?fs.readFileSync(catalogFile,'utf8').trim().split('\\n').map(JSON.parse):[];
+let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[];
 const update=update=>send({method:'session/update',params:{sessionId,update}});
+async function review(text,reply) {
+ const server=mcpServers.find(server=>server.name==='korus');
+ if(!server) throw new Error('Missing korus server');
+ const child=require('node:child_process').spawn(server.command,server.args,{env:{...process.env,...Object.fromEntries(server.env.map(item=>[item.name,item.value]))},stdio:['pipe','pipe','ignore']});
+ const pending=new Map();let id=0;
+ require('node:readline').createInterface({input:child.stdout}).on('line',line=>{const value=JSON.parse(line);const done=pending.get(value.id);if(done)done(value);});
+ const rpc=(method,params)=>new Promise((resolve,reject)=>{const key=++id;pending.set(key,value=>value.error?reject(new Error(value.error.message)):resolve(value.result));child.stdin.write(JSON.stringify({jsonrpc:'2.0',id:key,method,params})+'\\n');});
+ const call=async(name,args)=>{const result=await rpc('tools/call',{name,arguments:args});if(result.isError)throw new Error(JSON.stringify(result));return result.structuredContent;};
+ try {
+  const tools=await rpc('tools/list',{});
+  if(!tools.tools.some(tool=>tool.name==='report_finding')||tools.tools.some(tool=>tool.name==='create-agent')) throw new Error('Wrong review scope');
+  const ledgerFile=require('node:path').join(process.cwd(),'fixture-ledger.json');
+  if(text.startsWith('Fix the ')) {
+   const finding=JSON.parse(fs.readFileSync(ledgerFile,'utf8'));
+   fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-code.txt'),'fixed');
+   await call('update_finding',{findingId:finding.id,status:'fixed',evidence:'Fixture external tool wrote and verified fixed content.'});
+  } else if(!fs.existsSync(require('node:path').join(process.cwd(),'fixture-code.txt'))) {
+   const finding=await call('report_finding',{priority:'p2',title:'Fixture defect',body:'The fixture code needs a correction.'});
+   fs.writeFileSync(ledgerFile,JSON.stringify(finding.finding??finding));
+   await call('finish_review_round',{findingCount:1});
+  } else await call('finish_review_round',{findingCount:0});
+  update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Review turn complete.'}});reply({stopReason:'end_turn'});
+ } finally {child.stdin.end();}
+}
 rl.on('line',line=>{
  const v=JSON.parse(line), reply=result=>send({id:v.id,result});
  if(v.method==='initialize') reply({protocolVersion:2,agentInfo:{name:'antigravity-acp',version:'1.3.0'}});
  else if(v.method==='authenticate') reply({});
- else if(v.method==='session/new') reply({sessionId,models:{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'}]}});
+ else if(v.method==='session/new') {mcpServers=v.params.mcpServers;fs.appendFileSync(catalogFile,JSON.stringify({sessionId,cwd:v.params.cwd,title:'Saved conversation'})+'\\n');reply({sessionId,models:{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'}]}});}
+ else if(v.method==='session/list') reply({sessions:[...catalog(),{sessionId:'stored-session',cwd:process.cwd(),title:'Create a file'},{sessionId:'other-folder',cwd:'/another-workspace',title:'Private'}]});
  else if(v.method==='session/load') {
    sessionId=v.params.sessionId;
+   mcpServers=v.params.mcpServers;
    update({sessionUpdate:'user_message_chunk',content:{type:'text',text:'Create a file'}});
    update({sessionUpdate:'tool_call',toolCallId:'replay-id',title:'Create file',kind:'edit',status:'completed'});
    update({sessionUpdate:'tool_call_update',toolCallId:'replay-id',status:'failed',rawOutput:'Rejected by user'});
@@ -41,6 +74,7 @@ rl.on('line',line=>{
  } else if(v.method==='session/prompt') {
    promptId=v.id;
    const text=v.params.prompt[0].text;
+   if(mcpServers.some(server=>server.env.some(item=>item.name==='KORUS_ACP_MCP_URL'&&item.value.includes('reviewContextId=')))) {void review(text,reply).catch(error=>{fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-error.txt'),error.message);send({id:v.id,error:{code:-32603,message:error.message}});});return;}
    if(text==='crash') process.exit(1);
    if(text==='wait') return;
    if(text==='question'||text==='deny') {
@@ -67,6 +101,40 @@ async function open(sessionId?: string) {
 }
 
 describe('Antigravity native session', () => {
+  it('runs the real review ledger through the scoped stdio bridge, fixes a finding, and completes a clean second round', async () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.general.providerEnabled = { antigravity: true };
+    snapshot.providerConnections = [{ backend: 'antigravity', installed: true, connected: true, checking: false }];
+    const owner: Agent = { id: 'owner', name: 'Owner', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    snapshot.agents.push(owner);
+    const mcp = new AppMcpService({ snapshot });
+    const url = await mcp.start();
+    const host = new AntigravityHost({ appMcpServerUrl: url });
+    const creation = new AgentCreationService(snapshot);
+    const dispose = vi.fn(async (agent: Agent) => {
+      if (agent.backendSession) await host.disposeCodeReview(agent, agent.backendSession);
+      snapshot.agents = snapshot.agents.filter(candidate => candidate.id !== agent.id);
+    });
+    const checkpoint = { head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'fixture' };
+    const commit = vi.fn();
+    const review = new CodeReviewService({ snapshot, tools: mcp,
+      createAgent: (input, options) => creation.create(input, options),
+      runReview: (agent, prompt, reviewMcpServerUrl, reviewerSession) => host.runCodeReview(agent, { prompt, cwd: root, reviewMcpServerUrl, reviewerSession }),
+      resetReviewer: async agent => { await host.releaseConversation(agent.id); delete agent.backendSession; },
+      deleteReviewer: dispose, saveReport: async () => path.join(root, 'report.md'), changed: () => {},
+      git: { prepare: async () => ({ ...checkpoint, baseRef: 'a'.repeat(40) }), inspect: async () => checkpoint, commit },
+    });
+    try {
+      const result = review.startAutomatic(owner, { scope: { type: 'uncommitted' }, maxRounds: 3, autoCommit: false });
+      await vi.waitFor(async () => expect(result.automation?.state, await readFile(path.join(root, 'fixture-error.txt'), 'utf8').catch(() => JSON.stringify(result.rounds))).toBe('completed'), { timeout: 3000 });
+      expect(result.rounds.map(round => round.inspectionCompletion?.findingCount)).toEqual([1, 0]);
+      expect(result.rounds[0]?.findings[0]?.remediation).toMatchObject({ state: 'fixed', evidence: expect.stringContaining('verified') });
+      expect(await readFile(path.join(root, 'fixture-code.txt'), 'utf8')).toBe('fixed');
+      expect(dispose).toHaveBeenCalledOnce();
+      expect(snapshot.agents).toEqual([owner]);
+      expect(commit).not.toHaveBeenCalled();
+    } finally { await host.close(); await mcp.stop(); }
+  });
   it('routes two same-folder agents through distinct native sessions and validated provider frames', async () => {
     const host = new AntigravityHost();
     const events: BackendEvent[] = [];
@@ -125,6 +193,20 @@ describe('Antigravity native session', () => {
       { type: 'text', text: 'Denied.' },
     ]);
     expect(session.snapshot).toMatchObject({ busy: false, activeTurnId: null, clientRequests: [] });
+  });
+
+  it('lists only this workspace and rejects a forged folder before loading history', async () => {
+    const host = new AntigravityHost();
+    const agent: Agent = { id: 'history', name: 'History', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    try {
+      const rows = await host.listConversations(agent, { searchTerm: 'file' });
+      expect(rows).toEqual([expect.objectContaining({ id: 'stored-session', title: 'Create a file', updatedAt: '', ref: { backend: 'antigravity', sessionId: 'stored-session', folder: root } })]);
+      await expect(host.resumeConversation(agent, { storageState: 'active', ref: { backend: 'antigravity', folder: root, sessionId: 'other-folder' } })).rejects.toThrow('another workspace');
+      const messages = await host.readConversationMessages(rows[0]!.ref, agent.id);
+      expect(messages).toHaveLength(2);
+      expect(messages[1]?.parts[0]).toMatchObject({ type: 'tool', status: 'failed' });
+      expect(await host.readConversationSummary(agent, rows[0]!.ref)).toEqual(rows[0]);
+    } finally { await host.close(); }
   });
 
   it('marks runtime exit as a failed turn and rejects future work on the dead session', async () => {

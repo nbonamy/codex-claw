@@ -387,10 +387,12 @@ native capabilities.
 - A normal end-turn response is likewise not enough to classify overlapping
   prompts as supported steering. The live stream contained an explicit connection
   error even though both prompt calls eventually returned end-turn.
-- PDF resource links read files on the provider host. Korus must resolve trusted
-  attachment references and transfer remote-host files through its existing
-  attachment boundary; never accept arbitrary renderer paths or assume a Mac
-  file URL exists on a remote daemon.
+- PDF resource links read files on the provider host. Korus resolves trusted
+  local desktop references through its registry. Implementation audit found no
+  existing remote transfer or Web upload/registry seam: the earlier plan overstated
+  that boundary. Per delegating-agent direction, those attachments stay unavailable
+  and are rejected before dispatch. A general transfer system is a separate follow-up;
+  never accept arbitrary renderer paths or assume a Mac URL exists remotely.
 - Independent assertions passed for exact image/audio/text/PDF/skill fixture
   results, PDF-blob rejection, absent-method responses, the concurrent-prompt
   failure, ordered review-tool ledger counts (1 then 0), executable corrected
@@ -493,6 +495,16 @@ workflow integration remains pending.
   test success, denial, split lines, EOF, interruption and stale completion races.
 
 ### Phase 3: provider host, history and collaboration
+
+History now validates native catalog session/cwd identity before replay, including
+canonical paths, and exposes folder-scoped listing and cross-provider history reads.
+Real CodeReviewService and scoped HTTP MCP tests run through the actual stdio bridge
+with an external ACP fixture: one finding, remediation with evidence, clean second
+round, and disposal. Two regular bridges update only their own same-repository agents.
+Mission workflow tests exercise worker reuse, stage acceptance and restored evidence;
+Antigravity does not receive a synthetic `/compact` between tickets. Automation and
+worktree delegation tests retain the selected provider and isolated session.
+Native-runtime review/MCP proof is still pending; the fixture tests are not live model proof.
 
 - [ ] Implement the provider-owned host/replica and bounded revisioned transport.
 - [ ] Hydrate through native `session/load`, rebuild the provider replica atomically

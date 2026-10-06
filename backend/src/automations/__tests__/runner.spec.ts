@@ -16,11 +16,11 @@ describe('AutomationRunner', () => {
     warnMainMock.mockReset();
   });
 
-  it('selects overlapping Linear sources once and retains native identity through execution and repeated runs', async () => {
+  it.each(['claude', 'antigravity'] as const)('dispatches %s automation work once and retains its provider through repeated runs', async backend => {
     const targets = ['linear:eng', 'linear:eng:project', 'linear:ops'].map(repositoryId => ({
       provider: 'linear' as const, sourceId: repositoryId, executionRepositoryPath: repositoryId.endsWith(':project') ? '/other-code' : '/remote/code',
     }));
-    const snapshot = snapshotWithAutomation({ repositories: targets, selectionPrompt: 'Ready bugs', backend: 'claude' });
+    const snapshot = snapshotWithAutomation({ repositories: targets, selectionPrompt: 'Ready bugs', backend });
     const issue = (repositoryId: string): WorkItem => ({
       ...workItem(12, repositoryId), provider: 'linear', id: repositoryId === 'linear:ops' ? 'linear:ops-uuid' : 'linear:eng-uuid',
       identifier: repositoryId === 'linear:ops' ? 'OPS-12' : 'ENG-12', sourceName: repositoryId === 'linear:ops' ? 'Operations' : 'Engineering',
@@ -42,7 +42,7 @@ describe('AutomationRunner', () => {
     expect(snapshot.workBacklog.assignments['linear:linear:eng-uuid']).toMatchObject({
       provider: 'linear', status: 'inProgress', item: { identifier: 'ENG-12', body: 'Reproduction steps' },
     });
-    expect(snapshot.agents.find(agent => agent.name === 'Linear ENG-12')).toMatchObject({ backend: 'claude', folder: '/remote/code-automation/eng-12' });
+    expect(snapshot.agents.find(agent => agent.name === 'Linear ENG-12')).toMatchObject({ backend, folder: '/remote/code-automation/eng-12' });
     expect(snapshot.automations[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({
       workItemId: 'linear:linear:eng-uuid', workItemIdentifier: 'ENG-12', workItemUrl: 'https://linear.app/acme/issue/ENG-12',
     });
@@ -325,7 +325,7 @@ describe('automation scheduling and matching', () => {
 
 function snapshotWithAutomation(overrides: Partial<Automation> = {}) {
   const snapshot = createInitialSnapshot();
-  snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
+  snapshot.providerConnections = (['codex', 'claude', 'antigravity'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
   createAutomationInSnapshot(
     snapshot,
     {

@@ -5,10 +5,15 @@ import { product } from '@workspace/core/product';
 const bridge = String.raw`
 const readline = require('node:readline');
 const endpoint = process.env.KORUS_ACP_MCP_URL;
+const allowed = process.env.KORUS_ACP_MCP_TOOLS ? new Set(JSON.parse(process.env.KORUS_ACP_MCP_TOOLS)) : null;
 let session;
-const output = value => process.stdout.write(JSON.stringify(value) + '\n');
+const output = value => {
+  if(allowed && Array.isArray(value.result?.tools)) value.result.tools=value.result.tools.filter(tool=>allowed.has(tool.name));
+  process.stdout.write(JSON.stringify(value) + '\n');
+};
 async function request(message) {
   try {
+    if(allowed && message.method==='tools/call' && !allowed.has(message.params?.name)) throw new Error('Tool unavailable in this review');
     const response = await fetch(endpoint, {method:'POST',headers:{
       'Content-Type':'application/json', Accept:'application/json, text/event-stream',
       ...(session ? {'Mcp-Session-Id':session} : {}),
@@ -36,8 +41,10 @@ lines.on('line',line=>{try{const message=JSON.parse(line);void request(message);
 lines.on('close',()=>process.exit());
 `;
 
-export function sessionMcpServer(url: string, name = product.mcpServerName) {
+export function sessionMcpServer(url: string, name = product.mcpServerName, allowedTools?: string[]) {
   const endpoint = new URL(url);
   if (!['http:', 'https:'].includes(endpoint.protocol)) throw new Error('Invalid session MCP endpoint.');
-  return { name, command: process.execPath, args: ['-e', bridge], env: [{ name: 'KORUS_ACP_MCP_URL', value: endpoint.href }] };
+  return { name, command: process.execPath, args: ['-e', bridge], env: [{ name: 'KORUS_ACP_MCP_URL', value: endpoint.href },
+    ...(allowedTools ? [{ name: 'KORUS_ACP_MCP_TOOLS', value: JSON.stringify(allowedTools) }] : []),
+  ] };
 }

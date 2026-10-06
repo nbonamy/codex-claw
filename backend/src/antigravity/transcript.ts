@@ -35,6 +35,7 @@ export class AcpTranscript {
   }
 
   update(update: Record<string, unknown>, replay: boolean): void {
+    if (!replay && !this.replica.getSnapshot().busy && update.sessionUpdate !== 'usage_update') return;
     switch (update.sessionUpdate) {
       case 'user_message_chunk':
         if (!replay) return; // The admitted prompt is already visible locally.

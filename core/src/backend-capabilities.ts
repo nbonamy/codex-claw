@@ -91,7 +91,7 @@ export function defaultBackendCapabilities(backend: AgentBackend): BackendCapabi
 
 // Keep unimplemented app workflows unavailable until their owning integration is qualified.
 export const antigravityBackendCapabilities: BackendCapabilities = {
-  codeReview: false, planReview: false, questions: true, plugins: false,
+  codeReview: true, planReview: false, questions: true, plugins: false,
   conversationArchive: false, conversationResume: true, conversationReplaceWithSummary: false,
   remoteControl: false, attachments: false, models: true, skills: false,
   reasoningEffort: false, serviceTier: false, thinkingBudget: false,

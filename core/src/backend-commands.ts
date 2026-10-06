@@ -108,6 +108,8 @@ function worktreeDelegationCommands(backend: AgentBackend): BackendCommandSummar
 }
 
 export function defaultBackendCommands(backend: AgentBackend): BackendCommandSummary[] {
-  if (backend === 'antigravity') return [];
+  if (backend === 'antigravity') return [
+    ...claudeBackendCommands.filter(command => command.id.startsWith('app.')).map(command => ({ ...command, backend })),
+  ];
   return backend === 'claude' ? claudeBackendCommands : codexBackendCommands;
 }

@@ -7,6 +7,7 @@ import { antigravityHome } from './runtime';
 import { AcpTranscript } from './transcript';
 import { permissionRequest } from './permissions';
 import { handleAcpFileRequest } from './filesystem';
+import { validateAcpSession } from './catalog';
 
 type SessionOptions = {
   agentId: string; cwd: string; home?: string; sessionId?: string;
@@ -39,6 +40,7 @@ export class AcpSession {
         onClose: error => session.closed(error),
       });
       await session.runtime.authenticate();
+      if (options.sessionId) await validateAcpSession(session.runtime.connection, options.sessionId, options.cwd);
       const result = await session.runtime.connection.request(options.sessionId ? 'session/load' : 'session/new', {
         ...(options.sessionId ? { sessionId: options.sessionId } : {}), cwd: options.cwd, mcpServers: options.mcpServers,
       }, 120_000);
@@ -131,7 +133,10 @@ export class AcpSession {
 
   private notification(method: string, params: unknown): void {
     if (method !== 'session/update') return;
-    if (!this.transcript) { this.initialization.push(params); return; }
+    if (!this.transcript) {
+      if (this.initialization.length >= 50_000) throw new Error('Antigravity replay exceeds the supported history limit.');
+      this.initialization.push(params); return;
+    }
     this.update(params);
   }
 

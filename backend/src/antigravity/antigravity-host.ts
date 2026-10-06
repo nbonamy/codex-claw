@@ -1,7 +1,7 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import type { Agent, BackendModelOption, BackendRuntimeStatus, BackendSession, ConversationResumeTarget, SendPromptOptions } from '@workspace/core/contracts';
-import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
+import type { Agent, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSession, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from '@workspace/core/contracts';
+import type { AgentBackendDriver, BackendEvent, BackendCodeReviewInput, BackendCodeReviewResult } from '@workspace/core/backend-driver';
 import { requestFromClientRequest, type AgentRequestResponse } from '@workspace/core/agent-request';
 import type { ProviderAuthentication, ProviderAuthenticationAction } from '@workspace/core/contracts/provider-setup';
 import type { AntigravityConversationEvent } from '@workspace/core/contracts/antigravity-conversation';
@@ -15,6 +15,7 @@ import { AcpSession } from './session';
 import { antigravityHome, resolveAcpRuntime } from './runtime';
 import { record } from './acp-connection';
 import { sessionMcpServer } from './mcp-bridge';
+import { listAcpSessions } from './catalog';
 
 export class AntigravityHost implements AgentBackendDriver {
   readonly backend = 'antigravity' as const;
@@ -22,6 +23,7 @@ export class AntigravityHost implements AgentBackendDriver {
   private readonly opening = new Map<string, Promise<AcpSession>>();
   private readonly generations = new Map<string, number>();
   private readonly revisions = new Map<string, number>();
+  private readonly reviewScopes = new Map<string, string>();
   private readonly listeners = new Set<(event: BackendEvent) => void>();
   private authentication?: AcpRuntime;
   private authBusy = false;
@@ -60,7 +62,7 @@ export class AntigravityHost implements AgentBackendDriver {
   async sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions) {
     if (options?.attachments?.length) throw new Error('Antigravity attachments are not available yet.');
     const session = await this.ensure(agent);
-    const model = agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.model : undefined;
+    const model = options?.model ?? (agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.model : undefined);
     if (model) await session.setModel(model);
     const permission = options?.backendOptions?.kind === this.backend ? options.backendOptions.permissionMode
       : agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.permissionMode : undefined;
@@ -78,6 +80,27 @@ export class AntigravityHost implements AgentBackendDriver {
     const turnId = session.snapshot.activeTurnId ?? undefined;
     await session.interrupt(expectedTurnId);
     return { backendSession: this.reference(session), turnId };
+  }
+
+  async runCodeReview(agent: Agent, input: BackendCodeReviewInput): Promise<BackendCodeReviewResult> {
+    if (input.reviewerSession && input.reviewerSession.kind !== this.backend) throw new Error('Antigravity cannot continue another provider review.');
+    const reviewer = { ...agent, folder: input.cwd, backendSession: input.reviewerSession };
+    const session = await this.ensure(reviewer, input.reviewMcpServerUrl);
+    const model = agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.model : undefined;
+    if (model) await session.setModel(model);
+    const turn = session.prompt(input.prompt);
+    await turn.completion;
+    if (session.snapshot.turns.find(candidate => candidate.id === turn.turnId)?.status !== 'completed') throw new Error(session.snapshot.error ?? 'Antigravity review was interrupted.');
+    const text = session.snapshot.messages.filter(message => message.turnId === turn.turnId && message.role === 'assistant')
+      .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
+    return { text, reviewerSession: this.reference(session) };
+  }
+
+  async disposeCodeReview(agent: Agent, reviewerSession: BackendSession): Promise<void> {
+    if (reviewerSession.kind !== this.backend) throw new Error('Antigravity cannot dispose another provider review.');
+    const session = this.sessions.get(agent.id);
+    if (session && session.sessionId !== reviewerSession.sessionId) throw new Error('Antigravity review session changed.');
+    await this.releaseConversation(agent.id);
   }
 
   async respondToAgentRequest(response: AgentRequestResponse): Promise<void> {
@@ -100,11 +123,46 @@ export class AntigravityHost implements AgentBackendDriver {
     const existing = this.sessions.get(agent.id);
     if (existing?.snapshot.busy) throw new Error('Finish the current Antigravity turn before resuming history.');
     // Open and validate complete replay before replacing the visible conversation.
+    const generation = this.generations.get(agent.id) ?? 0;
     const next = await this.open(agent, target.ref.sessionId);
+    if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await next.close(); throw new Error('Antigravity session was released during history loading.'); }
     await this.releaseConversation(agent.id);
     this.sessions.set(agent.id, next);
     this.publishSnapshot(agent.id, next);
     return { backendSession: this.reference(next) };
+  }
+
+  async listConversations(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]> {
+    await mkdir(this.workingDirectory(agent), { recursive: true });
+    const runtime = await AcpRuntime.open({ cwd: this.workingDirectory(agent),
+      onRequest: async () => { throw new Error('No active Antigravity conversation.'); }, onNotification: () => {}, onClose: () => {},
+    });
+    try {
+      await runtime.authenticate();
+      const query = input?.searchTerm?.trim().toLocaleLowerCase();
+      const cwd = await realpath(this.workingDirectory(agent));
+      const entries = await Promise.all((await listAcpSessions(runtime.connection)).map(async entry => ({ ...entry, cwd: await realpath(entry.cwd).catch(() => null) })));
+      return entries
+        .filter(entry => entry.cwd === cwd)
+        .filter(entry => !query || `${entry.title} ${entry.sessionId}`.toLocaleLowerCase().includes(query))
+        .slice(0, input?.limit ?? 100)
+        .map(entry => ({ id: entry.sessionId, sessionId: entry.sessionId, title: entry.title,
+          updatedAt: '', messageCount: 0, storageState: 'active',
+          ref: { backend: this.backend, folder: agent.folder, sessionId: entry.sessionId } }));
+    } finally { await runtime.close(); }
+  }
+
+  async readConversationMessages(ref: BackendConversationRef, agentId: string) {
+    if (ref.backend !== this.backend) throw new Error('Antigravity cannot read another provider conversation.');
+    const current = this.sessions.get(agentId);
+    if (current?.sessionId === ref.sessionId) return structuredClone(current.snapshot.messages);
+    const session = await AcpSession.open({ agentId, cwd: this.workingDirectory({ id: agentId, folder: ref.folder }), sessionId: ref.sessionId, mcpServers: [], changed: () => {} });
+    try { return structuredClone(session.snapshot.messages); } finally { await session.close(); }
+  }
+
+  async readConversationSummary(agent: Agent, ref: BackendConversationRef): Promise<ConversationSummary | null> {
+    if (ref.backend !== this.backend || ref.folder !== agent.folder) return null;
+    return (await this.listConversations(agent)).find(entry => entry.sessionId === ref.sessionId) ?? null;
   }
 
   async listModels(agent: Agent): Promise<BackendModelOption[]> {
@@ -127,6 +185,7 @@ export class AntigravityHost implements AgentBackendDriver {
   async releaseConversation(agentId: string): Promise<void> {
     this.generations.set(agentId, (this.generations.get(agentId) ?? 0) + 1);
     const session = this.sessions.get(agentId); this.sessions.delete(agentId);
+    this.reviewScopes.delete(agentId);
     await session?.close();
   }
   async close(): Promise<void> {
@@ -136,15 +195,20 @@ export class AntigravityHost implements AgentBackendDriver {
     await Promise.allSettled(this.opening.values());
   }
 
-  private async ensure(agent: Agent): Promise<AcpSession> {
+  private async ensure(agent: Agent, reviewUrl?: string): Promise<AcpSession> {
     if (this.closed) throw new Error('Antigravity host is closed.');
+    if (this.reviewScopes.get(agent.id) !== reviewUrl) {
+      if (this.sessions.get(agent.id)?.snapshot.busy || this.opening.has(agent.id)) throw new Error('Antigravity collaboration scope cannot change during a turn.');
+      await this.releaseConversation(agent.id);
+    }
     const current = this.sessions.get(agent.id);
     if (current && !current.isClosed) return current;
     const pending = this.opening.get(agent.id);
     if (pending) return pending;
     const generation = this.generations.get(agent.id) ?? 0;
     const sessionId = agent.backendSession?.kind === this.backend ? agent.backendSession.sessionId : current?.sessionId;
-    const work = this.open(agent, sessionId).then(async session => {
+    if (reviewUrl) this.reviewScopes.set(agent.id, reviewUrl);
+    const work = this.open(agent, sessionId, reviewUrl).then(async session => {
       if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await session.close(); throw new Error('Antigravity session was released during startup.'); }
       this.sessions.set(agent.id, session);
       this.publishSnapshot(agent.id, session);
@@ -154,14 +218,18 @@ export class AntigravityHost implements AgentBackendDriver {
     return work;
   }
 
-  private async open(agent: Agent, sessionId?: string): Promise<AcpSession> {
-    const cwd = agent.folder ?? path.join(backendHomeDir(), 'antigravity-quick-chats', encodeURIComponent(agent.id));
+  private async open(agent: Agent, sessionId?: string, reviewUrl?: string): Promise<AcpSession> {
+    const cwd = this.workingDirectory(agent);
     if (!agent.folder) await mkdir(cwd, { recursive: true, mode: 0o700 });
-    const mcpServers = [
+    const mcpServers = reviewUrl ? [sessionMcpServer(reviewUrl, undefined, ['report_finding', 'update_finding', 'delete_finding', 'finish_review_round', 'set-status', 'finish_turn'])] : [
       ...(this.options.appMcpServerUrl ? [sessionMcpServer(appMcpUrlForAgent(this.options.appMcpServerUrl, agent))] : []),
       ...Object.entries(this.options.hostedMcpServerUrls?.() ?? {}).map(([name, url]) => sessionMcpServer(agentScopedMcpUrl(url, agent.id), name)),
     ];
     return AcpSession.open({ agentId: agent.id, cwd, sessionId, mcpServers, changed: event => this.conversationEvent(event) });
+  }
+
+  private workingDirectory(agent: Pick<Agent, 'folder' | 'id'>): string {
+    return agent.folder ?? path.join(backendHomeDir(), 'antigravity-quick-chats', encodeURIComponent(agent.id));
   }
 
   private conversationEvent(event: AntigravityConversationEvent): void {

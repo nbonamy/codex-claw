@@ -70,6 +70,9 @@ describe('provider conversation boundaries', () => {
       backend: 'claude', folder: '/repo', sessionId: 'session-live',
     });
     expect(conversationRefFromAgent(agent())).toBeNull();
+    expect(conversationRefFromAgent(agent({ kind: 'antigravity', sessionId: 'acp-session' }))).toStrictEqual({
+      backend: 'antigravity', folder: '/repo', sessionId: 'acp-session',
+    });
     expect(conversationRefFromAgent({
       ...agent({ kind: 'claude', sessionId: 'session-live', transport: 'stdio' }), folder: null,
     })).toStrictEqual({ backend: 'claude', folder: null, sessionId: 'session-live' });

@@ -3,8 +3,29 @@ import { once } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { AcpConnection } from '../acp-connection';
 import { sessionMcpServer } from '../mcp-bridge';
+import { AppMcpService } from '../../mcp/service';
+import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 
 describe('Antigravity session MCP bridge', () => {
+  it('binds real collaboration calls to two different agents in the same repository', async () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.agents = ['one', 'two'].map(id => ({ id, name: id, folder: '/fixture/repo', backend: 'antigravity', status: { type: 'idle' }, createdAt: '', updatedAt: '' }));
+    const service = new AppMcpService({ snapshot });
+    const endpoint = await service.start();
+    const connections = snapshot.agents.map(agent => {
+      const config = sessionMcpServer(`${endpoint}?agentId=${agent.id}`);
+      const connection = new AcpConnection({ ...config, cwd: process.cwd(), env: { ...process.env, ...Object.fromEntries(config.env.map(entry => [entry.name, entry.value])) },
+        onRequest: async () => { throw new Error('unexpected'); }, onNotification: () => {}, onClose: () => {},
+      });
+      connection.start(); return connection;
+    });
+    try {
+      const lists = await Promise.all(connections.map(connection => connection.request('tools/list', {})));
+      for (const list of lists) expect(list).toMatchObject({ tools: expect.arrayContaining([expect.objectContaining({ name: 'set-status' })]) });
+      await Promise.all(connections.map((connection, index) => connection.request('tools/call', { name: 'set-status', arguments: { status: `isolated-${index}` } })));
+      expect(snapshot.agents.map(agent => agent.statusText)).toEqual(['isolated-0', 'isolated-1']);
+    } finally { await Promise.all(connections.map(connection => connection.close())); await service.stop(); }
+  });
   it('keeps concurrent same-host identities isolated for regular and review discovery', async () => {
     const calls: string[] = [];
     const server = createServer(async (request, response) => {
