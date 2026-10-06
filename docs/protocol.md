@@ -67,6 +67,21 @@ aliases for older names such as `agent/listFiles` or `backend/event`; stale
 local or remote `daemon` daemons must be restarted or
 synced after this change.
 
+Antigravity is a provider identity in app session, defaults and authentication
+contracts. `provider/authenticate` routes explicit native login/cancellation to
+the owning daemon; connection observations and saved enablement stay separate.
+Antigravity conversation snapshots/events travel in their own revisioned
+`antigravity.conversationSnapshotChanged` and
+`antigravity.conversationEventReceived` envelopes. Clients validate session
+identity and recover revision gaps through the app conversation operation;
+renderer code never receives raw ACP frames. Native questions and approvals
+become app requests with answered/decision/cancelled outcomes.
+
+Web prompt operations reject attachment references until trusted upload exists.
+Remote prompt routing likewise rejects attachments before forwarding until a
+trusted transfer contract exists. Local desktop registry resolution remains the
+trusted ingestion boundary; renderer file paths are not provider input.
+
 ## Direction Rules
 
 - Client to `daemon`: app-owned product requests such as `agent/prompt/send`,

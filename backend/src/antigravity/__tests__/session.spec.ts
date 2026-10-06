@@ -33,7 +33,7 @@ const send=v=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',...v})+'\\n');
 const fs=require('node:fs'), catalogFile=require('node:path').join(process.env.GEMINI_HOME,'catalog.json');
 fs.mkdirSync(process.env.GEMINI_HOME,{recursive:true});
 const catalog=()=>fs.existsSync(catalogFile)?fs.readFileSync(catalogFile,'utf8').trim().split('\\n').map(JSON.parse):[];
-let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[], planPhase;
+let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[], planPhase, utility;
 const update=update=>send({method:'session/update',params:{sessionId,update}});
 async function review(text,reply) {
  const server=mcpServers.find(server=>server.name==='korus');
@@ -61,9 +61,9 @@ async function review(text,reply) {
 }
 rl.on('line',line=>{
  const v=JSON.parse(line), reply=result=>send({id:v.id,result});
- if(v.method==='initialize') reply({protocolVersion:2,agentInfo:{name:'antigravity-acp',version:'1.3.0'}});
+ if(v.method==='initialize') {fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-initialize.json'),JSON.stringify(v.params));reply({protocolVersion:2,agentInfo:{name:'antigravity-acp',version:'1.3.0'}});}
  else if(v.method==='authenticate') reply({});
- else if(v.method==='session/new') {mcpServers=v.params.mcpServers;fs.appendFileSync(catalogFile,JSON.stringify({sessionId,cwd:v.params.cwd,title:'Saved conversation'})+'\\n');reply({sessionId,models:{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'}]}});}
+ else if(v.method==='session/new') {mcpServers=v.params.mcpServers;fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-session.json'),JSON.stringify(v.params));fs.appendFileSync(catalogFile,JSON.stringify({sessionId,cwd:v.params.cwd,title:'Saved conversation'})+'\\n');reply({sessionId,models:{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'},{modelId:'opaque-oss-id',name:'GPT-OSS 120B (Medium)'}]}});}
  else if(v.method==='session/list') reply({sessions:[...catalog(),{sessionId:'stored-session',cwd:process.cwd(),title:'Create a file'},{sessionId:'other-folder',cwd:'/another-workspace',title:'Private'}]});
  else if(v.method==='session/load') {
    sessionId=v.params.sessionId;
@@ -81,6 +81,7 @@ rl.on('line',line=>{
  } else if(v.method==='session/prompt') {
    promptId=v.id;
    const text=v.params.prompt[0].text;
+   if(text.endsWith('utility-fixture')) {utility=true;send({id:211,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'unwanted-write'),content:'bad'}});return;}
    fs.appendFileSync(require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl'),JSON.stringify(text)+'\\n');
    if(text.startsWith('/plan ')) {
      planPhase='question';
@@ -95,6 +96,7 @@ rl.on('line',line=>{
    } else {update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});reply({stopReason:'end_turn'});}
  } else if(v.method==='session/cancel') send({id:promptId,result:{stopReason:'cancelled'}});
  else if(!v.method) {
+   if(utility) {utility=false;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:v.error?'Tools denied; text result.':'Unexpected write'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
    if(planPhase==='question') {planPhase='write';send({id:900,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'PLAN.md'),content:'# Native plan\\n\\n1. Make the scoped change.\\n2. Verify it.'}});return;}
    if(planPhase==='write') {planPhase=undefined;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'The plan is ready.'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
    update({sessionUpdate:'tool_call_update',toolCallId:'live-id',status:v.result.outcome.optionId==='native-deny-9'?'failed':'completed',rawOutput:v.result.outcome.optionId});
@@ -115,6 +117,21 @@ async function open(sessionId?: string) {
 }
 
 describe('Antigravity native session', () => {
+  it('generates auxiliary text with no MCP or filesystem tools and preserves the agent conversation', async () => {
+    const host = new AntigravityHost();
+    const agent: Agent = { id: 'utility', name: 'Utility', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const events: BackendEvent[] = [];
+    host.onEvent(event => events.push(event));
+    try {
+      const result = await host.generateText(agent, { cwd: root, prompt: 'utility-fixture', outputSchema: { type: 'string' } });
+      expect(result.text).toBe('Tools denied; text result.');
+      expect(JSON.parse(await readFile(path.join(root, 'fixture-initialize.json'), 'utf8')).clientCapabilities.fs).toEqual({ readTextFile: false, writeTextFile: false });
+      expect(JSON.parse(await readFile(path.join(root, 'fixture-session.json'), 'utf8'))).toMatchObject({ mcpServers: [], _meta: { agy: { enabledTools: [] } } });
+      await expect(readFile(path.join(root, 'unwanted-write'))).rejects.toMatchObject({ code: 'ENOENT' });
+      expect(events).toEqual([]);
+      expect(agent.backendSession).toBeUndefined();
+    } finally { await host.close(); }
+  });
   it('adapts a native plan artifact and question into the existing app confirmation before implementation', async () => {
     const snapshot = createEmptySnapshot();
     const agent: Agent = { id: 'planner', name: 'Planner', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
@@ -169,7 +186,7 @@ describe('Antigravity native session', () => {
       expect(result.rounds[0]?.findings[0]?.remediation).toMatchObject({ state: 'fixed', evidence: expect.stringContaining('verified') });
       expect(await readFile(path.join(root, 'fixture-code.txt'), 'utf8')).toBe('fixed');
       expect(dispose).toHaveBeenCalledOnce();
-      expect(snapshot.agents).toEqual([owner]);
+      await vi.waitFor(() => expect(snapshot.agents).toEqual([owner]));
       expect(commit).not.toHaveBeenCalled();
     } finally { await host.close(); await mcp.stop(); }
   });
@@ -184,6 +201,10 @@ describe('Antigravity native session', () => {
       expect(a.backendSession).not.toEqual(b.backendSession);
       expect(a.backendSession.kind).toBe('antigravity');
       await vi.waitFor(() => expect(events.filter(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toHaveLength(2));
+      expect(await host.listModels(first)).toEqual([
+        { id: 'gemini-low', model: 'gemini-low', displayName: 'Gemini Low', isDefault: true },
+        { id: 'opaque-oss-id', model: 'opaque-oss-id', displayName: 'GPT-OSS 120B (Medium)', isDefault: false },
+      ]);
       const snapshots = events.filter(event => event.type === 'antigravity.conversationSnapshotChanged');
       expect(snapshots.map(event => event.agentId)).toEqual(expect.arrayContaining(['first', 'second']));
       first.backendSession = a.backendSession;
@@ -228,7 +249,7 @@ describe('Antigravity native session', () => {
   });
 
   it.each(['deny', 'question'] as const)('maps %s to the exact native option and resolves its app request', async kind => {
-    const { session } = await open();
+    const { session, changed } = await open();
     const turn = session.prompt(kind);
     await vi.waitFor(() => expect(session.snapshot.clientRequests).toHaveLength(1));
     const request = session.snapshot.clientRequests[0]!;
@@ -239,6 +260,9 @@ describe('Antigravity native session', () => {
     await turn.completion;
     expect(session.snapshot.clientRequests).toEqual([]);
     expect(session.snapshot.answeredClientRequestIds).toContain(request.id);
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ type: 'request.resolved', payload: {
+      id: request.id, outcome: kind === 'question' ? { kind: 'answered', answers: { interaction_1: { answers: ['Proceed'] } } } : { kind: 'decision', decision: 'deny' },
+    } }));
     expect(session.snapshot.messages.at(-1)?.parts).toContainEqual(expect.objectContaining({ type: 'tool', status: kind === 'question' ? 'completed' : 'failed', output: kind === 'question' ? 'native-choice-7' : 'native-deny-9' }));
   });
 
@@ -247,6 +271,8 @@ describe('Antigravity native session', () => {
     expect(session.sessionId).toBe('stored-session');
     expect(changed).not.toHaveBeenCalled();
     expect(session.snapshot.messages).toHaveLength(2);
+    expect(session.snapshot.messages.map(message => message.createdAt)).toEqual(['', '']);
+    expect(session.snapshot.turns[0]).toMatchObject({ startedAt: '', completedAt: '', durationMs: null });
     expect(session.snapshot.messages[1]?.parts).toEqual([
       expect.objectContaining({ type: 'tool', id: 'replay-id', status: 'failed', output: 'Rejected by user' }),
       { type: 'text', text: 'Denied.' },
@@ -265,6 +291,10 @@ describe('Antigravity native session', () => {
       expect(messages).toHaveLength(2);
       expect(messages[1]?.parts[0]).toMatchObject({ type: 'tool', status: 'failed' });
       expect(await host.readConversationSummary(agent, rows[0]!.ref)).toEqual(rows[0]);
+      const loading = host.resumeConversation(agent, { storageState: 'active', ref: rows[0]!.ref });
+      await expect(host.sendPrompt(agent, 'too early')).rejects.toThrow('history is still loading');
+      await loading;
+      await expect(host.readConversationMessages({ backend: 'antigravity', sessionId: rows[0]!.sessionId!, folder: path.join(root, 'home') }, agent.id)).rejects.toThrow('another workspace');
     } finally { await host.close(); }
   });
 

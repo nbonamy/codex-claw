@@ -11,6 +11,7 @@ export class AcpTranscript {
   readonly replica;
   private message?: RendererMessage;
   private turnId = '';
+  private replaying = false;
 
   constructor(readonly agentId: string, readonly sessionId: string, private readonly changed: (event: AntigravityConversationEvent) => void,
     private readonly displayUser: (text: string) => { text: string; parts: RendererMessagePart[] } = text => ({ text, parts: [] })) {
@@ -18,11 +19,12 @@ export class AcpTranscript {
   }
 
   event(change: Change): void {
-    const event = { ...change, agentId: this.agentId, sessionId: this.sessionId, turnId: this.turnId, occurredAt: new Date().toISOString() } as AntigravityConversationEvent;
+    const event = { ...change, agentId: this.agentId, sessionId: this.sessionId, turnId: this.turnId, occurredAt: this.replaying ? '' : new Date().toISOString() } as AntigravityConversationEvent;
     this.replica.apply(event); this.changed(event);
   }
 
   start(text?: string, parts: RendererMessagePart[] = []): string {
+    if (text !== undefined) this.replaying = false;
     this.turnId = randomUUID(); this.message = undefined;
     this.event({ type: 'turn.started', payload: { turn: { id: this.turnId } } });
     if (text !== undefined) { this.text('user', text); this.attach(parts); }
@@ -36,6 +38,7 @@ export class AcpTranscript {
   }
 
   update(update: Record<string, unknown>, replay: boolean): void {
+    this.replaying = replay;
     if (!replay && !this.replica.getSnapshot().busy && update.sessionUpdate !== 'usage_update') return;
     switch (update.sessionUpdate) {
       case 'user_message_chunk':
@@ -100,7 +103,7 @@ export class AcpTranscript {
 
   private current(role: 'user' | 'assistant'): RendererMessage {
     if (this.message?.role !== role) this.message = { id: randomUUID(), agentId: this.agentId, role,
-      status: role === 'user' ? 'complete' : 'streaming', turnId: this.turnId, parts: [], createdAt: new Date().toISOString() };
+      status: role === 'user' ? 'complete' : 'streaming', turnId: this.turnId, parts: [], createdAt: this.replaying ? '' : new Date().toISOString() };
     return this.message;
   }
 }

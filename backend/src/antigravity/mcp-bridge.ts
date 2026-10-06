@@ -13,6 +13,9 @@ const output = value => {
 };
 async function request(message) {
   try {
+    // Google's harness probes this optional discovery extension before MCP
+    // initialize. The bridge has no extra discovery metadata to advertise.
+    if(message.method==='server/discover') { output({jsonrpc:'2.0',id:message.id,result:{}}); return; }
     if(allowed && message.method==='tools/call' && !allowed.has(message.params?.name)) throw new Error('Tool unavailable in this review');
     const response = await fetch(endpoint, {method:'POST',headers:{
       'Content-Type':'application/json', Accept:'application/json, text/event-stream',

@@ -174,8 +174,8 @@ function normalizeProviderModelDefaults(value: Record<string, unknown>): NonNull
     if (!isRecord(entry) || !model) continue;
     defaults[backend] = {
       model,
-      reasoningEffort: normalizeString(entry.reasoningEffort) || null,
-      serviceTier: normalizeString(entry.serviceTier) || null,
+      reasoningEffort: backend === 'antigravity' ? null : normalizeString(entry.reasoningEffort) || null,
+      serviceTier: backend === 'antigravity' ? null : normalizeString(entry.serviceTier) || null,
     } as NonNullable<typeof defaults[typeof backend]>;
   }
   return defaults;

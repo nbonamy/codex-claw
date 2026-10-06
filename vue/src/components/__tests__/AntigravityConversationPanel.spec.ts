@@ -43,7 +43,7 @@ it('renders the Antigravity replica, denies a native approval, and keeps unsuppo
   expect(confirmation.findAll('button').map(button => button.text())).toEqual(['Allow', 'Deny']);
   await confirmation.findAll('button').find(button => button.text() === 'Deny')!.trigger('click'); await flushPromises();
   expect(actions.clientResponse).toHaveBeenCalledExactlyOnceWith({ agentId: agent.id, id: 'permission', payload: { decision: 'deny' } });
-  view.antigravitySnapshot = replica.apply({ ...identity, type: 'request.resolved', payload: { id: 'permission' } });
+  view.antigravitySnapshot = replica.apply({ ...identity, type: 'request.resolved', payload: { id: 'permission', outcome: { kind: 'decision', decision: 'deny' } } });
   view.antigravitySnapshot = replica.apply({ ...identity, type: 'turn.completed', payload: { turn: { id: 'turn', status: 'completed' } } });
   await flushPromises();
   expect(wrapper.get('.chat-rich-text-editor').text()).toBe('Keep my draft');

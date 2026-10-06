@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { acpEnvironment, installAcpRuntime, resolveAcpRuntime } from '../runtime';
 import { AcpRuntime, NativeLoginRequired } from '../acp-runtime';
 import { createAntigravityLifecycle } from '../provider-lifecycle';
+import { AntigravityHost } from '../antigravity-host';
 import { createTestSnapshot } from '../../__tests__/server-test-fixtures';
 
 let root: string;
@@ -43,6 +44,20 @@ async function open() {
 }
 
 describe('Antigravity native lifecycle', () => {
+  it('cancels authentication during startup without publishing a late connected observation, then retries', async () => {
+    await fakeRuntime('reply({})');
+    const host = new AntigravityHost();
+    const events: unknown[] = [];
+    host.onEvent(event => events.push(event));
+    try {
+      const login = host.authenticate({ action: 'login' }).catch(error => error);
+      await host.authenticate({ action: 'cancel' });
+      await login;
+      expect(events).not.toContainEqual(expect.objectContaining({ type: 'provider.authenticationChanged', payload: expect.objectContaining({ connected: true }) }));
+      expect(await readdir(path.join(root, 'external/korus-tmp')).catch(() => [])).toEqual([]);
+      expect(await host.authenticate({ action: 'check' })).toMatchObject({ connected: true });
+    } finally { await host.close(); }
+  });
   it('requires the paired runtime and excludes ambient API billing credentials from child processes', async () => {
     await writeFile(path.join(root, 'runtime'), '', { mode: 0o700 });
     expect(resolveAcpRuntime()).toBeNull();
@@ -74,6 +89,19 @@ describe('Antigravity native lifecycle', () => {
     await fakeRuntime('reply({})', '9.0.0');
     await expect(open()).rejects.toThrow('qualified ACP 1.3.0');
     expect(await readdir(path.join(root, 'external/korus-tmp'))).toEqual([]);
+  });
+
+  it('disconnects the provider observation when conversation startup requires native login', async () => {
+    await fakeRuntime("process.stderr.write('Open the following link to authenticate the ACP server: https://example.invalid/secret\\n')");
+    const host = new AntigravityHost();
+    const events: unknown[] = [];
+    host.onEvent(event => events.push(event));
+    try {
+      await expect(host.listModels({ id: 'lost-auth', name: 'Lost auth', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } })).rejects.toBeInstanceOf(NativeLoginRequired);
+      expect(events).toContainEqual({ type: 'provider.authenticationChanged', backend: 'antigravity', payload: {
+        kind: 'antigravity', connected: false, state: { loggedIn: false, homePath: path.join(root, 'external') },
+      } });
+    } finally { await host.close(); }
   });
 
   it('rejects a modified download before extraction and leaves no partial installation', async () => {

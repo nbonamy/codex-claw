@@ -98,12 +98,12 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
       ...rest,
       model: input.modelSelection.model,
       userSelectedModel: true,
-      ...(input.modelSelection.reasoningEffort ? { reasoningEffort: input.modelSelection.reasoningEffort } : {}),
+      ...(agent.backend !== 'antigravity' && input.modelSelection.reasoningEffort ? { reasoningEffort: input.modelSelection.reasoningEffort } : {}),
       ...(agent.backend === 'codex' ? { serviceTier: input.modelSelection.serviceTier } : {}),
     } as BackendDefaults;
     snapshot.general.providerModelDefaults = {
       ...snapshot.general.providerModelDefaults,
-      [agent.backend]: { ...input.modelSelection },
+      [agent.backend]: { ...input.modelSelection, ...(agent.backend === 'antigravity' ? { reasoningEffort: null, serviceTier: null } : {}) },
     };
   }
   if (input.name !== undefined) {
@@ -227,7 +227,7 @@ function applyProviderDefaults(snapshot: AppSnapshot, agent: Agent): void {
     ...(agent.backendDefaults?.kind === agent.backend ? agent.backendDefaults : defaultBackendDefaults(agent.backend)),
     model: selection.model,
     userSelectedModel: true,
-    ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+    ...(agent.backend !== 'antigravity' && selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
     ...(agent.backend === 'codex' ? { serviceTier: selection.serviceTier } : {}),
   } as BackendDefaults;
   const approvals = snapshot.general.providerApprovalDefaults;

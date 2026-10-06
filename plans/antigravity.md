@@ -448,11 +448,11 @@ Antigravity surface.
 
 ### Phase 1: contracts and lifecycle
 
-Implementation in progress (2026-10-06): added Antigravity identity/session/default
+Implementation complete for review (2026-10-06): added Antigravity identity/session/default
 contracts, persisted generic preferences and disk schema, with creation/switch and
 disk-roundtrip regressions. Unavailable driver creation fails explicitly; default
 capabilities and commands do not inherit Codex features. Lifecycle registration,
-authentication, remaining admission paths and complete provider UX are still pending.
+native authentication and all applicable admission paths are implemented.
 
 Validation so far: all five workspace tests plus script tests passed after refreshing
 the installed SDK build; affected contract/persistence tests and typechecks passed.
@@ -463,18 +463,22 @@ private home and native skills links, sanitized process environment, and provide
 OAuth checks. Native fresh-profile probing confirmed background authentication
 detects a missing login without opening a browser. Credentials remain exclusively
 owned by Google's runtime. Login expiry was not induced.
+The actual installer downloaded and checksum-verified the paired macOS ARM64
+archive into a fresh temporary APP_HOME; that installation initialized as ACP
+1.3.0/protocol 2. Authentication cancellation during startup and disconnected
+Settings retry now have regression coverage without changing enablement.
 
 - [x] Qualify ACP for the measured text/permissions/MCP/history/cancellation scope.
-- [ ] Extend backend/session/default/auth unions and all owning runtime decoders.
-- [ ] Extend generic settings normalization, connected choices, and remembered
+- [x] Extend backend/session/default/auth unions and all owning runtime decoders.
+- [x] Extend generic settings normalization, connected choices, and remembered
   selections without silently falling back from an explicitly selected provider.
-- [ ] Register discovery, installation, configured home, and connection observation.
-- [ ] Add contract tests for roundtrip persistence, unavailable-provider rejection,
+- [x] Register discovery, installation, configured home, and connection observation.
+- [x] Add contract tests for roundtrip persistence, unavailable-provider rejection,
   disconnected retry, and cross-provider default isolation in this same milestone.
 
 ### Phase 2: selected transport and a minimal conversation slice
 
-Transport foundation in progress: duplex JSONL framing handles colliding inbound
+Transport implemented: duplex JSONL framing handles colliding inbound
 request IDs, split frames, bounded buffers, EOF and request timeouts. Deterministic
 tests launch a real child process that supplies sanitized ACP shapes. A fresh-home
 initialization using the qualified native runtime reported protocol 2, version 1.3.0
@@ -482,16 +486,16 @@ and loadSession support. The provider host now streams its own revisioned replic
 handles native approvals/questions and cancellation, and atomically rebuilds history.
 Native prompt completion and cold replay passed using the qualified runtime and
 the existing probe login in place. Full workspace tests/typechecks passed. Scoped
-MCP bridge tests prove two child environments stay separate; actual review/Mission
-workflow integration remains pending.
+MCP bridge tests prove two child environments stay separate. Actual review/Mission
+services now have workflow tests with only the external provider boundary faked.
 
-- [ ] Spawn the qualified ACP runtime without a shell; implement request/response,
+- [x] Spawn the qualified ACP runtime without a shell; implement request/response,
   notification framing, bounded buffering, session routing and process cleanup.
-- [ ] Implement proven prompt/resume/load semantics, permission responses and
+- [x] Implement proven prompt/resume/load semantics, permission responses and
   native cancellation with bounded teardown fallback.
-- [ ] Surface tool denials, protocol errors and unexpected exit. CLI-specific
+- [x] Surface tool denials, protocol errors and unexpected exit. CLI-specific
   `denied_actions` handling applies only if a CLI fallback is explicitly chosen.
-- [ ] Add transport-boundary tests with captured sanitized protocol shapes;
+- [x] Add transport-boundary tests with captured sanitized protocol shapes;
   test success, denial, split lines, EOF, interruption and stale completion races.
 
 ### Phase 3: provider host, history and collaboration
@@ -506,14 +510,14 @@ Antigravity does not receive a synthetic `/compact` between tickets. Automation 
 worktree delegation tests retain the selected provider and isolated session.
 Native-runtime review/MCP proof is still pending; the fixture tests are not live model proof.
 
-- [ ] Implement the provider-owned host/replica and bounded revisioned transport.
-- [ ] Hydrate through native `session/load`, rebuild the provider replica atomically
+- [x] Implement the provider-owned host/replica and bounded revisioned transport.
+- [x] Hydrate through native `session/load`, rebuild the provider replica atomically
   despite changed replay tool IDs, and validate session identity; prove reload
   does not lose or duplicate streamed messages or re-execute tools.
-- [ ] Add safely scoped MCP configuration and normal/review-session tool discovery.
+- [x] Add safely scoped MCP configuration and normal/review-session tool discovery.
 - [ ] Verify two agents sharing a workspace retain separate MCP identities and
   sessions; test reconnection and credential/config cleanup at the owning seam.
-- [ ] Enable reviews/Missions only after their required MCP and lifecycle
+- [x] Enable reviews/Missions only after their required MCP and lifecycle
   contracts work, including review round completion and session disposal.
 
 ### Phase 4: UI and capability hardening
@@ -533,18 +537,90 @@ implementation turn. Live host probes read synthetic image/WAV/PDF/text inputs;
 an approved PLAN.md write exactly matched the preview and left the source file
 unchanged. A denied plan write surfaced honestly. Full typechecks/lint and all
 five unchanged statement coverage gates passed (core 85.69%, backend 86.83%,
-Vue 87.71%, Electron 85.04%, Web 95.93%). Native app collaboration and final
-consumer verification are still pending.
+Vue 87.71%, Electron 85.04%, Web 95.93%). Native collaboration verification
+remains pending; the branch Web flow is documented in the checkpoint below.
 
-- [ ] Add backend icon, settings panel/navigation/i18n, conversation binding and
+- [x] Add backend icon, settings panel/navigation/i18n, conversation binding and
   model/effort options; reuse creation dialogs and shared controls.
-- [ ] Map the assessed capability matrix explicitly: native goals, steering,
+- [x] Map the assessed capability matrix explicitly: native goals, steering,
   forks and historical turn mutations stay disabled; enable measured attachments,
   approvals and adapted planning. Test the Korus plan preview/confirmation flow
   against native artifact writes and question choices before advertising it.
-- [ ] Mount representative selection, Settings, permission-denial and restart
+- [x] Mount representative selection, Settings, permission-denial and restart
   flows. Verify persisted choices and unsupported-control behavior through UI.
-- [ ] Exercise the actual provider boundary and one desktop/Web consumer flow.
+- [x] Exercise the actual provider boundary and one desktop/Web consumer flow.
+
+### Review checkpoint and remaining native proof (2026-10-06)
+
+The delegating agent approved review readiness with the following explicit live
+limitation, not merge/publication or a claim of fully live-validated support.
+Native two-agent **Korus** MCP identity and native **CodeReviewService** remediation
+remain outstanding. Initial probes denied native MCP permission requests; corrected
+probes reached Google's usage limit (the runtime reported a reset in 3 days,
+5 hours). Both default Gemini 3.8 Flash and catalog-selected Gemini 3.1 Pro Low
+returned the limit message. No account change, token extraction or alternate
+transport was used. The review correctly paused without an accepted
+`finish_review_round`; no clean-review result was inferred from assistant text.
+
+Native cancellation through our session produced `interrupted`, followed by a
+completed quota-message turn in the same still-open process. This proves recovery
+of the protocol, not successful model work after cancellation. A separate branch
+Web session did return `WEB_NATIVE_PROOF`; its original user prompt and one
+assistant reply survived reload. Submission used the public WebSocket operation;
+the real browser DOM verified rendering. Restarting only the owned preview
+daemon proved cold native history hydration with no duplicate/lost messages.
+ACP supplies no original replay timestamps; these now remain absent instead of
+showing the reload time. The browser typing tool does
+not support the contenteditable composer and screenshot capture timed out, so
+neither physical typing nor screenshot verification is claimed. Settings showed
+the native account/catalog and rejected disabling the last available engine.
+An actual Web attachment request failed before dispatch with the trusted-upload
+explanation.
+
+Final automated gates: `npm run test:ai` passed all five workspaces (3,368
+Vitest tests) and 15 script tests. `npm run lint` passed architecture, all
+workspace typechecks, CSS, i18n and dead-code checks. `npm run test:coverage`
+passed every unchanged 85% statement gate; backend coverage was rerun after
+the final auth/replay fixes. Final statements: core **85.69%**, backend
+**87.08%**, Vue **87.71%**, Electron **85.04%**, Web **95.93%**. The branch Web
+build and final backend build passed. No signed package/release was attempted.
+
+The user's native-picker screenshot includes GPT-OSS 120B (Medium). A source audit
+of the **qualified runtime** explains why Korus does not: `acp_server/model_selection.py`
+allows third-party models only for client identities JetBrains, Zed and Xcode,
+then removes non-`gemini` IDs for everyone else. `client_info.py` has no general
+capability opt-in. Korus does not impersonate an editor or hardcode unavailable
+models. Its catalog pass-through test includes a synthetic GPT-OSS entry to
+ensure it will display one when the native contract supplies it. This requires
+an upstream-supported change before GPT-OSS can be advertised for Korus.
+
+Rerun the two native collaboration checks after quota permits work:
+
+1. Keep this worktree checked out and use an isolated scratch repository and
+   APP_HOME. Revalidate paired ACP 1.3.0/protocol 2; use the user's native login
+   in place or request a fresh native login. Never copy/read credential files.
+2. Bundle the production `AntigravityHost`, `AcpSession`, `AppMcpService`,
+   `CodeReviewService`, `AgentCreationService` and `createEmptySnapshot` with Vite
+   SSR (`ssr.noExternal: true`). The optional current entry and runners are
+   `/tmp/korus-acp-native-app-entry.ts`, `/tmp/korus-acp-native-app-proof.mjs`
+   and `/tmp/korus-acp-native-review-proof.mjs`; these are evidence helpers,
+   never production dependencies. Regenerate them from the service wiring in
+   `backend/src/antigravity/__tests__/session.spec.ts` if scratch files expire.
+3. Run the MCP runner with two same-cwd agents and the actual AppMcpService URL.
+   Approve only their native `korus_set-status`/`korus_finish_turn` requests.
+   Require distinct session IDs and both distinct status markers on the correct
+   agent records. A completed ACP response alone is insufficient.
+4. Give the review runner a **new** scratch directory each run. Initialize a
+   disposable Git repo with `add(a,b) = a+b` and a Node test, commit its baseline,
+   then change the implementation to subtraction. Use real CodeReviewService,
+   ReviewGit and the scoped MCP bridge with `autoCommit:false`. Approve only
+   fixture reads/test commands, the fixture-file edit and scoped review ledger
+   calls. Require finding counts `[1,0]`, remediation evidence, passing Node
+   test and reviewer disposal. Stop on quota rather than retrying or changing
+   accounts. Capture synthetic results without credentials.
+5. Keep the deterministic review/Mission/delegation/automation workflow tests
+   green; report native results separately. Remote/Web attachment transfer and
+   the upstream third-party model gate remain separate follow-ups.
 
 ## Verification and commit checkpoints
 
@@ -581,3 +657,21 @@ Phase 0 learnings:
 - Stable session IDs do not imply stable tool IDs across cold history replay.
 - Keep feasibility failures visible instead of replacing them with prompt-based
   imitations or unapproved API billing. No production feature code changed here.
+
+Implementation learnings:
+
+- Exercise the full provider-to-app boundary early. Native model generation,
+  MCP discovery, permission to invoke an MCP tool, and app-ledger completion
+  are separate assertions; an ACP `end_turn` proves none of the latter three.
+- Preserve app prompt presentation metadata beside native history rather than
+  persisting a competing transcript. Native replay can use different tool IDs
+  and include injected instructions or flattened attachment contents.
+- Test the external wire shapes with a real child process and run real owning
+  app services around it. This catches bidirectional ID collisions, teardown,
+  workflow completion and caller isolation without replacing production logic.
+- Treat the native catalog as authoritative. A desktop model picker and a
+  provider's shared model enum do not prove that an identified ACP client is
+  offered that model; audit client capability/identity gates explicitly.
+- Keep source-audited and fixture-backed behavior separate from native proof,
+  especially when subscription limits interrupt a live test. Preserve the
+  exact failed acceptance action and its rerun procedure rather than relaxing it.

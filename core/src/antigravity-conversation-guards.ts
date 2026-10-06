@@ -1,5 +1,6 @@
 import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from './contracts/antigravity-conversation';
 import { isRendererMessage } from './snapshot-guard-collections';
+import { isAgentRequestResponse } from './agent-request';
 
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const nullableString = (value: unknown) => value === null || typeof value === 'string';
@@ -42,7 +43,7 @@ export function isAntigravityEvent(value: unknown): value is AntigravityConversa
     case 'turn.completed': return record(payload.turn) && payload.turn.id === value.turnId && ['completed', 'interrupted', 'failed'].includes(String(payload.turn.status)) && (payload.error === undefined || typeof payload.error === 'string');
     case 'message.upsert': return isRendererMessage(payload.message) && record(payload.message) && payload.message.agentId === value.agentId;
     case 'request.created': return request(payload.request);
-    case 'request.resolved': return typeof payload.id === 'string';
+    case 'request.resolved': return isAgentRequestResponse(payload);
     case 'context.updated': return usage(payload.usage);
     default: return false;
   }

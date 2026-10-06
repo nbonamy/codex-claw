@@ -6,9 +6,9 @@ import WorkspaceProvisioningProgressDialog from '../WorkspaceProvisioningProgres
 describe('WorkspaceProvisioningProgressDialog', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('shows project creation stages driven by backend progress and retains handoff failures', async () => {
+  it.each(['codex', 'antigravity'] as const)('shows %s project creation stages and retains handoff failures', async backend => {
     const progress = {
-      id: 'project-1', state: 'running' as const, backend: 'codex' as const,
+      id: 'project-1', state: 'running' as const, backend,
       repositoryName: 'new-product', createWorktree: false, createProject: true,
       hasPrompt: true, phase: 'creatingProject' as const,
     };
@@ -22,6 +22,7 @@ describe('WorkspaceProvisioningProgressDialog', () => {
     expect(steps()[0]!.classes()).toContain('is-active');
     await wrapper.setProps({ operation: { mode: 'single', progress: { ...progress, phase: 'creatingAgent' } } });
     expect(steps()[1]!.classes()).toContain('is-active');
+    expect(steps()[1]!.text()).toContain(backend === 'antigravity' ? 'Antigravity' : 'Codex');
     await wrapper.setProps({ operation: { mode: 'single', progress: { ...progress, phase: 'startingPrompt' } } });
     expect(steps()[2]!.classes()).toContain('is-active');
     await wrapper.setProps({ operation: { mode: 'single', progress: {

@@ -2153,7 +2153,7 @@ export class AppBackendServer {
           return createAppRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
-        return createAppRpcResult(message.id, await this.providerConnections.refresh());
+        return createAppRpcResult(message.id, await this.providerConnections.refreshDisconnected());
       }
       case backendMethods.providerSetupConfigure:
       case backendMethods.providerInstall: {

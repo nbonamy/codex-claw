@@ -2,7 +2,7 @@ import { mkdir, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Agent, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSession, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from '@workspace/core/contracts';
-import type { AgentBackendDriver, BackendEvent, BackendCodeReviewInput, BackendCodeReviewResult } from '@workspace/core/backend-driver';
+import type { AgentBackendDriver, BackendEvent, BackendCodeReviewInput, BackendCodeReviewResult, BackendTextGenerationInput } from '@workspace/core/backend-driver';
 import { requestFromClientRequest, type AgentRequestResponse } from '@workspace/core/agent-request';
 import type { ProviderAuthentication, ProviderAuthenticationAction } from '@workspace/core/contracts/provider-setup';
 import type { AntigravityConversationEvent } from '@workspace/core/contracts/antigravity-conversation';
@@ -26,8 +26,11 @@ export class AntigravityHost implements AgentBackendDriver {
   private readonly generations = new Map<string, number>();
   private readonly revisions = new Map<string, number>();
   private readonly reviewScopes = new Map<string, string>();
+  private readonly resuming = new Set<string>();
+  private readonly auxiliary = new Set<AcpSession>();
   private readonly listeners = new Set<(event: BackendEvent) => void>();
   private authentication?: AcpRuntime;
+  private authAbort?: AbortController;
   private authBusy = false;
   private closed = false;
   constructor(private readonly options: BackendDriverRegistryOptions = {}) {}
@@ -40,25 +43,33 @@ export class AntigravityHost implements AgentBackendDriver {
 
   async authenticate(request: ProviderAuthenticationAction): Promise<ProviderAuthentication> {
     if (request.action === 'cancel') {
+      this.authAbort?.abort();
       await this.authentication?.close();
       return this.authState(false);
     }
+    if (this.closed) throw new Error('Antigravity host is closed.');
     if (this.authBusy) throw new Error('Antigravity authentication is already in progress.');
     this.authBusy = true;
+    const abort = this.authAbort = new AbortController();
     try {
       const home = antigravityHome();
       await mkdir(home, { recursive: true, mode: 0o700 });
-      this.authentication = await AcpRuntime.open({ cwd: home, home, interactive: request.action === 'login',
+      this.authentication = await AcpRuntime.open({ cwd: home, home, interactive: request.action === 'login', signal: abort.signal,
         onRequest: async () => { throw new Error('No session during authentication.'); }, onNotification: () => {}, onClose: () => {},
       });
+      if (abort.signal.aborted) throw new Error('Antigravity authentication cancelled.');
       if (request.action === 'logout') {
         await Promise.all([...this.sessions.keys()].map(id => this.releaseConversation(id)));
         await this.authentication.connection.request('logout', {});
         return this.authState(false);
       }
-      try { await this.authentication.authenticate(); return this.authState(true); }
+      try {
+        await this.authentication.authenticate();
+        if (abort.signal.aborted) throw new Error('Antigravity authentication cancelled.');
+        return this.authState(true);
+      }
       catch (error) { if (error instanceof NativeLoginRequired) return this.authState(false); throw error; }
-    } finally { await this.authentication?.close(); this.authentication = undefined; this.authBusy = false; }
+    } finally { await this.authentication?.close(); this.authentication = undefined; this.authAbort = undefined; this.authBusy = false; }
   }
 
   async sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions) {
@@ -109,6 +120,26 @@ export class AntigravityHost implements AgentBackendDriver {
     return { text, reviewerSession: this.reference(session) };
   }
 
+  async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<{ text: string }> {
+    if (this.closed) throw new Error('Antigravity host is closed.');
+    const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: [], tools: false, changed: () => {} });
+    this.auxiliary.add(session);
+    try {
+      if (this.closed) throw new Error('Antigravity host is closed.');
+      const model = agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.model : undefined;
+      if (model) await session.setModel(model);
+      await session.setMode('default');
+      const turn = session.prompt([input.developerInstructions, 'Return only the requested text. Do not call tools.',
+        input.outputSchema ? `Return JSON matching this schema: ${JSON.stringify(input.outputSchema)}` : '', input.prompt].filter(Boolean).join('\n\n'));
+      await turn.completion;
+      if (session.snapshot.turns[0]?.status !== 'completed') throw new Error(session.snapshot.error ?? 'Antigravity text generation failed.');
+      const text = session.snapshot.messages.filter(message => message.role === 'assistant')
+        .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
+      if (!text.trim()) throw new Error('Antigravity returned no text.');
+      return { text };
+    } finally { this.auxiliary.delete(session); await session.close(); }
+  }
+
   async disposeCodeReview(agent: Agent, reviewerSession: BackendSession): Promise<void> {
     if (reviewerSession.kind !== this.backend) throw new Error('Antigravity cannot dispose another provider review.');
     const session = this.sessions.get(agent.id);
@@ -134,15 +165,18 @@ export class AntigravityHost implements AgentBackendDriver {
     if (target.ref.backend !== this.backend || target.storageState !== 'active') throw new Error('Invalid Antigravity conversation target.');
     if (target.ref.folder !== agent.folder) throw new Error('Antigravity conversation belongs to another workspace.');
     const existing = this.sessions.get(agent.id);
-    if (existing?.snapshot.busy) throw new Error('Finish the current Antigravity turn before resuming history.');
+    if (existing?.snapshot.busy || this.opening.has(agent.id) || this.resuming.has(agent.id)) throw new Error('Finish the current Antigravity operation before resuming history.');
     // Open and validate complete replay before replacing the visible conversation.
     const generation = this.generations.get(agent.id) ?? 0;
-    const next = await this.open(agent, target.ref.sessionId);
-    if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await next.close(); throw new Error('Antigravity session was released during history loading.'); }
-    await this.releaseConversation(agent.id);
-    this.sessions.set(agent.id, next);
-    this.publishSnapshot(agent.id, next);
-    return { backendSession: this.reference(next) };
+    this.resuming.add(agent.id);
+    try {
+      const next = await this.open(agent, target.ref.sessionId);
+      if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await next.close(); throw new Error('Antigravity session was released during history loading.'); }
+      await this.releaseConversation(agent.id);
+      this.sessions.set(agent.id, next);
+      this.publishSnapshot(agent.id, next);
+      return { backendSession: this.reference(next) };
+    } finally { this.resuming.delete(agent.id); }
   }
 
   async listConversations(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]> {
@@ -162,14 +196,18 @@ export class AntigravityHost implements AgentBackendDriver {
         .map(entry => ({ id: entry.sessionId, sessionId: entry.sessionId, title: entry.title,
           updatedAt: '', messageCount: 0, storageState: 'active',
           ref: { backend: this.backend, folder: agent.folder, sessionId: entry.sessionId } }));
-    } finally { await runtime.close(); }
+    } catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
+    finally { await runtime.close(); }
   }
 
   async readConversationMessages(ref: BackendConversationRef, agentId: string) {
     if (ref.backend !== this.backend) throw new Error('Antigravity cannot read another provider conversation.');
     const current = this.sessions.get(agentId);
-    if (current?.sessionId === ref.sessionId) return structuredClone(current.snapshot.messages);
-    const session = await AcpSession.open({ agentId, cwd: this.workingDirectory({ id: agentId, folder: ref.folder }), sessionId: ref.sessionId, mcpServers: [], changed: () => {} });
+    if (current?.sessionId === ref.sessionId) {
+      if (await realpath(current.cwd) !== await realpath(this.workingDirectory({ id: agentId, folder: ref.folder }))) throw new Error('Antigravity conversation belongs to another workspace.');
+      return structuredClone(current.snapshot.messages);
+    }
+    const session = await this.openSession({ agentId, cwd: this.workingDirectory({ id: agentId, folder: ref.folder }), sessionId: ref.sessionId, mcpServers: [], changed: () => {} });
     try { return structuredClone(session.snapshot.messages); } finally { await session.close(); }
   }
 
@@ -203,13 +241,16 @@ export class AntigravityHost implements AgentBackendDriver {
   }
   async close(): Promise<void> {
     this.closed = true;
+    this.authAbort?.abort();
     await this.authentication?.close();
+    await Promise.all([...this.auxiliary].map(session => session.close()));
     await Promise.all([...this.sessions.keys()].map(id => this.releaseConversation(id)));
     await Promise.allSettled(this.opening.values());
   }
 
   private async ensure(agent: Agent, reviewUrl?: string): Promise<AcpSession> {
     if (this.closed) throw new Error('Antigravity host is closed.');
+    if (this.resuming.has(agent.id)) throw new Error('Antigravity history is still loading.');
     if (this.reviewScopes.get(agent.id) !== reviewUrl) {
       if (this.sessions.get(agent.id)?.snapshot.busy || this.opening.has(agent.id)) throw new Error('Antigravity collaboration scope cannot change during a turn.');
       await this.releaseConversation(agent.id);
@@ -238,7 +279,12 @@ export class AntigravityHost implements AgentBackendDriver {
       ...(this.options.appMcpServerUrl ? [sessionMcpServer(appMcpUrlForAgent(this.options.appMcpServerUrl, agent))] : []),
       ...Object.entries(this.options.hostedMcpServerUrls?.() ?? {}).map(([name, url]) => sessionMcpServer(agentScopedMcpUrl(url, agent.id), name)),
     ];
-    return AcpSession.open({ agentId: agent.id, cwd, sessionId, mcpServers, changed: event => this.conversationEvent(event) });
+    return this.openSession({ agentId: agent.id, cwd, sessionId, mcpServers, changed: event => this.conversationEvent(event) });
+  }
+
+  private async openSession(options: Parameters<typeof AcpSession.open>[0]): Promise<AcpSession> {
+    try { return await AcpSession.open(options); }
+    catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
   }
 
   private workingDirectory(agent: Pick<Agent, 'folder' | 'id'>): string {
@@ -249,7 +295,7 @@ export class AntigravityHost implements AgentBackendDriver {
     const identity = { agentId: event.agentId, backend: this.backend, backendSessionId: event.sessionId, conversationId: event.sessionId, turnId: event.turnId };
     this.emit({ ...identity, type: 'antigravity.conversationEventReceived', payload: { revision: this.nextRevision(event.agentId), event } });
     if (event.type === 'request.created') this.emit({ ...identity, type: 'agentRequest.created', payload: { request: requestFromClientRequest(event.payload.request, { conversationId: event.sessionId, turnId: event.turnId }) } });
-    else if (event.type === 'request.resolved') this.emit({ ...identity, type: 'agentRequest.resolved', payload: { id: event.payload.id, outcome: { kind: 'completed' } } });
+    else if (event.type === 'request.resolved') this.emit({ ...identity, type: 'agentRequest.resolved', payload: event.payload });
     else if (event.type === 'turn.started') this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'working' } });
     else if (event.type === 'turn.completed') this.emit({ ...identity, type: 'agent.statusChanged', payload: event.payload.turn.status === 'failed' ? { type: 'error', message: event.payload.error ?? 'Antigravity turn failed.' } : { type: 'idle' } });
   }

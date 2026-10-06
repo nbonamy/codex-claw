@@ -20,6 +20,11 @@ describe('Antigravity session MCP bridge', () => {
       connection.start(); return connection;
     });
     try {
+      for (const connection of connections) {
+        expect(await connection.request('server/discover', {})).toEqual({});
+        expect(await connection.request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'native-fixture', version: '1' } })).toMatchObject({ capabilities: { tools: {} } });
+        connection.notify('notifications/initialized', {});
+      }
       const lists = await Promise.all(connections.map(connection => connection.request('tools/list', {})));
       for (const list of lists) expect(list).toMatchObject({ tools: expect.arrayContaining([expect.objectContaining({ name: 'set-status' })]) });
       await Promise.all(connections.map((connection, index) => connection.request('tools/call', { name: 'set-status', arguments: { status: `isolated-${index}` } })));

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
-import { claudeBackendCapabilities, codexBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { claudeBackendCapabilities, codexBackendCapabilities, defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
 import type { AgentBackendDriver, BackendCodeReviewResult } from '@workspace/core/backend-driver';
 import type { Agent } from '@workspace/core/contracts';
 import { BackendDriverRpc } from '../driver-rpc';
@@ -159,8 +159,9 @@ describe('AppBackendServer code review workflow', () => {
     await server.close();
   });
 
-  it.each(['codex', 'claude'] as const)('retains %s review conversations through review again and finish', async (backend) => {
+  it.each(['codex', 'claude', 'antigravity'] as const)('retains %s review conversations through review again and finish', async (backend) => {
     const snapshot = createTestSnapshot();
+    snapshot.providerConnections?.push({ backend: 'antigravity', installed: true, connected: true, checking: false });
     const owner: Agent = {
       id: 'agent-owner',
       teamId: snapshot.teams[0]!.id,
@@ -197,7 +198,8 @@ describe('AppBackendServer code review workflow', () => {
         text: '',
         reviewerSession: input.reviewerSession ?? (backend === 'codex'
           ? { kind: 'codex' as const, threadId: `review-thread-${reviewRun}` }
-          : { kind: 'claude' as const, sessionId: `review-thread-${reviewRun}`, transport: 'stdio' as const }),
+          : backend === 'claude' ? { kind: 'claude' as const, sessionId: `review-thread-${reviewRun}`, transport: 'stdio' as const }
+          : { kind: 'antigravity' as const, sessionId: `review-thread-${reviewRun}` }),
       };
     });
     const disposeCodeReview = vi.fn().mockResolvedValue(undefined);
@@ -209,7 +211,7 @@ describe('AppBackendServer code review workflow', () => {
     const driver: AgentBackendDriver = {
       backend,
       getRuntimeStatus: () => ({ backend, status: 'running' }),
-      getCapabilities: () => backend === 'codex' ? codexBackendCapabilities : claudeBackendCapabilities,
+      getCapabilities: () => defaultBackendCapabilities(backend),
       runCodeReview,
       disposeCodeReview,
       ...(backend === 'codex' ? { archiveAgentConversation } : {}),
@@ -249,12 +251,13 @@ describe('AppBackendServer code review workflow', () => {
     expect(reviewer).toMatchObject({
       folder: owner.folder,
       backend,
-      backendDefaults: { kind: backend, model: 'review-model', reasoningEffort: 'low' },
+      backendDefaults: { kind: backend, model: 'review-model', ...(backend === 'antigravity' ? {} : { reasoningEffort: 'low' }) },
       teamId: owner.teamId,
     });
     expect(snapshot.agentGitStatuses[reviewer.id]).toStrictEqual(snapshot.agentGitStatuses[owner.id]);
     expect(owner.backendDefaults).toMatchObject({ model: 'gpt-5.6-sol', reasoningEffort: 'high' });
-    expect(snapshot.general.codeReviewDefaults?.providers[backend]).toStrictEqual({ model: 'review-model', reasoningEffort: 'low' });
+    expect(snapshot.general.codeReviewDefaults?.providers[backend]).toStrictEqual({ model: 'review-model', ...(backend === 'antigravity' ? {} : { reasoningEffort: 'low' }) });
+    if (backend === 'antigravity') expect(reviewer.backendDefaults?.reasoningEffort).toBeUndefined();
     const round = session.rounds[0]!;
     expect(runCodeReview).toHaveBeenNthCalledWith(1, reviewer, expect.objectContaining({
       reviewMcpServerUrl: expect.stringContaining('reviewContextId=1'),
@@ -268,7 +271,8 @@ describe('AppBackendServer code review workflow', () => {
     await vi.waitFor(() => expect(session.status).toBe('readyToFinish'));
 
     expect(runCodeReview).toHaveBeenNthCalledWith(2, reviewer, expect.objectContaining({
-      reviewerSession: backend === 'codex' ? { kind: 'codex', threadId: 'review-thread-1' } : { kind: 'claude', sessionId: 'review-thread-1', transport: 'stdio' },
+      reviewerSession: backend === 'codex' ? { kind: 'codex', threadId: 'review-thread-1' }
+        : backend === 'claude' ? { kind: 'claude', sessionId: 'review-thread-1', transport: 'stdio' } : { kind: 'antigravity', sessionId: 'review-thread-1' },
     }));
     expect(round.findings[0]!.remediation.state).toBe('fixed');
 

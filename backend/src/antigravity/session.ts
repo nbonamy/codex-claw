@@ -14,6 +14,7 @@ import type { RendererMessagePart } from '@workspace/core/contracts';
 type SessionOptions = {
   agentId: string; cwd: string; home?: string; sessionId?: string;
   mcpServers: unknown[];
+  tools?: boolean;
   changed(event: AntigravityConversationEvent): void;
   requestChanged?(event: AntigravityConversationEvent): void;
   closed?(error: Error): void;
@@ -39,7 +40,7 @@ export class AcpSession {
   static async open(options: SessionOptions): Promise<AcpSession> {
     const session = new AcpSession(options);
     try {
-      session.runtime = await AcpRuntime.open({ cwd: options.cwd, home: options.home,
+      session.runtime = await AcpRuntime.open({ cwd: options.cwd, home: options.home, filesystem: options.tools !== false,
         onRequest: (method, params) => session.request(method, params),
         onNotification: (method, params) => session.notification(method, params),
         onClose: error => session.closed(error),
@@ -48,6 +49,7 @@ export class AcpSession {
       if (options.sessionId) await validateAcpSession(session.runtime.connection, options.sessionId, options.cwd);
       const result = await session.runtime.connection.request(options.sessionId ? 'session/load' : 'session/new', {
         ...(options.sessionId ? { sessionId: options.sessionId } : {}), cwd: options.cwd, mcpServers: options.mcpServers,
+        ...(options.tools === false ? { _meta: { agy: { enabledTools: [] } } } : {}),
       }, 120_000);
       if (!record(result)) throw new Error('Invalid Antigravity session response.');
       const id = options.sessionId ?? result.sessionId;
@@ -72,6 +74,7 @@ export class AcpSession {
   get configuration(): Record<string, unknown> { return this.config; }
   get sessionId(): string { return this.snapshot.sessionId; }
   get isClosed(): boolean { return this.disposed; }
+  get cwd(): string { return this.options.cwd; }
   get writtenPlan(): string | undefined { return this.planMarkdown; }
 
   prompt(text: string, content: unknown[] = [{ type: 'text', text }], parts: RendererMessagePart[] = []): { turnId: string; completion: Promise<void> } {
@@ -118,7 +121,7 @@ export class AcpSession {
     if (!pending) throw new Error('Antigravity request is no longer pending.');
     const result = pending.answer(response);
     this.pending.delete(response.id);
-    this.transcript.event({ type: 'request.resolved', payload: { id: response.id } });
+    this.transcript.event({ type: 'request.resolved', payload: { id: response.id, outcome: response.outcome } });
     pending.resolve(result);
   }
 
@@ -163,6 +166,10 @@ export class AcpSession {
 
   private async request(method: string, params: unknown): Promise<unknown> {
     if (!record(params) || !this.transcript || params.sessionId !== this.sessionId || this.disposed || this.loading) throw new Error('Antigravity client request is outside an active session.');
+    if (this.options.tools === false) {
+      if (method === 'session/request_permission') return { outcome: { outcome: 'cancelled' } };
+      throw new Error('Tools are unavailable during text generation.');
+    }
     if (method === 'session/request_permission') {
       if (!this.active) throw new Error('Antigravity permission request has no active turn.');
       const pending = permissionRequest(params);
@@ -187,7 +194,7 @@ export class AcpSession {
 
   private cancelPermissions(): void {
     for (const [id, pending] of this.pending) {
-      this.transcript?.event({ type: 'request.resolved', payload: { id } });
+      this.transcript?.event({ type: 'request.resolved', payload: { id, outcome: { kind: 'cancelled' } } });
       pending.resolve({ outcome: { outcome: 'cancelled' } });
     }
     this.pending.clear();

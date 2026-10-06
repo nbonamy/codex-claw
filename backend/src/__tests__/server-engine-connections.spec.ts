@@ -8,6 +8,25 @@ import { normalizeGeneralSettings } from '@workspace/core/settings';
 vi.mock('../claude/authentication', () => ({ getLocalClaudeAuthentication: vi.fn(), logoutLocalClaude: vi.fn() }));
 
 describe('connected engine admission', () => {
+  it('retries an Antigravity login observation through the owning connection operation without changing enablement', async () => {
+    const snapshot = createTestSnapshot();
+    snapshot.general.providerEnabled = { antigravity: false };
+    const handle = vi.fn().mockResolvedValueOnce({ kind: 'antigravity', connected: false, state: { loggedIn: false, homePath: '/acp' } })
+      .mockResolvedValue({ kind: 'antigravity', connected: true, state: { loggedIn: true, homePath: '/acp' } });
+    const server = new AppBackendServer({ version: 'test', snapshot,
+      driverRpc: { handle, onEvent: () => () => {}, close: async () => {} } as never,
+      providerSetup: { isChanging: () => false, list: () => [{ backend: 'antigravity', installed: true, homePath: '/acp' }] } as never,
+    });
+    try {
+      await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/connections/get' });
+      expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: false, enabled: false });
+      await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'provider/connections/get' });
+      expect(snapshot.providerConnections?.[0]).toMatchObject({ connected: true, enabled: false });
+      await server.handleMessage({ jsonrpc: '2.0', id: 3, method: 'provider/connections/get' });
+      expect(handle).toHaveBeenCalledTimes(2);
+      expect(snapshot.general.providerEnabled).toEqual({ antigravity: false });
+    } finally { await server.close(); }
+  });
   it('persists disablement without probing, interrupting a turn, or losing queued work; external auth changes are ignored', async () => {
     const snapshot = createTestSnapshot();
     const authenticate = vi.mocked(getLocalClaudeAuthentication).mockResolvedValue({ loggedIn: true });

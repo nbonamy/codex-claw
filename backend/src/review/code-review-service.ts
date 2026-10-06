@@ -620,8 +620,8 @@ export class CodeReviewService {
     if (input.model === undefined && input.reasoningEffort === undefined) return;
     reviewer.backendDefaults = {
       ...reviewer.backendDefaults, kind: reviewer.backend,
-      ...(input.model ? { model: input.model, userSelectedModel: true, reasoningEffort: input.reasoningEffort } : {}),
-      ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+      ...(input.model ? { model: input.model, userSelectedModel: true, reasoningEffort: reviewer.backend === 'antigravity' ? undefined : input.reasoningEffort } : {}),
+      ...(reviewer.backend !== 'antigravity' && input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
     };
   }
 
@@ -633,7 +633,7 @@ export class CodeReviewService {
       backend: reviewer.backend,
       automation: input.automation ?? { enabled: false, maxPriority: previous?.automation.maxPriority ?? 'p2', maxRounds: previous?.automation.maxRounds ?? 3, ...(previous?.automation.autoCommit !== undefined ? { autoCommit: previous.automation.autoCommit } : {}) },
       providers: { ...previous?.providers, [reviewer.backend]: {
-        ...(input.model ? { model: input.model } : {}), ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+        ...(input.model ? { model: input.model } : {}), ...(reviewer.backend !== 'antigravity' && input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
       } },
     };
   }

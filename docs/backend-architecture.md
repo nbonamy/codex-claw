@@ -1160,6 +1160,59 @@ package or platform credential helper behind the same port after packaging is
 settled.
 
 
+## Antigravity provider
+
+`backend/src/antigravity` owns the qualified Google ACP runtime, processes,
+native OAuth observations, session catalog, requests and conversation state.
+It launches the paired ACP 1.3.0 runtime/harness directly, using numeric protocol
+2 and the measured v1-shaped agent capabilities. Installation downloads the
+pinned official platform archive, verifies SHA-256 and extracts only the two
+executables under `APP_HOME/antigravity/1.3.0`. The CLI is not an execution path.
+
+Provider setup owns `providerHomes.antigravity` and `providerEnabled.antigravity`.
+The runtime owns Google credentials and renewal. Background checks suppress the
+native login browser; explicit authentication opens it. No credential migration
+is performed. Child environments remove ambient Google API/project credentials,
+use an isolated `GEMINI_HOME`, force native file storage and use a private TMPDIR.
+Home routing is not a filesystem sandbox; the native runtime may install its
+encoder outside that home. No subscription quota is inferred from login state.
+
+Each agent owns a process/session and a provider replica. Prompts are serialized;
+native cancellation has bounded process teardown fallback. `session/load` is
+validated against the native catalog and builds history atomically because replay
+tool IDs differ from live IDs. Native history remains authoritative. A private
+`korus-sessions/<session>/prompts.jsonl` journal stores only Korus prompt
+presentation metadata so injected instructions and attachment text do not replace
+the original user message on replay. ACP currently provides no paged history,
+native archive, or trustworthy replay/catalog timestamps. Unknown historical
+times stay absent rather than appearing as the time history was reloaded.
+
+Session MCP servers use a stdio-to-HTTP bridge with caller identity and review
+scope in the child environment. The app server name is `product.mcpServerName`.
+No session identities are written to shared MCP configuration. The bridge also
+answers the harness's optional pre-initialization `server/discover` probe.
+Review sessions expose only review/status tools. Auxiliary text generation uses
+a separate session without MCP, disables built-ins through the native
+`_meta.agy.enabledTools: []` contract, disables advertised filesystem capabilities
+and rejects client tool requests; it does not mutate an agent's conversation.
+
+The qualified runtime filters non-Gemini models by client identity. Its
+`supports_third_party_models` implementation permits only JetBrains, Zed and
+Xcode, so Korus does not currently receive GPT-OSS or Claude entries even when
+the native Antigravity app shows them. Korus keeps its own client identity and
+passes through the returned catalog without a model-family filter. Enabling
+third-party models requires an upstream-supported client capability/allowlist
+change; runtime patching or impersonating another editor is not part of this
+integration.
+
+Trusted local desktop attachments arrive through the existing attachment
+registry. Antigravity accepts images, WAV, UTF-8 text and PDF resource links.
+Web ingestion and remote transfer are separate unfinished capabilities: their
+attachment prompts reject before provider dispatch, while text prompts work.
+Native `/plan` text/file output feeds Korus plan review, and acceptance starts
+a separate implementation turn. Native goals, active steering, fork, historical
+turn mutations, manual compaction, plugin catalog and remote pairing stay gated.
+
 ## Testing Strategy
 
 The extraction needs contract tests more than broad end-to-end tests at first.

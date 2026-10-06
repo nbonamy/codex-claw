@@ -25,6 +25,8 @@ export class AcpRuntime {
     cwd: string;
     home?: string;
     interactive?: boolean;
+    signal?: AbortSignal;
+    filesystem?: boolean;
     onRequest: ConstructorParameters<typeof AcpConnection>[0]['onRequest'];
     onNotification: ConstructorParameters<typeof AcpConnection>[0]['onNotification'];
     onClose: ConstructorParameters<typeof AcpConnection>[0]['onClose'];
@@ -36,6 +38,7 @@ export class AcpRuntime {
     const temporaryRoot = path.join(home, 'korus-tmp');
     await mkdir(temporaryRoot, { recursive: true, mode: 0o700 });
     const temp = await mkdtemp(path.join(temporaryRoot, 'acp-'));
+    if (options.signal?.aborted) { await rm(temp, { recursive: true, force: true }); throw new Error('Antigravity authentication cancelled.'); }
     const env = acpEnvironment(home, runtime.harness, temp);
     // Python's native webbrowser honors this command. It receives the URL as an
     // ignored argument and succeeds, preventing fallback to the user's browser.
@@ -44,12 +47,14 @@ export class AcpRuntime {
     instance = new AcpRuntime(temp, { ...options, ...runtime, env,
       onLoginRequired: options.interactive ? undefined : () => { void instance.connection.close(); },
     });
+    const abort = () => { void instance.close(); };
+    options.signal?.addEventListener('abort', abort, { once: true });
     try {
       instance.connection.start();
       const initialization = await instance.connection.request('initialize', {
         protocolVersion: 2,
         clientInfo: { name: product.mcpServerName, title: product.name, version: '1' },
-        clientCapabilities: { fs: { readTextFile: true, writeTextFile: true }, terminal: false },
+        clientCapabilities: { fs: { readTextFile: options.filesystem !== false, writeTextFile: options.filesystem !== false }, terminal: false },
       });
       if (!record(initialization) || initialization.protocolVersion !== 2 || !record(initialization.agentInfo)
         || initialization.agentInfo.version !== acpVersion || initialization.agentInfo.name !== 'antigravity-acp') {
@@ -57,6 +62,7 @@ export class AcpRuntime {
       }
       return instance;
     } catch (error) { await instance.close(); throw error; }
+    finally { options.signal?.removeEventListener('abort', abort); }
   }
 
   async authenticate(): Promise<void> {

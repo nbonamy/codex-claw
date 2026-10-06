@@ -6,7 +6,7 @@ implementation/review role policy remains a separate decision.
 ## Problem
 
 Korus can create agents through several manual and automated entry points.
-Codex and Claude Code are peers. Either, both, or neither may be connected on a
+Codex, Claude Code and Antigravity are peers. Any subset may be connected on a
 host. Installation and process health are distinct from authentication.
 
 We need a consistent way to choose the coding agent without adding friction to
@@ -66,6 +66,8 @@ reasoning controls, approval/permission controls, and other capabilities to
 match that backend. Keep the draft text and attachments while switching; apply
 the selected backend's attachment support and validation before sending.
 Model IDs and approval settings must remain scoped to their provider.
+Antigravity effort is part of the native model ID. Separate reasoning-effort,
+thinking-budget and service-tier preferences do not apply to it.
 
 Eligibility means a fresh conversation before its first submitted prompt, not
 merely an empty rendered message list. A conversation that is loading, has a provider session,
