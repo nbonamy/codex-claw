@@ -40,7 +40,10 @@ test("the built website has reachable documentation pages, anchors, and assets",
     assert.ok(
       landing.querySelector(".brand").textContent.includes(product.name),
     );
-    assert.doesNotMatch(landing.documentElement.outerHTML, /__PRODUCT_\w+__/);
+    assert.doesNotMatch(
+      landing.documentElement.outerHTML,
+      /__(?:PRODUCT|DOWNLOAD)_\w+__/,
+    );
     assert.equal(
       landing.querySelector('link[rel="canonical"]').href,
       `${origin}/`,
@@ -66,25 +69,28 @@ test("the built website has reachable documentation pages, anchors, and assets",
       "Landing page links to the docs",
     );
     const home = documents.get("docs/index.html").window.document;
-    const downloadPath = `/desktop/downloads/${product.downloadFileName}`;
-    const downloads = [...landing.querySelectorAll("a[download]")];
-    assert.ok(downloads.length > 0);
+    const downloads = [...landing.querySelectorAll(".download-formats a")];
+    assert.ok(
+      downloads.length >= 4,
+      "Each platform and Linux architecture has a download entry",
+    );
     for (const link of downloads) {
-      assert.equal(new URL(link.href).pathname, downloadPath);
+      assert.ok(link.href.startsWith(`${product.repositoryUrl}/releases`));
+      assert.doesNotMatch(link.href, /\/latest(?:\/|$)/);
     }
     for (const [path, dom] of documents) {
       for (const link of dom.window.document.querySelectorAll("a[href]")) {
         const url = new URL(link.href);
-        if (url.pathname.startsWith("/desktop/downloads/")) {
-          assert.equal(
-            url.pathname,
-            downloadPath,
-            `${path}: current installer name`,
-          );
-          assert.equal(url.origin, origin, `${path}: public download origin`);
-        }
+        assert.ok(
+          !url.pathname.startsWith("/desktop/downloads/"),
+          `${path}: manual downloads go through the platform chooser or GitHub`,
+        );
       }
     }
+    assert.ok(
+      home.querySelector(`a[href="${origin}/#download"]`),
+      "Docs download navigation opens the platform chooser",
+    );
     assert.ok(
       [...home.querySelectorAll("main a[href]")].some(
         (link) =>

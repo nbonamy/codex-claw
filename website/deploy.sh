@@ -5,7 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST="${APP_WEBSITE_HOST:-joshua}"
 DOMAIN="$(node -p "new URL(require('$ROOT_DIR/../core/src/product.json').websiteUrl).hostname")"
 REMOTE_ROOT="${APP_WEBSITE_ROOT:-$(node -p "require('$ROOT_DIR/../core/src/product.json').deploymentRoot")}"
-DOWNLOAD_FILE="$(node -p "require('$ROOT_DIR/../core/src/product.json').downloadFileName")"
 NGINX_CONFIG="${APP_NGINX_CONFIG:-/etc/nginx/sites-available/$DOMAIN.conf}"
 NGINX_BOOTSTRAP_CONFIG="/etc/nginx/sites-available/$DOMAIN.bootstrap.conf"
 TEMP_DIR="$(mktemp -d)"
@@ -25,16 +24,12 @@ writeFileSync(target, readFileSync(source, 'utf8')
 NODE
 done
 
-# Never switch the public download links ahead of the actual release artifact.
-if ! ssh "$HOST" "test -s '$REMOTE_ROOT/downloads/$DOWNLOAD_FILE'"; then
-  echo "Website deployment blocked: publish $REMOTE_ROOT/downloads/$DOWNLOAD_FILE first." >&2
-  exit 1
-fi
-
-npm --prefix "$ROOT_DIR/.." run build:website
+# Validate the exact GitHub release/asset links before touching the server.
+# With no explicit tag, use the verified releases page, never /latest.
+APP_WEBSITE_VERIFY_DOWNLOADS=1 npm --prefix "$ROOT_DIR/.." run build:website
 
 echo "Deploying website to ${HOST}:${REMOTE_ROOT}"
-ssh "$HOST" "sudo mkdir -p '$REMOTE_ROOT/site' && sudo chown -R \"\$(id -un):\$(id -gn)\" '$REMOTE_ROOT'"
+ssh "$HOST" "sudo mkdir -p '$REMOTE_ROOT/site' && sudo chown -R \"\$(id -un):\$(id -gn)\" '$REMOTE_ROOT/site'"
 tar -czf - -C "$ROOT_DIR/../dist/website" . | ssh "$HOST" "tar -xzf - -C '$REMOTE_ROOT/site'"
 if ! ssh "$HOST" "sudo test -f '/etc/letsencrypt/live/$DOMAIN/fullchain.pem'"; then
   echo "No TLS certificate found; provisioning one with Certbot"

@@ -4,14 +4,26 @@ description: Download and install the Korus desktop app.
 
 # Installation
 
-The desktop release is available for **macOS on Apple silicon**. Linux x64 support is experimental; Computer Use and Screenshots are macOS-only.
+[Choose your platform](__PRODUCT_DOWNLOAD_URL__): **macOS Apple silicon**, **Windows x64**, or **Linux x64 / ARM64**. Downloads are hosted on GitHub Releases; choose an asset listed on the release page. Computer Use and Screenshots are macOS-only.
 
 ## Install on macOS
 
-1. [Download the macOS DMG](__PRODUCT_DOWNLOAD_URL__).
+1. Open [Downloads](__PRODUCT_DOWNLOAD_URL__) and choose the macOS DMG for Apple silicon.
 2. Open the DMG and move Korus to Applications.
 3. Launch Korus. The first-run screen checks your coding engines and offers **Connect Codex**, **Connect Claude Code**, and **Customize** for each one.
 4. Choose how each engine should store its setup before connecting it. Follow the steps below, then open a repository.
+
+## Install on Windows
+
+Choose the **Windows x64 installer** from [Downloads](__PRODUCT_DOWNLOAD_URL__), run it, and launch Korus. The Windows build is unsigned, so Windows may display a security warning. Verify that the file came from the official GitHub release before proceeding. A ZIP is also provided for manual extraction.
+
+## Install on Linux
+
+Choose **x64** or **ARM64** to match your system, then select the **DEB**, **RPM**, or **ZIP** format from [Downloads](__PRODUCT_DOWNLOAD_URL__). Use your distribution's package manager for DEB or RPM files; extract the ZIP for a manual installation. Korus does not infer Linux architecture from your browser.
+
+## Updates
+
+Install updates manually from GitHub Releases. Check the release notes and download the build for your platform and architecture.
 
 ## Choose separate or existing provider setup
 

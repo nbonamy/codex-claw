@@ -13,8 +13,8 @@ npx vite dist/website --host 127.0.0.1 --port 4173 --strictPort
 Then open <http://127.0.0.1:4173>.
 
 Product metadata comes from `core/src/product.json`. The landing-page build
-expands the product name, canonical URL, and download path; VitePress reads the
-same definition, including `__PRODUCT_DOWNLOAD_URL__` in guide links. Preview
+expands the product name, canonical URL, and GitHub download links; VitePress reads the
+same definition and sends `__PRODUCT_DOWNLOAD_URL__` guide links to the platform chooser. Preview
 the built artifact so the name and documentation are both available.
 
 ## Documentation
@@ -279,6 +279,39 @@ The source thumbnail is `videos/assets/visualize-film-thumbnail.png`.
 
 ## Deploy
 
+### Manual downloads
+
+The header and hero detect the visitor's desktop OS without external scripts.
+All platforms remain accessible: macOS Apple silicon, Windows x64 (unsigned),
+and Linux x64 / ARM64 with DEB, RPM, and ZIP choices. Browser OS detection does
+not infer CPU architecture; Linux always opens the explicit choices. Mobile,
+ChromeOS, and unknown browsers open all downloads. The chooser also works
+without JavaScript.
+
+Without `APP_WEBSITE_RELEASE_TAG`, downloads link to the repository's GitHub
+releases page. To expose a published release's installer links, provide its exact tag:
+
+```bash
+APP_WEBSITE_RELEASE_TAG=vX.Y.Z npm run build:website
+APP_WEBSITE_RELEASE_TAG=vX.Y.Z ./website/deploy.sh
+```
+
+Replace `vX.Y.Z` with a real published tag. The build accepts published
+prereleases, rejects drafts or missing tags, and checks every exposed asset's
+exact filename, completed upload, public URL, and HTTP response. Missing
+platforms link to that release's page rather than an invented installer URL.
+Never use `/releases/latest` or `/latest/download`: they exclude prereleases.
+No app-version inference or automatic stable promotion is performed.
+
+The website-owned asset mapping in `downloads.mjs` follows the release contract:
+`<slug>-macos-arm64.dmg`, `<slug>-win32-x64-setup.exe`,
+`<slug>-win32-x64.zip`, and `<slug>-linux-{x64,arm64}.{deb,rpm,zip}`.
+The macOS updater ZIP is not offered as a manual installer.
+`npm run test:website` covers publication/link safeguards; browser checks cover
+OS shortcuts, explicit architecture choices, and responsive layout.
+
+### Website upload
+
 The deploy helper first builds the landing page and generated documentation into
 `dist/website/`, then streams that artifact over SSH, provisions the Let’s Encrypt
 certificate if this is the first deploy, and installs the matching nginx site on `joshua`:
@@ -294,15 +327,12 @@ are rendered outside the public artifact. Joshua serves the website, downloads,
 and releases from `/var/www/korus/{site,downloads,releases}`. Certificate renewal
 uses `/var/www/korus/site` as its webroot.
 
-The public installer is `korus-macos-arm64.dmg`, and desktop updates use
-`https://meetkorus.dev/desktop/releases`. Publish the installer before deploying
-the website; the deployment helper checks that it exists before uploading.
-Landing-page and guide download links follow `product.downloadFileName`.
+Deployment verifies the GitHub release-page fallback as well as direct assets
+before making server changes. It uploads only the website; it neither publishes
+desktop releases nor changes their prerelease/stable status.
 
-Desktop releases are published separately with:
-
-```bash
-npm run publish
-```
-
-That command checks that the version is newer than the remote manifest, creates the macOS artifacts, and uploads the DMG, ZIP, and `RELEASES.json`. The landing-page download buttons target the uploaded arm64 DMG.
+Keep the existing `/desktop/releases/darwin/arm64/RELEASES.json` feed and
+`/desktop/downloads/korus-macos-arm64.dmg` installer unchanged. Their nginx
+aliases and storage directories remain separate from the website. Any bridge
+update requires a separately approved stable release; do not redirect the JSON
+feed to `update.electronjs.org`, which uses a different format.

@@ -3,6 +3,25 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import product from "../core/src/product.json" with { type: "json" };
+import { resolveDownloads } from "./downloads.mjs";
+
+const downloads = await resolveDownloads({
+  product,
+  tag: process.env.APP_WEBSITE_RELEASE_TAG,
+  verify: process.env.APP_WEBSITE_VERIFY_DOWNLOADS === "1",
+});
+
+function downloadLinks(formats) {
+  const available = formats.filter(([key]) => downloads.assets[key].available);
+  if (!available.length)
+    return `<a href="${downloads.releaseUrl}">View releases <span aria-hidden="true">↗</span></a>`;
+  return available
+    .map(
+      ([key, label]) =>
+        `<a data-installer href="${downloads.assets[key].url}">${label} <span aria-hidden="true">↓</span></a>`,
+    )
+    .join(" ");
+}
 
 const source = new URL("./", import.meta.url);
 const output = new URL("../dist/website/", import.meta.url);
@@ -77,6 +96,25 @@ for (const path of ["styles.css", "script.js", "assets"]) {
   await cp(new URL(path, source), new URL(path, output), { recursive: true });
 }
 let landing = await readFile(new URL("index.html", source), "utf8");
+for (const [platform, formats] of Object.entries({
+  MACOS: [["MACOS", "DMG"]],
+  WINDOWS: [
+    ["WINDOWS", "Installer"],
+    ["WINDOWS_ZIP", "ZIP"],
+  ],
+  LINUX_X64: ["DEB", "RPM", "ZIP"].map((format) => [
+    `LINUX_X64_${format}`,
+    format,
+  ]),
+  LINUX_ARM64: ["DEB", "RPM", "ZIP"].map((format) => [
+    `LINUX_ARM64_${format}`,
+    format,
+  ]),
+}))
+  landing = landing.replaceAll(
+    `__DOWNLOAD_${platform}__`,
+    downloadLinks(formats),
+  );
 for (const asset of media)
   landing = landing.replaceAll(asset.token, asset.path);
 await writeFile(
@@ -84,10 +122,7 @@ await writeFile(
   landing
     .replaceAll("__PRODUCT_NAME__", product.name)
     .replaceAll("__PRODUCT_WEBSITE_URL__", product.websiteUrl)
-    .replaceAll(
-      "__PRODUCT_DOWNLOAD_PATH__",
-      `/desktop/downloads/${product.downloadFileName}`,
-    ),
+    .replaceAll("__PRODUCT_RELEASE_URL__", downloads.releaseUrl),
 );
 await cp(new URL("docs/.vitepress/dist/", source), new URL("docs/", output), {
   recursive: true,

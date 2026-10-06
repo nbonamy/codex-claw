@@ -12,7 +12,7 @@ export default defineConfig({
       md.core.ruler.before("normalize", "product-download", (state) => {
         state.src = state.src.replaceAll(
           "__PRODUCT_DOWNLOAD_URL__",
-          `${product.websiteUrl}/desktop/downloads/${product.downloadFileName}`,
+          `${product.websiteUrl}/#download`,
         );
       });
     },
@@ -28,7 +28,7 @@ export default defineConfig({
       { text: "Install", link: "/getting-started/installation" },
       {
         text: "Download",
-        link: `${product.websiteUrl}/desktop/downloads/${product.downloadFileName}`,
+        link: `${product.websiteUrl}/#download`,
       },
     ],
     search: { provider: "local" },

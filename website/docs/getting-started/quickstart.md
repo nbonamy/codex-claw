@@ -8,9 +8,7 @@ Start with one repository, one agent, and a small change you can review.
 
 ## Install Korus
 
-[Download Korus for macOS](__PRODUCT_DOWNLOAD_URL__), move it to Applications, and launch it. The desktop download supports Apple silicon.
-
-See [Installation](./installation) for requirements.
+[Download Korus](__PRODUCT_DOWNLOAD_URL__) for your platform and launch it. See [Installation](./installation) for macOS Apple silicon, Windows x64, and Linux x64 / ARM64 instructions.
 
 ## Choose your provider's setup
 

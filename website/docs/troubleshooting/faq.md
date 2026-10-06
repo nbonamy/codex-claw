@@ -10,7 +10,7 @@ Use your connected coding provider's account and plan. Korus supplies the worksp
 
 ## Which desktop platforms are supported?
 
-The desktop download targets macOS on Apple silicon. Linux x64 support is experimental. Computer Use and Screenshots are currently macOS-only.
+Choose macOS Apple silicon, Windows x64, or Linux x64 / ARM64 from [Downloads](__PRODUCT_DOWNLOAD_URL__). Only assets listed on a GitHub release are available to download. Computer Use and Screenshots are macOS-only.
 
 ## Do agents share files?
 

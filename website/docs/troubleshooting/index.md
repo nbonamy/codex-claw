@@ -8,7 +8,7 @@ Start with the action that failed and the error it produced. Preserve unfinished
 
 ## The app will not launch
 
-Confirm you installed the intended macOS Apple silicon release and moved it to Applications. Record the app version and any macOS error shown during launch.
+Confirm you installed the build matching your platform and architecture. On macOS, move Korus to Applications; Windows builds are unsigned. Record the app version and any error shown during launch. See [Installation](../getting-started/installation) for platform-specific steps.
 
 Development builds have additional runtime and SDK requirements described in the repository README.
 
