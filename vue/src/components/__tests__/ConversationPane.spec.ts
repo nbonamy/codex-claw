@@ -14,7 +14,6 @@ import { formatCollaborationMessageEnvelope } from '@workspace/core/collaboratio
 import ConversationPane from '../ConversationPane.vue';
 import type { ChatTextAnnotation } from '../use-chat-text-annotations';
 import type { VisualizationAnnotation } from '../use-visualization-annotations';
-import { i18n } from '../../i18n';
 import { backendChoicesKey, provideBackendSwitch } from '../backend-selection';
 
 const agent: Agent = {
@@ -91,7 +90,6 @@ describe('ConversationPane', () => {
     const wrapper = mount(ConversationPane, {
       attachTo: document.body,
       props: { controller, agent, savePromptDraft, removePromptDraft },
-      global: { plugins: [i18n] },
     });
     const editor = wrapper.get<HTMLElement>('.chat-rich-text-editor');
 
@@ -470,7 +468,6 @@ describe('ConversationPane', () => {
     const wrapper = mount(ConversationPane, {
       props: { controller: controllerFor([]), agent, emptyHeadline: 'What do you want to build?', emptySubhead: '' },
       slots: { 'empty-actions': '<button type="button" class="issue-choice">Choose an issue</button>' },
-      global: { plugins: [i18n] },
     });
     expect(wrapper.get('.issue-choice').text()).toBe('Choose an issue');
     expect(wrapper.get('.conversation-pane__empty h1').text()).toBe('What do you want to build?');
@@ -908,7 +905,6 @@ function mountPane(props: {
 }) {
   return mount(ConversationPane, {
     props,
-    global: { plugins: [i18n] },
   });
 }
 

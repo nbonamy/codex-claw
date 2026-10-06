@@ -1,4 +1,7 @@
 import { EventEmitter } from 'node:events';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DesktopAutoUpdateService,
@@ -15,18 +18,20 @@ function createService(options: {
   app?: { getVersion: () => string; isPackaged: boolean };
   platform?: NodeJS.Platform;
   updater?: AutoUpdaterMock;
+  executablePath?: string;
 } = {}) {
   const updater = options.updater ?? new AutoUpdaterMock();
   const setIntervalFn = vi.fn() as unknown as typeof setInterval;
   const statuses: Array<{ state: string; error?: string; version?: string }> = [];
   const service = new DesktopAutoUpdateService({
     app: options.app ?? { getVersion: () => '0.3.0', isPackaged: true },
-    arch: 'arm64',
+    arch: options.platform === 'win32' ? 'x64' : 'arm64',
     autoUpdater: updater,
     logger: { error: vi.fn(), log: vi.fn() },
     onStatusChanged: (status) => statuses.push(status),
     platform: options.platform ?? 'darwin',
     setIntervalFn,
+    executablePath: options.executablePath,
   });
 
   return { service, statuses, updater, setIntervalFn };
@@ -35,14 +40,15 @@ function createService(options: {
 describe('desktop auto-update', () => {
   it('resolves the platform and architecture feed URL', () => {
     expect(resolveDesktopUpdateFeedUrl(
+      '0.27.0',
       'https://updates.example.test/releases/',
       'darwin',
       'arm64',
-    )).toBe('https://updates.example.test/releases/darwin/arm64/RELEASES.json');
+    )).toBe('https://updates.example.test/releases/nbonamy/korus/darwin-arm64/0.27.0');
   });
 
   it('rejects non-https feeds', () => {
-    expect(() => resolveDesktopUpdateFeedUrl('http://localhost:3000/releases')).toThrow(
+    expect(() => resolveDesktopUpdateFeedUrl('0.27.0', 'http://localhost:3000/releases')).toThrow(
       'Desktop update URL must use https',
     );
   });
@@ -53,10 +59,14 @@ describe('desktop auto-update', () => {
     expect(development.statuses).toStrictEqual([{ state: 'disabled' }]);
     expect(development.updater.checkForUpdates).not.toHaveBeenCalled();
 
-    const windows = createService({ platform: 'win32' });
+    const windows = createService({ platform: 'win32', executablePath: '/missing/portable/app.exe' });
     windows.service.start();
     expect(windows.statuses).toStrictEqual([{ state: 'disabled' }]);
     expect(windows.updater.checkForUpdates).not.toHaveBeenCalled();
+    const linux = createService({ platform: 'linux' });
+    linux.service.start();
+    expect(linux.service.getStatus()).toEqual({ state: 'disabled' });
+    expect(linux.updater.setFeedURL).not.toHaveBeenCalled();
   });
 
   it('configures the packaged feed and reports updater phases', () => {
@@ -64,8 +74,7 @@ describe('desktop auto-update', () => {
     service.start();
 
     expect(updater.setFeedURL).toHaveBeenCalledWith({
-      serverType: 'json',
-      url: 'https://meetkorus.dev/desktop/releases/darwin/arm64/RELEASES.json',
+      url: 'https://update.electronjs.org/nbonamy/korus/darwin-arm64/0.3.0',
     });
     expect(updater.checkForUpdates).toHaveBeenCalledOnce();
     expect(setIntervalFn).toHaveBeenCalledWith(expect.any(Function), 60 * 60 * 1000);
@@ -76,6 +85,18 @@ describe('desktop auto-update', () => {
     expect(statuses.at(-3)).toStrictEqual({ state: 'checking' });
     expect(statuses.at(-2)).toStrictEqual({ state: 'downloading' });
     expect(statuses.at(-1)).toStrictEqual({ state: 'downloaded', version: '0.4.0' });
+  });
+
+  it('enables the GitHub-backed feed for a Squirrel-installed Windows copy', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'app-update-'));
+    try {
+      mkdirSync(path.join(directory, 'app-0.3.0'));
+      writeFileSync(path.join(directory, 'Update.exe'), 'fixture');
+      const { service, updater } = createService({ platform: 'win32', executablePath: path.join(directory, 'app-0.3.0', 'app.exe') });
+      service.start();
+      expect(updater.setFeedURL).toHaveBeenCalledWith({ url: 'https://update.electronjs.org/nbonamy/korus/win32-x64/0.3.0' });
+      expect(updater.checkForUpdates).toHaveBeenCalledOnce();
+    } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
   it('reports synchronous check failures as an error status', () => {

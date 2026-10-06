@@ -1,17 +1,10 @@
 import { mount } from '@vue/test-utils';
-import { createI18n } from 'vue-i18n';
 import { describe, expect, it } from 'vitest';
-import { messages } from '../../i18n/messages';
 import GitHubOnboardingLanding from '../GitHubOnboardingLanding.vue';
 
 function mountLanding(props: Partial<InstanceType<typeof GitHubOnboardingLanding>['$props']> = {}) {
   return mount(GitHubOnboardingLanding, {
     props,
-    global: {
-      plugins: [
-        createI18n({ legacy: false, locale: 'en', messages }),
-      ],
-    },
   });
 }
 

@@ -1,314 +1,193 @@
 # Frontend
 
-Korus's renderer is Vue 3 with TypeScript and Element Plus. This is a
-working guide for consistent implementation. Feature behavior and its history
-belong in tests; backend and process ownership belong in the architecture docs.
+The renderer is Vue 3 with TypeScript and Element Plus. This is a working guide for
+consistent implementation. Feature behavior belongs in tests; process and backend
+ownership in [architecture.md](architecture.md). Update this guide only when a
+reusable convention or canonical component changes.
 
 ## Working Method
 
-Before changing a surface:
-
 1. Inspect the nearest component and its colocated tests.
 2. Search `vue/src/shared/` and `vue/src/components/` by interaction and product
-   concept before creating markup or CSS.
-3. Choose the narrowest correct owner: component, renderer state, composable,
-   renderer view model, core policy, SDK, or host capability.
-4. Reuse a component only when its contract fits without caller-specific flags.
-   Keep one-off composition product-local; promote it after a second real use or
-   when the contract is clearly domain-neutral. Record the mismatch when a
-   canonical component does not fit.
-5. Verify the changed contract per `docs/testing.md`. For visible behavior,
-   perform one proportional runtime, DOM, or screenshot check when tooling
-   exists.
+   concept before creating markup or CSS (historical names do not prove a component
+   is single-use).
+3. Choose the narrowest owner: component, renderer state, composable, view model,
+   core policy, SDK, or host capability.
+4. Reuse a component only when its contract fits without caller-specific flags. Keep
+   one-off composition product-local and promote it after a second real use. When a
+   canonical component does not fit, record the mismatch.
+5. Verify per [testing.md](testing.md); for visible behavior add one proportional
+   runtime, DOM or screenshot check when tooling exists.
 
-The change is ready when ownership is clear, reuse is justified, and the
-changed behavior is specified at its public seam.
+Done means ownership is clear, reuse is justified and behavior is specified at its
+public seam.
 
 ## Visual Direction
 
-Use `docs/codex.png` for the native shell shape: navigation on the left,
-conversation in the center, and workspace artifacts on the right.
+`docs/codex.png` is the shell shape: navigation left, conversation center, workspace
+artifacts right. The app is a dense operational workspace: quiet, compact,
+border-light and stable during loading and streaming; concrete actions, restrained
+weight and predictable geometry over decorative cards or explanatory copy.
 
-The app is a dense operational workspace: quiet, compact, border-light, and
-stable during loading or streaming. Prefer concrete actions, restrained font
-weight, and predictable geometry over decorative cards or explanatory copy.
+## Ownership
 
-## Ownership and Components
+- **Components:** ephemeral interaction and derived presentation state.
+- **`vue/src/app-state.ts`:** renderer state shared across surfaces, the replica of
+  server-authored app state, and the registry of per-agent provider replicas. It
+  routes provider frames to the matching provider reducer and never interprets or
+  rebuilds transcripts. It delegates catalogs, authorization, unread policy, history
+  paging and repository discovery to focused `*-state.ts` modules.
+- **Composables:** reusable stateful behavior (async loading, caching, request
+  lifecycle, mutations). `AppShell` delegates multi-step workflows (onboarding,
+  repository acquisition, work-item routing, per-agent right workspace, annotation) to
+  `use-*.ts` composables; shells coordinate and keep only navigation and one-step
+  event forwarding.
+- **Core** owns cross-client policy and contracts, specified in core tests.
+- **Product components** (`vue/src/components/`) represent one product concept with
+  typed props and semantic emits. **Shared primitives** (`vue/src/shared/`) are
+  domain-neutral with isolated tests and never import product components, stores,
+  views or backend clients.
+- **SDK surfaces** own conversation, composer, message, tool, approval, attachment,
+  clipboard and transcription behavior. **Host capabilities** own Electron/web
+  differences (dialogs, Browser views, Computer Use, Open In, Dock badges).
+- Components consume app-owned contracts, never provider types, Electron globals,
+  filesystem APIs or raw backend payloads.
 
-- **Components** own ephemeral interaction and derived presentation state such
-  as an open popover, active tab, local query, or filtered local rows.
-- **`vue/src/app-state.ts`** owns renderer state shared across surfaces, the
-  client replica of server-authored app state, and the registry of per-agent
-  provider conversation replicas. It routes provider reset/delta frames to the
-  matching provider reducer; it does not interpret or reconstruct transcripts.
-- **Colocated composables** own reusable stateful behavior such as async
-  loading, caching, request lifecycle, and mutations used by a focused surface.
-- **Renderer view models** stay beside the surface when their projection exists
-  only for that renderer experience.
-- **Core** owns cross-client domain policy and app contracts. Keep pure policy
-  projections there and specify them directly in core tests.
-- **Views and shell components** coordinate state, navigation, subscriptions,
-  and product components. Their templates remain thin.
-- **Product components** represent one product concept under
-  `vue/src/components/` and expose typed props and semantic emits.
-- **Shared interaction primitives** provide domain-neutral behavior under
-  `vue/src/shared/` and have isolated public-contract tests.
-- **SDK surfaces** own product-neutral conversation, composer, message, tool,
-  approval, attachment, clipboard, and transcription behavior.
-- **Host capabilities** own Electron/web differences such as native dialogs,
-  Browser views, Computer Use, Open In, Dock badges, and app lifecycle.
+Rules of thumb:
 
-Product components may depend on shared UI; shared UI does not import the
-product layer, stores, views, or backend clients. Components consume app-owned
-contracts rather than provider protocol types, Electron globals, filesystem
-APIs, or raw backend payloads.
+- `App` mounts the shell only after synchronization yields a connected workspace
+  snapshot; an empty placeholder or failed read is not evidence of first-run
+  onboarding. Later disconnects keep the mounted workspace intact.
+- Use `AsyncCatalogCache` for keyed async catalogs (dedupe, invalidation, stale
+  rejection, pushed updates) and `shared/use-debounced-save` for autosaved settings
+  (immutable snapshots, serialized writes, flush on disposal and before switching
+  resources). Commit an async result only while its request identity still matches
+  the active selection.
+- Name components after product concepts; use typed `defineProps`/`defineEmits`;
+  prefer computed presentation state; split a child when it has its own identity,
+  state machine, reusable behavior or test seam; keep styles scoped unless a token,
+  reset, shell rule or shared primitive is intentionally global; keep wrappers only
+  when they add product semantics.
 
-Mission navigation deliberately reuses the native workspace group, session row,
-selection, and status-dot primitives used by Quick Chats. Selecting a mission
-opens a three-part process surface: persistent stages, stage artifact, and
-supporting conversation. The artifact is rendered for review and comments flow
-through the conversation; do not add setup or artifact-editing forms to this
-surface. Mission-owned execution agents stay out of the global agent sidebar;
-the mission conversation pane owns switching among their provider conversations.
-Before the requirements conversation has messages, its empty state asks “What
-do you want to build?” and offers an issue picker using the same embedded menu
-pattern as the empty-team screen. The composer remains available for a direct
-description of the outcome.
-Accepted artifacts remain navigable after the workflow advances.
+### Conversation Panes
 
-Shells coordinate focused modules; they do not implement multi-step workflows.
-Move polling, timers, persistence transitions, and cleanup for one workflow
-into a colocated composable. Use `AsyncCatalogCache` for keyed async catalogs so
-request deduplication, source invalidation, stale-result rejection, and pushed
-updates remain one policy instead of being repeated in renderer state. Keep
-reusable dialog workflows such as repository acquisition in composables so the
-shell only supplies product context and navigation callbacks.
+`CodexConversationPane` from `@codex-app-sdk/vue` is the complete conversation and
+composer surface. Extend it through its controller, slots and typed actions; Korus's
+wrapper only maps app state and product routing. Codex panes receive the SDK-owned
+snapshot and call targeted SDK bridge operations; Claude panes receive the Claude
+host's snapshot. A generic Codex interaction defect is an SDK defect. Never add a
+global message list or provider-neutral reducer to `app-state.ts`; Korus-only
+overlays read the provider frame or an explicit coordination projection.
 
-Use `shared/use-debounced-save` for editable settings that autosave: callers
-schedule immutable edit snapshots, writes are serialized, and pending edits
-flush on disposal. Flush successfully before switching the edited resource.
+Split layouts hold equal conversation panes, never parent/child agents.
+`useSplitWorkspace` owns client-local assignment and focus per team. Controllers and
+async actions keep an explicit agent ID (background updates never select a pane); only
+the focused conversation handles global composer and interrupt shortcuts; hydration
+watches stable conversation identity, not snapshot object identity. One artifact
+sidebar follows the selected agent, keeping each agent's tabs separately.
 
-The renderer-state facade delegates provider catalogs and authorization,
-composer catalogs and selections, unread policy, history paging, and
-source-repository discovery to focused `*-state.ts` modules.
-`AppShell` similarly delegates first-run onboarding, repository acquisition and
-session creation, issue and pull-request routing, Cockpit backlog state,
-per-agent right-workspace state, workspace preview request races, and image
-annotation to `use-*.ts` composables. Work-item routing owns branch resolution,
-worktree-backed agent creation, reassignment protection, prompt generation, and
-the pending new-agent assignment lifecycle. New multi-step state belongs
-in the relevant module; keep simple navigation and one-step event forwarding in
-the facade or shell.
+### Surfaces
 
-The shell's rendered hierarchy follows the same ownership rule. First-run
-onboarding, team/agent navigation, backend connection status, and the active
-agent workspace are focused child components. The workspace owns plan,
-subagent, repository backlog, browser, link, and image routing; shell-level
-keyboard and native-menu commands live in a lifecycle-owning composable.
+- **Backlog** (work-provider inbox) and **Cockpit** (all-agent overview) are
+  distinct global surfaces. Opening Cockpit must not load Backlog data. Projection
+  and sorting live in a focused view model, not `AppShell`.
+- Team-rail dot: red for unread, orange for working, unread wins, never on the
+  selected team. Agent activity is stored apart from metadata so startup hydration
+  does not make idle agents look active.
+- Mission navigation reuses the workspace group, session row and status-dot
+  primitives of Quick Chats. Mission surfaces show artifacts for review with comments
+  flowing through the conversation; they have no setup or artifact-editing forms.
+  Mission-owned workers stay out of the global agent sidebar.
 
-`App` mounts the shell only after renderer synchronization obtains a connected
-workspace snapshot. An empty startup placeholder or a failed/disconnected read
-is not evidence of first-run onboarding. Startup uses the connection banner
-and supports retry; subsequent disconnects keep the mounted workspace intact.
+## Canonical UI
 
-### Component Rules
+Search by behavior first.
 
-- Name components after product concepts.
-- Use typed `defineProps` and `defineEmits`; pass stable data down and semantic
-  events up.
-- Prefer computed presentation state over branching template expressions.
-- Split a child when it has its own visual identity, state machine, reusable
-  behavior, or isolated test seam.
-- Keep styles scoped unless a token, reset, shell rule, or shared primitive is
-  intentionally global.
-- Keep wrappers only when they add product semantics while delegating the
-  underlying interaction and appearance.
-
-## Canonical UI Primitives
-
-Search by behavior, not only filename. Historical product names do not prove a
-component is single-use.
-
-### Shared interaction primitives
-
-| Need | Canonical UI | Location |
+| Need | Use | Location |
 | --- | --- | --- |
-| Action, checkbox/radio, separator, or submenu rows | `AppMenu` | `vue/src/shared/menu/AppMenu.vue` |
-| Pointer-positioned context menu overlay | `AppContextMenu` | `vue/src/shared/menu/AppContextMenu.vue` |
-| Application launcher and icon catalog | `OpenInControl` | `vue/src/shared/OpenInControl.vue` |
-| Product glyphs, including GitHub | App icon catalog | `vue/src/shared/icons/app-icons.ts` |
-| Reopen the collapsed agent sidebar from a surface header | `SidebarExpandButton` | `vue/src/shared/SidebarExpandButton.vue` |
-| Workspace header height, title, divider, and edge shadow | `WorkspaceHeader` and `.workspace-header__title` | `vue/src/shared/WorkspaceHeader.vue` |
-| Workspace body containment and edge shadow | `.workspace-body` | `vue/src/styles/base.css` |
+| Action, checkbox/radio, separator, submenu rows | `AppMenu` | `vue/src/shared/menu/` |
+| Pointer-positioned context menu | `AppContextMenu` | `vue/src/shared/menu/` |
+| Application launcher and icons | `OpenInControl` | `vue/src/shared/` |
+| Product glyphs (incl. GitHub) | app icon catalog | `vue/src/shared/icons/app-icons.ts` |
+| Reopen collapsed sidebar | `SidebarExpandButton` | `vue/src/shared/` |
+| Workspace header / body containment | `WorkspaceHeader`, `.workspace-header__title`, `.workspace-body` | `vue/src/shared/`, `styles/base.css` |
 | Dialog chrome and footer actions | `.app-dialog`, `.app-button` | `vue/src/styles/base.css` |
-| Form dialog structure and fields | `FormDialog`, `FormDialogField` | `vue/src/shared/dialog/` |
-| Searchable keyboard command palettes | `QuickOpenDialog` | `vue/src/shared/QuickOpenDialog.vue` |
-| Voice-enabled multiline input | `VoiceTextarea` | `vue/src/shared/VoiceTextarea.vue` |
+| Form dialogs | `FormDialog`, `FormDialogField` | `vue/src/shared/dialog/` |
+| Command palettes | `QuickOpenDialog` | `vue/src/shared/` |
+| Voice multiline input | `VoiceTextarea` | `vue/src/shared/` |
+| Emoji, grapheme or cropped-image identity | `IdentityPicker` (product component despite its path; keep new product dependencies out of `shared/`) | `vue/src/shared/identity/` |
+| Enabled coding backend picker | `BackendSelector` (consumes the choices `AppShell` provides once through `backend-selection`; hides itself with one backend; dialogs never read backend settings) | `vue/src/components/` |
+| Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow`, `SettingsTextareaField` | `vue/src/components/` |
+| Dense structured data | `AppDataList` | `vue/src/components/` |
+| Operation feedback | `GitOperationFeedback` | `vue/src/components/` |
+| Worktree provisioning progress | `WorkspaceProvisioningProgressDialog` | `vue/src/components/` |
 
-### Reusable product components
+## Interaction
 
-| Need | Canonical UI | Location |
-| --- | --- | --- |
-| Emoji, grapheme, or cropped-image identity | `IdentityPicker` | `vue/src/shared/identity/IdentityPicker.vue` |
-| Enabled coding backend, small/default/large | `BackendSelector` | `vue/src/components/BackendSelector.vue` |
-| Searchable compact picker | Header filter plus list body | GitHub mode in `RepositoryAcquireDialog`; `RepositorySessionSourceDialog` |
-| Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow`, `SettingsTextareaField` | `vue/src/components/Settings*.vue` |
-| Dense structured data | `AppDataList` | `vue/src/components/AppDataList.vue` |
-| Operation feedback | `GitOperationFeedback` | `vue/src/components/GitOperationFeedback.vue` |
-| Worktree provisioning progress, single or multiple | `WorkspaceProvisioningProgressDialog` | `vue/src/components/WorkspaceProvisioningProgressDialog.vue` |
+- **Dialogs:** compose `FormDialog`/`FormDialogField` (title, optional subtitle, one
+  padded body, labels above controls, divided footer, no second gutter). Footer:
+  dismiss tertiary, alternatives secondary, at most one primary. Compact pickers use
+  the filter as the whole top row, then loading/error/empty/results. Dialogs emit
+  domain actions; the parent or composable persists and calls the backend.
+- **Menus and tabs:** `AppMenu` gives consistent rows, roles and states; add roving
+  focus and Arrow/Home/End to `AppMenu` itself while the containing overlay owns
+  Escape, closing and focus return. Share one item model between inline and menu
+  actions. Use Element Plus teleport/placement for popovers, Element Plus tabs for
+  navigation, radio/segmented controls for exclusive form choices; pill tabs keep
+  symmetric edge padding.
+- **Lists:** `AppDataList` for dense data, focused rows for navigation. Make the
+  whole row the primary target with quiet, keyboard-reachable secondary actions;
+  hover and focus keep geometry stable; titlebars align to the shared appbar height;
+  each pane owns its scroll axes.
 
-`IdentityPicker` is a reusable product component despite its current path: it
-depends on avatar-specific product leaves. Keep new product dependencies out of
-`shared/`; extract domain-neutral preview and crop leaves before treating the
-picker as a shared interaction primitive.
+## Styling And Feedback
 
-`BackendSelector` consumes the enabled choices provided once by `AppShell`
-through `backend-selection`. It hides itself for a single enabled backend;
-creation dialogs must reuse it rather than read backend settings independently.
+- Semantic variables for colors and repeated design values; component-specific
+  geometry stays local. Derive Element Plus overrides from the same variables and
+  scope them to the owning wrapper. Bridge themes into the SDK through documented
+  `--codex-*` variables and `data-codex-theme`; never restyle SDK internals.
+- App chrome (buttons, menus, headers) is unselectable; conversation and document
+  content stays selectable. Native system sans stack, restrained weights.
+- Make loading, working, awaiting-input, empty, offline, error and interrupted
+  states explicit near what they affect. Drive staged steps from real backend phases;
+  timing may smooth completion but must never imply a phase finished early.
+- The in-app browser's `<webview>` sits in the workspace DOM so menus and dialogs
+  layer over it; never hide the page to expose an overlay.
 
-Use `CodexConversationPane` from `@codex-app-sdk/vue` as the complete
-conversation and composer surface. Extend it through its controller, slots, and
-typed actions. Keep Korus's wrapper limited to app-state mapping and product
-routing; the SDK retains its leaf UI, CSS, attachment, clipboard, and
-transcription code. A generic Codex interaction defect is an SDK defect: add the
-behavior and regression there, then keep only the host wiring and a boundary
-regression in Korus. Do not compensate with a second Korus-owned message,
-optimistic-state, paging, queue, or turn-mutation implementation.
+## Accessibility And Copy
 
-Codex panes receive the SDK-owned snapshot and invoke targeted SDK bridge
-operations for the pane's conversation. Claude panes receive the Claude host's
-provider snapshot. Never add a global message list or a provider-neutral
-conversation reducer to `app-state.ts`; Korus-only overlays should read the
-provider frame or consume an explicit coordination projection.
+- Every icon-only control has an accessible name; keep native keyboard behavior,
+  visible focus and predictable focus return; one semantic target per action, no
+  nested interactives.
+- Short, concrete labels. Reusable copy lives in `vue/src/i18n/messages.ts` (use
+  `vue-i18n` for dynamic labels). Backend and IPC send app-owned error and status
+  descriptors that only the rendering client localizes; raw backend, provider, Git
+  or shell text stays diagnostic detail.
 
-Split layouts contain equal conversation panes, never parent/child agents.
-`useSplitWorkspace` owns client-local pane assignment and focus for side-by-side,
-stacked, and four-quadrant layouts. Selecting an already visible agent focuses
-its pane; selecting another agent replaces the focused pane. Each team retains
-its own client-local layout, pane assignments, and focus across team switches;
-new teams start with a single pane. Each pane repeats the agent header; only the top-right
-pane shows the shared sidebar toggle, which operates on the focused agent without
-changing focus. One visible artifact sidebar follows the selected agent,
-retaining each agent's tabs separately. Within a team's split layout, its
-open/closed state carries across pane focus changes; agents without tabs show
-the workspace launcher. Conversation
-controllers and asynchronous actions retain an explicit agent ID; background
-updates do not select a pane. Only the focused conversation handles global
-composer/interrupt shortcuts. Hydration watches stable conversation identity,
-not snapshot object identity.
+## Themes
 
-For app-owned MCP icons, phase-aware titles, and bounded presentation metadata,
-follow [Custom MCP Tools](custom-tools.md).
+Components never import fixed colors. Themes are `ThemeDefinition`s of semantic
+tokens (`--color-*`, `--diff-*`) applied as CSS custom properties on the document
+root; syntax and diff highlighting share the theme source. VS Code theme import is a
+desired direction, not a requirement.
 
-## Interaction Patterns
+## Editable Visualize Canvases
 
-### Dialogs and Pickers
+Visualize imports Mermaid, SVG and image input into an Excalidraw canvas (read-only
+with pan by default; Edit unlocks). After import `Visualization.canvas` is
+authoritative: **never regenerate Mermaid over an edited canvas**. Mermaid imports as
+native shapes; SVG, generated images and converter fallbacks are rasterized sanitized
+content, not editable vectors. `ExcalidrawCanvas.vue` owns save scheduling and
+selection persistence; `excalidraw-editor.ts` isolates the React SDK, browser-only
+Mermaid import, sanitization, exports and cleanup. The canvas has no composer: the
+normal conversation handles change requests and the agent reads the saved selection
+through its canvas tools.
 
-- Form dialogs compose `FormDialog` and `FormDialogField`: a title and optional
-  subtitle, one padded semantic body, labels above controls, and a divided
-  footer. Form content adds no second outer gutter.
-- Footer actions use `.app-button`: dismiss is tertiary, alternatives are
-  secondary, and at most one action is primary.
-- Searchable compact pickers use the filter as the complete top row. The body
-  starts with loading, error, empty, or results; the accessible label carries
-  the dialog purpose.
-- Dialogs emit domain actions. Their parent or composable owns persistence and
-  backend calls.
-
-### Menus, Popovers, and Tabs
-
-- Use `AppMenu` for consistent row models, roles, spacing, selected/disabled
-  states, separators, and submenus. Extend `AppMenu` itself when menus need
-  roving focus, Arrow/Home/End, or keyboard activation; the containing overlay
-  owns Escape, closing, and focus return.
-- Share one item model when actions appear both inline and in a menu.
-- Use Element Plus teleport and placement for popover-based controls. An
-  anchored inline menu may own positioning explicitly and must account for
-  clipping.
-- Use Element Plus tabs for navigation and radio or segmented controls for
-  exclusive form choices. Keep surface-specific styling local and tokenized.
-- Pill tabs preserve symmetric first and last padding because Element Plus
-  removes padding at the outer edges.
-
-### Lists, Actions, and Layout
-
-- Use `AppDataList` for dense structured data and focused product rows for
-  navigation or action lists.
-- Align icon, primary text, metadata, badge, and trailing action columns on a
-  compact cadence. Reserve strong weight for real hierarchy.
-- Make the whole row the primary target; keep secondary actions quiet and
-  keyboard reachable.
-- Source shared glyphs from the app icon catalog. Labeled Element Plus buttons
-  receive icons through the `icon` prop.
-- Hover and focus treatments keep geometry stable.
-- Align shell titlebars to the shared appbar height. Each workspace pane owns
-  its scroll axes and constrains long content instead of resizing the shell.
-
-## Styling and Feedback
-
-- Use semantic variables for colors and repeated design-system values. Keep
-  genuinely component-specific geometry local.
-- Derive Element Plus overrides from the same variables and scope them to the
-  owning wrapper.
-- Bridge themes into the SDK through documented `--codex-*` variables and
-  `data-codex-theme`; do not restyle SDK internals.
-- Keep app chrome such as buttons, menus, and headers nonselectable while
-  conversation and document content remains selectable.
-- Use the native system sans stack and restrained weights.
-- Make reachable loading, working, awaiting-input, empty, offline, error, and
-  interrupted states explicit near the action or content they affect.
-- Drive staged operation steps from semantic backend phases when real progress
-  is available. Timing may smooth completion, but it must not imply that a
-  backend phase has completed before it actually has.
-- The in-app browser uses a sandboxed `<webview>` inside the workspace DOM, so
-  Korus menus and dialogs remain above the visible page in the usual stacking
-  order. Do not hide the page to expose an overlay. The renderer owns only the
-  element and layout; Electron main validates its guest and owns navigation.
-- Commit an async result only while its request identity still matches the
-  active selection.
-
-## Accessibility and Copy
-
-- Give every icon-only control an accessible name.
-- Preserve native keyboard behavior, visible focus, and predictable focus
-  return when overlays close.
-- Use one semantic target per action; avoid nested interactive elements.
-- Keep labels and status language short and concrete.
-- Put reusable renderer copy in `vue/src/i18n/messages.ts` and use `vue-i18n`
-  for dynamic labels.
-- Send app-owned error and status descriptors across backend and IPC boundaries;
-  localize them only in the client that renders them.
-- Keep raw backend, provider, Git, and shell text as diagnostic detail rather
-  than durable presentation copy.
-
-Behavior is the ledger. Update the test at the owning seam when a rule changes;
-update this guide only when a reusable convention or canonical component
-changes.
-
-## Editable Visualize canvases
-
-Visualize imports Mermaid/SVG/image input directly into the canvas. The canvas
-is the default read-only view, with pan active; Edit unlocks editing without
-switching renderers. Once imported, `Visualization.canvas` is authoritative. `ExcalidrawCanvas.vue` owns
-save scheduling and selection persistence; `excalidraw-editor.ts` isolates the
-React SDK, browser-only Mermaid import, SVG sanitization/rasterization, exports,
-and editor cleanup. Korus's existing conversation handles requests for changes; the canvas has no
-separate composer. The agent reads the saved selection through its canvas tools.
-
-Canvas elements, binary assets, selection, revision, and a bounded PNG preview
-persist through daemon's app-owned save method. No hosted editor or browser-only
-database owns the document. Renderer saves include the Visualize session ID and
-expected revision; final saves can finish after closing the pane. MCP operations
-remain gated by the owning open conversation. Conflicting revisions are rejected
-without replacing local edits. Agent batches enter editor history as one immediate
-undo unit; history itself is editor-local and resets when the editor remounts.
-
-Git-workspace diagrams are stored under the primary worktree's repository identity
-in Korus's state, not under the agent that created them. Linked worktree agents
-share the library; pane visibility, suggestions, selection, and tool authorization
-remain conversation-scoped.
-
-The pinned Mermaid converter imports supported diagrams as native shapes. SVG,
-generated images, and converter image fallbacks are rasterized sanitized content,
-not editable vector shapes. Never regenerate Mermaid over an edited canvas.
-Both hosts bundle Excalidraw fonts and license notices with the renderer.
+Elements, assets, selection, revision and a bounded PNG preview persist through the
+daemon's save method, with no hosted editor or browser database. Saves carry the
+Visualize session ID and expected revision (a final save may finish after the pane
+closes); conflicting revisions are rejected without replacing local edits. Agent
+batches are one undo unit; editor history is local and resets on remount. Git
+workspace diagrams belong to the primary worktree's repository identity, so linked
+worktree agents share the library, while pane visibility, suggestions, selection and
+tool authorization stay conversation-scoped.

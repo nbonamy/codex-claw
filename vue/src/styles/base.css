@@ -20,6 +20,22 @@ body,
   margin: 0;
 }
 
+/* Keep the Windows window edge visible without coloring its native title bar. */
+.window-edge {
+  display: none;
+}
+
+html[data-platform='windows'] .window-edge {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-border);
+}
+
 /* codex-app-sdk 0.1.0 incorrectly hides its dark/system theme host. */
 html[data-codex-theme] {
   display: block;

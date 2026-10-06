@@ -1,7 +1,5 @@
 import { mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it } from 'vitest';
-import { i18n } from '../../i18n';
 import ReviewFindingList, { type ReviewFindingListItem } from '../ReviewFindingList.vue';
 
 const findings: ReviewFindingListItem[] = [
@@ -13,7 +11,7 @@ const findings: ReviewFindingListItem[] = [
 
 describe('ReviewFindingList', () => {
   it('owns the shared expandable finding presentation and selection contract', async () => {
-    const wrapper = mount(ReviewFindingList, { props: { findings, selectable: true }, global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(ReviewFindingList, { props: { findings, selectable: true } });
     expect(wrapper.findAll('.review-finding__priority').map(node => node.text())).toStrictEqual(['P0', 'P1', 'P2', 'P3']);
     await wrapper.findAll('.review-finding__toggle')[0]!.trigger('click');
     expect(wrapper.text()).toContain('Critical body');
@@ -23,7 +21,7 @@ describe('ReviewFindingList', () => {
   });
 
   it('styles priority and remediation badges consistently for every parent workflow', () => {
-    const wrapper = mount(ReviewFindingList, { props: { findings }, global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(ReviewFindingList, { props: { findings } });
     expect(wrapper.findAll('.review-finding__priority').map(node => {
       const style = getComputedStyle(node.element);
       return [style.color, style.backgroundColor];

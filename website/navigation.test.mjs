@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { once } from "node:events";
 import test from "node:test";
 import { chromium } from "playwright";
+import { JSDOM } from "jsdom";
 
 // Catch navigation that disappears at responsive breakpoints. This exercises
 // the actual built page and its styles through a browser, without source assertions.
@@ -62,7 +63,12 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
     for (const width of [1440, 1040, 820, 761, 760, 600, 430, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(origin);
-      for (const selector of [".hero-copy", ".hero h1", ".hero-lede"]) {
+      for (const selector of [
+        ".hero-copy",
+        ".hero h1",
+        ".hero-lede",
+        ".hero-actions .button",
+      ]) {
         const bounds = await page.locator(selector).boundingBox();
         assert.ok(
           bounds.x >= 0 && bounds.x + bounds.width <= width,
@@ -81,7 +87,7 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         bounds.x >= 0 && bounds.x + bounds.width <= width,
         `Docs fits at ${width}px`,
       );
-      const download = header.getByRole("link", { name: "Download for macOS" });
+      const download = header.getByRole("link", { name: /^Download/ });
       assert.equal(await download.isVisible(), true);
       const downloadBounds = await download.boundingBox();
       assert.ok(
@@ -121,6 +127,21 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         );
       }
       const films = page.locator(".product-film");
+      for (const option of await page.locator(".download-option").all()) {
+        const bounds = await option.boundingBox();
+        assert.ok(
+          bounds.x >= 0 && bounds.x + bounds.width <= width,
+          `Download option fits at ${width}px`,
+        );
+        for (const link of await option.locator("a").all()) {
+          const inner = await link.boundingBox();
+          assert.ok(
+            inner.x >= bounds.x &&
+              inner.x + inner.width <= bounds.x + bounds.width,
+            "Download links stay in their card",
+          );
+        }
+      }
       assert.equal(await films.count(), 5);
       const intro = await page.locator(".hero").boundingBox();
       const mission = await films.first().boundingBox();
@@ -165,6 +186,106 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
       await docs.click();
       await page.getByRole("heading", { level: 1 }).waitFor();
       assert.equal(new URL(page.url()).pathname, "/docs/");
+    }
+    // OS is a shortcut, never an inferred CPU architecture or a mobile download.
+    for (const [userAgent, touch, platform] of [
+      ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", false, "macos"],
+      ["Mozilla/5.0 (Windows NT 10.0; Win64; x64)", false, "windows"],
+      ["Mozilla/5.0 (X11; Linux x86_64)", false, "linux"],
+      ["Mozilla/5.0 (X11; Linux aarch64)", false, "linux"],
+      ["Mozilla/5.0 (Linux; Android 14)", true, null],
+      ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)", true, null],
+      ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", true, null],
+      ["Mozilla/5.0 (X11; CrOS x86_64)", false, null],
+      ["Unknown browser", false, null],
+    ]) {
+      const context = await browser.newContext({
+        userAgent,
+        hasTouch: touch,
+        viewport: { width: 320, height: 844 },
+      });
+      if (touch)
+        await context.addInitScript(() =>
+          Object.defineProperty(navigator, "maxTouchPoints", { get: () => 5 }),
+        );
+      const visitor = await context.newPage();
+      await visitor.route("**/*", (route) =>
+        route.request().url().startsWith(origin)
+          ? route.continue()
+          : route.abort(),
+      );
+      await visitor.goto(origin);
+      const buttonBounds = await visitor
+        .locator(".hero-actions .button")
+        .boundingBox();
+      assert.ok(
+        buttonBounds.x >= 0 && buttonBounds.x + buttonBounds.width <= 320,
+        `${platform}: OS-specific button fits on a small screen`,
+      );
+      const shortcut = visitor.locator(".header-cta");
+      const installer =
+        platform && platform !== "linux"
+          ? visitor
+              .locator(`[data-platform="${platform}"] a[data-installer]`)
+              .first()
+          : null;
+      const target =
+        installer && (await installer.count())
+          ? await installer.getAttribute("href")
+          : `#download${platform ? `-${platform}` : ""}`;
+      assert.equal(await shortcut.getAttribute("href"), target, userAgent);
+      assert.equal(
+        await visitor.locator("[data-detected]").count(),
+        platform ? 1 : 0,
+      );
+      assert.equal(
+        await visitor.getByRole("link", { name: "All downloads" }).count(),
+        1,
+      );
+      assert.equal(
+        await visitor.locator(".download-architecture").count(),
+        2,
+        "Both Linux architectures stay available",
+      );
+      await context.close();
+    }
+    // Exercise direct-download shortcuts with published-asset DOM fixtures.
+    // The public repository may have no releases while this test runs.
+    for (const [platform, userAgent, filename] of [
+      [
+        "macos",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        "app-macos-arm64.dmg",
+      ],
+      [
+        "windows",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "app-win32-x64-setup.exe",
+      ],
+    ]) {
+      const visitor = await browser.newPage({ userAgent });
+      const installerUrl = `https://github.com/example/app/releases/download/v1.2.3/${filename}`;
+      await visitor.route("**/*", async (route) => {
+        if (route.request().url() === `${origin}/`) {
+          const response = await route.fetch();
+          const fixture = new JSDOM(await response.text());
+          const link = fixture.window.document.querySelector(
+            `[data-platform="${platform}"] a`,
+          );
+          link.href = installerUrl;
+          link.setAttribute("data-installer", "");
+          await route.fulfill({ response, body: fixture.serialize() });
+          fixture.window.close();
+        } else if (route.request().url().startsWith(origin))
+          await route.continue();
+        else await route.abort();
+      });
+      await visitor.goto(origin);
+      for (const shortcut of await visitor
+        .locator("[data-platform-download]")
+        .all())
+        assert.equal(await shortcut.getAttribute("href"), installerUrl);
+      await visitor.close();
     }
     // Fetch media only after intent; exercise decoding, controls and single playback.
     const mediaRequests = [];
@@ -387,6 +508,16 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
     );
     const noScript = await browser.newPage({ javaScriptEnabled: false });
     await noScript.goto(origin);
+    assert.equal(
+      await noScript.locator(".header-cta").getAttribute("href"),
+      "#download",
+    );
+    await noScript.locator(".header-cta").click();
+    assert.equal(new URL(noScript.url()).hash, "#download");
+    assert.equal(await noScript.locator(".download-option").count(), 3);
+    assert.equal(await noScript.locator(".download-architecture").count(), 2);
+    for (const link of await noScript.locator(".download-formats a").all())
+      assert.match(await link.getAttribute("href"), /^https:\/\/github\.com\//);
     const direct = noScript.getByRole("link", { name: /^Play / }).first();
     assert.equal(
       await noScript.locator(".film-captions").first().isVisible(),

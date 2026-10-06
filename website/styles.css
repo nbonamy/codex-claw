@@ -1006,6 +1006,8 @@ input {
 .download-content {
   position: relative;
   z-index: 1;
+  width: 100%;
+  padding: 72px 0;
 }
 .download .eyebrow {
   justify-content: center;
@@ -1028,6 +1030,68 @@ input {
   font:
     10px "DM Mono",
     monospace;
+}
+.download-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 820px;
+  margin: 32px auto 22px;
+  text-align: left;
+}
+.download-option {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  scroll-margin-top: 100px;
+}
+.download-option[data-detected] {
+  border-color: var(--blue);
+}
+.download-option h3 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  letter-spacing: -0.035em;
+}
+.download-option p {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.download-note {
+  color: var(--faint);
+}
+.download-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.download-formats a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.download-formats a:hover,
+.release-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.download-architecture + .download-architecture {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.release-link {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+@media (width <= 600px) {
+  .download-options {
+    grid-template-columns: 1fr;
+  }
 }
 .site-footer {
   min-height: 104px;

@@ -72,40 +72,40 @@ Preserve the product and process boundaries:
 ## Documentation Map
 
 Keep `AGENTS.md` high-level. Before changing a feature area, read the relevant
-doc. Update docs only when their architecture, process, or reusable convention
-changes; specify feature behavior in tests:
+doc. Docs are reference for the current state: ownership, invariants, gotchas
+and the reasons behind them. They do not restate what code, types, scripts or
+config already say (method catalogs, type listings, command tables, tool
+schemas), do not walk through UI behavior (specify that in tests), and carry no
+dates, "now/no longer/previously" narrative, or decision history (that is git
+history). Fix a stale doc in place rather than appending a correction. Update
+docs only when an architecture, process, or reusable convention changes.
 
-- `docs/testing.md`: desktop testing principles, coverage expectations,
-  Vitest/component/contract/smoke test guidance, and verification gates.
-- `docs/frontend.md`: renderer ownership, component and reuse patterns,
-  canonical UI, visual references, and design tokens.
-- `docs/team-cockpit.md`: design note for a possible team-scoped Cockpit entry
-  inside the agent sidebar while preserving the global Cockpit.
-- `docs/research/provider-handoff.md`: read when designing cross-provider
-  continuation; handoff goals, source evidence, lifecycle and persistence
-  contracts, and validation limits.
-- `docs/agent-provider-selection.md`: provider choice across manual
-  agent creation, delegation, projects, Missions, and independent review.
+- `docs/architecture.md`: process model and ownership rules, conversation
+  ownership, backend seam, persistence, remote teams, worktrees, durable tasks,
+  Missions, code review, work providers.
+- `docs/backend-architecture.md`: `daemon` design rules, transports, runtime
+  packaging, GitHub desktop releases, auto-update, security.
+- `docs/protocol.md`: app-owned JSON-RPC conventions, synchronization, and
+  lifecycles; the method catalog itself is in `core/src/backend-protocol/`.
 - `docs/codex.md`: read before changing Codex conversation state, rendering,
-  actions, history, or transport; it defines the SDK/Korus ownership boundary,
-  lifecycle, generated types, and test fixtures.
-- `docs/claude.md`: Claude Agent SDK integration, configured homes, conversation
-  ownership, and capability boundaries.
-- [Claude capability audit](docs/research/claude-capabilities.md): read before adding
-  Claude steering, forks, goals, turn mutations, or context controls; distinguishes
-  SDK contracts, Korus integration gaps, and runtime evidence.
-- `docs/research/synara.md`: competitive analysis for Synara comparisons and
-  provider-neutral workflow decisions; dated source evidence, not a roadmap.
-- `docs/mcp.md`: how the app-owned MCP server exposes agent collaboration
-  tools, inbox state, backend enablement, security, and tests.
-- `docs/custom-tools.md`: use when adding or presenting a `workspace` MCP tool,
-  including agent status, structured results, lifecycle titles, and tests.
-- `docs/backend-architecture.md`: backend process, transport, packaging, and
-  security architecture.
-- `docs/protocol.md`: app-owned JSON-RPC backend protocol between clients,
-  `daemon`, and client callbacks implemented by Electron today.
-- `docs/architecture.md`: product model, process architecture, IPC,
-  backend seam, persistence, and open architecture decisions.
+  actions, history, or transport; SDK/Korus ownership boundary.
+- `docs/claude.md`: Claude Agent SDK integration, homes, history, capabilities.
+- `docs/research/claude-capabilities.md`: read before adding Claude steering,
+  forks, goals, turn mutations, or context controls; dated runtime evidence.
+- `docs/mcp.md`: the app-owned MCP server model: identity, enablement,
+  collaboration, contextual tool families, Computer Use, hosted gateway.
+- `docs/custom-tools.md`: use when adding or presenting an MCP tool.
+- `docs/frontend.md`: renderer ownership, canonical UI, interaction and styling
+  conventions, Visualize canvases. Read before editing UI.
+- `docs/testing.md`: testing principles, Test Value Gate, fixtures, coverage and
+  gates. Read before editing code.
+- `docs/agent-provider-selection.md`: how Codex or Claude is chosen for new work.
+- `docs/agent-isolation.md`: unimplemented design note on shared-checkout
+  warnings.
+- `docs/research/provider-handoff.md`: read when designing cross-provider
+  continuation; dated evidence.
+- `docs/research/synara.md`: competitive analysis; dated source evidence, not a
+  roadmap.
 - `docs/codex.png`: visual reference for the target shell.
 - `website/README.md`: read before changing the public VitePress guide in
   `website/docs/` or the website build and deployment. Public user guides are
@@ -185,7 +185,8 @@ commit, or push work. Curate it only when Nicolas explicitly invokes
 - `update-changelog`: release-time audit of Korus and SDK histories, curated
   Unreleased notes, and an evidence-backed semantic-version recommendation.
 - `prepare-release`: invokes `update-changelog`, confirms the recommended
-  version, freezes release artifacts, and creates the local provenance tag.
+  version and channel, validates the release commit, and hands off one command
+  that creates the tag, builds, and publishes.
 
 ## Plans
 

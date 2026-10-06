@@ -1,7 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { RendererMessage } from '@workspace/core/contracts';
-import { i18n } from '../../i18n';
 import AutomationExecutionConversationOverlay from '../AutomationExecutionConversationOverlay.vue';
 
 const messages: RendererMessage[] = [{
@@ -27,9 +26,6 @@ describe('AutomationExecutionConversationOverlay', () => {
         agentName: 'Dina',
         messages,
         ticket: 'github:nbonamy/agent-workspace#12',
-      },
-      global: {
-        plugins: [i18n],
       },
     });
 
@@ -80,7 +76,6 @@ describe('AutomationExecutionConversationOverlay', () => {
         }],
         ticket: 'github:nbonamy/agent-workspace#12',
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.text()).toContain('Captured page screenshot');

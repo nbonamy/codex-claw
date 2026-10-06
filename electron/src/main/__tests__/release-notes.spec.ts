@@ -25,6 +25,14 @@ async function loadScript(): Promise<ReleaseNotesScript> {
 }
 
 describe('release-notes script', () => {
+  it('keeps release content and hashes stable across Windows checkout line endings', async () => {
+    const { createReleaseNotes, assertReleaseNotesCurrent } = await loadScript();
+    const changelog = '## [1.2.3] - 2026-10-06\n\n### Fixes\n\n- Fixed startup.\n';
+    const notes = createReleaseNotes({ version: '1.2.3', changelog });
+    expect(createReleaseNotes({ version: '1.2.3', changelog: changelog.replaceAll('\n', '\r\n') })).toStrictEqual(notes);
+    const serialized = JSON.stringify(notes, null, 2) + '\n';
+    expect(() => assertReleaseNotesCurrent(serialized.replaceAll('\n', '\r\n'), serialized)).not.toThrow();
+  });
   it('freezes the current version and complete released changelog history', async () => {
     const { createReleaseNotes } = await loadScript();
     const notes = createReleaseNotes({

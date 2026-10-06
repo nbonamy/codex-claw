@@ -166,10 +166,11 @@ describe('main window lifecycle', () => {
     const window = openWindow();
     expect(window.options).toMatchObject({ width: 1440, height: 960 });
     expect(window.options).not.toHaveProperty('x');
-    expect(window.loadFile).toHaveBeenCalledWith(expect.stringContaining('/renderer/main_window/index.html'));
+    expect(window.loadFile).toHaveBeenCalledWith(expect.stringContaining(path.join('renderer', 'main_window', 'index.html')));
     rmSync(file);
     window.emit('close');
-    expect(statSync(file).mode & 0o777).toBe(0o600);
+    // Windows does not implement POSIX file permission bits.
+    if (process.platform !== 'win32') expect(statSync(file).mode & 0o777).toBe(0o600);
   });
 
   it('releases focused shortcuts and enforces popup and renderer console boundaries', () => {

@@ -272,6 +272,7 @@ export const surfaceMessages = {
     "fixing": "fixing",
     "fixed": "fixed",
     "fixedEvidence": "Fixed evidence",
+    "stateRejected": "Rejected:",
     "reviewInProgress": "Review in progress",
     "inspectingUncommitted": "Inspecting uncommitted changes.",
     "inspectingBranch": "Inspecting {branch} against {base}.",

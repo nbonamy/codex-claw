@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
+import "./downloads.test.mjs";
 import { fileURLToPath } from "node:url";
 
 // Reuse the renderer workspace's declared DOM test dependency.
@@ -22,8 +23,9 @@ test("visitors can navigate the page and reach the desktop download", async () =
       assert.equal(dom.window.location.hash, link.hash);
     }
 
-    const downloads = [...document.querySelectorAll("a[download]")];
-    assert.ok(downloads.length > 0);
+    const downloads = [...document.querySelectorAll("[data-platform-download]")];
+    assert.equal(downloads.length, 2);
+    for (const link of downloads) assert.equal(link.hash, "#download");
     // docs.test.mjs checks final download URLs on the built artifact.
   } finally {
     dom.window.close();

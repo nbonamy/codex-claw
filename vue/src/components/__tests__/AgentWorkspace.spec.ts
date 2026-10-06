@@ -3,7 +3,6 @@ import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type { CodexConversationPaneController, CodexMessageImage, CodexMessageImageContext } from '@codex-app-sdk/vue';
 import { shallowMount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { i18n } from '../../i18n';
 import AgentWorkspace from '../AgentWorkspace.vue';
 import type { AgentRightWorkspaceState } from '../use-right-workspace-state';
 import type { RightWorkspaceTab } from '../right-workspace';
@@ -80,7 +79,6 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       hasRunningPlanTool: false,
       hasVisibleMessages: false,
       latestConversationTurnId: null,
-      loadWorkItems: vi.fn(),
       mergeAgentGitBranch: vi.fn(),
       updateAgentGitBranchFromBase: vi.fn(),
       updateAgent,
@@ -93,7 +91,6 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       openFilePreviewForAgent: vi.fn(),
       openInApplications: { defaultApplication: 'finder', applications: [] },
       openRightWorkspaceTab,
-      prefillWorkItemForAgent: vi.fn(),
       pushAgentGitBranch: vi.fn(),
       readConversationMessages: vi.fn(),
       readVisualizationAsset: vi.fn(),
@@ -112,7 +109,6 @@ function mountWorkspace(configureSnapshot?: (snapshot: ReturnType<typeof createI
       toggleRightWorkspace: vi.fn(),
       discardCodeReview,
     },
-    global: { plugins: [i18n] },
   });
   return {
     closeRightWorkspaceTab,

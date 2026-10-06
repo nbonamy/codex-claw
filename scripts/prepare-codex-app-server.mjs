@@ -4,14 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import config from '../codex-app-server-release.json' with { type: 'json' };
-import { hasExpectedExecutableArchitecture, selectCodexReleaseTarget } from './runtime-artifacts.mjs';
+import { assertPinnedCodexArchive, hasExpectedExecutableArchitecture, selectCodexReleaseTarget } from './runtime-artifacts.mjs';
 import { prepareWindowsCodex } from './windows-codex.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const target = selectCodexReleaseTarget(config, process.platform, process.arch);
-if (!/^codex-package-[a-z0-9-]+\.tar\.gz$/.test(target.archive) || !/^[a-f0-9]{64}$/.test(target.sha256)) {
-  throw new Error('The Codex archive and SHA-256 must be pinned for this target.');
-}
+assertPinnedCodexArchive(target);
 const output = path.join(root, 'electron/resources/codex');
 if (target.platform === 'win32') {
   // Preserve full-package validation, retries for locked files, and rollback.

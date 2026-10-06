@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import AgentHeader from '../AgentHeader.vue';
 import type { Agent, AgentGitStatus, BackendRuntimeStatus } from '@workspace/core/contracts';
-import { i18n } from '../../i18n';
 import '../../styles/base.css';
 
 const agent: Agent = {
@@ -27,8 +26,6 @@ function mountHeader(backendRuntime: BackendRuntimeStatus, isLoading = false, gi
       isLoading,
       sidebarCollapsed: false,
     },
-    global: {
-      },
   });
 }
 
@@ -345,7 +342,6 @@ describe('AgentHeader', () => {
           ],
         },
       },
-      global: { plugins: [i18n] },
     });
 
     await wrapper.get('[aria-label="Open in Xcode"]').trigger('click');
@@ -366,7 +362,6 @@ describe('AgentHeader', () => {
           applications: [{ id: 'vscode', label: 'VS Code' }],
         },
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.text()).toContain('Untitled conversation');
@@ -433,8 +428,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: false,
       },
-      global: {
-        },
     });
 
     expect(wrapper.text()).toContain('Running tests');
@@ -459,8 +452,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: false,
       },
-      global: {
-        },
     });
 
     expect(wrapper.find('.agent-header__activity-line').exists()).toBe(false);
@@ -475,8 +466,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: true,
       },
-      global: {
-        },
     });
 
     expect(wrapper.text()).toContain('No agent');
@@ -504,8 +493,6 @@ describe('AgentHeader', () => {
         isLoading: false,
         sidebarCollapsed: true,
       },
-      global: {
-        },
     });
 
     expect(wrapper.text()).toContain('Dina');
@@ -576,7 +563,6 @@ describe('AgentHeader', () => {
           activities: {},
         },
       },
-      global: { plugins: [i18n] },
     });
 
     const gitStats = wrapper.get('.agent-header__git-status');
@@ -633,7 +619,6 @@ describe('AgentHeader', () => {
         workspaceOpen: false,
         updateStatus: { state: 'downloaded', version: '0.4.0' },
       },
-      global: { plugins: [i18n] },
     });
 
     const activity = wrapper.get('.agent-header__activity');
@@ -671,7 +656,6 @@ describe('AgentHeader', () => {
           activities: {},
         },
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.find('.subagent-control').exists()).toBe(false);

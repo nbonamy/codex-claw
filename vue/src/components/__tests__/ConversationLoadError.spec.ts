@@ -1,13 +1,11 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { i18n } from '../../i18n';
 import ConversationLoadError from '../ConversationLoadError.vue';
 
 describe('ConversationLoadError', () => {
   it('presents a quiet alert and emits retry once', async () => {
     const wrapper = mount(ConversationLoadError, {
       props: { loading: false },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Conversation couldn’t be loaded.');
@@ -26,7 +24,6 @@ describe('ConversationLoadError', () => {
   it('disables retry while history is loading', () => {
     const wrapper = mount(ConversationLoadError, {
       props: { loading: true },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('button').attributes('disabled')).toBeDefined();

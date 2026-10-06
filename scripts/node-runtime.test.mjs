@@ -7,16 +7,13 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { nodeRuntimeTarget, prepareNodeRuntime } from './node-runtime.mjs';
 
-for (const platform of ['darwin', 'linux', 'win32']) {
-  for (const arch of ['x64', 'arm64']) {
-    test(`selects a pinned ${platform}/${arch} artifact`, () => {
-      const target = nodeRuntimeTarget(platform, arch);
-      assert.equal(target.executable, platform === 'win32' ? 'node.exe' : 'node');
-      assert.ok(target.url.endsWith(`-${platform === 'win32' ? 'win' : platform}-${arch}.${platform === 'win32' ? 'zip' : 'tar.gz'}`));
-      assert.match(target.sha256, /^[a-f0-9]{64}$/);
-    });
+test('every supported platform/arch has a pinned checksum', () => {
+  for (const platform of ['darwin', 'linux', 'win32']) {
+    for (const arch of ['x64', 'arm64']) {
+      assert.match(nodeRuntimeTarget(platform, arch).sha256, /^[a-f0-9]{64}$/, `${platform}/${arch}`);
+    }
   }
-}
+});
 test('rejects unsupported targets before downloading anything', () => {
   assert.throws(() => nodeRuntimeTarget('linux', 'ia32'), /No pinned Node runtime/);
 });

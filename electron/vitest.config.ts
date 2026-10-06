@@ -20,6 +20,7 @@ export default defineConfig({
       exclude: [
         'src/renderer/**/*.d.ts',
         'src/test/**',
+        'src/**/__tests__/**',
       ],
       thresholds: {
         statements: 85,

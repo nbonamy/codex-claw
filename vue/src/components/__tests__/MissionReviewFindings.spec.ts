@@ -1,9 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
 import { createMission } from '@workspace/core/missions';
-import { i18n } from '../../i18n';
 import MissionReviewFindings from '../MissionReviewFindings.vue';
 
 describe('MissionReviewFindings', () => {
@@ -26,7 +24,7 @@ describe('MissionReviewFindings', () => {
       status: 'awaitingReview', skills: [], feedback: '', startedAt: 'now', proposal: structuredClone(mission.artifacts),
     }];
     const executeMission = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mount(MissionReviewFindings, { props: { mission, executeMission }, global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(MissionReviewFindings, { props: { mission, executeMission } });
 
     expect(wrapper.findAll('.review-finding')).toHaveLength(2);
     expect(wrapper.findAll('.review-finding__quick-action')).toHaveLength(2);
@@ -72,7 +70,7 @@ describe('MissionReviewFindings', () => {
       id: 'review-run', stage: 'review', memberId: snapshot.agents[0]!.id, workerId: snapshot.agents[0]!.id,
       status: 'running', skills: [], feedback: '', startedAt: 'now',
     }];
-    const wrapper = mount(MissionReviewFindings, { props: { mission, executeMission: vi.fn() }, global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(MissionReviewFindings, { props: { mission, executeMission: vi.fn() } });
 
     expect(wrapper.findComponent({ name: 'ElSwitch' }).exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Fix 1 selected');

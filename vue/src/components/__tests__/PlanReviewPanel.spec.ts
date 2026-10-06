@@ -3,7 +3,6 @@ import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ElMessageBox } from 'element-plus';
 import PlanReviewPanel from '../PlanReviewPanel.vue';
-import { i18n } from '../../i18n';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -19,7 +18,6 @@ function mountPanel(content = '# Plan\n\nShip this carefully.') {
         error: null,
       },
     },
-    global: { plugins: [i18n] },
   });
 }
 
@@ -94,7 +92,6 @@ describe('PlanReviewPanel', () => {
         },
         planUpdating: true,
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('.plan-review-panel__overlay').text()).toBe('Updating plan...');

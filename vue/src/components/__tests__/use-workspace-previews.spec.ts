@@ -1,3 +1,4 @@
+import { effectScope } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type { AgentGitDiff } from '@workspace/core/contracts';
@@ -7,7 +8,7 @@ import { useWorkspacePreviews } from '../use-workspace-previews';
 function setup(getAgentGitDiff: (id: string) => Promise<AgentGitDiff>) {
   const snapshot = createInitialSnapshot();
   const agent = snapshot.agents[0]!;
-  const workspace = useRightWorkspaceState({ currentAgentId: () => snapshot.activeAgentId ?? undefined, workspaceBody: () => null });
+  const workspace = effectScope().run(() => useRightWorkspaceState({ currentAgentId: () => snapshot.activeAgentId ?? undefined, workspaceBody: () => null }))!;
   const previewAgentFile = vi.fn();
   const downloadAgentFile = vi.fn().mockResolvedValue(undefined);
   const reportError = vi.fn();

@@ -1,4 +1,6 @@
 import { type App, autoUpdater } from 'electron';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import type { DesktopUpdateStatus } from '@workspace/core/contracts';
 import { product } from '@workspace/core/product';
 
@@ -22,9 +24,11 @@ export type DesktopAutoUpdateOptions = {
   platform?: NodeJS.Platform;
   setIntervalFn?: typeof setInterval;
   updateBaseUrl?: string;
+  executablePath?: string;
 };
 
 export function resolveDesktopUpdateFeedUrl(
+  version: string,
   baseUrl = DEFAULT_UPDATE_BASE_URL,
   platform: NodeJS.Platform = process.platform,
   arch = process.arch,
@@ -36,9 +40,9 @@ export function resolveDesktopUpdateFeedUrl(
 
   parsedUrl.pathname = [
     parsedUrl.pathname.replace(/\/+$/, ''),
-    platform,
-    arch,
-    'RELEASES.json',
+    product.repository,
+    `${platform}-${arch}`,
+    encodeURIComponent(version),
   ].join('/');
 
   return parsedUrl.toString();
@@ -54,6 +58,7 @@ export class DesktopAutoUpdateService {
   private readonly platform: NodeJS.Platform;
   private readonly setIntervalFn: typeof setInterval;
   private readonly updateBaseUrl: string;
+  private readonly executablePath: string;
   private interval: ReturnType<typeof setInterval> | undefined;
   private status: DesktopUpdateStatus = { state: 'idle' };
   private started = false;
@@ -68,6 +73,7 @@ export class DesktopAutoUpdateService {
     this.platform = options.platform ?? process.platform;
     this.setIntervalFn = options.setIntervalFn ?? setInterval;
     this.updateBaseUrl = options.updateBaseUrl ?? DEFAULT_UPDATE_BASE_URL;
+    this.executablePath = options.executablePath ?? process.execPath;
   }
 
   getStatus(): DesktopUpdateStatus {
@@ -84,15 +90,17 @@ export class DesktopAutoUpdateService {
       return;
     }
 
-    if (this.platform !== 'darwin') {
+    const installedWindows = this.platform === 'win32'
+      && existsSync(path.resolve(path.dirname(this.executablePath), '..', 'Update.exe'));
+    if (this.platform !== 'darwin' && !installedWindows) {
       this.setStatus({ state: 'disabled' });
       this.logger.log('[update] skipping auto-update on unsupported platform', this.platform);
       return;
     }
 
-    const feedUrl = resolveDesktopUpdateFeedUrl(this.updateBaseUrl, this.platform, this.arch);
+    const feedUrl = resolveDesktopUpdateFeedUrl(this.app.getVersion(), this.updateBaseUrl, this.platform, this.arch);
     this.logger.log('[update] feed URL', feedUrl, 'version', this.app.getVersion());
-    this.autoUpdater.setFeedURL({ serverType: 'json', url: feedUrl });
+    this.autoUpdater.setFeedURL({ url: feedUrl });
 
     this.autoUpdater.on('checking-for-update', () => this.setStatus({ state: 'checking' }));
     this.autoUpdater.on('update-available', () => this.setStatus({ state: 'downloading' }));

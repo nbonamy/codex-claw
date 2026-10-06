@@ -102,12 +102,15 @@ you return.
 
 ## Get Korus
 
-Desktop builds support macOS on Apple silicon. The first Korus-branded installer
-is being prepared; the download below will become available when it is published.
-To try the current source before then, see [Development](#development).
+Desktop packaging targets macOS on Apple silicon, Windows x64, and Linux
+x64/ARM64. See [GitHub Releases](https://github.com/nbonamy/korus/releases) for
+published installers. Prereleases require manual downloads; automatic updates
+on macOS and installed Windows copies follow stable releases only. Windows
+installers are unsigned. Linux and portable Windows updates are manual.
+To run from source, see [Development](#development).
 
-1. Once published, [download the macOS DMG](https://meetkorus.dev/desktop/downloads/korus-macos-arm64.dmg).
-2. Move Korus to Applications and launch it.
+1. Download a published installer for your platform and architecture from GitHub Releases.
+2. Install and launch Korus (on macOS, move it to Applications).
 3. Connect Codex, Claude Code, or both, then choose Continue. Only one connected
    engine is required. Claude Code supports subscription or API-key setup.
 4. Create a team, add an agent from a repository, and start coding. When both
@@ -168,8 +171,14 @@ checks that do not need signing:
 APP_SKIP_SIGNING=1 npm run package
 ```
 
-Release builds run on GitHub Actions and stage artifacts before explicit
-promotion. See [GitHub desktop releases](docs/backend-architecture.md#github-desktop-releases)
+Once the prepared release commit is pushed, **`npm run prerelease`** builds and
+publishes a prerelease; **`npm run latest`** builds and publishes a stable release.
+Both infer the version from package.json, create the missing version tag, and
+monitor one GitHub workflow through
+quality checks, all four platform builds, and publication. Installers are
+uploaded by GitHub runners; there is no combined bundle or separate publishing
+workflow.
+See [GitHub desktop releases](docs/backend-architecture.md#github-desktop-releases)
 for the target matrix, launch/monitor commands, signing setup, and publication.
 
 ### App icon

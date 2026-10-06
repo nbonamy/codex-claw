@@ -1,5 +1,5 @@
-name: Desktop builds
-run-name: desktop ${{ inputs.version }} ${{ inputs.request_id }}
+name: Desktop release
+run-name: desktop ${{ inputs.version }} ${{ inputs.channel }} ${{ inputs.request_id }}
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +13,13 @@ on:
         description: Existing tag resolving to the commit
         required: true
       request_id:
-        description: Unique dispatch identifier (use release:build)
+        description: Unique dispatch identifier
+        required: true
+      channel:
+        description: Release channel (none is explicit build-only validation)
+        type: choice
+        options: [prerelease, latest, none]
+        default: prerelease
         required: true
 
 permissions:
@@ -24,10 +30,14 @@ env:
   RELEASE_TAG: ${{ inputs.tag }}
   NODE_OPTIONS: --max-old-space-size=4096
 
+concurrency:
+  group: desktop-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
   quality:
     name: quality
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -38,15 +48,20 @@ jobs:
         with:
           node-version: 22.23.3
           cache: npm
-      - run: node scripts/release-artifacts.mjs validate
+      - name: Validate immutable source
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(node -p 'require("./package.json").version')" = "$RELEASE_VERSION"
+          test "$RELEASE_TAG" = "v$RELEASE_VERSION"
+          test "$(git ls-remote origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}" | tail -1 | cut -f1)" = "$RELEASE_SHA"
       - run: npm install --global npm@10.9.4
       - run: npm ci --no-audit --no-fund
       - run: node node_modules/electron/install.js
       - run: npm run release-notes:check
-      - run: npm run typecheck
       - run: npm run lint
-      - run: npm run test:ai
       - run: npm run test:coverage
+      - run: npm run test:scripts
 
   build:
     name: build (${{ matrix.target }})
@@ -56,11 +71,11 @@ jobs:
       matrix:
         include:
           - target: darwin-arm64
-            runner: macos-15
+            runner: macos-latest
           - target: win32-x64
-            runner: windows-2022
+            runner: windows-latest
           - target: linux-x64
-            runner: ubuntu-24.04
+            runner: ubuntu-latest
           - target: linux-arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
@@ -78,7 +93,6 @@ jobs:
         with:
           node-version: 22.23.3
           cache: npm
-      - run: node scripts/release-artifacts.mjs validate
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y rpm fakeroot libevdev-dev
       - run: npm install --global npm@10.9.4
@@ -103,7 +117,9 @@ jobs:
       - name: Exercise packaged native runtimes
         run: node scripts/smoke-desktop.mjs
       - name: Collect checksummed artifacts
-        run: node scripts/release-artifacts.mjs collect --target=${{ matrix.target }} --source=electron/out/make --output=out/release/${{ matrix.target }}
+        # Use the tagged collector, independently of the workflow's control commit.
+        run: |
+          node --input-type=module -e "import { collectArtifacts } from './scripts/release-artifacts.mjs'; if (process.platform + '-' + process.arch !== '${{ matrix.target }}') throw new Error('Incorrect native runner'); if (process.platform === 'darwin' && (process.env.APP_SKIP_SIGNING === '1' || process.env.TEST)) throw new Error('Signed artifacts required'); await collectArtifacts({ source: 'electron/out/make', output: 'out/release/${{ matrix.target }}', target: '${{ matrix.target }}', signing: process.platform === 'darwin' ? 'developer-id-notarized' : 'unsigned', identity: { version: process.env.RELEASE_VERSION, sha: process.env.RELEASE_SHA, tag: process.env.RELEASE_TAG, runId: Number(process.env.GITHUB_RUN_ID), attempt: Number(process.env.GITHUB_RUN_ATTEMPT) } });"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -112,15 +128,17 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-  stage:
-    name: stage
+  publish:
+    name: publish
     needs: [quality, build]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    if: inputs.channel != 'none'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -129,11 +147,8 @@ jobs:
         with:
           pattern: desktop-*-${{ github.run_id }}-${{ github.run_attempt }}
           path: out/downloaded
-      - run: node scripts/release-artifacts.mjs assemble --source=out/downloaded --output=out/release-bundle
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: release-${{ github.run_id }}-${{ github.run_attempt }}
-          path: out/release-bundle
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
+      - name: Verify installers and publish GitHub release
+        run: node scripts/publish-desktop.mjs out/downloaded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}

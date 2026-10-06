@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import SubagentControl from '../SubagentControl.vue';
 import type { AgentSubagentTree } from '@workspace/core/contracts';
-import { i18n } from '../../i18n';
 
 const tree: AgentSubagentTree = {
   rootConversationId: 'thread-root',
@@ -50,7 +49,7 @@ describe('SubagentControl', () => {
   afterEach(() => vi.useRealTimers());
 
   it('counts only active agents in the icon-only badge and opens the full hierarchical menu', async () => {
-    const wrapper = mount(SubagentControl, { props: { tree }, global: { plugins: [i18n] } });
+    const wrapper = mount(SubagentControl, { props: { tree } });
     const trigger = wrapper.get('[aria-label="Subagents (1 active)"]');
 
     expect(trigger.text()).toBe('1');
@@ -78,7 +77,6 @@ describe('SubagentControl', () => {
   it('emits the selected conversation and closes the menu', async () => {
     const wrapper = mount(SubagentControl, {
       props: { tree, selectedConversationId: 'thread-reviewer' },
-      global: { plugins: [i18n] },
     });
     await wrapper.get('[aria-label="Subagents (1 active)"]').trigger('click');
     const rows = wrapper.findAll('[role="menuitem"]');
@@ -95,7 +93,7 @@ describe('SubagentControl', () => {
       ...tree,
       nodes: Object.fromEntries(Object.entries(tree.nodes).map(([id, node]) => [id, { ...node, status: 'completed' as const }])),
     };
-    const wrapper = mount(SubagentControl, { props: { tree: completedTree }, global: { plugins: [i18n] } });
+    const wrapper = mount(SubagentControl, { props: { tree: completedTree } });
     const trigger = wrapper.get('[aria-label="Subagents"]');
 
     expect(wrapper.find('.subagent-control__count').exists()).toBe(false);
@@ -109,7 +107,7 @@ describe('SubagentControl', () => {
   it('shows live elapsed time for active agents and relative activity for finished agents', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-05T00:02:01.000Z'));
-    const wrapper = mount(SubagentControl, { props: { tree }, global: { plugins: [i18n] } });
+    const wrapper = mount(SubagentControl, { props: { tree } });
 
     await wrapper.get('[aria-label="Subagents (1 active)"]').trigger('click');
     expect(wrapper.findAll('.subagent-control__time').map((time) => time.text())).toStrictEqual([

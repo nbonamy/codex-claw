@@ -2,6 +2,11 @@ import { computed, defineComponent, Fragment, h, inject, provide, ref, type Inje
 
 const dropdownCommandKey: InjectionKey<(command: unknown) => void> = Symbol('dropdown-command');
 const menuSelectKey: InjectionKey<(index: string) => void> = Symbol('menu-select');
+const radioGroupKey: InjectionKey<{
+  disabled: () => boolean;
+  modelValue: () => unknown;
+  select: (value: unknown) => void;
+}> = Symbol('radio-group');
 
 const flattenNodes = (nodes: VNode[]): VNode[] => nodes.flatMap((node) => {
   return node.type === Fragment && Array.isArray(node.children)
@@ -183,6 +188,39 @@ export const ElPopoverStub = defineComponent({
   template: '<span class="el-popover"><span @click="toggle"><slot name="reference" /></span><Teleport to="body" :disabled="!teleported"><span v-if="shown" :class="popperClass"><slot /></span></Teleport></span>',
 });
 
+export const ElRadioGroupStub = defineComponent({
+  name: 'ElRadioGroup',
+  inheritAttrs: false,
+  props: ['disabled', 'modelValue'],
+  emits: ['change', 'update:modelValue'],
+  setup(props, { emit }) {
+    provide(radioGroupKey, {
+      disabled: () => Boolean(props.disabled),
+      modelValue: () => props.modelValue,
+      select: (value) => {
+        emit('update:modelValue', value);
+        emit('change', value);
+      },
+    });
+  },
+  template: '<div class="el-radio-group" role="radiogroup" v-bind="$attrs"><slot /></div>',
+});
+
+export const ElRadioStub = defineComponent({
+  name: 'ElRadio',
+  inheritAttrs: false,
+  props: ['disabled', 'label', 'value'],
+  setup(props) {
+    const group = inject(radioGroupKey, null);
+    return {
+      checked: computed(() => group?.modelValue() === (props.value ?? props.label)),
+      isDisabled: computed(() => Boolean(props.disabled || group?.disabled())),
+      select: () => group?.select(props.value ?? props.label),
+    };
+  },
+  template: '<label class="el-radio" v-bind="$attrs"><input type="radio" :checked="checked" :disabled="isDisabled" @change="select"><slot /></label>',
+});
+
 export const ElSegmentedStub = defineComponent({
   name: 'ElSegmented',
   props: ['disabled', 'modelValue', 'options', 'size'],
@@ -276,6 +314,8 @@ export const elementPlusStubs = {
   ElMenuItem: ElMenuItemStub,
   ElOption: ElOptionStub,
   ElPopover: ElPopoverStub,
+  ElRadio: ElRadioStub,
+  ElRadioGroup: ElRadioGroupStub,
   ElSegmented: ElSegmentedStub,
   ElSelect: ElSelectStub,
   ElSwitch: ElSwitchStub,

@@ -4,6 +4,39 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.27.1] - 2026-10-06
+
+### New features
+
+- Ask a project thread to launch an automatic review. Korus starts an independent
+  reviewer using the thread's provider, model, and effort by default, without
+  changing saved review preferences. This requires an explicit request; local
+  commits remain off unless requested.
+- Desktop distribution now includes Windows x64 installers and Linux x64/ARM64
+  packages alongside macOS ARM64. GitHub prereleases are manual downloads;
+  macOS and installed Windows copies receive automatic updates from stable
+  GitHub releases. Windows installers are unsigned; Linux and portable Windows
+  use manual package updates.
+
+### Improvements and fixes
+
+- Packaged apps include a private Node runtime, so desktop startup no longer
+  requires a system Node installation. Korus waits for workspace state before
+  showing onboarding, avoiding a false welcome screen while connecting.
+- Claude authentication failures now update connection settings and finish the
+  failed turn with a useful error. Retrying after an external login rechecks
+  authentication instead of relying on a stale disconnected state.
+- Codex can now see attached file paths, with attachment chips preserved when
+  reopening conversation history.
+- Claude tool searches show the search query and progress, and all providers
+  use the same Korus collaboration-tool namespace.
+- Restored native window controls and menu access during onboarding. Windows
+  gains a subtle window border and more reliable Codex setup; Linux gains
+  corrected packaged icons, native dependencies, and window startup behavior.
+- The website offers platform-aware download choices, explicit Linux
+  architecture selection, and narrated workflow videos with shared playback
+  controls.
+
 ## [0.27.0] - 2026-10-05
 
 ### New features
