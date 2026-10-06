@@ -1,6 +1,7 @@
 import { product } from '@workspace/core/product';
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
+vi.mock('electron', () => ({ app: { getAppPath: () => '/app' }, nativeTheme: { shouldUseDarkColors: false } }));
 import {
   createMainWindowOptions,
   handleExternalWindowOpen,
@@ -50,11 +51,22 @@ describe('main window options', () => {
       vibrancy: 'menu',
     });
     expect(createMainWindowOptions(false, undefined, 'win32')).toMatchObject({
-      backgroundColor: '#061c2a',
+      backgroundColor: '#FAFAFA',
       titleBarStyle: 'default',
       autoHideMenuBar: true,
     });
     expect(createMainWindowOptions(false, undefined, 'win32').vibrancy).toBeUndefined();
+  });
+
+  it.each(['linux', 'win32'] as const)('uses a light or dark native background on %s', (platform) => {
+    expect(createMainWindowOptions(false, undefined, platform, false).backgroundColor).toBe('#FAFAFA');
+    expect(createMainWindowOptions(false, undefined, platform, true).backgroundColor).toBe('#202020');
+  });
+
+  it('supplies the product title and window icon on Linux', () => {
+    expect(createMainWindowOptions(false, undefined, 'linux')).toMatchObject({
+      title: product.name, icon: '/app/assets/icon.png',
+    });
   });
 
   it.each(['linux', 'win32'] as const)('keeps the native %s title bar and window controls available before onboarding', (platform) => {

@@ -37,9 +37,9 @@ function parseAnchor(value: string | null): AnnotationPopupAnchor {
 </script>
 
 <style scoped>
-:global(html),
-:global(body),
-:global(#app) {
+:global(html[data-surface='annotation-overlay']),
+:global(html[data-surface='annotation-overlay'] body),
+:global(html[data-surface='annotation-overlay'] #app) {
   overflow: hidden !important;
   background: transparent !important;
 }

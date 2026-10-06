@@ -17,7 +17,7 @@ import {
 } from './build/sign-binaries';
 import { copyPackagedNativeDependencies } from './build/package-native-dependencies';
 import { copyPackagedNodeRuntime } from './build/package-node-runtime';
-import { desktopMetadata } from './build/product-metadata';
+import { desktopMetadata, writePackagedDesktopIdentity } from './build/product-metadata';
 
 import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
@@ -82,6 +82,16 @@ const config: ForgeConfig = {
     extraResource,
     extendInfo: desktopMetadata,
     ...osxPackagerConfig,
+    afterCopy: [
+      (buildPath: string, _electronVersion: string, _platform: string, _arch: string, callback: (error?: Error) => void) => {
+        try {
+          writePackagedDesktopIdentity(buildPath);
+          callback();
+        } catch (error) {
+          callback(error instanceof Error ? error : new Error(String(error)));
+        }
+      },
+    ],
     afterCopyExtraResources: [
       (buildPath: string, _electronVersion: string, platform: string, arch: string, callback: (error?: Error) => void) => {
         try {

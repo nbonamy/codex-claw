@@ -29,6 +29,7 @@ export function mountAppVueApp(options: MountAppVueAppOptions) {
       ? 'annotation-overlay'
       : 'main');
   const rootComponent = surface === 'annotation-overlay' ? AnnotationOverlayApp : App;
+  document.documentElement.dataset.surface = surface;
 
   return createApp(rootComponent)
     .use(ElementPlus)
