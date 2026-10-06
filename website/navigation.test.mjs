@@ -7,12 +7,15 @@ import { chromium } from "playwright";
 
 // Catch navigation that disappears at responsive breakpoints. This exercises
 // the actual built page and its styles through a browser, without source assertions.
-test("navigation and illustrations stay readable at desktop and phone widths", async () => {
+test("navigation, films, and cards work at desktop and phone widths", async () => {
   const artifact = new URL("../dist/website/", import.meta.url);
   const types = {
     ".css": "text/css",
     ".js": "text/javascript",
     ".html": "text/html",
+    ".mp4": "video/mp4",
+    ".png": "image/png",
+    ".vtt": "text/vtt",
   };
   const server = createServer(async (request, response) => {
     const path = new URL(request.url, "http://localhost").pathname;
@@ -20,8 +23,23 @@ test("navigation and illustrations stay readable at desktop and phone widths", a
     try {
       const body = await readFile(new URL(`.${file}`, artifact));
       const type = types[file.slice(file.lastIndexOf("."))];
+      const range = request.headers.range?.match(/^bytes=(\d+)-(\d*)$/);
+      if (range) {
+        const start = Number(range[1]);
+        const end = range[2] ? Number(range[2]) : body.length - 1;
+        response.writeHead(206, {
+          "Content-Type": type,
+          "Content-Range": `bytes ${start}-${end}/${body.length}`,
+          "Content-Length": end - start + 1,
+          "Accept-Ranges": "bytes",
+        });
+        response.end(body.subarray(start, end + 1));
+        return;
+      }
       response.writeHead(200, {
         "Content-Type": type ?? "application/octet-stream",
+        "Content-Length": body.length,
+        "Accept-Ranges": "bytes",
       });
       response.end(body);
     } catch {
@@ -102,38 +120,295 @@ test("navigation and illustrations stay readable at desktop and phone widths", a
           `Card preview escapes its card at ${width}px`,
         );
       }
-      // The selection and remediation action must not get clipped on phones.
-      // Check rendered geometry rather than freezing the illustration's copy.
-      const review = page.getByRole("img", { name: /review findings/i });
-      await review.scrollIntoViewIfNeeded();
-      await page.waitForFunction(() =>
-        document.querySelector(".git-panel")?.classList.contains("is-visible"),
-      );
-      await review.evaluate((element) =>
-        Promise.all(
-          element.getAnimations().map((animation) => animation.finished),
-        ),
-      );
-      const panelBounds = await review.boundingBox();
+      const films = page.locator(".product-film");
+      assert.equal(await films.count(), 5);
+      const intro = await page.locator(".hero").boundingBox();
+      const mission = await films.first().boundingBox();
       assert.ok(
-        panelBounds.x >= 0 && panelBounds.x + panelBounds.width <= width,
+        mission.y >= intro.y + intro.height,
+        "Films follow the text-led introduction",
       );
-      for (const selector of [".finding-row", ".findings-footer"]) {
-        const elements = review.locator(selector);
-        assert.ok(await elements.count());
-        for (const element of await elements.all()) {
-          assert.ok(
-            await element.evaluate(
-              (node) => node.scrollWidth <= node.clientWidth,
-            ),
-            `Review contents fit at ${width}px: ${selector}`,
-          );
-        }
+      for (const film of await films.all()) {
+        const bounds = await film.boundingBox();
+        assert.ok(
+          bounds.x >= 0 && bounds.x + bounds.width <= width,
+          "Film fits viewport",
+        );
+        const captions = film.getByRole("button", { name: /captions$/ });
+        assert.equal(
+          await captions.evaluate((node) => {
+            const style = getComputedStyle(node);
+            const metadata = getComputedStyle(node.closest("figcaption"));
+            return (
+              style.borderTopWidth === "0px" &&
+              style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+              style.color === metadata.color &&
+              style.fontSize === metadata.fontSize &&
+              style.fontWeight === metadata.fontWeight
+            );
+          }),
+          true,
+          "Caption toggle looks like the adjacent metadata, not a boxed button",
+        );
+        const captionBounds = await captions.boundingBox();
+        const frameBounds = await film.locator(".film-frame").boundingBox();
+        assert.ok(
+          captionBounds.y >= frameBounds.y + frameBounds.height,
+          "Caption toggle stays below the player, not over native controls",
+        );
+        assert.ok(
+          captionBounds.x >= 0 &&
+            captionBounds.x + captionBounds.width <= width,
+          "Caption toggle fits on mobile",
+        );
       }
       await docs.click();
       await page.getByRole("heading", { level: 1 }).waitFor();
       assert.equal(new URL(page.url()).pathname, "/docs/");
     }
+    // Fetch media only after intent; exercise decoding, controls and single playback.
+    const mediaRequests = [];
+    page.on("request", (request) => {
+      if (/\.(mp4|vtt)$/.test(request.url())) mediaRequests.push(request.url());
+    });
+    await page.goto(origin);
+    for (const film of await page.locator(".product-film").all())
+      await film.scrollIntoViewIfNeeded();
+    assert.equal(
+      mediaRequests.length,
+      0,
+      "Browsing the page does not fetch films",
+    );
+    const assertCaptionPreference = async (enabled) => {
+      await page.waitForFunction(
+        (enabled) =>
+          [...document.querySelectorAll(".film-captions")].every(
+            (button) => button.getAttribute("aria-pressed") === String(enabled),
+          ) &&
+          [...document.querySelectorAll("track[src]")].every(
+            (track) => track.track.mode === (enabled ? "showing" : "disabled"),
+          ),
+        enabled,
+      );
+    };
+    await page.locator(".film-captions").first().click();
+    await assertCaptionPreference(false);
+    await page.locator(".film-captions").last().click();
+    await assertCaptionPreference(true);
+    assert.equal(
+      mediaRequests.length,
+      0,
+      "Shared preferences keep unopened films lazy",
+    );
+    let previous;
+    for (const film of await page.locator(".product-film").all()) {
+      const captions = film.getByRole("button", { name: /captions$/ });
+      assert.equal(await captions.getAttribute("aria-pressed"), "true");
+      assert.equal((await captions.textContent()).trim(), "Captions on");
+      if (previous) {
+        await captions.click();
+        assert.equal(await captions.getAttribute("aria-pressed"), "false");
+        assert.equal((await captions.textContent()).trim(), "Captions off");
+        await captions.click();
+      }
+      await page.evaluate(
+        () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          ),
+      );
+      assert.equal(
+        await captions.isEnabled(),
+        true,
+        "Selecting CC before Play must not mark valid captions unavailable",
+      );
+      const cover = film.getByRole("link", { name: /^Play / });
+      await cover.focus();
+      await page.keyboard.press("Enter");
+      const video = film.locator("video");
+      assert.equal(
+        await video.evaluate((node) => node.muted),
+        !previous,
+        "Films start muted, then inherit the visitor's sound preference",
+      );
+      if (!previous) {
+        await video.evaluate((node) => {
+          node.muted = false;
+          node.volume = 0.6;
+        });
+        await page.waitForFunction(() =>
+          [...document.querySelectorAll("video")].every(
+            (video) => !video.muted && video.volume === 0.6,
+          ),
+        );
+      }
+      await video.evaluate(
+        (node) =>
+          new Promise((resolve, reject) => {
+            if (node.currentTime > 0) return resolve();
+            const timer = setTimeout(
+              () => reject(new Error("Video did not play")),
+              10000,
+            );
+            node.addEventListener(
+              "timeupdate",
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true },
+            );
+          }),
+      );
+      assert.equal(
+        await video.evaluate(
+          (node) => node.videoWidth > 0 && node.controls && !node.paused,
+        ),
+        true,
+      );
+      await page.waitForFunction(
+        (id) => {
+          const video = document.getElementById(id);
+          return (
+            video.textTracks[0]?.cues?.length > 0 &&
+            video.webkitAudioDecodedByteCount > 0
+          );
+        },
+        await video.getAttribute("id"),
+      );
+      await video.evaluate((node) => {
+        node.pause();
+        node.currentTime = node.textTracks[0].cues[0].startTime + 0.15;
+      });
+      await page.waitForFunction(
+        (id) =>
+          document.getElementById(id).textTracks[0]?.activeCues?.length > 0,
+        await video.getAttribute("id"),
+      );
+      assert.equal(
+        await video.evaluate((node) =>
+          [...node.textTracks[0].cues].every(
+            (cue) =>
+              !cue.snapToLines &&
+              (1 - cue.line / 100) * node.clientHeight >= 60 &&
+              (1 - cue.line / 100) * node.clientHeight <= 80 &&
+              cue.lineAlign === "end",
+          ),
+        ),
+        true,
+        "Captions sit low with room for native controls",
+      );
+      await captions.click();
+      await assertCaptionPreference(false);
+      assert.equal(
+        await video.evaluate((node) => node.textTracks[0].mode),
+        "disabled",
+      );
+      // Changing captions in the native menu must also update the external button.
+      await video.evaluate((node) => {
+        node.textTracks[0].mode = "showing";
+      });
+      await page.waitForFunction(
+        (id) =>
+          document
+            .querySelector(`[aria-controls="${id}"]`)
+            .getAttribute("aria-pressed") === "true",
+        await video.getAttribute("id"),
+      );
+      await assertCaptionPreference(true);
+      await video.evaluate((node) => node.play());
+      if (previous)
+        assert.equal(
+          await previous.evaluate((node) => node.paused),
+          true,
+          "Starting another film pauses the first",
+        );
+      previous = video;
+    }
+    await previous.evaluate((node) => {
+      node.muted = true;
+    });
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("video")].every((video) => video.muted),
+    );
+    await previous.evaluate((node) => {
+      node.currentTime = node.duration - 0.1;
+    });
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("video")].some((video) => video.ended),
+    );
+    // A disabled preference must survive opening a previously unopened film.
+    await page.reload();
+    await page.locator(".film-captions").first().click();
+    const unopenedFilm = page.locator(".product-film").nth(1);
+    await unopenedFilm.locator(".film-cover").click();
+    await page.waitForFunction(
+      () => document.getElementById("film-delegation").currentTime > 0,
+    );
+    await assertCaptionPreference(false);
+    assert.equal(
+      await unopenedFilm.locator("video").evaluate((video) => video.muted),
+      true,
+      "A reload resets sound to muted",
+    );
+    await unopenedFilm.locator(".film-captions").click();
+    await assertCaptionPreference(true);
+    await page.waitForFunction(
+      () =>
+        document.getElementById("film-delegation").textTracks[0]?.cues?.length >
+        0,
+    );
+    await page.route("**/media/*.vtt", (route) => route.abort());
+    await page.reload();
+    const firstFilm = page.locator(".product-film").first();
+    await firstFilm.getByRole("link", { name: /^Play / }).click();
+    await page.waitForFunction(
+      () => document.querySelector(".film-captions").disabled,
+    );
+    assert.match(
+      await firstFilm.locator(".film-captions").textContent(),
+      /unavailable/,
+    );
+    await page.waitForFunction(
+      () => document.querySelector("video").currentTime > 0,
+    );
+    await page.unroute("**/media/*.vtt");
+    await page.route("**/media/*.mp4", (route) => route.abort());
+    await page.reload();
+    await page
+      .getByRole("link", { name: /^Play / })
+      .first()
+      .click();
+    const error = page.getByRole("status");
+    await error.waitFor();
+    assert.equal(
+      await error.getByRole("link", { name: "Open video" }).count(),
+      1,
+    );
+    const noScript = await browser.newPage({ javaScriptEnabled: false });
+    await noScript.goto(origin);
+    const direct = noScript.getByRole("link", { name: /^Play / }).first();
+    assert.equal(
+      await noScript.locator(".film-captions").first().isVisible(),
+      false,
+      "Do not show a nonfunctional caption toggle without JavaScript",
+    );
+    assert.equal(
+      await direct.evaluate((node) => {
+        for (let parent = node; parent; parent = parent.parentElement) {
+          if (getComputedStyle(parent).opacity === "0") return false;
+        }
+        return true;
+      }),
+      true,
+      "Film covers remain visible without JavaScript",
+    );
+    const media = await noScript.request.get(
+      new URL(await direct.getAttribute("href"), origin).href,
+    );
+    assert.equal(media.status(), 200);
+    assert.equal(media.headers()["content-type"], "video/mp4");
+    await noScript.close();
   } finally {
     await browser?.close();
     await new Promise((resolve, reject) =>

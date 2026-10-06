@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Korus · Voice-over drafts</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #252729;
+        background: #f4f3ef;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 1500px;
+        padding: 28px;
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #62666b;
+        line-height: 1.5;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 24px 0;
+      }
+      button,
+      a {
+        font: inherit;
+      }
+      nav button,
+      #toggle-captions {
+        cursor: pointer;
+        border: 1px solid #c9cbcd;
+        border-radius: 8px;
+        background: white;
+        padding: 10px 16px;
+      }
+      nav button[aria-pressed="true"],
+      #toggle-captions[aria-pressed="true"] {
+        color: white;
+        background: #30363c;
+        border-color: #30363c;
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+        gap: 24px;
+        align-items: start;
+      }
+      video {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #17191c;
+        border-radius: 12px;
+      }
+      h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+      ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 8px;
+      }
+      .cue {
+        width: 100%;
+        text-align: left;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 12px;
+        background: #fff;
+        cursor: pointer;
+        line-height: 1.5;
+      }
+      .cue[aria-current="true"] {
+        border-color: #637c91;
+        background: #e9eff3;
+      }
+      .cue small {
+        display: block;
+        color: #687681;
+        font-variant-numeric: tabular-nums;
+      }
+      a {
+        color: #38576c;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #637c91;
+        outline-offset: 3px;
+      }
+      #error {
+        color: #aa3030;
+      }
+      @media (max-width: 850px) {
+        main {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        body {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Korus · Voice-over drafts</h1>
+    <p id="intro">
+      Temporary macOS voice. Review the words and timing; the final voice comes
+      later. Click a line to replay it.
+    </p>
+    <nav aria-label="Choose a film"></nav>
+    <main>
+      <section aria-label="Video preview">
+        <video controls playsinline preload="metadata"></video>
+        <p>
+          <button
+            id="toggle-captions"
+            type="button"
+            aria-pressed="false"
+            disabled
+          >
+            CC · Captions
+          </button>
+        </p>
+        <p>
+          <a id="download" download>Download narrated MP4</a> ·
+          <a id="captions" download>Download captions</a>
+        </p>
+        <p id="voice"></p>
+        <p id="error" role="alert"></p>
+      </section>
+      <section aria-label="Timed narration">
+        <h2 id="title"></h2>
+        <ol></ol>
+      </section>
+    </main>
+    <script type="module">
+      const video = document.querySelector("video");
+      const nav = document.querySelector("nav");
+      const list = document.querySelector("ol");
+      const error = document.querySelector("#error");
+      const captionToggle = document.querySelector("#toggle-captions");
+      let captionsEnabled = false;
+      let selected;
+      captionToggle.addEventListener("click", () => {
+        captionsEnabled = !captionsEnabled;
+        video.textTracks[0].mode = captionsEnabled ? "showing" : "disabled";
+        captionToggle.setAttribute("aria-pressed", String(captionsEnabled));
+      });
+      // Keep the visible switch in sync with the native player's caption menu.
+      video.textTracks.addEventListener("change", () => {
+        if (!video.textTracks.length) return;
+        captionsEnabled = video.textTracks[0].mode === "showing";
+        captionToggle.setAttribute("aria-pressed", String(captionsEnabled));
+      });
+      const clock = (seconds) =>
+        `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+      function select(film) {
+        video.pause();
+        selected = film;
+        video.src = film.video;
+        video.replaceChildren();
+        const track = document.createElement("track");
+        Object.assign(track, {
+          kind: "captions",
+          label: "English",
+          srclang: "en",
+          src: film.subtitles,
+        });
+        video.append(track);
+        track.track.mode = captionsEnabled ? "showing" : "disabled";
+        captionToggle.disabled = false;
+        document.querySelector("#download").href = film.video;
+        document.querySelector("#captions").href = film.subtitles;
+        document.querySelector("#title").textContent = film.title;
+        document.querySelector("#voice").textContent =
+          `${film.voice} · ${film.rate ? `${film.rate} words per minute` : "local AI narration"} · draft audio only`;
+        error.textContent = "";
+        list.replaceChildren(
+          ...film.cues.map((cue) => {
+            const item = document.createElement("li");
+            const button = document.createElement("button");
+            button.className = "cue";
+            const time = document.createElement("small");
+            time.textContent = `${clock(cue.start)} – ${clock(cue.spokenEnd)} · ${(cue.end - cue.spokenEnd).toFixed(1)}s breathing room`;
+            button.append(time, document.createTextNode(cue.text));
+            button.addEventListener("click", () => {
+              video.currentTime = Math.max(0, cue.start - 0.15);
+              video.play().catch((reason) => {
+                error.textContent = reason.message;
+              });
+            });
+            item.append(button);
+            return item;
+          }),
+        );
+        [...nav.children].forEach((button) =>
+          button.setAttribute(
+            "aria-pressed",
+            String(button.dataset.id === film.id),
+          ),
+        );
+      }
+      video.addEventListener("timeupdate", () => {
+        list.querySelectorAll("button").forEach((button, index) => {
+          const cue = selected.cues[index];
+          button.setAttribute(
+            "aria-current",
+            String(
+              video.currentTime >= cue.start &&
+                video.currentTime < cue.spokenEnd,
+            ),
+          );
+        });
+      });
+      video.addEventListener("error", () => {
+        error.textContent =
+          "Could not load this draft. Re-run the narration exporter and refresh.";
+      });
+      try {
+        const response = await fetch("narration.json");
+        if (!response.ok)
+          throw new Error("Could not load the narration script.");
+        const script = await response.json();
+        if (script.title) {
+          document.querySelector("h1").textContent = script.title;
+          document.title = script.title;
+        }
+        if (script.description)
+          document.querySelector("#intro").textContent = script.description;
+        script.films.forEach((film) => {
+          const button = document.createElement("button");
+          button.textContent = film.title;
+          button.dataset.id = film.id;
+          button.addEventListener("click", () => select(film));
+          nav.append(button);
+        });
+        select(script.films[0]);
+      } catch (reason) {
+        error.textContent = reason.message;
+      }
+    </script>
+  </body>
+</html>

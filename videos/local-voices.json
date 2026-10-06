@@ -1,0 +1,18 @@
+{
+  "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+  "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+  "referenceText": "I can now use the slash delegate command to hand off the implementation. Korus sets up the worktree, starts the agent, and hands over the instructions.",
+  "seed": 42,
+  "voices": [
+    {
+      "id": "american-male",
+      "title": "Calm American",
+      "direction": "A calm adult male voice with a warm lower-mid pitch, clear neutral American English accent, and relaxed confidence. Sound like a software engineer demonstrating his own workflow to a colleague. Brisk and fluent, around 180 words per minute. Clean dry solo speech, no music or sound effects."
+    },
+    {
+      "id": "british-male",
+      "title": "Understated British",
+      "direction": "Speak in a British male voice, with a low pitch and a brisk conversational pace."
+    }
+  ]
+}

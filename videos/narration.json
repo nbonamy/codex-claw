@@ -1,0 +1,226 @@
+{
+  "voice": "Samantha",
+  "rate": 180,
+  "films": [
+    {
+      "id": "mission-film",
+      "title": "Mission",
+      "duration": 48,
+      "cues": [
+        { "start": 0.5, "end": 3.2, "text": "Let's build a feature in Korus." },
+        {
+          "start": 3.5,
+          "end": 9.1,
+          "text": "I start a Mission and ask for cloud-based agents, alongside the local ones."
+        },
+        {
+          "start": 9.6,
+          "end": 16.1,
+          "text": "Before any code, I can review the requirements, clarify the scope, and approve the brief."
+        },
+        {
+          "start": 16.6,
+          "end": 22.3,
+          "text": "That becomes a set of tickets. I check the breakdown, then approve the work."
+        },
+        {
+          "start": 22.8,
+          "end": 30.3,
+          "text": "The agent works through each ticket in an isolated worktree. I can follow the progress and inspect the changes."
+        },
+        {
+          "start": 30.8,
+          "end": 37.4,
+          "text": "Next comes review. The findings get fixed one by one, then checked in another round."
+        },
+        {
+          "start": 37.9,
+          "end": 41.8,
+          "text": "I'm ready to hand this over. I'll create a pull request."
+        },
+        {
+          "start": 42.1,
+          "end": 44.7,
+          "text": "It's ready for my team to review."
+        },
+        { "start": 45, "end": 47.7, "text": "From idea to delivery, in Korus." }
+      ]
+    },
+    {
+      "id": "review-film",
+      "title": "Code Review",
+      "duration": 50,
+      "cues": [
+        { "start": 0.5, "end": 3, "text": "Let's review my changes in Korus." },
+        {
+          "start": 3.5,
+          "end": 8.3,
+          "text": "I can use the slash review command, right here in my conversation."
+        },
+        {
+          "start": 8.8,
+          "end": 14.8,
+          "text": "I choose the branch I want to review, and an independent agent to take a look."
+        },
+        {
+          "start": 15.3,
+          "end": 20.8,
+          "text": "The reviewer checks the changes and records its findings, while I stay in my workspace."
+        },
+        {
+          "start": 21.3,
+          "end": 28.8,
+          "text": "Here are the findings. I can inspect the details, select the issues worth fixing, and leave the others out."
+        },
+        {
+          "start": 29.3,
+          "end": 36.8,
+          "text": "Now I ask the agent to fix my selection. I can follow each issue as it moves from pending to fixed."
+        },
+        {
+          "start": 37.3,
+          "end": 43.8,
+          "text": "I run another round to check the fixes. No more findings, so I can finish the review."
+        },
+        {
+          "start": 44.5,
+          "end": 49.3,
+          "text": "I've chosen the fixes and checked the result. All in Korus."
+        }
+      ]
+    },
+    {
+      "id": "delegation-film",
+      "title": "Worktree Delegation",
+      "duration": 46,
+      "cues": [
+        {
+          "start": 0.5,
+          "end": 3,
+          "text": "Let's give this feature its own space."
+        },
+        {
+          "start": 3.5,
+          "end": 8.3,
+          "text": "I want a faster way to switch between agents. First, I talk it through."
+        },
+        {
+          "start": 8.6,
+          "end": 12.8,
+          "text": "A few iterations later, we've agreed on how it should work."
+        },
+        {
+          "start": 13.2,
+          "end": 17.8,
+          "text": "I can now use the slash delegate command to hand off the implementation."
+        },
+        {
+          "start": 18.2,
+          "end": 23.8,
+          "text": "Korus sets up the worktree, starts the agent, and hands over the instructions."
+        },
+        {
+          "start": 24.2,
+          "end": 29.8,
+          "text": "I keep working with the new agent. Here, I'm asking it to pin my recent sessions."
+        },
+        {
+          "start": 30.2,
+          "end": 36.3,
+          "text": "The changes are ready, so I select Merge. Korus brings them back and cleans up the worktree."
+        },
+        {
+          "start": 36.7,
+          "end": 40.3,
+          "text": "The agent closes. My first chat stays open."
+        },
+        {
+          "start": 41,
+          "end": 45.5,
+          "text": "I can keep discussing the feature, with my main branch clear."
+        }
+      ]
+    },
+    {
+      "id": "project-film",
+      "title": "Quick Chat to Project",
+      "duration": 43,
+      "cues": [
+        { "start": 0.4, "end": 2.8, "text": "I've got an idea for an app." },
+        {
+          "start": 3.2,
+          "end": 8,
+          "text": "I start in Quick Chat, without a project folder."
+        },
+        {
+          "start": 8.4,
+          "end": 15.8,
+          "text": "I want to turn meeting notes into tasks. We discuss owners, due dates, and links back to the notes."
+        },
+        {
+          "start": 16.2,
+          "end": 20.8,
+          "text": "Once the idea is clear, I ask Korus to create the project."
+        },
+        {
+          "start": 21.2,
+          "end": 27.8,
+          "text": "It sets up the folder, creates a project agent, and hands over the plan we just worked out."
+        },
+        {
+          "start": 28.2,
+          "end": 33.8,
+          "text": "There's my new project. I can open its agent, and the original Quick Chat stays available."
+        },
+        {
+          "start": 34.2,
+          "end": 37.8,
+          "text": "The context is already here. I can start building."
+        },
+        {
+          "start": 38.4,
+          "end": 42.6,
+          "text": "From a conversation to a project, without starting over."
+        }
+      ]
+    },
+    {
+      "id": "visualize-film",
+      "title": "Visualize and Annotate",
+      "duration": 31,
+      "cues": [
+        {
+          "start": 0.3,
+          "end": 2.3,
+          "text": "Let's see how this fits together."
+        },
+        {
+          "start": 2.7,
+          "end": 6.8,
+          "text": "I type slash visualize to get diagram suggestions on the right."
+        },
+        { "start": 7.1, "end": 9.4, "text": "I'll open this release flow." },
+        {
+          "start": 9.7,
+          "end": 15.3,
+          "text": "I select Annotate, then this box. I'd like to separate code review from human approval."
+        },
+        {
+          "start": 15.6,
+          "end": 17.9,
+          "text": "I send the annotation directly."
+        },
+        {
+          "start": 18.2,
+          "end": 26.2,
+          "text": "The agent uses my comment and the selected shape to update the diagram. Now review and approval are separate, and the rest stays in place."
+        },
+        {
+          "start": 27,
+          "end": 30.7,
+          "text": "I can show what I mean, right on the diagram."
+        }
+      ]
+    }
+  ]
+}

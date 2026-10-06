@@ -1,0 +1,5 @@
+mlx-audio[tts]==0.5.8
+mlx==0.32.3
+mlx-whisper==0.4.3
+resemblyzer==0.1.4
+setuptools==80.10.2

@@ -1,16 +1,84 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import product from "../core/src/product.json" with { type: "json" };
 
 const source = new URL("./", import.meta.url);
 const output = new URL("../dist/website/", import.meta.url);
+const narratedDirectory = resolve(
+  process.env.APP_NARRATED_FILMS ??
+    join(homedir(), "Downloads", "korus-narrated-videos"),
+);
+const narration = JSON.parse(
+  await readFile(join(narratedDirectory, "narration.json"), "utf8").catch(
+    () => {
+      throw new Error(
+        "Missing narrated films. Follow website/README.md's Calm American export steps, then run: node videos/render-voice-comparison.mjs --all. Set APP_NARRATED_FILMS for another export directory.",
+      );
+    },
+  ),
+);
+
+// Rendered films stay out of Git. Require them before replacing the last build.
+const media = [];
+for (const film of [
+  "mission",
+  "review",
+  "delegation",
+  "project",
+  "visualize",
+]) {
+  const record = narration.films.find((entry) => entry.id === `${film}-film`);
+  if (
+    !record ||
+    record.voice !== "Calm American" ||
+    !Number.isFinite(record.duration) ||
+    record.duration <= 0
+  )
+    throw new Error(`Missing approved Calm American export for ${film}-film.`);
+  for (const [kind, name, location] of [
+    ["VIDEO", `${film}-film-paced.mp4`, narratedDirectory],
+    ["CAPTIONS", `${film}-film-paced.vtt`, narratedDirectory],
+    ["POSTER", `${film}-film-poster.png`, new URL("../videos/assets/", source)],
+  ]) {
+    if (
+      (kind === "VIDEO" && record.video !== name) ||
+      (kind === "CAPTIONS" && record.subtitles !== name)
+    )
+      throw new Error(
+        `Unexpected ${kind.toLowerCase()} export for ${film}-film.`,
+      );
+    const bytes = await readFile(
+      typeof location === "string"
+        ? join(location, name)
+        : new URL(name, location),
+    ).catch(() => {
+      throw new Error(
+        `Missing ${name}. Run: ${kind === "POSTER" ? `node videos/render-mission-film.mjs ${film}-film` : "node videos/render-voice-comparison.mjs --all"}`,
+      );
+    });
+    const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 12);
+    media.push({
+      token: `__FILM_${film.toUpperCase()}_${kind}__`,
+      path: `media/${hash}-${name}`,
+      bytes,
+    });
+  }
+}
 
 // Publish a static artifact rather than the website's source directory.
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
+await mkdir(new URL("media/", output));
+for (const asset of media)
+  await writeFile(new URL(asset.path, output), asset.bytes);
 for (const path of ["styles.css", "script.js", "assets"]) {
   await cp(new URL(path, source), new URL(path, output), { recursive: true });
 }
-const landing = await readFile(new URL("index.html", source), "utf8");
+let landing = await readFile(new URL("index.html", source), "utf8");
+for (const asset of media)
+  landing = landing.replaceAll(asset.token, asset.path);
 await writeFile(
   new URL("index.html", output),
   landing

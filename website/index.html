@@ -40,7 +40,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=korus-review-3" />
+    <link rel="stylesheet" href="styles.css?v=korus-narrated-films-7" />
   </head>
   <body>
     <header class="site-header shell">
@@ -96,126 +96,6 @@
             ><span>Free to use</span>
           </div>
         </div>
-
-        <div
-          class="hero-product product-visual reveal delay-1"
-          aria-label="__PRODUCT_NAME__ repository sessions preview"
-        >
-          <div class="product-visual__media">
-            <div class="product-window">
-              <div class="window-bar">
-                <div class="traffic-lights" aria-hidden="true">
-                  <span></span><span></span><span></span>
-                </div>
-                <div class="window-title">
-                  <img src="assets/app-icon.png?v=mark-2" alt="" /> __PRODUCT_NAME__
-                </div>
-                <div class="window-version">v0.25</div>
-              </div>
-              <div class="session-shell">
-                <div class="team-rail" aria-hidden="true">
-                  <span class="team-rail__cockpit">⌘</span>
-                  <span class="team-rail__team active">NB</span>
-                  <span class="team-rail__team">OS</span>
-                  <span class="team-rail__add">+</span>
-                </div>
-                <aside class="session-sidebar">
-                  <div class="session-sidebar__title">
-                    Sessions <span>‹</span>
-                  </div>
-                  <div class="session-sidebar__actions">
-                    <span><b>＋</b> Start work</span>
-                    <span><b>◌</b> Quick Chat</span>
-                  </div>
-                  <div class="session-group">
-                    <div class="session-group__head">
-                      <span>⌘</span><strong>example-project</strong><b>＋</b>
-                    </div>
-                    <div class="session-item">
-                      <i>⑂</i><span>main</span><b class="status-dot idle"></b>
-                    </div>
-                    <div class="session-item active">
-                      <i>⑂</i><span>fix/gh-286</span
-                      ><b class="status-dot working"></b>
-                    </div>
-                    <div class="session-item">
-                      <i>⑂</i><span>feat/onboarding</span
-                      ><b class="status-dot unread"></b>
-                    </div>
-                  </div>
-                  <div class="session-group">
-                    <div class="session-group__head">
-                      <span>⚙️</span><strong>codex-app-sdk</strong><b>＋</b>
-                    </div>
-                    <div class="session-item">
-                      <i>⑂</i><span>main</span><b class="status-dot idle"></b>
-                    </div>
-                  </div>
-                  <div class="session-group quick-chat-group">
-                    <div class="session-group__head">
-                      <span>◌</span><strong>Quick Chats</strong><b>＋</b>
-                    </div>
-                    <div class="session-item">
-                      <span>Release naming</span><b class="status-dot idle"></b>
-                    </div>
-                  </div>
-                </aside>
-                <section class="conversation-preview">
-                  <header class="conversation-preview__header">
-                    <span>⌘</span>
-                    <strong>fix/gh-286</strong>
-                    <small>fix/gh-286 @ example-project</small>
-                    <b><i></i> Working</b>
-                  </header>
-                  <div class="conversation-preview__body">
-                    <div class="user-bubble">
-                      Preserve the active session if the backend reconnects.
-                    </div>
-                    <div class="assistant-turn">
-                      <div class="assistant-turn__label">
-                        <span>⌘</span><strong>Codex</strong>
-                      </div>
-                      <p>
-                        I found the restore race. I’m keeping the selected
-                        session visible while the backend snapshot catches up.
-                      </p>
-                      <div class="tool-row done">
-                        <i>✓</i><span>Explored session restore flow</span>
-                      </div>
-                      <div class="tool-row done">
-                        <i>✓</i><span>Edited 4 files</span>
-                      </div>
-                      <div class="tool-row running">
-                        <i></i><span>Running focused tests</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="composer-preview">
-                    Ask for follow-up changes <span>↑</span>
-                  </div>
-                </section>
-                <aside class="review-preview">
-                  <header><strong>Review</strong><span>×</span></header>
-                  <div class="review-preview__stats">
-                    <b>+184</b><i>−52</i><span>4 files</span>
-                  </div>
-                  <div class="review-preview__file">
-                    <span>useSessionRestore.ts</span><b>+91 −18</b>
-                  </div>
-                  <pre><code><span>  const totalPages = computed(() =&gt;</span>
-<del>-   Math.ceil(items.length / size)</del>
-<ins>+   Math.ceil(totalItems / size)</ins>
-<span>  );</span>
-<ins>+ const visible = cached[page];</ins></code></pre>
-                </aside>
-              </div>
-            </div>
-          </div>
-          <div class="product-visual__caption">
-            <span><i></i> 4 sessions active</span>
-            <span>Agents do the work. You guide it forward.</span>
-          </div>
-        </div>
       </section>
 
       <section class="signal-strip" aria-label="__PRODUCT_NAME__ workflow">
@@ -240,54 +120,57 @@
           </p>
         </div>
         <div class="session-story">
-          <div
-            class="session-map reveal"
-            aria-label="Illustrative Mission progressing from requirements to delivery"
-          >
-            <div class="session-map__top">
-              <span>Mission / Add team invitations</span><b>In progress</b>
+          <figure class="product-film mission-film reveal">
+            <div class="film-frame">
+              <video
+                controls
+                playsinline
+                muted
+                preload="none"
+                hidden
+                tabindex="0"
+                aria-label="Mission walkthrough"
+                id="film-mission"
+              >
+                <track
+                  kind="captions"
+                  label="English"
+                  srclang="en"
+                  data-src="__FILM_MISSION_CAPTIONS__"
+                />
+              </video>
+              <a
+                class="film-cover"
+                href="__FILM_MISSION_VIDEO__"
+                aria-label="Play Mission film"
+              >
+                <img
+                  src="__FILM_MISSION_POSTER__"
+                  width="1600"
+                  height="900"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span class="film-play"
+                  ><span aria-hidden="true">▶</span> Watch film</span
+                >
+              </a>
             </div>
-            <div class="session-map__repo">
-              <header>
-                <span>◎</span><strong>From idea to delivery</strong
-                ><small>WORKFLOW</small>
-              </header>
-              <div>
-                <i>✓</i><strong>Requirements</strong><span>Approved</span>
-              </div>
-              <div>
-                <i>✓</i><strong>Tickets</strong><span>Ready to build</span>
-              </div>
-              <div class="active">
-                <i>⑂</i><strong>Implementation</strong><span>Working</span>
-              </div>
-              <div><i>◌</i><strong>Review</strong><span>Up next</span></div>
-              <div><i>↗</i><strong>Ship</strong><span>When ready</span></div>
-            </div>
-            <div class="session-map__repo">
-              <header>
-                <span>▤</span><strong>The work stays visible</strong
-                ><small>ARTIFACTS</small>
-              </header>
-              <div>
-                <i>✓</i><strong>Requirements &amp; tickets</strong
-                ><span>Available</span>
-              </div>
-              <div>
-                <i>⑂</i><strong>Code changes</strong><span>In progress</span>
-              </div>
-            </div>
-            <div class="session-map__repo quick">
-              <header>
-                <span>↳</span><strong>You guide the decisions</strong
-                ><small>HUMAN + AGENTS</small>
-              </header>
-              <div>
-                <i>✓</i><strong>Scope approved · implementation underway</strong
-                ><span></span>
-              </div>
-            </div>
-          </div>
+            <figcaption>
+              <span><strong>Mission</strong> · Idea to pull request</span>
+              <button
+                class="film-captions"
+                type="button"
+                aria-label="Mission captions"
+                aria-controls="film-mission"
+                aria-pressed="true"
+                hidden
+              >
+                CC · Captions
+              </button>
+            </figcaption>
+          </figure>
           <div class="session-principles">
             <article class="session-principle reveal">
               <span>01</span>
@@ -321,14 +204,12 @@
       <section id="routing" class="routing-section">
         <div class="shell routing-grid">
           <div class="routing-copy reveal">
-            <p class="section-kicker">02 / Start where you are</p>
-            <h2>
-              An idea. An issue.<br /><span>Work already in motion.</span>
-            </h2>
+            <p class="section-kicker">02 / Give work its own space</p>
+            <h2>Delegate the task.<br /><span>Keep the context.</span></h2>
             <p>
-              Talk through an idea in Quick Chat, pick up a GitHub issue, or
-              jump into an existing repository. Use a Mission for a multi-stage
-              change or work directly with an agent for a focused task.
+              Turn a feature discussion into focused work. Hand it to a
+              dedicated agent in an isolated worktree, keep iterating together,
+              and merge the changes back when they’re ready.
             </p>
             <div class="routing-note">
               <span>The right space for the work</span>
@@ -338,61 +219,60 @@
               </p>
             </div>
           </div>
-          <div
-            class="routing-demo reveal delay-1"
-            aria-label="GitHub issue work routing preview"
-          >
-            <div class="issue-picker">
-              <header>
-                <strong>Start work</strong><span>example-project / Issues</span>
-              </header>
-              <div class="issue-search">⌕ Search open issues</div>
-              <div class="issue-row selected">
-                <b>#286</b
-                ><span>Preserve the active session after reconnect</span
-                ><i>bug</i>
-              </div>
-              <div class="issue-row">
-                <b>#281</b><span>Improve onboarding repository picker</span
-                ><i>ui</i>
-              </div>
-              <div class="issue-row">
-                <b>#275</b><span>Show unread state on background sessions</span
-                ><i>ux</i>
-              </div>
+          <figure class="product-film reveal delay-1">
+            <div class="film-frame">
+              <video
+                controls
+                playsinline
+                muted
+                preload="none"
+                hidden
+                tabindex="0"
+                aria-label="Delegation walkthrough"
+                id="film-delegation"
+              >
+                <track
+                  kind="captions"
+                  label="English"
+                  srclang="en"
+                  data-src="__FILM_DELEGATION_CAPTIONS__"
+                />
+              </video>
+              <a
+                class="film-cover"
+                href="__FILM_DELEGATION_VIDEO__"
+                aria-label="Play Delegation film"
+              >
+                <img
+                  src="__FILM_DELEGATION_POSTER__"
+                  width="1600"
+                  height="900"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span class="film-play"
+                  ><span aria-hidden="true">▶</span> Watch film</span
+                >
+              </a>
             </div>
-            <div class="route-decision">
-              <div class="route-decision__head">
-                <small>ISSUE #286</small
-                ><strong>Where should this work happen?</strong>
-              </div>
-              <article>
-                <span class="route-icon">↳</span>
-                <div>
-                  <strong>Use this session</strong>
-                  <p>
-                    Continue in the current folder and branch with its existing
-                    context.
-                  </p>
-                </div>
-                <b>Best for follow-ups</b>
-              </article>
-              <article class="selected">
-                <span class="route-icon">⑂</span>
-                <div>
-                  <strong>New isolated session</strong>
-                  <p>
-                    Create a dedicated branch and worktree so this task can run
-                    independently.
-                  </p>
-                </div>
-                <b>Best for parallel work</b>
-              </article>
-              <button type="button" tabindex="-1">
-                Start isolated work <span>→</span>
+            <figcaption>
+              <span
+                ><strong>Delegation</strong> · Isolate the work. Merge it
+                back.</span
+              >
+              <button
+                class="film-captions"
+                type="button"
+                aria-label="Delegation captions"
+                aria-controls="film-delegation"
+                aria-pressed="true"
+                hidden
+              >
+                CC · Captions
               </button>
-            </div>
-          </div>
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -416,57 +296,59 @@
               <li>Commit, push, and deliver when ready</li>
             </ul>
           </div>
-          <div
-            class="git-panel reveal delay-1"
-            role="img"
-            aria-label="__PRODUCT_NAME__ review findings: two issues selected for fixes, with P1, P2, and P3 priority labels and a Fix selected findings action"
-          >
-            <div class="git-panel-head">
-              <span>Code review</span>
-              <small>feature/session-restore</small>
-              <span class="review-round">Round 1</span>
-            </div>
-            <div class="findings-summary">
-              <strong>3 findings</strong>
-              <span>Choose what to fix</span>
-            </div>
-            <div class="findings-list" aria-hidden="true">
-              <div class="finding-row is-selected">
-                <div class="finding-heading">
-                  <span class="finding-priority priority-high">P1</span>
-                  <strong>Restore the correct session</strong>
-                  <span class="finding-toggle is-on"></span>
-                </div>
-                <div class="finding-detail">
-                  <span>src/session/restore.ts:42</span>
-                  <p>
-                    A delayed response can replace the active session. Check the
-                    session ID before applying the result.
-                  </p>
-                </div>
-              </div>
-              <div class="finding-row is-selected">
-                <div class="finding-heading">
-                  <span class="finding-priority priority-medium">P2</span>
-                  <strong>Keep drafts when switching tabs</strong>
-                  <span class="finding-toggle is-on"></span>
-                </div>
-              </div>
-              <div class="finding-row">
-                <div class="finding-heading">
-                  <span class="finding-priority priority-low">P3</span>
-                  <strong>Clarify the empty-state message</strong>
-                  <span class="finding-toggle"></span>
-                </div>
-              </div>
-            </div>
-            <div class="findings-footer" aria-hidden="true">
-              <span>2 of 3 selected</span>
-              <span class="findings-action"
-                >Fix selected findings <span>→</span></span
+          <figure class="product-film reveal delay-1">
+            <div class="film-frame">
+              <video
+                controls
+                playsinline
+                muted
+                preload="none"
+                hidden
+                tabindex="0"
+                aria-label="Code Review walkthrough"
+                id="film-review"
               >
+                <track
+                  kind="captions"
+                  label="English"
+                  srclang="en"
+                  data-src="__FILM_REVIEW_CAPTIONS__"
+                />
+              </video>
+              <a
+                class="film-cover"
+                href="__FILM_REVIEW_VIDEO__"
+                aria-label="Play Code Review film"
+              >
+                <img
+                  src="__FILM_REVIEW_POSTER__"
+                  width="1600"
+                  height="900"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span class="film-play"
+                  ><span aria-hidden="true">▶</span> Watch film</span
+                >
+              </a>
             </div>
-          </div>
+            <figcaption>
+              <span
+                ><strong>Code Review</strong> · Find, fix, review again</span
+              >
+              <button
+                class="film-captions"
+                type="button"
+                aria-label="Code Review captions"
+                aria-controls="film-review"
+                aria-pressed="true"
+                hidden
+              >
+                CC · Captions
+              </button>
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -562,6 +444,130 @@
               ><span class="running"><i></i> 1 needs attention</span>
             </div>
           </article>
+          <article class="capability reveal">
+            <span class="capability-label">QUICK CHAT</span>
+            <h3>Start with a conversation.<br />Leave with a project.</h3>
+            <p>
+              Explore an idea before choosing a folder. When it takes shape, ask
+              an agent to create the project and carry your context into the
+              work.
+            </p>
+            <figure class="product-film">
+              <div class="film-frame">
+                <video
+                  controls
+                  playsinline
+                  muted
+                  preload="none"
+                  hidden
+                  tabindex="0"
+                  aria-label="Quick Chat walkthrough"
+                  id="film-project"
+                >
+                  <track
+                    kind="captions"
+                    label="English"
+                    srclang="en"
+                    data-src="__FILM_PROJECT_CAPTIONS__"
+                  />
+                </video>
+                <a
+                  class="film-cover"
+                  href="__FILM_PROJECT_VIDEO__"
+                  aria-label="Play Quick Chat film"
+                >
+                  <img
+                    src="__FILM_PROJECT_POSTER__"
+                    width="1600"
+                    height="900"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span class="film-play"
+                    ><span aria-hidden="true">▶</span> Watch film</span
+                  >
+                </a>
+              </div>
+              <figcaption>
+                <span
+                  ><strong>Quick Chat</strong> · Conversation to project</span
+                >
+                <button
+                  class="film-captions"
+                  type="button"
+                  aria-label="Quick Chat captions"
+                  aria-controls="film-project"
+                  aria-pressed="true"
+                  hidden
+                >
+                  CC · Captions
+                </button>
+              </figcaption>
+            </figure>
+          </article>
+          <article class="capability reveal delay-1">
+            <span class="capability-label">VISUALIZE</span>
+            <h3>Think through the system together.</h3>
+            <p>
+              Create and refine diagrams beside the conversation. Keep the
+              design visible as your understanding evolves.
+            </p>
+            <figure class="product-film">
+              <div class="film-frame">
+                <video
+                  controls
+                  playsinline
+                  muted
+                  preload="none"
+                  hidden
+                  tabindex="0"
+                  aria-label="Visualize walkthrough"
+                  id="film-visualize"
+                >
+                  <track
+                    kind="captions"
+                    label="English"
+                    srclang="en"
+                    data-src="__FILM_VISUALIZE_CAPTIONS__"
+                  />
+                </video>
+                <a
+                  class="film-cover"
+                  href="__FILM_VISUALIZE_VIDEO__"
+                  aria-label="Play Visualize film"
+                >
+                  <img
+                    src="__FILM_VISUALIZE_POSTER__"
+                    width="1600"
+                    height="900"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span class="film-play"
+                    ><span aria-hidden="true">▶</span> Watch film</span
+                  >
+                </a>
+              </div>
+              <figcaption>
+                <span
+                  ><strong>Visualize</strong> · See it. Annotate it. Refine
+                  it.</span
+                >
+                <button
+                  class="film-captions"
+                  type="button"
+                  aria-label="Visualize captions"
+                  aria-controls="film-visualize"
+                  aria-pressed="true"
+                  hidden
+                >
+                  CC · Captions
+                </button>
+              </figcaption>
+            </figure>
+          </article>
           <article class="capability reveal delay-1">
             <span class="capability-label">YOUR CHOICE OF AGENTS</span>
             <h3>Codex, Claude Code—or both.</h3>
@@ -571,29 +577,6 @@
             </p>
             <div class="tab-preview" aria-hidden="true">
               <span>Codex</span><span>Claude Code</span>
-            </div>
-          </article>
-          <article class="capability reveal delay-1">
-            <span class="capability-label">VISUALIZE</span>
-            <h3>Think through the system together.</h3>
-            <p>
-              Create and refine diagrams beside the conversation. Keep the
-              design visible as your understanding evolves.
-            </p>
-            <div class="tab-preview" aria-hidden="true">
-              <span>Diagrams</span><span>Designs</span><span>Conversation</span>
-            </div>
-          </article>
-          <article class="capability reveal">
-            <span class="capability-label">COLLABORATION</span>
-            <h3>Give the next piece of work its own space.</h3>
-            <p>
-              Agents can share context and propose work in a dedicated worktree.
-              Run local teams or connect remote teams over SSH, keeping each
-              agent's workspace and progress in view.
-            </p>
-            <div class="agent-stack" aria-hidden="true">
-              <span>⌘</span><span>⚙️</span><span>🛠️</span><i>3 active</i>
             </div>
           </article>
           <article class="capability reveal delay-1">
@@ -649,13 +632,15 @@
 
     <footer class="site-footer shell">
       <a class="brand" href="#top"
-        ><img class="brand-icon" src="assets/app-icon.png?v=mark-2" alt="" /><span
-          ><strong>__PRODUCT_NAME__</strong></span
-        ></a
+        ><img
+          class="brand-icon"
+          src="assets/app-icon.png?v=mark-2"
+          alt=""
+        /><span><strong>__PRODUCT_NAME__</strong></span></a
       >
       <span>Software engineering, orchestrated.</span>
       <span class="mono">© <span id="year"></span> nabocorp</span>
     </footer>
-    <script src="script.js"></script>
+    <script src="script.js?v=korus-narrated-films-7"></script>
   </body>
 </html>

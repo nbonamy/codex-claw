@@ -7,7 +7,7 @@ This contains the static landing page and VitePress documentation for [meetkorus
 ```bash
 npm run docs:build
 node website/build.mjs
-python3 -m http.server 4173 --directory dist/website
+npx vite dist/website --host 127.0.0.1 --port 4173 --strictPort
 ```
 
 Then open <http://127.0.0.1:4173>.
@@ -44,7 +44,7 @@ Build, check, and preview the complete static website:
 ```bash
 npm run test:docs
 npm run docs:check
-python3 -m http.server 4173 --directory dist/website
+npx vite dist/website --host 127.0.0.1 --port 4173 --strictPort
 ```
 
 Visit <http://127.0.0.1:4173/docs/>. `test:docs` builds the site and checks the
@@ -70,19 +70,42 @@ remain full-square. Composite the canonical vector into thumbnails, the social
 card, and the channel banner rather than asking image generation to redraw it.
 Re-export the films after updating their shared `website/assets/app-icon.png`.
 
-The hero currently uses a lightweight HTML and CSS product composition. It is deliberately structured as a replaceable media frame so a current release screenshot can take over later without changing the page narrative.
+The page opens with a text-led hero, followed by five self-hosted product films:
+Mission in the first workflow section, Delegation and Code Review beside their
+workflow copy, and Quick Chat and Visualize in the feature cards. Automations
+and Cockpit retain static illustrations.
 
-When a product screenshot is ready, replace the `.product-window` element inside `.product-visual__media` with:
+Each film opens from its rendered poster frame. No MP4 is requested until the
+visitor clicks; native controls provide seeking and fullscreen, and starting a
+film pauses the others. The films use the approved Calm American narration and
+pacing. Playback starts muted with captions on; visitors can unmute using the
+native controls or use the understated Captions on/off text link below each player.
+Sound, volume, and caption choices apply to all five players until the page reloads.
+Captions sit near the bottom of the video; native controls may adjust their placement.
+Captions are separate WebVTT tracks and also available through the native player's menu. Subtitle
+files are loaded only when the visitor opens a film. Cover links also open the
+MP4 directly without JavaScript. These are animated walkthroughs, not live recordings.
 
-```html
-<img
-  class="product-screenshot"
-  src="assets/product-shell.png"
-  alt="Korus with repository-grouped sessions, an active conversation, and a review pane"
-/>
+Before building or deploying from a fresh checkout, render all five films:
+
+```bash
+for film in mission review delegation project visualize; do
+  node videos/render-mission-film.mjs "$film-film"
+done
 ```
 
-Keep the screenshot free of private repository names, issue content, messages, and account details. The website positions Korus as a workspace for agentic software engineering workflows. Missions, direct repository sessions, Review, and Visualize support that story; the page should explain their value without becoming a release changelog.
+Then follow the **Calm American five-film exports** instructions below. The build
+uses the approved narrated MP4s, VTTs, and timing manifest from
+`~/Downloads/korus-narrated-videos` (override with `APP_NARRATED_FILMS`) plus the
+ignored poster outputs in `videos/assets/`. Missing assets stop the build with
+an actionable error; it never falls back to silent videos. MP4s, VTTs, and posters are copied into
+`dist/website/media/` using content-hashed filenames to avoid stale caches.
+Do not commit these rebuildable outputs; deployments upload them with the rest
+of the static artifact. YouTube uploads are independent of the website.
+
+Keep visuals free of private repository names, messages, and account details.
+The page positions Korus as a workspace for agentic software engineering
+workflows; explain their value without becoming a release changelog.
 
 Run the static-site checks with:
 
@@ -109,6 +132,108 @@ node videos/render-mission-film.mjs
 ```
 
 The render writes `videos/assets/mission-film.mp4` and `videos/assets/mission-film-poster.png`. These rebuildable outputs are ignored by Git; run the renderer for each film when you need an MP4 or poster. The thumbnails remain as source artwork, and the viewers reuse the website's Korus icon. Set `APP_FILM_CHROME` if Chrome is not at the default macOS path. The deterministic `window.seekFilm(seconds)` renderer drives both the preview and frame export, so the encoded video matches the editable source.
+
+## Draft voice-over review
+
+The five widescreen films have first-person narration scripts in
+`videos/narration.json`. Each line has a start and end window tied to the existing
+animation. macOS speech is only a temporary voice for reviewing copy and pacing;
+it is not used for the website's selected Calm American narration.
+
+After rendering the silent originals, generate all narrated drafts:
+
+```bash
+node videos/render-narration.mjs
+npx vite ~/Downloads/korus-voiceover-drafts --host 127.0.0.1 --port 4187 --strictPort
+```
+
+Open <http://127.0.0.1:4187> for a five-film review player with clickable timed
+scripts and a **CC · Captions** toggle. Captions start off and your choice stays
+active when switching films; they are separate VTT tracks, not burned into the
+video. Narrated MP4s, captions, and the generated review
+page go directly into Downloads; none belongs in Git. Original video frames and
+silent exports remain unchanged. The exporter rejects speech that overruns its
+window instead of cutting it off or speeding it up.
+
+To revise one film, edit its copy/timing and run
+`node videos/render-narration.mjs delegation-film`. An optional second argument
+sets the output directory; `APP_FILM_VOICE` overrides the default Samantha voice.
+The focused exporter check is `node --test videos/narration.test.mjs` on macOS
+with FFmpeg installed. Final narration will replace these draft voices only
+after the scripts have been reviewed.
+
+### Local AI voice comparison
+
+The Delegation comparison uses full BF16 Qwen3-TTS 1.7B on Apple Silicon through
+MLX, conditioned on the two approved synthetic male audition samples. Model and
+library versions are pinned in `videos/local-voices.json` and
+`videos/requirements-voice.txt`.
+
+```bash
+uv venv --python 3.12 .app-dev/video-tts
+uv pip install --python .app-dev/video-tts/bin/python -r videos/requirements-voice.txt
+.app-dev/video-tts/bin/python videos/generate-local-narration.py
+.app-dev/video-tts/bin/python videos/check-local-narration.py
+node videos/render-voice-comparison.mjs
+npx vite ~/Downloads/korus-delegation-voices --host 127.0.0.1 --port 4189 --strictPort
+```
+
+Keep the approved `ming-american-male-raw.wav` and `ming-british-male-raw.wav`
+references in `~/Downloads/korus-voiceover-audition`, or pass `--references`.
+Missing references fail explicitly; the generator never substitutes a descriptive
+prompt. Each film is generated in one uninterrupted reference-conditioned call.
+Never synthesize individual sentences independently: the same voice prompt and
+seed did not preserve speaker identity in the rejected Ming exports. Ming's full
+paragraph attempts also repeated or dropped copy, so those are not used.
+
+The checker independently transcribes the entire take, rejects missing/repeated
+words, aligns each caption to recognized word timestamps, and screens reference
+and adjacent-line speaker similarity using [Resemblyzer](https://github.com/resemble-ai/Resemblyzer).
+The 0.8 similarity floor is a local diagnostic screen, not a perceptual guarantee;
+listen before publishing. SHA-256 provenance prevents stale checks from certifying
+new audio. Both generation and checking run locally after model downloads.
+Use `--voice american-male` or `--voice british-male`, optionally `--seed 43`, to
+retry a whole take. Never retry only one line with a new speaker sample.
+Focused checks: `node --test videos/narration.test.mjs` and
+`.app-dev/video-tts/bin/python videos/narration-alignment.test.py`.
+
+Both films use the same script and choreography, with visual timing aligned to
+each take. The paced edit inserts silence between lines from the same approved
+take, without regenerating lines or trimming natural breaths. A pitch-preserving
+tempo adjustment makes speech 4% slower, with pauses approximately 10% longer
+than the previous 40–41-second edit. Visuals and captions follow the adjusted timing; the final
+screen is retained. To adjust pacing,
+rerun only `node videos/render-voice-comparison.mjs`, not voice generation.
+The assembler rejects stale
+alignment, failed voice checks, and extreme timing outliers. All generated WAVs, provenance
+JSON, MP4s, captions, and the comparison page stay in Downloads. Model caches and
+the ignored virtual environment stay outside tracked source. The originals and
+the macOS drafts are untouched; the two-voice comparison is not deployed.
+Use Vite for the reviewer: its byte-range responses allow immediate video seeking;
+Python's basic HTTP server can reset seeks to zero even after buffering the file.
+
+### Calm American five-film exports
+
+Calm American is the selected voice for all five widescreen films. Generate and
+check one continuous take per film using the same approved reference, then use
+the shared pacing pipeline (0.96× speech tempo, approved pause settings):
+
+```bash
+for film in mission-film review-film delegation-film project-film visualize-film; do
+  .app-dev/video-tts/bin/python videos/generate-local-narration.py "$film" --voice american-male --output "$HOME/Downloads/korus-narrated-videos/$film" || break
+  .app-dev/video-tts/bin/python videos/check-local-narration.py --voice american-male --output "$HOME/Downloads/korus-narrated-videos/$film" || break
+done
+node videos/render-voice-comparison.mjs --all
+npx vite ~/Downloads/korus-narrated-videos --host 127.0.0.1 --port 4190 --strictPort
+```
+
+To preserve an already approved take, copy its `narration.wav`, `narration.json`,
+and `narration-aligned.json` into that film's `american-male` subfolder instead
+of regenerating it. The batch validates every film's script, voice, model,
+audio hash, and consistency check before rendering. MP4s, optional VTT captions,
+and the five-film review page are generated in `~/Downloads/korus-narrated-videos`.
+Re-rendering pacing does not invoke speech synthesis. These files are local
+exports; producing them does not deploy or publish them.
 
 ## Code Review product film
 
