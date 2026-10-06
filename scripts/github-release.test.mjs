@@ -6,11 +6,17 @@ const head = 'a'.repeat(40);
 
 // Command orchestration against fake gh/git, not proof of GitHub behavior.
 function setup({ dirty = '', remoteHead = head, tagSha = '', published, runs = [{ status: 'completed', conclusion: 'success', jobs: [] }], url = true } = {}) {
-  const calls = [], lines = [];
+  const calls = [], lines = [], panels = [];
   const queue = [...runs];
+  let current;
   const gh = args => {
     calls.push(args);
-    if (args[0] === 'api' && args.length === 2) return JSON.stringify({ default_branch: 'main' });
+    if (args[0] === 'api' && args[1] === 'repos/nbonamy/korus') return JSON.stringify({ default_branch: 'main' });
+    if (args[0] === 'api' && args[1].includes('/actions/runs/42/jobs')) return JSON.stringify({ jobs: current.jobs });
+    if (args[0] === 'api' && args[1].endsWith('/actions/runs/42')) {
+      current = queue.length > 1 ? queue.shift() : queue[0];
+      return JSON.stringify({ html_url: 'run-url', ...current });
+    }
     if (args[0] === 'release') {
       if (published === undefined) throw Object.assign(new Error('failed'), { stderr: 'release not found' });
       return JSON.stringify({ isDraft: !published });
@@ -18,7 +24,6 @@ function setup({ dirty = '', remoteHead = head, tagSha = '', published, runs = [
     if (args[0] === 'workflow') return url ? 'https://github.com/nbonamy/korus/actions/runs/42\n' : '';
     if (args[0] === 'run' && args[1] === 'list') return JSON.stringify([{ databaseId: 42, createdAt: new Date().toISOString() }]);
     if (args[0] === 'run' && args.includes('--log-failed')) return 'boom';
-    if (args[0] === 'run') return JSON.stringify({ url: 'run-url', ...(queue.length > 1 ? queue.shift() : queue[0]) });
     return '';
   };
   const git = args => {
@@ -27,11 +32,11 @@ function setup({ dirty = '', remoteHead = head, tagSha = '', published, runs = [
     if (args[1] === 'origin' && args[2] === 'refs/heads/main') return `${remoteHead}\trefs/heads/main`;
     return tagSha ? `${tagSha}\trefs/tags/v0.27.0` : '';
   };
-  return { gh, git, calls, lines, log: line => lines.push(line), wait: async () => {}, version: '0.27.0' };
+  return { gh, git, calls, lines, panels, output: { write: chunk => panels.push(chunk) }, log: line => lines.push(line), wait: async () => {}, version: '0.27.0' };
 }
 const dispatched = f => f.calls.find(call => call[0] === 'workflow');
 
-test('a release tags the pushed commit, dispatches that tag, and reports each job change once', async () => {
+test('a release tags the pushed commit, dispatches that tag, and shows the progress panel only when it changes', async () => {
   const f = setup({ runs: [
     { status: 'in_progress', jobs: [{ name: 'quality', status: 'in_progress' }] },
     { status: 'in_progress', jobs: [{ name: 'quality', status: 'in_progress' }] },
@@ -41,7 +46,9 @@ test('a release tags the pushed commit, dispatches that tag, and reports each jo
   const tag = f.calls.find(call => call[0] === 'api' && call.includes('--method'));
   assert.ok(tag.includes('ref=refs/tags/v0.27.0') && tag.includes(`sha=${head}`));
   assert.ok(dispatched(f).includes('v0.27.0') && dispatched(f).includes('channel=latest'));
-  assert.deepEqual(f.lines.filter(line => line.startsWith('quality')), ['quality: in_progress', 'quality: success']);
+  assert.equal(f.panels.length, 2);
+  assert.match(f.panels[0], /v0\.27\.0 · latest · in_progress/);
+  assert.match(f.panels[1], /✓ quality +success/);
   assert.match(f.lines.at(-1), /Published latest: .*\/releases\/tag\/v0\.27\.0/);
 });
 
@@ -74,8 +81,9 @@ test('an existing tag on HEAD is reused and build-only validation never tags', a
 });
 
 test('a failed run prints the failure and how to resume', async () => {
-  const f = setup({ runs: [{ status: 'completed', conclusion: 'failure', jobs: [{ name: 'build (win32-x64)', status: 'completed', conclusion: 'failure' }] }] });
+  const f = setup({ runs: [{ status: 'completed', conclusion: 'failure', jobs: [{ id: 7, name: 'build (win32-x64)', status: 'completed', conclusion: 'failure' }] }] });
   await assert.rejects(watch(42, f), /failure/);
-  assert.ok(f.lines.includes('build (win32-x64): failure') && f.lines.includes('boom'));
+  assert.match(f.panels.at(-1), /✗ build \(win32-x64\) +failed/);
+  assert.ok(f.lines.includes('\nFailure details: build (win32-x64)') && f.lines.includes('boom'));
   assert.ok(f.lines.some(line => line.includes('gh run rerun 42') && line.includes('npm run release:watch -- 42')));
 });
