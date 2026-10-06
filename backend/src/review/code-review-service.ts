@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { appMcpServerName } from '@workspace/core/product';
+import { product } from '@workspace/core/product';
 import {
   activeCodeReviewRound,
   codeReviewLedger,
@@ -408,7 +408,7 @@ export class CodeReviewService {
         } else await this.assertReviewWorkspace(agent, session, true);
         if (session.automation.state !== 'running' || agent.codeReview !== session) return;
       }
-      const result = await this.options.runReview(agent, reviewPrompt(session, appMcpServerName(agent.backend)), context.url, initialReviewerSession);
+      const result = await this.options.runReview(agent, reviewPrompt(session), context.url, initialReviewerSession);
       if (agent.codeReview !== session) {
         return;
       }
@@ -923,7 +923,8 @@ function reviewOutcomeSummary(session: CodeReviewSession, fixedCount: number, re
   return parts.join(' ');
 }
 
-function reviewPrompt(session: CodeReviewSession, mcpServerName: string): string {
+function reviewPrompt(session: CodeReviewSession): string {
+  const mcpServerName = product.mcpServerName;
   const ledger = codeReviewLedger(session);
   const detailedScope = session.automation?.baseRef
     ? `all changes against the fixed baseline ${session.automation.baseRef}, including subsequent review commits and working changes (use git diff ${session.automation.baseRef} and inspect untracked files). Do not recalculate the baseline or review only the latest commit`

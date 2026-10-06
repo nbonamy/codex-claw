@@ -1,4 +1,5 @@
 import type { Agent, AppPluginSettings } from '@workspace/core/contracts';
+import { product } from '@workspace/core/product';
 import { defaultPluginSettings } from '@workspace/core/settings';
 import { workProviderDefinition, workProviderKinds } from '@workspace/core/work-providers';
 import type { CodexThreadStartExtension } from '@codex-app-sdk/backend';
@@ -34,8 +35,8 @@ export function buildAppThreadConfig(
 
   return {
     config: {
-      'mcp_servers.workspace.url': appMcpUrlForAgent(mcpServerUrl, agent),
-      'mcp_servers.workspace.default_tools_approval_mode': 'approve',
+      [`mcp_servers.${product.mcpServerName}.url`]: appMcpUrlForAgent(mcpServerUrl, agent),
+      [`mcp_servers.${product.mcpServerName}.default_tools_approval_mode`]: 'approve',
       ...Object.fromEntries(
         Object.entries(hostedMcpServerUrls).map(([serverId, serverUrl]) => [
           `mcp_servers.${serverId}.url`,

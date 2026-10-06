@@ -117,8 +117,8 @@ The transport configures:
 Claude's app-owned MCP server is named `korus`, from `product.mcpServerName`.
 Claude Code reserves `workspace` and silently omits a dynamic server with that
 name. Tool allow rules, review prompts, and collaboration instructions must use
-the same configured namespace. Codex retains its existing `workspace` namespace;
-tool presentation recognizes both names, including retained Claude history.
+the same configured namespace, shared with Codex and future providers. Tool
+presentation also recognizes `workspace` for retained conversation history.
 
 The live Claude transport uses the Agent SDK and feeds its messages into one
 Claude conversation host. The host is the sole owner of the normalized Claude

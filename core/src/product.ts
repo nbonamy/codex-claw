@@ -2,11 +2,6 @@ import product from './product.json';
 
 export { product };
 
-/** Claude reserves `workspace`; keep the existing Codex session namespace. */
-export function appMcpServerName(backend: 'codex' | 'claude'): string {
-  return backend === 'claude' ? product.mcpServerName : 'workspace';
-}
-
 /** Recognize current tools and retained conversations using the old namespace. */
 export function isAppMcpServerName(value: unknown): boolean {
   return value === product.mcpServerName || value === 'workspace';

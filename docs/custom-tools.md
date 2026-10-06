@@ -1,6 +1,6 @@
 # Custom MCP Tools
 
-This guide covers app-owned tools exposed by the `workspace` MCP server. A
+This guide covers app-owned tools exposed by the `korus` MCP server. A
 tool is a product capability, not only an MCP schema: `daemon` owns its behavior,
 the app-owned protocol carries any client effect, and Vue owns its presentation.
 
@@ -11,7 +11,7 @@ does not need a renderer event. A native desktop action does.
 
 ```text
 backend agent
-  -> workspace MCP tool
+  -> korus MCP tool
   -> daemon coordinator/service
   -> optional app-owned backend event or client request
   -> renderer or Electron effect
@@ -129,7 +129,7 @@ This lifecycle belongs to the conversation tool row when one is shown. It does
 not update `agent.statusText`. Korus hides `set-status` and `finish_turn` from
 the conversation because their effects have dedicated UI; the calls still run
 and remain in the provider transcript. Without a Korus presenter, the SDK uses
-a generic title such as `Ran workspace.example-tool`.
+a generic title such as `Ran korus.example-tool`.
 
 ## Structured results and bounded presentation data
 

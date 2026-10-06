@@ -42,11 +42,13 @@ describe('codex-config', () => {
     expect(buildAppThreadConfig(agent, null)).toStrictEqual({});
     expect(buildAppThreadConfig(agent, 'http://127.0.0.1:8767/mcp')).toStrictEqual({
       config: {
-        'mcp_servers.workspace.url': 'http://127.0.0.1:8767/mcp?agentId=agent-dina',
-        'mcp_servers.workspace.default_tools_approval_mode': 'approve',
+        [`mcp_servers.${product.mcpServerName}.url`]: 'http://127.0.0.1:8767/mcp?agentId=agent-dina',
+        [`mcp_servers.${product.mcpServerName}.default_tools_approval_mode`]: 'approve',
       },
       developerInstructions: expect.stringContaining(`Your ${product.name} agent ID is agent-dina.`),
     });
+    expect(buildAppThreadConfig(agent, 'http://127.0.0.1:8767/mcp').developerInstructions)
+      .toContain(`Use the ${product.mcpServerName} MCP server`);
   });
 
   it('adds connected hosted MCP servers without auto-approving their tools', () => {
@@ -125,10 +127,10 @@ describe('codex-config', () => {
         createdAt: '', updatedAt: '',
       },
     };
-    expect(buildAppThreadConfig(reviewer, 'http://127.0.0.1:8767/mcp').config?.['mcp_servers.workspace.url'])
+    expect(buildAppThreadConfig(reviewer, 'http://127.0.0.1:8767/mcp').config?.[`mcp_servers.${product.mcpServerName}.url`])
       .toBe('http://127.0.0.1:8767/mcp?agentId=agent-dina&reviewContextId=review-1');
     reviewer.codeReview!.status = 'finished';
-    expect(buildAppThreadConfig(reviewer, 'http://127.0.0.1:8767/mcp').config?.['mcp_servers.workspace.url'])
+    expect(buildAppThreadConfig(reviewer, 'http://127.0.0.1:8767/mcp').config?.[`mcp_servers.${product.mcpServerName}.url`])
       .toBe('http://127.0.0.1:8767/mcp?agentId=agent-dina');
   });
 });

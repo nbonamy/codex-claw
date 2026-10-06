@@ -797,11 +797,10 @@ Detailed behavior lives in `docs/mcp.md`.
 
 Backend drivers enable this server in backend-specific ways. Codex receives the
 server through `thread/start.config` or `thread/resume.config` entries for
-`mcp_servers.workspace`. During MCP elicitation development, the scoped
-`default_tools_approval_mode = "approve"` override stays disabled so the
-approval UI path is exercised; we expect to bring it back for normal Korus MCP
-collaboration after that flow is proven. Future backends should keep the Korus
-tool semantics and only change the backend-specific enablement path.
+`mcp_servers.korus`. The scoped `default_tools_approval_mode = "approve"`
+override authorizes Korus collaboration tools without changing approvals for
+other tools. All providers use `product.mcpServerName` (`korus`) for this
+server and its instructions; only the provider-specific enablement path differs.
 
 ## Codex Exec SDK Decision
 

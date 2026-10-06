@@ -34,11 +34,11 @@ not Codex-specific protocols. Codex and Claude receive the same Korus-owned
 endpoints through their session-local configuration; each backend translates
 only that configuration into its native launch contract.
 
-Claude receives the app-owned endpoint under `product.mcpServerName` (`korus`);
-`workspace` is reserved by Claude Code. Codex retains `workspace`. Generated
-instructions use the provider's actual namespace, while shared tool descriptions
-and recovery errors use unqualified tool names. Presentation recognizes both
-names so retained conversations remain readable.
+All providers receive the app-owned endpoint under `product.mcpServerName`
+(`korus`). Configuration, allow rules, and generated instructions use this same
+namespace; shared tool descriptions and recovery errors use unqualified tool
+names. Presentation also recognizes the former `workspace` name so retained
+conversations remain readable.
 
 ## Boundary
 
@@ -183,8 +183,8 @@ overrides, then passes the Korus MCP server through each agent's
 
 ```json
 {
-  "mcp_servers.workspace.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
-  "mcp_servers.workspace.default_tools_approval_mode": "approve"
+  "mcp_servers.korus.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
+  "mcp_servers.korus.default_tools_approval_mode": "approve"
 }
 ```
 
@@ -197,7 +197,7 @@ When both integrations are connected, the same extension also adds:
 }
 ```
 
-Only `workspace` collaboration tools receive Korus's automatic approval mode.
+Only `korus` collaboration tools receive Korus's automatic approval mode.
 Hosted provider tools keep the backend's normal approval behavior.
 
 The agent id in the MCP URL is the app's session-local caller identity. Tool
@@ -206,7 +206,7 @@ own `agentId` or `from`. The same unique ID is also injected into the agent's
 developer instructions and returned by `list-agents`, so agents can coordinate
 precisely.
 
-The scoped `mcp_servers.workspace.default_tools_approval_mode = "approve"`
+The scoped `mcp_servers.korus.default_tools_approval_mode = "approve"`
 override authorizes only Korus's own collaboration tools; it does not authorize
 all Codex shell/file operations and does not mutate the user's global MCP
 config.
@@ -252,7 +252,7 @@ bundled Chrome skill to use it when explicitly enabled; it does not change the
 user's global MCP configuration.
 
 ```text
-agent -> workspace MCP -> daemon -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility
+agent -> korus MCP -> daemon -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility
 ```
 
 Tools are `computer-use-guide`, `computer-use-status`, `computer-use-request-accessibility`,
@@ -371,16 +371,18 @@ closes it automatically, so the next interaction must begin with a fresh app
 observation.
 
 For Claude, `daemon` passes the same request-scoped agent URL through the Claude
-CLI instead of mutating global Claude Code config:
+Agent SDK instead of mutating global Claude Code config:
 
-```bash
-claude -p "<prompt>" \
-  --mcp-config '{"mcpServers":{"workspace":{"type":"http","url":"http://127.0.0.1:<port>/mcp?agentId=<agent-id>"}}}' \
-  --allowed-tools 'mcp__workspace__*' \
-  --append-system-prompt "<Korus developer instructions>"
+```json
+{
+  "mcpServers": {
+    "korus": { "type": "http", "url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>" }
+  },
+  "allowedTools": ["mcp__korus__*"]
+}
 ```
 
-The `--allowed-tools` pattern authorizes only tools from the `workspace` MCP
+The `allowedTools` pattern authorizes only tools from the `korus` MCP
 server. Connected hosted servers are added to `mcpServers`, but are not added to
 that allowlist, so their normal permission flow remains intact.
 
@@ -749,7 +751,7 @@ acknowledgment: `finish_review_round({ findingCount })` requires a non-negative
 integer equal to the current round's saved finding count across all priorities.
 Counts refer to findings, not tool calls or previous rounds. A mismatch returns
 an MCP error directing the model to register missing findings with
-`mcp__workspace__report_finding`, reconcile the ledger, and retry the finish call.
+`report_finding`, reconcile the ledger, and retry the finish call.
 Finding mutations during inspection invalidate an earlier acknowledgment.
 The acknowledgment is persisted but does not itself advance the workflow: the
 provider turn must also finish successfully. Ending without valid confirmation

@@ -148,7 +148,7 @@ describe('BackendDriverRpc', () => {
 
     const extension = await options.extensions?.[0]?.configureConversation?.({ extensionContext: agent } as never);
 
-    expect(extension?.config?.['mcp_servers.workspace.url'])
+    expect(extension?.config?.[`mcp_servers.${product.mcpServerName}.url`])
       .toBe(`http://127.0.0.1:4321/mcp?agentId=${agent.id}`);
     expect(extension?.developerInstructions).toContain('use create-project');
   });

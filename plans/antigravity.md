@@ -440,7 +440,7 @@ Antigravity surface.
 | Conversation UI | Add icon, provider snapshot binding, identity, requests and capability projections in the existing app-state/provider host path and `use-agent-conversation.ts`; a null-coalescing snapshot addition alone is insufficient |
 | Settings UI | Extend settings navigation/panel using `SettingsEngineConnectionRow`, backend display names, and i18n |
 | Workflows | Audit `core/src/code-review.ts`, MCP backend validators, automations, Mission roles, remote-host routing and fresh-agent switching. Generic selectors do not prove these contracts accept a third provider |
-| MCP namespace | Use product metadata for new provider configuration/instructions. Claude currently uses `product.mcpServerName`; Codex retains `workspace`. Do not change existing namespaces as part of this work |
+| MCP namespace | Use `product.mcpServerName` (`korus`) for configuration and instructions, shared with Codex and Claude. Do not introduce a provider-specific namespace |
 
 ## Remaining implementation phases
 

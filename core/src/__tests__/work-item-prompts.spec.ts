@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkItem } from '../contracts';
+import { product } from '../product';
 import { workItemAssignmentPrompt, workItemBranchName, workItemComposerPrompt, workProviderLabel } from '../work-item-prompts';
 
 describe('work item prompts', () => {
@@ -25,6 +26,7 @@ describe('work item prompts', () => {
 
     expect(prompt).toContain('Work item ID: github:nbonamy/agent-workspace#42');
     expect(prompt).toContain('status `readyForReview`');
+    expect(prompt).toContain(`${product.mcpServerName} MCP tool \`update-work-item\``);
     expect(prompt).toContain('Labels: bug');
     expect(prompt).toContain('Author: nicolas');
     expect(prompt).toContain('Assignment instructions:\nAdd a regression test.');
@@ -66,6 +68,7 @@ describe('work item prompts', () => {
     const prompt = workItemAssignmentPrompt(workItem(), { completionPolicy: 'complete' });
 
     expect(prompt).toContain('status `completed`');
+    expect(prompt).toContain(`${product.mcpServerName} MCP tool \`update-work-item\``);
     expect(prompt).not.toContain('status `readyForReview`');
   });
 

@@ -121,7 +121,7 @@ describe('Linear hosted MCP through daemon', () => {
       'mcp_servers.github.url': `${new URL(url).origin}/mcp/providers/github?agentId=${snapshot.agents[0]!.id}`,
       'apps.connector_76869538009648d5b282a4bb21c3d157.enabled': false,
     });
-    expect(Object.keys(enabled.config!).filter(key => key.endsWith('default_tools_approval_mode'))).toStrictEqual(['mcp_servers.workspace.default_tools_approval_mode']);
+    expect(Object.keys(enabled.config!).filter(key => key.endsWith('default_tools_approval_mode'))).toStrictEqual([`mcp_servers.${product.mcpServerName}.default_tools_approval_mode`]);
     expect(JSON.stringify(enabled)).not.toMatch(/linear-secret|github-secret|linear-refresh|github-refresh/);
     await manager.disconnect('linear');
     const disabled = await configure();

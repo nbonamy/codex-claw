@@ -88,6 +88,8 @@ describe('CodeReviewService', () => {
       automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 },
     });
     await vi.waitFor(() => expect(session.automation?.state).toBe('paused'));
+    expect(test.turns[0]!.prompt).toContain(`mcp__${product.mcpServerName}__report_finding`);
+    expect(test.turns[0]!.prompt).toContain(`mcp__${product.mcpServerName}__finish_review_round`);
     expect(session.status).toBe('failed');
     expect(session.automation?.reason).toContain('finish_review_round');
     expect(test.deleted).toEqual([]);

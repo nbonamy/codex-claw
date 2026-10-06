@@ -482,8 +482,8 @@ every Korus-managed Codex session.
 
 ```json
 {
-  "mcp_servers.workspace.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
-  "mcp_servers.workspace.default_tools_approval_mode": "approve"
+  "mcp_servers.korus.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
+  "mcp_servers.korus.default_tools_approval_mode": "approve"
 }
 ```
 
@@ -491,7 +491,7 @@ The `agentId` query parameter is session-local caller identity for the MCP
 server, not a tool argument the model has to provide for itself. The same
 unique ID is injected into the agent's developer instructions and returned by
 `list-agents` so duplicated agents can still coordinate precisely. The
-approval override is scoped to `workspace`; it does not put the entire Codex
+approval override is scoped to `korus`; it does not put the entire Codex
 session into full-access/yolo mode.
 
 Each `thread/start` still receives agent-specific developer instructions, such

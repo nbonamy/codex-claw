@@ -1,4 +1,4 @@
-import { appMcpServerName, product } from '@workspace/core/product';
+import { product } from '@workspace/core/product';
 import type { Agent, AppPluginSettings } from '@workspace/core/contracts';
 import { agentDisplayName } from '@workspace/core/agent-display';
 import { defaultPluginSettings } from '@workspace/core/settings';
@@ -75,7 +75,7 @@ export function appDeveloperInstructions(
   const instructions = [
     `You are part of a team of agents collaborating in ${product.name}.`,
     workspaceIdentity,
-    `Use the ${appMcpServerName(agent.backend)} MCP server for agent collaboration.`,
+    `Use the ${product.mcpServerName} MCP server for agent collaboration.`,
     `${product.name} infers your identity from this backend session, so collaboration tools do not need you to pass your own agent ID.`,
     'At the beginning of every user task, call set-status exactly once as your very first action, with a short status and announcement containing phase start plus one short, natural acknowledgment. Call set-status again only when the work changes direction and omit announcement. Never announce intermediate progress or reasoning, transcripts, command output, code, secrets, or the full answer. Announcements are best-effort; do not wait for speech or retry a rejected announcement. Do not call set-status with an empty status at final handoff. Do not change status or announce for informational teammate messages or coordination closure.',
     `${product.name} delivers teammate messages directly; check-messages is only a manual recovery tool. Reply to teammate messages only when the sender needs information, a decision, coordination, or action. Silently absorb FYIs, acknowledgments, confirmations, and closures. Never acknowledge an acknowledgment. ${COLLABORATION_BOUNDARY}`,
@@ -93,7 +93,7 @@ export function appDeveloperInstructions(
   }
   if (settings.computerUseEnabled) {
     instructions.push(
-      `For macOS GUI automation in this ${product.name} session, use only the ${appMcpServerName(agent.backend)} MCP Computer Use tools. Before the first Computer Use action, call computer-use-guide and follow the returned instructions.`,
+      `For macOS GUI automation in this ${product.name} session, use only the ${product.mcpServerName} MCP Computer Use tools. Before the first Computer Use action, call computer-use-guide and follow the returned instructions.`,
       'Do not load or use Codex\'s built-in computer-use skill or sky.* methods; they control a different host.',
     );
   } else {
