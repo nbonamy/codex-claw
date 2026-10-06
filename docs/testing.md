@@ -1,373 +1,176 @@
 # Testing
 
-Use focused tests while iterating, then run the relevant final gates before
-handing off or committing.
+Focused tests while iterating; the relevant full gate before handoff or commit.
 
-Korus has an Electron desktop host and an initial localhost-only Express
-web host. Do not copy id8's generic API harness here. When this repo says
-"contract" or "workflow" test, it means Electron IPC, the Korus WebSocket
-adapter, client state, renderer behavior, or a fake backend transport.
-Use a fake unified backend for app-controller/state routing tests, a fake Codex
-SDK surface for the real Codex driver, and a fake Claude SDK query for the real
-Claude driver. Do not run the real Codex SDK against a fake app-server in Korus's
-normal tests: that boundary belongs to the SDK repository.
+"Contract" and "workflow" tests here mean Electron IPC, the Korus WebSocket
+adapter, client state, renderer behavior, or a fake backend transport (Korus is a
+desktop app: no server/API integration gates). Fakes sit at ownership boundaries:
+
+| Under test | Fake |
+| --- | --- |
+| App controller / state routing | unified backend fake |
+| Real Codex driver | typed Codex SDK surface (never the real SDK against a fake app-server; that boundary belongs to the SDK repo) |
+| Real Claude driver | fake Claude SDK query |
+| Mounted UI / `App` | `vue/src/test/client-api-mock.ts` + `backend-fixture.ts` |
+
+Korus tests its adapter translations and product behavior, not either SDK. Wire
+framing, decoding and lifecycle tests for its own process/socket transports remain.
+Real provider smoke tests are opt-in and never part of the normal gate.
 
 ## Quality Bar
 
-Every code change must add or update tests for the behavior it changes. There
-is no small-change exemption for code.
+Every code change adds or updates tests for the behavior it changes; no small-change
+exemption. If a test cannot be run or a change is truly untestable or docs-only, say
+so explicitly and name what to run next.
 
-All five workspaces (core, backend, vue, electron, web) gate on exactly 85%
-statement coverage. Statements are the only blocking coverage metric; continue
-reporting lines, branches, and functions to guide risk assessment. Electron has
-the same gate as every other workspace.
-
-Rules:
-
-- Do not lower the statement threshold or shrink coverage includes/exclusions
-  to land a change.
-- Coverage does not substitute for meaningful behavioral/regression tests or
-  verification at the owning runtime boundary.
-- Do not leave broad untested areas around IPC, protocol adapters,
-  persistence, reducers, agent status, tool rendering, approvals, diffs,
-  filesystem behavior, git behavior, or teams.
-- Prefer small focused tests during implementation.
-- Run the relevant full gate before handoff.
-- If a test cannot be run, say exactly why and what should be run next.
-- If a change is docs-only or truly cannot be tested, say that explicitly.
+All five workspaces (`core`, `backend`, `vue`, `electron`, `web`) gate on exactly
+**85% statements**; lines, branches and functions are diagnostics. Never lower the
+threshold or shrink includes/exclusions to land a change. Coverage is evidence of
+exercised behavior, not a reason to invent a test. Leave no broad untested areas
+around IPC, protocol adapters, persistence, reducers, agent status, tool rendering,
+approvals, diffs, filesystem, git or teams.
 
 ## Principles
 
-Use the same core testing principles as id8, adapted to a desktop app:
-
-- Test behavior, not implementation details.
-- Assert what the user sees, what IPC emits, what state changes, and what
-  contracts return.
-- Prefer workflow tests over isolated happy-path pings.
-- Verify state transitions. A mutation should be followed by a read, list,
-  status check, emitted event, persisted snapshot, or cleanup assertion that
-  proves it happened.
-- Use strict payload assertions whenever practical. Prefer `toStrictEqual()`
-  for app-owned contracts and fixtures.
-- Do not cherry-pick fields with scattered `toHaveProperty()` checks when the
-  full shape is part of the contract.
-- Keep tests isolated and idempotent.
-- Clean up what tests create.
-- Close streams, child processes, file handles, and long-lived subscriptions in
-  `finally`.
-- Mock external boundaries, not the logic under test.
+- Test behavior, not implementation: assert what users see, what IPC emits, what
+  state changes, what contracts return. Prefer workflows over isolated pings, and
+  follow a mutation with a read, list, event, persisted snapshot or cleanup check.
+- Use `toStrictEqual()` for app-owned contracts and fixtures; do not cherry-pick
+  fields with scattered `toHaveProperty()` when the full shape is the contract.
+- Isolate and clean up: tests are idempotent, close streams, child processes, file
+  handles and subscriptions in `finally`.
+- Mock external boundaries, never the logic under test.
 
 ## Test Value Gate
 
-Before writing, modifying, or retaining a test, name the regression it protects
-in one sentence. The test is acceptable only when all of these are true:
+Name the regression a test protects in one sentence. Accept it only if:
 
-1. It exercises production behavior through the closest owning public seam.
-2. The named regression would make the test fail for the right reason.
-3. A harmless refactor, rewording, file move, or equivalent implementation
-   would leave the test green.
-4. No test at a closer owning layer already protects the same contract in more
-   detail.
+1. it exercises production behavior through the closest owning public seam;
+2. that regression would fail it for the right reason;
+3. a harmless refactor, rewording, file move or equivalent implementation keeps it
+   green;
+4. no closer layer already protects the same contract in more detail.
 
-If a proposed test cannot pass this gate, do not add it. Remove an existing test
-when it fails the gate and no realistic regression risk would be lost. Coverage
-is a guardrail, not a reason to preserve or invent assertions without useful
-confidence.
+Otherwise do not add it, and remove an existing test that fails the gate when no
+realistic regression risk is lost. A test that survives replacing the implementation
+with a constant, or breaks on harmless rewording, fails the gate. Accepted tests
+protect a user-visible outcome, an owned or external contract, a state transition or
+persistence guarantee, or an error/security/architecture boundary.
 
-Each accepted test should protect at least one of these things:
+- Mount Vue components and assert rendered DOM, accessibility state, interactions,
+  emitted events or resulting behavior. When behavior depends on CSS, mount with the
+  production styles and assert the resolved result (proving the selector matches and
+  the cascade applies); use a real browser only for layout geometry.
+- Do not assert every sentence of tool descriptions, prompts or help text. Test
+  interpolation, conditional sections, schemas and the behavior they enable; keep one
+  assertion where exact copy is itself the contract.
+- **Never read production `.vue`, TypeScript, stylesheets, scripts, manifests or
+  config as text to assert their contents.** Enforce architecture and security rules
+  with lint, TypeScript, AST or dependency tooling. Tests may read source only when it
+  is product input, via a fixture, and may inspect generated artifacts that are the
+  output under test.
+- Give the detailed assertion to the owning unit and keep one representative smoke
+  test at the next boundary. Table-driven rows must be distinct behaviors.
+- Keep snapshots rare; prefer explicit assertions.
 
-- a user-visible outcome or interaction;
-- an app-owned or external contract;
-- a meaningful state transition or persistence guarantee;
-- an error, security, or architecture boundary with realistic regression risk.
+## Main Process And Preload
 
-Reject tests that freeze incidental implementation details:
+Without a real backend process by default, cover: RPC parsing, request/response
+matching, notifications, malformed responses and client callbacks; app-server
+lifecycle (spawn/connect, readiness, restart, shutdown, cleanup); driver routing and
+policy (create/resume/archive, submit/steer/interrupt, status projection);
+routing-envelope and replica revision handling without a second Korus reducer;
+approval and input coordination; persistence, migrations, settings, teams, agents and
+window state; filesystem and git at the app boundary. Host-boundary tests prove Korus
+forwards SDK snapshots, events and promise-returning actions without duplicating SDK
+behavior.
 
-- Vue components must be tested by mounting them and asserting rendered DOM,
-  accessibility state, user interactions, emitted events, or resulting app
-  behavior. This is production behavior and is explicitly encouraged.
-- When meaningful behavior depends on CSS, mount the component with its
-  production styles and assert the resolved behavior on the rendered element.
-  This must prove the selector matches and the cascade applies; use a real
-  browser only when the invariant depends on layout geometry.
-- Do not assert every sentence or phrase in tool descriptions, model prompts,
-  help text, or developer instructions. Test dynamic interpolation, conditional
-  sections, schemas, and the behavior those instructions enable. If exact copy
-  is itself the product contract, keep one focused assertion at its owning
-  layer.
-- Never read production `.vue`, TypeScript, stylesheets, scripts, package
-  manifests, or config files as text to assert their contents. There is no test
-  exception for architecture or security rules: enforce those with lint,
-  TypeScript, AST, or dependency tooling in the lint gate. Tests may read source
-  code only when source code is product input to the behavior under test, and
-  should use a fixture rather than the repository's implementation. Tests may
-  inspect generated artifacts when that artifact is the output under test.
-- Do not repeat the same contract at every layer. Give the detailed assertion
-  to the owning unit, then keep only one representative integration smoke test
-  at the next boundary.
-- A table-driven test is valuable when its rows represent distinct mappings or
-  behaviors. Do not multiply cases merely to increase the test count.
+Preload is a security boundary and must stay narrow: test allowed channels and
+argument validation, typed returns, subscribe/unsubscribe cleanup, reload snapshot
+behavior and renderer-safe errors. Never expose broad Electron or Node primitives.
 
-When a test would survive replacing the implementation with a constant result,
-or would fail after a harmless rewording or refactor, it fails the value gate.
+## Renderer
 
-## Main Process Tests
+Vue Test Utils, Vitest and jsdom. Co-locate specs in `__tests__/`, one same-named
+spec per component, no catch-all suites. Prefer direct props and emits over booting
+the shell; use small store fakes only when the contract depends on a store; stub IPC at
+the app boundary, not inside the tree; do not use Codex app-server fixtures for
+visual components. Test loading, empty, error, disabled, pending-approval and
+streaming states separately. If a component is too hard to isolate, split it first.
 
-Main-process tests should cover desktop backend behavior without depending on a
-real backend process by default.
+- The shared setup supplies lightweight Element Plus controls that preserve rendered
+  and emitted contracts (DOM, classes, aria, slots, model events). A placeholder that
+  only makes a test mount is not acceptable. Mount the real control when its own
+  interaction, validation, focus, teleport or accessibility is under test.
+- Avoid product-component stubs unless the child is covered elsewhere. App-shell
+  tests use contract-faithful child stubs by default and real children only for
+  representative composition workflows.
+- SDK-owned behavior (composer, message rendering, clipboard, attachments, paste/drop,
+  transcription, approval and ask-user UI) is tested in the SDK; Korus tests only its
+  wrapper, adapter and product policy.
+- Test capabilities through a visible control and its interaction result, not
+  forwarded props. Assert event retention before supplying a later navigation
+  snapshot that could repair lost state.
 
-Cover:
+## Fixtures
 
-- Korus RPC parsing, request/response matching, notifications, malformed
-  responses, and client callbacks (not Codex SDK wire parsing).
-- App-server lifecycle decisions: spawn/connect, readiness, restart, shutdown,
-  and process cleanup.
-- Backend-driver routing for prompt send, interrupt, request responses, history
-  hydration, model/skill catalogs, and unsupported capabilities.
-- Driver/adapter policy: create/resume/archive, submit/steer/interrupt,
-  status projection and routing by agent/conversation.
-- Codex routing-envelope behavior and SDK replica revision handling, without a
-  second Korus transcript reducer.
-- Host-boundary regressions proving Korus forwards SDK snapshots, events, and
-  promise-returning conversation actions without duplicating SDK behavior.
-- Approval and user-input request coordination.
-- Persistence, migrations, settings, teams, agents, selected
-  team/agent, and window state.
-- Filesystem and git operations at the app boundary.
+Scripted, never simulators: `backend/src/codex/__tests__/sdk-surface-fixture.ts`
+(typed SDK methods, per-conversation snapshots, explicit events; tests supply the
+provider's resulting state, so the fixture must not grow a reducer),
+`backend/src/claude/__tests__/sdk-query-fixture.ts` (independently controlled query
+iterators; inputs, permissions and failures observable at the SDK boundary), and
+`vue/src/test/client-api-mock.ts` (exhaustive typed `AppApi` fake with production
+initialization, disposable subscriptions, I/O-free defaults, and throwing
+consequential operations unless scripted). Per-test overrides merge into the complete
+fake; use `stubLegacyElectronTestWindow` only to test missing-method compatibility,
+and await asynchronous initialization before exercising controls.
 
-Use these ownership boundaries for integration coverage: a Codex app SDK fake
-drives the real Korus Codex backend; a Claude Agent SDK fake drives the real Korus
-Claude backend; a unified backend fake drives application state and mounted UI.
-Korus tests its adapter translations and product behavior, not either SDK's
-implementation. Process/socket transport tests still validate Korus's own wire
-framing, decoding and lifecycle. Real provider smoke tests remain opt-in and are
-never required for the normal test gate.
+`sdk-boundary-*.spec.ts`, Claude's `sdk-boundary.spec.ts` and `*backend-boundary.spec.ts`
+run in the normal glob and CI (`npm run test:integration` is a fast entry). Keep
+lower-level tests for Korus-owned algorithms, provider translation, wire security,
+persistence, filesystem and Git safety. A provider-independent service needs no
+artificial Codex and Claude variants.
 
-## Preload And IPC Tests
+- Store captured fixtures next to their tests; include malformed and partial-stream
+  cases and enough original payload shape to catch protocol drift.
+- Drive the real adapter from SDK-shaped fixtures and renderer composition from the
+  resulting app-owned contract; renderer tests never import generated Codex types.
+- When replacing tests, record the retained Korus behavior and its new owning suite;
+  delete SDK-owned optimistic-message, raw-reduction and slash-copy assertions rather
+  than transplanting them, and never trade failure, identity or ordering tests for
+  call-through smoke tests.
+- To prove a regression family is caught, inject a temporary deliberate fault (drop a
+  review event, remove a queue lock), watch it fail, restore and rerun green. These
+  probes are local validation, never committed switches.
 
-Preload is a security boundary. Tests should prove that it stays narrow.
+## Conversation Ownership
 
-Cover:
-
-- Allowed IPC channels and argument validation.
-- Typed bridge return values.
-- Event subscription and unsubscribe cleanup.
-- Renderer reload snapshot behavior.
-- Errors from main surfaced in renderer-safe shapes.
-
-Never expose broad Electron or Node primitives through preload.
-
-## Renderer Tests
-
-Renderer component tests use Vue Test Utils, Vitest, and jsdom.
-
-Rules:
-
-- Co-locate component tests in `__tests__/` folders.
-- Give each component its own same-named spec file. Do not accumulate unrelated
-  Vue components in a catch-all component suite.
-- Test user-visible rendering and emitted actions.
-- The shared setup provides lightweight Element Plus controls that preserve
-  the rendered and emitted contracts parent components consume. This keeps
-  isolated product-component tests fast without replacing product behavior.
-- Mount the specific real Element Plus control when its own interaction,
-  validation, focus, teleport, or accessibility behavior is part of the
-  behavior under test. Do not reinstall the full plugin for one control.
-- Keep shared control substitutes contract-faithful: render the relevant DOM,
-  classes, aria state, slots, and model events. A shallow placeholder that only
-  makes a test mount is not acceptable.
-- Avoid product-component stubs unless the child component is covered
-  elsewhere and the parent contract is the unit.
-- Test routers/stores with realistic route/state setup when a component
-  renders navigation or depends on app-level state.
-
-## Component Isolation
-
-Test components in isolation whenever the behavior belongs to that component.
-Mount the real component with controlled props, fake user interactions, and
-typed emitted events.
-
-Rules:
-
-- Prefer direct props and emitted events over booting the full app shell.
-- Use small store fakes only when the component contract actually depends on a
-  store.
-- Vue Test Utils wrappers are auto-unmounted by the shared test setup. Clearing
-  `document.body` is cleanup for teleports, not a substitute for unmounting.
-- Stub IPC at the app boundary, not inside the component tree.
-- Do not pull in Codex app-server fixtures for visual components unless the
-  component is specifically a protocol-adapter view.
-- Assert rendered text, aria labels, button states, selected rows, emitted
-  payloads, and visible status changes.
-- Test loading, empty, error, disabled, pending approval, and streaming states
-  as separate cases.
-- Keep snapshots rare. Prefer explicit assertions that explain the behavior.
-- If a component is too hard to test in isolation, split it before adding
-  brittle tests around the whole shell.
-- Keep shared SDK behavior in the SDK component's isolated spec and keep only
-  Korus wrapper, adapter, and product-policy assertions in this repo.
-- App-shell tests use contract-faithful product-child stubs by default and opt
-  into real child trees only for representative composition workflows.
-
-Use integration-style renderer tests only when testing composition between
-components, stores, router state, and IPC events.
-
-High-priority renderer coverage:
-
-- Agent list, team rail, and status indicators.
-- Provider capability mapping and the thin `CodexConversationPane` integration.
-- Active-agent/conversation switching without draft or scroll leakage.
-- Plan updates, reasoning summaries, command output, file changes, and diffs.
-- Theme switching and SDK token bridging.
-- Reload recovery from snapshots and buffered events.
-
-Composer, message rendering, clipboard, attachment, paste/drop, transcription,
-approval, and ask-user behavior belong to the SDK test suite and should not be
-reimplemented or exhaustively retested in Korus.
-
-## Contract Fixtures
-
-The reusable boundary fixtures are deliberately scripted, not simulators:
-
-- `backend/src/codex/__tests__/sdk-surface-fixture.ts`: typed SDK methods,
-  per-conversation snapshots and explicit SDK events. Tests supply the provider's
-  resulting state; the fixture must not grow a transcript reducer.
-- `backend/src/claude/__tests__/sdk-query-fixture.ts`: real transport consumes
-  independently controlled SDK query iterators; inputs, permissions and failures
-  are observable at the SDK boundary.
-- `vue/src/test/client-api-mock.ts`: exhaustive, typed `AppApi` fake with
-  production snapshot/connection/sequence initialization and independent,
-  disposable backend-event, app-command and update-status subscriptions. Explicit
-  read defaults perform no I/O; consequential operations throw unless scripted.
-  `backend-fixture.ts` adds sequenced event delivery for app state and mounted
-  `App` tests. Neither fixture implements backend policy or a reducer.
-- Shared desktop test setup merges per-test API overrides into this complete
-  fake. Use `stubLegacyElectronTestWindow` only to explicitly test missing-method
-  compatibility, never as the normal application boundary. Await asynchronous
-  initialization before exercising controls; script consistent navigation and
-  history responses instead of relying on missing APIs to skip those paths.
-
-Assert event retention before supplying a later navigation snapshot that could
-repair lost state. Capability tests should exercise a visible control and its
-interaction result, not merely inspect forwarded component props.
-
-`sdk-boundary-*.spec.ts`, Claude's `sdk-boundary.spec.ts`, and the app's
-`*backend-boundary.spec.ts` exercise these seams. They run in the normal workspace
-test glob and CI; `npm run test:integration` is a fast focused entry point.
-Keep lower-level tests for Korus-owned algorithms, provider translation, wire
-security, persistence, filesystem and Git safety. A provider-independent service
-does not need artificial Codex and Claude variants.
-
-Rules:
-
-- Store captured fixtures near the tests that use them unless a shared fixture
-  folder becomes clearly useful.
-- Include malformed and partial-stream cases, not only happy paths.
-- Preserve enough original payload shape to catch protocol drift.
-- Drive the real adapter from SDK-shaped fixtures; drive renderer composition
-  from the resulting app-owned contract, not an SDK fake inside the UI test.
-- Do not make renderer tests import generated Codex protocol types.
-
-When replacing tests, record the Korus behavior retained and the new owning suite.
-Delete SDK-owned optimistic-message, raw protocol reduction and slash-prompt-copy
-assertions instead of transplanting them. Do not replace useful failure, identity
-or ordering tests with call-through smoke tests.
-
-For a regression family, demonstrate sensitivity with a temporary deliberate
-fault (for example dropping a review event or removing a queue lock), observe the
-expected failure, restore the implementation, and rerun green. These probes are
-local validation, not committed fault switches or a second test runner.
-
-## Desktop Smoke And Visual Checks
-
-Once the Electron shell exists, add smoke coverage for the core workflow:
-
-1. App boots.
-2. User creates or selects an agent.
-3. User selects a folder.
-4. Prompt is sent.
-5. Assistant response streams.
-6. Interrupt or approval path works when available.
-7. State restores after reload.
-
-Use Playwright, Electron automation, or the repo's chosen desktop smoke tool
-once configured. Use screenshot checks for meaningful layout changes,
-especially the app shell, sidebars, composer, artifact panes, diff view, and
-theme switching.
+Provider suites own transcript semantics. Korus tests only: targeted operations never
+cross agent or conversation identity; one reset plus revisioned deltas yields one row
+per provider message; stale or gapped revisions trigger rehydration; Electron
+forwards frames without reducing; snapshot persistence and sync stay transcript-free;
+projections (plans, diffs, unread, sidebar activity) are read-only and cannot
+resurrect or mutate provider turns. Plan review decisions are explicit commands:
+test pending-review persistence, identity, idempotence and failed acceptance. Client
+isolation tests assert no implicit runtime loading and that snapshot queries do no
+maintenance. Use captured long-conversation fixtures for deterministic performance
+regressions; do not reintroduce a transcript reducer to benchmark provider traffic.
 
 ## Gates
 
-Use the repo scripts for broad verification:
+`package.json` scripts are the reference. `npm test`, `npm run test:coverage`,
+`npm run lint` (includes every workspace typecheck and the Knip dead-code check) and
+`npm run build`. Prefer `npm run test:ai` for agent-driven full runs: same suites,
+quiet output, `[TESTS:DONE]` after each workspace. Host-only iteration uses suffixed
+commands (`test:electron`, `typecheck:web`, …). For visual changes add a local
+app/screenshot check when the app can boot; for protocol or persistence changes run
+the touched module's tests plus the full coverage gate.
 
-```bash
-npm test
-npm run test:ai
-npm run test:coverage
-npm run lint
-npm run lint:dead-code
-npm run build
-```
-
-`npm run test:ai` runs the same workspace suites as `npm test`, but suppresses
-per-test output and prints `[TESTS:DONE]` after each workspace summary. Prefer
-it for agent-driven full-suite verification where concise, unambiguous output
-reduces context use. Keep `npm test` for normal human-readable output.
-
-`npm run lint` includes the Knip dead-code check. Run `lint:dead-code`
-directly when iterating on unused files, dependencies, exports, or types.
-
-For focused iteration, run the smallest relevant Vitest target first, then the
-full relevant gate before handoff.
-
-For visual changes, run tests plus a local app/screenshot check when the app can
-boot.
-
-Host-only iteration uses the suffixed root lifecycle commands. For example:
-
-```bash
-npm run typecheck:electron
-npm run test:electron
-npm run typecheck:web
-npm run test:web
-npm run build:web
-npm run preview:web
-```
-
-The unqualified typecheck, lint, and test commands cover every workspace.
-
-For protocol or persistence changes, run focused tests for the touched module
-and the full coverage gate.
-
-Before release, require the full test suite, including script tests, and
-coverage across all five workspaces. CI runs `npm run test:coverage` followed
-by `npm run test:scripts`: coverage already executes every workspace test, so
-an additional `test:ai` run is unnecessary. Likewise, `npm run lint` includes
-all workspace typechecks and does not need a separate `typecheck` run.
-A failed test or a workspace below 85% statements blocks release. Run against
-the installed SDK package boundary; source aliases are not a substitute for
-package verification.
-
-## Conversation Ownership Verification
-
-Provider suites own exact transcript semantics. Korus tests only the boundaries
-it owns:
-
-- targeted provider operations never cross agent or conversation identity;
-- one provider reset followed by revisioned deltas produces one renderer row
-  per provider message;
-- stale or gapped revisions trigger provider rehydration;
-- Electron forwards provider frames without reducing conversation state;
-- app snapshot persistence and synchronization remain transcript-free;
-- Korus projections such as plans, diffs, unread state, and sidebar activity are
-  read-only and cannot resurrect or mutate provider turns.
-
-Plan review decisions are explicit backend commands, not projection mutations.
-Test pending-review persistence, identity, idempotence and failed acceptance;
-test the application opening/dismissing review in response to domain state.
-Likewise, normalized pending input and typed outcomes must not require clients
-to decode provider frames. Navigation/preferences tests assert client isolation
-and no implicit runtime loading; snapshot queries must not perform maintenance.
-
-Use captured long-conversation fixtures for deterministic performance or memory
-regressions. Do not reintroduce a Korus transcript reducer solely to benchmark
-provider traffic.
+Before release CI runs `npm run test:coverage` then `npm run test:scripts`
+(coverage already executes every workspace suite, and lint already covers
+typechecks). A failed test or any workspace below 85% statements blocks release. Run
+against the installed SDK package boundary; source aliases do not substitute for
+package verification. Desktop smoke (boot, create or select an agent, pick a folder,
+send, stream, interrupt or approve, restore after reload) and screenshot checks for
+shell, sidebars, composer, artifact panes, diffs and theme switching apply once the
+chosen desktop tool is configured.

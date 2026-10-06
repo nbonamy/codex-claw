@@ -1,874 +1,168 @@
 # Codex Integration
 
-Korus talks to Codex through the Codex app-server. All provider
-communication with Codex happens in `daemon`, not Electron main. Electron main
-forwards renderer IPC over the app-owned backend protocol, fans backend events
-to the renderer, and owns only desktop-native callbacks.
-
-## Boundary
-
-`daemon` responsibilities:
-
-- choose an explicit Codex executable override when configured, otherwise use
-  the Codex executable supplied by its local desktop host;
-- start or connect to `codex app-server`;
-- initialize the app-server session;
-- own JSON-RPC request IDs and response matching;
-- route server notifications to the right agent/session;
-- answer server-initiated approval and user-input requests;
-- wrap SDK-owned conversation snapshots/events in Korus's agent/thread/revision
-  routing envelope;
-- persist only app product state, not Codex transcripts.
-
-Codex assistant text keeps the app-server's optional `commentary` or
-`final_answer` phase through this adapter. Completed reasoning items contribute
-only their app-server-provided summaries; raw reasoning content is never copied
-into Korus state. The shared SDK Vue renderer uses those semantics to keep work
-expanded while a turn runs, then collapse it under `Done · View details` when
-the final answer begins.
-
-The local `codex-app-sdk` dependency owns Codex executable discovery, generated
-app-server protocol types, request/response inference, bidirectional request
-routing, stdio JSONL framing, targeted conversation operations, conversation
-snapshots/reducers, optimistic submissions, history reconciliation, queues,
-turn mutations, and generic conversation rendering. `daemon` remains the
-product adapter: it owns explicit executable selection, initialization
-metadata, agent/session policy, approval presets, the Korus routing envelope,
-and recovery behavior. Product policy must not be added to the SDK to make a
-Korus call compile; generic Codex conversation behavior must not be added
-to Korus to avoid fixing the SDK.
-
-SDK readiness is distinct from terminal outcome. A native thread-idle update
-releases readiness and queued prompts but does not fabricate `turn.completed`.
-Durable task results remain provisional until the submitting turn's authoritative
-terminal event arrives. A missing outcome can therefore time out in `wait-tasks`
-without implying interruption or cancellation. A late terminal event belongs to
-its original turn and must not clear a newer active turn.
-
-Electron main responsibilities:
-
-- spawn/connect to `daemon`;
-- translate renderer IPC calls into app-owned backend RPC calls;
-- provide client callbacks requested by `daemon`, such as open-external and
-  native permission prompts/settings;
-- fan backend events out to the renderer.
-
-Renderer responsibilities:
-
-- route SDK-owned Codex provider frames to the addressed per-agent SDK replica
-  and render it through `CodexConversationPane`;
-- render Korus-owned coordination and workspace state around that conversation;
-- send user actions through preload IPC;
-- never import generated Codex protocol types;
-- never spawn Codex or access `CODEX_HOME`.
-
-Preload is the only bridge between renderer and Electron main. It must not
-talk directly to Codex app-server, provider protocol modules, or local
-filesystem read APIs. Workspace file previews are backend resource requests,
-not desktop filesystem requests.
-
-## Transport
-
-The first transport should be stdio:
-
-```bash
-codex app-server --stdio
-```
-
-or the equivalent explicit listen form:
-
-```bash
-codex app-server --listen stdio://
-```
-
-Stdio keeps the first product local and simple. Future transport options can
-include a Unix socket daemon or `codex app-server proxy`.
-
-## Lifecycle
-
-Connection flow:
-
-1. Use an explicit user-configured Codex executable when present. Otherwise,
-   local desktop `daemon` uses the pinned executable bundled by Korus;
-   remote `daemon` lets the SDK discover Codex on that remote machine.
-2. Start app-server with the chosen environment.
-3. Send `initialize` with `clientInfo.name = "workspace"` and
-   `capabilities.experimentalApi = true`.
-4. Send `initialized`.
-5. Start or resume a thread for the selected agent folder.
-6. Start turns from user prompts.
-7. Stream notifications and server requests into the session manager.
-8. Cleanly interrupt, stop, or shut down when the app exits.
-
-Electron allows up to 15 seconds for `daemon` shutdown. The SDK closes app-server
-stdin first to allow provider-owned history flushing before bounded signal
-escalation. Optional SDK questions do not hold the agent in `awaitingInput`;
-that status is reserved for blocking requests and approvals.
-
-Korus always gives the SDK an isolated Codex home at
-`~/.korus/codex-home` (or `$APP_HOME/codex-home`). Threads, config,
-and auth remain isolated so Korus cannot pollute the normal Codex CLI/Desktop
-home. By default, only the isolated home's `skills` and `plugins` entries are
-links to `~/.codex/skills` and `~/.codex/plugins`. The Codex settings screen can
-turn that sharing off when every chat is idle, either with fresh Korus
-directories or by copying the current ChatGPT resources. A fresh home creates the links
-before any Codex driver starts. An existing non-linked home is left untouched;
-after launch, Korus asks whether to migrate it or keep it isolated. Migration is
-blocked while chats are active because it restarts `daemon` and its app-server
-processes. The isolated home may require its own sign in on first launch; do
-not copy normal Codex thread or auth files into it.
-
-Korus disables the bundled unified Computer Use plugin in its app-server
-startup overrides, even when plugins are shared. macOS GUI automation in Korus
-uses the app-owned Computer Use MCP tools instead.
-
-Korus reads and mutates that isolated authentication state through the
-SDK account surface. When `account/read` reports that OpenAI authentication is
-required and no account is loaded, the renderer gates the workspace behind a
-signed-out landing screen. `account/login/start` opens the ChatGPT browser
-flow, and the renderer refreshes account state until the SDK observes
-`account/login/completed`. Once signed in, the lower-left account menu shows
-the active account and exposes `account/logout`. Raw Codex account protocol
-types and authentication files never cross into the renderer.
-
-SSH connection settings expose a separate, host-targeted Codex account check
-and **Connect ChatGPT** action. The latter invokes the SDK's
-`startChatGptDeviceCodeLogin()` on that host and displays its verification URL
-and user code. Korus polls the SDK account view while that UI is pending and
-passes the exact login ID when cancelling; it never implements token exchange,
-copies credentials, or owns token refresh. These remote account results do not
-replace the local desktop's account state. Both local and SSH access use the
-same isolated Korus Codex home on the target host.
-
-The General settings Advanced section can store a Codex executable path. A
-non-empty value is passed as the executable for
-`codex app-server --listen stdio://` and always wins. Empty uses the pinned
-Codex executable bundled with local desktop builds. If no bundle is supplied,
-as with an SSH-installed remote `daemon`, SDK discovery searches the inherited
-and login-shell `PATH`, common user and Homebrew bins, nvm installs, and Windows
-executable extensions. Changing the path persists the setting and relaunches
-Korus so the backend and app-server start from a clean lifecycle.
-
-## Bundled App Server
-
-`codex-app-server-release.json` pins the Codex CLI version, platform, and
-architecture used by desktop builds. `npm run dev` and every Electron
-build/package/make path run `scripts/prepare-codex-app-server.mjs`. If the
-repo-owned ignored resource is absent or reports a different version, the
-script runs <https://releases.openai.com/codex/install.sh> in an isolated
-temporary home with `CODEX_RELEASE`, `CODEX_NON_INTERACTIVE`, and
-`CODEX_INSTALL_DIR`, then copies the resolved executable into
-`electron/resources/codex/codex`. The official installer verifies its release
-checksums, and Korus verifies the resulting version and Developer ID signature.
-Electron signing explicitly preserves the executable's upstream OpenAI
-signature and entitlements. The outer Korus signature seals that nested
-code, and release notarization validates the complete app bundle.
-
-Electron passes the copied path to local `daemon` through
-`APP_BUNDLED_CODEX_PATH`. The SSH installer uploads only `daemon.mjs`,
-not the desktop Codex executable or that environment variable, so remote agents
-continue to require a Codex installation on the remote host.
-
-## Thread And Agent Mapping
-
-Personalization edits `AGENTS.md` or `CLAUDE.md` in each provider's configured
-home on the owning host; it is not another instruction string in app state.
-Isolated homes keep these instructions separate from the user's existing Codex
-or Claude setup. Saving to all requires explicit confirmation before
-overwriting both configured files. Codex discovers its home instructions
-natively; Korus adds only its own coordination and task-specific developer
-instructions. Claude loads its home instructions through its existing
-user/project/local settings sources. Project-level instructions remain
-provider-owned. Changes apply when sessions start/resume, not by injecting a
-user message into an active turn. Remote hosts keep their own instruction
-files; the editor does not overwrite files on other hosts.
-
-Mission workers use the same conversation configuration boundary. Korus appends
-the active Mission contract after its normal developer instructions inside a
-`<context>` block. Creating a Mission does not inject that contract as a user
-message or start a turn; the user's first visible message starts the provider
-session with the Mission context already configured. Claude receives the same
-app-owned Mission context through its appended system prompt.
-
-Git draft preferences are app-owned settings: commit-message instructions and
-PR-description instructions are sent only to their matching generation calls.
-They are separate from global agent instructions and do not trigger Git writes.
-
-Codex app-server owns conversation history and thread storage. Korus owns
-the product mapping:
-
-- team id;
-- agent id;
-- folder;
-- display name and avatar;
-- current status;
-- `backendSession` with `{ kind: "codex", threadId }`;
-- local UI preferences.
-
-One app-server process can host many threads. Agents are routed by `threadId`
-and app-owned `agentId`.
-
-If an agent has a persisted Codex `backendSession`, `daemon` resumes it with
-`thread/resume` before starting the next turn. New agents without a Codex
-session use `thread/start`, then set the conversation title to the Korus agent
-name with `thread/name/set` before the first `turn/start`. The generic backend
-seam repeats title synchronization after storing the new session, but the
-Codex adapter treats an already-matching title as a no-op. Editing the Korus
-agent name updates the active conversation title as well.
-
-Korus maintains one non-archived Codex conversation per live agent. Restarting
-an agent archives its current conversation before clearing the provider
-reference. Closing an agent archives its conversation before removing
-app-owned state. If archiving fails, the restart or close fails without
-detaching the agent. On startup, `daemon` reconciles the isolated Korus
-`CODEX_HOME`: top-level conversations not referenced by a live local agent are
-archived through the SDK, while an attached conversation found in the archived
-catalog is restored after an interrupted lifecycle transaction. Korus never
-scans or moves rollout files itself.
-
-Code review defaults to a separate visible reviewer agent in the same workspace,
-but the user may choose the owning agent's current conversation. Either path
-uses the review-session finding tools; finding clarification and batched
-remediation continue through the normal Codex conversation replica. An
-independent reviewer starts without the source conversation history. It defaults
-to the source backend and inherits its selected model and reasoning effort only
-when using that same backend; users can choose another enabled backend.
-`Review again` archives the independent
-reviewer's conversation and binds a fresh one to the same sidebar agent, while
-current-thread reviews keep the user-owned conversation for the whole workflow.
-Finishing removes an independent reviewer agent while retaining its archived
-conversation and saving a report; a current-thread conversation remains intact.
-Korus persists the selected Git scope, reviewer identity, opaque conversation
-reference, and app-owned finding ledger without creating a second transcript
-model.
-
-`thread/settings/updated`
-confirms the active thread settings and should update the app-owned
-agent/session mapping so the id is saved in backend-owned state and reused
-after relaunch.
-
-Codex approval presets are app-owned shortcuts over Codex thread settings. The
-renderer only sees the Codex preset id; `daemon` maps it to
-`approvalPolicy`, `approvalsReviewer`, and sandbox settings for `thread/start`,
-`thread/resume`, and live `thread/settings/update` calls. Do not reuse these
-three Codex presets for Claude permission modes; Claude should expose its own
-backend-specific option set.
-
-Before applying a Codex approval preset, production `daemon` reads
-`configRequirements/read` from app-server. Managed requirements can disallow
-specific approval policies, reviewers, sandbox modes, or permission profiles.
-When the configured/default Korus preset is not allowed, the Codex adapter clamps
-to the best compatible preset (`approve-for-me`, then `ask-for-approval`, then
-`full-access`). If none of Korus's presets satisfy the app-server requirements,
-`daemon` omits approval/sandbox overrides and lets app-server use its effective
-configuration instead of sending a known-invalid `danger-full-access` request.
-The adapter returns the generated app-server `SandboxPolicy` shape directly;
-the shared SDK does not define or normalize a second sandbox-policy model.
-
-`thread/resume` and older-history paging are owned by the Codex SDK. Korus's
-Codex adapter subscribes to the SDK's conversation-targeted replica bridge. It
-publishes one bounded `CodexConversationSnapshot`, then forwards only
-`CodexConversationEvent` deltas with a monotonic per-agent revision. The SDK
-owns history reconciliation, cursors, turn identity, optimistic messages, tool
-lifecycle, and mutation results; Korus does not translate those into a second
-`RendererMessage` store.
-
-Existing active sessions remain SDK-memory-authoritative and are not re-resumed
-on selection. On relaunch, `agent/conversation/load` binds the persisted thread
-reference to the targeted SDK surface and emits a fresh provider snapshot. The
-renderer creates one SDK replica for that agent and applies only contiguous
-provider revisions; a gap triggers rehydration.
-
-Korus's cross-agent prompt admission queue remains app-owned coordination state:
-it decides whether a prompt starts now or waits for the agent, persists that
-pending work, and passes the active agent's queued prompts into the SDK pane for
-generic queue presentation and interaction. This is distinct from any
-provider-native queue represented by the SDK conversation snapshot; Korus must
-not substitute the provider snapshot's queue for its own admitted prompts.
-
-The SDK pane's Continue control for a restored interrupted turn invokes a
-dedicated Korus controller action. Korus routes it through IPC and `daemon` to the
-Codex conversation handle's `continueInterruptedTurn()` operation, which starts
-the next turn with empty input only after confirming the latest turn is
-interrupted. It must not submit the text `continue` as a new user prompt.
-
-The Resume Session dialog opened from an agent's sidebar menu searches both
-active and archived SDK conversation catalogs with the agent folder as an
-exact `cwd` filter. `ConversationSummary.storageState` tells the UI which rows
-are archived; the only active row shown is the agent's current conversation.
-Selecting an archived row first calls the SDK unarchive operation, loads it,
-then archives the displaced conversation before persisting the new
-`{ kind: "codex", threadId }` reference. A failed load rearchives the target
-and restores the current runtime. Resume is allowed only while the agent is
-idle. Claude keeps its existing transcript behavior until its provider exposes
-an archive primitive.
-
-Fork Agent calls the SDK conversation handle's high-level `fork()` operation,
-which owns `thread/fork` and returns a new conversation id plus its snapshot.
-`daemon` creates a selected agent directly below the source with the new
-`{ kind: "codex", threadId }` session and publishes the returned SDK snapshot;
-raw fork protocol types remain outside product contracts. Forking requires an
-idle Codex agent with an existing conversation.
-
-The controlled conversation pane opts into SDK turn-level Fork actions for
-user and assistant messages. It passes the stable turn id through the
-app-owned `agent/fork` request; the Codex adapter calls the conversation
-handle's `forkTurn()` operation, and the result enters the same new-agent
-workflow without changing the source thread.
-
-Compress Session is an app-owned session rollover, not Codex context
-compaction. It is available only for an idle agent with an existing Codex
-thread. The renderer keeps a blocking progress dialog visible across the
-transition. `daemon` asks the current SDK-owned conversation for a bounded
-handoff with a temporary fast model/effort override, waits for the exact
-handoff turn to complete, creates a replacement SDK conversation in the same
-folder with the agent's original Codex settings, sends the handoff inside a
-real initial user prompt, and only then archives the old thread. The temporary
-handoff turn's settings and transcript events are internal to the rollover and
-must not update the agent's persisted defaults. The SDK strips the prompt's
-`<context>` block from the visible message, leaving only the repeated
-background-only instruction in the transcript. Submitting a turn also
-guarantees that the replacement has a persisted rollout that can be resumed
-after restart.
-After the replacement exists, `daemon` updates the agent's persisted thread
-reference and publishes the replacement SDK snapshot. Korus never copies or
-reduces either transcript. If replacement creation or old-thread archival
-fails, the persisted agent continues to reference the old thread.
-
-The warning preference and rollover orchestration are Korus product metadata.
-The old and new conversation contents, optimistic messages, turns, history,
-and rendering remain SDK-owned throughout. This boundary is deliberate: do
-not implement a parallel handoff transcript, synthetic user message, or
-session reducer in Korus.
-
-## Requests
-
-Important requests for the first product:
-
-- `thread/start`
-- `thread/name/set`
-- `thread/resume`
-- `thread/fork`
-- `thread/list`
-- `turn/start`
-- `turn/steer`
-- `turn/interrupt`
-- `model/list`
-- `skills/list`
-
-`daemon` should expose these through app-level backend driver/session services,
-not directly through renderer IPC.
-
-## Models And Reasoning Effort
-
-Codex app-server v2 exposes the model picker catalog through `model/list`.
-Korus should use that request instead of hardcoding model or reasoning
-level options. The response includes visible model entries, each model's
-`supportedReasoningEfforts` in the order Codex intends clients to display, and
-the model's `defaultReasoningEffort`. Models may also expose `serviceTiers` and
-`defaultServiceTier`; the SDK presents the fast/priority tier as the Fast mode
-toggle.
-
-The renderer consumes an app-owned picker shape only. `daemon` fetches and adapts
-the Codex catalog to `BackendModelOption[]`. An explicit picker choice is saved
-immediately in the agent's `backendDefaults`, marked as user-selected. Provider
-settings hydrate those defaults until the user makes an explicit choice; later
-thread events cannot replace that choice for future prompts or agent actions.
-Each prompt request captures the selected model, reasoning effort, and service
-tier in app-owned prompt options, including when that prompt is queued.
-
-The selected service tier is part of the hydrated thread settings. `daemon`
-emits it through `conversation.settingsUpdated`, including an explicit `null` when
-Fast mode is disabled, so switching agents or reloading the app does not retain
-a stale toggle.
-
-`turn/start` accepts `model` and `effort` overrides for the current turn and
-subsequent turns, so Korus applies the current picker selection on every
-prompt without requiring a new thread.
-
-## Skills
-
-Codex app-server v2 exposes available skills through `skills/list`.
-Korus treats skills as agent-folder scoped because each agent has its own
-cwd:
-
-```json
-{
-  "method": "skills/list",
-  "params": {
-    "cwds": ["/absolute/agent/folder"],
-    "forceReload": false
-  }
-}
-```
-
-`daemon` adapts the response into `BackendSkillSummary[]` and exposes it through
-backend RPC, which Electron forwards over typed IPC. The renderer uses this
-app-owned shape for the composer skill menu; it does not import generated
-app-server skill types.
-
-When a prompt contains `$skill-name`, renderer state resolves the mention
-against the active skill catalog and sends those skills under
-`SendPromptOptions.backendOptions` with `kind: "codex"`. Slash skill fallback
-from `/` command search resolves the same way. `daemon` then appends Codex
-`UserInput` skill items to `turn/start`, alongside the normal text input:
-
-```json
-[
-  { "type": "text", "text": "$skill-name do the thing", "text_elements": [] },
-  { "type": "skill", "name": "skill-name", "path": "/.../SKILL.md" }
-]
-```
-
-Composer shortcuts are split by surface: `@` searches files, `$` searches
-skills, and `/` searches backend commands first, then matching skills. The
-initial Codex command catalog includes `compact`, `review`, `plan`, and `goal` without
-a visible slash prefix in the menu. Immediate commands submit their slash form;
-selecting `goal` enters the SDK's pending command mode until an objective is submitted.
-
-`compact` is an app command. Bare `/compact`, the agent-menu action, and
-Command-K all open the Compress Session flow described above. The renderer
-intercepts the bare slash form before normal prompt submission so the warning
-and blocking transition are always applied. `/compact <text>` remains a normal
-prompt.
-
-Bare `/review` is a Korus app command. The renderer intercepts it and opens the
-app-owned review setup without appending a visible user message or starting a
-provider turn. The same command is present for Codex and Claude agents. The
-Codex driver continues to own custom provider review prompts:
-
-- `/review <instructions>` calls `review/start` with a custom review target.
-
-`plan` is handled earlier in the renderer/app prompt path because Codex CLI
-semantics change the composer mode, then optionally submit stripped text:
-
-- bare `/plan` enables Plan mode, clears the composer, and does not call
-  `sendPrompt`;
-- `/plan <prompt>` enables Plan mode and submits `<prompt>` as a normal visible
-  user prompt with `planMode: true`;
-- `/plan` while Plan mode is already enabled keeps Plan mode enabled.
-
-`goal` is also handled in the renderer/app prompt path because it mutates
-thread metadata instead of starting a visible prompt turn:
-
-- `/goal <objective>` sets or replaces the active thread goal;
-- `/goal clear` clears the active thread goal;
-- bare `/goal` and `/goal edit` are reserved for the goal shelf/editor surface.
-
-`review/start` uses `delivery: "inline"`, so app-server should return the same
-`reviewThreadId` as the active thread. `daemon` treats a different review thread id
-as a protocol error instead of moving the agent session. The review lifecycle
-streams `enteredReviewMode`/`exitedReviewMode` items; the final
-`exitedReviewMode.review` string is rendered as assistant text because it is the
-plain-text review body, not hidden tool output. Review-mode markers are not
-tool parts and should not create a tool group in the renderer.
-
-This is preferred over relying on Codex to infer the skill from text alone.
-`skills/changed` is an invalidation notification; `daemon` emits app-owned
-`skills.changed`, and the renderer invalidates the folder-keyed skill caches
-before warming the known agents again.
-
-## MCP Enablement
-
-The Korus MCP server is documented in `docs/mcp.md`. It is an app-owned
-collaboration server, not a Codex-specific subsystem.
-
-For Codex, do not rely on a global `codex mcp add` entry for the product path.
-Korus starts the app-server process with process-wide feature overrides,
-then passes the local Korus MCP server through each agent's thread config:
-
-The process-wide overrides enable Codex memories and streamed patch events for
-every Korus-managed Codex session.
-
-```json
-{
-  "mcp_servers.korus.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
-  "mcp_servers.korus.default_tools_approval_mode": "approve"
-}
-```
-
-The `agentId` query parameter is session-local caller identity for the MCP
-server, not a tool argument the model has to provide for itself. The same
-unique ID is injected into the agent's developer instructions and returned by
-`list-agents` so duplicated agents can still coordinate precisely. The
-approval override is scoped to `korus`; it does not put the entire Codex
-session into full-access/yolo mode.
-
-Each `thread/start` still receives agent-specific developer instructions, such
-as the Korus agent ID/name/folder and guidance to use the MCP server without
-passing its own caller ID to each tool.
-
-This keeps normal Codex config and normal Codex data untouched.
-
-Independent product review rounds create a fresh SDK conversation; a first round
-configured for the current thread loads that conversation instead. Both replace
-the normal Korus MCP URL with a review-session URL. That stable URL adds the
-finding actions and `finish_review_round` documented in `docs/mcp.md`; normal
-repository tools remain owned by the Codex harness. A successful finish call
-confirms the current-round finding count, including zero, but Korus also waits
-for the inspection turn to end before advancing. Missing confirmation fails
-the round and pauses automatic mode. Clarification and remediation continue in
-the same conversation; fresh independent rounds archive the previous one.
-Findings live in Korus's review ledger and are saved to a report on completion.
-
-## Notifications And Server Requests
-
-Handled notifications:
-
-- `thread/started`
-- `thread/settings/updated`
-- `thread/goal/updated`
-- `thread/goal/cleared`
-- `thread/tokenUsage/updated`
-- `skills/changed`
-- `thread/status/changed`
-- `turn/started`
-- `turn/plan/updated`
-- `turn/completed`
-- `item/started`
-- `item/completed`
-- `rawResponseItem/completed` as a compatibility/fallback path for raw
-  Responses items that are not projected into `ThreadItem`s.
-- `item/agentMessage/delta`
-- `item/plan/delta`
-- `item/commandExecution/outputDelta`
-- `item/fileChange/patchUpdated`
-- `item/mcpToolCall/progress`
-- `thread/compacted` as a deprecated compatibility notification; prefer the
-  `contextCompaction` item emitted through `item/started`.
-
-High-priority missing notifications:
-
-- `error`: should become an app-owned error event and visible system message.
-- `item/reasoning/summaryTextDelta`: needed for reasoning summary rendering.
-- `item/reasoning/summaryPartAdded`: needed for reasoning summary rendering.
-- `item/reasoning/textDelta`: needed for reasoning text rendering.
-- `item/commandExecution/terminalInteraction`: useful once native terminal or
-  process interaction UI exists.
-- `item/fileChange/outputDelta`: deprecated legacy apply-patch output stream,
-  but worth accepting for compatibility.
-
-Useful app/account/config notifications that should be logged or surfaced once
-we add the matching UI:
-
-- `account/updated`
-- `mcpServer/startupStatus/updated`
-- `mcpServer/oauthLogin/completed`
-- `configWarning`
-- `warning`
-- `guardianWarning`
-- `deprecationNotice`
-- `model/rerouted`
-- `model/verification`
-- `turn/moderationMetadata`
-
-Thread lifecycle notifications that can wait until thread/history management:
-
-- `thread/name/updated`
-- `thread/archived`
-- `thread/unarchived`
-- `thread/closed`
-
-Low-priority protocol surfaces for the current Korus MVP:
-
-- `app/list/updated`
-- `remoteControl/status/changed`
-- `externalAgentConfig/import/completed`
-- `fs/changed`
-- `fuzzyFileSearch/sessionUpdated`
-- `fuzzyFileSearch/sessionCompleted`
-- `thread/realtime/*`
-- `windows/worldWritableWarning`
-- `windowsSandbox/setupCompleted`
-- `hook/started`
-- `hook/completed`
-- `command/exec/*`
-- `process/*`
-
-Current server-initiated request methods:
-
-- `mcpServer/elicitation/request`: implemented for MCP tool approval
-  confirmation.
-- `item/tool/requestUserInput`: implemented for app-server user questions.
-- `item/commandExecution/requestApproval`: not implemented.
-- `item/fileChange/requestApproval`: not implemented.
-- `item/permissions/requestApproval`: not implemented.
-- `item/tool/call`: not implemented.
-- `account/chatgptAuthTokens/refresh`: not implemented.
-- `attestation/generate`: not implemented.
-- `applyPatchApproval`: legacy-ish and not implemented.
-- `execCommandApproval`: legacy-ish and not implemented.
-
-Server requests are not renderer implementation details. `daemon` stores the
-pending request, emits an app-owned prompt event, and resolves or rejects the
-server request when the renderer answers. Until a request type is implemented,
-`daemon` must log `not implemented` and respond with a JSON-RPC error so the
-app-server does not wait forever.
-
-`mcpServer/elicitation/request` with `_meta.codex_approval_kind =
-"mcp_tool_call"` maps to the same renderer-facing confirmation shape as id8:
-`kind: "confirm_tool"` with a stable request id, summary, integration/server
-name, tool name, arguments preview, and supported persistence choices. The
-renderer returns `allow`, `allow_conversation`, `always_allow`, or `deny`;
-`daemon` translates that back to Codex's `accept`/`decline` elicitation response
-and optional `_meta.persist`.
-
-`item/tool/requestUserInput` maps to an app-owned `ask_user` client request.
-The request carries Codex's `questions[]` shape with stable question ids,
-headers, option lists, `multiSelect`, and secret/free-form flags. The renderer
-shows a paginated id8-style form for multi-question requests and answers with
-`{ answers: { [questionId]: { answers: string[] } } }`. User cancellation is
-handled explicitly by returning an empty `answers` map so the app-server does
-not wait forever. This is separate from tool approvals because the request is
-asking Nicolas for information, not for permission.
-
-Context compaction is primarily represented by the `contextCompaction`
-`ThreadItem`. The Codex SDK converts its lifecycle into provider-owned
-conversation events so its reducer can split the active assistant message and
-insert one visible compaction marker exactly where the item arrived in the
-stream. The deprecated `thread/compacted` notification remains an SDK-owned
-completion fallback. Korus only transports those provider events and must not
-synthesize another compaction lifecycle.
-
-Unhandled notifications should also log `not implemented`, but they do not need
-a response because notifications cannot block the app-server.
-
-## Plan And Goal Modes
-
-Composer Plan mode is sent through Codex's experimental
-`turn/start.collaborationMode` override. `daemon` builds the `collaborationMode`
-object from app-owned prompt options and the selected model/reasoning effort;
-renderer code only sees a boolean Plan toggle.
-Plan mode must be sent even when no model is selected in the renderer. In that
-case `daemon` omits `settings.model` and uses Codex's Plan preset default reasoning
-effort of `medium`, with `developer_instructions: null` so the app-server keeps
-its built-in Plan instructions.
-Because Codex persists the thread collaboration mode, disabling Plan mode is
-also an app-server operation: native Codex prompts send `planMode: false`, and
-`daemon` maps that to `turn/start.collaborationMode.mode = "default"` with the
-selected model/reasoning settings. Omitting `collaborationMode` would leave the
-thread in its previous mode.
-
-Codex goals are durable thread metadata. The transient Goal composer pill only
-collects an objective; it is not the active goal itself. Selecting `/goal` with
-Enter or Tab shows this pill, and submitting the objective sends
-`/goal <objective>` through the existing host action and clears the pill.
-The renderer handles
-`/goal` commands before prompt submission:
-
-- `/goal <objective>` calls `thread/goal/set` through `daemon`, strips the slash
-  command, and does not start a turn or add a visible user prompt.
-- `/goal clear` calls `thread/goal/clear`, even when the agent is busy.
-- Bare `/goal` and `/goal edit` do not submit a turn yet; goal editing is
-  exposed from the goal surface above the composer and currently loads
-  `/goal <objective>` into the composer as the editing draft.
-- `/goal pause` and `/goal resume` are intentionally unsupported for now.
-
-The active goal is displayed by the SDK conversation shelf, below queued
-prompts and closest to the composer. That keeps editor/clear controls out of
-the composer mode chip row and avoids mixing durable thread state with
-per-turn prompt options.
-
-Mode notifications stay app-owned:
-
-- `thread/settings/updated` is still emitted for persistence/thread mapping.
-- If the thread settings include `collaborationMode.mode`, `daemon` also emits
-  `conversation.modeUpdated` with `default` or `plan`.
-- `thread/goal/updated` and `thread/goal/cleared` become app-owned goal events
-  so the agent metadata and shelf stay in sync.
-- `turn/plan/updated` is the structured plan artifact event. `daemon` stores it as
-  an execution-kind `agent.plan` and derives completion only when every step is
-  complete. `turn/completed` finalizes any remaining execution plan as
-  incomplete, interrupted, or failed before it is persisted.
-- Codex plan-mode output is a separate `ThreadItem` with `type: "plan"`, not a
-  normal assistant message. `daemon` stores `item/plan/delta` as a draft
-  proposed-kind `agent.plan` artifact only; the app-server marks those deltas
-  experimental. Its item status is not execution task-list status.
-- `item/completed` with `item.type === "plan"` is authoritative. `daemon` overwrites
-  any draft plan with the completed item text, persists it, and
-  opens it in the markdown side panel when the corresponding turn completes.
-- Raw response assistant messages are diagnostic only for this path. Do not use
-  them as the primary plan renderer; Codex core already parses
-  `<proposed_plan>...</proposed_plan>` into typed plan item notifications.
-- The transcript must not render the markdown between `<proposed_plan>` and
-  `</proposed_plan>` as normal assistant text. While a plan streams, the
-  snapshot reducer inserts a normal ungrouped tool-style progress row with
-  `Writing plan` or `Updating plan` and live line stats; the side panel remains
-  the place where the full plan markdown is rendered.
-
-Plan previews use the markdown side panel with plan-specific review actions:
-
-- Confirm exits Plan mode and sends `implement the plan` as a normal prompt.
-- Cancel exits Plan mode and closes the preview without sending another prompt.
-- Comment keeps Plan mode active. The user selects text in the plan, adds one or
-  more inline comments, then sends those comments as a plan-refinement prompt.
-  Saved comments can be edited or deleted before submission and are reset after
-  the refinement prompt is sent.
-
-### Token Usage And Rate Limits
-
-`thread/tokenUsage/updated` payload:
-
-```ts
-{
-  threadId: string;
-  turnId: string;
-  tokenUsage: {
-    total: {
-      totalTokens: number;
-      inputTokens: number;
-      cachedInputTokens: number;
-      outputTokens: number;
-      reasoningOutputTokens: number;
-    };
-    last: {
-      totalTokens: number;
-      inputTokens: number;
-      cachedInputTokens: number;
-      outputTokens: number;
-      reasoningOutputTokens: number;
-    };
-    modelContextWindow: number | null;
-  };
-}
-```
-
-`daemon` converts this into `conversation.contextUsageUpdated` with an app-owned
-`contextUsage` payload. `total` is cumulative thread/session usage and can
-exceed the model window after a long conversation. Context occupancy uses
-`last.totalTokens`, which is the latest active context size, divided by
-`modelContextWindow`. Tooltip displays should also cap the visible numerator
-to the model window so the UI never shows an impossible `tokens > window`
-context fraction.
-
-`account/rateLimits/updated` payload:
-
-```ts
-{
-  rateLimits: {
-    limitId: string | null;
-    limitName: string | null;
-    primary: {
-      usedPercent: number;
-      windowDurationMins: number | null;
-      resetsAt: number | null;
-    } | null;
-    secondary: RateLimitWindow | null;
-    credits: unknown;
-    individualLimit: unknown;
-    planType: string | null;
-    rateLimitReachedType: string | null;
-  };
-}
-```
-
-The rate-limit notification is a sparse account-level update, not tied to an
-agent. `daemon` emits `account.rateLimitsUpdated` and the reducer stores it as
-global app state. `daemon` also persists the latest snapshot when
-this event arrives because the app-server only sends it opportunistically
-during streaming.
-
-## Generated Protocol Types
-
-The app-server can generate TypeScript bindings:
-
-```bash
-codex app-server generate-ts --out <dir>
-```
-
-Generated types should live in a backend provider protocol package, for example:
-
-```text
-backend/src/codex/generated
-```
-
-Renderer code depends on app IPC/event types instead. This keeps app-server
-protocol churn contained in the Codex adapter.
-
-## Event Adaptation
-
-The durable flow is:
-
-```text
-Codex app-server -> Codex SDK surface -> targeted SDK snapshot/event
-                 -> Korus revisioned transport frame -> SDK renderer replica -> UI
-```
-
-Renderer components consume the SDK-owned conversation snapshot. Korus consumes
-only explicit read-only projections needed by product chrome, such as plan
-preview, diff, unread state, and sidebar activity.
-
-Do not encode Codex tool calls as id8-style `<tool>` text tags. Those tags are
-an id8/multi-LLM parsing artifact. Codex app-server already emits structured
-`ThreadItem` payloads and item-specific progress notifications, so the Codex
-SDK preserves that structure in its surface snapshot and exposes typed tool
-parts to its renderer. The chat renderer preserves placement with ordered
-message parts (`text`, `tool`, `text`) so tool calls appear where they happened
-in the stream.
-
-SDK mapping sketch:
-
-- `UserMessage` becomes a user message.
-- `AgentMessageDelta` appends assistant text to an in-flight assistant message.
-- completed `AgentMessage` finalizes the assistant message.
-- `CommandExecution` from `item/started` and `item/completed` becomes a
-  command tool part with stable item id, command, cwd, status, output, exit
-  code, and duration.
-- `CommandExecutionOutputDelta` appends output to the matching tool call.
-- `FileChange` and `FileChangePatchUpdated` become file-change tool/diff
-  state.
-- `TurnDiffUpdated` updates turn-level diff state and requests the read-only
-  git diff side panel with the unified diff text.
-- `PlanDelta` updates a draft plan artifact, and completed `Plan` items update
-  the authoritative plan artifact. They are not replayed as normal assistant
-  chat text.
-- MCP and dynamic tool calls become renderer tool calls.
-- `rawResponseItem/completed` is adapted in `daemon` into the same app-owned tool
-  events when the app-server exposes raw function, shell, custom-tool, search,
-  or output items.
-- approval and ask-user requests become pending UI prompts. MCP tool approval
-  elicitations update the matching running MCP tool part when possible so the
-  confirmation appears where the tool call happened in the stream.
-- `TurnCompleted` finalizes streaming state and updates usage/status.
-
-Keep original Codex payloads available in debug fields during development, but
-do not make normal renderer components depend on them.
-
-## SDK Decision
-
-The TypeScript SDK is useful for spikes, but it is not the target boundary. It
-wraps `codex exec --experimental-json`, spawns the CLI, and streams JSONL over
-stdin/stdout.
-
-Korus should use app-server directly because the product needs:
-
-- thread list/read/resume;
-- active turn steering;
-- approval routing;
-- turn diff updates;
-- server-initiated requests;
-- future realtime/control surfaces.
-
-If the SDK is temporarily used, it must sit behind the same backend driver
-interface as the app-server implementation so renderer and IPC contracts do not
-change when the SDK is removed.
-
-## Testing
-
-Normal Korus integration tests use a typed fake Codex SDK surface and real Korus
-driver/adapter/server code. The SDK repository owns app-server transport and
-conversation-reducer tests; Korus must not recreate them here.
-
-Cover:
-
-- initialization and shutdown;
-- SDK events before, during, and after turns;
-- SDK failures, nullable catalog fields and stale session identities;
-- normalized approval/question routing and SDK-targeted responses;
-- interrupt and steer;
-- event adaptation into app-owned state, including durable review readiness;
-- renderer reload snapshots for in-flight streams.
-
-A real app-server smoke test is useful once the first agent works, but it must
-be gated behind an environment variable and stay outside the normal unit-test
-gate.
+Korus talks to Codex through `codex app-server`, and only from `daemon`. Electron
+forwards app-owned RPC and fans events out; the renderer never imports generated
+Codex types, spawns Codex or touches `CODEX_HOME`. Read this before changing Codex
+conversation state, rendering, actions, history or transport.
+
+## Ownership
+
+The local `codex-app-sdk` owns: executable discovery, generated app-server types,
+request/response inference, bidirectional routing, stdio JSONL framing, targeted
+conversation operations, snapshots and reducers, optimistic submissions, history
+reconciliation, queues, turn mutations and the generic conversation UI
+(`CodexConversationPane`). `daemon` is the product adapter: explicit executable
+selection, initialization metadata, agent/session policy, approval presets, the
+routing envelope (agent, thread, revision) and recovery.
+
+- Generic Codex conversation behavior missing or wrong? Fix it in the SDK and
+  consume it. Product policy never goes into the SDK to make a Korus call compile.
+- Korus must not add a parallel message store, optimistic row, history or queue
+  reducer, or turn-mutation state machine. Korus's own admission queue (whether a
+  prompt starts now or waits for the agent) is coordination state, distinct from the
+  provider-native queue in the SDK snapshot, and must not be substituted for it.
+- Agent text keeps the app-server's optional `commentary`/`final_answer` phase.
+  Only app-server reasoning summaries are kept, never raw reasoning content.
+- The TypeScript `codex exec` SDK is not an integration boundary; app-server is,
+  because the product needs thread list/resume, steering, approval routing, turn
+  diffs and server-initiated requests.
+- Unimplemented server-initiated request types log `not implemented` and answer a
+  JSON-RPC error so app-server never waits forever; unhandled notifications are
+  logged. Optional questions do not hold an agent in `awaitingInput`, which is
+  reserved for blocking requests and approvals.
+- **Readiness is not outcome.** A native thread-idle update releases readiness and
+  queued prompts but never fabricates `turn.completed`. Durable task results stay
+  provisional until the submitting turn's authoritative terminal event; a late
+  terminal event belongs to its original turn and cannot clear a newer active turn.
+
+## Process And Home
+
+- Executable precedence: the explicit Settings path (always wins; changing it
+  relaunches Korus), then the pinned executable bundled with local desktop builds
+  (`APP_BUNDLED_CODEX_PATH`), then SDK discovery on the host (remote hosts, which
+  receive only `daemon.mjs` from SSH sync).
+- `scripts/prepare-codex-app-server.mjs` runs for every dev/build/package path and
+  installs the version in `codex-app-server-release.json` into
+  `electron/resources/codex/` using the official installer. Korus verifies version
+  and Developer ID signature, and signing preserves OpenAI's signature and
+  entitlements on that nested executable.
+- `CODEX_HOME` is always `$APP_HOME/codex-home`, ignoring any inherited home. Skills
+  and plugins sharing, isolation and the roster-reset rules are in
+  [architecture.md](architecture.md#provider-homes). Folder-changing actions restart
+  `daemon` and need idle chats. Never copy normal Codex thread or auth files.
+- Process-wide app-server overrides enable memories and streamed patch events, and
+  disable the bundled unified Computer Use plugin (Korus's own MCP tools replace it)
+  and the curated GitHub/Linear plugins ([mcp.md](mcp.md)).
+- Authentication goes through the SDK account surface: signed-out renders a landing
+  gate; browser login (local) or device-code login (SSH host, with its exact login
+  ID for cancellation) is SDK-driven. Korus never implements token exchange, copies
+  credentials or owns refresh, and raw account types never reach the renderer.
+- Shutdown: Electron allows `daemon` 15 s; the SDK closes app-server stdin first so
+  provider history flushes before bounded signal escalation.
+
+## Threads And Agents
+
+Codex owns history and thread storage; Korus maps team, agent, folder, display name,
+status and `backendSession { kind: "codex", threadId }`. One app-server hosts many
+threads, routed by `threadId` and `agentId`.
+
+- A persisted session is resumed with `thread/resume` before the next turn; new
+  agents use `thread/start` and set the conversation title to the agent name
+  (matching titles are a no-op; renaming the agent renames the conversation).
+  Active sessions are SDK-memory-authoritative and are not re-resumed on selection;
+  after relaunch `agent/conversation/load` rebinds the persisted reference.
+- Archive/reconcile/resume rules are in
+  [architecture.md](architecture.md#backend-seam). Resume searches active and
+  archived catalogs with the agent folder as exact `cwd`; `storageState` marks
+  archived rows; a failed load rearchives the target and restores the current runtime.
+- Fork (agent- or turn-level) calls the SDK conversation handle's `fork()` /
+  `forkTurn()`; raw fork types stay out of product contracts. It requires an idle
+  agent with an existing conversation and creates a new selected agent below the
+  source.
+- **Compress Session is session rollover, not Codex compaction.** For an idle agent:
+  ask the SDK conversation for a bounded handoff with a temporary fast model/effort
+  override, wait for that exact turn, create a replacement conversation in the same
+  folder with the original settings, send the handoff inside a real initial prompt
+  (the SDK strips its `<context>` block from the visible message), and only then
+  archive the old thread and update the persisted reference. The handoff turn's
+  settings and events are internal and must not change persisted defaults. If
+  creation or archiving fails the agent keeps its old thread. Never build a parallel
+  handoff transcript or synthetic message.
+- Continue on an interrupted turn is a dedicated action that starts a turn with empty
+  input after confirming the latest turn is interrupted; it never submits the text
+  "continue".
+- Review: independent or current-thread rules are in
+  [architecture.md](architecture.md#code-review). Review rounds replace the normal
+  MCP URL with the review-session URL ([mcp.md](mcp.md)). `review/start` uses inline
+  delivery and a different returned review thread ID is a protocol error rather than
+  a session move; the `exitedReviewMode` body renders as assistant text.
+- Personalization edits `AGENTS.md` (or `CLAUDE.md`) in each provider's configured
+  home on the owning host; changes apply when sessions start or resume, never as a
+  message in an active turn. Mission contracts and developer instructions are
+  applied at session configuration, never injected as user messages.
+
+## Settings And Policy
+
+- **Approval presets** are app-owned shortcuts over thread settings; the renderer
+  sees only the preset ID and `daemon` maps it to `approvalPolicy`,
+  `approvalsReviewer` and sandbox for `thread/start|resume` and live updates. Do not
+  reuse them for Claude's permission modes. Before applying one, `daemon` reads
+  `configRequirements/read`: a disallowed preset clamps to the best compatible
+  (`approve-for-me`, `ask-for-approval`, `full-access`), and if none fits `daemon`
+  omits approval/sandbox overrides and lets app-server use its effective
+  configuration rather than sending a known-invalid request. The generated
+  `SandboxPolicy` shape is returned directly.
+- **Models and effort** come from `model/list` (never hard-coded), adapted to
+  `BackendModelOption[]`. An explicit picker choice is saved immediately in
+  `backendDefaults` as user-selected and later thread events cannot replace it; each
+  prompt captures model, effort and service tier in its options, including queued
+  ones. The service tier (Fast mode) is emitted with thread settings, including an
+  explicit `null`, so a stale toggle never survives an agent switch or reload.
+- **Skills** are folder-scoped (`skills/list` per agent `cwd`), adapted to
+  `BackendSkillSummary[]`. `$skill` mentions resolve against the active catalog and
+  are sent as `skill` input items beside the text, not left for Codex to infer.
+  `skills/changed` becomes `skills.changed` and invalidates folder-keyed caches.
+- **Composer commands:** `@` files, `$` skills, `/` commands then skills. `/compact`
+  (bare, menu action or Command-K) opens Compress Session; `/compact <text>` is an
+  ordinary prompt. Bare `/review` opens Korus's review setup without a visible turn
+  (same for Claude); `/review <text>` calls `review/start`. `/plan` toggles composer
+  Plan mode (bare, or with a prompt submitted as `planMode: true`). `/goal` mutates
+  thread metadata without a turn (`/goal clear` works while busy;
+  pause/resume are unsupported).
+- **Plan mode** uses `turn/start.collaborationMode`. It must be sent even without a
+  selected model (`daemon` omits `settings.model`, uses the Plan preset's `medium`
+  effort and `developer_instructions: null`). Because Codex persists the mode,
+  leaving Plan mode must send `mode: "default"`; omitting it keeps the thread in
+  Plan.
+- **Plans:** `turn/plan/updated` is the structured execution plan (complete only when
+  every step is, finalized as incomplete/interrupted/failed at `turn/completed`).
+  `item/plan/delta` drafts a proposed plan (experimental); the completed `plan` item
+  is authoritative and overwrites the draft. Raw response messages are diagnostic
+  only, and plan Markdown never renders as assistant text. Plan preview actions:
+  Confirm exits Plan mode and sends `implement the plan`; Cancel exits and sends
+  nothing; Comment keeps Plan mode and sends the inline comments as a refinement.
+- **Goals** are durable thread metadata; the goal shelf and pending-goal pill are SDK
+  UI. `thread/goal/*` notifications become app-owned goal events.
+- **Usage:** context occupancy is `last.totalTokens / modelContextWindow` (`total` is
+  cumulative and can exceed the window; cap displayed numerators).
+  `account/rateLimits/updated` is a sparse, account-level update emitted
+  opportunistically during streaming, so `daemon` persists the latest value.
+- **Compaction:** the SDK converts the `contextCompaction` item (and the deprecated
+  `thread/compacted`) into provider events; Korus transports them and never
+  synthesizes its own lifecycle.
+
+## Server Requests
+
+`daemon` stores each pending request, emits an app-owned prompt event and resolves or
+rejects the server request when the client answers. MCP approval maps to
+`confirm_tool` ([mcp.md](mcp.md)). `item/tool/requestUserInput` maps to an `ask_user`
+request (stable question IDs, options, multi-select, secret flags); user
+cancellation answers an empty map so app-server does not wait. Generated types live
+in the SDK; never encode tool calls as id8-style `<tool>` text tags.
+
+## Tests
+
+Integration tests use a typed fake Codex SDK surface with the real Korus driver,
+adapter and server; the SDK repository owns app-server transport and
+conversation-reducer tests. A real app-server smoke test is opt-in behind an
+environment variable. See [testing.md](testing.md).

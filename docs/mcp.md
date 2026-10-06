@@ -1,905 +1,229 @@
 # MCP Servers
 
-## Durable task delegation
-
-`create-agent` accepts optional `task: { title, doneWhen }`. Task mode requires
-the visible assignment in `prompt` and a stable parent-scoped `requestId`; reuse
-that ID after timeout. Optional `instructions` supplies the full handoff in the
-same escaped `<context>` block as ordinary creation. Tasks retain the combined
-assignment for recovery. Returned `taskId`, `agentId` and status describe accepted
-startup or an existing task, not completed work. Calls without `task` keep their
-previous behavior. Provider/model/effort/worktree selection remains unchanged.
-
-Contextual `complete-task` takes `summary`, `evidence`, `artifacts` and
-`caveats`. It saves a provisional result and finalizes only after the exact
-submitting turn succeeds. Task instructions require this before `finish_turn`
-instead of a manual completion `send-message`. Notifications need no reply.
-
-`wait-tasks` lists owned/assigned tasks, optionally filters `taskIds`, and
-supports `mode: any|all` with `timeoutMs` from 0 to 30,000. Completion, failure,
-cancellation, interruption and needs-input end a relevant wait. Timeout leaves
-work running. `cancel-task` accepts one owned `taskId`, saves cancellation
-and interrupts only the recorded execution. Unrelated agents cannot read
-filtered task IDs, submit another worker's results or cancel assignments.
-
-All operations run on the executing daemon's MCP server. Remote clients inspect
-and cancel through agent-scoped RPC routed to that same owner. Tasks survive
-agent removal; undelivered results are never pruned. See `architecture.md` for
-recovery and retention limits.
-
-
-Korus owns local MCP endpoints for agent-to-agent collaboration and for
-credentialed access to provider-hosted MCP servers. These are app surfaces,
-not Codex-specific protocols. Codex and Claude receive the same Korus-owned
-endpoints through their session-local configuration; each backend translates
-only that configuration into its native launch contract.
-
-All providers receive the app-owned endpoint under `product.mcpServerName`
-(`korus`). Configuration, allow rules, and generated instructions use this same
-namespace; shared tool descriptions and recovery errors use unqualified tool
-names. Presentation also recognizes the former `workspace` name so retained
-conversations remain readable.
+Korus runs local MCP endpoints inside `daemon` for agent collaboration and for
+credentialed access to provider-hosted MCP servers. They are app surfaces, not
+Codex-specific: every provider gets the same endpoints through session-local
+configuration, and each driver translates only that into its native launch
+contract. Tool schemas and descriptions are the reference for individual tools
+(`backend/src/mcp/`); this document records the model around them. To add a tool,
+read [custom-tools.md](custom-tools.md).
 
 ## Boundary
 
-`daemon` owns the MCP server, collaboration state, and backend-owned tool
-effects. Electron main does not start this HTTP server; it only receives
-app-owned backend events for desktop effects such as displaying Markdown in the
-side panel. The renderer never talks to MCP directly.
+- `daemon` owns the server, collaboration state and tool effects. Electron main
+  never starts it; it only receives app-owned backend events or client requests
+  for desktop effects. The renderer never calls MCP.
+- Only advertise tools backed by real Korus product capabilities, and never
+  filesystem, worktree or process-control tools the product does not own.
+- Streamable HTTP on loopback, ephemeral port, JSON responses, started before
+  provider drivers so sessions receive a valid URL. `POST /mcp` only: the server is
+  stateless per HTTP request while a process-local coordinator owns collaboration
+  state, so `GET`/`DELETE /mcp` are rejected.
+- All providers see the server as `product.mcpServerName` (`korus`). Claude Code
+  reserves `workspace` and silently drops a dynamic server with that name; tool
+  presentation still recognizes `workspace` for retained history. Allow rules,
+  review prompts and instructions use the same namespace.
 
-Backend responsibilities:
+## Enablement And Identity
 
-- start and stop the MCP server;
-- proxy installed provider-hosted MCP servers without exposing credentials to
-  Codex, Claude, or renderer state;
-- obtain provider credentials from the existing work integration and refresh
-  them before an upstream request or once after an upstream `401`;
-- expose only tools backed by real Korus product behavior;
-- keep message inboxes and connection state;
-- enforce team visibility;
-- notify the right agent when inbox work arrives;
-- translate status updates into app-owned `agent.updated` events.
-- route Computer Use requests to the connected desktop client; `daemon` never spawns the native helper itself.
+Backends receive the server through request- or session-local configuration, never
+by mutating user-global tool config.
 
-Electron main responsibilities:
+- The caller is identified by `?agentId=<id>` in the agent-scoped URL. Tools infer
+  it; models never pass their own agent ID or `from`. The same ID is injected into
+  developer instructions and returned by `list-agents`.
+- **Codex:** `thread/start|resume` config sets `mcp_servers.korus.url` and
+  `default_tools_approval_mode = "approve"`, scoped to Korus tools; the rest of the
+  session keeps normal approvals.
+- **Claude:** the Agent SDK gets the same URL in `mcpServers` and an
+  `allowedTools: ["mcp__korus__*"]` rule. Hosted servers are added without
+  allowlisting, so their normal permission flow remains.
+- `daemon` appends developer instructions with the agent's ID, name and folder and
+  the workflows models do not reliably infer from schemas. They distinguish
+  engine-native subagents (inside the Codex/Claude session) from Korus co-agents
+  (`create-agent`); ambiguous requests to delegate require a clarifying question.
+- Codex approval of an MCP tool call arrives as `mcpServer/elicitation/request`.
+  Korus never auto-accepts it: it becomes a `confirm_tool` request, resolved by the
+  user (`allow`, `allow_conversation` and `always_allow` map to `accept` with
+  `_meta.persist` of none, `session`, `always`; `deny` to `decline`).
 
-- fan backend events out to renderer windows;
-- perform native desktop effects requested by app-owned backend events;
-- keep preload IPC independent from MCP SDK and provider protocol types.
-- package the product-specific Computer Use helper and execute it only in response to explicit `client/computerUse/*` requests.
+## Collaboration Model
 
-Renderer responsibilities:
+- Visibility is team-scoped (agents without a team see other no-team agents).
+  Ambiguous recipient names fail with the visible IDs, names and folders so an
+  agent can recover after compaction; errors are `isError` results with plain text.
+- Messages are delivered as normal backend prompts, not as a "check your inbox"
+  instruction. An idle recipient starts a turn; a busy recipient is steered when the
+  provider supports it, otherwise the message waits in the visible prompt queue
+  (owned by `daemon`) and all pending messages drain into one delivery after the
+  turn. `check-messages` is manual recovery only.
+- The delivery prompt carries a versioned, JSON-encoded envelope between stable
+  marker lines (`<<<APP_AGENT_MESSAGES_V1>>>`). The renderer parses only the
+  envelope, so delivery guidance can change without breaking sender labels; it also
+  still recognizes the earlier prose envelope in hydrated history.
+- Inbox and connection state is process-local and bounded. Durable collaboration
+  history, if ever added, is app state and never a copy of provider transcripts.
 
-- render agent status and unread/working state from app-owned events;
-- send normal user actions through preload IPC;
-- never import MCP SDK types;
-- never call MCP tools directly.
+### Status, flags and completion
 
-## Transport
+- `set-status` stores a short `statusText` (cleared when the provider turn
+  completes), emits `agent.updated`, and may carry the start `announcement`. Stable
+  instructions make it the first action of a task.
+- `finish_turn` is the last tool action of a substantive turn. It always clears
+  status; optionally sets one flag (`delegate_to_worktree`, `ready_for_review`),
+  a finish announcement and a celebration. A flag replaces the current proposal;
+  omitting it leaves it. A new user prompt clears `ready_for_review` only. A failed
+  flag action stays available for retry. Instructions forbid choosing
+  `delegate_to_worktree` and then continuing the work, and require assessing review
+  readiness at every handoff (omit it when review is deferred or the user asked for
+  immediate commit/push). Flags are persisted app state cleared with the
+  conversation runtime.
 
-The server uses the official TypeScript MCP SDK with Streamable HTTP on a
-loopback address:
+### Delegation
 
-```text
-http://127.0.0.1:<port>/mcp
-```
+- `create-agent` creates a Korus co-agent in the caller's team without selecting it,
+  optionally with an isolated worktree, and stays pending until the new agent
+  accepts its initial prompt. `prompt` is the concise visible request;
+  `instructions` is the full handoff, prepended inside an escaped `<context>`
+  block (presentation separation, not secret storage: both stay in the transcript).
+  Model and effort inherit from the caller only for the same backend; another
+  backend uses its own defaults.
+- With a `task` contract (`title`, `doneWhen`), a stable parent-scoped `requestId`
+  is mandatory and reused after a timeout. Returned `taskId`/`agentId`/status
+  describe accepted startup, not completed work.
+- `complete-task` (worker, before `finish_turn`) saves a provisional result that
+  finalizes only after that exact turn succeeds. `wait-tasks` (`any|all`, 0–30 s)
+  ends on completion, failure, cancellation, interruption or needs-input; a timeout
+  leaves work running. `cancel-task` interrupts only the recorded execution.
+  Unrelated agents cannot read, complete or cancel another's tasks. Guarantees and
+  retention are in [architecture.md](architecture.md#durable-delegated-tasks).
+- `create-project` exists only for Quick Chats and reuses the New Project service;
+  a later failure leaves the created folder or agent for recovery.
+- `display-markdown` takes exactly one of `path` or `markdown`. Paths must resolve
+  inside the caller's folder, be regular files and fit the preview limit (renderer
+  previews, by contrast, accept paths outside the agent folder).
+- `update-work-item` changes the caller's own assignment status (`blocked` requires
+  a note); completing the last assignment of an automation execution completes it
+  while keeping its agents and worktrees.
 
-The port is ephemeral by default. The server starts inside `daemon` before
-backend drivers are constructed so Codex and Claude sessions receive a valid
-backend-owned MCP URL. Keep the server loopback-only unless we explicitly
-design a remote-control product surface.
+### Automatic review
 
-The transport uses JSON responses for normal request/response calls
-(`enableJsonResponse: true`) rather than one-shot SSE responses. This mirrors
-id8's embedded MCP servers and keeps tool call results easy for backend clients
-and app-server event adapters to consume.
+`start_automatic_review` creates an independent reviewer without selecting it and
+returns `reviewId`/`reviewerAgentId` once startup is persisted. It is not offered to
+Quick Chats or review agents and nested or duplicate reviews are rejected. Scope is
+`uncommitted` or `branch` with `baseRef`; provider, model and effort default to the
+caller's (another provider uses its own defaults); `maxPriority`/`maxRounds` fall
+back to saved settings and `autoCommit` is always false unless explicitly
+requested. Descriptions and instructions require an explicit user request (and
+separate authorization for local commits); generic review/ship requests, teammate
+messages and readiness are not authorization. This is model-facing policy, not
+consent verification. After launch the agent stops editing the reviewed files and
+does not relaunch to poll.
 
-Auxiliary endpoints:
+Each review session gets a stable URL derived from its durable session ID (provider
+conversations may retain their initial MCP config) adding `report_finding`,
+`update_finding`, `delete_finding` and `finish_review_round`. They mutate the
+persisted ledger before returning and are model-only; user decisions are backend
+commands. `finish_review_round({ findingCount })` must equal the round's saved
+finding count across all priorities (zero must be confirmed explicitly); a mismatch
+errors and tells the model to reconcile via `report_finding`. A later finding
+mutation invalidates an earlier acknowledgment, restarted inspections need a fresh
+one, and the acknowledgment alone does not advance the workflow: the provider turn
+must also end successfully. A missing confirmation fails the round and pauses
+automatic mode.
 
-- `GET /health` returns a simple health response.
-- `GET /` returns debug agent state for local development.
-- `POST /mcp` handles MCP requests.
-- `/mcp/providers/<provider>` transparently proxies the provider's Streamable
-  HTTP MCP endpoint when that provider is installed and connected.
+## Contextual Tool Families
 
-`GET /mcp` and `DELETE /mcp` are rejected because the current implementation is
-stateless per HTTP request while Korus's process-local coordinator owns the
-collaboration state.
+Registered per authenticated request by independent modules
+([custom-tools.md](custom-tools.md)).
 
-Provider endpoints preserve Streamable HTTP methods, session headers, response
-content types, and response bodies. They replace any caller authorization with
-a current Korus-owned provider credential. The upstream token never appears in
-backend session config, MCP tool input/output, renderer state, or logs.
-
-## Hosted MCP Gateway
-
-Provider-hosted MCP servers are represented by a small backend-owned catalog.
-The catalog contains public transport facts such as the server id and upstream
-URL plus the work integration that owns its credential. It does not duplicate
-provider tool schemas or implement provider APIs. The gateway is a transparent
-reverse MCP proxy:
-
-```text
-Codex or Claude
-  -> agent-scoped Korus loopback MCP URL
-  -> daemon hosted MCP gateway
-  -> current credential from WorkIntegrationManager
-  -> provider-hosted MCP server
-```
-
-The catalog includes GitHub (`https://api.githubcopilot.com/mcp/`) and
-Linear (`https://mcp.linear.app/mcp`). Connecting either integration also enables
-its hosted MCP server. A newly started or resumed agent receives a local server
-named `github` or `linear`, preserving the upstream tool names and schemas under
-the backend's normal MCP namespace. Disconnecting an integration disables its
-entry for future session configuration; an already-running session keeps its
-local URL but calls fail until that integration is reconnected. Each request
-requires a known Korus agent identity, as on the collaboration endpoint.
-
-Linear reuses the integration's OAuth `read,write` grant for issue reads,
-creation, updates and comments. There is no additional login or API-key setting
-for MCP. The official [Linear MCP endpoint](https://linear.app/docs/mcp) accepts
-the existing OAuth bearer credential; its catalog remains upstream-owned.
-GitHub code and pull-request tools continue using the separate GitHub endpoint.
-
-Korus also launches its Codex app-server with
-`plugins."github@openai-curated-remote".enabled=false` and
-`plugins."linear@openai-curated-remote".enabled=false`. These process-local
-overrides prevent globally installed provider plugins from contributing duplicate
-tool surfaces inside Korus. They do not edit the shared Codex config or disable
-plugins in ChatGPT and other Codex clients.
-
-For each Codex thread, Korus disables the ChatGPT GitHub connector only when the
-same thread receives Korus's authenticated `github` MCP proxy. If Korus has no
-usable GitHub integration, it leaves the ChatGPT connector enabled as a
-fallback so the model can still access GitHub even though Korus-specific GitHub
-features are unavailable. The choice is session-local and never changes the
-user's shared Codex or ChatGPT configuration.
-
-`WorkIntegrationManager` is the runtime credential authority. The gateway asks it
-for an authorization header on every upstream request, so the ordinary expiry
-check and concurrent refresh de-duplication apply to both Korus's product
-features and MCP calls for the same provider. If the upstream rejects a credential with `401`,
-the gateway asks the manager to rotate it and retries that request exactly once.
-Refresh failure marks only that provider's shared connection as requiring
-reconnection. Caller Authorization is replaced, never used as a fallback.
-
-Do not configure a provider's remote URL or bearer token directly in Codex,
-Claude, or user-global MCP settings. That would expose a rotating secret to the
-harness, split credential ownership, and make Korus unable to refresh an active
-session safely. Future Apps should add catalog/install state and provider auth
-adapters behind this gateway; they should not add provider-specific transcript,
-tool-schema, or API wrappers to the renderer.
-
-## Backend Enablement
-
-Backends should receive the MCP server through request-local or session-local
-configuration. Do not mutate a user's global tool configuration as part of the
-normal app path.
-
-For Codex, `daemon` starts `codex app-server` with only process-wide feature
-overrides, then passes the Korus MCP server through each agent's
-`thread/start.config` or `thread/resume.config`:
-
-```json
-{
-  "mcp_servers.korus.url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>",
-  "mcp_servers.korus.default_tools_approval_mode": "approve"
-}
-```
-
-When both integrations are connected, the same extension also adds:
-
-```json
-{
-  "mcp_servers.github.url": "http://127.0.0.1:<port>/mcp/providers/github?agentId=<agent-id>",
-  "mcp_servers.linear.url": "http://127.0.0.1:<port>/mcp/providers/linear?agentId=<agent-id>"
-}
-```
-
-Only `korus` collaboration tools receive Korus's automatic approval mode.
-Hosted provider tools keep the backend's normal approval behavior.
-
-The agent id in the MCP URL is the app's session-local caller identity. Tool
-calls infer the caller from the URL instead of asking the model to provide its
-own `agentId` or `from`. The same unique ID is also injected into the agent's
-developer instructions and returned by `list-agents`, so agents can coordinate
-precisely.
-
-The scoped `mcp_servers.korus.default_tools_approval_mode = "approve"`
-override authorizes only Korus's own collaboration tools; it does not authorize
-all Codex shell/file operations and does not mutate the user's global MCP
-config.
-
-## In-app Browser
-
-The same MCP server exposes an agent-scoped `browser-open` tool that accepts an
-HTTP or HTTPS URL, opens that agent's Browser workspace without changing the
-user's selected agent, and waits for its sandboxed page to load. The agent can
-then use `browser-get-dom`,
-`browser-screenshot`, `browser-click`, `browser-type`, `browser-scroll`, and
-`browser-console-logs`. `daemon` routes opening through `client/browser/open`
-and page operations through `client/browser/execute`; Electron main performs
-the operations against its sandboxed `WebContentsView`. Browser instances are
-addressed by agent id and browser id; today's UI uses one stable `primary`
-browser id per agent, while the contract and native host can support multiple
-browser tabs later. Inactive agent workspaces and their native views remain
-mounted but hidden, so browser MCP work can continue in the background. The
-renderer never receives page DOM, cookies, screenshots, or arbitrary
-page-script access.
+- **Visualize** tools are advertised from session start because providers may cache
+  tool catalogs, but calls are accepted only while the agent owns an open Visualize
+  session for its current conversation. Instructions say tool availability alone
+  does not activate Visualize. Mermaid is limited to the families `beautiful-mermaid`
+  renders (flowchart, state, sequence, class, ER, XY); other types use SVG, and
+  unsupported Mermaid is rejected before it reaches durable state. Generated-image
+  inputs must resolve inside the generated-images root (10 MiB cap); snapshots keep
+  only the relative path, MIME type and alt text. Source-diagram replacement is
+  last-write-wins; **editable canvases require an expected revision** (a stale
+  revision is reread, never blindly retried), validate a bounded edit batch against
+  stable IDs before applying, and serialize writes per visualization across agents.
+  Whole replacement is rejected once a canvas exists. The view tool reports
+  unavailable while a changed scene has no fresh preview.
+- **Mission** tools register for authenticated Mission workers by their recorded
+  assignments, not current turn or run status, so failed or finished attempts can
+  still read artifacts; ordinary agents never receive them. Availability permits
+  inspection; backend ownership checks separately control mutations and reject
+  stale or superseded attempts. A failed attempt stays recoverable: its worker can
+  continue and submit later, and success clears the error. Mission and run IDs are
+  inferred from identity, never model input. Mission workers get no generic
+  thread-flag tools. Behavior is in
+  [architecture.md](architecture.md#missions).
+- **Browser:** `browser-open` opens the agent's Browser workspace without changing
+  selection and waits for load; other `browser-*` tools operate the sandboxed page
+  through `client/browser/open|execute`. The renderer never exposes DOM, cookies or
+  screenshots to page scripts.
 
 ## Computer Use
 
-Computer Use is a local macOS capability exposed through the same Korus MCP
-server. The shared native helper lives in `~/src/computer-use/macos`; Codex
-Korus packages its own signed `Korus Computer Use.app` copy. The release
-artifact and checksum are pinned in `computer-use-release.json`; local helper
-development remains available through `npm run build:computer-use:local`.
-Korus and the bundled helper move together on the v2 contract; there is no v1
-compatibility layer or protocol negotiation. The version returned by status is
-diagnostic only.
-
-Computer Use tools are omitted from an agent's MCP server unless the user
-enables Computer Use in Settings -> Plugins. Chrome is a separate bundled
-ChatGPT plugin: it is not reimplemented as a Korus MCP server. When enabled in
-ChatGPT using Korus's shared `CODEX_HOME`, the `chrome:control-chrome` skill is
-available to agents that have Chrome enabled in Korus settings.
-
-When Korus launches Codex app-server, it disables that child process's
-`node_repl` MCP server unless Chrome is enabled in Settings -> Plugins. This
-keeps the raw host bridge out of the default Korus session while allowing the
-bundled Chrome skill to use it when explicitly enabled; it does not change the
-user's global MCP configuration.
-
-```text
-agent -> korus MCP -> daemon -> client/computerUse RPC -> Electron main -> native helper -> macOS Accessibility
-```
-
-Tools are `computer-use-guide`, `computer-use-status`, `computer-use-request-accessibility`,
-`computer-use-request-screen-recording`,
-`computer-use-list-apps`, `computer-use-list-windows`, `computer-use-find-apps`,
-`computer-use-launch-app`, `computer-use-focus-app`,
-`computer-use-get-app-state`, `computer-use-screenshot`, `computer-use-click`,
-`computer-use-dismiss`,
-`computer-use-press-key`, `computer-use-type-text`, `computer-use-paste`,
-`computer-use-set-value`, `computer-use-select-text`, `computer-use-scroll`,
-`computer-use-drag`, and `computer-use-perform-secondary-action`.
-
-The developer prompt tells agents to call `computer-use-guide` before their
-first Computer Use action. The guide returns the cross-tool workflow and
-fallback rules on demand, keeping individual MCP descriptions focused on their
-own contracts without permanently loading detailed operating instructions.
-
-Window targeting is explicit. Agents call `computer-use-list-windows` for the
-selected app, choose its positive session-local `window_id`, and pass that ID
-to application state, window screenshots, focus, and every action, including
-native menu actions. There is no implicit current-window fallback. Opening or
-closing a window invalidates assumptions about the list, so agents list again
-instead of silently retrying against another window. Read-only menu-bar state,
-full-screen screenshots, discovery, app launch, status, and permission commands
-do not require a window ID.
-
-Closed or foreign IDs return `window_not_found`; cross-window elements or
-coordinates return `window_mismatch`; keyboard focus verification can return
-`window_focus_failed`; and window capture can return
-`window_capture_ambiguous` when the exact Accessibility-to-ScreenCaptureKit
-match is unavailable. These errors require refreshing `computer-use-list-windows`,
-not falling back to another window.
-
-`computer-use-get-app-state` returns one coherent observation: compact
-Accessibility hierarchy text, with screenshots opt-in (`includeScreenshot: true`).
-The first observation for a window/configuration is full; later observations
-are per-window `+`/`~` diffs and compact removed-ID ranges, with `stateRevision`
-and `baseRevision`. A full baseline replaces a diff when it is smaller.
-Leading numbers are helper-session-stable `element_index` values.
-`rootElementIndex` and indexed actions are valid only in the selected window.
-`disableDiff: true` forces a new full baseline, while
-`includeScreenshot: false` avoids capture when the AX state is sufficient. A
-screenshot failure leaves the Accessibility result usable and reports
-`screenshotError`; screenshot bytes are emitted as MCP image content and
-removed from structured JSON. Hierarchy text is emitted only once, in text
-content; structured metadata excludes duplicate text and context snapshots.
-
-Window-targeted actions accept `observe: {}` to return a settled observation in
-the same call. `observe` may include `includeScreenshot`, `waitForText`, and
-`timeoutMs` (1–15000); standalone observations accept the same readiness options.
-The helper checks bounded AX stability, not application-level success. Inspect
-the resulting state and `settling.timedOut`. Combined responses preserve
-`actionDelivered: true` and `actionResult` if the following observation fails;
-do not blindly retry an already-delivered action. Tool schemas reject unknown
-arguments so misspelled targeting and observation options cannot be ignored.
-Native Computer Use callbacks have a 35-second outer deadline, allowing the
-helper's 30-second transport deadline to return its result. Other callbacks
-retain their existing deadline. If an observation response is lost, the MCP
-adapter forces a new full baseline on the next read of each scope; it never
-replays the action. Web loading state participates in readiness, and explicit
-text conditions need not wait for unrelated content to stop changing.
-
-AX inspection and actions do not require foregrounding the app. Targeted
-`computer-use-type-text` accepts `element_index`, `replace`, and `submit`,
-verifies editable focus internally, and stops if focus is lost. Background
-keyboard targeting does not raise the window; physical input still requires
-foreground activation.
-
-`computer-use-screenshot` remains available for explicit window or full-screen
-capture. Window scope requires an explicit `window_id` from the current helper
-session; screen scope captures the main or explicitly selected display,
-including the menu bar. Screenshot results state the captured region's
-absolute macOS logical bounds, image scale factor, and pixel-to-screen
-conversion next to the image.
-Coordinate actions always use absolute logical screen points from the top-left
-of the main display; they never use window-relative positions or screenshot
-pixels. Displays left of or above the main display can have negative origins.
-Screenshot capture is gated by the helper's separately reported Screen
-Recording trust, surfaced in General -> System permissions.
-
-`computer-use-click` uses Accessibility `AXPress` by default. Agents may set
-`physical: true` for a visible Electron/web control known to require actual
-mouse input, or after an `AXPress` reports success but refreshed state shows no
-change. Physical clicks require the target app to remain frontmost and the
-target position to remain unobstructed.
-
-Indexed actions validate the latest observation and target app PID, returning
-`stale_element` rather than redirecting an obsolete index. Click and dismiss
-also accept semantic AX selectors (`role`, `title`, `description`, `value`,
-`subrole`, and optional occurrence) for dialogs and menus. Right and middle
-clicks use physical mouse events. `accessibilityScope: "menu_bar"` lets agents
-inspect and activate native application menus through AX without moving the
-user's pointer. After using a native menu, `computer-use-dismiss` applies its
-AX cancel action before the agent continues typing or acting in the app.
-
-Keyboard operations (`press-key`, `type-text`, and `paste`) select and verify
-the explicit window before posting to its app process; selection may raise the
-window. `set-value` handles
-ordinary settable AX controls; `select-text` provides exact UTF-16-safe text or
-cursor placement with optional context. `perform-secondary-action` invokes
-only actions advertised by the latest observed element. Physical clicks and
-`drag` require the target app to remain frontmost and unobstructed. Computer
-Use intentionally exposes no mouse-move/hover action.
-
-The helper reports its own Accessibility trust. Agents must check status or
-request permission before inspection/actions and refresh app state before
-acting on an indexed element. Normal MCP approval applies to each call.
-
-Electron keeps one helper process alive for the Computer Use session so stable
-window IDs, element IDs, and per-window diff baselines stay valid. The native virtual cursor keeps its
-existing show trigger, then remains visible for that session. Every Computer
-Use call, including a screenshot, resets the 30-second inactivity timeout.
-Screenshots temporarily hide the cursor while capturing and restore it
-afterward. `computer-use-stop` closes the session immediately; inactivity
-closes it automatically, so the next interaction must begin with a fresh app
-observation.
-
-For Claude, `daemon` passes the same request-scoped agent URL through the Claude
-Agent SDK instead of mutating global Claude Code config:
-
-```json
-{
-  "mcpServers": {
-    "korus": { "type": "http", "url": "http://127.0.0.1:<port>/mcp?agentId=<agent-id>" }
-  },
-  "allowedTools": ["mcp__korus__*"]
-}
-```
-
-The `allowedTools` pattern authorizes only tools from the `korus` MCP
-server. Connected hosted servers are added to `mcpServers`, but are not added to
-that allowlist, so their normal permission flow remains intact.
-
-`daemon` also adds developer instructions that give the backend agent its Korus
-agent ID/name/folder and advertise the product workflows models do not reliably
-discover from schemas alone. The instructions distinguish engine-native
-subagents, which remain inside the current Codex or Claude Code session, from
-Korus co-agents, which are separate team agents created with `create-agent`.
-Explicit subagent and co-agent requests use the corresponding mechanism;
-ambiguous requests to delegate, parallelize, or use another agent require a
-clarifying question. The same instructions cover `display-markdown`, meaningful
-celebrations, status, and teammate messaging. Agents do not need to register or
-pass their own agent ID to tools.
-
-For another backend, keep the tool semantics below unchanged and implement the
-smallest equivalent enablement path for that backend.
-
-## Tools
-
-Collaboration tool names are app-owned, and caller identity is inferred from
-the backend session. The server composes self-contained tool modules for each
-request. Module providers decide whether their family applies to the current
-agent and scoped URL, so adding a workflow-specific family does not add mode
-branches to the server composer.
-
-See [Custom MCP Tools](custom-tools.md) for the implementation path, structured
-results, agent status updates, tool-row lifecycle presentation, and required
-tests.
-
-### `list-agents`
-
-Lists visible agents for the caller.
-
-Input: none.
-
-Visibility is team-scoped. Agents with a `teamId` see agents in the same team.
-Agents without a team see other no-team agents.
-
-Output uses unique agent IDs, display names, folders, and status. An agent name
-is an optional custom label; when it is absent, model-facing output uses the
-same branch-or-folder fallback as the product UI instead of rendering `null`.
-If several visible agents share the same display name, `send-message` uses the
-agent ID as the disambiguator.
-
-### `set-status`
-
-Updates the caller's short collaboration status.
-
-Input:
-
-- `status`: short status text; an empty string clears the status early.
-- `announcement`: optional `{ phase: "start", text }` spoken acknowledgment for
-  the first status update of a user task.
-
-Effects:
-
-- stores `agent.statusText`;
-- emits `agent.updated`;
-- optionally queues the same best-effort native acknowledgment previously
-  exposed as a separate tool;
-- clears automatically when the current provider turn completes;
-- lets other agents understand who is working, idle, blocked, or ready.
-
-Developer instructions make the first `set-status` call the first action for a
-user task and include the start acknowledgment in that same round trip. Later
-direction updates omit `announcement`; `finish_turn` owns completion effects.
-
-### `finish_turn`
-
-Finishes the caller's visible turn state. It is the last tool action before the
-final response.
-
-Input:
-
-- `flag`: optional `delegate_to_worktree` or `ready_for_review` proposed action.
-- `announcement`: optional `{ text }` spoken completion acknowledgment; the
-  `finish` phase is implied.
-- `celebration`: optional `{ kind }` visual celebration request.
-
-The operation always clears `agent.statusText` and emits one `agent.updated`
-event. Passing `flag` replaces the current proposal; omitting it leaves an
-existing proposal untouched. A new user prompt clears `ready_for_review`
-automatically, without clearing other proposed actions. Korus renders a
-proposal as a compact composer-shelf action. Activating delegation submits an
-app-owned prompt through the existing worktree/co-agent workflow. Activating
-review readiness opens Korus's review setup after the backend accepts and clears
-the flag. A failed action leaves its flag available for retry. The user can
-dismiss either flag.
-
-Developer instructions make `finish_turn` mandatory as the final tool action
-of a substantive turn and combine its optional completion effects into that
-single round trip. They forbid selecting `delegate_to_worktree` and then
-continuing the implementation. At every substantive handoff they assess
-whether a complete, validated uncommitted diff should be offered for review,
-including after a new prompt clears earlier readiness. They omit that proposal
-when the user defers review or requests immediate commit/push.
-
-Flags are persisted app state and are cleared with the agent's conversation
-runtime when that conversation is restarted or replaced. Clients may present,
-ignore, or programmatically respond to them without interpreting provider
-transcripts.
-
-### `send-message`
-
-Sends a direct message to another visible agent.
-
-Input:
-
-- `to`: recipient agent ID, or recipient name if visible names are unique.
-- `content`: message content.
-
-Effects:
-
-- resolves the recipient inside the sender's visibility scope;
-- rejects ambiguous recipient names and asks the agent to use the ID from
-  `list-agents`;
-- stores an unread inbox message;
-- steers the message into the recipient's active Codex turn when steering is
-  available;
-- otherwise exposes it in the recipient's visible prompt queue and sends it as
-  the next prompt after the active turn completes;
-- `daemon` owns that same queue for user and teammate prompts; renderer actions
-  request steer/delete mutations and only reflect confirmed snapshot changes;
-- returns the resolved recipient ID and display name so tool activity uses a
-  human-friendly label even when the caller addressed an agent by UUID.
-
-### `check-messages`
-
-Manual recovery tool that returns unread messages for the caller.
-
-Normal agent-to-agent messages are delivered directly as backend prompts. An
-agent should only call `check-messages` when explicitly asked to recover missed
-messages or debug message delivery.
-
-Input:
-
-- `markAsRead`: optional boolean, default `true`.
-
-Returned messages include message ID, sender display name, sender agent ID,
-content, and timestamp. Message IDs are inbox item IDs, not agent IDs. When
-`markAsRead` is true, returned messages are marked read immediately.
-
-### `broadcast-message`
-
-Sends a message to every other connected visible agent.
-
-Input:
-
-- `content`: message content.
-
-Effects are the same as `send-message`, repeated for each connected recipient.
-Visible agents without an active MCP session are skipped internally.
-
-### `create-agent`
-
-Creates a Korus co-agent in the caller's team without selecting it. The tool can
-also create an isolated worktree and start the co-agent with initial
-instructions as one backend-owned operation. It is distinct from the native
-subagent mechanism owned by Codex or Claude Code.
-
-Input:
-
-- `repoPath`: repository or existing worktree folder;
-- `createWorktree`: optionally create an isolated worktree from `repoPath`;
-- `branchName`: required when creating a worktree;
-- `destinationPath`: optional worktree destination;
-- `backend` and `name`: optional agent configuration;
-- `model` and `reasoningEffort`: optional backend overrides. When omitted and
-  the new agent uses the caller's backend, each value inherits from the caller;
-  cross-backend creation uses that backend's defaults instead;
-- `prompt`: optional concise initial request shown to the user. The tool stays
-  pending until the new agent accepts this prompt;
-- `instructions`: optional full handoff, requiring a nonempty `prompt`. Korus
-  prepends these instructions inside `<context>` and leaves the visible request
-  outside it. Existing prompt-only calls are unchanged. This is presentation
-  separation, not secret storage or a separate system-instruction channel:
-  both parts remain in the provider transcript.
-
-`daemon` emits transient `agentCreation.progress` events around worktree
-creation, agent creation, and initial-prompt handoff. The renderer shows the
-staged preparation dialog only when the calling agent is still active, so
-background delegation never interrupts an unrelated conversation.
-
-Agents created by this tool retain their delegating agent relationship. Their
-pull-request and merge dialogs can optionally request a whole-task handoff from
-the worker and deliver it back to that agent after the Git operation succeeds.
-
-### `create-project`
-
-Available only to Quick Chats. When the user explicitly asks to turn the
-discussion into a project, the tool takes a single-folder `name` and a
-self-contained `prompt`. It calls the same project-creation service as the
-New Project UI: create an empty folder in the team's configured source folder,
-create a normal agent there, and submit the handoff prompt. The Quick Chat
-remains available, and the tool returns the new agent and folder. If a later
-step fails, the created folder or agent remains available and the error
-names what needs recovery.
-
-### `display-markdown`
-
-Displays Markdown in Korus's right side panel.
-
-Input:
-
-- `path`: optional Markdown file path relative to the caller agent's folder, or
-  an absolute path inside that folder.
-- `markdown`: optional inline Markdown content.
-- `title`: optional side panel title.
-
-Exactly one of `path` or `markdown` must be provided. Path reads use the same
-agent-folder boundary as renderer file previews: files must resolve inside the
-caller agent folder, must be regular files, and must fit the app preview size
-limit. Inline Markdown is emitted directly as app-owned renderer content.
-
-Effects:
-
-- emits `client.markdownDisplayRequested`;
-- renderer opens the Markdown side panel for the active agent;
-- returns a structured success result with the displayed title and path when
-  available.
-
-### `update-work-item`
-
-Updates the local lifecycle of one of the caller's assigned backlog work items.
-
-Input:
-
-- `workItemId`: exact Work item ID from the assignment prompt, such as
-  `github:owner/repo#123`.
-- `status`: `inProgress`, `blocked`, `readyForReview`, or `completed`.
-- `note`: concise user-facing context. It is required for `blocked` so the user
-  knows what help or input is needed.
-
-Effects:
-
-- verifies that the work item is currently assigned to the caller;
-- updates `workBacklog.assignments[workItemId]` with the requested status,
-  timestamp, and optional note;
-- completes the owning automation execution after all of its assignments finish,
-  while preserving the created agents and worktrees for review;
-- emits `workItem.assignmentUpdated` so the cockpit backlog reflects the
-  lifecycle state;
-- persists the updated assignment.
-
-## Direct Message Delivery
-
-When a recipient receives a direct or broadcast message:
-
-- the message is stored as unread in the MCP coordinator;
-- if the recipient is idle, main drains unread messages for that agent and
-  starts a normal backend turn containing the sender name, sender agent ID, and
-  message body directly;
-- the delivery prompt is also appended to the recipient's visible conversation
-  as a user message, just like a normal prompt from the renderer;
-- the renderer recognizes Korus's delivery envelope, labels the bubble with the
-  sender name, and shows only the teammate-authored body; the complete envelope
-  still reaches the backend agent and remains recoverable from hydrated thread
-  history;
-- if the recipient is busy, main waits until the current turn completes, then
-  drains all pending unread messages into one direct delivery prompt.
-
-The direct delivery prompt is intentionally not a generic "check your inbox"
-instruction. Messages use a versioned, JSON-encoded envelope with stable marker
-lines, followed by separately delimited delivery guidance:
-
-```text
-<<<APP_AGENT_MESSAGES_V1>>>
-{
-  "version": 1,
-  "messages": [
-    {
-      "senderName": "Dina",
-      "senderId": "agent-dina",
-      "sentAt": "2026-08-02T12:00:00.000Z",
-      "content": "Please review this."
-    }
-  ]
-}
-<<<END_APP_AGENT_MESSAGES_V1>>>
-```
-
-The renderer reads only the delimited envelope, so delivery-instruction wording
-can change without breaking the sender label or message-body projection. It
-also recognizes the earlier prose envelope for hydrated historical messages.
-This keeps agent-to-agent messaging inside the same turn pipeline as normal
-user prompts while avoiding the old extra `check-messages` indirection. There
-is no separate renderer-side command path.
-
-## Approval Flow
-
-Codex may ask the app-server client to approve MCP tool calls through
-`mcpServer/elicitation/request`. Korus does not auto-accept these requests.
-Electron main translates the Codex elicitation into an app-owned
-`confirm_tool` client request, emits `approval.requested`, and keeps the
-JSON-RPC request pending until the renderer answers.
-
-The renderer shows the approval inline on the running MCP tool call whenever
-the matching item is already present. The decision maps back to Codex as:
-
-- `allow` -> `accept`
-- `allow_conversation` -> `accept` with `_meta.persist = "session"`
-- `always_allow` -> `accept` with `_meta.persist = "always"`
-- `deny` -> `decline`
-
-## State Model
-
-MCP collaboration state is process-local runtime state for now:
-
-- agent connection state lives on the app `Agent` objects;
-- short statuses live as `agent.statusText`;
-- typed thread flags live durably on the app-owned agent snapshot;
-- inbox messages live in the MCP coordinator;
-- unread messages stay until checked;
-- old read messages are bounded so long desktop sessions do not grow without
-  limit.
-
-Persisting MCP inbox history is not part of the first no-team communication
-milestone. If we add durable collaboration history later, it should be app
-state, not Codex transcript duplication.
-
-### `start_automatic_review`
-
-Workspace threads can launch the existing automatic review workflow through
-this caller-scoped tool. It creates an independent reviewer without selecting
-it, returns `reviewId` and `reviewerAgentId` after persisting startup, and sends
-the completed or paused report back through the existing review handoff.
-Quick Chats and review agents do not receive the launch tool. The service also
-rejects nested reviews and the existing workflow rejects duplicate active runs.
-
-The caller must choose `scope: { type: "uncommitted" }` or
-`scope: { type: "branch", baseRef }`. Optional `backend`, `model`, and
-`reasoningEffort` override caller defaults; cross-provider reviews use the new
-provider's defaults rather than transferring incompatible selections. Optional
-`maxPriority` and `maxRounds` fall back to saved review settings, then P2 and 3.
-`autoCommit` always defaults to false, even when the saved preference is true.
-The usual review service owns Git checks, remediation, commits, reports, and
-cleanup; no second review loop or renderer command is involved.
-
-Tool descriptions and stable agent instructions require an explicit user
-request for automatic review and separate explicit authorization for local
-commits. Generic review/finish/ship requests, teammate messages, and review
-readiness are not launch authorization. This is model-facing invocation policy,
-not a claim that the server can verify natural-language consent. Agents must
-stop editing the reviewed files after launch and must not relaunch to poll.
-
-### Review-scoped finding tools
-
-Each review session receives a dedicated MCP URL whose tool surface adds
-`report_finding`, `update_finding`, `delete_finding`, and `finish_review_round`. The URL is derived
-from the durable review session ID and remains stable across app restarts,
-inspection, clarification, remediation, and later rounds because the provider
-conversation may retain its initial MCP configuration. The reviewer can change
-findings while the review is open, even after an inspection turn ends. Korus
-closes the context when the user finishes or discards the review.
-`update_finding` may also move an actively remediated finding to `fixed`.
-`delete_finding` removes a finding from every round of the review. These are
-model-only tools; users cannot invoke them from the review pane. The ordinary
-provider harness continues to supply repository reading, search, Git,
-and test tools. The review tools mutate the active app-owned ledger and persist
-it before returning; the registry itself does not own finding storage.
-
-User decisions and manual workflow actions are backend methods, not model tools. The
-renderer uses the unified client contract to accept, decline, assign, discuss,
-submit, repeat, or finish a review. Inspection completion is a separate model
-acknowledgment: `finish_review_round({ findingCount })` requires a non-negative
-integer equal to the current round's saved finding count across all priorities.
-Counts refer to findings, not tool calls or previous rounds. A mismatch returns
-an MCP error directing the model to register missing findings with
-`report_finding`, reconcile the ledger, and retry the finish call.
-Finding mutations during inspection invalidate an earlier acknowledgment.
-The acknowledgment is persisted but does not itself advance the workflow: the
-provider turn must also finish successfully. Ending without valid confirmation
-fails the round and pauses automatic mode, retaining the reviewer and findings.
-A clean inspection requires explicit confirmation of zero findings. Restarted
-inspections require fresh confirmation. Clarification and remediation turns do
-not use this tool; Korus still owns their transitions and final review closure.
-
-## Error Handling
-
-Tool errors return MCP tool results with `isError: true` and plain text
-messages. Useful recovery messages matter because agents may need to repair
-their own context after compaction. Model-facing agent lists include unique
-agent IDs alongside names and folders. Unknown or ambiguous recipients include
-visible IDs, names, and folders so the agent can recover cleanly.
-
-## Security
-
-- Bind to `127.0.0.1`.
-- Keep provider access and refresh tokens in the backend token store. Never put
-  them in harness configuration, query parameters, app snapshots, renderer
-  contracts, tool results, or logs.
-- Replace, rather than forward, any client-supplied `Authorization` header at
-  the hosted MCP boundary.
-- Do not expose filesystem, worktree, panel, or process-control tools until
-  Korus owns those product capabilities. `display-markdown` is allowed because
-  Korus now owns a constrained Markdown side panel and agent-folder-limited file
-  preview path.
-- Advertise only tools backed by real Korus product capabilities.
-- Do not let renderer code call MCP directly.
-- Prefer request-local backend configuration over global user config mutation.
-
-## Testing
-
-Cover MCP behavior at three layers:
-
-- coordinator contract tests for session connection, visibility, messaging,
-  broadcasts, status, and errors;
-- Streamable HTTP MCP round-trip tests for tool listing and tool calls;
-- hosted gateway tests for header filtering, provider credential injection,
-  upstream session forwarding, and one-time refresh/retry after `401`;
-- backend session tests proving the MCP server URL and developer instructions
-  are injected into backend session startup.
-
-When adding a tool, add coordinator tests first, then HTTP tool-call coverage,
-then any backend enablement tests needed to prove agents can see it.
-
-## Future Tools
-
-Potential tools are intentionally not exposed yet:
-
-- repo/worktree operations;
-- create/close agent;
-- markdown or artifact panel display;
-- file or git actions.
-
-Add them only when Korus has the matching product capability and a tested
-main-process implementation.
-
-### Visualize tools
-
-The Visualize tools are advertised from session start because provider clients
-may cache their tool catalogs. Calls are accepted only while the authenticated
-agent owns an open Visualize session for its current provider conversation.
-Stable developer instructions explain that tool availability alone does not
-activate Visualize mode; live selection and content are discovered through the
-tools instead of being captured in session-start instructions.
-
-`suggest-visualizations` replaces the pane's suggestions with one to four
-bounded title/description pairs. `add-visualization` publishes and selects a
-complete Mermaid, SVG, or generated-image result, optionally satisfying one
-suggestion. `list-visualizations` exposes compact IDs, kinds, and selection,
-while `get-visualization` returns the complete current source needed for an
-edit. `replace-visualization` uses last-write-wins semantics for a source
-diagram; editable canvases instead require an expected revision.
-`delete-visualization` removes an item and repairs selections and suggestion
-links for every agent viewing that repository library.
-
-Mermaid content is limited to the diagram families rendered by
-`beautiful-mermaid`: flowchart, state, sequence, class, ER, and XY. Agents use
-SVG for other visualization types, and unsupported Mermaid input is rejected
-before it can enter durable state.
-
-Generated-image inputs must resolve inside Korus's generated-images root and
-are capped at 10 MiB. The app snapshot stores only the relative asset path,
-MIME type, and alt text; clients load bytes through
-`agent/visualize/asset/get`. Renderer SVG sanitization and generated-image
-path validation remain mandatory boundaries.
-
-### Mission tools
-
-Mission tools remain registered for authenticated Mission workers across run
-failures, cancellations, acceptance, and stage transitions. Membership comes
-from the worker's recorded assignments, not its current turn or run status.
-Ordinary agents do not receive them. Tool availability permits inspection;
-backend ownership checks separately control mutations and reject stale calls.
-Mission workers do not receive generic thread-flag tools because the Mission
-workflow owns delegation and worktree transitions explicitly.
-
-`set-mission-title` lets the requirements worker replace the initial `New mission`
-label once the outcome is clear. The backend infers the Mission and run from the
-caller identity, trims the title, persists it immediately, and publishes the
-updated snapshot.
-
-`attach-mission-repository` lets the active orchestrator record one repository
-already represented by a Mission team member. The tool validates the path as a
-Git repository and persists it without exposing a setup form; implementation
-creates the isolated worktree later, when code work begins.
-
-`list-mission-artifacts` and `read-mission-artifact` let any assigned Mission
-worker discover and consume the canonical Markdown created by earlier stages.
-`write-mission-artifact` writes only the caller's assigned stage under the
-Korus-owned Mission home. Existing files use an expected revision so concurrent
-or stale agents cannot silently overwrite each other.
-
-`upsert-mission-ticket` accepts writes only from the current Tickets-stage orchestrator.
-It assigns stable Mission ticket IDs, resolves blocking edges against those IDs,
-persists the structured draft, rewrites the canonical Tickets Markdown artifact,
-and publishes the snapshot after every change. Tracker issue numbers are optional
-external references and never serve as the Mission ticket identity.
-
-`submit-mission-result` is an app-owned stage handoff. The active Mission and run
-are inferred from the authenticated worker; volatile Mission and run IDs are not
-model-authored inputs. Only the worker bound to the current, unsuperseded Mission
-attempt may report artifacts. Requirements, Tickets, and Review require the
-canonical stage artifact to exist and become persisted proposals for
-human review. Tickets may carry canonical tracker references and zero-based
-dependency indices; invalid/cyclic dependencies are rejected. A completed
-implementation report updates only its assigned ticket, appends verification
-evidence, and continues toward the explicit Review stage. Late reports from
-cancelled or accepted attempts are rejected by mutation ownership checks.
-A failed attempt remains recoverable: its worker can read artifacts, continue
-its assigned work, and submit the result on a later turn without restarting the
-Mission. A successful submission clears the old error. A replacement attempt,
-a stage change, or Mission completion prevents the old attempt from writing.
-Historical workers keep read access without receiving obsolete stage execution
-instructions.
-
-### Visualize canvas tools
-
-The focused Visualize module exposes `read-visualization-canvas`,
-`edit-visualization-canvas`, and `view-visualization-canvas`. Reads default to the
-selection and its bound labels; full-scene reads are explicit. Edits are bounded
-batches against stable existing IDs and an expected revision. The service validates
-all edits before replacing the document and serializes canvas writes per
-visualization, including edits from different agents in the same repository.
-A stale revision must be reread, never retried blindly. Whole-visualization
-replacement is rejected after an editable canvas exists. The view tool returns
-the latest renderer-saved PNG and reports unavailable while a changed scene has
-no fresh preview. All three tools use the authenticated agent's open Visualize
-conversation and remain provider-neutral.
+A local macOS capability exposed through the same server. A signed helper (pinned in
+`computer-use-release.json`; local builds via `npm run build:computer-use:local`)
+runs under Electron main, which executes it only in response to
+`client/computerUse/*` requests; `daemon` never spawns it. Korus and the helper move
+together with no compatibility layer. Tools appear only when the user enables
+Computer Use in Settings → Plugins; Chrome control is the bundled ChatGPT plugin, not
+a Korus tool, and Korus disables Codex's `node_repl` MCP server unless Chrome is
+enabled. Instructions require calling `computer-use-guide` before the first action;
+cross-tool workflow lives there, not in descriptions.
+
+Invariants the tool schemas cannot enforce:
+
+- **Explicit window targeting.** Agents pass a session-local `window_id` from
+  `computer-use-list-windows` to state, screenshots, focus and every action. There
+  is no implicit current-window fallback; a changed window set means list again.
+  `window_not_found`, `window_mismatch`, `window_focus_failed` and
+  `window_capture_ambiguous` require refreshing the list.
+- Observations are full on first read, then per-window diffs by `stateRevision`;
+  element indexes are valid only in the selected window and for the latest
+  observation (`stale_element` otherwise). A lost observation forces a new full
+  baseline; an already-delivered action is **never replayed**, and `actionDelivered`
+  survives a failed follow-up observation.
+- Coordinate actions use absolute logical screen points, never window-relative
+  positions or screenshot pixels. Physical clicks and drags require the target app
+  frontmost and unobstructed; AX actions and background typing do not.
+- One helper process lives for the session so IDs and diff baselines stay valid;
+  every call resets a 30-second inactivity timeout, after which the next
+  interaction starts with a fresh observation. Native callbacks have a 35-second
+  outer deadline. Normal MCP approval applies per call.
+
+## Hosted MCP Gateway
+
+Provider-hosted servers (GitHub, Linear) are reached through a transparent reverse
+proxy at `/mcp/providers/<provider>?agentId=…`, backed by a small catalog of public
+transport facts (server ID, upstream URL, owning work integration). Connecting an
+integration enables its entry; sessions see local servers named `github` /
+`linear` with the upstream tool names and schemas.
+
+- `WorkIntegrationManager` is the credential authority. The gateway asks it for an
+  authorization header on every upstream request, replaces any caller
+  `Authorization`, and on upstream `401` rotates the credential and retries
+  **once**. A refresh failure marks only that provider as needing reconnection.
+- Never configure a provider's remote URL or bearer token directly in Codex, Claude
+  or user-global MCP settings: that exposes a rotating secret to the harness and
+  prevents safe refresh. Tokens never appear in session config, URLs, tool I/O,
+  renderer state or logs.
+- Disconnecting disables the entry for future sessions; a running session keeps its
+  local URL but calls fail until reconnect. Every request requires a known agent.
+- Codex app-server is launched with the curated GitHub/Linear plugins disabled,
+  process-locally, to avoid duplicate tool surfaces; the shared Codex config is
+  untouched. The ChatGPT GitHub connector is disabled per thread only when that
+  thread receives Korus's authenticated `github` proxy, so a missing integration
+  leaves the connector as a fallback.
+
+## Tests
+
+Cover each layer a change touches: coordinator contracts (connection, visibility,
+messaging, status, errors), Streamable HTTP round trips (listing and calls), gateway
+behavior (header filtering, credential injection, session forwarding, one-time
+refresh retry), and backend session tests proving the URL and developer instructions
+are injected. Add coordinator tests first.
