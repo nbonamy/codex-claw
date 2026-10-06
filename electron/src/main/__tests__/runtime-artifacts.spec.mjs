@@ -4,7 +4,6 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   hasExpectedExecutableArchitecture,
-  resolveInstalledExecutable,
   selectCodexReleaseTarget,
   shouldPrepareComputerUse,
 } from '../../../../scripts/runtime-artifacts.mjs';
@@ -53,33 +52,6 @@ describe('runtime artifacts', () => {
     }
   });
 
-  it('prefers the installer bin alias and falls back to the standalone release layout', () => {
-    const realpathSync = vi.fn((filePath) => `/real${filePath}`);
-    const aliasFs = {
-      existsSync: vi.fn((filePath) => filePath === '/install/bin/codex-code-mode-host'),
-      realpathSync,
-    };
-    expect(resolveInstalledExecutable(
-      'codex-code-mode-host', '/install/bin', '/install/home', aliasFs,
-    )).toBe('/real/install/bin/codex-code-mode-host');
-
-    const standalonePath = '/install/home/packages/standalone/current/bin/codex-code-mode-host';
-    const standaloneFs = {
-      existsSync: vi.fn((filePath) => filePath === standalonePath),
-      realpathSync,
-    };
-    expect(resolveInstalledExecutable(
-      'codex-code-mode-host', '/install/bin', '/install/home', standaloneFs,
-    )).toBe(`/real${standalonePath}`);
-  });
-
-  it('throws when the installer provides neither executable layout', () => {
-    expect(() => resolveInstalledExecutable('codex', '/bin', '/home', {
-      existsSync: vi.fn(() => false),
-      realpathSync: vi.fn(),
-    })).toThrow("OpenAI's installer did not provide codex.");
-  });
-
   it.each([
     ['x64', 0x3e, true],
     ['arm64', 0xb7, true],
@@ -117,4 +89,5 @@ describe('runtime artifacts', () => {
     expect(shouldPrepareComputerUse('linux')).toBe(false);
     expect(shouldPrepareComputerUse('win32')).toBe(false);
   });
+
 });

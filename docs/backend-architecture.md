@@ -31,21 +31,178 @@ updates ship with app updates; development and explicitly configured backend
 commands still use their configured runtime. `npm run build:runtime --
 --platform=linux --arch=x64` prepares an individual target for inspection.
 
-This runtime matrix is not a claim that Windows/Linux desktop releases are
-ready: provider distribution, installer/update publishing, platform-specific
-helpers and clean-machine smoke tests must also pass on each target OS. Linux
-uses the official glibc Node builds, not a universal musl-compatible binary.
+The desktop build matrix is macOS ARM64, Windows x64, and Linux x64/ARM64.
+Intel macOS is deferred because the published Computer Use helper is ARM64-only;
+Windows ARM64 is deferred from the initial release matrix. This is not a claim
+of native installer/UI validation: each target still needs a clean-machine
+installation and provider-authentication check. Linux uses the official glibc
+Node builds, not a universal musl-compatible binary.
+
+`codex-app-server-release.json` pins official Codex package archive SHA-256s.
+Preparation verifies the hash, architecture and executable version on the native
+build host. macOS retains upstream Codex signatures.
+Computer Use, Screenshots and Apple speech/TTS helpers
+remain macOS-only; packaging another OS does not enable those capabilities.
 
 Windows Codex preparation downloads the pinned version's complete official
-package and verifies its release SHA-256, package manifest, and executable
-architectures before promotion. It checks the reported CLI version from the
-final location, since running staged binaries can lock their directory on
-Windows. Directory moves retry transient locks; failed validation rolls back
-the previous installation, retaining recovery files if rollback is blocked.
-Keep its `bin/`, `codex-path/`, and `codex-resources/` layout intact; the Windows
-desktop launches `resources/codex/bin/codex.exe`. macOS/Linux retain their
-existing bundled executable paths. Development invokes the parent npm CLI
+package and verifies its pinned SHA-256, package manifest, and executable
+architectures before promotion. It reuses cached packages matching those pins
+and checks the reported CLI version from the final location, since running
+staged binaries can lock their directory on Windows. Directory moves retry
+transient locks; failed validation rolls back the previous installation,
+retaining recovery files if rollback is blocked. Keep its `bin/`, `codex-path/`,
+and `codex-resources/` layout intact, including sandbox helpers and DLLs; the
+Windows desktop launches `resources/codex/bin/codex.exe`. macOS/Linux retain
+their existing bundled executable paths. Development invokes the parent npm CLI
 through Node to avoid Windows command-shim execution and quoting issues.
+Windows ARM64 remains available for experimental development; it is not part of
+the initial GitHub build matrix.
+
+## GitHub desktop releases
+
+`.github/workflows/desktop-build.yml` builds an existing immutable remote tag.
+Use Node 22.23.3, npm 10.9.4 and `npm ci`; SDK packages are pinned published npm
+dependencies, and no sibling checkout or private npm token is needed. Install
+Electron explicitly with `node node_modules/electron/install.js` before running
+parallel tests or Forge (its lazy download otherwise races between workers).
+
+The workflow checks tag/SHA/package-version identity before any build. One
+quality job runs release-note consistency, all-workspace typecheck/lint, the full
+test suite including scripts, and all five 85% statement coverage gates. Every
+build depends on that job. Native runners are `macos-15`, `windows-2022`,
+`ubuntu-24.04` and `ubuntu-24.04-arm`, respectively. Labels were checked against
+the [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+Actions are pinned to reviewed commit SHAs.
+
+Artifacts are DMG/ZIP for macOS, an **unsigned** Squirrel EXE/NUPKG plus portable
+ZIP for Windows, and DEB/RPM/ZIP for Linux. Windows users may see SmartScreen or
+Unknown Publisher warnings, and managed devices may block installation. There
+is no Windows certificate or signing-service prerequisite. Windows/Linux
+auto-update remains disabled; users install newer downloads manually.
+Codex is bundled. Claude Code still uses its separately installed provider CLI;
+the existing Windows onboarding contract requires installing that CLI manually
+before retrying setup. Git/GitHub tooling also remains a user prerequisite for
+repository workflows.
+
+Each native build exercises the packaged private Node, daemon version, and
+Codex app-server initialization without system Node on PATH. macOS additionally
+requires Developer ID verification, Gatekeeper assessment, and a valid notarization
+staple. These checks do not prove GUI installation, login or a complete agent turn
+on a fresh Windows/Linux machine. Run those acceptance checks before promoting
+the first release for an OS. Native Windows ICO generation also runs on Windows.
+
+### One-time setup
+
+The workflow must be available on the repository's default branch before GitHub
+accepts a dispatch. Push only after the implementation has been reviewed and
+the user authorizes it; this infrastructure change itself creates no tags,
+releases, runs, remote secrets or production uploads.
+
+Create the `desktop-build` GitHub environment, restrict it to trusted release
+tags, and configure these secrets through the repository/environment settings:
+
+| Secret | Purpose |
+| --- | --- |
+| `BUILD_CERTIFICATE_BASE64` | Base64 PKCS#12 Developer ID Application certificate and private key |
+| `BUILD_CERTIFICATE_PASSWORD` | Password protecting that PKCS#12 export |
+| `IDENTITY_DARWIN_CODE` | Full Developer ID Application signing identity |
+| `APPLE_ID` | Apple account used for notarization |
+| `APPLE_PASSWORD` | App-specific Apple notarization password |
+| `APPLE_TEAM_ID` | Apple Developer team ID |
+| `APP_GITHUB_CLIENT_ID` | Registered GitHub OAuth client ID |
+| `APP_LINEAR_CLIENT_ID` | Registered Linear OAuth client ID |
+
+Exporting keys or setting secrets is a separate authorized operator action.
+Credentials have not been assumed to exist. The macOS wrapper uses a random
+temporary keychain password, restores the prior search list, and removes its
+certificate/keychain in `finally`, with an additional `always()` cleanup step.
+No signing credentials are passed to dependency installation or other OS jobs.
+
+Store all account and OAuth client IDs in GitHub's **Secrets** settings, including
+`APP_GITHUB_CLIENT_ID` and `APP_LINEAR_CLIENT_ID`; do not use Actions variables.
+This keeps their CI configuration private and masks their values in Actions logs.
+OAuth client IDs are still embedded in the distributed desktop app and can be
+extracted from it. Missing IDs leave the respective integration unavailable.
+Never put OAuth client secrets in the app.
+
+### Dispatch, monitor and inspect
+
+After explicitly pushing a reviewed immutable tag, use an authenticated `gh`
+with repository read and Actions write access:
+
+```bash
+npm run release:build -- --tag v0.27.0 --state .release/0.27.0.json
+npm run release:monitor -- --state .release/0.27.0.json
+npm run release:download -- --state .release/0.27.0.json --output .release/0.27.0-review
+```
+
+The version is read from the tagged package, not the working checkout. A unique
+dispatch ID, full SHA, version, tag, run ID and attempt are saved before dispatch.
+The monitor discovers only that request, tolerates queue/discovery delay, prints
+plain-text per-target status and job/run URLs, and exits nonzero on incomplete or
+unsuccessful required jobs. Failed jobs include a `gh run view ... --log` command.
+It works without a TTY. A timeout or API failure preserves the receipt for resume.
+
+Retry an unchanged build with `gh run rerun <run-id> --repo nbonamy/korus` (all
+jobs), then `release:monitor -- --state <file> --attempt <N>`. The tool never
+silently accepts a later attempt. Rerunning only failed jobs cannot produce the
+complete same-attempt artifact set. Source changes require a new commit/tag and
+state file; never move a release tag. If dispatch has an ambiguous network error,
+resume discovery using its receipt before issuing any new dispatch.
+
+Artifacts remain in Actions for 30 days. Per-target `provenance.json` files record
+version/SHA/tag/run/attempt, signing status, runtime versions, lockfile hash, and
+each file's size/SHA-256. The stage job verifies all four targets before uploading
+`release-<run-id>-<attempt>`. Downloads recheck every hash and identity field.
+This flow uses Actions artifact staging, not a public GitHub Release or live feed.
+
+### Explicit production promotion
+
+`npm run release:promote` (also the legacy `publish` aliases) rechecks the exact
+successful Actions run and downloads a fresh verified bundle. It does not rebuild.
+Configure these environment variables on the operator machine or dedicated
+promotion runner; no developer SSH alias is used:
+
+| Variable | Purpose |
+| --- | --- |
+| `APP_PUBLISH_HOST` | Explicit SSH hostname |
+| `APP_PUBLISH_USER` | Deployment account |
+| `APP_PUBLISH_SSH_KEY` | Path to a private-key file with restrictive permissions |
+| `APP_PUBLISH_KNOWN_HOSTS` | Path to a trusted, independently verified known-hosts file |
+| `APP_PUBLISH_ROOT` | Optional deployment root; defaults to `product.deploymentRoot` |
+
+Use an account restricted to the deployment root. In CI, provision key and
+known-hosts files under the runner temporary directory from approved secrets and
+remove them in an always/finally step. Host-key verification is mandatory. The
+remote host needs POSIX `sh`, `sha256sum`, `cp`, `mv`, and directory write access.
+
+```bash
+npm run release:promote -- --state .release/0.27.0.json --output .release/0.27.0-promote
+```
+
+Choose a new output directory each time. Promotion uploads every target into a
+unique staging directory, verifies remote checksums, acquires `.promotion-lock`,
+and confirms the feed has not changed since preflight. It archives provenance and
+all targets under `releases/builds/<version>/<sha>/<run>-<attempt>/`, places the
+macOS versioned ZIP and stable DMG, and atomically replaces `RELEASES.json` last.
+Release history is merged from the current live feed rather than a stale build
+snapshot. Same-version and older-version promotions are rejected.
+
+`product.json` remains the external identity authority. Existing clients keep
+`https://meetkorus.dev/desktop/releases/darwin/arm64/RELEASES.json`, and the stable
+download remains `https://meetkorus.dev/desktop/downloads/korus-macos-arm64.dmg`.
+Other target files are available beneath the versioned build archive on the same
+domain; this change does not add a Windows/Linux update protocol or alter the site.
+
+After an interrupted promotion, inspect the feed, versioned ZIP, archived bundle,
+stable DMG and lock before retrying. An upload/checksum failure leaves the old
+feed intact and normally removes staging. Failure after assets were placed can
+leave an unreferenced versioned ZIP or a newer stable DMG while the old feed stays
+active. The retry deliberately refuses collisions: reconcile under operator
+review rather than deleting a lock or overwriting a version automatically. A stale
+lock may be removed only after confirming no promotion still owns it. Retain the
+receipt and archived provenance for recovery; never claim success from CLI exit
+alone without checking the public download/feed after an authorized promotion.
 
 Use `backend/dist/korusd --version`, `--stdio`, `serve`, or `connect` when
 running the built backend directly. SSH deployments still transport the

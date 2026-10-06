@@ -49,7 +49,8 @@ function fixture(arch = 'x64', { wrongMachine = false, missingHelper = false, wr
   };
   return {
     root, urls, dependencies,
-    options: { config: { version, targets: [{ platform: 'win32', arch }] }, arch, outputDir },
+    options: { config: { version, targets: [{ platform: 'win32', arch,
+      archive: `codex-package-${triple}.tar.gz`, sha256: createHash('sha256').update(archive).digest('hex') }] }, arch, outputDir },
   };
 }
 
@@ -57,8 +58,11 @@ for (const arch of ['x64', 'arm64']) {
   test(`installs the complete verified Windows ${arch} package, reuses it, and repairs missing helpers`, async () => {
     const { root, options, dependencies, urls } = fixture(arch);
     try {
+      mkdirSync(options.outputDir);
+      writeFileSync(path.join(options.outputDir, '.gitignore'), '*\n!.gitignore\n');
       const executable = await prepareWindowsCodex(options, dependencies);
       assert.equal(executable, path.join(options.outputDir, 'bin/codex.exe'));
+      assert.equal(readFileSync(path.join(options.outputDir, '.gitignore'), 'utf8'), '*\n!.gitignore\n');
       assert.equal(readFileSync(path.join(options.outputDir, 'codex-resources/voice/licenses/NOTICE'), 'utf8'), 'upstream notices');
       assert.equal(urls.length, 2);
       assert.equal(await prepareWindowsCodex(options, dependencies), executable);
@@ -85,6 +89,28 @@ test('rejects modified archive bytes before extracting or replacing an existing 
     assert.equal(readFileSync(path.join(options.outputDir, 'previous'), 'utf8'), 'keep');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+for (const cached of [false, true]) {
+  test(`rejects upstream metadata that disagrees with the pinned checksum${cached ? ' even with a cached installation' : ''}`, async () => {
+    const { root, options, dependencies } = fixture();
+    try {
+      if (cached) await prepareWindowsCodex(options, dependencies);
+      else mkdirSync(options.outputDir);
+      writeFileSync(path.join(options.outputDir, 'previous'), 'keep');
+      options.config.targets[0].sha256 = '0'.repeat(64);
+      let extracted = false;
+      await assert.rejects(prepareWindowsCodex(options, {
+        ...dependencies,
+        execFileSync: (command, args, runOptions) => {
+          if (command === 'tar') extracted = true;
+          return dependencies.execFileSync(command, args, runOptions);
+        },
+      }), /pinned checksum/);
+      assert.equal(extracted, false);
+      assert.equal(readFileSync(path.join(options.outputDir, 'previous'), 'utf8'), 'keep');
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
 
 for (const invalid of ['wrongMachine', 'missingHelper', 'wrongVersion']) {
   test(`rejects a package with ${invalid} and preserves the previous installation`, async () => {

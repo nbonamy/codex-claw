@@ -44,7 +44,7 @@ describe('signDarwinBinaries', () => {
     });
 
     expect(execFileSync).not.toHaveBeenCalled();
-    expect(logger.log).toHaveBeenCalledWith('IDENTIFY_DARWIN_CODE not set, skipping macOS helper signing in afterCopyExtraResources');
+    expect(logger.log).toHaveBeenCalledWith('IDENTITY_DARWIN_CODE not set, skipping macOS helper signing in afterCopyExtraResources');
   });
 
   it('signs the nested helpers from the extraResource location after resources are copied', () => {
@@ -52,7 +52,7 @@ describe('signDarwinBinaries', () => {
 
     signDarwinBinaries(`/build/${product.name}.app`, 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
+        IDENTITY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: (filePath) => [
@@ -114,7 +114,7 @@ describe('signDarwinBinaries', () => {
 
     signDarwinBinaries(`/build/${product.name}.app/Contents/Resources/app`, 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
+        IDENTITY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: (filePath) => [
@@ -148,7 +148,7 @@ describe('signDarwinBinaries', () => {
 
     signDarwinBinaries('/var/folders/electron-packager/tmp-123', 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
+        IDENTITY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: (filePath) => [
@@ -186,7 +186,7 @@ describe('signDarwinBinaries', () => {
 
     expect(() => signDarwinBinaries(`/build/${product.name}.app/Contents/Resources/app`, 'arm64', {
       env: {
-        IDENTIFY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
+        IDENTITY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
       },
       execFileSync,
       existsSync: () => false,

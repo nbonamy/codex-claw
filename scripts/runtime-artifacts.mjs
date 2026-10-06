@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import path from 'node:path';
 
 export function validateCodexReleaseConfig(value) {
   if (!value || typeof value !== 'object') {
@@ -32,18 +31,6 @@ export function selectCodexReleaseTarget(config, platform, arch) {
   return target;
 }
 
-export function resolveInstalledExecutable(name, installBinDir, installHomeDir, fsApi = fs) {
-  const candidates = [
-    path.join(installBinDir, name),
-    path.join(installHomeDir, 'packages', 'standalone', 'current', 'bin', name),
-  ];
-  const candidate = candidates.find((filePath) => fsApi.existsSync(filePath));
-  if (!candidate) {
-    throw new Error(`OpenAI's installer did not provide ${name}.`);
-  }
-  return fsApi.realpathSync(candidate);
-}
-
 export function hasExpectedExecutableArchitecture(executablePath, target, dependencies = {}) {
   if (target.platform === 'win32') {
     const descriptor = fs.openSync(executablePath, 'r');
@@ -63,12 +50,13 @@ export function hasExpectedExecutableArchitecture(executablePath, target, depend
     const architectures = run('lipo', ['-archs', executablePath], { encoding: 'utf8' })
       .trim()
       .split(/\s+/);
-    if (!architectures.includes(target.arch)) return false;
+    if (!architectures.includes(target.arch === 'x64' ? 'x86_64' : target.arch)) return false;
     dependencies.verifyDarwinSignature?.(executablePath);
     return true;
   }
 
   const header = (dependencies.readElfHeader ?? readElfHeader)(executablePath);
+  if (header.length < 20) return false;
   if (!header.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))) return false;
   const littleEndian = header[5] === 1;
   if (!littleEndian && header[5] !== 2) return false;

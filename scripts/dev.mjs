@@ -8,9 +8,8 @@ const backendBundle = path.join(rootDir, 'backend/dist/daemon.mjs');
 const children = new Set();
 let shuttingDown = false;
 
-// Development resolves the sibling SDK directly from source so Vite can
-// hot-reload changes. Package and release builds use its locally built dist.
-process.env.CODEX_APP_SDK_SOURCE = '1';
+// Published SDK packages are the default. Opt in to sibling source development
+// explicitly with CODEX_APP_SDK_SOURCE=1.
 
 if (process.argv.includes('--help')) {
   console.log('Usage: npm run dev');

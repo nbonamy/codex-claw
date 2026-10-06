@@ -10,6 +10,10 @@ import { hasExpectedExecutableArchitecture, selectCodexReleaseTarget } from './r
 export async function prepareWindowsCodex({ config, arch, outputDir }, dependencies = {}) {
   const target = selectCodexReleaseTarget(config, 'win32', arch);
   const triple = `${arch === 'arm64' ? 'aarch64' : 'x86_64'}-pc-windows-msvc`;
+  const archiveName = `codex-package-${triple}.tar.gz`;
+  if (target.archive !== archiveName || !/^[a-f0-9]{64}$/.test(target.sha256)) {
+    throw new Error('The Codex archive and SHA-256 must be pinned for this target.');
+  }
   const run = dependencies.execFileSync ?? execFileSync;
   const fetchRelease = dependencies.fetch ?? fetch;
   const executable = path.join(outputDir, 'bin', 'codex.exe');
@@ -19,15 +23,17 @@ export async function prepareWindowsCodex({ config, arch, outputDir }, dependenc
   const metadataResponse = await fetchRelease(`${baseUrl}/release.json`, { signal: AbortSignal.timeout(30_000) });
   if (!metadataResponse.ok) throw new Error(`Codex release metadata download failed: HTTP ${metadataResponse.status}.`);
   const metadata = await metadataResponse.json();
-  const archiveName = `codex-package-${triple}.tar.gz`;
   const asset = metadata.assets?.find(candidate => candidate.name === archiveName);
   if (metadata.tag_name !== `rust-v${config.version}` || !/^sha256:[a-f0-9]{64}$/.test(asset?.digest ?? '')) {
     throw new Error(`Codex ${config.version} has no verified Windows ${arch} package.`);
   }
+  if (asset.digest !== `sha256:${target.sha256}`) {
+    throw new Error(`Codex release metadata disagrees with the pinned checksum: ${archiveName}.`);
+  }
   const response = await fetchRelease(`${baseUrl}/${archiveName}`, { signal: AbortSignal.timeout(300_000) });
   if (!response.ok) throw new Error(`Codex package download failed: HTTP ${response.status}.`);
   const archive = Buffer.from(await response.arrayBuffer());
-  if (`sha256:${createHash('sha256').update(archive).digest('hex')}` !== asset.digest) {
+  if (createHash('sha256').update(archive).digest('hex') !== target.sha256) {
     throw new Error(`Codex package checksum mismatch: ${archiveName}.`);
   }
 
@@ -42,9 +48,12 @@ export async function prepareWindowsCodex({ config, arch, outputDir }, dependenc
     fs.mkdirSync(packageDir);
     // tar.exe ships with supported Windows versions; no Unix shell or npm shim.
     run('tar', ['-xzf', archivePath, '-C', packageDir], { stdio: 'pipe' });
+    fs.writeFileSync(path.join(packageDir, 'release.json'), JSON.stringify({ version: config.version, ...target }, null, 2) + '\n');
     // Validate bytes before moving, but only execute from the final location:
     // Windows may keep a just-executed binary's directory locked.
     if (!isExpectedPackage(packageDir, false)) throw new Error(`Codex ${config.version} Windows package failed validation.`);
+    const ignoreFile = path.join(outputDir, '.gitignore');
+    if (fs.existsSync(ignoreFile)) fs.copyFileSync(ignoreFile, path.join(packageDir, '.gitignore'));
     if (fs.existsSync(outputDir)) await renameWithRetry(outputDir, previousDir);
     let promoted = false;
     try {
@@ -76,6 +85,9 @@ export async function prepareWindowsCodex({ config, arch, outputDir }, dependenc
 
   function isExpectedPackage(directory, checkVersion = true) {
     try {
+      const provenance = JSON.parse(fs.readFileSync(path.join(directory, 'release.json'), 'utf8'));
+      if (provenance.version !== config.version || provenance.platform !== target.platform
+        || provenance.arch !== arch || provenance.archive !== archiveName || provenance.sha256 !== target.sha256) return false;
       const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'codex-package.json'), 'utf8'));
       if (manifest.version !== config.version || manifest.target !== triple
         || manifest.entrypoint !== 'bin/codex.exe' || manifest.layoutVersion !== 1) return false;

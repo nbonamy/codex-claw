@@ -9,6 +9,11 @@ dotenv.config();
 const skipMacSigning = Boolean(process.env.TEST) || process.env.APP_SKIP_SIGNING === '1';
 
 function run(command, args) {
+  if (command === 'npm') {
+    if (!process.env.npm_execpath) throw new Error('Run this build through npm run build.');
+    args = [process.env.npm_execpath, ...args];
+    command = process.execPath;
+  }
   const result = spawnSync(command, args, { stdio: 'inherit' });
   if (result.error) {
     throw result.error;
@@ -23,7 +28,7 @@ function requireReleaseSigningConfiguration() {
     return;
   }
 
-  const required = ['IDENTIFY_DARWIN_CODE', 'APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID'];
+  const required = ['IDENTITY_DARWIN_CODE', 'APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID'];
   const missing = required.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     throw new Error(`A signed macOS build requires: ${missing.join(', ')}. Set APP_SKIP_SIGNING=1 only for an unsigned local build.`);

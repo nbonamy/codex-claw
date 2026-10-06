@@ -8,8 +8,10 @@ coverage/
 *.log
 .env
 .app-dev/
+.release/
 electron/.computer-use-artifacts/
 electron/.tts/
+electron/.icons/
 electron/.runtime-cache/
 native/**/.build/
 

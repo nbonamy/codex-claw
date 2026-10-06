@@ -5,6 +5,9 @@
   "description": "Native Codex team desktop app.",
   "main": ".vite/build/main.js",
   "scripts": {
+    "prepackage": "node ../scripts/prepare-windows-icon.mjs",
+    "premake": "node ../scripts/prepare-windows-icon.mjs",
+    "prebuild": "node ../scripts/prepare-windows-icon.mjs",
     "build:codex": "node ../scripts/prepare-codex-app-server.mjs",
     "build:computer-use": "node ../scripts/prepare-computer-use.mjs",
     "build:computer-use:local": "node ../scripts/prepare-computer-use.mjs --local",
@@ -15,7 +18,7 @@
     "package": "npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge package",
     "make": "npm run release-notes:check && npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge make",
     "check-publish:macos": "node ../scripts/publish-macos.mjs --check-only",
-    "publish:macos": "node ../scripts/publish-macos.mjs",
+    "publish:macos": "node ../scripts/github-release.mjs promote",
     "build": "npm run build:codex && npm run build:computer-use && npm run build:tts && tsc --noEmit && electron-forge package",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
@@ -27,7 +30,7 @@
     "@workspace/core": "0.27.0",
     "@workspace/vue": "0.27.0",
     "autolib": "github:nbonamy/witsy-autolib#v1.2.3",
-    "@codex-app-sdk/electron": "latest",
+    "@codex-app-sdk/electron": "0.14.0",
     "electron-log": "^5.4.4",
     "electron-squirrel-startup": "^1.0.1",
     "vue": "^3.5.35"
@@ -35,6 +38,9 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
     "@electron-forge/maker-dmg": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
     "@electron-forge/maker-zip": "^7.11.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
     "@electron-forge/plugin-fuses": "^7.11.2",
