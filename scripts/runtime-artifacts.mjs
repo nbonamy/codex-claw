@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import path from 'node:path';
 
 export function validateCodexReleaseConfig(value) {
   if (!value || typeof value !== 'object') {
@@ -30,18 +29,6 @@ export function selectCodexReleaseTarget(config, platform, arch) {
     throw new Error(`Bundled Codex ${config.version} does not support ${platform}/${arch}.`);
   }
   return target;
-}
-
-export function resolveInstalledExecutable(name, installBinDir, installHomeDir, fsApi = fs) {
-  const candidates = [
-    path.join(installBinDir, name),
-    path.join(installHomeDir, 'packages', 'standalone', 'current', 'bin', name),
-  ];
-  const candidate = candidates.find((filePath) => fsApi.existsSync(filePath));
-  if (!candidate) {
-    throw new Error(`OpenAI's installer did not provide ${name}.`);
-  }
-  return fsApi.realpathSync(candidate);
 }
 
 export function hasExpectedExecutableArchitecture(executablePath, target, dependencies = {}) {

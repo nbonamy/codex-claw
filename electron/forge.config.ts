@@ -10,6 +10,7 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import path from 'node:path';
+import desktopPackage from './package.json';
 import {
   shouldPreserveUpstreamCodexSignature,
   signDarwinBinaries,
@@ -74,7 +75,7 @@ if (isDarwin && !skipMacSigning) {
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    icon: process.platform === 'win32' ? undefined : 'assets/icon',
+    icon: process.platform === 'win32' ? '.icons/icon.ico' : 'assets/icon',
     name: product.name,
     appBundleId: product.appId,
     executableName: product.name,
@@ -110,9 +111,12 @@ const config: ForgeConfig = {
     new MakerDMG(dmgOptions, ['darwin']),
     // Intentionally unsigned. No certificate or signing service is required.
     new MakerSquirrel({ name: product.slug, authors: product.name, description: `${product.name} desktop`,
-      setupExe: `${product.slug}-${process.env.RELEASE_VERSION ?? 'setup'}-${process.arch}.exe` }),
-    new MakerDeb({ options: { name: product.slug, maintainer: product.name, homepage: product.websiteUrl } }),
-    new MakerRpm({ options: { name: product.slug, homepage: product.websiteUrl } }),
+      setupIcon: '.icons/icon.ico',
+      setupExe: `${product.slug}-${desktopPackage.version}-${process.arch}-setup.exe` }),
+    new MakerDeb({ options: { name: product.slug, productName: product.name, bin: product.name,
+      maintainer: product.name, homepage: product.websiteUrl, icon: path.resolve(__dirname, 'assets/icon.png') } }),
+    new MakerRpm({ options: { name: product.slug, productName: product.name, bin: product.name,
+      license: 'Apache-2.0', homepage: product.websiteUrl, icon: path.resolve(__dirname, 'assets/icon.png') } }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

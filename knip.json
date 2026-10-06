@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreBinaries": ["shasum", "swift"],
+  "ignoreBinaries": ["shasum", "swift", "spctl"],
   "workspaces": {
     ".": {
       "entry": [

@@ -1,36 +1,30 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
-// Execute the real npm release entry point; replace child npm invocations so
-// this contract test can never build, sign, contact a provider, or publish.
-for (const failedGate of ['test:ai', 'test:coverage', null]) {
-  test(`publication stops at ${failedGate ?? 'the validated build boundary'}`, () => {
+// Exercise each public publication alias with no dispatch receipt. No alias
+// may fall back to a local build, SSH alias, or an unverified artifact.
+for (const command of ['publish', 'publish:electron', 'publish:macos']) {
+  test(`${command} requires a successful GitHub dispatch before external operations`, () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'app-publish-gate-'));
     try {
-      const trace = path.join(directory, 'calls.jsonl');
-      writeFileSync(path.join(directory, 'npm'), `#!${process.execPath}
-const fs = require('node:fs');
-const command = process.argv[3];
-fs.appendFileSync(process.env.APP_GATE_TRACE, JSON.stringify(command) + '\\n');
-process.exit(command === process.env.APP_FAILED_GATE ? 19 : 0);
+      const trace = path.join(directory, 'calls');
+      for (const binary of ['ssh', 'scp', 'gh']) {
+        writeFileSync(path.join(directory, binary), `#!${process.execPath}
+require('node:fs').appendFileSync(process.env.APP_GATE_TRACE, 'called');
+process.exit(19);
 `, { mode: 0o700 });
-      const result = spawnSync(process.execPath, [process.env.npm_execpath, 'run', 'publish:electron'], {
-        cwd: fileURLToPath(new URL('..', import.meta.url)),
-        encoding: 'utf8',
-        env: { ...process.env, PATH: directory + path.delimiter + process.env.PATH,
-          APP_GATE_TRACE: trace, APP_FAILED_GATE: failedGate ?? '' },
+      }
+      const result = spawnSync(process.execPath, [process.env.npm_execpath, 'run', command, '--', '--state', path.join(directory, 'missing.json')], {
+        cwd: path.resolve(import.meta.dirname, '..'), encoding: 'utf8',
+        env: { ...process.env, PATH: directory + path.delimiter + process.env.PATH, APP_GATE_TRACE: trace },
       });
-      const calls = readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line));
-      const expected = ['test:ai', 'test:coverage', 'check-publish:macos', 'make:electron', 'publish:macos'];
-      assert.deepEqual(calls, failedGate ? expected.slice(0, expected.indexOf(failedGate) + 1) : expected);
-      assert.equal(result.status, failedGate ? 19 : 0, result.stderr);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stderr, /missing.json/);
+      assert.equal(existsSync(trace), false);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 }
