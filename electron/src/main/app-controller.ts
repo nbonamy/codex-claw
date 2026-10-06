@@ -35,6 +35,7 @@ import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from '.
 import { installLocalMediaProtocol as installLocalMediaProtocolHandler, LocalMediaRegistry, withRendererMediaUrls } from './local-media';
 import { createRuntimeSpokenAnnouncementQueue, PolicyAwareSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
 import { registerAgentGitIpcHandlers } from './agent-git-ipc';
+import { installMacAppBeforeStartup } from './mac-install';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
@@ -1983,6 +1984,7 @@ export class AppController {
 }
 
 export function startMainApp(): void {
+  if (installMacAppBeforeStartup()) return;
   initializeMainLogging();
   installProcessErrorLogging();
   const controller = new AppController(

@@ -1,6 +1,15 @@
 import { product } from '@workspace/core/product';
 const messages = {
   en: {
+    'install.title': `Install ${product.name}`,
+    'install.replace': `${product.name} is already installed. Replace it?`,
+    'install.replaceDetail': 'Your chats and settings will be kept.',
+    'install.replaceButton': 'Replace',
+    'install.cancel': 'Cancel',
+    'install.finderRequired': 'Use Finder to authorize this installation.',
+    'install.openApplications': 'Open Applications',
+    'install.failed': `Could not install ${product.name}`,
+    'install.manual': `Drag ${product.name} to Applications, then open it from there.`,
     'menu.app': `${product.name}`,
     'menu.agent': 'Agent',
     'menu.browser': 'Browser',

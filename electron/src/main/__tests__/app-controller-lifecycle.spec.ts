@@ -9,8 +9,9 @@ import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
 const native = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => any>(),
   exposed: new Map<string, unknown>(),
-  dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn() },
-  shell: { openExternal: vi.fn(), beep: vi.fn() },
+  dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn(), showMessageBoxSync: vi.fn(), showErrorBox: vi.fn() },
+  shell: { openExternal: vi.fn(), openPath: vi.fn(), beep: vi.fn() },
+  access: vi.fn(), applicationExists: true,
   factory: vi.fn(), createWindow: vi.fn(), maintenance: vi.fn(), capture: vi.fn(),
   keyStart: vi.fn((_hotkey: string, _capture: () => void) => true), keyStop: vi.fn(), ready: false,
 }));
@@ -18,8 +19,10 @@ vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events');
   return {
     app: Object.assign(new EventEmitter(), {
-      isPackaged: true, getAppPath: () => '/test/app', getPath: () => '/test/data',
+      isPackaged: true, getAppPath: () => '/test/app',
+      getPath: (name: string) => name === 'exe' ? '/Volumes/Install/Test.app/Contents/MacOS/Test' : '/test/data',
       isReady: () => native.ready, whenReady: vi.fn(), requestSingleInstanceLock: vi.fn(() => true),
+      isInApplicationsFolder: vi.fn(() => true), moveToApplicationsFolder: vi.fn(),
       quit: vi.fn(), exit: vi.fn(), relaunch: vi.fn(), setAsDefaultProtocolClient: vi.fn(),
     }),
     BrowserWindow: { getAllWindows: vi.fn(() => []) },
@@ -37,6 +40,15 @@ vi.mock('electron', async () => {
     protocol: { handle: vi.fn() }, net: { fetch: vi.fn() },
   };
 });
+vi.mock('node:fs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs')>();
+  const overrides = {
+    accessSync: native.access,
+    existsSync: (file: string) => file === '/Applications/Test.app' ? native.applicationExists : original.existsSync(file),
+  };
+  return { ...original, ...overrides, default: { ...original, ...overrides } };
+});
+vi.mock('../log', () => ({ initializeMainLogging: vi.fn(), installProcessErrorLogging: vi.fn(), logMain: vi.fn(), warnMain: vi.fn() }));
 vi.mock('../main-window', () => ({ createMainWindow: native.createWindow }));
 vi.mock('../app-menu', () => ({ installAppMenu: vi.fn() }));
 vi.mock('../backend-client', () => ({ createRuntimeAppBackendClient: native.factory }));
@@ -106,11 +118,16 @@ beforeEach(() => {
   vi.useFakeTimers();
   native.handlers.clear();
   native.factory.mockReturnValue(null);
+  native.createWindow.mockImplementation(() => windowFixture());
   native.maintenance.mockResolvedValue(undefined);
   native.ready = false;
+  native.access.mockReset();
+  native.applicationExists = true;
+  native.shell.openPath.mockResolvedValue('');
   app.removeAllListeners();
   powerMonitor.removeAllListeners();
   vi.mocked(app.requestSingleInstanceLock).mockReturnValue(true);
+  vi.mocked(app.isInApplicationsFolder).mockReturnValue(true);
 });
 afterEach(async () => {
   for (const controller of controllers) await controller.shutdown();
@@ -122,6 +139,139 @@ afterEach(async () => {
 });
 
 describe('controller desktop lifecycle', () => {
+  it.each(['/Applications', '/Applications/Test.app'])('keeps the existing installation untouched when %s requires authorization', async (protectedPath) => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
+    vi.mocked(app.isInApplicationsFolder).mockReturnValue(false);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    native.access.mockImplementation((file) => {
+      if (file === protectedPath) throw Object.assign(new Error('Permission denied'), { code: 'EACCES' });
+    });
+    native.dialog.showMessageBoxSync.mockReturnValue(0);
+
+    startMainApp();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(app.moveToApplicationsFolder).not.toHaveBeenCalled();
+    expect(native.shell.openPath).toHaveBeenCalledWith('/Applications');
+    expect(app.quit).toHaveBeenCalledOnce();
+    expect(native.factory).not.toHaveBeenCalled();
+  });
+
+  it('allows fresh installation without testing a nonexistent destination for write access', async () => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
+    vi.mocked(app.isInApplicationsFolder).mockReturnValue(false);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    vi.mocked(app.moveToApplicationsFolder).mockReturnValue(true);
+    native.applicationExists = false;
+    native.access.mockImplementation((file) => {
+      if (file === '/Applications/Test.app') throw Object.assign(new Error('Missing'), { code: 'ENOENT' });
+    });
+
+    startMainApp();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(app.moveToApplicationsFolder).toHaveBeenCalledOnce();
+    expect(native.dialog.showErrorBox).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancel', 'finder-error'] as const)('leaves protected installs untouched on manual-install %s', async (outcome) => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
+    vi.mocked(app.isInApplicationsFolder).mockReturnValue(false);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    native.access.mockImplementation(() => { throw new Error('Permission denied'); });
+    native.dialog.showMessageBoxSync.mockReturnValue(outcome === 'cancel' ? 1 : 0);
+    native.shell.openPath.mockResolvedValue('Could not open Applications');
+
+    startMainApp();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(app.moveToApplicationsFolder).not.toHaveBeenCalled();
+    expect(app.quit).toHaveBeenCalledOnce();
+    expect(native.shell.openPath).toHaveBeenCalledTimes(outcome === 'cancel' ? 0 : 1);
+    expect(native.dialog.showErrorBox).toHaveBeenCalledTimes(outcome === 'cancel' ? 0 : 1);
+    expect(native.factory).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { platform: 'darwin', packaged: false, installed: false },
+    { platform: 'darwin', packaged: true, installed: true },
+    { platform: 'win32', packaged: true, installed: false },
+    { platform: 'linux', packaged: true, installed: false },
+  ])('starts normally without relocation for $platform packaged=$packaged installed=$installed', async ({ platform, packaged, installed }) => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: platform } }));
+    const originalPackaged = app.isPackaged;
+    Object.defineProperty(app, 'isPackaged', { value: packaged, configurable: true });
+    vi.mocked(app.isInApplicationsFolder).mockReturnValue(installed);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    try {
+      startMainApp();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(app.moveToApplicationsFolder).not.toHaveBeenCalled();
+      expect(native.createWindow).toHaveBeenCalledOnce();
+      app.emit('before-quit', { preventDefault: vi.fn() });
+      await vi.advanceTimersByTimeAsync(0);
+    } finally {
+      Object.defineProperty(app, 'isPackaged', { value: originalPackaged, configurable: true });
+    }
+  });
+
+  it('installs a packaged Mac app before creating backend resources or taking the single-instance lock', async () => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
+    vi.mocked(app.isInApplicationsFolder).mockReturnValue(false);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    vi.mocked(app.moveToApplicationsFolder).mockReturnValue(true);
+
+    startMainApp();
+    app.emit('activate');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(app.moveToApplicationsFolder).toHaveBeenCalledOnce();
+    expect(app.requestSingleInstanceLock).not.toHaveBeenCalled();
+    expect(native.factory).not.toHaveBeenCalled();
+    expect(native.maintenance).not.toHaveBeenCalled();
+    expect(native.createWindow).not.toHaveBeenCalled();
+    expect(app.quit).not.toHaveBeenCalled(); // Electron owns the successful relaunch.
+  });
+
+  it.each(['cancel', 'error'] as const)('stops startup after installation %s', async (outcome) => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
+    vi.mocked(app.isInApplicationsFolder).mockReturnValue(false);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    vi.mocked(app.moveToApplicationsFolder).mockImplementation(() => {
+      if (outcome === 'error') throw new Error('Destination is not writable');
+      return false;
+    });
+
+    startMainApp();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(app.quit).toHaveBeenCalledOnce();
+    expect(native.factory).not.toHaveBeenCalled();
+    expect(native.createWindow).not.toHaveBeenCalled();
+    expect(native.dialog.showErrorBox).toHaveBeenCalledTimes(outcome === 'error' ? 1 : 0);
+  });
+
+  it('confirms replacing an installed app but lets Electron focus an already running copy', async () => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
+    vi.mocked(app.isInApplicationsFolder).mockReturnValue(false);
+    vi.mocked(app.whenReady).mockResolvedValue(undefined);
+    const decisions: boolean[] = [];
+    vi.mocked(app.moveToApplicationsFolder).mockImplementation((options) => {
+      native.dialog.showMessageBoxSync.mockReturnValueOnce(1).mockReturnValueOnce(0);
+      decisions.push(options!.conflictHandler!('exists'));
+      decisions.push(options!.conflictHandler!('exists'));
+      decisions.push(options!.conflictHandler!('existsAndRunning'));
+      return true;
+    });
+
+    startMainApp();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(decisions).toStrictEqual([false, true, true]);
+    expect(native.dialog.showMessageBoxSync).toHaveBeenCalledTimes(2);
+    expect(native.factory).not.toHaveBeenCalled();
+  });
+
   it.each(['linux', 'win32', 'darwin'] as const)('applies menu visibility through the real preload bridge on %s without a backend request', async (platform) => {
     const { controller, window, backend } = setup();
     controller.createWindow();
