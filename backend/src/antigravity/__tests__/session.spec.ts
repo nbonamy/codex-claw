@@ -134,6 +134,20 @@ describe('Antigravity native session', () => {
       expect(agent.backendSession).toBeUndefined();
     } finally { await host.close(); }
   });
+  it('keeps utility generation sessions out of history and stores no prompt text for them', async () => {
+    const host = new AntigravityHost();
+    const agent: Agent = { id: 'utility', name: 'Utility', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    try {
+      await host.generateText(agent, { cwd: root, prompt: 'utility-fixture-diff' });
+      const generated = (await readFile(path.join(root, 'home', 'catalog.json'), 'utf8')).trim().split('\n').map(line => JSON.parse(line).sessionId as string);
+      expect(generated).toHaveLength(1);
+      const sessionDirectory = path.join(root, 'home', 'korus-sessions', encodeURIComponent(generated[0]!));
+      await expect(readFile(path.join(sessionDirectory, 'prompts.jsonl'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      const rows = await host.listConversations(agent);
+      expect(rows.map(row => row.id)).toEqual(['stored-session']);
+    } finally { await host.close(); }
+  });
+
   it('adapts a native plan artifact and question into the existing app confirmation before implementation', async () => {
     const snapshot = createEmptySnapshot();
     const agent: Agent = { id: 'planner', name: 'Planner', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };

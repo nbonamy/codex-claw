@@ -18,6 +18,7 @@ import { record } from './acp-connection';
 import { sessionMcpServer } from './mcp-bridge';
 import { listAcpSessions } from './catalog';
 import { acpAttachments } from './attachments';
+import { AcpPromptJournal } from './prompt-journal';
 
 export class AntigravityHost implements AgentBackendDriver {
   readonly backend = 'antigravity' as const;
@@ -122,7 +123,7 @@ export class AntigravityHost implements AgentBackendDriver {
 
   async generateText(agent: Agent, input: BackendTextGenerationInput): Promise<{ text: string }> {
     if (this.closed) throw new Error('Antigravity host is closed.');
-    const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: [], tools: false, changed: () => {} });
+    const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: [], tools: false, ephemeral: true, changed: () => {} });
     this.auxiliary.add(session);
     try {
       if (this.closed) throw new Error('Antigravity host is closed.');
@@ -188,8 +189,11 @@ export class AntigravityHost implements AgentBackendDriver {
       await runtime.authenticate();
       const query = input?.searchTerm?.trim().toLocaleLowerCase();
       const cwd = await realpath(this.workingDirectory(agent));
-      const entries = await Promise.all((await listAcpSessions(runtime.connection)).map(async entry => ({ ...entry, cwd: await realpath(entry.cwd).catch(() => null) })));
+      const home = antigravityHome();
+      const entries = await Promise.all((await listAcpSessions(runtime.connection)).map(async entry => ({ ...entry, cwd: await realpath(entry.cwd).catch(() => null),
+        ephemeral: await AcpPromptJournal.isEphemeral(home, entry.sessionId) })));
       return entries
+        .filter(entry => !entry.ephemeral)
         .filter(entry => entry.cwd === cwd)
         .filter(entry => !query || `${entry.title} ${entry.sessionId}`.toLocaleLowerCase().includes(query))
         .slice(0, input?.limit ?? 100)
@@ -279,7 +283,7 @@ export class AntigravityHost implements AgentBackendDriver {
       ...(this.options.appMcpServerUrl ? [sessionMcpServer(appMcpUrlForAgent(this.options.appMcpServerUrl, agent))] : []),
       ...Object.entries(this.options.hostedMcpServerUrls?.() ?? {}).map(([name, url]) => sessionMcpServer(agentScopedMcpUrl(url, agent.id), name)),
     ];
-    return this.openSession({ agentId: agent.id, cwd, sessionId, mcpServers, changed: event => this.conversationEvent(event) });
+    return this.openSession({ agentId: agent.id, cwd, sessionId, mcpServers, ephemeral: Boolean(reviewUrl), changed: event => this.conversationEvent(event) });
   }
 
   private async openSession(options: Parameters<typeof AcpSession.open>[0]): Promise<AcpSession> {

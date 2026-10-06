@@ -15,6 +15,8 @@ type SessionOptions = {
   agentId: string; cwd: string; home?: string; sessionId?: string;
   mcpServers: unknown[];
   tools?: boolean;
+  /** Not a user conversation: persist no prompts and hide it from history. */
+  ephemeral?: boolean;
   changed(event: AntigravityConversationEvent): void;
   requestChanged?(event: AntigravityConversationEvent): void;
   closed?(error: Error): void;
@@ -55,7 +57,8 @@ export class AcpSession {
       const id = options.sessionId ?? result.sessionId;
       if (typeof id !== 'string' || !id || (result.sessionId !== undefined && result.sessionId !== id)) throw new Error('Antigravity session identity mismatch.');
       session.config = result;
-      session.journal = await AcpPromptJournal.open(options.home ?? antigravityHome(), id);
+      const home = options.home ?? antigravityHome();
+      session.journal = options.ephemeral ? await AcpPromptJournal.ephemeral(home, id) : await AcpPromptJournal.open(home, id);
       session.transcript = new AcpTranscript(options.agentId, id, event => {
         if (!session.loading) {
           options.changed(event);
