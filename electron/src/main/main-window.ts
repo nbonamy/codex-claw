@@ -1,7 +1,8 @@
-import { app, BrowserWindow, globalShortcut, screen, shell, type BrowserWindowConstructorOptions, type Rectangle } from 'electron';
+import { app, BrowserWindow, globalShortcut, nativeTheme, screen, shell, type BrowserWindowConstructorOptions, type Rectangle } from 'electron';
 import { closeSync, fstatSync, mkdirSync, openSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { isBrowserGuestPartition } from '@workspace/core/browser-guest';
+import { product } from '@workspace/core/product';
 import {
   appCommandFromInput,
   cycleTeamsAccelerator,
@@ -26,6 +27,11 @@ export function createMainWindow(
     ? savedState
     : undefined;
   const window = new BrowserWindow(createMainWindowOptions(releaseMode, restoredState?.bounds));
+  const updateBackground = (): void => {
+    window.setBackgroundColor(mainWindowBackground(process.platform, nativeTheme.shouldUseDarkColors));
+  };
+  nativeTheme.on('updated', updateBackground);
+  window.once('closed', () => nativeTheme.removeListener('updated', updateBackground));
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   const saveState = (): void => {
     if (saveTimer) {
@@ -50,11 +56,18 @@ export function createMainWindow(
   window.on('unmaximize', scheduleSave);
   window.on('close', saveState);
 
-  window.once('ready-to-show', () => {
+  let shown = false;
+  const showWindow = (): void => {
+    if (shown) return;
+    shown = true;
     if (restoredState?.isMaximized) {
       window.maximize();
     }
     window.show();
+  };
+  window.once('ready-to-show', showWindow);
+  window.once('closed', () => {
+    shown = true;
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => handleExternalWindowOpen(url, (targetUrl) => shell.openExternal(targetUrl)));
@@ -80,11 +93,17 @@ export function createMainWindow(
     sendAppCommand(window.webContents, command);
   });
 
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    void window.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
-  }
+  const loading = MAIN_WINDOW_VITE_DEV_SERVER_URL
+    ? window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+    : window.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+  // Some compositors do not paint hidden windows. Load completion can reveal
+  // the window even when ready-to-show never arrives.
+  void loading.then(showWindow, (error: unknown) => {
+    warnMain('window', 'failed to load main window', {
+      detail: error instanceof Error ? error.message : String(error),
+    });
+    showWindow();
+  });
 
   return window;
 }
@@ -116,6 +135,7 @@ export function createMainWindowOptions(
   releaseMode: boolean,
   bounds?: Rectangle,
   platform = process.platform,
+  dark = nativeTheme.shouldUseDarkColors,
 ): BrowserWindowConstructorOptions {
   const macOSWindowOptions: BrowserWindowConstructorOptions = platform === 'darwin'
     ? {
@@ -126,7 +146,7 @@ export function createMainWindowOptions(
         vibrancy: 'menu',
       }
     : {
-        backgroundColor: '#061c2a',
+        backgroundColor: mainWindowBackground(platform, dark),
         titleBarStyle: 'default',
         autoHideMenuBar: true,
       };
@@ -139,6 +159,8 @@ export function createMainWindowOptions(
     minHeight: 720,
     ...macOSWindowOptions,
     show: false,
+    title: product.name,
+    ...(platform === 'linux' ? { icon: path.join(app.getAppPath(), 'assets', 'icon.png') } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -148,6 +170,10 @@ export function createMainWindowOptions(
       webviewTag: true,
     },
   };
+}
+
+function mainWindowBackground(platform: string, dark: boolean): string {
+  return platform === 'darwin' ? '#00000000' : dark ? '#202020' : '#FAFAFA';
 }
 
 export function isWindowBoundsVisible(bounds: Rectangle, workAreas: Rectangle[]): boolean {

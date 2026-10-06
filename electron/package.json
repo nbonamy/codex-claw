@@ -11,7 +11,7 @@
     "build:tts": "node ../scripts/prepare-tts-helper.mjs",
     "release-notes:check": "node ../scripts/release-notes.mjs check",
     "dev": "node ../scripts/dev.mjs",
-    "start": "electron-forge start",
+    "start": "node ../scripts/start-electron.mjs",
     "package": "npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge package",
     "make": "npm run release-notes:check && npm run build:codex && npm run build:computer-use && npm run build:tts && electron-forge make",
     "check-publish:macos": "node ../scripts/publish-macos.mjs --check-only",

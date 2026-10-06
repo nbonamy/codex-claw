@@ -411,6 +411,12 @@ Package ownership:
   depends on `@workspace/core` and `@workspace/vue`; it should talk to the
   backend through the app-owned backend protocol/client rather than importing
   backend internals.
+  On Linux, Electron reads the product desktop ID from generated startup
+  metadata and receives the native window icon. Development launches through
+  an isolated manifest under `.development-shell`; packaging brands only the
+  copied manifest. Extracted builds register a per-user desktop
+  entry when no installed entry exists; development uses a separate hidden
+  desktop entry so it cannot replace an installed application's identity.
 - `web` contains the browser composition root and the Express-owned product
   WebSocket bridge. It depends on core, Vue, and the SDK web transport ports,
   and starts a built `daemon` artifact rather than importing backend internals.
