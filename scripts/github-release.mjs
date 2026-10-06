@@ -98,6 +98,7 @@ async function main() {
       + '       npm run prerelease\n'
       + '       npm run latest\n'
       + 'Shortcuts use package.json version; one GitHub workflow builds and publishes.\n'
+      + 'A missing version tag is created automatically from the clean, pushed default-branch commit.\n'
       + 'Optional overrides: --tag v<version> or --state file. Existing receipts resume without rebuilding.\n'
       + 'Build-only dispatch never publishes.');
     return;
@@ -120,13 +121,26 @@ async function main() {
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(values.tag ?? '')) throw new Error('An existing immutable tag is required.');
     if (fs.existsSync(statePath)) throw new Error(`State already exists: ${statePath}. Resume it or choose a new --state file.`);
     const repository = product.repository;
-    api(`repos/${repository}/git/ref/tags/${values.tag}`); // Reject moving branch refs.
-    const commit = api(`repos/${repository}/commits/${values.tag}`);
+    const branch = api(`repos/${repository}`).default_branch;
+    const workflowSha = api(`repos/${repository}/commits/${encodeURIComponent(branch)}`).sha;
+    let missingTag = false;
+    try { api(`repos/${repository}/git/ref/tags/${values.tag}`); }
+    catch (error) {
+      if (!pipeline || !String(error.stderr).includes('HTTP 404')) throw error;
+      missingTag = true;
+      const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim();
+      if (git(['status', '--porcelain'])) throw new Error('Commit and push release changes before publishing.');
+      if (git(['rev-parse', 'HEAD']) !== workflowSha) throw new Error(`Push the release commit to ${branch} before publishing.`);
+    }
+    const commit = missingTag ? { sha: workflowSha } : api(`repos/${repository}/commits/${values.tag}`);
     const pkg = api(`repos/${repository}/contents/package.json?ref=${commit.sha}`);
     const version = JSON.parse(Buffer.from(pkg.content, 'base64').toString('utf8')).version;
     if (pipeline && values.tag !== `v${version}`) throw new Error('Release tag does not match its package version.');
-    const branch = api(`repos/${repository}`).default_branch;
-    const workflowSha = api(`repos/${repository}/commits/${encodeURIComponent(branch)}`).sha;
+    if (missingTag) {
+      gh(['api', `repos/${repository}/git/refs`, '--method', 'POST',
+        '-f', `ref=refs/tags/${values.tag}`, '-f', `sha=${commit.sha}`]);
+      console.log(`Created ${values.tag} at ${commit.sha}.`);
+    }
     state = { workflowSha, channel: pipeline ? command : 'none', repository, tag: values.tag, sha: commit.sha, version, requestId: randomBytes(16).toString('hex'),
       runId: null, attempt: 1, createdAt: new Date(Date.now() - 60_000).toISOString() };
     validateState(state);

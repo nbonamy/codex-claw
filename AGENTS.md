@@ -185,7 +185,8 @@ commit, or push work. Curate it only when Nicolas explicitly invokes
 - `update-changelog`: release-time audit of Korus and SDK histories, curated
   Unreleased notes, and an evidence-backed semantic-version recommendation.
 - `prepare-release`: invokes `update-changelog`, confirms the recommended
-  version, freezes release artifacts, and creates the local provenance tag.
+  version and channel, validates the release commit, and hands off one command
+  that creates the tag, builds, and publishes.
 
 ## Plans
 

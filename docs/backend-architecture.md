@@ -63,7 +63,8 @@ the initial GitHub build matrix.
 
 ## GitHub desktop releases
 
-`.github/workflows/desktop-build.yml` builds an existing immutable remote tag.
+The release command creates a missing version tag; `.github/workflows/desktop-build.yml`
+then builds that immutable source commit.
 Use Node 22.23.3, npm 10.9.4 and `npm ci`; SDK packages are pinned published npm
 dependencies, and no sibling checkout or private npm token is needed. Install
 Electron explicitly with `node node_modules/electron/install.js` before running
@@ -132,7 +133,7 @@ Never put OAuth client secrets in the app.
 
 ### Build and publish
 
-After preparing and pushing an immutable version tag, run one command:
+After preparing and pushing the release commit, run one command:
 
 ```bash
 npm run prerelease
@@ -140,7 +141,10 @@ npm run prerelease
 npm run latest
 ```
 
-Both infer the version from package.json and dispatch **one workflow**:
+Both infer the version from package.json and automatically create a missing
+remote `v<version>` tag at the pushed default-branch commit. New tags require a
+clean checkout whose HEAD matches that remote commit and whose version matches
+the requested tag. Existing tags are reused, never moved. Then they dispatch **one workflow**:
 quality → four platform builds → publish. The workflow runs from the default
 branch; quality and packaging check out the exact tagged source SHA. Publication
 uses the workflow's tooling commit, so release-tool fixes do not require moving
@@ -155,8 +159,8 @@ quality/build jobs prevent publication; failed uploads leave a draft. Published
 assets are never overwritten. Prereleases are manual downloads; latest enables
 stable auto-updates. Nothing uploads to Joshua.
 
-The local command dispatches and monitors the run. It does not download release
-binaries. Receipts in `.release/v<version>-<channel>.json` pin the source SHA,
+The local command creates the tag if needed, dispatches and monitors the run.
+It does not download release binaries. Receipts in `.release/v<version>-<channel>.json` pin the source SHA,
 workflow SHA, channel, request ID, run and attempt. Repeat the same command to
 resume an interrupted run; it does not dispatch another one. A completed run is
 reported as published only after checking the release's actual visibility.

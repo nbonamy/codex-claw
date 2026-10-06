@@ -171,9 +171,10 @@ checks that do not need signing:
 APP_SKIP_SIGNING=1 npm run package
 ```
 
-Once a prepared version tag is pushed, **`npm run prerelease`** builds and
+Once the prepared release commit is pushed, **`npm run prerelease`** builds and
 publishes a prerelease; **`npm run latest`** builds and publishes a stable release.
-Both infer the version from package.json and monitor one GitHub workflow through
+Both infer the version from package.json, create the missing version tag, and
+monitor one GitHub workflow through
 quality checks, all four platform builds, and publication. Installers are
 uploaded by GitHub runners; there is no combined bundle or separate publishing
 workflow.

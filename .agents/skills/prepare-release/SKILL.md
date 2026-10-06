@@ -1,6 +1,6 @@
 ---
 name: prepare-release
-description: Prepare a Korus release by auditing changes, confirming version and prerelease/latest channel, validating and tagging. Hand Nicolas one command for GitHub-hosted build and publication. Use when asked to prepare or cut a release, including $prepare-release.
+description: Prepare a Korus release by auditing changes, confirming version and prerelease/latest channel, and validating the release commit. Hand Nicolas one command that creates the tag, builds and publishes on GitHub. Use when asked to prepare or cut a release, including $prepare-release.
 ---
 
 # Prepare Release
@@ -53,27 +53,22 @@ including script tests, and 85% statements in each of the five workspaces.
 A failing gate blocks release. Only CHANGELOG.md, the six package manifests,
 package-lock.json, and vue/src/generated/release-notes.json may change.
 
-Use `app-dod` and review the staged diff. When the user has authorized committing
-and tagging this release, commit with `chore: release prep`. Create an annotated
-`v<version>` tag on that exact commit, recording:
-
-- `app <version>`;
-- `codex-app-sdk: <published-sdk-git-head>`;
-- `codex-app-sdk-version: <locked-sdk-version>`.
-
-Resolve SDK Git provenance from the exact npm version, not the sibling HEAD.
-Never replace or move an existing release tag. If the user requested local-only
-preparation, stop here and report the local commit/tag.
+Use `app-dod` and review the staged diff. When committing is authorized,
+commit with `chore: release prep`. Report the audited SDK version and Git
+provenance from the exact npm package, not the sibling HEAD.
+Tag creation belongs to the publication command, not preparation. If the user
+requested local-only preparation, stop here and report the local commit.
 
 ## Push and hand off one command
 
-Once pushing is authorized, push the branch and immutable tag and verify their
-remote SHA. For the confirmed channel, give Nicolas exactly one command:
+Once pushing is authorized, push the release commit to the default branch and
+verify its remote SHA. For the confirmed channel, give Nicolas exactly one command:
 
 - Prerelease: `npm run prerelease`
 - Stable/latest: `npm run latest`
 
-Both infer `v<version>` from package.json and run one GitHub workflow:
+Both infer `v<version>` from package.json, create the missing remote tag at the
+clean, pushed release commit, and run one GitHub workflow:
 quality → four platform builds → publish. The final job verifies and uploads
 the individual installers; there is no combined bundle or second workflow.
 The local command dispatches and monitors. Workflow tooling comes from the
