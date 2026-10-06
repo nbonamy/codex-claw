@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.27.0",
+  "currentVersion": "0.27.1",
   "releases": [
+    {
+      "version": "0.27.1",
+      "releasedAt": "2026-10-06",
+      "sourceSha256": "9d53fe8ec3eb00f44be225d0d3a1c9a554918130aba520c73ffbafc3f5f42249",
+      "markdown": "### New features\n\n- Ask a project thread to launch an automatic review. Korus starts an independent\n  reviewer using the thread's provider, model, and effort by default, without\n  changing saved review preferences. This requires an explicit request; local\n  commits remain off unless requested.\n- Desktop distribution now includes Windows x64 installers and Linux x64/ARM64\n  packages alongside macOS ARM64. GitHub prereleases are manual downloads;\n  macOS and installed Windows copies receive automatic updates from stable\n  GitHub releases. Windows installers are unsigned; Linux and portable Windows\n  use manual package updates.\n\n### Improvements and fixes\n\n- Packaged apps include a private Node runtime, so desktop startup no longer\n  requires a system Node installation. Korus waits for workspace state before\n  showing onboarding, avoiding a false welcome screen while connecting.\n- Claude authentication failures now update connection settings and finish the\n  failed turn with a useful error. Retrying after an external login rechecks\n  authentication instead of relying on a stale disconnected state.\n- Codex can now see attached file paths, with attachment chips preserved when\n  reopening conversation history.\n- Claude tool searches show the search query and progress, and all providers\n  use the same Korus collaboration-tool namespace.\n- Restored native window controls and menu access during onboarding. Windows\n  gains a subtle window border and more reliable Codex setup; Linux gains\n  corrected packaged icons, native dependencies, and window startup behavior.\n- The website offers platform-aware download choices, explicit Linux\n  architecture selection, and narrated workflow videos with shared playback\n  controls."
+    },
     {
       "version": "0.27.0",
       "releasedAt": "2026-10-05",
