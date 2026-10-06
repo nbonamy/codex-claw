@@ -7,7 +7,7 @@ import { test } from 'node:test';
 
 // Exercise each public publication alias with no dispatch receipt. No alias
 // may fall back to a local build, SSH alias, or an unverified artifact.
-for (const command of ['publish', 'publish:electron', 'publish:macos']) {
+for (const command of ['publish', 'publish:electron', 'publish:macos', 'release:stage', 'prerelease', 'latest']) {
   test(`${command} requires a successful GitHub dispatch before external operations`, () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'app-publish-gate-'));
     try {

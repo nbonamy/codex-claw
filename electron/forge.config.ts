@@ -60,8 +60,6 @@ const dmgOptions: MakerDMGConfig = {
   //   }
   // }
 }
-const updateBaseUrl = process.env.APP_UPDATE_BASE_URL ?? product.updateBaseUrl;
-const updateManifestBaseUrl = `${updateBaseUrl.replace(/\/+$/, '')}/darwin/${process.arch}`;
 
 if (isDarwin && !skipMacSigning) {
   osxPackagerConfig = {
@@ -132,7 +130,7 @@ const config: ForgeConfig = {
     ],
   },
   makers: [
-    new MakerZIP({ macUpdateManifestBaseUrl: updateManifestBaseUrl }, ['darwin', 'win32', 'linux']),
+    new MakerZIP({}, ['darwin', 'win32', 'linux']),
     new MakerDMG(dmgOptions, ['darwin']),
     // Intentionally unsigned. No certificate or signing service is required.
     new MakerSquirrel({ name: product.slug, authors: product.name, description: `${product.name} desktop`,

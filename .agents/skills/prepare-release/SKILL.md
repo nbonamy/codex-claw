@@ -1,6 +1,6 @@
 ---
 name: prepare-release
-description: Audit, version, freeze, and stage a Korus desktop release with reproducible GitHub builds. Use when Nicolas asks to prepare or cut a release, including $prepare-release. Promote the production download and update feed only when publication is explicitly authorized.
+description: Audit, version, freeze, and stage a Korus desktop release with reproducible GitHub builds. Use when Nicolas asks to prepare or cut a release, including $prepare-release. Publish only when authorized, as a prerelease by default; stable promotion requires explicit approval.
 ---
 
 # Prepare Release
@@ -33,10 +33,9 @@ npm ci
 node node_modules/electron/install.js
 npm run release-notes:generate
 npm run release-notes:check
-npm run typecheck
 npm run lint
-npm run test:ai
 npm run test:coverage
+npm run test:scripts
 git diff --check
 git status --short
 ```
@@ -61,8 +60,21 @@ preparation, stop here and report the local commit/tag.
 ## Push, build, and stage
 
 GitHub builds require the commit and tag to exist remotely. Once pushing and
-dispatch are authorized, push the branch and the new tag explicitly, verify
-their remote SHA, then run:
+dispatch are authorized, push the branch and the new tag explicitly and verify
+their remote SHA. Choose the command by the user's authorized endpoint:
+
+- Build-only or native validation before publication: use `release:build` below.
+- Full build through prerelease publication: `npm run prerelease -- --tag v<version>`.
+- Full build through stable publication, only when explicitly approved:
+  `npm run latest -- --tag v<version>`.
+
+The two shortcuts dispatch, monitor, verify, stage and publish in one run.
+They save `.release/v<version>.json`. Repeating the command resumes that exact
+build; promoting a prerelease with `latest` reuses its verified artifacts.
+They never change versions, commit, tag or push. Build-only approval is not
+authorization to use either publication shortcut.
+
+For a build-only run:
 
 ```bash
 npm run release:build -- --tag v<version> --state .release/<version>.json
@@ -81,7 +93,7 @@ For a same-source retry, explicitly rerun **all** jobs, then monitor using
 required jobs block promotion. Source fixes need a fresh reviewed commit/tag;
 do not relabel artifacts or move a release tag.
 
-Download and verify the staged bundle into a new directory:
+Download and verify the Actions bundle into a new directory:
 
 ```bash
 npm run release:download -- --state .release/<version>.json --output .release/<version>-review
@@ -91,29 +103,44 @@ Report staged artifact provenance and request the remaining native installer/UI
 checks before the first release on a new OS. A hosted build's native runtime
 smoke check is not proof of GUI installation, authentication, or updates.
 
-## Explicit promotion
+When draft creation is authorized, use `release:stage` with the same state and
+a fresh output directory. It uploads the verified bundle to a GitHub draft,
+preserving checksums and per-target provenance. Build-only approval does not
+authorize draft creation or public publication.
 
-If publication was not authorized, hand off the staged result. When authorized,
-configure the explicit SSH destination, key-file path and pinned known-hosts file
-described in the architecture doc, then use a fresh download directory:
+## Explicit publication
+
+If publication was not authorized, hand off the Actions artifacts or authorized
+draft. When authorized after a build-only run, the shortcut can reuse its receipt:
 
 ```bash
-npm run release:promote -- --state .release/<version>.json --output .release/<version>-promote
+npm run prerelease -- --state .release/<version>.json
 ```
 
-Promotion rechecks the exact successful run/attempt and every artifact hash,
-uploads all targets, and advances the existing meetkorus.dev macOS feed last
-under a remote lock. Windows/Linux downloads are archived; their auto-updaters
-remain disabled. Never set signing bypasses for a release.
+Promotion rechecks the exact successful run/attempt, tag SHA and all uploaded
+GitHub asset bytes. Default publication is **prerelease**, manual downloads only,
+and does not mark it latest. Use version-specific links: GitHub's latest URLs and
+the Electron updater exclude prereleases. Never set signing bypasses.
 
-If promotion fails, report its phase and inspect remote state using the documented
-recovery procedure. A versioned asset collision after a partial promotion needs
-operator review; never delete a lock, overwrite assets, or force a rollback to
-make a retry pass.
+Only explicit stable-release approval permits `npm run latest`; it promotes the
+verified draft/prerelease to stable and latest, enabling macOS and installed
+Windows auto-updates. Linux and portable Windows stay manual. Coordinate the
+legacy macOS JSON-feed bridge with the website/server owner only for the first
+approved stable cutover; prereleases leave the legacy feed unchanged.
+
+For publication-only control after draft staging, retain `release:promote`
+(with `--stable` only for explicit stable approval). Omitted output paths are
+unique automatically; an explicit `--output` must be a fresh directory.
+
+If staging or publication fails, inspect the GitHub draft/release before
+retrying. Matching draft assets can be resumed; differing or published assets
+require operator review. Keep the receipt and verified bundle; Actions artifacts
+expire after 30 days, so staging/promotion must happen before that boundary.
 
 ## Handoff
 
-Distinguish prepared, committed, pushed, built, staged, native-tested, and promoted.
+Distinguish prepared, committed, pushed, built, draft-staged, native-tested,
+published prerelease, and promoted stable.
 Include version, commit/tag, SDK version/provenance, Actions run/attempt and URL,
 artifact location, gates, and outstanding target checks. Celebrate a completed
 publication through `finish_turn`; preparation or staging alone is not publication.

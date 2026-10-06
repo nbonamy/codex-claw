@@ -75,26 +75,33 @@ async function monitor(state, statePath, timeout, attempt) {
 
 async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
-    tag: { type: 'string' }, state: { type: 'string', default: '.release/state.json' },
+    tag: { type: 'string' }, state: { type: 'string' },
     timeout: { type: 'string', default: '7200' }, attempt: { type: 'string' },
-    output: { type: 'string', default: '.release/artifacts' }, help: { type: 'boolean' },
+    output: { type: 'string' }, help: { type: 'boolean' }, stable: { type: 'boolean', default: false },
   } });
   const command = positionals[0];
   if (values.help || !command) {
     console.log('Usage: npm run release:build -- --tag <existing-remote-tag> [--state file]\n'
       + '       npm run release:monitor -- [--state file] [--attempt N] [--timeout seconds]\n'
       + '       npm run release:download -- [--state file] [--output directory]\n'
-      + '       npm run release:promote -- [--state file] [--output directory]\n'
-      + 'Builds stage Actions artifacts only. Promotion explicitly updates the production download/feed.');
+      + '       npm run release:stage -- [--state file] [--output directory]\n'
+      + '       npm run release:promote -- [--state file] [--output directory] [--stable]\n'
+      + '       npm run prerelease -- --tag v<version> [--state file]\n'
+      + '       npm run latest -- --tag v<version> [--state file]\n'
+      + 'Shortcuts build, monitor, verify, stage and publish; an existing receipt resumes without rebuilding.\n'
+      + 'Build-only dispatch never publishes. Low-level promotion defaults to prerelease unless --stable is explicit.');
     return;
   }
-  if (positionals.length !== 1 || !['dispatch', 'monitor', 'download', 'promote'].includes(command)) throw new Error('Unknown release command. Use --help.');
-  const statePath = path.resolve(values.state);
+  if (positionals.length !== 1 || !['dispatch', 'monitor', 'download', 'stage', 'promote', 'prerelease', 'latest'].includes(command)) throw new Error('Unknown release command. Use --help.');
+  if (values.stable && command !== 'promote') throw new Error('--stable is only valid for explicit promotion.');
+  const pipeline = command === 'prerelease' || command === 'latest';
+  if (pipeline && values.tag && !/^v\d+\.\d+\.\d+$/.test(values.tag)) throw new Error('Publication requires a canonical v<version> tag.');
+  const statePath = path.resolve(values.state ?? (pipeline && values.tag ? `.release/${values.tag}.json` : '.release/state.json'));
   const timeout = Number(values.timeout);
   const attempt = values.attempt === undefined ? undefined : Number(values.attempt);
   if (!Number.isFinite(timeout) || timeout < 0 || (attempt !== undefined && (!Number.isSafeInteger(attempt) || attempt < 1))) throw new Error('Invalid timeout/attempt.');
   let state;
-  if (command === 'dispatch') {
+  if (command === 'dispatch' || (pipeline && values.tag && !fs.existsSync(statePath))) {
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(values.tag ?? '')) throw new Error('An existing immutable tag is required.');
     if (fs.existsSync(statePath)) throw new Error(`State already exists: ${statePath}. Resume it or choose a new --state file.`);
     const repository = product.repository;
@@ -102,6 +109,7 @@ async function main() {
     const commit = api(`repos/${repository}/commits/${values.tag}`);
     const pkg = api(`repos/${repository}/contents/package.json?ref=${commit.sha}`);
     const version = JSON.parse(Buffer.from(pkg.content, 'base64').toString('utf8')).version;
+    if (pipeline && values.tag !== `v${version}`) throw new Error('Release tag does not match its package version.');
     state = { repository, tag: values.tag, sha: commit.sha, version, requestId: randomBytes(16).toString('hex'),
       runId: null, attempt: 1, createdAt: new Date(Date.now() - 60_000).toISOString() };
     validateState(state);
@@ -112,18 +120,21 @@ async function main() {
   } else {
     state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     validateState(state);
+    if (values.tag && values.tag !== state.tag) throw new Error('Requested tag does not match the saved receipt tag.');
   }
+  if (pipeline && state.tag !== `v${state.version}`) throw new Error('Publication requires a canonical v<version> tag.');
   await monitor(state, statePath, timeout, attempt);
-  if (command === 'download' || command === 'promote') {
-    const output = path.resolve(values.output);
+  if (pipeline || ['download', 'stage', 'promote'].includes(command)) {
+    const output = path.resolve(values.output ?? `.release/${state.version}-${state.runId}-${state.attempt}-${command}-${randomBytes(4).toString('hex')}`);
     if (fs.existsSync(output)) throw new Error(`Download directory already exists: ${output}. Choose a new --output directory.`);
     gh(['run', 'download', String(state.runId), '--repo', state.repository,
       '--name', `release-${state.runId}-${state.attempt}`, '--dir', output]);
     await verifyBundle(output, state);
     console.log(`Verified all release artifacts: ${output}`);
-    if (command === 'promote') {
-      const { promote } = await import('./promote-release.mjs');
-      await promote(output, state);
+    if (pipeline || command === 'stage' || command === 'promote') {
+      const { stageRelease, promote } = await import('./promote-release.mjs');
+      if (pipeline || command === 'stage') await stageRelease(output, state);
+      if (pipeline || command === 'promote') await promote(output, state, { stable: command === 'latest' || values.stable });
     }
   }
 }

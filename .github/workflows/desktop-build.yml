@@ -43,10 +43,9 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: node node_modules/electron/install.js
       - run: npm run release-notes:check
-      - run: npm run typecheck
       - run: npm run lint
-      - run: npm run test:ai
       - run: npm run test:coverage
+      - run: npm run test:scripts
 
   build:
     name: build (${{ matrix.target }})

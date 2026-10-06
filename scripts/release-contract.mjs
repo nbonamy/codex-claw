@@ -42,7 +42,7 @@ export async function verifyTarget(directory, expected, target) {
     const info = await fs.lstat(location);
     if (!info.isFile() || info.size !== file.size || await checksum(location) !== file.sha256) throw new Error(`Artifact checksum/size mismatch: ${target}/${file.name}`);
   }
-  const extensions = target.startsWith('darwin') ? ['.zip', '.dmg', 'RELEASES.json']
+  const extensions = target.startsWith('darwin') ? ['.zip', '.dmg']
     : target.startsWith('win32') ? ['.zip', '.exe', '.nupkg', 'RELEASES'] : ['.zip', '.deb', '.rpm'];
   for (const extension of extensions) {
     if (![...names].some(name => name.endsWith(extension))) throw new Error(`Missing ${extension} artifact for ${target}.`);

@@ -338,10 +338,14 @@ The unqualified typecheck, lint, and test commands cover every workspace.
 For protocol or persistence changes, run focused tests for the touched module
 and the full coverage gate.
 
-Before release, require both `npm run test:ai` (including script tests) and
-`npm run test:coverage` across all five workspaces. A failed test or a workspace
-below 85% statements blocks release. Run against the installed SDK package
-boundary; source aliases are not a substitute for package verification.
+Before release, require the full test suite, including script tests, and
+coverage across all five workspaces. CI runs `npm run test:coverage` followed
+by `npm run test:scripts`: coverage already executes every workspace test, so
+an additional `test:ai` run is unnecessary. Likewise, `npm run lint` includes
+all workspace typechecks and does not need a separate `typecheck` run.
+A failed test or a workspace below 85% statements blocks release. Run against
+the installed SDK package boundary; source aliases are not a substitute for
+package verification.
 
 ## Conversation Ownership Verification
 

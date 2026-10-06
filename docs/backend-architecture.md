@@ -70,8 +70,9 @@ Electron explicitly with `node node_modules/electron/install.js` before running
 parallel tests or Forge (its lazy download otherwise races between workers).
 
 The workflow checks tag/SHA/package-version identity before any build. One
-quality job runs release-note consistency, all-workspace typecheck/lint, the full
-test suite including scripts, and all five 85% statement coverage gates. Every
+quality job runs release-note consistency, lint (including all workspace
+typechecks), each workspace test suite once with coverage, and script tests
+separately. All five 85% statement coverage gates remain enforced. Every
 build depends on that job. Native runners are `macos-15`, `windows-2022`,
 `ubuntu-24.04` and `ubuntu-24.04-arm`, respectively. Labels were checked against
 the [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
@@ -80,8 +81,9 @@ Actions are pinned to reviewed commit SHAs.
 Artifacts are DMG/ZIP for macOS, an **unsigned** Squirrel EXE/NUPKG plus portable
 ZIP for Windows, and DEB/RPM/ZIP for Linux. Windows users may see SmartScreen or
 Unknown Publisher warnings, and managed devices may block installation. There
-is no Windows certificate or signing-service prerequisite. Windows/Linux
-auto-update remains disabled; users install newer downloads manually.
+is no Windows certificate or signing-service prerequisite. Installed Windows
+copies and macOS use GitHub-backed stable updates; portable Windows and Linux
+use manual downloads. Prereleases are manual downloads on every platform.
 Codex is bundled. Claude Code still uses its separately installed provider CLI;
 the existing Windows onboarding contract requires installing that CLI manually
 before retrying setup. Git/GitHub tooling also remains a user prerequisite for
@@ -159,53 +161,83 @@ each file's size/SHA-256. The stage job verifies all four targets before uploadi
 `release-<run-id>-<attempt>`. Downloads recheck every hash and identity field.
 This flow uses Actions artifact staging, not a public GitHub Release or live feed.
 
-### Explicit production promotion
+### Drafts, prereleases and stable promotion
 
-`npm run release:promote` (also the legacy `publish` aliases) rechecks the exact
-successful Actions run and downloads a fresh verified bundle. It does not rebuild.
-Configure these environment variables on the operator machine or dedicated
-promotion runner; no developer SSH alias is used:
-
-| Variable | Purpose |
-| --- | --- |
-| `APP_PUBLISH_HOST` | Explicit SSH hostname |
-| `APP_PUBLISH_USER` | Deployment account |
-| `APP_PUBLISH_SSH_KEY` | Path to a private-key file with restrictive permissions |
-| `APP_PUBLISH_KNOWN_HOSTS` | Path to a trusted, independently verified known-hosts file |
-| `APP_PUBLISH_ROOT` | Optional deployment root; defaults to `product.deploymentRoot` |
-
-Use an account restricted to the deployment root. In CI, provision key and
-known-hosts files under the runner temporary directory from approved secrets and
-remove them in an always/finally step. Host-key verification is mandatory. The
-remote host needs POSIX `sh`, `sha256sum`, `cp`, `mv`, and directory write access.
+GitHub Releases owns distributable assets. After preparing and pushing an
+immutable version tag, an authenticated operator with Actions-write and
+contents-write access can run the complete workflow with one command:
 
 ```bash
-npm run release:promote -- --state .release/0.27.0.json --output .release/0.27.0-promote
+npm run prerelease -- --tag v0.27.1
+# Only with separate explicit stable-release approval:
+npm run latest -- --tag v0.27.1
 ```
 
-Choose a new output directory each time. Promotion uploads every target into a
-unique staging directory, verifies remote checksums, acquires `.promotion-lock`,
-and confirms the feed has not changed since preflight. It archives provenance and
-all targets under `releases/builds/<version>/<sha>/<run>-<attempt>/`, places the
-macOS versioned ZIP and stable DMG, and atomically replaces `RELEASES.json` last.
-Release history is merged from the current live feed rather than a stale build
-snapshot. Same-version and older-version promotions are rejected.
+Both shortcuts **dispatch → monitor → download/verify → stage → publish**.
+They do not edit versions, commit, tag or push: the remote tag must already
+exist and match the tagged package version. The first invocation saves
+`.release/v<version>.json`; repeating the same command resumes that exact run
+instead of dispatching another build. `latest` after `prerelease` reuses the
+same verified artifacts and only changes release status. Timeouts and failed
+required jobs block publication. Existing published assets are verified but
+never replaced. Nothing uploads to Joshua.
 
-`product.json` remains the external identity authority. Existing clients keep
-`https://meetkorus.dev/desktop/releases/darwin/arm64/RELEASES.json`, and the stable
-download remains `https://meetkorus.dev/desktop/downloads/korus-macos-arm64.dmg`.
-Other target files are available beneath the versioned build archive on the same
-domain; this change does not add a Windows/Linux update protocol or alter the site.
+For build-only work or an inspection pause, retain the individual commands:
+`release:build`, `release:monitor`, `release:download`, `release:stage`, and
+`release:promote` (add `--stable` only for approved stable promotion). These
+default to `.release/state.json`. Pass `--state` to the shortcuts to reuse such
+an existing receipt; a supplied `--tag` must match it. Canonical `v<version>`
+tags are required for publication; build-test tags are valid only for CI.
 
-After an interrupted promotion, inspect the feed, versioned ZIP, archived bundle,
-stable DMG and lock before retrying. An upload/checksum failure leaves the old
-feed intact and normally removes staging. Failure after assets were placed can
-leave an unreferenced versioned ZIP or a newer stable DMG while the old feed stays
-active. The retry deliberately refuses collisions: reconcile under operator
-review rather than deleting a lock or overwriting a version automatically. A stale
-lock may be removed only after confirming no promotion still owns it. Retain the
-receipt and archived provenance for recovery; never claim success from CLI exit
-alone without checking the public download/feed after an authorized promotion.
+Omitted `--output` gets a unique verification directory automatically; an explicit
+output must be a fresh directory. Each command rechecks the exact
+successful run/attempt and downloads and verifies its bundle. Draft staging
+uploads target artifacts, `<target>-provenance.json` files and `release.json`.
+Existing draft assets must match byte-for-byte; missing assets can be resumed
+without clobbering anything. Publication downloads the GitHub assets again and
+checks their hashes, complete file set, tag SHA and release state. A failed
+upload leaves a draft, not a half-published release. Inspect remote state after
+an ambiguous network failure; retries never replace published assets.
+
+Publication (including the legacy `publish` aliases) defaults to **prerelease**
+and explicitly does not mark it latest. Prereleases are manual downloads only.
+`--stable` can promote a verified draft or existing prerelease; it removes the
+prerelease marker and marks the release latest, rejecting equal/newer stable
+versions already present. An already stable release is immutable to this tool.
+Retain the Actions receipt and downloaded verified bundle. The commands require
+the original Actions artifact, which expires after 30 days; publish/promote
+before expiry, or prepare a new build/version rather than bypassing provenance.
+
+Asset names are stable within each version-specific GitHub release:
+
+| Target | Assets |
+| --- | --- |
+| macOS ARM64 | `korus-macos-arm64.dmg`, `korus-darwin-arm64.zip` |
+| Windows x64 | `korus-win32-x64-setup.exe`, `korus-win32-x64.zip`, original `*-full.nupkg` and `RELEASES` |
+| Linux x64 | `korus-linux-x64.deb`, `.rpm`, `.zip` |
+| Linux ARM64 | `korus-linux-arm64.deb`, `.rpm`, `.zip` |
+
+Windows NuGet filenames and `RELEASES` bytes stay intact because Squirrel's
+manifest references them. macOS ZIP names include the platform and architecture
+required by the Electron update service. Product identity remains in
+`core/src/product.json`; artifact names derive from that metadata.
+
+For prereleases, the website must link to `/releases/tag/v<version>` or verified
+assets under `/releases/download/v<version>/<asset>` on the product repository.
+`/releases/latest` and `/releases/latest/download/<asset>` exclude prereleases;
+use them only after stable publication. Verify public release visibility and
+asset URLs before switching live website links.
+
+Existing installed macOS clients still check
+`https://meetkorus.dev/desktop/releases/darwin/arm64/RELEASES.json`. Preserve that
+feed and `https://meetkorus.dev/desktop/downloads/korus-macos-arm64.dmg` during
+prereleases. At the first approved **stable** cutover, the website/server owner
+must publish a bridge entry in the existing JSON schema pointing to the signed
+GitHub ZIP of a newer version containing the new updater. Preserve history and
+verify the download before advancing the feed. Do not redirect this static JSON
+URL to the Electron service: old clients expect a different response format.
+This bridge is a separately approved deployment, not a side effect of staging
+or publishing a prerelease.
 
 `npm run build` packages the desktop application without creating an installer.
 `npm run make` also creates distributable archives: Windows produces
@@ -216,7 +248,7 @@ the host's 7-Zip executable required to create the installer.
 Squirrel installer identity, executable names and icons come from product
 metadata and Forge configuration. The desktop handles Squirrel startup events
 before starting the application. Installer generation does not publish an
-update feed or enable Windows automatic updates.
+update feed. Squirrel-installed copies can receive subsequent stable updates.
 
 Use `backend/dist/korusd --version`, `--stdio`, `serve`, or `connect` when
 running the built backend directly. SSH deployments still transport the
@@ -1035,19 +1067,23 @@ Recommended build pipeline:
 
 ### Desktop auto-update
 
-Packaged macOS builds use Electron's native `autoUpdater` with the Forge ZIP
-maker's JSON feed. The updater checks immediately at startup and every hour,
+Packaged macOS builds and Squirrel-installed Windows copies use Electron's native
+`autoUpdater` with the public GitHub-backed Electron update service. The updater
+checks immediately at startup and every hour,
 then exposes status through the typed preload bridge and an
 "Update available" badge. Manual checks and install/relaunch are also available
-from the Korus menu. Development builds and unsupported platforms report updates
-as disabled.
+from the Korus menu. Development builds, portable Windows copies (no parent
+`Update.exe`), and Linux report updates as disabled. Linux uses package downloads.
 
 The feed is served at
-`https://meetkorus.dev/desktop/releases/<platform>/<arch>/RELEASES.json`
-by default. Set `APP_UPDATE_BASE_URL` for another HTTPS host. A release
-publish uses `npm run publish:macos` after a signed `npm run make`; the script
-uploads the ZIP, manifest, and DMG through SSH using
-`APP_UPDATE_PUBLISH_HOST` and `APP_UPDATE_REMOTE_ROOT`.
+`https://update.electronjs.org/nbonamy/korus/<platform>-<arch>/<installed-version>`.
+The repository and service origin come from product metadata;
+`APP_UPDATE_BASE_URL` can override the HTTPS service origin. Use the native
+Squirrel server protocol, not `serverType: 'json'`. The service ignores drafts
+and prereleases: only explicitly promoted stable releases trigger updates.
+See [Electron's update service](https://github.com/electron/update.electronjs.org)
+for its asset naming and public-release requirements. The legacy macOS bridge
+is described in the release section above.
 
 The release notes embedded in the renderer are generated from every released
 versioned section of `CHANGELOG.md` with `npm run release-notes:generate`. The
