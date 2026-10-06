@@ -56,5 +56,5 @@ function isMainModule() {
 
 if (isMainModule()) {
   if (process.argv.includes('--check-only')) checkPublishedVersion();
-  else throw new Error('Local publication is retired. Use npm run release:promote with a successful GitHub dispatch state.');
+  else throw new Error('Local publication is retired. Use npm run prerelease or npm run latest.');
 }

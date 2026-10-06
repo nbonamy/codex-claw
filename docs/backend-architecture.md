@@ -130,104 +130,62 @@ OAuth client IDs are still embedded in the distributed desktop app and can be
 extracted from it. Missing IDs leave the respective integration unavailable.
 Never put OAuth client secrets in the app.
 
-### Dispatch, monitor and inspect
+### Build and publish
 
-After explicitly pushing a reviewed immutable tag, use an authenticated `gh`
-with repository read and Actions write access:
-
-```bash
-npm run release:build -- --tag v0.27.0 --state .release/0.27.0.json
-npm run release:monitor -- --state .release/0.27.0.json
-npm run release:download -- --state .release/0.27.0.json --output .release/0.27.0-review
-```
-
-The monitor redraws a compact colored dashboard in terminals, showing each
-job's active step, step count, and elapsed time. Redirected output stays plain
-text, reports step changes, and emits a heartbeat every 30 seconds. Failed runs
-print bounded failed-step log excerpts plus exact commands for full logs and
-retrying; skipped downstream jobs are not reported as still waiting. Monitoring
-does not publish a release or retry a failed build automatically.
-
-The version is read from the tagged package, not the working checkout. A unique
-dispatch ID, full SHA, version, tag, run ID and attempt are saved before dispatch.
-The monitor discovers only that request, tolerates queue/discovery delay, and
-exits nonzero on incomplete or unsuccessful required jobs. A timeout or API
-failure preserves the receipt for resume.
-
-Retry an unchanged build with `gh run rerun <run-id> --repo nbonamy/korus` (all
-jobs), then resume the original command with `--attempt <N>`: for example,
-`npm run prerelease -- --tag v0.27.1 --attempt 2` continues all the way through
-publication. Use `release:monitor` only when watching without publishing. The tool never
-silently accepts a later attempt. Rerunning only failed jobs cannot produce the
-complete same-attempt artifact set. Source changes require a new commit/tag and
-state file; never move a release tag. If dispatch has an ambiguous network error,
-resume discovery using its receipt before issuing any new dispatch.
-
-Artifacts remain in Actions for 30 days. Per-target `provenance.json` files record
-version/SHA/tag/run/attempt, signing status, runtime versions, lockfile hash, and
-each file's size/SHA-256. The stage job verifies all four targets before uploading
-`release-<run-id>-<attempt>`. Downloads recheck every hash and identity field.
-This flow uses Actions artifact staging, not a public GitHub Release or live feed.
-
-### Drafts, prereleases and stable promotion
-
-GitHub Releases owns distributable assets. After preparing and pushing an
-immutable version tag, an authenticated operator with Actions-write and
-contents-write access can run the complete workflow with one command:
+After preparing and pushing an immutable version tag, run one command:
 
 ```bash
 npm run prerelease
-# Only with separate explicit stable-release approval:
+# Or, for an explicitly approved stable release:
 npm run latest
 ```
 
-Both shortcuts **build → monitor → verify → upload → publish**. They infer the
-version tag from the root package.json; no arguments are required.
-They do not edit versions, commit, tag or push: the remote tag must already
-exist and match the tagged package version. The first invocation saves
-`.release/v<version>.json`; repeating the same command resumes that exact run
-instead of dispatching another build. `latest` after `prerelease` reuses the
-same verified artifacts and only changes release status. Timeouts and failed
-required jobs block publication. Existing published assets are verified but
-never replaced. Nothing uploads to Joshua.
+Both infer the version from package.json and dispatch **one workflow**:
+quality → four platform builds → publish. The workflow runs from the default
+branch; quality and packaging check out the exact tagged source SHA. Publication
+uses the workflow's tooling commit, so release-tool fixes do not require moving
+the app's immutable tag.
 
-After build success the command dispatches `desktop-publish.yml` on the default
-branch and monitors its exact run to completion. That GitHub runner validates
-the build workflow, tag, SHA, attempt and all required jobs, downloads the matching
-Actions artifact, verifies provenance and checksums, creates a draft, uploads the
-assets and publishes the requested channel. Only this publication job has
-`contents: write`; the build workflow remains read-only. Publication jobs are
-serialized. The local command never downloads or uploads release binaries.
-The receipt records publication identity separately from the immutable build.
-For an interrupted publication, repeat the same shortcut; it resumes that run.
-For a failed publication job, use its printed rerun command and explicit
-`--publication-attempt N` when resuming. A build failure instead uses `--attempt N`.
+The final job downloads the four individual Actions artifacts, verifies their
+provenance and checksums, attaches installers to a draft GitHub Release, checks
+GitHub's uploaded asset digests, then publishes the requested channel. There is
+no combined all-platform archive, second publication workflow, or separate
+promotion command. Only the final job has contents-write permission. Failed
+quality/build jobs prevent publication; failed uploads leave a draft. Published
+assets are never overwritten. Prereleases are manual downloads; latest enables
+stable auto-updates. Nothing uploads to Joshua.
 
-For build-only work or an inspection pause, retain the individual commands:
-`release:build`, `release:monitor`, and `release:download` default to
-`.release/state.json`. Download is explicitly opt-in for local inspection, not
-part of publication. Pass `--state` to a shortcut to reuse a build-only receipt;
-an optional `--tag` must match it. `release:promote` also delegates to the GitHub
-publisher (default prerelease, `--stable` for an explicitly approved stable
-release). Canonical `v<version>` tags are required for publication; build-test
-tags are valid only for CI.
+The local command dispatches and monitors the run. It does not download release
+binaries. Receipts in `.release/v<version>-<channel>.json` pin the source SHA,
+workflow SHA, channel, request ID, run and attempt. Repeat the same command to
+resume an interrupted run; it does not dispatch another one. A completed run is
+reported as published only after checking the release's actual visibility.
+A different channel starts its own run; do not assume rebuilt installers are
+byte-identical to a previously published release.
 
-On the runner, draft staging uploads target artifacts,
-`<target>-provenance.json` files and `release.json`. Existing draft assets must
-match byte-for-byte; missing assets can be resumed without clobbering anything.
-Publication verifies uploaded asset bytes, complete file set, tag SHA and release
-state before removing draft status. A failed upload leaves a draft, not a
-half-published release. Inspect remote state after an ambiguous network failure;
-retries never replace published assets.
+The terminal monitor shows each job's active step, elapsed time and progress,
+and prints bounded failure excerpts. Piped output stays plain text. To retry
+an unchanged failed run, use the printed `gh run rerun` command (all jobs), then
+resume the original shortcut with `--attempt N`. Rerunning only failed jobs
+does not produce a complete same-attempt artifact set. Never move a release tag.
+The old two-workflow receipts are left untouched and are not reused.
 
-Publication (including the legacy `publish` aliases) defaults to **prerelease**
-and explicitly does not mark it latest. Prereleases are manual downloads only.
-`--stable` can promote a verified draft or existing prerelease; it removes the
-prerelease marker and marks the release latest, rejecting equal/newer stable
-versions already present. An already stable release is immutable to this tool.
-Retain the Actions receipt. The GitHub publisher requires
-the original Actions artifact, which expires after 30 days; publish/promote
-before expiry, or prepare a new build/version rather than bypassing provenance.
+Build-only validation is an explicit exception:
+
+```bash
+npm run release:build -- --tag v0.27.1 --state .release/build-only.json
+```
+
+It selects `channel=none` and skips publication. `release:monitor -- --state
+<file>` only watches an existing run. `release:download -- --state <file>
+--output <directory>` is an optional local inspection command. Individual
+Actions artifacts expire after 30 days.
+
+Per-target provenance records version, tag, source SHA, run/attempt, signing
+status, runtime versions, lockfile hash and installer sizes/SHA-256. These checks
+and local script tests do not prove live publication. Verify the actual Actions
+run, public release visibility and downloadable installers before calling a
+release published.
 
 Asset names are stable within each version-specific GitHub release:
 

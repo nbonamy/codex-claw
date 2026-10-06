@@ -3,8 +3,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { collectArtifacts, assembleArtifacts } from './release-artifacts.mjs';
-import { verifyBundle } from './release-contract.mjs';
+import { collectArtifacts } from './release-artifacts.mjs';
+import { verifyArtifacts } from './release-contract.mjs';
 
 const identity = { version: '0.27.0', sha: 'a'.repeat(40), tag: 'v0.27.0', runId: 92, attempt: 1 };
 async function fixture(t) {
@@ -20,25 +20,24 @@ async function fixture(t) {
     await collectArtifacts({ source: make, output: path.join(source, `desktop-${target}-92-1`), identity, target,
       signing: target.startsWith('darwin') ? 'developer-id-notarized' : 'unsigned' });
   }
-  return { root, source, output: path.join(root, 'bundle'), identity };
+  return { root, source, identity };
 }
 
-test('assembled bundle preserves every target and checksums verified artifact bytes', async t => {
+test('per-platform artifacts preserve installer names and verify their bytes', async t => {
   const f = await fixture(t);
-  await assembleArtifacts(f);
-  const manifests = await verifyBundle(f.output, identity);
+  const manifests = await verifyArtifacts(f.source, identity);
   assert.equal(manifests.length, 4);
   assert.equal(manifests.find(m => m.target === 'win32-x64').signing, 'unsigned');
   assert.deepEqual(manifests.find(m => m.target === 'darwin-arm64').files.map(f => f.name),
     ['korus-darwin-arm64.zip', 'korus-macos-arm64.dmg']);
   assert.deepEqual(manifests.find(m => m.target === 'win32-x64').files.map(f => f.name),
     ['app-0.27.0.nupkg', 'korus-win32-x64-setup.exe', 'korus-win32-x64.zip', 'RELEASES'].sort((a, b) => a.localeCompare(b)));
-  await fs.appendFile(path.join(f.output, 'linux-arm64/korus-linux-arm64.deb'), 'corrupt');
-  await assert.rejects(verifyBundle(f.output, identity), /checksum\/size/);
+  await fs.appendFile(path.join(f.source, 'desktop-linux-arm64-92-1/korus-linux-arm64.deb'), 'corrupt');
+  await assert.rejects(verifyArtifacts(f.source, identity), /checksum\/size/);
 });
 
 for (const change of ['missing-target', 'wrong-sha', 'wrong-version', 'wrong-attempt', 'missing-installer', 'path-traversal']) {
-  test(`staging refuses ${change}`, async t => {
+  test(`artifact verification refuses ${change}`, async t => {
     const f = await fixture(t);
     const target = path.join(f.source, 'desktop-win32-x64-92-1');
     const file = path.join(target, 'provenance.json');
@@ -55,6 +54,6 @@ for (const change of ['missing-target', 'wrong-sha', 'wrong-version', 'wrong-att
       }
       await fs.writeFile(file, JSON.stringify(manifest));
     }
-    await assert.rejects(assembleArtifacts(f));
+    await assert.rejects(verifyArtifacts(f.source, identity));
   });
 }

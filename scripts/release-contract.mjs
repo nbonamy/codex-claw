@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 export const targets = ['darwin-arm64', 'win32-x64', 'linux-x64', 'linux-arm64'];
-export const requiredJobs = ['quality', ...targets.map(target => `build (${target})`), 'stage'];
+export const requiredJobs = ['quality', ...targets.map(target => `build (${target})`), 'publish'];
 export const workflow = 'desktop-build.yml';
 
 export function validateIdentity(value) {
@@ -52,9 +52,7 @@ export async function verifyTarget(directory, expected, target) {
   return manifest;
 }
 
-export async function verifyBundle(directory, expected) {
-  const index = JSON.parse(await fs.readFile(path.join(directory, 'release.json'), 'utf8'));
-  assertIdentity(index, expected);
-  if (index.schemaVersion !== 1 || JSON.stringify(index.targets) !== JSON.stringify(targets)) throw new Error('Incomplete required target set.');
-  return Promise.all(targets.map(target => verifyTarget(path.join(directory, target), expected, target)));
+export async function verifyArtifacts(directory, expected) {
+  return Promise.all(targets.map(target => verifyTarget(
+    path.join(directory, `desktop-${target}-${expected.runId}-${expected.attempt}`), expected, target)));
 }

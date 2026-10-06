@@ -73,19 +73,18 @@ remote SHA. For the confirmed channel, give Nicolas exactly one command:
 - Prerelease: `npm run prerelease`
 - Stable/latest: `npm run latest`
 
-Both infer `v<version>` from package.json and perform the complete workflow:
-build → monitor → verify → create draft/upload assets → publish. All binary
-transfers and verification happen on GitHub runners, never through Nicolas's
-machine. The local command sends requests and displays progress only. The
-publication workflow runs from the default branch; build inputs remain pinned
-to the version tag. Both workflows must be available remotely before handoff.
+Both infer `v<version>` from package.json and run one GitHub workflow:
+quality → four platform builds → publish. The final job verifies and uploads
+the individual installers; there is no combined bundle or second workflow.
+The local command dispatches and monitors. Workflow tooling comes from the
+default branch; app source stays pinned to the immutable tag. The updated
+workflow must be pushed before handoff.
 
-The receipt `.release/v<version>.json` tracks exact build and publication runs.
-Repeating the same command resumes without rebuilding; `npm run latest` after a
-prerelease reuses the verified build. After interruption, resume the same
-shortcut, not `release:monitor`, which only watches and cannot publish.
-For failed runs, use the printed retry/resume commands and explicit attempt;
-never move the version tag. Artifacts expire after 30 days.
+The receipt `.release/v<version>-<channel>.json` tracks the exact run and attempt.
+Repeating the same command resumes it. A different channel starts a separate
+run; published assets are immutable, so do not promise replacement of an
+existing release with rebuilt installers. Use the printed retry/resume commands
+for failed runs, with the explicit attempt. Never move the version tag.
 
 Only when explicitly asked for build-only validation, use `release:build` with
 `--tag v<version>`. That path deliberately stops before publication. Local
