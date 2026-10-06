@@ -26,6 +26,10 @@ quick actions such as starting a session on main.
   and reject new work. Existing chats remain accessible.
 - Populate choices from the owning host's runtime `providerConnections`, never
   from legacy enable flags or backend process health.
+- Developer release gates live in `core/src/features.ts`. Unreleased providers
+  are absent from the owning daemon's setup/connection lists and reject new
+  work even with saved enablement. Clients use the owning host's availability,
+  including for remote teams. Saved histories and preferences are retained.
 - Any fresh, empty chat allows changing its backend before the first prompt,
   even when creation already selected one. Show this control only when multiple
   backends are connected.

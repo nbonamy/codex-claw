@@ -6,6 +6,8 @@ import { createTestSnapshot, readyRemoteConnection } from './server-test-fixture
 import { normalizeGeneralSettings } from '@workspace/core/settings';
 
 vi.mock('../claude/authentication', () => ({ getLocalClaudeAuthentication: vi.fn(), logoutLocalClaude: vi.fn() }));
+// Exercise the enabled build; shipped-off admission lives in release-gates.spec.ts.
+vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 describe('connected engine admission', () => {
   it('retries an Antigravity login observation through the owning connection operation without changing enablement', async () => {

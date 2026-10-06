@@ -1160,6 +1160,30 @@ package or platform credential helper behind the same port after packaging is
 settled.
 
 
+## Developer release gates
+
+`core/src/features.ts` defines immutable, developer-controlled release gates.
+Change a flag in source and rebuild to ship a different feature set. There are
+no persisted preferences, environment overrides, or remote configuration for
+these gates. Remove a temporary gate when its feature graduates.
+
+The daemon maps gated providers in `provider-release.ts`. It omits unreleased
+providers from setup and connection discovery, skips home preparation and
+authentication probes, and rejects new work at admission and driver dispatch.
+Clients consume the owning host's setup/connection contracts rather than
+evaluating their own build's flags; a remote daemon controls its own release
+availability. Settings and onboarding use those same observations.
+
+Release availability, user enablement, authentication, and provider capabilities
+remain separate. Turning a gate off preserves saved homes, preferences, agents,
+queues and native history. Provider hosts remain registered for history reads,
+interruption and cleanup. Running processes keep their build's fixed gates;
+changing a flag takes effect after rebuilding and restarting the daemon.
+
+Antigravity is initially gated off pending the remaining native qualification
+in `plans/antigravity.md`. Its enabled-build workflow tests substitute only the
+build configuration; shipped-off tests exercise the actual default registry.
+
 ## Antigravity provider
 
 `backend/src/antigravity` owns the qualified Google ACP runtime, processes,

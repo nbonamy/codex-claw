@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { requireReleasedProvider } from '../provider-release';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
@@ -456,6 +457,7 @@ export class AppMcpService {
     input: McpCreateAgentInput & { teamId?: string },
     intendedId?: string,
   ): Promise<McpCreateAgentResponse> {
+    requireReleasedProvider(input.backend ?? caller.backend);
     const prompt = input.prompt?.trim() ?? '';
     const instructions = input.instructions?.trim();
     if (instructions && !prompt) {

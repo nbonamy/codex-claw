@@ -9,6 +9,21 @@ import { configureAppClient } from '../../platform-api';
 import { setElectronTestClient } from '../../test/client';
 
 describe('SettingsView', () => {
+  it('uses daemon availability for gated settings and falls back from a saved unavailable tab', async () => {
+    setElectronTestClient({});
+    const connectAntigravity = vi.fn();
+    const wrapper = mount(SettingsView, { props: {
+      activeTab: 'antigravity', settings: defaultThemeSettings,
+      generalSettings: { ...defaultGeneralSettings, providerEnabled: { antigravity: true } },
+      providerConnections: [], connectAntigravity,
+    } });
+    expect(wrapper.text()).not.toContain('Antigravity');
+    expect(wrapper.text()).toContain('Accessibility');
+    await wrapper.setProps({ providerConnections: [{ backend: 'antigravity', installed: false, connected: false, checking: false }] });
+    await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
+    expect(connectAntigravity).toHaveBeenCalledOnce();
+    expect(wrapper.findAll('.el-menu-item').some(item => item.text() === 'Antigravity')).toBe(true);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
@@ -33,7 +48,6 @@ describe('SettingsView', () => {
       'Personalization',
       'Codex',
       'Claude Code',
-      'Antigravity',
       'Plugins',
       'Integrations',
       'Screenshots',

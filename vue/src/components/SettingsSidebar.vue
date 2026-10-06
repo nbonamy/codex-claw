@@ -27,7 +27,7 @@
         <BackendIcon backend="claude" monochrome />
         <span>{{ $t('surface.settingsSidebar.claudeCode') }}</span>
       </el-menu-item>
-      <el-menu-item index="antigravity">
+      <el-menu-item v-if="availableBackends?.includes('antigravity')" index="antigravity">
         <BackendIcon backend="antigravity" monochrome />
         <span>{{ $t('antigravity.name') }}</span>
       </el-menu-item>
@@ -57,12 +57,14 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
+import type { AgentBackend } from '@workspace/core/contracts';
 import { AffiliateIcon, GitBranchIcon, PaletteIcon, PhotoIcon, PuzzleIcon, SettingsIcon, TerminalIcon } from '../shared/icons/app-icons';
 import BackendIcon from './BackendIcon.vue';
 import { appHostCapabilities } from '../platform-api';
 
 defineProps<{
   activeTab: SettingsTab;
+  availableBackends?: AgentBackend[];
 }>();
 
 const emit = defineEmits<{

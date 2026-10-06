@@ -7,6 +7,7 @@
     
     <SettingsSidebar
       :active-tab="activeTab"
+      :available-backends="providerConnections?.map(provider => provider.backend) ?? []"
       class="settings-view__sidebar"
       @select="selectTab"
     />
@@ -131,6 +132,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, DaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@workspace/core/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@workspace/core/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
@@ -152,7 +154,7 @@ import appPackage from '../../package.json';
 
 const appVersion = appPackage.version;
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   codexConnected?: boolean;
   providerConnections?: ProviderConnection[];
   customizeProvider?: (backend: import('@workspace/core/contracts').AgentBackend) => unknown;
@@ -248,6 +250,8 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   selectTab: [tab: SettingsTab];
 }>();
+
+const activeTab = computed(() => props.activeTab === 'antigravity' && !props.providerConnections?.some(provider => provider.backend === 'antigravity') ? 'general' : props.activeTab);
 
 function selectTab(tab: SettingsTab): void {
   emit('selectTab', tab);

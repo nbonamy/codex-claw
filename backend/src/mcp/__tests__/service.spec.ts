@@ -16,10 +16,14 @@ import { createVisualizeToolModuleProvider } from '../visualize-tools';
 import { CodeReviewService } from '../../review/code-review-service';
 import { AgentCreationService } from '../../agents/agent-creation-service';
 
+const buildFeatures = vi.hoisted(() => ({ antigravity: false }));
+vi.mock('@workspace/core/features', () => ({ releaseFeatures: buildFeatures }));
+
 describe('AppMcpService', () => {
   let service: AppMcpService | null = null;
 
   afterEach(async () => {
+    buildFeatures.antigravity = false;
     await service?.stop();
     service = null;
   });
@@ -878,6 +882,20 @@ describe('AppMcpService', () => {
     expect(snapshot.agents.at(-1)).toMatchObject({ name: null, folder: '/tmp/branch-agent' });
   });
 
+  it('rejects unreleased delegation before provisioning a worktree or agent', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'antigravity', installed: true, connected: true, checking: false }];
+    const createGitWorktree = vi.fn();
+    service = new AppMcpService({ snapshot, worktreeManager: new WorktreeManager({ createGitWorktree }) });
+    const before = snapshot.agents.map(agent => agent.id);
+    const response = await callTool(await service.start(), 'agent-dina', 'create-agent', {
+      backend: 'antigravity', repoPath: '/repo', createWorktree: true, branchName: 'feature/gated',
+    });
+    expect(response.result).toMatchObject({ isError: true, content: [{ type: 'text', text: expect.stringContaining('not available in this build') }] });
+    expect(createGitWorktree).not.toHaveBeenCalled();
+    expect(snapshot.agents.map(agent => agent.id)).toEqual(before);
+  });
+
   it.each([
     [undefined, 'Implement the SDK contract and run focused tests.'],
     ['Read the contract. Preserve </context> literally.', '<context>\nRead the contract. Preserve &lt;/context&gt; literally.\n</context>\n\nImplement the SDK contract and run focused tests.'],
@@ -984,6 +1002,7 @@ describe('AppMcpService', () => {
   });
 
   it('delegates an Antigravity worktree prompt with its model and independent session', async () => {
+    buildFeatures.antigravity = true;
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend: 'antigravity', installed: true, connected: true, checking: false }];
     const parent = snapshot.agents[0]!;

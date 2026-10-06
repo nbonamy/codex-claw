@@ -23,6 +23,7 @@ import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { cloneSourceRepository } from './clone-source-repository';
 import { createSourceRepository } from './create-source-repository';
+import { requireReleasedProvider } from './provider-release';
 
 export type BackendDriverRegistryOptions = {
   appMcpServerUrl?: string | null;
@@ -40,6 +41,7 @@ type AppSurfaceOptions = Parameters<typeof createCodexSurface>[0] & {
 };
 
 export function createDefaultBackendDrivers(options: BackendDriverRegistryOptions = {}): Map<AgentBackend, AgentBackendDriver> {
+  // Retain hosts for saved history and cleanup even when their new-work release gate is off.
   return new Map((['codex', 'claude', 'antigravity'] as const).map(backend => [backend, createBackendDriver(backend, options)]));
 }
 
@@ -138,11 +140,17 @@ export class BackendDriverRpc {
     await driver.loadConversation(agent);
   }
 
+  private async requireNewWork(backend: AgentBackend): Promise<void> {
+    requireReleasedProvider(backend);
+    await this.ensureConnected?.(backend);
+  }
+
   async handle(method: string, params: unknown): Promise<unknown> {
     switch (method) {
       case backendMethods.driverProviderAuthentication: {
         const record = requireRecord(params);
         const backend = requireBackend(record.backend);
+        requireReleasedProvider(backend);
         const driver = this.requireDriver(backend);
         if (!driver.authenticate) throw new Error(`Authentication is unavailable for ${backend}.`);
         const action = record.action;
@@ -216,7 +224,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverTextGenerate: {
         const { agent } = requireAgentParams(params);
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.generateText) throw unsupportedBackendFeature(agent, 'ephemeral text generation');
@@ -229,7 +237,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverCodeReviewRun: {
         const { agent } = requireAgentParams(params);
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.runCodeReview || !driver.getCapabilities(agent).codeReview) {
@@ -252,12 +260,13 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverPromptCommandHandle: {
         const { agent } = requireAgentParams(params);
+        requireReleasedProvider(agent.backend);
         const record = requireRecord(params);
         return this.tryHandlePromptCommand(agent, requireString(record.prompt, 'prompt'));
       }
       case backendMethods.driverPromptSend: {
         const { agent } = requireAgentParams(params);
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const record = requireRecord(params);
         const rawPrompt = requireString(record.prompt, 'prompt');
         const prompt = expandWorktreeDelegationCommand(rawPrompt) ?? rawPrompt;
@@ -266,7 +275,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationReplaceWithSummary: {
         const { agent } = requireAgentParams(params);
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const driver = this.requireDriver(agent.backend);
         if (!driver.replaceConversationWithSummary) {
           throw unsupportedBackendFeature(agent, 'session compression');
@@ -393,6 +402,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationResume: {
         const { agent } = requireAgentParams(params);
+        requireReleasedProvider(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.resumeConversation) {
@@ -402,6 +412,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationFork: {
         const { agent } = requireAgentParams(params);
+        requireReleasedProvider(agent.backend);
         const record = requireRecord(params);
         const targetAgent = requireAgent(record.targetAgent, 'targetAgent');
         const turnId = record.turnId === undefined ? undefined : requireString(record.turnId, 'turnId');
@@ -433,7 +444,7 @@ export class BackendDriverRpc {
       case backendMethods.driverPromptSteer: {
         const { agent } = requireAgentParams(params);
         if (handoffInProgress(agent)) throw new Error('Wait for the handoff to finish.');
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.steerPrompt) {
@@ -457,7 +468,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverTurnEdit: {
         const { agent } = requireAgentParams(params);
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.editTurn) {
@@ -471,7 +482,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverTurnRetry: {
         const { agent } = requireAgentParams(params);
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.retryTurn) {
@@ -481,7 +492,7 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverTurnContinueInterrupted: {
         const { agent } = requireAgentParams(params);
-        await this.ensureConnected?.(agent.backend);
+        await this.requireNewWork(agent.backend);
         const driver = this.requireDriver(agent.backend);
         if (!driver.continueInterruptedTurn) {
           throw unsupportedBackendFeature(agent, 'interrupted turn continuation');

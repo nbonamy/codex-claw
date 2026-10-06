@@ -66,7 +66,7 @@
             <button v-if="updatingProvider !== 'claude' && !claudeLoading" type="button" :disabled="continuing || Boolean(updatingProvider)" @click="emit('customize', 'claude')">{{ t('auth.customize') }}</button>
           </div>
           </div>
-          <div class="codex-login__provider">
+          <div v-if="antigravityAvailable" class="codex-login__provider">
             <el-button size="large" :disabled="antigravityLoading || antigravityPending || (antigravityConnected && antigravityEnabled) || continuing || Boolean(updatingProvider)" @click="emit('connect-antigravity')">
               <BackendIcon backend="antigravity" />
               {{ t(antigravityConnected ? (antigravityEnabled ? 'antigravity.connected' : 'antigravity.enable') : 'antigravity.connect') }}
@@ -80,13 +80,13 @@
               </template>
             </div>
           </div>
-          <el-button class="codex-login__continue" size="large" :loading="continuing" :disabled="Boolean(updatingProvider) || !(codexConnected && codexEnabled || claudeConnected && claudeEnabled || antigravityConnected && antigravityEnabled)" @click="emit('continue')">
+          <el-button class="codex-login__continue" size="large" :loading="continuing" :disabled="Boolean(updatingProvider) || !(codexConnected && codexEnabled || claudeConnected && claudeEnabled || antigravityAvailable && antigravityConnected && antigravityEnabled)" @click="emit('continue')">
             {{ t('auth.continue') }}
           </el-button>
         </div>
         <p v-if="error" class="codex-login__error" role="alert">{{ error }}</p>
         <p v-if="claudeError" class="codex-login__error" role="alert">{{ claudeError }}</p>
-        <p v-if="antigravityError" class="codex-login__error" role="alert">{{ antigravityError }}</p>
+        <p v-if="antigravityAvailable && antigravityError" class="codex-login__error" role="alert">{{ antigravityError }}</p>
         <p v-if="setupError" class="codex-login__error" role="alert">{{ setupError }}</p>
       </template>
     </div>
@@ -94,6 +94,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OnboardingLandingFrame from './OnboardingLandingFrame.vue';
 import BackendIcon from './BackendIcon.vue';
@@ -134,6 +135,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ cancel: []; login: []; 'connect-claude': []; 'connect-antigravity': []; 'cancel-antigravity': []; continue: []; customize: [backend: AgentBackend] }>();
 const { t } = useI18n();
 const detected = (backend: AgentBackend) => props.providerSetup?.some(setup => setup.backend === backend && setup.installed);
+const antigravityAvailable = computed(() => props.providerSetup?.some(setup => setup.backend === 'antigravity') ?? false);
 </script>
 
 <style scoped>

@@ -19,8 +19,15 @@ function mountLanding(props: InstanceType<typeof CodexLoginLanding>['$props'] = 
 }
 
 describe('CodexLoginLanding', () => {
+  it('hides unreleased setup and ignores stale connection state when continuing', () => {
+    const wrapper = mountLanding({ providerSetup: [], antigravityConnected: true });
+    expect(wrapper.text()).not.toContain('Antigravity');
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+  });
   it('offers native Antigravity sign-in and can continue with it as the only connected engine', async () => {
-    const wrapper = mountLanding({ antigravityConnected: false });
+    const wrapper = mountLanding({ antigravityConnected: false, providerSetup: [
+      { backend: 'antigravity', installed: true, isolated: true, shareSkills: false, homePath: '/app/acp', locked: false },
+    ] });
     await wrapper.findAll('button').find(button => button.text() === 'Connect Antigravity')!.trigger('click');
     expect(wrapper.emitted('connect-antigravity')).toEqual([[]]);
     await wrapper.setProps({ antigravityPending: true });

@@ -14,6 +14,8 @@ import { AppMcpService } from '../../mcp/service';
 import { AppBackendServer } from '../../server';
 import { BackendDriverRpc } from '../../driver-rpc';
 
+vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
+
 let root: string;
 const sessions: AcpSession[] = [];
 vi.mock('@workspace/core/runtime-discovery', async importOriginal => ({

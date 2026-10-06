@@ -39,6 +39,18 @@ function setup() {
 }
 
 describe('mission execution', () => {
+  it('rejects an unreleased member before creating a Mission run, worker, or workspace', async () => {
+    const h = setup();
+    const member = h.snapshot.agents[0]!;
+    member.backend = 'antigravity';
+    const before = structuredClone(h.current());
+    await expect(h.command({ action: 'run', memberId: member.id })).rejects.toThrow(/not available in this build/);
+    expect(h.current()).toEqual(before);
+    expect(h.snapshot.agents).toHaveLength(h.originalAgents.length);
+    expect(h.ports.ensureMissionHome).not.toHaveBeenCalled();
+    expect(h.ports.createWorktree).not.toHaveBeenCalled();
+    expect(h.ports.continueStage).not.toHaveBeenCalled();
+  });
   it('retains Mission tools and accepts a later result after an implementation turn ends without submitting', async () => {
     const h = setup();
     await h.configure();

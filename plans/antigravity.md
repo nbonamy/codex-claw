@@ -660,6 +660,20 @@ Phase 0 learnings:
 
 Implementation learnings:
 
+- Antigravity now ships behind the developer-controlled `releaseFeatures.antigravity`
+  gate in `core/src/features.ts`, defaulting off. There are no runtime overrides.
+  The daemon owns admission and advertises availability through existing setup
+  and connection contracts; saved histories and provider preferences survive.
+  Enabled-build qualification tests override only the build registry, while
+  shipped-off tests retain the real defaults. Enabling this gate still requires
+  accepting or resolving the native proof limitations recorded above.
+  Release-gate verification: all 3,375 workspace tests and 15 script tests,
+  full lint/typechecks, Web build, and all-workspace coverage passed (statements:
+  core 85.66%, backend 87.10%, Vue 87.71%, Electron 85.04%, Web 95.93%).
+  An isolated branch Web preview showed only Codex/Claude onboarding and working
+  Codex customization. Its public WebSocket setup/connection operations omitted
+  Antigravity and rejected explicit enablement with the build-unavailable error.
+
 - Exercise the full provider-to-app boundary early. Native model generation,
   MCP discovery, permission to invoke an MCP tool, and app-ledger completion
   are separate assertions; an ACP `end_turn` proves none of the latter three.

@@ -5,6 +5,9 @@ import { AgentHandoffService } from '../agents/agent-handoff-service';
 import { createTestSnapshot } from './server-test-fixtures';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 
+// Handoff qualification exercises a build with the destination provider released.
+vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
+
 function fixture() {
   const snapshot = createTestSnapshot();
   const source: Agent = {

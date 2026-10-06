@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
 import { createMission, type MissionArtifacts } from '@workspace/core/missions';
 import type { MissionExecutionInput } from '@workspace/core/mission-execution';
@@ -13,6 +13,8 @@ import { FileMissionSkillStore } from '../mission-skill-store';
 import { createSourceWorktree, readWorktreeHead } from '../git-worktrees';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 const exec = promisify(execFile);
+
+vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 it.each(['codex', 'antigravity'] as const)('keeps %s orchestrators and workers through the full Mission without inventing unsupported compaction', async backend => {
   const folder = await mkdtemp(join(tmpdir(), 'app-mission-workflow-'));
