@@ -11,6 +11,8 @@ coverage/
 electron/.computer-use-artifacts/
 electron/.tts/
 electron/.runtime-cache/
+# Temporary Codex installer staging and recovery directories
+/electron/resources/.codex-*/
 native/**/.build/
 
 # Rebuild promo video renders from videos/*.html and videos/render-mission-film.mjs.
