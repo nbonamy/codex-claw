@@ -37,7 +37,7 @@ concurrency:
 jobs:
   quality:
     name: quality
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -71,11 +71,11 @@ jobs:
       matrix:
         include:
           - target: darwin-arm64
-            runner: macos-15
+            runner: macos-latest
           - target: win32-x64
-            runner: windows-2022
+            runner: windows-latest
           - target: linux-x64
-            runner: ubuntu-24.04
+            runner: ubuntu-latest
           - target: linux-arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
@@ -132,7 +132,7 @@ jobs:
     name: publish
     needs: [quality, build]
     if: inputs.channel != 'none'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write
