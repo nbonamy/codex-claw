@@ -65,6 +65,11 @@ test('creation attaches installers before publication even when the release list
   assert.ok(f.remote.assets.has('RELEASES'));
   assert.ok(f.remote.assets.has('linux-arm64-provenance.json'));
   assert.equal(f.remote.calls.filter(args => args[1] === 'create').length, 1);
+  const create = f.remote.calls.find(args => args[1] === 'create');
+  assert.ok(create.includes('--verify-tag'));
+  // Existing tags pin the source; an old explicit target invokes GitHub's
+  // workflow-write permission check when main's workflows have changed.
+  assert.equal(create.includes('--target'), false);
   assert.ok(f.remote.calls.find(args => args[1] === 'edit').includes('--latest=false'));
 });
 

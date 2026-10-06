@@ -41,7 +41,7 @@ export async function publishDesktop(directory, identity, channel, run = execFil
     if (!existing) {
       // gh uploads through the creation response's ID, without re-listing drafts.
       gh(['release', 'create', identity.tag, ...[...files.values()].map(item => item.file),
-        '--repo', product.repository, '--verify-tag', '--target', identity.sha,
+        '--repo', product.repository, '--verify-tag',
         '--draft', '--prerelease', '--latest=false', '--title', `${product.name} ${identity.version}`,
         '--notes', `Build: ${identity.sha}\nActions: ${product.repositoryUrl}/actions/runs/${identity.runId}/attempts/${identity.attempt}\n\nWindows installers are unsigned. Prereleases are manual downloads only.`]);
     }
