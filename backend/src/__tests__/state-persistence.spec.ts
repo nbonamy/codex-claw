@@ -347,18 +347,22 @@ describe('state persistence', () => {
     expect(restored.agents[0].codeReview).toStrictEqual(snapshot.agents[0].codeReview);
   });
 
-  it('round-trips valid thread flags and drops invalid persisted values', () => {
+  it('round-trips valid turn suggestions and drops invalid persisted values', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].threadFlags = {
       delegate_to_worktree: true,
       ready_for_review: true,
     };
+    snapshot.agents[0].suggestedPrompt = 'Review the changes';
     const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
       agents: Array<Record<string, unknown>>;
     };
 
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags)
       .toStrictEqual({ delegate_to_worktree: true, ready_for_review: true });
+    expect(snapshotFromPersistedState(persisted).agents[0].suggestedPrompt).toBe('Review the changes');
+    persisted.agents[0].suggestedPrompt = 123;
+    expect(snapshotFromPersistedState(persisted).agents[0].suggestedPrompt).toBeUndefined();
     persisted.agents[0].threadFlags = { delegate_to_worktree: false };
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags).toBeUndefined();
   });

@@ -96,6 +96,7 @@ export type FinishTurnResponse = {
 
 export type FinishTurnInput = {
   flag?: ThreadFlagId;
+  suggestedPrompt?: string;
   announcement?: { text: string };
   celebration?: { kind: CelebrationKind };
 };
@@ -323,6 +324,9 @@ export class AppMcpAgentCoordinator {
     }
     delete agent.statusText;
     if (input.flag) agent.threadFlags = { [input.flag]: true };
+    const suggestedPrompt = input.suggestedPrompt?.trim();
+    if (suggestedPrompt) agent.suggestedPrompt = suggestedPrompt;
+    else delete agent.suggestedPrompt;
     agent.updatedAt = this.now().toISOString();
     this.onAgentUpdated?.(agent);
     const [announcement, celebration] = await Promise.all([

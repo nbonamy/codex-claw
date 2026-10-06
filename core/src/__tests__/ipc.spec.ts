@@ -221,10 +221,11 @@ describe('ipc channels', () => {
     type AgentUpdatedEvent = Extract<MainToRendererEvent, { type: 'agent.updated' }>;
     expectTypeOf<AgentUpdatedEvent['payload']>()
       .toEqualTypeOf<
-        Omit<Partial<Agent>, 'threadFlags' | 'id' | 'statusText'> & {
+        Omit<Partial<Agent>, 'threadFlags' | 'id' | 'statusText' | 'suggestedPrompt'> & {
           threadFlags?: Agent['threadFlags'] | null;
           id: string;
           statusText?: string | null;
+          suggestedPrompt?: string | null;
         }
       >();
     expectTypeOf<Pick<AgentUpdatedEvent, keyof AgentOnlyEventContext>>()

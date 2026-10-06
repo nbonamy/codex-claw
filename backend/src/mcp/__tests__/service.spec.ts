@@ -205,6 +205,26 @@ describe('AppMcpService', () => {
     }));
   });
 
+  it('publishes a caller-scoped prompt suggestion and explicitly clears it when omitted', async () => {
+    const snapshot = createInitialSnapshot();
+    const events: BackendEvent[] = [];
+    service = new AppMcpService({ snapshot, onEvent: event => events.push(event) });
+    const url = await service.start();
+    const result = await callTool(url, 'agent-dina', 'finish_turn', {
+      suggestedPrompt: '  Add keyboard navigation  ',
+    });
+    expect(result.result.isError).not.toBe(true);
+    expect(snapshot.agents[0]!.suggestedPrompt).toBe('Add keyboard navigation');
+    expect(snapshot.agents[1]!.suggestedPrompt).toBeUndefined();
+    expect(events.at(-1)).toMatchObject({
+      agentId: 'agent-dina', type: 'agent.updated',
+      payload: { suggestedPrompt: 'Add keyboard navigation' },
+    });
+    await callTool(url, 'agent-dina', 'finish_turn', {});
+    expect(snapshot.agents[0]!.suggestedPrompt).toBeUndefined();
+    expect(events.at(-1)).toMatchObject({ payload: { suggestedPrompt: null } });
+  });
+
   it('adds only model-owned finding actions to a scoped review context', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));

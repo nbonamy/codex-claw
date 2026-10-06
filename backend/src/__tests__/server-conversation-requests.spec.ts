@@ -13,7 +13,7 @@ import {
 
 describe('AppBackendServer', () => {
 
-  it('clears stale review readiness when admitting a user prompt and assigns the conversation title', async () => {
+  it.each([true, false])('clears prompt hints when admitting a user prompt (review readiness: %s) and assigns the conversation title', async (reviewReady) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 10, 15, 42));
     try {
@@ -26,7 +26,8 @@ describe('AppBackendServer', () => {
         folder: '/Users/nbonamy/src/agent-workspace',
         backend: 'codex',
         status: { type: 'idle' },
-        threadFlags: { ready_for_review: true, delegate_to_worktree: true },
+        threadFlags: { ...(reviewReady ? { ready_for_review: true as const } : {}), delegate_to_worktree: true },
+        suggestedPrompt: 'Review the diff',
         createdAt: '2026-06-13T00:00:00.000Z',
         updatedAt: '2026-06-13T00:00:00.000Z',
       }];
@@ -75,6 +76,7 @@ describe('AppBackendServer', () => {
       expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: 'agent-dina' }), 'revert everything', undefined);
       expect(snapshot.agents[0]?.backendSession).toStrictEqual({ kind: 'codex', threadId: 'thread-dina' });
       expect(snapshot.agents[0]?.conversationTitle).toBe('Dina');
+      expect(snapshot.agents[0]?.suggestedPrompt).toBeUndefined();
       expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'working' });
       expect(setConversationTitle).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'agent-dina', backendSession: { kind: 'codex', threadId: 'thread-dina' } }),
@@ -98,6 +100,7 @@ describe('AppBackendServer', () => {
       id: 'agent-dina', teamId: 'team-test', name: 'Dina', folder: '/workspace/dina', backend: 'codex',
       backendSession: { kind: 'codex', threadId: 'thread-dina' }, status: { type: 'working' },
       threadFlags: { ready_for_review: true },
+      suggestedPrompt: 'Review the diff',
       createdAt: '2026-06-13T00:00:00.000Z', updatedAt: '2026-06-13T00:00:00.000Z',
     }];
     const steerPrompt = vi.fn()
@@ -127,10 +130,12 @@ describe('AppBackendServer', () => {
 
     await expect(server.handleMessage(request('failed'))).rejects.toThrow('offline');
     expect(snapshot.agents[0]?.threadFlags).toStrictEqual({ ready_for_review: true });
+    expect(snapshot.agents[0]?.suggestedPrompt).toBe('Review the diff');
     expect(events.some(event => event.type === 'agent.updated')).toBe(false);
 
     const response = await server.handleMessage(request('accepted'));
     expect((response as { result: AppSnapshot }).result.agents[0]?.threadFlags).toBeUndefined();
+    expect((response as { result: AppSnapshot }).result.agents[0]?.suggestedPrompt).toBeUndefined();
     expect(events).toContainEqual(expect.objectContaining({
       type: 'agent.updated', payload: expect.objectContaining({ id: 'agent-dina', threadFlags: null }),
     }));

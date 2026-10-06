@@ -115,6 +115,7 @@ export class AppMcpService {
           ...agent,
           threadFlags: agent.threadFlags ?? null,
           statusText: agent.statusText ?? null,
+          suggestedPrompt: agent.suggestedPrompt ?? null,
         },
       }),
       onInboxMessage: (agentId) => {

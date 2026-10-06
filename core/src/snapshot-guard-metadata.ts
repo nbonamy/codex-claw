@@ -125,6 +125,7 @@ function isAgent(value: unknown): boolean {
     optional(value, 'planReview', isPlanReview) &&
     optional(value, 'codeReview', isCodeReviewSession) &&
     optional(value, 'threadFlags', isThreadFlags) &&
+    optional(value, 'suggestedPrompt', isString) &&
     optional(value, 'goal', isThreadGoal) &&
     optional(value, 'visualize', isVisualizeSession) &&
     optional(value, 'isRegistered', isBoolean) &&

@@ -78,6 +78,10 @@ by mutating user-global tool config.
   readiness at every handoff (omit it when review is deferred or the user asked for
   immediate commit/push). Flags are persisted app state cleared with the
   conversation runtime.
+- Prompt suggestions are agent-scoped Korus metadata, not provider conversation
+  state or draft text. The renderer uses the SDK's placeholder contract; a
+  suggestion never authorizes or submits work. Suggestions reuse the active
+  model's finish-turn call rather than invoking a separate model.
 
 ### Delegation
 

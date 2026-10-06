@@ -2061,7 +2061,7 @@ const conversationPaneState: CodexConversationPaneState = {
       if (activeSurface.value === 'mission' && selectedMission.value?.stage === 'requirements' && conversationMessages.value.length === 0) {
         return t('missions.describeWhatYouWantToBuild');
       }
-      return translate('surface.appShell.askForFollowUpChanges');
+      return currentAgent.value.suggestedPrompt || translate('surface.appShell.askForFollowUpChanges');
     },
     get approvalPreset() { return props.approvalPreset; },
     get leadingMenuItems() { return [...permissionModeMenuItems.value, ...conversationCommandMenuItems()]; },

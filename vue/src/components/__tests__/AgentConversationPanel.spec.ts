@@ -12,6 +12,48 @@ import AgentConversationPanel from '../AgentConversationPanel.vue';
 import { backendChoicesKey } from '../backend-selection';
 
 describe('AgentConversationPanel', () => {
+  it('shows only the active agent suggestion as a placeholder without changing its draft', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const view = shallowReactive<AgentConversationView>({
+      agent, codexSnapshot: null, claudeSnapshot: null,
+      composer: createAgentComposerState({ getSnapshot: () => snapshot }).configurationForAgent(agent.id),
+      composerState: { text: '', selectionStart: 0, selectionEnd: 0 },
+      attachments: [], capabilities: claudeBackendCapabilities, approvals: [], sending: false,
+      queuedPrompts: [], history: { failed: false, hydrating: false, hasOlder: false, loadingOlder: false },
+      answeredClientRequestIds: new Set(),
+    });
+    const actions: AgentConversationActions = {
+      planReview: vi.fn(), clearGoal: vi.fn(), threadFlag: vi.fn(), prepare: vi.fn(), loadOlder: vi.fn(),
+      send: vi.fn(), steer: vi.fn(), interrupt: vi.fn(), deleteTurn: vi.fn(), editTurn: vi.fn(), forkTurn: vi.fn(), retryTurn: vi.fn(),
+      continueInterruptedTurn: vi.fn(), resolveApproval: vi.fn(), clientResponse: vi.fn(),
+      selectModel: vi.fn(), selectReasoningEffort: vi.fn(), selectServiceTier: vi.fn(), setPlanMode: vi.fn(),
+      setApprovalPreset: vi.fn(), setPermissionMode: vi.fn(), updateComposerState: vi.fn(), updateAttachments: vi.fn(),
+      deleteQueuedPrompt: vi.fn(), updateQueuedPrompt: vi.fn(), steerQueuedPrompt: vi.fn(),
+    };
+    const wrapper = mount(AgentConversationPanel, { props: {
+      view, actions, agents: snapshot.agents, focused: true, mentionGroups: [], modelMenuItems: [], selectModelMenuItem: vi.fn(),
+      savedPromptDrafts: [], savePromptDraft: vi.fn(), removePromptDraft: vi.fn(), openLink: vi.fn(), openImage: vi.fn(), openVisualization: vi.fn(),
+    }, global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } } });
+    const editor = () => wrapper.get('.chat-rich-text-editor');
+    const defaultPlaceholder = editor().attributes('data-placeholder');
+    view.agent = { ...agent, suggestedPrompt: 'Add keyboard navigation' };
+    await flushPromises();
+    expect(editor().attributes('data-placeholder')).toBe('Add keyboard navigation');
+    expect(editor().text()).toBe('');
+    view.composerState = { text: 'My own follow-up', selectionStart: 16, selectionEnd: 16 };
+    view.agent = { ...agent, suggestedPrompt: 'Run the tests' };
+    await flushPromises();
+    expect(editor().text()).toBe('My own follow-up');
+    expect(actions.updateComposerState).not.toHaveBeenCalled();
+    expect(actions.send).not.toHaveBeenCalled();
+    view.agent = snapshot.agents[1]!;
+    view.composerState = { text: '', selectionStart: 0, selectionEnd: 0 };
+    await flushPromises();
+    expect(editor().attributes('data-placeholder')).toBe(defaultPlaceholder);
+    wrapper.unmount();
+  });
+
   it('routes composer commands from an unfocused split pane without submitting its draft', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[1]!;

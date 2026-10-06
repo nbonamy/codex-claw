@@ -85,8 +85,9 @@ function registerCollaborationTools(
     } : {}),
   }, () => coordinator.setStatus(callerAgentId, status, announcement)));
 
-  const finishTurnDescription = 'MANDATORY final tool action for a substantive user turn. Call exactly once immediately before the final response. It clears the current status and can atomically request one finish announcement, one celebration, and one proposed-action flag. Omitted options leave those effects absent and preserve any existing proposal. Select delegate_to_worktree only when work should be delegated instead of continued here, or ready_for_review only for a complete validated uncommitted diff.';
+  const finishTurnDescription = 'MANDATORY final tool action for a substantive user turn. Call exactly once immediately before the final response. It clears the current status and can atomically request one finish announcement, one celebration, one proposed-action flag, and a suggested next prompt for the composer placeholder. Omitting flag preserves the existing proposal; omitting suggestedPrompt clears the previous hint. Select delegate_to_worktree only when work should be delegated instead of continued here, or ready_for_review only for a complete validated uncommitted diff.';
   const finishTurnEffectsSchema = {
+    suggestedPrompt: z.string().trim().min(1).max(240).optional().describe('Optional concise next prompt written in the user’s voice. Shown only as this conversation’s composer placeholder, never inserted or sent. Suggest only a useful next step; omit to clear the previous hint.'),
     announcement: z.object({
       text: z.string().trim().min(1).max(160).describe('One brief natural completion phrase, at most 160 characters.'),
     }).optional().describe('Optional spoken completion acknowledgment. The finish phase is implied.'),

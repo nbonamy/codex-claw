@@ -12,6 +12,28 @@ beforeEach(clearFirstRunOnboardingStage);
 afterEach(() => { delete window.app; });
 
 describe('Unified backend → mounted application', () => {
+  it('shows and clears a finish-turn suggestion in the main composer through backend events', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    const { emit } = installBackendFixture(snapshot);
+    const wrapper = mount(App);
+    await flushPromises();
+    const editor = () => wrapper.get('.chat-rich-text-editor');
+    const defaultPlaceholder = editor().attributes('data-placeholder');
+
+    emit({ type: 'agent.updated', agentId: agent.id, payload: {
+      id: agent.id, suggestedPrompt: 'Verify that Korus is using my local SDK',
+    } });
+    await flushPromises();
+    expect(editor().attributes('data-placeholder')).toBe('Verify that Korus is using my local SDK');
+    expect(editor().text()).toBe('');
+
+    emit({ type: 'agent.updated', agentId: agent.id, payload: { id: agent.id, suggestedPrompt: null } });
+    await flushPromises();
+    expect(editor().attributes('data-placeholder')).toBe(defaultPlaceholder);
+    wrapper.unmount();
+  });
+
   it.each(['backend gap', 'desktop recovery'])('settles a silent completed report after %s without another user prompt', async (recovery) => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;

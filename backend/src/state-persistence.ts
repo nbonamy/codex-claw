@@ -65,6 +65,7 @@ export type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' 
   planReview?: import('@workspace/core/plan-review').PlanReview;
   codeReview?: import('@workspace/core/code-review').CodeReviewSession;
   threadFlags?: import('@workspace/core/thread-flags').ThreadFlags;
+  suggestedPrompt?: string;
   goal?: ThreadGoal;
   visualize?: Omit<VisualizeSession, 'visualizations'> & { visualizations?: Visualization[] };
   statusText?: string;
@@ -137,6 +138,7 @@ function persistedAgentFromSnapshot(agent: Agent, libraries?: RepositoryVisualiz
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
     ...(agent.plan ? { plan: cloneThreadPlan(agent.plan) } : {}),
     ...(agent.threadFlags ? { threadFlags: structuredClone(agent.threadFlags) } : {}),
+    ...(agent.suggestedPrompt ? { suggestedPrompt: agent.suggestedPrompt } : {}),
     ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
     ...(agent.codeReview ? { codeReview: cloneCodeReviewSession(agent.codeReview) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
@@ -384,6 +386,7 @@ function sanitizeAgent(value: unknown, libraries: RepositoryVisualizations): Age
     ...(contextUsage ? { contextUsage } : {}),
     ...(plan ? { plan } : {}),
     ...(isThreadFlags(value.threadFlags) ? { threadFlags: structuredClone(value.threadFlags) } : {}),
+    ...(typeof value.suggestedPrompt === 'string' && value.suggestedPrompt.trim() ? { suggestedPrompt: value.suggestedPrompt.trim() } : {}),
     ...(isPlanReview(value.planReview) ? { planReview: { ...value.planReview } } : {}),
     ...(isCodeReviewSession(value.codeReview)
       ? { codeReview: cloneCodeReviewSession(value.codeReview) }
