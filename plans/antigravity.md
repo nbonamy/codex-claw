@@ -456,6 +456,12 @@ Validation so far: all five workspace tests plus script tests passed after refre
 the installed SDK build; affected contract/persistence tests and typechecks passed.
 This is foundation work, not shipped Antigravity support.
 
+Lifecycle foundation added: version-pinned paired-runtime discovery/installation,
+private home and native skills links, sanitized process environment, and provider-owned
+OAuth checks. Native fresh-profile probing confirmed background authentication
+detects a missing login without opening a browser. Credentials remain exclusively
+owned by Google's runtime. Login expiry was not induced.
+
 - [x] Qualify ACP for the measured text/permissions/MCP/history/cancellation scope.
 - [ ] Extend backend/session/default/auth unions and all owning runtime decoders.
 - [ ] Extend generic settings normalization, connected choices, and remembered
