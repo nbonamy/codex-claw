@@ -161,6 +161,7 @@ export function createMainWindowOptions(
     ...macOSWindowOptions,
     show: false,
     title: product.name,
+    ...(platform === 'win32' ? { accentColor: false } : {}),
     ...(platform === 'linux' ? { icon: desktopIconPath(app) } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

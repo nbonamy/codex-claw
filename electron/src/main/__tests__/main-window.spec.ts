@@ -1,4 +1,5 @@
 import { product } from '@workspace/core/product';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 vi.mock('electron', () => ({ app: { getAppPath: () => '/app' }, nativeTheme: { shouldUseDarkColors: false } }));
@@ -11,6 +12,11 @@ import {
 } from '../main-window';
 
 describe('main window options', () => {
+  it('keeps the native Windows title bar neutral', () => {
+    expect(createMainWindowOptions(false, undefined, 'win32').accentColor).toBe(false);
+    expect(createMainWindowOptions(false, undefined, 'darwin').accentColor).toBeUndefined();
+    expect(createMainWindowOptions(false, undefined, 'linux').accentColor).toBeUndefined();
+  });
   it('disables BrowserWindow developer tools in release mode', () => {
     expect(createMainWindowOptions(true).webPreferences?.devTools).toBe(false);
     expect(createMainWindowOptions(false).webPreferences?.devTools).toBe(true);
@@ -65,7 +71,7 @@ describe('main window options', () => {
 
   it('supplies the product title and window icon on Linux', () => {
     expect(createMainWindowOptions(false, undefined, 'linux')).toMatchObject({
-      title: product.name, icon: '/app/assets/icon.png',
+      title: product.name, icon: path.join('/app', 'assets', 'icon.png'),
     });
   });
 

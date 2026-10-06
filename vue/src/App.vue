@@ -1,4 +1,5 @@
 <template>
+  <div class="window-edge" aria-hidden="true" />
   <AppShell
     v-if="hasLoadedSnapshot"
     :inert="backendRestartInProgress || pendingSessionCompression !== null ? '' : undefined"

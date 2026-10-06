@@ -1,7 +1,9 @@
-export type RendererPlatform = 'macos' | 'other';
+export type RendererPlatform = 'macos' | 'windows' | 'other';
 
 export function rendererPlatform(navigatorPlatform: string, userAgent = ''): RendererPlatform {
-  return navigatorPlatform.startsWith('Mac') || userAgent.includes('Macintosh') ? 'macos' : 'other';
+  if (navigatorPlatform.startsWith('Mac') || userAgent.includes('Macintosh')) return 'macos';
+  if (navigatorPlatform.startsWith('Win') || userAgent.includes('Windows')) return 'windows';
+  return 'other';
 }
 
 export function applyRendererPlatform(
