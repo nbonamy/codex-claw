@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { product } from '@workspace/core/product';
-import { configureDesktopIdentity } from '../desktop-identity';
+import { configureDesktopIdentity, desktopIconPath } from '../desktop-identity';
 
 const directories: string[] = [];
 afterEach(() => directories.splice(0).forEach(directory => rmSync(directory, { recursive: true, force: true })));
@@ -12,15 +12,19 @@ function fixture(packaged = false) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'desktop-identity-'));
   directories.push(root);
   const appPath = path.join(root, 'app with spaces');
-  mkdirSync(path.join(appPath, 'assets'), { recursive: true });
-  writeFileSync(path.join(appPath, 'assets', 'icon.png'), 'product icon');
   const app = { setName: vi.fn(), getAppPath: () => appPath, getPath: () => root, isPackaged: packaged };
+  const sourceIcon = packaged ? path.join(root, 'icon.png') : path.join(appPath, 'assets', 'icon.png');
+  mkdirSync(path.dirname(sourceIcon), { recursive: true });
+  writeFileSync(sourceIcon, 'product icon');
   const dataHome = path.join(root, 'data');
   const env = { XDG_DATA_HOME: dataHome, XDG_DATA_DIRS: path.join(root, 'system') };
   return { app, appPath, dataHome, env };
 }
 
 describe('Linux desktop identity', () => {
+  it('resolves packaged icons outside the application archive', () => {
+    expect(desktopIconPath({ isPackaged: true, getAppPath: () => '/opt/app/resources/app.asar' })).toBe('/opt/app/resources/icon.png');
+  });
   it.each([false, true])('registers a matching name, icon, and safely quoted launcher (packaged=%s)', (packaged) => {
     const { app, appPath, dataHome, env } = fixture(packaged);
     configureDesktopIdentity(app, 'linux', env, '/runtime with spaces/electron');

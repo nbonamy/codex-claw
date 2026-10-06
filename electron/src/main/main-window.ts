@@ -3,6 +3,7 @@ import { closeSync, fstatSync, mkdirSync, openSync, readSync, writeFileSync } fr
 import path from 'node:path';
 import { isBrowserGuestPartition } from '@workspace/core/browser-guest';
 import { product } from '@workspace/core/product';
+import { desktopIconPath } from './desktop-identity';
 import {
   appCommandFromInput,
   cycleTeamsAccelerator,
@@ -160,7 +161,7 @@ export function createMainWindowOptions(
     ...macOSWindowOptions,
     show: false,
     title: product.name,
-    ...(platform === 'linux' ? { icon: path.join(app.getAppPath(), 'assets', 'icon.png') } : {}),
+    ...(platform === 'linux' ? { icon: desktopIconPath(app) } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

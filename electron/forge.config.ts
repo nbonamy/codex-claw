@@ -30,6 +30,7 @@ const appleSpeechHelperPath = path.resolve(
   '../node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli',
 );
 const extraResource = [
+  path.resolve(__dirname, 'assets/icon.png'),
   ...(process.platform === 'darwin' ? [appleSpeechHelperPath] : []),
   'resources/daemon',
   'resources/codex',
