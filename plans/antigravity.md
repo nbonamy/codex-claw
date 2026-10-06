@@ -518,12 +518,23 @@ Native-runtime review/MCP proof is still pending; the fixture tests are not live
 
 ### Phase 4: UI and capability hardening
 
-The initial settings/onboarding/navigation, icon, native authentication actions,
-provider replica binding and model selector are implemented with mounted tests.
-An isolated branch Web client/daemon loaded the native model catalog. Attachments,
-planning and reviews remain gated while their owning integrations are completed.
-Full workspace tests and typechecks pass at this checkpoint; coverage and full
-native consumer verification are still pending.
+Settings/onboarding/navigation, icon, native authentication actions, provider
+replica binding and model selection are implemented with mounted tests. The
+isolated branch Web client/daemon loaded the native model catalog and connected
+account state. Trusted desktop attachments now map to native images, WAV,
+embedded text and PDF resource links. Web and remote attachments reject before
+dispatch because those clients do not yet have trusted ingestion/transfer.
+Provider-owned prompt metadata preserves the original prompt and attachment
+chips during cold native replay without storing a second transcript.
+
+Native `/plan` now feeds Korus's existing preview/confirmation flow. Mounted
+confirmation and daemon acceptance tests cover the transition to a separate
+implementation turn. Live host probes read synthetic image/WAV/PDF/text inputs;
+an approved PLAN.md write exactly matched the preview and left the source file
+unchanged. A denied plan write surfaced honestly. Full typechecks/lint and all
+five unchanged statement coverage gates passed (core 85.69%, backend 86.83%,
+Vue 87.71%, Electron 85.04%, Web 95.93%). Native app collaboration and final
+consumer verification are still pending.
 
 - [ ] Add backend icon, settings panel/navigation/i18n, conversation binding and
   model/effort options; reuse creation dialogs and shared controls.

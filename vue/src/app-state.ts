@@ -1894,6 +1894,7 @@ function backendCapabilitiesForAgent(agent: Agent | null): BackendCapabilities {
   return {
     ...defaults,
     ...runtime?.capabilities,
+    ...(snapshot.value.teams.some(team => team.id === agent?.teamId && team.remoteConnectionId) ? { attachments: false } : {}),
   };
 }
 

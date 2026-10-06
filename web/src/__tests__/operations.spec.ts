@@ -4,6 +4,15 @@ import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { invokeAppWebOperation } from '../server/operations';
 
 describe(`${product.name} web operations`, () => {
+  it.each(['sendPrompt', 'steerPrompt'])('rejects untrusted Web attachments before %s dispatch and preserves text prompts', async operation => {
+    const request = vi.fn().mockResolvedValue({});
+    for (const attachment of [{ type: 'file', path: '/private/file' }, { type: 'image', reference: 'forged-registry-id' }]) {
+      await expect(invokeAppWebOperation({ request }, operation, ['agent', 'Inspect', { attachments: [attachment] }])).rejects.toThrow('trusted upload');
+    }
+    expect(request).not.toHaveBeenCalled();
+    await invokeAppWebOperation({ request }, operation, ['agent', 'Hello']);
+    expect(request).toHaveBeenCalledOnce();
+  });
   it('preserves opaque source IDs, filters and cursors at the web boundary', async () => {
     const request = vi.fn().mockResolvedValue({ items: [], nextCursor: 'native:next' });
     const location = { kind: 'remote', remoteConnectionId: 'remote-owner' };

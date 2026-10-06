@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { RendererMessage, RendererToolPart } from '@workspace/core/contracts';
+import type { RendererMessage, RendererMessagePart, RendererToolPart } from '@workspace/core/contracts';
 import type { AntigravityConversationEvent } from '@workspace/core/contracts/antigravity-conversation';
 import { createAntigravityConversationReplica, emptyAntigravitySnapshot } from '@workspace/core/antigravity-conversation-replica';
 import { record } from './acp-connection';
@@ -12,7 +12,8 @@ export class AcpTranscript {
   private message?: RendererMessage;
   private turnId = '';
 
-  constructor(readonly agentId: string, readonly sessionId: string, private readonly changed: (event: AntigravityConversationEvent) => void) {
+  constructor(readonly agentId: string, readonly sessionId: string, private readonly changed: (event: AntigravityConversationEvent) => void,
+    private readonly displayUser: (text: string) => { text: string; parts: RendererMessagePart[] } = text => ({ text, parts: [] })) {
     this.replica = createAntigravityConversationReplica(emptyAntigravitySnapshot(agentId, sessionId));
   }
 
@@ -21,10 +22,10 @@ export class AcpTranscript {
     this.replica.apply(event); this.changed(event);
   }
 
-  start(text?: string): string {
+  start(text?: string, parts: RendererMessagePart[] = []): string {
     this.turnId = randomUUID(); this.message = undefined;
     this.event({ type: 'turn.started', payload: { turn: { id: this.turnId } } });
-    if (text !== undefined) this.text('user', text);
+    if (text !== undefined) { this.text('user', text); this.attach(parts); }
     return this.turnId;
   }
 
@@ -40,7 +41,10 @@ export class AcpTranscript {
       case 'user_message_chunk':
         if (!replay) return; // The admitted prompt is already visible locally.
         if (this.message?.role !== 'user') { this.finish('completed'); this.start(); }
-        if (record(update.content) && update.content.type === 'text' && typeof update.content.text === 'string') this.text('user', update.content.text);
+        if (record(update.content) && update.content.type === 'text' && typeof update.content.text === 'string') {
+          const display = this.displayUser(update.content.text);
+          this.text('user', display.text); this.attach(display.parts);
+        }
         return;
       case 'agent_message_chunk':
       case 'agent_thought_chunk':
@@ -65,6 +69,12 @@ export class AcpTranscript {
       else message.parts.push({ type: 'reasoning', summary: text, itemId: randomUUID(), summaryIndex: 0 });
     } else if (last?.type === 'text') last.text += text;
     else message.parts.push({ type: 'text', text });
+    this.event({ type: 'message.upsert', payload: { message } });
+  }
+
+  private attach(parts: RendererMessagePart[]): void {
+    if (!parts.length) return;
+    const message = this.current('user'); message.parts.push(...parts);
     this.event({ type: 'message.upsert', payload: { message } });
   }
 

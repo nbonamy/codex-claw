@@ -8,6 +8,8 @@ import { AcpTranscript } from './transcript';
 import { permissionRequest } from './permissions';
 import { handleAcpFileRequest } from './filesystem';
 import { validateAcpSession } from './catalog';
+import { AcpPromptJournal } from './prompt-journal';
+import type { RendererMessagePart } from '@workspace/core/contracts';
 
 type SessionOptions = {
   agentId: string; cwd: string; home?: string; sessionId?: string;
@@ -26,9 +28,12 @@ export class AcpSession {
   private loading = true;
   private disposed = false;
   private interrupted = false;
+  private promptSent = false;
   private active?: Promise<void>;
   private readonly pending = new Map<string, PendingPermission>();
   private config: Record<string, unknown> = {};
+  private journal!: AcpPromptJournal;
+  private planMarkdown?: string;
   private constructor(private readonly options: SessionOptions) {}
 
   static async open(options: SessionOptions): Promise<AcpSession> {
@@ -48,12 +53,13 @@ export class AcpSession {
       const id = options.sessionId ?? result.sessionId;
       if (typeof id !== 'string' || !id || (result.sessionId !== undefined && result.sessionId !== id)) throw new Error('Antigravity session identity mismatch.');
       session.config = result;
+      session.journal = await AcpPromptJournal.open(options.home ?? antigravityHome(), id);
       session.transcript = new AcpTranscript(options.agentId, id, event => {
         if (!session.loading) {
           options.changed(event);
           if (event.type === 'request.created' || event.type === 'request.resolved') options.requestChanged?.(event);
         }
-      });
+      }, text => session.journal.display(text));
       for (const params of session.initialization) session.update(params);
       session.initialization = [];
       session.transcript.finish('completed');
@@ -66,13 +72,21 @@ export class AcpSession {
   get configuration(): Record<string, unknown> { return this.config; }
   get sessionId(): string { return this.snapshot.sessionId; }
   get isClosed(): boolean { return this.disposed; }
+  get writtenPlan(): string | undefined { return this.planMarkdown; }
 
-  prompt(text: string, content: unknown[] = [{ type: 'text', text }]): { turnId: string; completion: Promise<void> } {
+  prompt(text: string, content: unknown[] = [{ type: 'text', text }], parts: RendererMessagePart[] = []): { turnId: string; completion: Promise<void> } {
     if (this.disposed) throw new Error('Antigravity session is closed.');
     if (this.active) throw new Error('Antigravity is still finishing the previous turn. Queue the next prompt.');
     this.interrupted = false;
-    const turnId = this.transcript.start(text);
-    const completion = this.runtime.connection.request('session/prompt', { sessionId: this.sessionId, prompt: content }, 30 * 60_000)
+    this.promptSent = false;
+    this.planMarkdown = undefined;
+    const turnId = this.transcript.start(text, parts);
+    const wireText = record(content[0]) && typeof content[0].text === 'string' ? content[0].text : text;
+    const completion = this.journal.append({ wireText, text, parts }).then(() => {
+      if (this.interrupted) return { stopReason: 'cancelled' };
+      this.promptSent = true;
+      return this.runtime.connection.request('session/prompt', { sessionId: this.sessionId, prompt: content }, 30 * 60_000);
+    })
       .then(result => {
         if (!record(result) || typeof result.stopReason !== 'string') throw new Error('Invalid Antigravity turn completion.');
         const status = this.interrupted || result.stopReason === 'cancelled' ? 'interrupted'
@@ -93,7 +107,7 @@ export class AcpSession {
     if (expectedTurnId && expectedTurnId !== this.snapshot.activeTurnId) throw new Error('Antigravity turn changed before cancellation.');
     this.interrupted = true;
     this.cancelPermissions();
-    this.runtime.connection.notify('session/cancel', { sessionId: this.sessionId });
+    if (this.promptSent) this.runtime.connection.notify('session/cancel', { sessionId: this.sessionId });
     const timer = setTimeout(() => { void this.runtime.close(); }, 5_000);
     try { await this.active; } finally { clearTimeout(timer); }
   }
@@ -158,8 +172,10 @@ export class AcpSession {
       });
     }
     if (!this.active) throw new Error('Antigravity file request has no active turn.');
-    return handleAcpFileRequest(method, params, [this.options.cwd,
+    const result = await handleAcpFileRequest(method, params, [this.options.cwd,
       path.join(this.options.home ?? antigravityHome(), 'antigravity-acp', 'brain', this.sessionId)]);
+    if (method === 'fs/write_text_file' && typeof params.path === 'string' && /^(?:PLAN|implementation_plan)\.md$/i.test(path.basename(params.path)) && typeof params.content === 'string') this.planMarkdown = params.content;
+    return result;
   }
 
   private closed(error: Error): void {

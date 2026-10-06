@@ -2652,6 +2652,10 @@ export class AppBackendServer {
       }
       return createAppRpcResult(messageId, await localHandler(route.agent));
     }
+    if (method === backendMethods.agentPromptSend || method === backendMethods.agentPromptSteer) {
+      const options = requireRecord(params).options as SendPromptOptions | undefined;
+      if (options?.attachments?.length) throw new Error('Remote attachments require a trusted file transfer. Send text or use a local agent.');
+    }
     const result = await this.backendHandleForAgentLocation(route).request<AppSnapshot>(method, params, () => localHandler(route.agent));
     const decodedSnapshot = decodeAppSnapshot(result);
     if (decodedSnapshot) {

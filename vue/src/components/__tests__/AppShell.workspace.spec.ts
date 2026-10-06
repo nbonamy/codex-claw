@@ -1154,9 +1154,10 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.text()).toContain('Generated');
   });
 
-  it('confirms a plan by exiting plan mode and sending the implementation prompt', async () => {
+  it.each(['codex', 'antigravity'] as const)('confirms a %s plan through the owning review action and closes its preview', async backend => {
     const respondToPlanReview = vi.fn().mockResolvedValue(undefined);
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backend = backend;
     const wrapper = mount(AppShell, {
       props: {
         snapshot,

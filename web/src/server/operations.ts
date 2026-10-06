@@ -157,6 +157,10 @@ export async function invokeAppWebOperation(
   operation: string,
   args: unknown[],
 ): Promise<unknown> {
+  if ((operation === 'sendPrompt' || operation === 'steerPrompt') && isRecord(args[2]) && args[2].attachments !== undefined
+    && (!Array.isArray(args[2].attachments) || args[2].attachments.length > 0)) {
+    throw new Error('Web attachments require a trusted upload service. Use the local desktop app.');
+  }
   if (operation === 'updateSettings') {
     const { policy, preferences } = splitSettingsInput(args[0] as UpdateSettingsInput);
     let result: unknown;

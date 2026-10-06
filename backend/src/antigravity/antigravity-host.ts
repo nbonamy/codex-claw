@@ -1,4 +1,5 @@
 import { mkdir, realpath } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Agent, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSession, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from '@workspace/core/contracts';
 import type { AgentBackendDriver, BackendEvent, BackendCodeReviewInput, BackendCodeReviewResult } from '@workspace/core/backend-driver';
@@ -16,6 +17,7 @@ import { antigravityHome, resolveAcpRuntime } from './runtime';
 import { record } from './acp-connection';
 import { sessionMcpServer } from './mcp-bridge';
 import { listAcpSessions } from './catalog';
+import { acpAttachments } from './attachments';
 
 export class AntigravityHost implements AgentBackendDriver {
   readonly backend = 'antigravity' as const;
@@ -60,7 +62,7 @@ export class AntigravityHost implements AgentBackendDriver {
   }
 
   async sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions) {
-    if (options?.attachments?.length) throw new Error('Antigravity attachments are not available yet.');
+    const attachments = await acpAttachments(options?.attachments ?? []);
     const session = await this.ensure(agent);
     const model = options?.model ?? (agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.model : undefined);
     if (model) await session.setModel(model);
@@ -70,7 +72,18 @@ export class AntigravityHost implements AgentBackendDriver {
     const instructions = appDeveloperInstructions(agent, this.options.pluginSettings?.(), {
       celebrationsEnabled: this.options.celebrationsEnabled?.(), developerInstructions: this.options.additionalDeveloperInstructions?.(agent),
     });
-    const { turnId } = session.prompt(prompt, [{ type: 'text', text: `${instructions}\n\nUser request:\n${prompt}` }]);
+    const planning = options?.planMode === true || /^\/plan(?:\s|$)/.test(prompt);
+    const wireText = `${planning && !prompt.startsWith('/plan') ? '/plan ' : ''}${prompt}\n\n<context id="${randomUUID()}">\n${instructions}${planning ? '\nWrite the plan and stop. Do not implement it or request implementation approval in this turn; Korus will collect the decision after showing the plan.' : ''}\n</context>`;
+    const { turnId, completion } = session.prompt(prompt, [{ type: 'text', text: wireText }, ...attachments],
+      (options?.attachments ?? []).map(attachment => ({ type: 'attachment', attachment: {
+        kind: attachment.type, name: attachment.name ?? path.basename(attachment.path), path: attachment.path, mimeType: attachment.mimeType,
+      } })));
+    if (planning) void completion.then(() => {
+      if (this.sessions.get(agent.id) !== session || session.snapshot.turns.find(turn => turn.id === turnId)?.status !== 'completed') return;
+      const markdown = session.writtenPlan ?? session.snapshot.messages.filter(message => message.turnId === turnId && message.role === 'assistant')
+        .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
+      if (markdown.trim()) this.emit({ type: 'plan.readyForReview', backend: this.backend, agentId: agent.id, conversationId: session.sessionId, turnId, payload: { markdown } });
+    });
     return { backendSession: this.reference(session), turnId };
   }
 

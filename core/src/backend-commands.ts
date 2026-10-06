@@ -110,6 +110,7 @@ function worktreeDelegationCommands(backend: AgentBackend): BackendCommandSummar
 export function defaultBackendCommands(backend: AgentBackend): BackendCommandSummary[] {
   if (backend === 'antigravity') return [
     ...claudeBackendCommands.filter(command => command.id.startsWith('app.')).map(command => ({ ...command, backend })),
+    { id: 'antigravity.plan', backend, name: 'plan', displayName: 'Plan', description: 'Create an Antigravity plan for review.', slashName: 'plan', submitOnSelect: true },
   ];
   return backend === 'claude' ? claudeBackendCommands : codexBackendCommands;
 }

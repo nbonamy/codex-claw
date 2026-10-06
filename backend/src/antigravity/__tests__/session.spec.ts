@@ -11,6 +11,8 @@ import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import { CodeReviewService } from '../../review/code-review-service';
 import { AgentCreationService } from '../../agents/agent-creation-service';
 import { AppMcpService } from '../../mcp/service';
+import { AppBackendServer } from '../../server';
+import { BackendDriverRpc } from '../../driver-rpc';
 
 let root: string;
 const sessions: AcpSession[] = [];
@@ -31,7 +33,7 @@ const send=v=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',...v})+'\\n');
 const fs=require('node:fs'), catalogFile=require('node:path').join(process.env.GEMINI_HOME,'catalog.json');
 fs.mkdirSync(process.env.GEMINI_HOME,{recursive:true});
 const catalog=()=>fs.existsSync(catalogFile)?fs.readFileSync(catalogFile,'utf8').trim().split('\\n').map(JSON.parse):[];
-let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[];
+let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[], planPhase;
 const update=update=>send({method:'session/update',params:{sessionId,update}});
 async function review(text,reply) {
  const server=mcpServers.find(server=>server.name==='korus');
@@ -66,6 +68,11 @@ rl.on('line',line=>{
  else if(v.method==='session/load') {
    sessionId=v.params.sessionId;
    mcpServers=v.params.mcpServers;
+   const saved=require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl');
+   if(fs.existsSync(saved)) {
+     for(const line of fs.readFileSync(saved,'utf8').trim().split('\\n')) {const prompt=JSON.parse(line);update({sessionUpdate:'user_message_chunk',content:{type:'text',text:prompt.replace(/^\\/plan\\s*/,'')}});update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});}
+     reply({});return;
+   }
    update({sessionUpdate:'user_message_chunk',content:{type:'text',text:'Create a file'}});
    update({sessionUpdate:'tool_call',toolCallId:'replay-id',title:'Create file',kind:'edit',status:'completed'});
    update({sessionUpdate:'tool_call_update',toolCallId:'replay-id',status:'failed',rawOutput:'Rejected by user'});
@@ -74,6 +81,11 @@ rl.on('line',line=>{
  } else if(v.method==='session/prompt') {
    promptId=v.id;
    const text=v.params.prompt[0].text;
+   fs.appendFileSync(require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl'),JSON.stringify(text)+'\\n');
+   if(text.startsWith('/plan ')) {
+     planPhase='question';
+     send({id:v.id,method:'session/request_permission',params:{sessionId,toolCall:{toolCallId:'interaction_plan',title:'Use the minimal plan?'},options:[{optionId:'minimal-plan',name:'Minimal',kind:'allow_once'}]}});return;
+   }
    if(mcpServers.some(server=>server.env.some(item=>item.name==='KORUS_ACP_MCP_URL'&&item.value.includes('reviewContextId=')))) {void review(text,reply).catch(error=>{fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-error.txt'),error.message);send({id:v.id,error:{code:-32603,message:error.message}});});return;}
    if(text==='crash') process.exit(1);
    if(text==='wait') return;
@@ -83,6 +95,8 @@ rl.on('line',line=>{
    } else {update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});reply({stopReason:'end_turn'});}
  } else if(v.method==='session/cancel') send({id:promptId,result:{stopReason:'cancelled'}});
  else if(!v.method) {
+   if(planPhase==='question') {planPhase='write';send({id:900,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'PLAN.md'),content:'# Native plan\\n\\n1. Make the scoped change.\\n2. Verify it.'}});return;}
+   if(planPhase==='write') {planPhase=undefined;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'The plan is ready.'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
    update({sessionUpdate:'tool_call_update',toolCallId:'live-id',status:v.result.outcome.optionId==='native-deny-9'?'failed':'completed',rawOutput:v.result.outcome.optionId});
    send({id:promptId,result:{stopReason:'end_turn'}});
  } else reply({});
@@ -101,6 +115,30 @@ async function open(sessionId?: string) {
 }
 
 describe('Antigravity native session', () => {
+  it('adapts a native plan artifact and question into the existing app confirmation before implementation', async () => {
+    const snapshot = createEmptySnapshot();
+    const agent: Agent = { id: 'planner', name: 'Planner', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    snapshot.agents = [agent];
+    snapshot.providerConnections = [{ backend: 'antigravity', installed: true, connected: true, checking: false }];
+    const host = new AntigravityHost();
+    const events: BackendEvent[] = [];
+    const server = new AppBackendServer({ version: 'test', snapshot, driverRpc: new BackendDriverRpc(new Map([['antigravity', host]])), onEvent: event => events.push(event) });
+    try {
+      await server.handleMessage({ jsonrpc: '2.0', id: 'plan', method: 'agent/prompt/send', params: { agentId: agent.id, prompt: 'Describe the change', options: { planMode: true } } });
+      await vi.waitFor(() => expect(events.some(event => event.type === 'agentRequest.created')).toBe(true));
+      const pending = events.find(event => event.type === 'agentRequest.created')!;
+      if (pending.type !== 'agentRequest.created') throw new Error('Missing native question');
+      await host.respondToAgentRequest({ id: pending.payload.request.id, agentId: agent.id, outcome: { kind: 'answered', answers: { interaction_plan: { answers: ['Minimal'] } } } });
+      await vi.waitFor(() => expect(agent.planReview).toMatchObject({ status: 'pending', markdown: '# Native plan\n\n1. Make the scoped change.\n2. Verify it.' }));
+      expect(await readFile(path.join(root, 'PLAN.md'), 'utf8')).toBe(agent.planReview!.markdown);
+      expect(agent.status.type).toBe('idle');
+      await server.handleMessage({ jsonrpc: '2.0', id: 'accept', method: 'agent/planReview/respond', params: { agentId: agent.id, response: { reviewId: agent.planReview!.id, resolution: 'accept' } } });
+      await vi.waitFor(() => expect(agent.planReview?.status).toBe('accept'));
+      await vi.waitFor(() => expect(events.filter(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toHaveLength(2));
+      const history = await host.readConversationMessages({ backend: 'antigravity', sessionId: agent.backendSession!.kind === 'antigravity' ? agent.backendSession!.sessionId : '', folder: root }, agent.id);
+      expect(history.filter(message => message.role === 'user').at(-1)?.parts).toEqual([{ type: 'text', text: 'implement the plan' }]);
+    } finally { await server.close(); }
+  });
   it('runs the real review ledger through the scoped stdio bridge, fixes a finding, and completes a clean second round', async () => {
     const snapshot = createEmptySnapshot();
     snapshot.general.providerEnabled = { antigravity: true };
@@ -153,7 +191,8 @@ describe('Antigravity native session', () => {
       await host.loadConversation(first);
       const loaded = events.filter(event => event.type === 'antigravity.conversationSnapshotChanged').at(-1)!;
       expect(loaded.payload.snapshot.messages).toHaveLength(2);
-      expect(loaded.payload.snapshot.messages[1]?.parts[0]).toMatchObject({ type: 'tool', status: 'failed' });
+      expect(loaded.payload.snapshot.messages[0]?.parts).toEqual([{ type: 'text', text: 'hello' }]);
+      expect(loaded.payload.snapshot.messages[1]?.parts).toEqual([{ type: 'text', text: 'Recovered.' }]);
     } finally { await host.close(); }
   });
   it('serializes prompts, cancels natively, and accepts a fresh turn in the same process', async () => {
@@ -166,6 +205,26 @@ describe('Antigravity native session', () => {
     await session.prompt('next').completion;
     expect(session.snapshot.turns.map(turn => turn.status)).toEqual(['interrupted', 'completed']);
     expect(session.snapshot.messages.at(-1)?.parts).toEqual([{ type: 'text', text: 'Recovered.' }]);
+  });
+
+  it('preserves user text and attachment chips across cold replay without exposing injected instructions', async () => {
+    const file = path.join(root, 'notes.txt');
+    await writeFile(file, 'Synthetic context');
+    const host = new AntigravityHost();
+    const agent: Agent = { id: 'attachments', name: 'Attachments', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const events: BackendEvent[] = [];
+    host.onEvent(event => events.push(event));
+    try {
+      const result = await host.sendPrompt(agent, 'Read my notes', { attachments: [{ type: 'file', path: file, name: 'notes.txt', mimeType: 'text/plain' }] });
+      agent.backendSession = result.backendSession;
+      await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
+      const ref = { backend: 'antigravity' as const, sessionId: result.backendSession.kind === 'antigravity' ? result.backendSession.sessionId : '', folder: root };
+      const live = await host.readConversationMessages(ref, agent.id);
+      await host.releaseConversation(agent.id);
+      const replay = await host.readConversationMessages(ref, agent.id);
+      expect(replay.map(message => message.parts)).toEqual(live.map(message => message.parts));
+      expect(replay[0]?.parts).toEqual([{ type: 'text', text: 'Read my notes' }, { type: 'attachment', attachment: { kind: 'file', name: 'notes.txt', path: file, mimeType: 'text/plain' } }]);
+    } finally { await host.close(); }
   });
 
   it.each(['deny', 'question'] as const)('maps %s to the exact native option and resolves its app request', async kind => {
