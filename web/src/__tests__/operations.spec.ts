@@ -206,6 +206,9 @@ describe(`${product.name} web operations`, () => {
     await expect(invokeAppWebOperation({ request }, 'browserOpen', [])).rejects.toThrow(
       `'browserOpen' is not available in ${product.name} Web.`,
     );
+    await expect(invokeAppWebOperation({ request }, 'setMenuBarVisible', [true])).rejects.toThrow(
+      `'setMenuBarVisible' is not available in ${product.name} Web.`,
+    );
     await expect(invokeAppWebOperation({ request }, 'arbitraryBackendCall', [])).rejects.toThrow(
       `Unknown ${product.name} web operation`,
     );

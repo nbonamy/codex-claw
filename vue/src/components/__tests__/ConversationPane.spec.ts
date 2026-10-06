@@ -688,6 +688,28 @@ describe('ConversationPane', () => {
     expect(wrapper.find('.tabler-icon-message-report').exists()).toBe(true);
   });
 
+  it.each([
+    ['running', 'Searching tools: browser screenshot'],
+    ['completed', 'Searched tools: browser screenshot'],
+    ['failed', 'Could not search tools: browser screenshot'],
+  ] as const)('renders tool search details while %s', (status, label) => {
+    const wrapper = mountPane({ agent, controller: controllerFor([{
+      id: 'tool-search-message', agentId: agent.id, role: 'assistant',
+      status: status === 'running' ? 'streaming' : 'complete', createdAt: '',
+      parts: [{
+        type: 'tool', id: 'tool-search', kind: 'generic', title: 'ToolSearch', status,
+        input: { query: 'browser screenshot' },
+        statusText: JSON.stringify({
+          source: 'claude', action: 'search', phase: status,
+          params: { scope: 'tools', target: 'browser screenshot' },
+        }),
+      }],
+    }]) });
+    expect(wrapper.get('.chat-tool-call').text()).toContain(label);
+    expect(wrapper.get('.chat-tool-call').text()).not.toContain('Ran ToolSearch');
+    expect(wrapper.find('.tabler-icon-search').exists()).toBe(true);
+  });
+
   it('renders task waiting and restored results without raw tool names or false completion', async () => {
     const taskMessages: RendererMessage[] = [{
       id: 'message-task-tool', agentId: agent.id, role: 'assistant', status: 'streaming',

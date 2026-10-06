@@ -43,6 +43,6 @@ async function prepareClaudeHome(home: ProviderHomeSettings, existingHome: strin
     if (current && !current.isSymbolicLink()) { home.shareSkills = false; return; }
     const linked = current ? path.resolve(path.dirname(target), await readlink(target)) : null;
     if (linked && linked !== source) { home.shareSkills = false; return; }
-    if (home.shareSkills && !current) await symlink(source, target, 'dir');
+    if (home.shareSkills && !current) await symlink(path.resolve(source), target, process.platform === 'win32' ? 'junction' : 'dir');
     if (!home.shareSkills && linked === source) await unlink(target);
 }

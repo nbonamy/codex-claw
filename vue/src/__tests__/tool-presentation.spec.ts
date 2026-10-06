@@ -18,6 +18,22 @@ import { presentAppTool } from '../tool-presentation';
 
 describe(`${product.name} tool presentation`, () => {
   it.each([
+    ['running', 'browser screenshot', 'Searching tools: browser screenshot'],
+    ['completed', 'select:mcp__korus__list_agents', 'Searched tools: select:mcp__korus__list_agents'],
+    ['failed', 'browser screenshot', 'Could not search tools: browser screenshot'],
+    ['running', undefined, 'Searching tools'],
+    ['completed', undefined, 'Searched tools'],
+  ])('shows tool search context when %s', (phase, target, title) => {
+    const call = context('ToolSearch', {});
+    call.kind = 'generic';
+    call.metadata = undefined;
+    call.descriptor = { source: 'claude', action: 'search', phase, params: { scope: 'tools', target } };
+    expect(presentAppTool(call, translate)?.title).toBe(title);
+    call.descriptor.params = { target };
+    expect(presentAppTool(call, translate)).toBeUndefined();
+  });
+
+  it.each([
     ['wait-tasks', SquareCheck, 'Checked delegated tasks'],
     ['complete-task', SquareCheck, 'Submitted task result'],
     ['cancel-task', SquareCheck, 'Requested task cancellation'],

@@ -2,7 +2,7 @@ import { product } from '@workspace/core/product';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { discoveredRuntimePath, resolveRuntimeExecutable, type RuntimeDiscoveryDependencies } from '@workspace/core/runtime-discovery';
+import { discoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@workspace/core/runtime-discovery';
 
 export type RuntimeDaemonBackendMode = 'auto' | 'bundled' | 'existing';
 
@@ -108,15 +108,20 @@ function packagedDaemonCommand(deps: RuntimeDaemonConfigDeps): RuntimeDaemonComm
   if (!fileExists(bundlePath)) {
     return null;
   }
-  const nodeCommand = resolveRuntimeExecutable('node', deps);
-  if (!nodeCommand) {
+  const platform = deps.platform ?? process.platform;
+  const nodeCommand = path.join(resourcesPath, 'runtime', platform === 'win32' ? 'node.exe' : 'node');
+  if (!fileExists(nodeCommand)) {
     return null;
   }
 
+  const runtimeEnv = runtimeDaemonEnv(deps);
   return {
     command: nodeCommand,
     args: [bundlePath, '--stdio'],
-    env: runtimeDaemonEnv(deps),
+    env: {
+      ...runtimeEnv,
+      PATH: [path.dirname(nodeCommand), runtimeEnv.PATH].filter(Boolean).join(platform === 'win32' ? ';' : ':'),
+    },
   };
 }
 
@@ -153,7 +158,8 @@ function runtimeBundledCodexPath(deps: RuntimeDaemonConfigDeps): string | null {
     return null;
   }
 
-  const binaryPath = path.join(resourcesPath, 'codex', 'codex');
+  const platform = deps.platform ?? process.platform;
+  const binaryPath = path.join(resourcesPath, 'codex', ...(platform === 'win32' ? ['bin', 'codex.exe'] : ['codex']));
   return (deps.existsSync ?? existsSync)(binaryPath) ? binaryPath : null;
 }
 

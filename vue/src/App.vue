@@ -1,5 +1,6 @@
 <template>
   <AppShell
+    v-if="hasLoadedSnapshot"
     :inert="backendRestartInProgress || pendingSessionCompression !== null ? '' : undefined"
     :aria-hidden="backendRestartInProgress || pendingSessionCompression !== null ? 'true' : undefined"
     :snapshot="snapshot"
@@ -187,6 +188,12 @@
     @update:composer-attachments="updateComposerAttachments($event.agentId, $event.attachments)"
     @install-update="installUpdate"
   />
+  <main v-else class="app-startup">
+    <BackendConnectionBanner :connection-state="connectionState.status === 'connected' ? { status: 'connecting' } : connectionState" />
+    <button v-if="connectionState.status === 'error'" class="app-button app-button--secondary" :disabled="isLoading" @click="loadSnapshot">
+      {{ $t('common.retry') }}
+    </button>
+  </main>
   <AgentCloseDialog
     :visible="pendingAgentClose !== null"
     :agent="pendingAgentClose?.agent"
@@ -242,6 +249,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, AgentGitWorkflow, DesktopUpdateStatus } from '@workspace/core/contracts';
 import AppShell from './components/AppShell.vue';
+import BackendConnectionBanner from './components/BackendConnectionBanner.vue';
 import type { AgentConversationActions } from './components/use-agent-conversation';
 import AgentCloseDialog from './components/AgentCloseDialog.vue';
 import PullRequestCleanupDialog from './components/PullRequestCleanupDialog.vue';
@@ -267,6 +275,7 @@ const {
   activeComposerAttachments,
   unreadAgentIds,
   isLoading,
+  hasLoadedSnapshot,
   isActiveAgentHistoryFailed,
   isHydratingActiveAgentHistory,
   retryActiveAgentHistory,
@@ -688,6 +697,14 @@ watch(() => snapshot.value.theme, (theme) => {
 </script>
 
 <style scoped>
+.app-startup {
+  padding-top: var(--workbench-appbar-height);
+}
+
+.app-startup > .app-button {
+  margin: var(--space-4);
+}
+
 .backend-restart-overlay {
   position: fixed;
   z-index: 10000;

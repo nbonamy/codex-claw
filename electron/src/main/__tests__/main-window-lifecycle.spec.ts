@@ -5,11 +5,14 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const host = vi.hoisted(() => ({
-  userData: '', packaged: false, registered: false, windows: [] as unknown[],
+  dark: false,
+  userData: '', packaged: false, registered: false, windows: [] as unknown[], loadError: null as Error | null,
+  loading: null as Promise<void> | null,
   register: vi.fn((_accelerator: string, _callback: () => void) => true), unregister: vi.fn(), openExternal: vi.fn(),
 }));
 vi.mock('electron', () => ({
-  app: { getPath: () => host.userData, get isPackaged() { return host.packaged; } },
+  nativeTheme: Object.defineProperty(new EventEmitter(), 'shouldUseDarkColors', { get: () => host.dark }),
+  app: { getPath: () => host.userData, getAppPath: () => '/app', get isPackaged() { return host.packaged; } },
   screen: { getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }] },
   globalShortcut: { register: host.register, unregister: host.unregister, isRegistered: () => host.registered },
   shell: { openExternal: host.openExternal },
@@ -24,8 +27,9 @@ vi.mock('electron', () => ({
     isFocused = () => this.focused;
     maximize = vi.fn(() => { this.maximized = true; });
     show = vi.fn();
-    loadURL = vi.fn();
-    loadFile = vi.fn();
+    setBackgroundColor = vi.fn();
+    loadURL = vi.fn(() => host.loading ?? (host.loadError ? Promise.reject(host.loadError) : Promise.resolve()));
+    loadFile = vi.fn(() => host.loading ?? Promise.resolve());
   },
 }));
 vi.mock('../app-menu', () => ({ installAppMenu: vi.fn() }));
@@ -34,6 +38,7 @@ import { createMainWindow } from '../main-window';
 import { cycleTeamsAccelerator } from '../app-shortcuts';
 import { ipcChannels } from '@workspace/core/ipc';
 import { logRendererConsole, warnMain } from '../log';
+import { nativeTheme } from 'electron';
 
 function openWindow() {
   return createMainWindow() as unknown as EventEmitter & {
@@ -42,6 +47,7 @@ function openWindow() {
     webContents: EventEmitter & { setWindowOpenHandler: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn> };
     maximize: ReturnType<typeof vi.fn>; show: ReturnType<typeof vi.fn>;
     loadURL: ReturnType<typeof vi.fn>; loadFile: ReturnType<typeof vi.fn>;
+    setBackgroundColor: ReturnType<typeof vi.fn>;
   };
 }
 beforeEach(() => {
@@ -50,6 +56,10 @@ beforeEach(() => {
   host.userData = mkdtempSync(path.join(os.tmpdir(), 'app-window-'));
   host.packaged = false;
   host.registered = false;
+  host.loadError = null;
+  host.loading = null;
+  host.dark = false;
+  nativeTheme.removeAllListeners();
   host.register.mockReturnValue(true);
   vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', 'http://localhost:5173');
   vi.stubGlobal('MAIN_WINDOW_VITE_NAME', 'main_window');
@@ -61,6 +71,68 @@ afterEach(() => {
 });
 
 describe('main window lifecycle', () => {
+  it('tracks system appearance changes and detaches when the window closes', () => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'linux' } }));
+    const window = openWindow();
+    expect(window.options.backgroundColor).toBe('#FAFAFA');
+    host.dark = true;
+    nativeTheme.emit('updated');
+    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#202020');
+    host.dark = false;
+    nativeTheme.emit('updated');
+    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#FAFAFA');
+    window.emit('closed');
+    nativeTheme.emit('updated');
+    expect(window.setBackgroundColor).toHaveBeenCalledTimes(2);
+  });
+  it.each(['development', 'packaged'] as const)('reveals the %s window as soon as renderer loading finishes without a first paint', async (mode) => {
+    let finishLoading!: () => void;
+    host.loading = new Promise(resolve => { finishLoading = resolve; });
+    if (mode === 'packaged') vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', '');
+    const window = openWindow();
+    vi.advanceTimersByTime(5000);
+    expect(window.show).not.toHaveBeenCalled();
+    finishLoading();
+    await host.loading;
+    expect(window.show).toHaveBeenCalledOnce();
+    window.emit('ready-to-show');
+    expect(window.show).toHaveBeenCalledOnce();
+  });
+
+  it('reveals on first paint without waiting for renderer loading to finish', async () => {
+    let finishLoading!: () => void;
+    host.loading = new Promise(resolve => { finishLoading = resolve; });
+    const window = openWindow();
+    window.emit('ready-to-show');
+    expect(window.show).toHaveBeenCalledOnce();
+    finishLoading();
+    await host.loading;
+    expect(window.show).toHaveBeenCalledOnce();
+  });
+
+  it.each(['complete', 'fail'] as const)('does not reveal a closed window when renderer loading later ends (%s)', async (outcome) => {
+    let finishLoading!: () => void;
+    let failLoading!: (error: Error) => void;
+    host.loading = new Promise((resolve, reject) => { finishLoading = resolve; failLoading = reject; });
+    const window = openWindow();
+    window.emit('closed');
+    if (outcome === 'complete') finishLoading();
+    else failLoading(new Error('navigation cancelled'));
+    await host.loading.catch(() => undefined);
+    window.emit('ready-to-show');
+    expect(window.show).not.toHaveBeenCalled();
+  });
+
+  it('reveals the window and logs a renderer navigation failure', async () => {
+    host.loadError = new Error('connection refused');
+    const failedWindow = openWindow();
+    await Promise.resolve();
+    expect(failedWindow.show).toHaveBeenCalledOnce();
+    expect(warnMain).toHaveBeenCalledWith('window', 'failed to load main window', {
+      detail: 'connection refused',
+    });
+  });
+
   it('restores maximization only when ready, debounces normal bounds, and flushes on close', () => {
     const saved = { bounds: { x: 10, y: 20, width: 1400, height: 900 }, isMaximized: true };
     const file = path.join(host.userData, 'window-state.json');

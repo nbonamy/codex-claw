@@ -106,6 +106,11 @@ agent workspace are focused child components. The workspace owns plan,
 subagent, repository backlog, browser, link, and image routing; shell-level
 keyboard and native-menu commands live in a lifecycle-owning composable.
 
+`App` mounts the shell only after renderer synchronization obtains a connected
+workspace snapshot. An empty startup placeholder or a failed/disconnected read
+is not evidence of first-run onboarding. Startup uses the connection banner
+and supports retry; subsequent disconnects keep the mounted workspace intact.
+
 ### Component Rules
 
 - Name components after product concepts.

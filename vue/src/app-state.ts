@@ -43,6 +43,7 @@ import { workspaceSidebarRepositoryRootForAgent } from '@workspace/core/workspac
 import { isSnapshotEventOwnedBy, type RendererOnlySnapshotEvent } from '@workspace/core/snapshot-event-ownership';
 
 const snapshot = ref<AppSnapshot>(createEmptySnapshot());
+const hasLoadedSnapshot = ref(false);
 const isLoading = ref(false);
 const connectionState = ref<BackendConnectionState>({ status: 'connecting' });
 const sendingAgentIds = ref(new Set<string>());
@@ -512,8 +513,10 @@ export function useAppState() {
         detail: error instanceof Error ? error.message : String(error),
       };
     } finally {
+      const pendingConnectionEvents = bufferedMainEvents?.filter(event => event.type === 'client.connectionChanged') ?? [];
       bufferedMainEvents = null;
       isLoading.value = false;
+      for (const event of pendingConnectionEvents) handleMainEvent(event);
     }
 
   }
@@ -569,7 +572,11 @@ export function useAppState() {
         handleMainEvent(event);
       }
       if (!gap) {
+        // A connection event can overtake an in-flight read of the host's
+        // disconnected cache. Re-read before treating that cache as loaded.
+        if (state.connection.status !== 'connected' && connectionState.value.status === 'connected') continue;
         bufferedMainEvents = null;
+        if (connectionState.value.status === 'connected') hasLoadedSnapshot.value = true;
         return;
       }
     }
@@ -1627,6 +1634,7 @@ export function useAppState() {
     activeComposerAttachments,
     unreadAgentIds,
     isLoading,
+    hasLoadedSnapshot,
     connectionState,
     isActiveAgentHistoryFailed,
     isHydratingActiveAgentHistory,

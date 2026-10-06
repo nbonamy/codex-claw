@@ -168,6 +168,7 @@ export function createClientApiMock(
     openScreenRecordingSettings: unscripted('openScreenRecordingSettings'),
     launchChatGptApp: unscripted('launchChatGptApp'),
     quit: unscripted('quit'),
+    setMenuBarVisible: vi.fn<AppApi['setMenuBarVisible']>().mockResolvedValue(undefined),
     restartApp: unscripted('restartApp'),
     reloadRenderer: unscripted('reloadRenderer'),
     setAgentGoal: unscripted('setAgentGoal'),

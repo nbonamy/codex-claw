@@ -149,7 +149,7 @@ const desktopOnlyOperations = new Set([
   'browserSetVisible', 'chooseAgentFolder', 'chooseCodexBinary', 'chooseSourceFolder',
   'chooseSourceWorktreeDestination', 'getDaemonStatus', 'getOpenInApplications', 'getSystemPermissions',
   'getUpdateStatus', 'installUpdate', 'launchChatGptApp', 'openAccessibilitySettings', 'openAgentPath',
-  'openScreenRecordingSettings', 'quit', 'reloadRenderer', 'restartApp', 'setDaemonEnabled', 'setDockBadgeCount',
+  'openScreenRecordingSettings', 'quit', 'reloadRenderer', 'restartApp', 'setDaemonEnabled', 'setDockBadgeCount', 'setMenuBarVisible',
 ]);
 
 export async function invokeAppWebOperation(

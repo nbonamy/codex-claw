@@ -307,7 +307,7 @@ describe('provider onboarding setup', () => {
       expect(reloaded.general).not.toHaveProperty('shareCodexSkillsAndPlugins');
       await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'settings/codexResourceSharing/set', params: { input: { enabled: true } } });
       expect((await loadBackendSnapshot()).general.providerHomes?.codex?.shareSkills).toBe(true);
-      expect(await readlink(path.join(root, 'app/codex-home/skills'))).toBe(path.relative(path.join(root, 'app/codex-home'), path.join(root, 'codex/skills')));
+      expect(path.resolve(path.join(root, 'app/codex-home'), await readlink(path.join(root, 'app/codex-home/skills')))).toBe(path.join(root, 'codex/skills'));
     } finally { await server.close(); }
   });
   it('persists separate homes and shares skills without copying credentials; reload keeps the choices', async () => {
@@ -393,7 +393,12 @@ describe('provider onboarding setup', () => {
     cli.fail = true;
     await expect(request('provider/install', { backend: 'claude' })).rejects.toThrow('Could not install Claude Code.');
     cli.fail = false;
-    expect(await request('provider/install', { backend: 'claude' })).toMatchObject({ result: { backend: 'claude', installed: true } });
+    if (process.platform === 'win32') {
+      await expect(request('provider/install', { backend: 'claude' })).rejects.toThrow('Could not install Claude Code.');
+      expect(cli.installs).toBe(0);
+    } else {
+      expect(await request('provider/install', { backend: 'claude' })).toMatchObject({ result: { backend: 'claude', installed: true } });
+    }
     await expect(request('provider/setup/configure', { backend: 'claude', choice: { isolated: 'yes' } })).rejects.toThrow('Invalid provider setup');
     await expect(request('settings/update', { input: { general: { providerHomes: { claude: { homePath: '/arbitrary' } } } } })).rejects.toThrow('provider setup');
   });

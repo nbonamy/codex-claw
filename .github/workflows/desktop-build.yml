@@ -1,0 +1,139 @@
+name: Desktop builds
+run-name: desktop ${{ inputs.version }} ${{ inputs.request_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full immutable commit SHA
+        required: true
+      version:
+        description: Exact package version
+        required: true
+      tag:
+        description: Existing tag resolving to the commit
+        required: true
+      request_id:
+        description: Unique dispatch identifier (use release:build)
+        required: true
+
+permissions:
+  contents: read
+env:
+  RELEASE_SHA: ${{ inputs.sha }}
+  RELEASE_VERSION: ${{ inputs.version }}
+  RELEASE_TAG: ${{ inputs.tag }}
+  NODE_OPTIONS: --max-old-space-size=4096
+
+jobs:
+  quality:
+    name: quality
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.3
+          cache: npm
+      - run: node scripts/release-artifacts.mjs validate
+      - run: npm install --global npm@10.9.4
+      - run: npm ci --no-audit --no-fund
+      - run: node node_modules/electron/install.js
+      - run: npm run release-notes:check
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:ai
+      - run: npm run test:coverage
+
+  build:
+    name: build (${{ matrix.target }})
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-15
+          - target: win32-x64
+            runner: windows-2022
+          - target: linux-x64
+            runner: ubuntu-24.04
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    environment: desktop-build
+    env:
+      APP_GITHUB_CLIENT_ID: ${{ secrets.APP_GITHUB_CLIENT_ID }}
+      APP_LINEAR_CLIENT_ID: ${{ secrets.APP_LINEAR_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.3
+          cache: npm
+      - run: node scripts/release-artifacts.mjs validate
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot libevdev-dev
+      - run: npm install --global npm@10.9.4
+      - run: npm ci --no-audit --no-fund
+      - run: node node_modules/electron/install.js
+      - name: Signed and notarized macOS build
+        if: runner.os == 'macOS'
+        run: npm run release:ci-build
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          BUILD_CERTIFICATE_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+          IDENTITY_DARWIN_CODE: ${{ secrets.IDENTITY_DARWIN_CODE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Remove temporary signing keychain
+        if: always() && runner.os == 'macOS'
+        run: node scripts/macos-keychain.mjs cleanup
+      - name: Unsigned Windows or Linux build
+        if: runner.os != 'macOS'
+        run: npm run make:electron
+      - name: Exercise packaged native runtimes
+        run: node scripts/smoke-desktop.mjs
+      - name: Collect checksummed artifacts
+        run: node scripts/release-artifacts.mjs collect --target=${{ matrix.target }} --source=electron/out/make --output=out/release/${{ matrix.target }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/release/${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  stage:
+    name: stage
+    needs: [quality, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.3
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: desktop-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/downloaded
+      - run: node scripts/release-artifacts.mjs assemble --source=out/downloaded --output=out/release-bundle
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/release-bundle
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

@@ -591,7 +591,7 @@ import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities
 import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import { defaultTeamColor } from '@workspace/core/team-colors';
 import { projectAgentMentionLabels } from '@workspace/core/workspace-sidebar';
-import { appApi } from '../platform-api';
+import { appApi, appHostCapabilities } from '../platform-api';
 import { codeReviewSettingsKey, useCodeReviewSettings } from './code-review-settings';
 import AgentDialog from './AgentDialog.vue';
 import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
@@ -1291,6 +1291,12 @@ const {
   load: loadAuthentication,
   startChatGptLogin,
 } = firstRunOnboarding;
+watch(showOnboardingGate, (gated) => {
+  if (!appHostCapabilities.appLifecycle) return;
+  void appApi?.setMenuBarVisible?.(!gated).catch((error: unknown) => {
+    console.warn('Failed to update native menu visibility', error);
+  });
+}, { immediate: true });
 const teamDialogVisible = ref(false);
 const teamDialogMode = ref<'create' | 'edit'>('create');
 const whatsNewVisible = ref(false);

@@ -122,21 +122,28 @@ Settings shows each engine's account, conversation location, and enabled state.
 
 Requirements:
 
-- macOS arm64, or experimental Linux x64, with a current Node.js toolchain;
+- macOS arm64, or experimental Linux/Windows x64/arm64 for development;
+- Node 22.23.3 and npm 10.9.4 (the CI toolchain);
 - network access to download the pinned Codex app-server on the first build;
-- a sibling `codex-app-sdk` checkout.
 
 ```bash
-npm install
+npm ci
+node node_modules/electron/install.js
 npm run dev
 ```
 
-The root `package.json` overrides all Codex App SDK packages to the sibling
-checkout. Workspace manifests pin published package versions; removing the
-`overrides` block uses those pins, not necessarily the latest sibling changes.
-Check compatibility before switching dependency sources.
-Development additionally aliases SDK imports directly to sibling sources for
-hot reloads; build and package entrypoints rebuild the sibling SDK first.
+Workspace manifests pin published Codex App SDK packages; the lockfile is the
+release dependency boundary. No sibling checkout is required. SDK contributors
+can explicitly set `CODEX_APP_SDK_SOURCE=1` for development source aliases.
+Install Electron once before running parallel tests: its lazy first-import
+download can otherwise race across workers on a clean checkout.
+
+On Windows, run development from PowerShell with Node and npm installed. The
+launcher invokes npm through Node, so it does not require a Unix shell or direct
+execution of `npm.cmd`. Preparing Codex requires `tar.exe` on `PATH` (included
+with current Windows versions). It downloads and verifies the full Windows
+Codex package, including its supporting executables and resources. Native
+Windows startup remains experimental until exercised on the target machine.
 
 Focused project gates:
 
@@ -150,8 +157,8 @@ npm run typecheck
 Builds consume the pinned Computer Use artifact and verify its checksum. Set
 `COMPUTER_USE_LOCAL=1` in `.env` to build the helper from a sibling
 `computer-use` checkout instead.
-Linux support is experimental. Computer Use and Screenshots are currently
-macOS-only; Linux builds skip the Computer Use helper and do not package its
+Windows/Linux support is experimental. Computer Use and Screenshots are currently
+macOS-only; those builds skip the Computer Use helper and do not package its
 native automation dependency.
 
 macOS release packaging signs and notarizes by default. For local packaging
@@ -160,6 +167,10 @@ checks that do not need signing:
 ```bash
 APP_SKIP_SIGNING=1 npm run package
 ```
+
+Release builds run on GitHub Actions and stage artifacts before explicit
+promotion. See [GitHub desktop releases](docs/backend-architecture.md#github-desktop-releases)
+for the target matrix, launch/monitor commands, signing setup, and publication.
 
 ### App icon
 

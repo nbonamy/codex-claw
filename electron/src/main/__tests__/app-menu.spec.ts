@@ -1,10 +1,11 @@
 import { product } from '@workspace/core/product';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MenuItemConstructorOptions } from 'electron';
 import { buildAppMenuTemplate, installAppMenu, type AppMenuCallbacks } from '../app-menu';
 import { sendAppCommand } from '../ipc-events';
 
 vi.mock('../ipc-events', () => ({ sendAppCommand: vi.fn() }));
+afterEach(() => vi.unstubAllGlobals());
 
 const electronMenuMocks = vi.hoisted(() => ({
   buildFromTemplate: vi.fn((template: MenuItemConstructorOptions[]) => ({
@@ -265,6 +266,7 @@ describe('app menu', () => {
   });
 
   it('passes update callbacks through the native menu installer', () => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
     const checkForUpdates = vi.fn();
     const installUpdate = vi.fn();
     installAppMenu({

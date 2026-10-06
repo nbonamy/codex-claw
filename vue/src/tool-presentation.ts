@@ -12,6 +12,7 @@ import {
   IconMarkdown as MarkdownIcon,
   IconMessage as MessageIcon,
   IconMessageReport as MessageReportIcon,
+  IconSearch as SearchIcon,
   IconSquareCheck as SquareCheck,
   IconTargetArrow as TargetArrowIcon,
   IconSitemap as SitemapIcon,
@@ -33,6 +34,7 @@ const icons = {
   markdown: MarkdownIcon as unknown as ToolIcon,
   messages: MessageIcon as unknown as ToolIcon,
   review: MessageReportIcon as unknown as ToolIcon,
+  search: SearchIcon as unknown as ToolIcon,
   workItem: SquareCheck as unknown as ToolIcon,
   mission: TargetArrowIcon as unknown as ToolIcon,
   visualize: SitemapIcon as unknown as ToolIcon,
@@ -88,6 +90,17 @@ export function presentAppTool(
   translate: Translate,
   resolveAgentName?: AgentNameResolver,
 ): CodexToolPresentation | undefined {
+  if (context.descriptor?.action === 'search' && context.descriptor.params?.scope === 'tools') {
+    const phase = context.descriptor.phase === 'failed' || context.toolCall.state === 'error'
+      ? 'failed'
+      : context.descriptor.phase === 'completed' ? 'completed' : 'running';
+    const target = typeof context.descriptor.params.target === 'string' ? context.descriptor.params.target.trim() : '';
+    return {
+      icon: icons.search,
+      title: translate(`chat.tool.searchTools.${target ? 'target' : 'empty'}.${phase}`, { target }),
+    };
+  }
+
   if (context.kind === 'mcp' && context.metadata?.server === 'cua_repl' && context.metadata.tool === 'js') {
     const phase = context.descriptor?.phase === 'failed' || context.toolCall.state === 'error'
       ? 'failed'

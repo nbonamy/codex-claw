@@ -98,7 +98,7 @@ describe('daemon launch agent', () => {
         throw new Error('login shell unavailable');
       }),
       existsSync: (filePath) => filePath === `/Applications/${product.name}.app/Contents/Resources/daemon/${product.daemonName}` ||
-        filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
+        filePath === `/Applications/${product.name}.app/Contents/Resources/runtime/node`,
       getuid: () => 501,
       homedir: () => '/Users/nicolas',
       mkdir,
@@ -120,7 +120,7 @@ describe('daemon launch agent', () => {
     expect(mkdir).toHaveBeenCalledWith(`/Users/nicolas/${product.homeDirectory}`, { recursive: true, mode: 0o700 });
     expect(writeFile).toHaveBeenCalledWith(
       `/Users/nicolas/Library/LaunchAgents/${product.appId}.daemon.plist`,
-      expect.stringContaining('<string>/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node</string>'),
+      expect.stringContaining(`<string>/Applications/${product.name}.app/Contents/Resources/runtime/node</string>`),
     );
 
     const plist = writeFile.mock.calls[0][1] as string;
@@ -162,12 +162,12 @@ describe('daemon launch agent', () => {
         throw new Error('login shell unavailable');
       }),
       existsSync: (filePath) => filePath === `/Applications/${product.name}.app/Contents/Resources/daemon/${product.daemonName}` ||
-        filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
+        filePath === `/Applications/${product.name}.app/Contents/Resources/runtime/node`,
       homedir: () => '/Users/nicolas',
       resourcesPath: `/Applications/${product.name}.app/Contents/Resources`,
     })).resolves.toBe('0.2.0');
 
-    expect(execFile).toHaveBeenCalledWith('/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node', [
+    expect(execFile).toHaveBeenCalledWith(`/Applications/${product.name}.app/Contents/Resources/runtime/node`, [
       `/Applications/${product.name}.app/Contents/Resources/daemon/${product.daemonName}`,
       '--version',
     ]);

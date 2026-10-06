@@ -135,6 +135,7 @@ export const ipcChannels = {
   getUpdateStatus: 'app:update-status:get',
   installUpdate: 'app:update:install',
   setDockBadgeCount: 'app:dock-badge:set',
+  setMenuBarVisible: 'app:menu-bar:visible:set',
   getDaemonStatus: 'daemon:status:get',
   setDaemonEnabled: 'daemon:enabled:set',
   getSystemPermissions: 'system-permissions:get',

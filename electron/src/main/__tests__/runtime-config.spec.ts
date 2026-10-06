@@ -120,34 +120,35 @@ describe('runtime config', () => {
     });
   });
 
-  it('resolves the packaged daemon runtime from resources when no env command is configured', async () => {
+  it.each(['darwin', 'linux', 'win32'] as const)('uses private Node on %s without a system installation', async (platform) => {
     const { runtimeDaemonCommand } = await import('../runtime-config');
 
     expect(runtimeDaemonCommand({
       defaultApp: false,
+      platform,
       env: {
-        PATH: '/usr/bin:/Users/nicolas/.nvm/versions/node/v22.19.0/bin',
+        PATH: '/usr/bin',
       },
       execFileSync: vi.fn(() => {
         throw new Error('login shell unavailable');
       }),
       existsSync: (filePath) => filePath === `/app/resources/daemon/${product.daemonName}` ||
-        filePath === '/app/resources/codex/codex' ||
-        filePath === '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
+        filePath === `/app/resources/codex/${platform === 'win32' ? 'bin/codex.exe' : 'codex'}` ||
+        filePath === `/app/resources/runtime/${platform === 'win32' ? 'node.exe' : 'node'}`,
       homedir: () => '/Users/nicolas',
       resourcesPath: '/app/resources',
     })).toStrictEqual({
-      command: '/Users/nicolas/.nvm/versions/node/v22.19.0/bin/node',
+      command: `/app/resources/runtime/${platform === 'win32' ? 'node.exe' : 'node'}`,
       args: [
         `/app/resources/daemon/${product.daemonName}`,
         '--stdio',
       ],
       env: {
         APP_ASSETS_PATH: '/app/resources',
-        APP_BUNDLED_CODEX_PATH: '/app/resources/codex/codex',
+        APP_BUNDLED_CODEX_PATH: `/app/resources/codex/${platform === 'win32' ? 'bin/codex.exe' : 'codex'}`,
         APP_HOME: `/Users/nicolas/${product.homeDirectory}`,
         HOME: '/Users/nicolas',
-        PATH: '/usr/bin:/Users/nicolas/.nvm/versions/node/v22.19.0/bin',
+        PATH: `/app/resources/runtime${platform === 'win32' ? ';' : ':'}/usr/bin`,
       },
     });
   });
@@ -172,7 +173,7 @@ describe('runtime config', () => {
     });
   });
 
-  it('returns null for packaged apps when node cannot be discovered', async () => {
+  it('does not silently use system Node when the packaged runtime is missing', async () => {
     const { runtimeDaemonCommand } = await import('../runtime-config');
 
     expect(runtimeDaemonCommand({
@@ -183,7 +184,7 @@ describe('runtime config', () => {
       execFileSync: vi.fn(() => {
         throw new Error('login shell unavailable');
       }),
-      existsSync: (filePath) => filePath === `/app/resources/daemon/${product.daemonName}`,
+      existsSync: (filePath) => filePath === `/app/resources/daemon/${product.daemonName}` || filePath === '/usr/bin/node',
       resourcesPath: '/app/resources',
     })).toBeNull();
   });

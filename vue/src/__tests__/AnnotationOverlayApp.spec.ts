@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => {
   window.history.replaceState({}, '', '/');
+  delete document.documentElement.dataset.surface;
 });
 
 describe('AnnotationOverlayApp', () => {
@@ -47,5 +48,21 @@ describe('AnnotationOverlayApp', () => {
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(browserResolveAnnotation).not.toHaveBeenCalled();
+  });
+});
+
+describe('annotation overlay background isolation', () => {
+  it.each(['main', 'annotation-overlay'])('limits transparent page styling to the overlay surface (%s)', async (surface) => {
+    document.documentElement.dataset.surface = surface;
+    const AnnotationOverlayApp = (await import('../AnnotationOverlayApp.vue')).default;
+    const wrapper = mount(AnnotationOverlayApp, {
+      attachTo: document.body,
+      global: { stubs: { AnnotationPopup: true } },
+    });
+
+    expect(wrapper.find('.annotation-overlay').exists()).toBe(true);
+    expect(getComputedStyle(document.body).getPropertyValue('background')).toBe(
+      surface === 'annotation-overlay' ? 'transparent' : '',
+    );
   });
 });

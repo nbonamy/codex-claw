@@ -2,14 +2,14 @@
   "name": "agent-workspace",
   "version": "0.27.0",
   "private": true,
+  "packageManager": "npm@10.9.4",
   "overrides": {
-    "@codex-app-sdk/backend": "file:../codex-app-sdk/packages/backend",
-    "@codex-app-sdk/core": "file:../codex-app-sdk/packages/core",
-    "@codex-app-sdk/electron": "file:../codex-app-sdk/packages/electron",
-    "@codex-app-sdk/vue": "file:../codex-app-sdk/packages/vue",
-    "@codex-app-sdk/web": "file:../codex-app-sdk/packages/web"
+    "extract-zip": {
+      "yauzl": "^3.4.0"
+    }
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
     "@lyliya/stylelint-value-no-unknown-custom-properties": "^6.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
@@ -38,6 +38,7 @@
     "build:computer-use": "node scripts/prepare-computer-use.mjs",
     "build:computer-use:local": "node scripts/prepare-computer-use.mjs --local",
     "build:electron": "node scripts/build.mjs",
+    "build:runtime": "node scripts/prepare-node-runtime.mjs",
     "build:sdk": "node scripts/build-sdk.mjs",
     "build:tts": "node scripts/prepare-tts-helper.mjs",
     "build:web": "npm run build:sdk && npm run build -w @workspace/backend && npm run build -w @workspace/web",
@@ -68,11 +69,16 @@
     "package": "npm run package:electron",
     "package:electron": "npm run build:sdk && npm run build -w @workspace/backend && node scripts/package-backend.mjs && npm run package -w @workspace/electron",
     "preview:web": "npm run build:web && npm run start:web",
-    "publish": "npm run publish:electron",
-    "publish:electron": "npm run test:ai && npm run test:coverage && npm run check-publish:macos && npm run make:electron && npm run publish:macos",
-    "publish:macos": "node scripts/publish-macos.mjs",
+    "publish": "node scripts/github-release.mjs promote",
+    "publish:electron": "node scripts/github-release.mjs promote",
+    "publish:macos": "node scripts/github-release.mjs promote",
     "release-notes:check": "node scripts/release-notes.mjs check",
     "release-notes:generate": "node scripts/release-notes.mjs generate",
+    "release:build": "node scripts/github-release.mjs dispatch",
+    "release:monitor": "node scripts/github-release.mjs monitor",
+    "release:download": "node scripts/github-release.mjs download",
+    "release:promote": "node scripts/github-release.mjs promote",
+    "release:ci-build": "node scripts/macos-keychain.mjs build",
     "start:electron": "npm run start -w @workspace/electron",
     "start:web": "npm run start -w @workspace/web",
     "test": "npm run test --workspaces && npm run test:scripts",

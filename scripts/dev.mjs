@@ -8,9 +8,8 @@ const backendBundle = path.join(rootDir, 'backend/dist/daemon.mjs');
 const children = new Set();
 let shuttingDown = false;
 
-// Development resolves the sibling SDK directly from source so Vite can
-// hot-reload changes. Package and release builds use its locally built dist.
-process.env.CODEX_APP_SDK_SOURCE = '1';
+// Published SDK packages are the default. Opt in to sibling source development
+// explicitly with CODEX_APP_SDK_SOURCE=1.
 
 if (process.argv.includes('--help')) {
   console.log('Usage: npm run dev');
@@ -39,7 +38,8 @@ const electronDev = start('npm', ['run', 'start:electron'], {
     APP_BACKEND_ARGS: `${backendBundle},--stdio`,
     APP_BACKEND_WATCH_FILE: '',
     APP_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
-    APP_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex'),
+    APP_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex',
+      ...(process.platform === 'win32' ? ['bin', 'codex.exe'] : ['codex'])),
     CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', '@codex-app-sdk', 'backend', 'assets'),
   },
 });
@@ -52,18 +52,21 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 
 electronDev.on('exit', (code) => {
   if (!shuttingDown) {
-    shutdown(`electron exited with code ${code ?? 'null'}`);
+    shutdown(`electron exited with code ${code ?? 'null'}`, code ?? 1);
   }
 });
 
 backendWatch.on('exit', (code) => {
   if (!shuttingDown) {
-    shutdown(`backend watch exited with code ${code ?? 'null'}`);
+    shutdown(`backend watch exited with code ${code ?? 'null'}`, code || 1);
   }
 });
 
 function start(command, args, options) {
-  const child = spawn(command, args, {
+  // npm.cmd requires a shell on Windows. Use the CLI selected by the parent
+  // npm invocation through Node, preserving arguments and paths with spaces.
+  const npmCli = command === 'npm' ? process.env.npm_execpath : undefined;
+  const child = spawn(npmCli ? process.execPath : command, npmCli ? [npmCli, ...args] : args, {
     cwd: options.cwd,
     env: {
       ...process.env,
@@ -77,7 +80,7 @@ function start(command, args, options) {
   });
   child.once('error', (error) => {
     console.error(`[dev:${options.name}] ${error.message}`);
-    shutdown(`${options.name} failed`);
+    shutdown(`${options.name} failed`, 1);
   });
   return child;
 }
@@ -85,6 +88,7 @@ function start(command, args, options) {
 function run(command, args) {
   return new Promise((resolve, reject) => {
     const child = start(command, args, { cwd: rootDir, name: command });
+    child.once('error', reject);
     child.once('exit', (code) => {
       code === 0 ? resolve() : reject(new Error(`${command} ${args.join(' ')} exited with ${code}`));
     });
@@ -101,15 +105,16 @@ async function waitForFile(filePath) {
   throw new Error(`Timed out waiting for ${filePath}`);
 }
 
-function shutdown(reason) {
+function shutdown(reason, exitCode = 0) {
   if (shuttingDown) {
     return;
   }
 
   shuttingDown = true;
+  process.exitCode = exitCode;
   console.log(`[dev] stopping: ${reason}`);
   for (const child of children) {
     child.kill();
   }
-  setTimeout(() => process.exit(0), 250).unref();
+  setTimeout(() => process.exit(exitCode), 250).unref();
 }

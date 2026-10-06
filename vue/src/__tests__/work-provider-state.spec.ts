@@ -8,6 +8,29 @@ import { createWorkProviderState } from '../work-provider-state';
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); configureAppClient(); });
 
 describe('work provider authorization state', () => {
+  it.each([
+    { status: 'notConfigured' as const, detail: { key: 'workProvider.oauthNotConfigured', params: { provider: 'GitHub' } }, message: 'GitHub OAuth is not configured.' },
+    { status: 'error' as const, detail: 'GitHub authorization request failed.', message: 'GitHub authorization request failed.' },
+  ])('surfaces a $status connection result instead of silently treating it as success', async ({ status, detail, message }) => {
+    vi.useFakeTimers();
+    let snapshot = createInitialSnapshot();
+    const { api } = createClientApiMock(snapshot);
+    const failed = structuredClone(snapshot);
+    failed.workBacklog.connections = [{ provider: 'github', status, detail }];
+    api.connectWorkProvider.mockResolvedValue({ snapshot: failed });
+    configureAppClient({ platform: 'desktop', api });
+    const state = createWorkProviderState({ getSnapshot: () => snapshot, adoptSnapshot: value => { snapshot = value; } });
+
+    await state.connect('github');
+
+    expect(snapshot).toStrictEqual(failed);
+    expect(state.status.value).toBe('error');
+    expect(state.error.value).toBe(message);
+    expect(state.authorization.value).toBeNull();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(api.pollWorkProviderAuthorization).not.toHaveBeenCalled();
+  });
+
   it('finishes Linear authorization without leaving settings busy or loading GitHub repositories', async () => {
     let snapshot = createInitialSnapshot();
     const { api } = createClientApiMock(snapshot);

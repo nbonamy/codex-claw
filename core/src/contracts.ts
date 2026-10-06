@@ -919,6 +919,7 @@ export type AppApi = {
   getUpdateStatus(): Promise<DesktopUpdateStatus>;
   installUpdate(): Promise<void>;
   setDockBadgeCount(count: number): Promise<void>;
+  setMenuBarVisible(visible: boolean): Promise<void>;
   getDaemonStatus(): Promise<DaemonStatus>;
   setDaemonEnabled(enabled: boolean): Promise<DaemonStatus>;
   getSystemPermissions(): Promise<SystemPermissionsStatus>;
