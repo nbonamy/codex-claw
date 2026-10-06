@@ -96,6 +96,8 @@ tags, and configure these secrets through the repository/environment settings:
 | `APPLE_ID` | Apple account used for notarization |
 | `APPLE_PASSWORD` | App-specific Apple notarization password |
 | `APPLE_TEAM_ID` | Apple Developer team ID |
+| `APP_GITHUB_CLIENT_ID` | Registered GitHub OAuth client ID |
+| `APP_LINEAR_CLIENT_ID` | Registered Linear OAuth client ID |
 
 Exporting keys or setting secrets is a separate authorized operator action.
 Credentials have not been assumed to exist. The macOS wrapper uses a random
@@ -103,10 +105,12 @@ temporary keychain password, restores the prior search list, and removes its
 certificate/keychain in `finally`, with an additional `always()` cleanup step.
 No signing credentials are passed to dependency installation or other OS jobs.
 
-Set environment variables `APP_GITHUB_CLIENT_ID` and `APP_LINEAR_CLIENT_ID` in
-GitHub's **Variables** settings to preserve the registered OAuth integrations.
-These IDs are public build configuration, not private secrets. Missing IDs
-leave the respective integration unavailable. Never put client secrets in the app.
+Store all account and OAuth client IDs in GitHub's **Secrets** settings, including
+`APP_GITHUB_CLIENT_ID` and `APP_LINEAR_CLIENT_ID`; do not use Actions variables.
+This keeps their CI configuration private and masks their values in Actions logs.
+OAuth client IDs are still embedded in the distributed desktop app and can be
+extracted from it. Missing IDs leave the respective integration unavailable.
+Never put OAuth client secrets in the app.
 
 ### Dispatch, monitor and inspect
 

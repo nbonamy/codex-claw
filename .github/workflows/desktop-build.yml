@@ -67,8 +67,8 @@ jobs:
     timeout-minutes: 90
     environment: desktop-build
     env:
-      APP_GITHUB_CLIENT_ID: ${{ vars.APP_GITHUB_CLIENT_ID }}
-      APP_LINEAR_CLIENT_ID: ${{ vars.APP_LINEAR_CLIENT_ID }}
+      APP_GITHUB_CLIENT_ID: ${{ secrets.APP_GITHUB_CLIENT_ID }}
+      APP_LINEAR_CLIENT_ID: ${{ secrets.APP_LINEAR_CLIENT_ID }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
