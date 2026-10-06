@@ -752,7 +752,6 @@ describe('AppShell authentication and conversation', () => {
         isSending: false,
         connectionState: { status: 'reconnecting', detail: 'socket closed' },
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('.app-shell__connection-status').text()).toContain('Agents keep working in the background.');
@@ -833,9 +832,6 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: false,
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     expect(wrapper.getComponent({ name: 'AgentSidebar' }).props('teamName')).toBe(product.defaultTeamName);
@@ -882,7 +878,6 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: true,
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(plan);
@@ -920,7 +915,6 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: true,
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual({
@@ -963,7 +957,6 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: false,
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toStrictEqual(activeAgent.plan);
@@ -992,7 +985,6 @@ describe('AppShell authentication and conversation', () => {
         isConversationLoading: true,
         isSending: false,
       },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.findComponent({ name: 'ConversationPane' }).props('plan')).toBeNull();
@@ -1054,9 +1046,6 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: false,
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     const editor = wrapper.get('[role="textbox"][contenteditable]');
@@ -1093,9 +1082,6 @@ describe('AppShell authentication and conversation', () => {
         isLoading: false,
         isSending: false,
         sendPromptAction,
-      },
-      global: {
-        plugins: [i18n],
       },
     });
 
@@ -1391,7 +1377,6 @@ describe('AppShell authentication and conversation', () => {
         }],
         composerState: { text: 'saved draft', selectionStart: 5, selectionEnd: 5 },
       },
-      global: { plugins: [i18n] },
     });
 
     const state = conversationControllerState(wrapper);
@@ -1716,7 +1701,6 @@ describe('AppShell authentication and conversation', () => {
         backendCapabilities: claudeBackendCapabilities,
         permissionMode: 'acceptEdits',
       },
-      global: { plugins: [i18n] },
     });
 
     expect(conversationControllerState(wrapper).capabilities?.approvalPresets).toStrictEqual([]);

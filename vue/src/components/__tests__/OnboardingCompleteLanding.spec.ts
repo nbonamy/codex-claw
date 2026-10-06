@@ -1,19 +1,12 @@
 import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
-import { createI18n } from 'vue-i18n';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { messages } from '../../i18n/messages';
 import { clearConfetti, useConfetti } from '../../shared/confetti/use-confetti';
 import OnboardingCompleteLanding from '../OnboardingCompleteLanding.vue';
 
 function mountLanding(props: Partial<InstanceType<typeof OnboardingCompleteLanding>['$props']> = {}) {
   return mount(OnboardingCompleteLanding, {
     props,
-    global: {
-      plugins: [
-        createI18n({ legacy: false, locale: 'en', messages }),
-      ],
-    },
   });
 }
 

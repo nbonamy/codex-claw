@@ -2,7 +2,6 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Agent, WorkItem } from '@workspace/core/contracts';
-import { i18n } from '../../i18n';
 import RepositoryBacklogPanel from '../RepositoryBacklogPanel.vue';
 import { createClientApiMock } from '../../test/client-api-mock';
 import { appApi, configureAppClient } from '../../platform-api';
@@ -523,7 +522,6 @@ async function mountPanel(overrides: Partial<InstanceType<typeof RepositoryBackl
     props,
     global: {
       provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }, { provider: 'linear', status: 'connected' }] },
-      plugins: [i18n],
       stubs: {
         ElPopover: {
           name: 'ElPopover',

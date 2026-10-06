@@ -4,8 +4,8 @@ const root = vi.hoisted(() => ({ render: vi.fn(), unmount: vi.fn() }));
 vi.mock('react-dom/client', () => ({ createRoot: () => root }));
 const convert = vi.hoisted(() => vi.fn());
 vi.mock('@excalidraw/excalidraw', () => ({
-  Excalidraw: {},
-  MainMenu: {},
+  Excalidraw: () => null,
+  MainMenu: () => null,
   CaptureUpdateAction: {},
   convertToExcalidrawElements: vi.fn(),
   exportToCanvas: vi.fn(),

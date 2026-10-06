@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
 import SavedPromptDraftPicker from '../SavedPromptDraftPicker.vue';
-import { i18n } from '../../i18n';
 
 const drafts = [
   { id: 'first', agentId: 'agent', text: 'Fix the login flow', createdAt: 1 },
@@ -11,7 +10,7 @@ const drafts = [
 
 describe('SavedPromptDraftPicker', () => {
   it('explains how to save the first draft without showing that hint for an unmatched search', async () => {
-    const wrapper = mount(SavedPromptDraftPicker, { attachTo: document.body, props: { drafts: [] }, global: { plugins: [i18n] } });
+    const wrapper = mount(SavedPromptDraftPicker, { attachTo: document.body, props: { drafts: [] } });
     await nextTick();
     expect(wrapper.find('[role="searchbox"]').exists()).toBe(false);
     expect(document.activeElement).toBe(wrapper.element);
@@ -26,7 +25,7 @@ describe('SavedPromptDraftPicker', () => {
   });
 
   it('searches drafts and offers restore, insert-copy, and deletion from the keyboard or rows', async () => {
-    const wrapper = mount(SavedPromptDraftPicker, { attachTo: document.body, props: { drafts }, global: { plugins: [i18n] } });
+    const wrapper = mount(SavedPromptDraftPicker, { attachTo: document.body, props: { drafts } });
     const search = wrapper.get<HTMLInputElement>('input[role="searchbox"]');
     await nextTick();
     expect(document.activeElement).toBe(search.element);

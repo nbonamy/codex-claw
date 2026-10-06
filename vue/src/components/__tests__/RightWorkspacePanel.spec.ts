@@ -7,7 +7,6 @@ import RightWorkspacePanel from '../RightWorkspacePanel.vue';
 import BrowserPanel from '../BrowserPanel.vue';
 import { rightWorkspaceFileTab, type RightWorkspaceFilePanel, type RightWorkspaceFileTab, type RightWorkspaceImagePanel, type RightWorkspaceImageTab, type RightWorkspaceTab } from '../right-workspace';
 import type { SidePanelMarkdownState } from '../side-panel';
-import { i18n } from '../../i18n';
 
 class ResizeObserverStub {
   observe() {}
@@ -64,7 +63,7 @@ function mountPanel(
       finishCodeReview: vi.fn(),
       reviewCodeAgain: vi.fn(),
     },
-    global: { plugins: [i18n], components: { ElTooltip } },
+    global: { components: { ElTooltip } },
   });
 }
 

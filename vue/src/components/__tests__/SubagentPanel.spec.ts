@@ -2,7 +2,6 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SubagentPanel from '../SubagentPanel.vue';
 import type { AgentSubagentTree, RendererMessage } from '@workspace/core/contracts';
-import { i18n } from '../../i18n';
 
 const tree: AgentSubagentTree = {
   rootConversationId: 'thread-root',
@@ -67,7 +66,6 @@ describe('SubagentPanel', () => {
     const wrapper = mount(SubagentPanel, {
       props: { tree, conversationId: 'thread-scout', loadMessages },
       global: {
-        plugins: [i18n],
         stubs: {
           CodexMessageList: {
             props: ['messages', 'actionsDisabled', 'canDeleteTurn', 'canEditTurn', 'canRetryTurn'],
@@ -130,7 +128,6 @@ describe('SubagentPanel', () => {
     };
     const wrapper = mount(SubagentPanel, {
       props: { tree, conversationId: 'thread-scout', loadMessages: vi.fn().mockResolvedValue([toolMessage]) },
-      global: { plugins: [i18n] },
     });
     await flushPromises();
 
@@ -151,7 +148,7 @@ describe('SubagentPanel', () => {
         conversationId: 'thread-scout',
         loadMessages,
       },
-      global: { plugins: [i18n], stubs: { CodexMessageList: true } },
+      global: { stubs: { CodexMessageList: true } },
     });
     await flushPromises();
 
@@ -175,7 +172,6 @@ describe('SubagentPanel', () => {
     const wrapper = mount(SubagentPanel, {
       props: { tree, conversationId: 'thread-scout', visible: true, loadMessages },
       global: {
-        plugins: [i18n],
         stubs: {
           CodexMessageList: {
             props: ['messages'],

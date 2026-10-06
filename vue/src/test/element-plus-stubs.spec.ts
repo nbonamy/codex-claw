@@ -5,6 +5,8 @@ import {
   ElDropdownItemStub,
   ElDropdownMenuStub,
   ElDropdownStub,
+  ElRadioGroupStub,
+  ElRadioStub,
 } from './element-plus-stubs';
 
 describe('Element Plus test controls', () => {
@@ -39,5 +41,26 @@ describe('Element Plus test controls', () => {
     expect(command).toHaveBeenCalledExactlyOnceWith('edit');
     expect(visibleChange.mock.calls).toStrictEqual([[true], [false]]);
     expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+  });
+
+  it('selects a radio through its group and reflects the group value', async () => {
+    const Harness = defineComponent({
+      components: { ElRadio: ElRadioStub, ElRadioGroup: ElRadioGroupStub },
+      data: () => ({ choice: true }),
+      template: `
+        <ElRadioGroup v-model="choice">
+          <ElRadio :value="true">Separate</ElRadio>
+          <ElRadio :value="false">Existing</ElRadio>
+        </ElRadioGroup>
+      `,
+    });
+    const wrapper = mount(Harness);
+    const inputs = wrapper.findAll('input[type="radio"]');
+    expect(inputs.map(input => (input.element as HTMLInputElement).checked)).toStrictEqual([true, false]);
+
+    await inputs[1]!.setValue();
+
+    expect(wrapper.vm.choice).toBe(false);
+    expect(inputs.map(input => (input.element as HTMLInputElement).checked)).toStrictEqual([false, true]);
   });
 });

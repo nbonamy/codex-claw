@@ -1,5 +1,4 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import ElementPlus from 'element-plus';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
 import { createMission } from '@workspace/core/missions';
@@ -37,7 +36,6 @@ describe('MissionReviewChanges', () => {
     const getDiff = vi.fn().mockReturnValue(new Promise(resolve => { resolveApiDiff = resolve; }));
     const wrapper = mount(MissionReviewChanges, {
       props: { agent, agents: [agent], getDiff, mission },
-      global: { plugins: [ElementPlus] },
     });
     await vi.waitFor(() => expect(getDiff).toHaveBeenCalledOnce());
 

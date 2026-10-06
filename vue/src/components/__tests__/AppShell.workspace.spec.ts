@@ -10,7 +10,6 @@ import AppShell from '../AppShell.vue';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type { AppCommand, AppApi } from '@workspace/core/contracts';
 import { workItemAssignmentPrompt, workItemComposerPrompt } from '@workspace/core/work-item-prompts';
-import { i18n } from '../../i18n';
 import { setElectronTestClient } from '../../test/client';
 import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 import { useConfetti } from '../../shared/confetti/use-confetti';
@@ -203,7 +202,6 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
       },
-      global: { plugins: [i18n] },
     });
 
     await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
@@ -464,9 +462,6 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         getAgentGitDiff,
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     await wrapper.get('[aria-label="Open repository diff"]').trigger('click');
@@ -694,9 +689,6 @@ describe('AppShell workspace and plans', () => {
           diff: 'diff --git a/src/main.ts b/src/main.ts\n',
         },
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     expect(wrapper.get('[aria-label="Right workspace"]').isVisible()).toBe(false);
@@ -718,9 +710,6 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
         previewAgentFile,
-      },
-      global: {
-        plugins: [i18n],
       },
     });
 
@@ -765,9 +754,6 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
         previewAgentFile,
-      },
-      global: {
-        plugins: [i18n],
       },
     });
 
@@ -821,7 +807,6 @@ describe('AppShell workspace and plans', () => {
         isLoading: false,
         isSending: false,
       },
-      global: { plugins: [i18n] },
     });
 
     await conversationControllerActions(wrapper).openLink?.({
@@ -849,7 +834,6 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         getAgentGitDiff,
       },
-      global: { plugins: [i18n] },
     });
 
     await conversationControllerActions(wrapper).openLink?.({
@@ -883,7 +867,6 @@ describe('AppShell workspace and plans', () => {
         previewAgentFile,
         fileActivity: null,
       },
-      global: { plugins: [i18n] },
     });
 
     await wrapper.setProps({
@@ -947,9 +930,6 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         previewAgentFile,
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     await wrapper.get('a[href="README.md:40"]').trigger('click');
@@ -999,9 +979,6 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         previewAgentFile,
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
@@ -1036,9 +1013,6 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         previewAgentFile,
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     await wrapper.get('a[href="docs/architecture.md"]').trigger('click');
@@ -1067,8 +1041,6 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         previewAgentFile,
       },
-      global: {
-        },
     });
 
     await wrapper.get('a[href="../secret.md"]').trigger('click');
@@ -1093,8 +1065,6 @@ describe('AppShell workspace and plans', () => {
         isSending: false,
         previewAgentFile,
       },
-      global: {
-        },
     });
 
     await conversationControllerActions(wrapper).openLink?.({
@@ -1122,8 +1092,6 @@ describe('AppShell workspace and plans', () => {
           content: '# Plan\n\nShip it.',
         },
       },
-      global: {
-        },
     });
 
     expect(wrapper.find('.side-panel').exists()).toBe(false);
@@ -1172,9 +1140,6 @@ describe('AppShell workspace and plans', () => {
           content: '# Plan\n\n- [ ] Build it',
         },
       },
-      global: {
-        plugins: [i18n],
-      },
     });
 
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Plan');
@@ -1194,7 +1159,7 @@ describe('AppShell workspace and plans', () => {
     const wrapper = mount(AppShell, { props: {
       snapshot, activeAgent: snapshot.agents[0], isLoading: false, isSending: false,
       sidePanelRequest: { kind: 'markdown', purpose: 'plan', title: 'Plan', content: '# Plan' },
-    }, global: { plugins: [i18n] } });
+    } });
     expect(wrapper.find('.plan-review-footer').exists()).toBe(true);
     const resolved = structuredClone(snapshot);
     resolved.agents[0]!.planReview!.status = 'cancel';
@@ -1221,9 +1186,6 @@ describe('AppShell workspace and plans', () => {
           title: 'Plan',
           content: '# Plan',
         },
-      },
-      global: {
-        plugins: [i18n],
       },
     });
 
@@ -1253,9 +1215,6 @@ describe('AppShell workspace and plans', () => {
           title: 'Plan',
           content: '# Plan',
         },
-      },
-      global: {
-        plugins: [i18n],
       },
     });
 
@@ -1312,9 +1271,6 @@ describe('AppShell workspace and plans', () => {
           title: 'Plan',
           content: '# Previous Plan',
         },
-      },
-      global: {
-        plugins: [i18n],
       },
     });
 

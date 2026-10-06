@@ -1,20 +1,13 @@
 import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
-import { createI18n } from 'vue-i18n';
 import { ElButton } from 'element-plus';
 import { describe, expect, it } from 'vitest';
-import { messages } from '../../i18n/messages';
 import CodexLoginLanding from '../CodexLoginLanding.vue';
 
 function mountLanding(props: InstanceType<typeof CodexLoginLanding>['$props'] = {}) {
   return mount(CodexLoginLanding, {
     props,
-    global: {
-      components: { ElButton },
-      plugins: [
-        createI18n({ legacy: false, locale: 'en', messages }),
-      ],
-    },
+    global: { components: { ElButton } },
   });
 }
 

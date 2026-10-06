@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { ThreadPlan } from '@workspace/core/contracts';
 import ConversationPlanPanel from '../ConversationPlanPanel.vue';
-import { i18n } from '../../i18n';
 
 const plan: ThreadPlan = {
   threadId: 'thread-plan',
@@ -23,7 +22,6 @@ describe('ConversationPlanPanel', () => {
   it('renders a passive status checklist for the active turn', () => {
     const wrapper = mount(ConversationPlanPanel, {
       props: { plan },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('aside').attributes('aria-label')).toBe('Task list');
@@ -41,7 +39,6 @@ describe('ConversationPlanPanel', () => {
   it('emits close when the overlay dismiss button is pressed', async () => {
     const wrapper = mount(ConversationPlanPanel, {
       props: { plan },
-      global: { plugins: [i18n] },
     });
 
     await wrapper.get('[aria-label="Close task list"]').trigger('click');
@@ -52,7 +49,6 @@ describe('ConversationPlanPanel', () => {
   it('omits the status line when the backend provides no explanation', () => {
     const wrapper = mount(ConversationPlanPanel, {
       props: { plan: { ...plan, explanation: '  ' } },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('h2').text()).toBe('Task list');

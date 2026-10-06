@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils';
 import { ElCheckbox, ElRadio, ElRadioGroup } from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import ProviderSetupDialog from '../ProviderSetupDialog.vue';
-import { i18n } from '../../i18n';
 
 describe('ProviderSetupDialog', () => {
   it('lets Settings change skills reuse for existing chats without requesting roster removal', async () => {
@@ -45,7 +44,7 @@ describe('ProviderSetupDialog', () => {
     const wrapper = mount(ProviderSetupDialog, {
       attachTo: document.body,
       props: { setup: { backend: 'claude', installed: false, isolated: true, shareSkills: true, homePath: '/app/claude-home', locked: false }, busy: false, error: null },
-      global: { plugins: [i18n], components: { ElCheckbox, ElRadio, ElRadioGroup }, stubs: { teleport: true } },
+      global: { components: { ElCheckbox, ElRadio, ElRadioGroup }, stubs: { teleport: true } },
     });
     expect(getComputedStyle(wrapper.getComponent(ElRadioGroup).element).flexDirection).toBe('column');
     expect(wrapper.getComponent(ElRadioGroup).findAll('input').map(input => input.attributes('type')))

@@ -5,7 +5,6 @@ import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
 import type { Agent, AgentGitStatus, AppSnapshot } from '@workspace/core/contracts';
 import type { CodeReviewFinding, CodeReviewSession } from '@workspace/core/code-review';
-import { i18n } from '../../i18n';
 import CodeReviewPanel from '../CodeReviewPanel.vue';
 import { codeReviewSettingsKey } from '../code-review-settings';
 import type { CodeReviewPreferences } from '@workspace/core/code-review';
@@ -73,7 +72,7 @@ function mountPanel(
     actions,
     wrapper: mount(CodeReviewPanel, {
       props: { agent: owner, gitStatus, ...actions },
-      global: { plugins: [i18n], components: { ElInputNumber, ElSwitch }, provide: {
+      global: { components: { ElInputNumber, ElSwitch }, provide: {
         [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']),
         [codeReviewSettingsKey as symbol]: { preferences: () => preferences, listModels: actions.listModels, stop: actions.stop },
       } },

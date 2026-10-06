@@ -1,7 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import PlanReviewFooter from '../PlanReviewFooter.vue';
-import { i18n } from '../../i18n';
 
 describe('PlanReviewFooter', () => {
   it('renders saved comments as compact one-line highlighted targets', () => {
@@ -13,7 +12,6 @@ describe('PlanReviewFooter', () => {
           body: 'Keep this scoped.',
         }],
       },
-      global: { plugins: [i18n] },
     });
 
     const row = wrapper.get('.plan-review-footer__comment');
@@ -35,7 +33,6 @@ describe('PlanReviewFooter', () => {
   it('shows initial actions and disables every action while comments are being sent', async () => {
     const wrapper = mount(PlanReviewFooter, {
       props: { comments: [] },
-      global: { plugins: [i18n] },
     });
 
     expect(wrapper.get('.plan-review-footer__help').text()).toBe(
