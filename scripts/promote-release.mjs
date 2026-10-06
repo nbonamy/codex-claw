@@ -5,7 +5,7 @@ import path from 'node:path';
 import product from '../core/src/product.json' with { type: 'json' };
 import { checksum, verifyBundle } from './release-contract.mjs';
 
-// Only this explicit operator path can write releases. CI remains artifact-only.
+// Invoked by the explicitly dispatched GitHub publication job after build verification.
 async function publication(directory, identity, options, action) {
   if (identity.tag !== `v${identity.version}`) throw new Error('Publication requires a canonical v<version> tag.');
   const manifests = await verifyBundle(directory, identity);

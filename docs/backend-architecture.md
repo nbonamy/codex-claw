@@ -141,15 +141,23 @@ npm run release:monitor -- --state .release/0.27.0.json
 npm run release:download -- --state .release/0.27.0.json --output .release/0.27.0-review
 ```
 
+The monitor redraws a compact colored dashboard in terminals, showing each
+job's active step, step count, and elapsed time. Redirected output stays plain
+text, reports step changes, and emits a heartbeat every 30 seconds. Failed runs
+print bounded failed-step log excerpts plus exact commands for full logs and
+retrying; skipped downstream jobs are not reported as still waiting. Monitoring
+does not publish a release or retry a failed build automatically.
+
 The version is read from the tagged package, not the working checkout. A unique
 dispatch ID, full SHA, version, tag, run ID and attempt are saved before dispatch.
-The monitor discovers only that request, tolerates queue/discovery delay, prints
-plain-text per-target status and job/run URLs, and exits nonzero on incomplete or
-unsuccessful required jobs. Failed jobs include a `gh run view ... --log` command.
-It works without a TTY. A timeout or API failure preserves the receipt for resume.
+The monitor discovers only that request, tolerates queue/discovery delay, and
+exits nonzero on incomplete or unsuccessful required jobs. A timeout or API
+failure preserves the receipt for resume.
 
 Retry an unchanged build with `gh run rerun <run-id> --repo nbonamy/korus` (all
-jobs), then `release:monitor -- --state <file> --attempt <N>`. The tool never
+jobs), then resume the original command with `--attempt <N>`: for example,
+`npm run prerelease -- --tag v0.27.1 --attempt 2` continues all the way through
+publication. Use `release:monitor` only when watching without publishing. The tool never
 silently accepts a later attempt. Rerunning only failed jobs cannot produce the
 complete same-attempt artifact set. Source changes require a new commit/tag and
 state file; never move a release tag. If dispatch has an ambiguous network error,
@@ -168,12 +176,13 @@ immutable version tag, an authenticated operator with Actions-write and
 contents-write access can run the complete workflow with one command:
 
 ```bash
-npm run prerelease -- --tag v0.27.1
+npm run prerelease
 # Only with separate explicit stable-release approval:
-npm run latest -- --tag v0.27.1
+npm run latest
 ```
 
-Both shortcuts **dispatch → monitor → download/verify → stage → publish**.
+Both shortcuts **build → monitor → verify → upload → publish**. They infer the
+version tag from the root package.json; no arguments are required.
 They do not edit versions, commit, tag or push: the remote tag must already
 exist and match the tagged package version. The first invocation saves
 `.release/v<version>.json`; repeating the same command resumes that exact run
@@ -182,29 +191,41 @@ same verified artifacts and only changes release status. Timeouts and failed
 required jobs block publication. Existing published assets are verified but
 never replaced. Nothing uploads to Joshua.
 
-For build-only work or an inspection pause, retain the individual commands:
-`release:build`, `release:monitor`, `release:download`, `release:stage`, and
-`release:promote` (add `--stable` only for approved stable promotion). These
-default to `.release/state.json`. Pass `--state` to the shortcuts to reuse such
-an existing receipt; a supplied `--tag` must match it. Canonical `v<version>`
-tags are required for publication; build-test tags are valid only for CI.
+After build success the command dispatches `desktop-publish.yml` on the default
+branch and monitors its exact run to completion. That GitHub runner validates
+the build workflow, tag, SHA, attempt and all required jobs, downloads the matching
+Actions artifact, verifies provenance and checksums, creates a draft, uploads the
+assets and publishes the requested channel. Only this publication job has
+`contents: write`; the build workflow remains read-only. Publication jobs are
+serialized. The local command never downloads or uploads release binaries.
+The receipt records publication identity separately from the immutable build.
+For an interrupted publication, repeat the same shortcut; it resumes that run.
+For a failed publication job, use its printed rerun command and explicit
+`--publication-attempt N` when resuming. A build failure instead uses `--attempt N`.
 
-Omitted `--output` gets a unique verification directory automatically; an explicit
-output must be a fresh directory. Each command rechecks the exact
-successful run/attempt and downloads and verifies its bundle. Draft staging
-uploads target artifacts, `<target>-provenance.json` files and `release.json`.
-Existing draft assets must match byte-for-byte; missing assets can be resumed
-without clobbering anything. Publication downloads the GitHub assets again and
-checks their hashes, complete file set, tag SHA and release state. A failed
-upload leaves a draft, not a half-published release. Inspect remote state after
-an ambiguous network failure; retries never replace published assets.
+For build-only work or an inspection pause, retain the individual commands:
+`release:build`, `release:monitor`, and `release:download` default to
+`.release/state.json`. Download is explicitly opt-in for local inspection, not
+part of publication. Pass `--state` to a shortcut to reuse a build-only receipt;
+an optional `--tag` must match it. `release:promote` also delegates to the GitHub
+publisher (default prerelease, `--stable` for an explicitly approved stable
+release). Canonical `v<version>` tags are required for publication; build-test
+tags are valid only for CI.
+
+On the runner, draft staging uploads target artifacts,
+`<target>-provenance.json` files and `release.json`. Existing draft assets must
+match byte-for-byte; missing assets can be resumed without clobbering anything.
+Publication verifies uploaded asset bytes, complete file set, tag SHA and release
+state before removing draft status. A failed upload leaves a draft, not a
+half-published release. Inspect remote state after an ambiguous network failure;
+retries never replace published assets.
 
 Publication (including the legacy `publish` aliases) defaults to **prerelease**
 and explicitly does not mark it latest. Prereleases are manual downloads only.
 `--stable` can promote a verified draft or existing prerelease; it removes the
 prerelease marker and marks the release latest, rejecting equal/newer stable
 versions already present. An already stable release is immutable to this tool.
-Retain the Actions receipt and downloaded verified bundle. The commands require
+Retain the Actions receipt. The GitHub publisher requires
 the original Actions artifact, which expires after 30 days; publish/promote
 before expiry, or prepare a new build/version rather than bypassing provenance.
 

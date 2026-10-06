@@ -172,10 +172,12 @@ APP_SKIP_SIGNING=1 npm run package
 ```
 
 Release builds run on GitHub Actions and stage artifacts before explicit
-promotion. Once a prepared version tag is pushed, `npm run prerelease -- --tag
-v<version>` builds, monitors, verifies and publishes a prerelease; `npm run latest
--- --tag v<version>` runs the same flow for stable publication (or promotes the
-same verified prerelease build). See [GitHub desktop releases](docs/backend-architecture.md#github-desktop-releases)
+promotion. Once a prepared version tag is pushed, **`npm run prerelease`** builds,
+monitors, verifies and publishes a prerelease; **`npm run latest`** does the same
+for stable publication (or promotes the same verified prerelease build). Both
+infer the version from package.json. Binary transfers, verification and uploads
+stay on GitHub runners; your machine only starts and monitors the workflow.
+See [GitHub desktop releases](docs/backend-architecture.md#github-desktop-releases)
 for the target matrix, launch/monitor commands, signing setup, and publication.
 
 ### App icon

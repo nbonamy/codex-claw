@@ -6,9 +6,11 @@ import { parseArgs } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import product from '../core/src/product.json' with { type: 'json' };
 import { requiredJobs, workflow, validateIdentity, verifyBundle } from './release-contract.mjs';
+import { createReleaseProgress, failureExcerpt } from './release-progress.mjs';
 
 function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 32 * 1024 * 1024,
     timeout: args[0] === 'run' && args[1] === 'download' ? 900_000 : 60_000 });
 }
 function api(route, paginate = false) {
@@ -26,40 +28,49 @@ function validateState(state) {
 }
 function title(state) { return `desktop ${state.version} ${state.requestId}`; }
 
-async function monitor(state, statePath, timeout, attempt) {
+async function monitor(state, statePath, timeout, attempt, resumeCommand, options = {}) {
   const deadline = Date.now() + timeout * 1000;
   const base = `repos/${state.repository}/actions`;
-  let lastOutput = '';
+  const workflowName = options.workflow ?? workflow;
+  const expectedTitle = options.title ?? title(state);
+  const jobNames = options.jobs ?? requiredJobs;
+  const persist = options.persist ?? (() => save(statePath, state));
+  const progress = createReleaseProgress(process.stdout, jobNames);
   while (true) {
     if (!state.runId) {
-      const pages = api(`${base}/workflows/${workflow}/runs?event=workflow_dispatch&head_sha=${state.sha}&per_page=100&created=${encodeURIComponent('>=' + state.createdAt)}`, true);
-      const matches = pages.flatMap(page => page.workflow_runs).filter(run => run.display_title === title(state));
+      const pages = api(`${base}/workflows/${workflowName}/runs?event=workflow_dispatch&head_sha=${state.sha}&per_page=100&created=${encodeURIComponent('>=' + state.createdAt)}`, true);
+      const matches = pages.flatMap(page => page.workflow_runs).filter(run => run.display_title === expectedTitle);
       if (matches.length > 1) throw new Error('Ambiguous dispatch identity; inspect Actions before continuing.');
-      if (matches.length === 1) { state.runId = matches[0].id; save(statePath, state); }
+      if (matches.length === 1) { state.runId = matches[0].id; persist(); }
     }
     if (state.runId) {
       const run = api(`${base}/runs/${state.runId}`);
-      if (run.head_sha !== state.sha || run.display_title !== title(state) || run.event !== 'workflow_dispatch'
-        || run.path !== `.github/workflows/${workflow}`) throw new Error('Workflow identity mismatch (SHA/version/request/workflow).');
+      if (run.head_sha !== state.sha || run.display_title !== expectedTitle || run.event !== 'workflow_dispatch'
+        || run.path !== `.github/workflows/${workflowName}`) throw new Error('Workflow identity mismatch (SHA/version/request/workflow).');
       if (attempt !== undefined) {
         if (attempt !== run.run_attempt) throw new Error(`Requested attempt ${attempt} is not the current attempt ${run.run_attempt}.`);
-        state.attempt = attempt; save(statePath, state);
+        state.attempt = attempt; persist();
       }
-      if (run.run_attempt !== state.attempt) throw new Error(`Run attempt changed to ${run.run_attempt}; resume explicitly with --attempt ${run.run_attempt}. Rerun ALL jobs.`);
+      const attemptFlag = options.attemptFlag ?? '--attempt';
+      if (run.run_attempt !== state.attempt) throw new Error(`Run attempt changed to ${run.run_attempt}; resume explicitly with: ${resumeCommand} ${attemptFlag} ${run.run_attempt}. Rerun ALL jobs.`);
       const jobs = api(`${base}/runs/${state.runId}/attempts/${state.attempt}/jobs?per_page=100`, true).flatMap(page => page.jobs);
-      const lines = [run.html_url, `Attempt ${state.attempt}: ${run.status} (${run.conclusion ?? 'pending'})`];
-      for (const name of requiredJobs) {
-        const job = jobs.find(candidate => candidate.name === name);
-        lines.push(`${name}: ${job?.conclusion ?? job?.status ?? 'waiting'}${job?.html_url ? ` ${job.html_url}` : ''}`);
-        if (job?.status === 'completed' && job.conclusion !== 'success') {
-          lines.push(`Logs: gh run view ${state.runId} --repo ${state.repository} --attempt ${state.attempt} --job ${job.id} --log`);
-        }
-      }
-      const output = lines.join('\n');
-      if (output !== lastOutput) { console.log(output); lastOutput = output; }
+      progress(state, run, jobs);
       if (run.status === 'completed') {
-        if (run.conclusion !== 'success') throw new Error(`Required build unsuccessful: ${run.conclusion}.`);
-        for (const name of requiredJobs) {
+        if (run.conclusion !== 'success') {
+          for (const job of jobs.filter(job => jobNames.includes(job.name) && job.status === 'completed'
+            && !['success', 'skipped', 'neutral'].includes(job.conclusion))) {
+            const args = ['run', 'view', String(state.runId), '--repo', state.repository,
+              '--attempt', String(state.attempt), '--job', String(job.id), '--log-failed'];
+            console.log(`\nFailure details: ${job.name}`);
+            try { console.log(failureExcerpt(gh(args)) || 'No failed-step logs available.'); }
+            catch { console.log('Logs unavailable from GitHub.'); }
+            console.log(`Full logs: gh ${args.join(' ')}`);
+          }
+          console.log(`\nRetry all jobs: gh run rerun ${state.runId} --repo ${state.repository}`);
+          console.log(`Resume: ${resumeCommand} ${attemptFlag} ${state.attempt + 1}`);
+          throw new Error(`Required build unsuccessful: ${run.conclusion}.`);
+        }
+        for (const name of jobNames) {
           const matching = jobs.filter(job => job.name === name);
           if (matching.length !== 1 || matching[0].status !== 'completed' || matching[0].conclusion !== 'success') {
             throw new Error(`Required job missing or unsuccessful: ${name}. Rerun ALL jobs to produce one complete attempt.`);
@@ -68,15 +79,45 @@ async function monitor(state, statePath, timeout, attempt) {
         return;
       }
     }
-    if (Date.now() >= deadline) throw new Error(`Timed out ${state.runId ? 'waiting for required builds' : 'discovering dispatched run'}. Resume with --state ${statePath}.`);
+    if (Date.now() >= deadline) throw new Error(`Timed out ${state.runId ? 'waiting for required builds' : 'discovering dispatched run'}. Resume with: ${resumeCommand}`);
     await delay(Math.min(10_000, Math.max(1, deadline - Date.now())));
   }
+}
+
+async function publishOnGitHub(state, statePath, channel, timeout, attempt, resumeCommand) {
+  const workflowName = 'desktop-publish.yml';
+  let publication = state.publication;
+  if (!publication || publication.channel !== channel || publication.buildAttempt !== state.attempt) {
+    const branch = api(`repos/${state.repository}`).default_branch;
+    const sha = api(`repos/${state.repository}/commits/${encodeURIComponent(branch)}`).sha;
+    publication = { repository: state.repository, tag: state.tag, version: state.version, sha,
+      channel, buildAttempt: state.attempt, requestId: randomBytes(16).toString('hex'), runId: null,
+      attempt: 1, createdAt: new Date(Date.now() - 60_000).toISOString() };
+    state.publication = publication;
+    save(statePath, state);
+    gh(['workflow', 'run', workflowName, '--repo', state.repository, '--ref', branch,
+      '-f', `build_run_id=${state.runId}`, '-f', `build_attempt=${state.attempt}`,
+      '-f', `channel=${channel}`, '-f', `request_id=${publication.requestId}`]);
+  }
+  validateState(publication);
+  console.log(`GitHub is verifying and publishing ${state.tag} as ${channel}; no artifacts are downloaded to this machine.`);
+  await monitor(publication, statePath, timeout, attempt, resumeCommand, {
+    workflow: workflowName, jobs: ['publish'], attemptFlag: '--publication-attempt',
+    title: `publish ${state.runId} ${state.attempt} ${channel} ${publication.requestId}`,
+    persist: () => save(statePath, state),
+  });
+  const release = api(`repos/${state.repository}/releases/tags/${state.tag}`);
+  if (release.draft || release.tag_name !== state.tag || release.prerelease !== (channel === 'prerelease')) {
+    throw new Error('Publication completed but the GitHub release does not match the requested channel.');
+  }
+  console.log(`Published ${channel}: ${product.repositoryUrl}/releases/tag/${state.tag}`);
 }
 
 async function main() {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     tag: { type: 'string' }, state: { type: 'string' },
     timeout: { type: 'string', default: '7200' }, attempt: { type: 'string' },
+    'publication-attempt': { type: 'string' },
     output: { type: 'string' }, help: { type: 'boolean' }, stable: { type: 'boolean', default: false },
   } });
   const command = positionals[0];
@@ -84,22 +125,29 @@ async function main() {
     console.log('Usage: npm run release:build -- --tag <existing-remote-tag> [--state file]\n'
       + '       npm run release:monitor -- [--state file] [--attempt N] [--timeout seconds]\n'
       + '       npm run release:download -- [--state file] [--output directory]\n'
-      + '       npm run release:stage -- [--state file] [--output directory]\n'
-      + '       npm run release:promote -- [--state file] [--output directory] [--stable]\n'
-      + '       npm run prerelease -- --tag v<version> [--state file]\n'
-      + '       npm run latest -- --tag v<version> [--state file]\n'
-      + 'Shortcuts build, monitor, verify, stage and publish; an existing receipt resumes without rebuilding.\n'
+      + '       npm run prerelease\n'
+      + '       npm run latest\n'
+      + 'Shortcuts use package.json version; GitHub builds, verifies, uploads and publishes.\n'
+      + 'Optional overrides: --tag v<version> or --state file. Existing receipts resume without rebuilding.\n'
       + 'Build-only dispatch never publishes. Low-level promotion defaults to prerelease unless --stable is explicit.');
     return;
   }
-  if (positionals.length !== 1 || !['dispatch', 'monitor', 'download', 'stage', 'promote', 'prerelease', 'latest'].includes(command)) throw new Error('Unknown release command. Use --help.');
+  if (positionals.length !== 1 || !['dispatch', 'monitor', 'download', 'promote', 'prerelease', 'latest'].includes(command)) throw new Error('Unknown release command. Use --help.');
   if (values.stable && command !== 'promote') throw new Error('--stable is only valid for explicit promotion.');
-  const pipeline = command === 'prerelease' || command === 'latest';
+  const pipeline = command === 'prerelease' || command === 'latest' || command === 'promote';
+  if (values.output && command !== 'download') throw new Error('--output is only for explicit release:download; publication stays on GitHub.');
+  if (pipeline && !values.tag && !values.state) {
+    const version = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8')).version;
+    if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('A prepared package.json release version is required.');
+    values.tag = `v${version}`;
+  }
   if (pipeline && values.tag && !/^v\d+\.\d+\.\d+$/.test(values.tag)) throw new Error('Publication requires a canonical v<version> tag.');
   const statePath = path.resolve(values.state ?? (pipeline && values.tag ? `.release/${values.tag}.json` : '.release/state.json'));
   const timeout = Number(values.timeout);
   const attempt = values.attempt === undefined ? undefined : Number(values.attempt);
+  const publicationAttempt = values['publication-attempt'] === undefined ? undefined : Number(values['publication-attempt']);
   if (!Number.isFinite(timeout) || timeout < 0 || (attempt !== undefined && (!Number.isSafeInteger(attempt) || attempt < 1))) throw new Error('Invalid timeout/attempt.');
+  if (publicationAttempt !== undefined && (!Number.isSafeInteger(publicationAttempt) || publicationAttempt < 1)) throw new Error('Invalid publication attempt.');
   let state;
   if (command === 'dispatch' || (pipeline && values.tag && !fs.existsSync(statePath))) {
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(values.tag ?? '')) throw new Error('An existing immutable tag is required.');
@@ -123,19 +171,18 @@ async function main() {
     if (values.tag && values.tag !== state.tag) throw new Error('Requested tag does not match the saved receipt tag.');
   }
   if (pipeline && state.tag !== `v${state.version}`) throw new Error('Publication requires a canonical v<version> tag.');
-  await monitor(state, statePath, timeout, attempt);
-  if (pipeline || ['download', 'stage', 'promote'].includes(command)) {
+  const resumeCommand = `npm run ${pipeline ? (command === 'promote' ? 'release:promote' : command) : 'release:monitor'} -- --state ${JSON.stringify(statePath)}${values.stable ? ' --stable' : ''}`;
+  await monitor(state, statePath, timeout, attempt, resumeCommand);
+  if (pipeline) {
+    await publishOnGitHub(state, statePath, command === 'latest' || values.stable ? 'latest' : 'prerelease', timeout, publicationAttempt, resumeCommand);
+  } else if (command === 'download') {
     const output = path.resolve(values.output ?? `.release/${state.version}-${state.runId}-${state.attempt}-${command}-${randomBytes(4).toString('hex')}`);
     if (fs.existsSync(output)) throw new Error(`Download directory already exists: ${output}. Choose a new --output directory.`);
+    console.log('Downloading build artifacts from GitHub Actions…');
     gh(['run', 'download', String(state.runId), '--repo', state.repository,
       '--name', `release-${state.runId}-${state.attempt}`, '--dir', output]);
     await verifyBundle(output, state);
     console.log(`Verified all release artifacts: ${output}`);
-    if (pipeline || command === 'stage' || command === 'promote') {
-      const { stageRelease, promote } = await import('./promote-release.mjs');
-      if (pipeline || command === 'stage') await stageRelease(output, state);
-      if (pipeline || command === 'promote') await promote(output, state, { stable: command === 'latest' || values.stable });
-    }
   }
 }
 

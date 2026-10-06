@@ -77,7 +77,6 @@
     "release:build": "node scripts/github-release.mjs dispatch",
     "release:monitor": "node scripts/github-release.mjs monitor",
     "release:download": "node scripts/github-release.mjs download",
-    "release:stage": "node scripts/github-release.mjs stage",
     "prerelease": "node scripts/github-release.mjs prerelease",
     "latest": "node scripts/github-release.mjs latest",
     "release:promote": "node scripts/github-release.mjs promote",
