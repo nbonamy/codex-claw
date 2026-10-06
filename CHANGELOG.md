@@ -4,6 +4,18 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.27.2] - 2026-10-06
+
+### New features
+
+- Agents suggest useful follow-up prompts in the empty composer after finishing
+  a turn. Suggestions stay with their conversation without changing your draft
+  or sending anything automatically.
+
+### Improvements and fixes
+
+- Website download links follow the latest stable release for each platform.
+
 ## [0.27.1] - 2026-10-06
 
 ### New features

@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.27.1",
+  "currentVersion": "0.27.2",
   "releases": [
+    {
+      "version": "0.27.2",
+      "releasedAt": "2026-10-06",
+      "sourceSha256": "3ec3fbbcdae0d8b289b07e9114329eba2b9ca4b975502a04e4dc1618a8521e00",
+      "markdown": "### New features\n\n- Agents suggest useful follow-up prompts in the empty composer after finishing\n  a turn. Suggestions stay with their conversation without changing your draft\n  or sending anything automatically.\n\n### Improvements and fixes\n\n- Website download links follow the latest stable release for each platform."
+    },
     {
       "version": "0.27.1",
       "releasedAt": "2026-10-06",
