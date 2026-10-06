@@ -1,6 +1,6 @@
 ---
 name: update-changelog
-description: Audit Korus and its live sibling codex-app-sdk Git histories, curate the current CHANGELOG.md Unreleased section from user-visible outcomes, and return an evidence-backed semantic-version recommendation. Use only when Nicolas explicitly asks to update, audit, or prepare the changelog or when the prepare-release skill invokes it; never use during ordinary implementation, review, handoff, commit, or push work.
+description: Audit Korus and its locked published codex-app-sdk Git histories, curate CHANGELOG.md Unreleased from user-visible outcomes, and recommend a semantic version. Use only when Nicolas explicitly requests a changelog audit or prepare-release invokes it; never during ordinary implementation, review, commit, or push work.
 ---
 
 # Update Changelog
@@ -11,20 +11,24 @@ history when this skill is explicitly invoked.
 
 ## 1. Require clean release inputs
 
-Korus consumes the live sibling checkout at `../codex-app-sdk`. Before any
-mutation, require both repositories to be clean:
+Before any mutation, require Korus to be clean:
 
 ```bash
 git status --short
-git -C ../codex-app-sdk status --short
 ```
 
-Abort if either command returns any entry. Do not stash, discard, stage,
+Abort if the command returns any entry. Do not stash, discard, stage,
 commit, or absorb existing changes.
 
-Confirm the current branch and upstream in both repositories without pulling
-or switching branches. Require the SDK `HEAD` to equal its upstream exactly.
-Record the full SDK `HEAD` as `<sdk-head>`.
+Confirm Korus's branch/upstream without pulling or switching branches. Resolve
+`<sdk-version>` from `package-lock.json`'s installed `@codex-app-sdk/backend`
+entry and require all SDK workspace dependencies to use that same published
+version. Resolve `<sdk-head>` with `npm view @codex-app-sdk/backend@<sdk-version>
+gitHead --registry=https://registry.npmjs.org`. Require a full commit SHA.
+The audit ends at that published commit, even if the sibling checkout is newer.
+Use the sibling repository as a read-only Git object database if available;
+otherwise use the SDK repository's GitHub compare/commit APIs. Do not require
+a sibling checkout for builds or alter its worktree.
 
 Read `<current-version>` from the root `package.json`.
 
@@ -52,14 +56,16 @@ git for-each-ref "refs/tags/v<current-version>" --format='%(contents)' \
 ```
 
 Require exactly one full commit SHA and verify it exists in the SDK repository.
-For a legacy tag without provenance, infer the SDK baseline from the tag's
+If the annotation is absent, first resolve the SDK version from the baseline
+Korus lockfile and obtain that version's npm `gitHead`. For a legacy local SDK
+lockfile without published provenance, infer the SDK baseline from the tag's
 creation time. If the current release has no tag, use the resolved Korus
 baseline commit time instead:
 
 ```bash
 git for-each-ref "refs/tags/v<current-version>" \
   --format='%(creatordate:iso-strict)'
-git -C ../codex-app-sdk rev-list -n 1 --before='<baseline-date>' HEAD
+git -C ../codex-app-sdk rev-list -n 1 --before='<baseline-date>' <sdk-head>
 ```
 
 State explicitly when the SDK baseline was inferred. Stop and ask Nicolas if
@@ -128,11 +134,11 @@ Run:
 ```bash
 git diff --check
 git status --short
-git -C ../codex-app-sdk status --short
 ```
 
-Only `CHANGELOG.md` may be modified in Korus; the SDK must remain clean and at
-`<sdk-head>`. Review the complete changelog diff.
+Only `CHANGELOG.md` may be modified in Korus; the SDK repository is read-only.
+Recheck that the locked SDK version/provenance did not change and review the
+complete changelog diff.
 
 Return a concise audit result for Nicolas or the calling release skill:
 

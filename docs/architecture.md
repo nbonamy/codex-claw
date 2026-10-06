@@ -435,8 +435,10 @@ Root host commands use the same Electron/Web suffixes:
 | Test | `npm run test:electron` | `npm run test:web` |
 | Test with coverage | `npm run test:coverage:electron` | `npm run test:coverage:web` |
 
-The unqualified `dev`, `build`, `package`, `make`, and `publish` commands are
-Electron-first aliases. Unqualified typecheck, lint, and test commands continue
+The unqualified `dev`, `build`, `package`, and `make` commands are Electron-first
+aliases. `publish` now promotes a verified GitHub build using an explicit dispatch
+receipt; it does not build locally. See the [release workflow](backend-architecture.md#github-desktop-releases).
+Unqualified typecheck, lint, and test commands continue
 to cover every workspace. Web additionally exposes `preview:web`.
 
 Host capabilities are enforced at both UI and backend boundaries. Electron

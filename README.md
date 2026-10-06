@@ -161,6 +161,10 @@ checks that do not need signing:
 APP_SKIP_SIGNING=1 npm run package
 ```
 
+Release builds run on GitHub Actions and stage artifacts before explicit
+promotion. See [GitHub desktop releases](docs/backend-architecture.md#github-desktop-releases)
+for the target matrix, launch/monitor commands, signing setup, and publication.
+
 ### App icon
 
 `electron/assets/icon.svg` is the editable icon source. Keep its background

@@ -1,4 +1,4 @@
 interface:
   display_name: "Prepare Release"
-  short_description: "Audit, freeze, build, and publish a release"
-  default_prompt: "Use $prepare-release to prepare and publish the next Korus release."
+  short_description: "Audit, freeze, and stage GitHub desktop builds"
+  default_prompt: "Use $prepare-release to prepare and stage the next Korus release."
