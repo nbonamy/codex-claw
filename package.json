@@ -3,6 +3,9 @@
   "version": "0.27.0",
   "private": true,
   "overrides": {
+    "extract-zip": {
+      "yauzl": "^3.4.0"
+    },
     "@codex-app-sdk/backend": "file:../codex-app-sdk/packages/backend",
     "@codex-app-sdk/core": "file:../codex-app-sdk/packages/core",
     "@codex-app-sdk/electron": "file:../codex-app-sdk/packages/electron",

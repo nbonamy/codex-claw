@@ -4,7 +4,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const rootPackageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const sdkDependencies = [
   ['backend', '@codex-app-sdk/backend'],
@@ -49,7 +48,8 @@ if (!fs.existsSync(path.join(sdkRoot, 'package.json'))) {
 }
 
 console.log(`[build:sdk] rebuilding local modular Codex App SDK at ${sdkRoot}`);
-const result = spawnSync(npmCommand, ['run', 'build'], { cwd: sdkRoot, stdio: 'inherit' });
+const npmCli = process.env.npm_execpath;
+const result = spawnSync(npmCli ? process.execPath : 'npm', npmCli ? [npmCli, 'run', 'build'] : ['run', 'build'], { cwd: sdkRoot, stdio: 'inherit' });
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 

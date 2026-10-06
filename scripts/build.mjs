@@ -9,7 +9,8 @@ dotenv.config();
 const skipMacSigning = Boolean(process.env.TEST) || process.env.APP_SKIP_SIGNING === '1';
 
 function run(command, args) {
-  const result = spawnSync(command, args, { stdio: 'inherit' });
+  const npmCli = command === 'npm' ? process.env.npm_execpath : undefined;
+  const result = spawnSync(npmCli ? process.execPath : command, npmCli ? [npmCli, ...args] : args, { stdio: 'inherit' });
   if (result.error) {
     throw result.error;
   }

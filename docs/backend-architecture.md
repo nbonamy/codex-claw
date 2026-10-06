@@ -44,8 +44,11 @@ Windows. Directory moves retry transient locks; failed validation rolls back
 the previous installation, retaining recovery files if rollback is blocked.
 Keep its `bin/`, `codex-path/`, and `codex-resources/` layout intact; the Windows
 desktop launches `resources/codex/bin/codex.exe`. macOS/Linux retain their
-existing bundled executable paths. Development invokes the parent npm CLI
-through Node to avoid Windows command-shim execution and quoting issues.
+existing bundled executable paths. Development and build scripts invoke the
+parent npm CLI through Node to avoid Windows command-shim execution and quoting
+issues. The `extract-zip` dependency uses an overridden `yauzl` version to avoid
+incomplete Electron archive extraction on Node 26. Keep the archive completion
+regression test when updating this packaging dependency.
 
 Use `backend/dist/korusd --version`, `--stdio`, `serve`, or `connect` when
 running the built backend directly. SSH deployments still transport the
