@@ -1,6 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 
+export function assertPinnedCodexArchive(target) {
+  if (!/^codex-package-[a-z0-9_-]+\.tar\.gz$/.test(target.archive) || !/^[a-f0-9]{64}$/.test(target.sha256)) {
+    throw new Error('The Codex archive and SHA-256 must be pinned for this target.');
+  }
+}
+
 export function validateCodexReleaseConfig(value) {
   if (!value || typeof value !== 'object') {
     throw new Error('Invalid bundled Codex release configuration.');

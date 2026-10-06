@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  assertPinnedCodexArchive,
   hasExpectedExecutableArchitecture,
   selectCodexReleaseTarget,
   shouldPrepareComputerUse,
@@ -19,6 +20,12 @@ const releaseConfig = {
 };
 
 describe('runtime artifacts', () => {
+  it('accepts official x86_64 archives while rejecting unsafe names and missing checksums', () => {
+    const target = { archive: 'codex-package-x86_64-pc-windows-msvc.tar.gz', sha256: 'a'.repeat(64) };
+    expect(() => assertPinnedCodexArchive(target)).not.toThrow();
+    expect(() => assertPinnedCodexArchive({ ...target, archive: '../' + target.archive })).toThrow('must be pinned');
+    expect(() => assertPinnedCodexArchive({ ...target, sha256: '' })).toThrow('must be pinned');
+  });
   it('selects the release target for the current platform and rejects unsupported hosts', () => {
     expect(selectCodexReleaseTarget(releaseConfig, 'linux', 'x64')).toStrictEqual({
       platform: 'linux',
