@@ -3,15 +3,27 @@
   "targets": [
     {
       "platform": "darwin",
-      "arch": "arm64"
+      "arch": "arm64",
+      "archive": "codex-package-aarch64-apple-darwin.tar.gz",
+      "sha256": "fad57a5681cabcef21d322af5aec938975cfb711b5f25d4ce4907e6561616d07"
     },
     {
       "platform": "linux",
-      "arch": "x64"
+      "arch": "x64",
+      "archive": "codex-package-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "3930f31ac5fca861ea3e444e2683f261190d96b63fba58e0a40a879174369cdf"
     },
     {
       "platform": "linux",
-      "arch": "arm64"
+      "arch": "arm64",
+      "archive": "codex-package-aarch64-unknown-linux-musl.tar.gz",
+      "sha256": "20b7d673cf2b64b6c6208fa4fda06feb9dac0572da9987294b48cde1dab9d001"
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "archive": "codex-package-x86_64-pc-windows-msvc.tar.gz",
+      "sha256": "a174a1c8c0405076c7cc56534fa8d6760b83ce175526ddd20d1a182e33d9ebdb"
     }
   ]
 }

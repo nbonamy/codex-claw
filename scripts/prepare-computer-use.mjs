@@ -25,6 +25,10 @@ function run(command, args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
+if (process.arch !== 'arm64') {
+  throw new Error('The published Computer Use helper supports macOS ARM64 only; Intel desktop releases are deferred.');
+}
+
 function localBuild() {
   run('bash', [
     sourceBuildScript,

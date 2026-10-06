@@ -2,6 +2,9 @@ import { product } from '@workspace/core/product';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDMG, MakerDMGConfig } from '@electron-forge/maker-dmg';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerRpm } from '@electron-forge/maker-rpm';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { VitePlugin } from '@electron-forge/plugin-vite';
@@ -47,14 +50,13 @@ const dmgOptions: MakerDMGConfig = {
   // }
 }
 const updateBaseUrl = process.env.APP_UPDATE_BASE_URL ?? product.updateBaseUrl;
-const updateManifestBaseUrl = `${updateBaseUrl.replace(/\/+$/, '')}/darwin/arm64`;
+const updateManifestBaseUrl = `${updateBaseUrl.replace(/\/+$/, '')}/darwin/${process.arch}`;
 
 if (isDarwin && !skipMacSigning) {
   osxPackagerConfig = {
     osxSign: {
       identity: process.env.IDENTIFY_DARWIN_CODE,
       ignore: shouldPreserveUpstreamCodexSignature,
-      // provisioningProfile: './build/Witsy_Darwin.provisionprofile',
       optionsForFile: () => { return {
         hardenedRuntime: true,
         entitlements: './build/Entitlements.darwin.plist',
@@ -72,7 +74,7 @@ if (isDarwin && !skipMacSigning) {
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    icon: 'assets/icon',
+    icon: process.platform === 'win32' ? undefined : 'assets/icon',
     name: product.name,
     appBundleId: product.appId,
     executableName: product.name,
@@ -106,6 +108,11 @@ const config: ForgeConfig = {
   makers: [
     new MakerZIP({ macUpdateManifestBaseUrl: updateManifestBaseUrl }, ['darwin', 'win32', 'linux']),
     new MakerDMG(dmgOptions, ['darwin']),
+    // Intentionally unsigned. No certificate or signing service is required.
+    new MakerSquirrel({ name: product.slug, authors: product.name, description: `${product.name} desktop`,
+      setupExe: `${product.slug}-${process.env.RELEASE_VERSION ?? 'setup'}-${process.arch}.exe` }),
+    new MakerDeb({ options: { name: product.slug, maintainer: product.name, homepage: product.websiteUrl } }),
+    new MakerRpm({ options: { name: product.slug, homepage: product.websiteUrl } }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

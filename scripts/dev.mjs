@@ -8,9 +8,8 @@ const backendBundle = path.join(rootDir, 'backend/dist/daemon.mjs');
 const children = new Set();
 let shuttingDown = false;
 
-// Development resolves the sibling SDK directly from source so Vite can
-// hot-reload changes. Package and release builds use its locally built dist.
-process.env.CODEX_APP_SDK_SOURCE = '1';
+// Published SDK packages are the default. Opt in to sibling source development
+// explicitly with CODEX_APP_SDK_SOURCE=1.
 
 if (process.argv.includes('--help')) {
   console.log('Usage: npm run dev');
@@ -39,7 +38,8 @@ const electronDev = start('npm', ['run', 'start:electron'], {
     APP_BACKEND_ARGS: `${backendBundle},--stdio`,
     APP_BACKEND_WATCH_FILE: '',
     APP_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
-    APP_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex', 'codex'),
+    APP_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex',
+      ...(process.platform === 'win32' ? ['bin', 'codex.exe'] : ['codex'])),
     CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', '@codex-app-sdk', 'backend', 'assets'),
   },
 });
@@ -63,6 +63,11 @@ backendWatch.on('exit', (code) => {
 });
 
 function start(command, args, options) {
+  if (command === 'npm') {
+    if (!process.env.npm_execpath) throw new Error('Run development through npm run dev.');
+    args = [process.env.npm_execpath, ...args];
+    command = process.execPath;
+  }
   const child = spawn(command, args, {
     cwd: options.cwd,
     env: {

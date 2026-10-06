@@ -1,135 +1,50 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import {
-  hasExpectedExecutableArchitecture,
-  resolveInstalledExecutable,
-  selectCodexReleaseTarget,
-} from './runtime-artifacts.mjs';
+import config from '../codex-app-server-release.json' with { type: 'json' };
+import { hasExpectedExecutableArchitecture, selectCodexReleaseTarget } from './runtime-artifacts.mjs';
 
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const configPath = path.join(rootDir, 'codex-app-server-release.json');
-const outputDir = path.join(rootDir, 'electron', 'resources', 'codex');
-const outputPath = path.join(outputDir, 'codex');
-const codeModeHostOutputPath = path.join(outputDir, 'codex-code-mode-host');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-const installerUrl = 'https://releases.openai.com/codex/install.sh';
-
+const root = path.resolve(import.meta.dirname, '..');
 const target = selectCodexReleaseTarget(config, process.platform, process.arch);
-if (hasExpectedRelease(outputPath, codeModeHostOutputPath)) {
-  console.log(
-    `[prepare-codex-app-server] Codex ${config.version} is already hosted at ${path.relative(rootDir, outputPath)}`,
-  );
-} else {
-  await installRelease();
-
-  console.log(
-    `[prepare-codex-app-server] hosted Codex ${config.version} at ${path.relative(rootDir, outputPath)}`,
-  );
+if (!/^codex-package-[a-z0-9-]+\.tar\.gz$/.test(target.archive) || !/^[a-f0-9]{64}$/.test(target.sha256)) {
+  throw new Error('The Codex archive and SHA-256 must be pinned for this target.');
 }
-
-async function installRelease() {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-workspace-app-server-'));
-  const installerPath = path.join(tempDir, 'install.sh');
-  const installBinDir = path.join(tempDir, 'bin');
-  const installHomeDir = path.join(tempDir, 'home');
-  const installerUserHome = path.join(tempDir, 'user-home');
-  const temporaryOutputPath = path.join(outputDir, `.codex-${process.pid}.tmp`);
-  const temporaryCodeModeHostOutputPath = path.join(
-    outputDir,
-    `.codex-code-mode-host-${process.pid}.tmp`,
-  );
-
-  try {
-    run('curl', [
-      '--fail',
-      '--location',
-      '--retry', '3',
-      '--silent',
-      '--show-error',
-      '--output', installerPath,
-      installerUrl,
-    ]);
-    fs.mkdirSync(installBinDir, { recursive: true });
-    fs.mkdirSync(installerUserHome, { recursive: true });
-    run('sh', [installerPath], {
-      ...process.env,
-      CODEX_HOME: installHomeDir,
-      CODEX_INSTALL_DIR: installBinDir,
-      CODEX_NON_INTERACTIVE: '1',
-      CODEX_RELEASE: config.version,
-      HOME: installerUserHome,
-      PATH: [installBinDir, '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(path.delimiter),
-      SHELL: '/bin/sh',
-    });
-
-    const installedPath = resolveInstalledExecutable('codex', installBinDir, installHomeDir);
-    const installedCodeModeHostPath = resolveInstalledExecutable(
-      'codex-code-mode-host',
-      installBinDir,
-      installHomeDir,
-    );
-    if (!hasExpectedRelease(installedPath, installedCodeModeHostPath)) {
-      throw new Error(`OpenAI's installer did not provide Codex ${config.version}.`);
-    }
-
-    fs.mkdirSync(outputDir, { recursive: true });
-    fs.copyFileSync(installedPath, temporaryOutputPath);
-    fs.copyFileSync(installedCodeModeHostPath, temporaryCodeModeHostOutputPath);
-    fs.chmodSync(temporaryOutputPath, 0o755);
-    fs.chmodSync(temporaryCodeModeHostOutputPath, 0o755);
-    if (!hasExpectedRelease(temporaryOutputPath, temporaryCodeModeHostOutputPath)) {
-      throw new Error(`Copied Codex ${config.version} failed validation.`);
-    }
-    fs.renameSync(temporaryCodeModeHostOutputPath, codeModeHostOutputPath);
-    fs.renameSync(temporaryOutputPath, outputPath);
-  } finally {
-    fs.rmSync(temporaryOutputPath, { force: true });
-    fs.rmSync(temporaryCodeModeHostOutputPath, { force: true });
-    fs.rmSync(tempDir, { recursive: true, force: true });
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'app-codex-'));
+const output = path.join(root, 'electron/resources/codex');
+try {
+  const archive = path.join(temp, target.archive);
+  execFileSync('curl', ['--fail', '--location', '--retry', '3', '--silent', '--show-error',
+    '--output', archive, `https://github.com/openai/codex/releases/download/rust-v${config.version}/${target.archive}`], { stdio: 'inherit' });
+  const digest = createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
+  if (digest !== target.sha256) throw new Error(`Codex archive checksum mismatch: ${target.archive}`);
+  const extracted = path.join(temp, 'release');
+  fs.mkdirSync(extracted);
+  execFileSync('tar', ['-xzf', archive, '-C', extracted]);
+  const suffix = process.platform === 'win32' ? '.exe' : '';
+  for (const name of ['codex', 'codex-code-mode-host']) {
+    const executable = path.join(extracted, 'bin', name + suffix);
+    if (!hasExpectedExecutableArchitecture(executable, target, {
+      verifyDarwinSignature: file => execFileSync('codesign', ['--verify', '--strict', file]),
+    })) throw new Error(`Wrong architecture: ${name}`);
   }
-}
-
-function verifyDarwinSignature(filePath) {
-  execFileSync('codesign', ['--verify', '--strict', '--verbose=2', filePath], {
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
-}
-
-function hasExpectedRelease(filePath, codeModeHostPath) {
-  try {
-    if (!fs.statSync(filePath).isFile() || !fs.statSync(codeModeHostPath).isFile()) {
-      return false;
-    }
-    const version = execFileSync(filePath, ['--version'], { encoding: 'utf8' }).trim();
-    if (version !== `codex-cli ${config.version}`) {
-      return false;
-    }
-    for (const executablePath of [filePath, codeModeHostPath]) {
-      if (!hasExpectedArchitecture(executablePath)) return false;
-    }
-    return true;
-  } catch {
-    return false;
+  const version = execFileSync(path.join(extracted, 'bin', 'codex' + suffix), ['--version'], { encoding: 'utf8' }).trim();
+  if (version !== `codex-cli ${config.version}`) throw new Error(`Unexpected Codex version: ${version}`);
+  fs.mkdirSync(output, { recursive: true });
+  for (const entry of fs.readdirSync(output)) {
+    if (entry !== '.gitignore') fs.rmSync(path.join(output, entry), { recursive: true, force: true });
   }
-}
-
-function hasExpectedArchitecture(executablePath) {
-  return hasExpectedExecutableArchitecture(executablePath, target, { verifyDarwinSignature });
-}
-
-function run(command, args, env = process.env) {
-  const result = spawnSync(command, args, {
-    cwd: rootDir,
-    env,
-    stdio: 'inherit',
-  });
-  if (result.error) {
-    throw result.error;
+  if (process.platform === 'win32') {
+    // The sandbox runners, rg, voice host and DLLs resolve relative to bin/codex.exe.
+    fs.cpSync(extracted, output, { recursive: true });
+  } else {
+    fs.mkdirSync(output, { recursive: true });
+    for (const name of ['codex', 'codex-code-mode-host']) {
+      fs.copyFileSync(path.join(extracted, 'bin', name), path.join(output, name));
+      fs.chmodSync(path.join(output, name), 0o755);
+    }
   }
-  if (result.status !== 0) {
-    throw new Error(`${command} exited with ${result.status ?? 'no status'}.`);
-  }
-}
+  fs.writeFileSync(path.join(output, 'release.json'), JSON.stringify({ version: config.version, ...target }, null, 2) + '\n');
+  console.log(`[prepare-codex-app-server] prepared Codex ${config.version} for ${target.platform}/${target.arch}`);
+} finally { fs.rmSync(temp, { recursive: true, force: true }); }

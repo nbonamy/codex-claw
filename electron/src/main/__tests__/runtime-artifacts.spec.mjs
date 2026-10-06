@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   hasExpectedExecutableArchitecture,
   resolveInstalledExecutable,
@@ -88,5 +91,22 @@ describe('runtime artifacts', () => {
     expect(shouldPrepareComputerUse('darwin')).toBe(true);
     expect(shouldPrepareComputerUse('linux')).toBe(false);
     expect(shouldPrepareComputerUse('win32')).toBe(false);
+  });
+
+  it('validates Windows PE architecture and rejects truncated images', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'app-pe-'));
+    const executable = path.join(dir, 'codex.exe');
+    try {
+      const image = Buffer.alloc(256);
+      image.write('MZ');
+      image.writeUInt32LE(128, 60);
+      image.write('PE\0\0', 128);
+      image.writeUInt16LE(0x8664, 132);
+      writeFileSync(executable, image);
+      expect(hasExpectedExecutableArchitecture(executable, { platform: 'win32', arch: 'x64' })).toBe(true);
+      expect(hasExpectedExecutableArchitecture(executable, { platform: 'win32', arch: 'arm64' })).toBe(false);
+      writeFileSync(executable, image.subarray(0, 64));
+      expect(hasExpectedExecutableArchitecture(executable, { platform: 'win32', arch: 'x64' })).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

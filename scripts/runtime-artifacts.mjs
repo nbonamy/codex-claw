@@ -14,7 +14,7 @@ export function validateCodexReleaseConfig(value) {
   }
   for (const target of value.targets) {
     if (!target || typeof target !== 'object'
-      || !['darwin', 'linux'].includes(target.platform)
+      || !['darwin', 'linux', 'win32'].includes(target.platform)
       || !['arm64', 'x64'].includes(target.arch)) {
       throw new Error('Bundled Codex release contains an invalid target.');
     }
@@ -50,12 +50,24 @@ export function hasExpectedExecutableArchitecture(executablePath, target, depend
     const architectures = run('lipo', ['-archs', executablePath], { encoding: 'utf8' })
       .trim()
       .split(/\s+/);
-    if (!architectures.includes(target.arch)) return false;
+    if (!architectures.includes(target.arch === 'x64' ? 'x86_64' : target.arch)) return false;
     dependencies.verifyDarwinSignature?.(executablePath);
     return true;
   }
 
+  if (target.platform === 'win32') {
+    const descriptor = fs.openSync(executablePath, 'r');
+    try {
+      const dos = Buffer.alloc(64);
+      if (fs.readSync(descriptor, dos, 0, 64, 0) !== 64 || dos.toString('ascii', 0, 2) !== 'MZ') return false;
+      const pe = Buffer.alloc(6);
+      if (fs.readSync(descriptor, pe, 0, 6, dos.readUInt32LE(60)) !== 6 || pe.readUInt32LE(0) !== 0x4550) return false;
+      return pe.readUInt16LE(4) === (target.arch === 'x64' ? 0x8664 : 0xaa64);
+    } finally { fs.closeSync(descriptor); }
+  }
+
   const header = (dependencies.readElfHeader ?? readElfHeader)(executablePath);
+  if (header.length < 20) return false;
   if (!header.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))) return false;
   const littleEndian = header[5] === 1;
   if (!littleEndian && header[5] !== 2) return false;

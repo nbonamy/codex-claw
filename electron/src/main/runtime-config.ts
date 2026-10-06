@@ -158,7 +158,8 @@ function runtimeBundledCodexPath(deps: RuntimeDaemonConfigDeps): string | null {
     return null;
   }
 
-  const binaryPath = path.join(resourcesPath, 'codex', 'codex');
+  const binaryPath = path.join(resourcesPath, 'codex',
+    ...((deps.platform ?? process.platform) === 'win32' ? ['bin', 'codex.exe'] : ['codex']));
   return (deps.existsSync ?? existsSync)(binaryPath) ? binaryPath : null;
 }
 

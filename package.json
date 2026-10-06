@@ -2,13 +2,7 @@
   "name": "agent-workspace",
   "version": "0.27.0",
   "private": true,
-  "overrides": {
-    "@codex-app-sdk/backend": "file:../codex-app-sdk/packages/backend",
-    "@codex-app-sdk/core": "file:../codex-app-sdk/packages/core",
-    "@codex-app-sdk/electron": "file:../codex-app-sdk/packages/electron",
-    "@codex-app-sdk/vue": "file:../codex-app-sdk/packages/vue",
-    "@codex-app-sdk/web": "file:../codex-app-sdk/packages/web"
-  },
+  "packageManager": "npm@10.9.4",
   "devDependencies": {
     "@lyliya/stylelint-value-no-unknown-custom-properties": "^6.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
