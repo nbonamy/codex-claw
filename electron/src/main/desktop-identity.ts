@@ -3,6 +3,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { product } from '@workspace/core/product';
 
+export function desktopIconPath(app: Pick<App, 'getAppPath' | 'isPackaged'>): string {
+  return app.isPackaged
+    ? path.join(path.dirname(app.getAppPath()), 'icon.png')
+    : path.join(app.getAppPath(), 'assets', 'icon.png');
+}
+
 export function configureDesktopIdentity(app: Pick<App, 'setName' | 'getAppPath' | 'getPath' | 'isPackaged'>, platform = process.platform, env = process.env, executable = process.execPath): void {
   app.setName(product.name);
   if (platform !== 'linux') return;
@@ -14,7 +20,7 @@ export function configureDesktopIdentity(app: Pick<App, 'setName' | 'getAppPath'
   if (app.isPackaged && [dataHome, ...systemDirectories].some(directory => existsSync(path.join(directory, 'applications', filename)))) return;
   const icon = path.join(dataHome, 'icons', 'hicolor', '256x256', 'apps', `${id}.png`);
   mkdirSync(path.dirname(icon), { recursive: true });
-  writeFileSync(icon, readFileSync(path.join(app.getAppPath(), 'assets', 'icon.png')));
+  writeFileSync(icon, readFileSync(desktopIconPath(app)));
   mkdirSync(path.dirname(entry), { recursive: true });
   const quote = (value: string): string => `"${value.replace(/[%\\"`$]/g, character => character === '%' ? '%%' : character === '\\' ? '\\\\\\\\' : `\\\\${character}`)}"`;
   const command = [executable, ...(app.isPackaged ? [] : [app.getAppPath()])].map(quote).join(' ');
