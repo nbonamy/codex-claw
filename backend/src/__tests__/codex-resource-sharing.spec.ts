@@ -55,6 +55,17 @@ describe('Codex resource sharing', () => {
     });
   });
 
+  it('keeps shared resources live across repeated startup reconciliation', async () => {
+    await initializeCodexResourceSharing(true, paths);
+    await writeFile(path.join(paths.userCodexHome, 'skills', 'shared.md'), 'first');
+    expect(await readFile(path.join(paths.appCodexHome, 'skills', 'shared.md'), 'utf8')).toBe('first');
+
+    await initializeCodexResourceSharing(true, paths);
+    await writeFile(path.join(paths.appCodexHome, 'skills', 'shared.md'), 'updated');
+    expect(await readFile(path.join(paths.userCodexHome, 'skills', 'shared.md'), 'utf8')).toBe('updated');
+    expect(await getCodexResourceSharingStatus(true, paths)).toStrictEqual({ enabled: true, migrationRequired: false });
+  });
+
   it('creates fresh isolated directories when sharing is turned off', async () => {
     await reconcileCodexResourceSharing(true, paths);
     await writeFile(path.join(paths.userCodexHome, 'skills', 'shared.md'), 'shared');
