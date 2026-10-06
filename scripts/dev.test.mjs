@@ -19,7 +19,17 @@ test('dev launches npm through its CLI path, including paths with spaces, and re
       const fs = require('node:fs');
       fs.appendFileSync(process.env.APP_DEV_TRACE, JSON.stringify({ args: process.argv.slice(2), codex: process.env.APP_BUNDLED_CODEX_PATH }) + '\\n');
       if (process.argv[3] === 'dev:backend') setInterval(() => {}, 1000);
-      if (process.argv[3] === 'start:electron') process.exit(23);
+      if (process.argv[3] === 'start:electron') {
+        const watcher = fs.watch(process.env.APP_DEV_TRACE, () => finish());
+        const finish = () => {
+          const calls = fs.readFileSync(process.env.APP_DEV_TRACE, 'utf8').trim().split('\\n').map(JSON.parse);
+          if (calls.some(call => call.args[1] === 'dev:backend')) {
+            watcher.close();
+            process.exit(23);
+          }
+        };
+        finish();
+      }
     `);
     const result = spawnSync(process.execPath, [path.join(root, 'scripts/dev.mjs')], {
       env: { ...process.env, PATH: '', npm_execpath: npmCli, APP_DEV_TRACE: trace },
