@@ -8,6 +8,17 @@ import {
 } from '../claude-tool-part-adapter';
 
 describe('Claude tool part adapter', () => {
+  it.each(['browser screenshot', 'select:mcp__korus__list_agents', ''])('preserves tool search context through streaming and completion: %s', (query) => {
+    const part = claudeToolPart({ type: 'tool_use', id: 'search-1', name: 'ToolSearch', input: { query } });
+    const descriptor = { source: 'claude', action: 'search', phase: 'running', params: { scope: 'tools', ...(query ? { target: query } : {}) } };
+    expect(part.input).toEqual({ query });
+    expect(JSON.parse(part.statusText!)).toEqual(descriptor);
+    expect(claudeToolPartInputUpdate(part).statusText).toBe(part.statusText);
+    for (const phase of ['completed', 'failed'] as const) {
+      expect(JSON.parse(completedClaudeToolPart(part, phase, undefined, '').statusText!)).toEqual({ ...descriptor, phase });
+    }
+  });
+
   it('preserves Bash commands and descriptions as a command tool', () => {
     const part = claudeToolPart({
       type: 'tool_use',

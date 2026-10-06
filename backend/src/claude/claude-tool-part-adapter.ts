@@ -128,6 +128,18 @@ export function claudeToolPart(
     });
   }
 
+  if (block.name === 'ToolSearch') {
+    const query = stringValue(input.query);
+    return toolPart(block, {
+      kind: 'generic',
+      title: 'ToolSearch',
+      status,
+      input,
+      statusText: toolStatus('search', status, { scope: 'tools', ...(query ? { target: query } : {}) }),
+      metadata,
+    });
+  }
+
   if (block.name === 'WebSearch') {
     const query = stringValue(input.query);
     return toolPart(block, {
