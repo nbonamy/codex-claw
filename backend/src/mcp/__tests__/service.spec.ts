@@ -968,6 +968,7 @@ describe('AppMcpService', () => {
           kind: 'codex',
           model: 'gpt-5.6-sol',
           reasoningEffort: 'high',
+          userSelectedModel: true,
         },
       }),
       expectedPrompt,
@@ -1009,6 +1010,8 @@ describe('AppMcpService', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.claudeCodeEnabled = true;
+    snapshot.general.providerApprovalDefaults = { claude: 'auto' };
+    snapshot.general.providerModelDefaults = { claude: { model: 'sonnet', reasoningEffort: 'medium', serviceTier: null } };
     snapshot.agents[0]!.backendDefaults = {
       kind: 'codex',
       model: 'gpt-5.6-sol',
@@ -1033,9 +1036,14 @@ describe('AppMcpService', () => {
       kind: 'codex',
       model: 'gpt-6-astra',
       reasoningEffort: 'max',
+      userSelectedModel: true,
     });
     expect(snapshot.agents.find((agent) => agent.name === 'Claude worker')?.backendDefaults).toStrictEqual({
       kind: 'claude',
+      model: 'sonnet',
+      reasoningEffort: 'medium',
+      userSelectedModel: true,
+      permissionMode: 'auto',
     });
   });
 

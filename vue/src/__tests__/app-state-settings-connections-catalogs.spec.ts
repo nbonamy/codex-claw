@@ -348,6 +348,41 @@ describe('useAppState', () => {
     expect(state.selectedReasoningEffort.value).toBe('xhigh');
   });
 
+  it('keeps a delegated Claude model visible when startup reports its resolved model id', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backend = 'claude';
+    agent.delegatedByAgentId = snapshot.agents[1]!.id;
+    agent.backendDefaults = { kind: 'claude', model: 'claude-sonnet-5-5', permissionMode: 'auto' };
+    agent.backendSession = { kind: 'claude', sessionId: 'delegated-session', transport: 'stdio', model: 'claude-sonnet-5-5' };
+    let receive!: (event: MainToRendererEvent) => void;
+    const sendPrompt = vi.fn().mockResolvedValue(snapshot);
+    stubElectronTestWindow({ app: {
+      getSnapshot: async () => snapshot,
+      listBackendModels: async () => [
+        { id: 'default', model: 'default', displayName: 'Default', isDefault: true },
+        { id: 'sonnet', model: 'sonnet', displayName: 'Sonnet 5.5', providerMetadata: { resolvedModel: 'claude-sonnet-5-5' } },
+      ],
+      onEvent: listener => { receive = listener; return () => undefined; }, sendPrompt,
+    } satisfies Partial<AppApi> });
+    const state = useAppState();
+    await state.loadSnapshot();
+    const controller = createCodexConversationPaneController({
+      state: agentConversationState(() => state.agentConversationFor(agent.id)!),
+      actions: { updateComposerState: value => state.updateComposerState(agent.id, value) },
+    });
+    const wrapper = mount(ConversationPane, { props: { agent, controller } });
+    try {
+      expect(wrapper.text()).toContain('Sonnet 5.5');
+      receive({ seq: 1, agentId: agent.id, backend: 'claude', type: 'conversation.settingsUpdated',
+        payload: { settings: { model: 'claude-sonnet-5-5' } }, occurredAt: '2026-10-07T13:46:28Z' });
+      await nextTick();
+      expect(wrapper.text()).toContain('Sonnet 5.5');
+      await state.sendAgentPrompt(agent.id, 'Continue');
+      expect(sendPrompt).toHaveBeenCalledWith(agent.id, 'Continue', expect.objectContaining({ model: 'sonnet' }));
+    } finally { wrapper.unmount(); }
+  });
+
   it('uses the last Claude selection when the thread has no model metadata', async () => {
     const base = createInitialSnapshot();
     base.agents[0] = {

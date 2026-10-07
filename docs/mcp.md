@@ -91,7 +91,9 @@ by mutating user-global tool config.
   `instructions` is the full handoff, prepended inside an escaped `<context>`
   block (presentation separation, not secret storage: both stay in the transcript).
   Model and effort inherit from the caller only for the same backend; another
-  backend uses its own defaults.
+  backend uses its own defaults. Target-provider saved approval settings apply
+  before the initial prompt; explicit or inherited model selections override
+  model defaults without replacing that approval policy.
 - With a `task` contract (`title`, `doneWhen`), a stable parent-scoped `requestId`
   is mandatory and reused after a timeout. Returned `taskId`/`agentId`/status
   describe accepted startup, not completed work.
