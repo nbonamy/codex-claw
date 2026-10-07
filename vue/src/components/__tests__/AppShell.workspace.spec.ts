@@ -130,7 +130,7 @@ describe('AppShell workspace and plans', () => {
     const snapshot = createInitialSnapshot(); snapshot.agents[0]!.folder = '/work/branch';
     const wrapper = mountShell({ snapshot });
     await flushPromises();
-    const clickSave = async () => { await wrapper.findAll('button').find(button => button.text() === 'Save As…')!.trigger('click'); await flushPromises(); };
+    const clickSave = async () => { await wrapper.get('button[aria-label^="Save "][aria-label$=" as…"]').trigger('click'); await flushPromises(); };
     await clickSave();
     expect(choose).toHaveBeenCalledWith('/work/branch/Proposal.md');
     expect(save).not.toHaveBeenCalled();
@@ -140,7 +140,7 @@ describe('AppShell workspace and plans', () => {
     await clickSave();
     expect(save).toHaveBeenLastCalledWith('agent-dina', { tabId, path: '/work/saved.md', overwrite: true });
     expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['saved.md']);
-    expect(wrapper.findAll('button').some(button => button.text() === 'Save As…')).toBe(false);
+    expect(wrapper.find('button[aria-label^="Save "][aria-label$=" as…"]').exists()).toBe(false);
     await wrapper.get('[aria-label="Close saved.md tab"]').trigger('click');
     await flushPromises();
     expect(update).toHaveBeenLastCalledWith('agent-dina', expect.objectContaining({ close: [tabId] }));
@@ -170,7 +170,7 @@ describe('AppShell workspace and plans', () => {
     const snapshot = createInitialSnapshot();
     snapshot.teams[0]!.remoteConnectionId = 'remote-test'; snapshot.agents[0]!.folder = '/remote/worktree';
     const wrapper = mountShell({ snapshot }); await flushPromises();
-    await wrapper.findAll('button').find(button => button.text() === 'Save As…')!.trigger('click'); await flushPromises();
+    await wrapper.get('button[aria-label^="Save "][aria-label$=" as…"]').trigger('click'); await flushPromises();
     const box = new DOMWrapper(document.querySelector('.el-message-box')!);
     expect((box.get('input').element as HTMLInputElement).value).toBe('/remote/worktree/Remote proposal.md');
     expect(box.get('.el-button--primary').text()).toBe('Save');
@@ -190,7 +190,7 @@ describe('AppShell workspace and plans', () => {
     let finishSave!: (result: import('@workspace/core/document-workspace').DocumentWorkspace) => void;
     setElectronTestClient({ getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': saved }), readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '# Content' }), updateDocumentWorkspace: vi.fn().mockResolvedValue(saved), chooseDocumentSavePath: vi.fn().mockResolvedValue('/work/saved.md'), saveWorkspaceDocument: () => new Promise(resolve => { finishSave = resolve; }) });
     const wrapper = mountShell(); await flushPromises();
-    await wrapper.findAll('button').find(button => button.text() === 'Save As…')!.trigger('click'); await flushPromises();
+    await wrapper.get('button[aria-label^="Save "][aria-label$=" as…"]').trigger('click'); await flushPromises();
     await wrapper.get('[aria-label="Close Saving tab"]').trigger('click');
     finishSave({ ...saved, tabs: [{ id: tabId, title: 'saved.md', savedPath: '/work/saved.md' }] });
     await flushPromises();

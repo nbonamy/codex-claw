@@ -54,6 +54,17 @@
                 </button>
               </el-tooltip>
               <button
+                v-if="isRightWorkspaceFileTab(tab) && filePanel(tab)?.documentId && saveDocument"
+                class="right-workspace-panel__tab-save"
+                type="button"
+                :aria-label="$t('documents.saveTabAs', { title: tabLabel(tab) })"
+                :title="$t('documents.saveAs')"
+                :disabled="savingDocument"
+                @click="saveTabDocument(tab)"
+              >
+                <DownloadIcon aria-hidden="true" />
+              </button>
+              <button
                 class="right-workspace-panel__tab-close"
                 type="button"
                 :aria-label="$t('dynamic.files.closeTab', { tab: tabLabel(tab) })"
@@ -75,12 +86,6 @@
           <IconChevronRight aria-hidden="true" />
         </button>
       </div>
-
-      <button
-        v-if="activeTab && isRightWorkspaceFileTab(activeTab) && filePanel(activeTab)?.documentId && saveDocument"
-        type="button" class="app-button app-button--tertiary"
-        :disabled="savingDocument" @click="saveActiveDocument"
-      >{{ $t('documents.saveAs') }}</button>
 
       <OpenInControl
         v-if="activeProjectFilePath && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
@@ -366,7 +371,7 @@ import { ElMessage } from 'element-plus';
 import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkItem } from '@workspace/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, DownloadIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppContextMenu from '../shared/menu/AppContextMenu.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -501,10 +506,10 @@ const tabTrackRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
 const tabContextMenu = ref<{ tab: RightWorkspaceTab; x: number; y: number } | null>(null);
 const savingDocument = ref(false);
-async function saveActiveDocument(): Promise<void> {
-  if (!props.activeTab || !isRightWorkspaceFileTab(props.activeTab) || !props.saveDocument) return;
+async function saveTabDocument(tab: RightWorkspaceFileTab): Promise<void> {
+  if (!props.saveDocument || savingDocument.value) return;
   savingDocument.value = true;
-  try { await props.saveDocument(props.activeTab); }
+  try { await props.saveDocument(tab); }
   catch (error) { ElMessage.error(String(error)); }
   finally { savingDocument.value = false; }
 }
@@ -923,6 +928,7 @@ function urlForTab(tab: RightWorkspaceTab): string {
 }
 
 .right-workspace-panel__tab-select,
+.right-workspace-panel__tab-save,
 .right-workspace-panel__tab-close,
 .right-workspace-panel__files-toggle,
 .right-workspace-panel__add > button {
@@ -951,6 +957,7 @@ function urlForTab(tab: RightWorkspaceTab): string {
 }
 
 .right-workspace-panel__tab-select svg,
+.right-workspace-panel__tab-save svg,
 .right-workspace-panel__tab-close svg,
 .right-workspace-panel__files-toggle svg,
 .right-workspace-panel__add svg {
@@ -959,6 +966,7 @@ function urlForTab(tab: RightWorkspaceTab): string {
   height: var(--icon-md);
 }
 
+.right-workspace-panel__tab-save,
 .right-workspace-panel__tab-close {
   flex: 0 0 var(--space-12);
   display: grid;
@@ -968,6 +976,20 @@ function urlForTab(tab: RightWorkspaceTab): string {
   margin-right: var(--space-2);
   padding: 0;
   border-radius: var(--radius-full);
+}
+
+.right-workspace-panel__tab-save {
+  display: none;
+  margin-right: 0;
+}
+
+.right-workspace-panel__tab:hover .right-workspace-panel__tab-save,
+.right-workspace-panel__tab:focus-within .right-workspace-panel__tab-save {
+  display: grid;
+}
+
+.right-workspace-panel__tab-save:disabled {
+  cursor: default;
 }
 
 @container (max-width: 72px) {
@@ -987,11 +1009,13 @@ function urlForTab(tab: RightWorkspaceTab): string {
 }
 
 @container (max-width: 48px) {
+  .right-workspace-panel__tab-save,
   .right-workspace-panel__tab-close {
     display: none;
   }
 }
 
+.right-workspace-panel__tab-save:hover:not(:disabled),
 .right-workspace-panel__tab-close:hover,
 .right-workspace-panel__files-toggle:hover,
 .right-workspace-panel__add > button:hover,
