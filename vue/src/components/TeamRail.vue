@@ -27,8 +27,10 @@
         :aria-pressed="cockpitActive"
         @click="emit('select-cockpit')"
       >
-        <CockpitIcon :teams="teams" />
+        <DashboardIcon aria-hidden="true" />
       </button>
+
+      <div class="team-rail__separator" role="separator" />
 
       <button
         v-for="team in teams"
@@ -149,9 +151,8 @@ import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount, Remote
 import { defaultTeamColor } from '@workspace/core/team-colors';
 import { product } from '@workspace/core/product';
 import { teamInitials } from '@workspace/core/team-manager';
-import { ClockHour8Icon, BacklogIcon, PlusIcon, ProductMarkIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
+import { ClockHour8Icon, BacklogIcon, DashboardIcon, PlusIcon, ProductMarkIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
-import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
@@ -451,14 +452,24 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 
 .team-rail__backlog {
   padding: 0;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-lowest);
 }
 
-.team-rail__backlog--active {
-  border-color: currentColor;
-  background: var(--color-primary-container);
+.team-rail__cockpit {
+  margin-top: calc(var(--space-4) * -1);
+}
+
+.team-rail__backlog--active,
+.team-rail__cockpit--active {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+}
+
+.team-rail__separator {
+  width: calc(var(--team-rail-button-size) * 0.7);
+  border-top: 1px solid var(--color-border-strong);
+  margin: var(--space-4) 0;
 }
 
 .team-rail__automations svg,
@@ -471,7 +482,8 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   transform: scale(1.15);
 }
 
-.team-rail__backlog svg {
+.team-rail__backlog svg,
+.team-rail__cockpit svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
 }
@@ -557,7 +569,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--color-border);
+  border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-lg);
   color: var(--color-text-muted);
   background: var(--color-surface-low);

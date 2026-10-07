@@ -26,7 +26,7 @@ describe('applyAppTheme', () => {
     expect(root.dataset.effectiveAppearance).toBe('light');
     expect(root.style.getPropertyValue('--color-shell-main')).toBe('var(--color-surface-lowest)');
     expect(root.style.getPropertyValue('--color-shell-sidebar')).toBe('var(--color-surface-low)');
-    expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-sidebar) 97%, black)');
+    expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-main) 92%, black)');
   });
 
   it('applies theme color and font tokens to the document root', () => {
@@ -51,12 +51,12 @@ describe('applyAppTheme', () => {
     expect(root.style.getPropertyValue('--color-text')).toBe('var(--color-on-surface)');
     expect(root.style.getPropertyValue('--color-shell-main')).toBe('var(--color-surface-low)');
     expect(root.style.getPropertyValue('--color-shell-sidebar')).toBe('var(--color-surface-lowest)');
-    expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-sidebar) 97%, white)');
+    expect(root.style.getPropertyValue('--color-shell-rail')).toBe('color-mix(in srgb, var(--color-shell-main) 92%, black)');
     expect(root.style.getPropertyValue('--chat-font-size')).toBe('16px');
     expect(root.style.getPropertyValue('--code-font-size')).toBe('12px');
   });
 
-  it('preserves native macOS translucency when applying a theme', () => {
+  it('preserves macOS sidebar translucency but uses an opaque rail to avoid overlapping tints', () => {
     document.documentElement.dataset.platform = 'macos';
 
     applyAppTheme({
@@ -72,7 +72,7 @@ describe('applyAppTheme', () => {
       'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)',
     );
     expect(root.style.getPropertyValue('--color-shell-rail')).toBe(
-      'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)',
+      'color-mix(in srgb, var(--color-shell-main) 92%, black)',
     );
   });
 

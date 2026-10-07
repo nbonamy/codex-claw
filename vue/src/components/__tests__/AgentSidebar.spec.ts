@@ -10,6 +10,22 @@ import type { Agent, AgentBackend } from '@workspace/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
+  it('hides idle dots at rest without hiding unread or working indicators', async () => {
+    const idle: Agent = { ...agents[0]!, status: { type: 'idle' } };
+    const wrapper = mount(AgentSidebar, {
+      attachTo: document.body,
+      props: { agents: [idle], activeAgentId: idle.id, teamName: 'Team' },
+    });
+    const dot = () => wrapper.get('.agent-sidebar__status').element;
+    expect(getComputedStyle(dot()).visibility).toBe('hidden');
+
+    await wrapper.setProps({ activeAgentId: null, unreadAgentIds: [idle.id] });
+    expect(getComputedStyle(dot()).visibility).toBe('visible');
+    await wrapper.setProps({ unreadAgentIds: [], agents: [{ ...idle, status: { type: 'working' } }] });
+    expect(getComputedStyle(dot()).visibility).toBe('visible');
+    wrapper.unmount();
+  });
+
   it('clips long repository text inside its label without clipping the icon or actions', () => {
     const source = agents[0]!;
     const name = 'a-very-long-project-name-that-does-not-fit-in-the-sidebar';

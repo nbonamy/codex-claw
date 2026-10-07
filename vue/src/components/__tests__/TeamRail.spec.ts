@@ -99,6 +99,8 @@ describe('TeamRail', () => {
 
     expect(expanded.classes()).toContain('team-rail--agent-sidebar-expanded');
     expect(collapsed.classes()).not.toContain('team-rail--agent-sidebar-expanded');
+    expect(getComputedStyle(expanded.get('.team-rail__header').element).background).toBe('var(--color-shell-rail)');
+    expect(getComputedStyle(collapsed.get('.team-rail__header').element).background).toBe('var(--color-shell-collapsed-header)');
   });
 
   it('shows a corner indicator on teams containing unread agents', () => {
@@ -217,35 +219,22 @@ describe('TeamRail', () => {
     expect(wrapper.emitted('select-backlog')).toStrictEqual([[]]);
   });
 
-  it('refreshes the cockpit icon from team colors', async () => {
-    const wrapper = mountRail({
-      teams: [teams[0]],
-      activeTeamId: 'team-sk',
-    });
-
-    expect(cockpitSquareBackgrounds(wrapper)).toStrictEqual([
-      'rgb(70, 168, 87)',
-      'transparent',
-      'transparent',
-      'transparent',
-    ]);
-
-    await (wrapper as unknown as { setProps: (props: { teams: Team[] }) => Promise<void> }).setProps({
-      teams: [
-        {
-          ...teams[0],
-          color: '#0093FF',
-        },
-        teams[1],
-      ],
-    });
-
-    expect(cockpitSquareBackgrounds(wrapper)).toStrictEqual([
-      'rgb(0, 147, 255)',
-      'rgb(27, 79, 178)',
-      'transparent',
-      'transparent',
-    ]);
+  it('separates monochrome navigation from teams and matches active navigation to the add-team surface', async () => {
+    const wrapper = mountRail({ teams, activeTeamId: 'team-sk' });
+    const cockpit = wrapper.get('[aria-label="Cockpit"]');
+    const backlog = wrapper.get('[aria-label="Backlog"]');
+    const add = wrapper.get('[aria-label="Create team"]');
+    expect(cockpit.get('svg').attributes('stroke')).toBe('currentColor');
+    expect(cockpit.element.nextElementSibling?.getAttribute('role')).toBe('separator');
+    expect(getComputedStyle(cockpit.element).borderTopWidth).toBe('0px');
+    expect(getComputedStyle(backlog.element).borderTopWidth).toBe('0px');
+    for (const mode of ['cockpitActive', 'backlogActive'] as const) {
+      await wrapper.setProps({ cockpitActive: mode === 'cockpitActive', backlogActive: mode === 'backlogActive' });
+      const active = mode === 'cockpitActive' ? cockpit : backlog;
+      const style = getComputedStyle(active.element);
+      expect(style.background).toBe(getComputedStyle(add.element).background);
+      expect(style.borderRadius).toBe(getComputedStyle(add.element).borderRadius);
+    }
   });
 
   it('emits automations selection and marks it active', async () => {
@@ -650,10 +639,4 @@ function mockRect(element: Element, rect: { top: number; height: number }): void
     y: rect.top,
     toJSON: () => undefined,
   });
-}
-
-function cockpitSquareBackgrounds(wrapper: ReturnType<typeof mountRail>): string[] {
-  return wrapper
-    .findAll('.cockpit-icon__square')
-    .map((square) => (square.element as HTMLElement).style.backgroundColor);
 }

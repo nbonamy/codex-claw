@@ -800,7 +800,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   padding-left: var(--space-16);
   padding-right: var(--space-8);
   color: var(--color-text);
-  background: transparent;
+  background: var(--color-shell-rail);
   border-bottom: 1px solid var(--color-shell-appbar-divider);
   -webkit-app-region: drag;
 }
@@ -1080,7 +1080,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   --agent-sidebar-trailing-column-width: 28px;
 }
 
-.agent-sidebar:hover .agent-sidebar__agent:has(.agent-sidebar__engine) {
+.agent-sidebar__agent-row:hover .agent-sidebar__agent:has(.agent-sidebar__engine) {
   --agent-sidebar-engine-track: 18px;
 }
 
@@ -1234,6 +1234,11 @@ function onResizePointerEnd(event: PointerEvent): void {
   background: var(--color-success);
 }
 
+.agent-sidebar__agent-row:not(:hover)
+  .agent-sidebar__status[data-status="idle"]:not(.agent-sidebar__status--unread) {
+  visibility: hidden;
+}
+
 .agent-sidebar__input-needed {
   grid-column: -2;
   padding: var(--space-1) var(--space-4);
@@ -1257,7 +1262,7 @@ function onResizePointerEnd(event: PointerEvent): void {
   color: var(--color-text-muted);
 }
 
-.agent-sidebar:hover .agent-sidebar__engine {
+.agent-sidebar__agent-row:hover .agent-sidebar__engine {
   display: grid;
 }
 
