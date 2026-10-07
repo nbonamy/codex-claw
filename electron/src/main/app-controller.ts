@@ -1517,9 +1517,7 @@ export class AppController {
   }
 
   private async getSystemPermissions(): Promise<SystemPermissionsStatus> {
-    const permissions = await this.requireBackendClient().request<SystemPermissionsStatus>(backendMethods.systemPermissionsGet);
-    if (permissions.accessibility.trusted) this.syncAppshotsKeyMonitor();
-    return permissions;
+    return this.requireBackendClient().request<SystemPermissionsStatus>(backendMethods.systemPermissionsGet);
   }
 
   private async openAccessibilitySettings(): Promise<SystemPermissionsStatus> {

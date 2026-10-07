@@ -28,7 +28,7 @@
   "dependencies": {
     "@workspace/core": "0.27.2",
     "@workspace/vue": "0.27.2",
-    "autolib": "github:nbonamy/witsy-autolib#v1.2.3",
+    "autolib": "github:nbonamy/witsy-autolib#v1.2.4",
     "@codex-app-sdk/electron": "0.14.0",
     "electron-log": "^5.4.4",
     "electron-squirrel-startup": "^1.0.1",
