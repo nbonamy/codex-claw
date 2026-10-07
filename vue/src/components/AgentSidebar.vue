@@ -6,7 +6,7 @@
     :aria-label="t('sidebar.agents')"
   >
     <header class="agent-sidebar__header">
-      <strong :title="teamName">{{ t('sidebar.sessions') }}</strong>
+      <strong :title="teamName">{{ teamName }}</strong>
       <button
         class="agent-sidebar__collapse"
         type="button"

@@ -52,7 +52,14 @@
         @drop="clientTeamOrderUpdate.onDrop(team.id, $event)"
         @dragend="clientTeamOrderUpdate.onDragEnd"
       >
-        {{ team.avatar ?? teamInitials(team.name) }}
+        <ProductMarkIcon
+          v-if="team.name === product.name"
+          class="team-rail__product-mark"
+          fill="currentColor"
+          stroke="none"
+          aria-hidden="true"
+        />
+        <template v-else>{{ team.avatar ?? teamInitials(team.name) }}</template>
         <span
           v-if="showsTeamActivityIndicator(team.id)"
           class="team-rail__unread-indicator"
@@ -137,8 +144,9 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@workspace/core/contracts';
 import { defaultTeamColor } from '@workspace/core/team-colors';
+import { product } from '@workspace/core/product';
 import { teamInitials } from '@workspace/core/team-manager';
-import { ClockHour8Icon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
+import { ClockHour8Icon, BacklogIcon, PlusIcon, ProductMarkIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
 import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
@@ -355,12 +363,18 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   color: var(--team-text-color);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
   cursor: pointer;
+}
+
+.team-rail__product-mark {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  vertical-align: middle;
 }
 
 .team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging) {

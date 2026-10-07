@@ -53,7 +53,13 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Backlog"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').text()).toBe('SK');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
+    const brandedTeam = wrapper.get(`[aria-label="${product.name}"]`);
+    expect(brandedTeam.text()).toBe('');
+    expect(brandedTeam.get('svg').attributes('fill')).toBe('currentColor');
+    expect(brandedTeam.get('svg').attributes('aria-hidden')).toBe('true');
+    const markStyle = getComputedStyle(brandedTeam.get('svg').element);
+    expect(markStyle.width).toBe('var(--icon-md)');
+    expect(markStyle.height).toBe('var(--icon-md)');
     expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect((wrapper.get('[aria-label="Skwad"]').element as HTMLButtonElement).style.backgroundColor).toBe('rgb(70, 168, 87)');
@@ -123,11 +129,21 @@ describe('TeamRail', () => {
 
   it('falls back to team initials when no avatar is set', () => {
     const wrapper = mountRail({
-      teams: [teams[1]],
+      teams: [{ ...teams[1], name: 'Research' }],
       activeTeamId: null,
     });
 
-    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
+    expect(wrapper.get('[aria-label="Research"]').text()).toBe('RE');
+  });
+
+  it('switches between the product mark and the saved avatar when a team is renamed', async () => {
+    const team = { ...teams[0], name: product.name };
+    const wrapper = mountRail({ teams: [team], activeTeamId: team.id });
+    expect(wrapper.get(`[aria-label="${product.name}"]`).find('svg').exists()).toBe(true);
+    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe('');
+    await wrapper.setProps({ teams: [{ ...team, name: 'Research' }] });
+    expect(wrapper.get('[aria-label="Research"]').find('svg').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Research"]').text()).toBe('SK');
   });
 
   it('falls back to the default team color when none is set', () => {

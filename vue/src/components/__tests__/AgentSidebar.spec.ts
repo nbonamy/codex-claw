@@ -96,7 +96,7 @@ describe('AgentSidebar sessions', () => {
     expect(row.find('[aria-label="Working"]').exists()).toBe(true);
   });
 
-  it('renders repository headers, branch sessions, statuses, and active selection', () => {
+  it('renders the selected team name, repository headers, branch sessions, statuses, and active selection', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -108,7 +108,10 @@ describe('AgentSidebar sessions', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__header').text()).toContain('Sessions');
+    expect(wrapper.get('.agent-sidebar__header strong').text()).toBe(product.name);
+    await wrapper.setProps({ teamName: 'Research' });
+    expect(wrapper.get('.agent-sidebar__header strong').text()).toBe('Research');
+    expect(wrapper.get('.agent-sidebar__header strong').attributes('title')).toBe('Research');
     expect(wrapper.text()).toContain('id8');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('multi-llm-ts');

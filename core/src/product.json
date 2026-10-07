@@ -1,6 +1,6 @@
 {
   "name": "Korus",
-  "defaultTeamName": "/<",
+  "defaultTeamName": "Korus",
   "slug": "korus",
   "daemonName": "korusd",
   "homeDirectory": ".korus",

@@ -13,8 +13,8 @@ describe('snapshot construction', () => {
       ...expectedEmptySnapshot(),
       teams: [{
         id: 'team-app',
-        name: '/<',
-        avatar: '/<',
+        name: 'Korus',
+        avatar: 'Korus',
         color: '#1B4FB2',
         agentIds: ['agent-dina', 'agent-jesse'],
       }],
@@ -122,8 +122,8 @@ function expectedEmptySnapshot(): AppSnapshot {
   return {
     teams: [{
       id: 'team-app',
-      name: '/<',
-      avatar: '/<',
+      name: 'Korus',
+      avatar: 'Korus',
       color: '#1B4FB2',
       agentIds: [],
     }],
