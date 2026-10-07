@@ -76,6 +76,12 @@
         </button>
       </div>
 
+      <button
+        v-if="activeTab && isRightWorkspaceFileTab(activeTab) && filePanel(activeTab)?.documentId && saveDocument"
+        type="button" class="app-button app-button--tertiary"
+        :disabled="savingDocument" @click="saveActiveDocument"
+      >{{ $t('documents.saveAs') }}</button>
+
       <OpenInControl
         v-if="activeProjectFilePath && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
         :application="effectiveOpenInApplication(agent, openInCatalog)"
@@ -403,6 +409,7 @@ import {
 const workspaceShortcuts = { changes: '⌘G', browser: '⌘B' } as const;
 
 const props = withDefaults(defineProps<{
+  saveDocument?: (tab: RightWorkspaceFileTab) => Promise<void>;
   linkDropActive?: boolean;
   browserPanels?: Partial<Record<RightWorkspaceBrowserTab, RightWorkspaceBrowserPanel>>;
   activeTab: RightWorkspaceTab | null;
@@ -492,6 +499,14 @@ const tabListRoot = ref<HTMLElement | null>(null);
 const tabTrackRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
 const tabContextMenu = ref<{ tab: RightWorkspaceTab; x: number; y: number } | null>(null);
+const savingDocument = ref(false);
+async function saveActiveDocument(): Promise<void> {
+  if (!props.activeTab || !isRightWorkspaceFileTab(props.activeTab) || !props.saveDocument) return;
+  savingDocument.value = true;
+  try { await props.saveDocument(props.activeTab); }
+  catch (error) { ElMessage.error(String(error)); }
+  finally { savingDocument.value = false; }
+}
 const browserUrl = ref('');
 const browserUrls = ref<Partial<Record<RightWorkspaceBrowserTab, string>>>({});
 const browserTabs = computed(() => props.tabs.filter(isRightWorkspaceBrowserTab).filter(tab => props.browserPanels[tab]));

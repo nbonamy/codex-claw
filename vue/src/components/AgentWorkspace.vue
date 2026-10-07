@@ -87,6 +87,7 @@
       :select-visualization="selectVisualization"
       :delete-visualization="deleteVisualization"
       :read-visualization-asset="readVisualizationAsset"
+      :save-document="saveDocumentAs ? tab => saveDocumentAs!(agent.id, tab) : undefined"
       @close-tab="closeWorkspaceTab(agent, $event)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
@@ -193,6 +194,7 @@ const props = defineProps<{
   addVisualizationAnnotation: (annotation: VisualizationAnnotationInput) => void;
   agentFiles: AgentFileSearchItem[];
   agentSidebarCollapsed: boolean;
+  saveDocumentAs?: (agentId: string, tabId: string) => Promise<void>;
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
@@ -296,6 +298,7 @@ const emit = defineEmits<{
 const {
   activeAttachmentAnnotationCounts,
   agentFiles,
+  saveDocumentAs,
   closeRightWorkspaceTab,
   confirmPlan,
   conversationPaneController,

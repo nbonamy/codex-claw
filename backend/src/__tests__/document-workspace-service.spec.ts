@@ -76,4 +76,32 @@ describe('document workspace lifetime', () => {
     await new DocumentWorkspaceService(filename).get('desktop');
     expect(JSON.parse(await readFile(filename, 'utf8')).data.documents.orphan).toBeUndefined();
   });
+  it('refuses corrupt and newer stores without rewriting their bytes', async () => {
+    const { service, filename } = await fixture();
+    for (const content of ['{broken', JSON.stringify({ schemaVersion: 9, data: { clients: {}, documents: {} } }), JSON.stringify({ schemaVersion: 1, data: { clients: { desktop: { a: { tabs: 'invalid' } } }, documents: {} } })]) {
+      await writeFile(filename, content);
+      await expect(service.get('desktop')).rejects.toThrow();
+      expect(await readFile(filename, 'utf8')).toBe(content);
+    }
+  });
+
+  it('serializes a close behind an in-flight save and retains only the saved file', async () => {
+    const { service, filename, home } = await fixture();
+    const doc = await service.display('a', { kind: 'markdown', content: 'Save before close' });
+    const tabId = `file:markdown:${doc.documentId}`;
+    let release!: () => void;
+    let started!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const destination = path.join(home, 'concurrent.md');
+    const saving = service.save('desktop', 'a', { tabId, path: destination }, async (file, content) => { started(); await gate; await writeFile(file, content); return file; });
+    await begun;
+    const closing = service.apply('desktop', 'a', { close: [tabId] });
+    release();
+    await Promise.all([saving, closing]);
+    expect((await new DocumentWorkspaceService(filename).get('desktop')).a!.tabs).toEqual([]);
+    expect(await readFile(destination, 'utf8')).toBe('Save before close');
+    expect(JSON.parse(await readFile(filename, 'utf8')).data.documents).toEqual({});
+  });
+
 });

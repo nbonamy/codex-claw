@@ -265,6 +265,7 @@
         :agent-files="agentFiles"
         :agent-sidebar-collapsed="agentSidebarCollapsed"
         :close-right-workspace-tab="closeRightWorkspaceTab"
+        :save-document-as="saveDocumentAs"
         :commit-agent-git-changes="props.commitAgentGitChanges"
         :confirm-plan="confirmPlan"
         :respond-to-plan-review="respondToPlanReview"
@@ -657,6 +658,8 @@ import {
 import { useFirstRunOnboarding } from './use-first-run-onboarding';
 import { useRepositoryAcquisition } from './use-repository-acquisition';
 import { useRepositorySession } from './use-repository-session';
+import { useDocumentSaveAs } from './use-document-save-as';
+import { useDocumentWorkspaces } from './use-document-workspaces';
 import { useRightWorkspaceState } from './use-right-workspace-state';
 import type { RightWorkspaceTab } from './right-workspace';
 import { useImageAnnotation } from './use-image-annotation';
@@ -704,6 +707,7 @@ const props = withDefaults(defineProps<{
   composerAttachments?: readonly CodexNativeAttachment[];
   updateStatus?: DesktopUpdateStatus;
   sidePanelRequest?: SidePanelRequest | null;
+  markdownDisplayRequests?: Array<Extract<SidePanelRequest, { kind: 'markdown' }>>;
   fileActivity?: AgentFileActivity | null;
   workProviderAuthorization?: WorkProviderAuthorization | null;
   workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkSource[]>>;
@@ -842,6 +846,7 @@ const props = withDefaults(defineProps<{
   composerState: () => ({ text: '', selectionStart: 0, selectionEnd: 0 }),
   composerAttachments: () => [],
   sidePanelRequest: null,
+  markdownDisplayRequests: () => [],
   fileActivity: null,
   workProviderAuthorization: null,
   workRepositoriesByProvider: () => ({}),
@@ -949,6 +954,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
+  'consume-markdown-displays': [count: number];
   'close-team': [teamId: string];
   'disconnect-team': [teamId: string];
   'close-agent': [agentId: string];
@@ -1563,6 +1569,17 @@ const rightWorkspaceState = useRightWorkspaceState({
   sharedVisibilityGroupId: () => split.layout.value === 'single' ? undefined : activeTeam.value?.id,
   workspaceBody: () => agentWorkspace.value?.workspaceBodyElement() ?? null,
 });
+const documentWorkspaces = useDocumentWorkspaces({
+  api: appApi,
+  workspaces: rightWorkspaceState.workspaces,
+  workspaceFor: rightWorkspaceState.workspaceFor,
+  reportError: message => ElMessage.error(message),
+});
+const saveDocumentAs = useDocumentSaveAs({
+  snapshot: () => props.snapshot,
+  workspaceFor: rightWorkspaceState.workspaceFor,
+  save: documentWorkspaces.save,
+});
 const splitPanels = new Map<string, InstanceType<typeof AgentConversationPanel>>();
 function setSplitPanel(agentId: string, instance: unknown): void {
   if (instance) splitPanels.set(agentId, instance as InstanceType<typeof AgentConversationPanel>);
@@ -1662,6 +1679,7 @@ async function startVisualizeForAgent(agentId: string, input?: import('@workspac
 }
 
 function closeRightWorkspaceTab(agentId: string, tab: RightWorkspaceTab): void {
+  documentWorkspaces.recordClose(agentId, tab);
   closeRightWorkspaceTabLocal(agentId, tab);
   const visualize = props.snapshot.agents.find(agent => agent.id === agentId)?.visualize;
   if (tab === 'visualize' && visualize?.isOpen) {
@@ -3063,13 +3081,19 @@ async function quit(): Promise<void> {
 const resumeSessionAgent = computed(() => (
   props.snapshot.agents.find((agent) => agent.id === resumeSessionAgentId.value) ?? null
 ));
+watch(() => props.markdownDisplayRequests, (requests) => {
+  if (!requests.length) return;
+  for (const request of requests) openMarkdownRequest(request);
+  emit('consume-markdown-displays', requests.length);
+}, { immediate: true });
+
 watch(() => props.sidePanelRequest, (request) => {
   if (!request) {
     return;
   }
 
   openSidePanelRequest(request);
-}, { immediate: true });
+}, { immediate: true, flush: 'sync' });
 
 watch(() => props.snapshot.agents.map((agent) => [agent.id, agent.planReview?.status] as const), (reviews) => {
   for (const [agentId, status] of reviews) {

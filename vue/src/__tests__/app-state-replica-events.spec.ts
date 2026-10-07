@@ -104,6 +104,7 @@ describe('useAppState', () => {
     const state = useAppState();
     await state.loadSnapshot();
     state.sidePanelRequest.value = null;
+    state.markdownDisplayRequests.value = [];
 
     listeners[0]?.({
       seq: 1,
@@ -120,6 +121,7 @@ describe('useAppState', () => {
     });
 
     expect(state.sidePanelRequest.value).toStrictEqual({
+      agentId: 'agent-dina',
       kind: 'markdown',
       purpose: 'plan',
       title: 'Architecture',
@@ -138,11 +140,20 @@ describe('useAppState', () => {
       occurredAt: '2026-06-05T00:00:02.000Z',
     });
 
-    const markdownRequest = state.sidePanelRequest.value as { content: string } | null;
-    expect(markdownRequest?.content).toBe('# Architecture');
+    listeners[0]?.({
+      seq: 3, agentId: 'agent-dina', type: 'client.markdownDisplayRequested',
+      payload: { kind: 'markdown', content: '# Another' }, occurredAt: '2026-06-05T00:00:02.500Z',
+    });
+    expect(state.markdownDisplayRequests.value).toStrictEqual([
+      { agentId: 'agent-jesse', kind: 'markdown', content: '# Other' },
+      { agentId: 'agent-dina', kind: 'markdown', content: '# Another' },
+    ]);
+    expect(state.snapshot.value.activeAgentId).toBe('agent-dina');
+    state.consumeMarkdownDisplayRequests(2);
+    expect(state.markdownDisplayRequests.value).toEqual([]);
 
     listeners[0]?.({
-      seq: 3,
+      seq: 4,
       agentId: 'agent-dina',
       type: 'plan.readyForReview',
       turnId: 'turn-plan',

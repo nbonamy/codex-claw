@@ -25,3 +25,27 @@ it('restores and saves through the client-scoped protocol after a fresh backend 
     expect((await new DocumentWorkspaceService(filename).get('desktop'))['agent-dina']!.tabs).toEqual([]);
   } finally { await server.close(); await rm(home, { recursive: true, force: true }); }
 });
+
+it('routes Save As to the remote agent host rather than a local folder', async () => {
+  const { createTestSnapshot, createRemoteAgent, createRemoteTeamSnapshot, readyRemoteConnection } = await import('./server-test-fixtures');
+  const home = await mkdtemp(path.join(os.tmpdir(), 'remote-document-test-'));
+  const remoteAgent = createRemoteAgent(); remoteAgent.folder = home;
+  const remote = new AppBackendServer({ version: 'test', snapshot: createRemoteTeamSnapshot([remoteAgent]) });
+  const snapshot = createTestSnapshot();
+  const connection = readyRemoteConnection(); snapshot.remoteConnections.connections = [connection];
+  snapshot.teams.push({ id: 'remote-pointer', name: 'Remote', agentIds: [], remoteConnectionId: connection.id, remoteTeamId: 'team-remote' });
+  const documents = new DocumentWorkspaceService(path.join(home, 'client-documents.json'));
+  const displayed = await documents.display(remoteAgent.id, { kind: 'markdown', content: 'Remote bytes' });
+  const local = new AppBackendServer({ version: 'test', snapshot, documents, remoteClients: {
+    request: async (_connection: unknown, method: string, params: unknown) => {
+      const response = await remote.handleMessage({ jsonrpc: '2.0', id: 1, method, params } as import('@workspace/core/backend-protocol/rpc').AppRpcRequest);
+      if (response && 'result' in response) return response.result;
+      throw Error(JSON.stringify(response));
+    }, close: async () => {},
+  } as never });
+  try {
+    const result = await local.handleMessage({ jsonrpc: '2.0', id: 1, method: 'client/document/save', params: { agentId: remoteAgent.id, input: { tabId: `file:markdown:${displayed.documentId}`, path: 'remote.md' } } });
+    expect(result).toHaveProperty('result');
+    expect(await readFile(path.join(home, 'remote.md'), 'utf8')).toBe('Remote bytes');
+  } finally { await local.close(); await remote.close(); await rm(home, { recursive: true, force: true }); }
+});
