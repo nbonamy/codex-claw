@@ -381,6 +381,23 @@ describe('controller desktop lifecycle', () => {
     expect(window.focus).toHaveBeenCalledTimes(3);
   });
 
+  it.each(['win32', 'linux'] as const)('opens stable downloads for a disabled updater on %s', async (platform) => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: platform } }));
+    native.shell.openExternal.mockResolvedValue(undefined);
+    const { controller } = setup();
+    const service = {
+      getStatus: () => ({ state: 'disabled' }), start: vi.fn(), stop: vi.fn(),
+      check: vi.fn(), install: vi.fn(),
+    };
+    controller.setAutoUpdateService(service as unknown as DesktopAutoUpdateService);
+    controller.createWindow();
+    native.createWindow.mock.calls[0]![0].checkForUpdates();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(native.shell.openExternal).toHaveBeenCalledWith(`${product.repositoryUrl}/releases/latest`);
+    expect(service.check).not.toHaveBeenCalled();
+    expect(native.dialog.showMessageBox).not.toHaveBeenCalled();
+  });
+
   it('routes menu update checks, renderer status, and confirmed installation through one service', async () => {
     const { controller, window } = setup();
     const service = {

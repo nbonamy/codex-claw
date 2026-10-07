@@ -265,8 +265,8 @@ describe('app menu', () => {
     expect(idleMenuCallbacks.sendAppCommand).toHaveBeenCalledWith({ type: 'open-settings' });
   });
 
-  it('passes update callbacks through the native menu installer', () => {
-    vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
+  it.each(['darwin', 'win32', 'linux'] as const)('passes update callbacks through the native menu installer on %s', (platform) => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: platform } }));
     const checkForUpdates = vi.fn();
     const installUpdate = vi.fn();
     installAppMenu({
@@ -283,10 +283,31 @@ describe('app menu', () => {
 
     const template = electronMenuMocks.buildFromTemplate.mock.calls.at(-1)?.[0];
     if (!Array.isArray(template)) throw new Error('Menu template was not built');
-    clickItem(template, `${product.name}`, 'Check for Updates...');
+    clickItem(template, platform === 'darwin' ? product.name : 'Help', 'Check for Updates...');
+    if (platform !== 'darwin') {
+      expect(menuItem(template, 'Help', `About ${product.name}`)).toMatchObject({ role: 'about' });
+      expect(template.some((item) => item.label === product.name)).toBe(false);
+    }
 
     expect(checkForUpdates).toHaveBeenCalledOnce();
     expect(electronMenuMocks.setApplicationMenu).toHaveBeenCalledOnce();
+  });
+
+  it.each(['win32', 'linux'] as const)('keeps the Help update action useful across updater states on %s', (platform) => {
+    const actions = { ...callbacks(), checkForUpdates: vi.fn(), installUpdate: vi.fn() };
+    for (const state of ['disabled', 'checking', 'downloading', 'downloaded'] as const) {
+      const menu = buildAppMenuTemplate(actions, { debugMode: false, updateStatus: { state } }, platform);
+      if (state === 'downloaded') {
+        clickItem(menu, 'Help', 'Install Update and Relaunch');
+        expect(actions.installUpdate).toHaveBeenCalledOnce();
+      } else if (state === 'disabled') {
+        expect(menuItem(menu, 'Help', 'Check for Updates...')).toMatchObject({ enabled: true });
+        clickItem(menu, 'Help', 'Check for Updates...');
+        expect(actions.checkForUpdates).toHaveBeenCalledOnce();
+      } else {
+        expect(menuItem(menu, 'Help', 'Checking for Updates...')).toMatchObject({ enabled: false });
+      }
+    }
   });
 
   it('passes the message fixture callback through the startup menu installer', () => {

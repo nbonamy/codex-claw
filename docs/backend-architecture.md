@@ -187,7 +187,9 @@ against the public update service
 overridable with `APP_UPDATE_BASE_URL`), with the native Squirrel protocol, not
 `serverType: 'json'`. The service ignores drafts and prereleases, so only promoted
 stable releases update clients. Development, portable Windows and Linux report
-updates as disabled.
+automatic updates as disabled. On Windows and Linux, manual update requests fall
+back to the repository's latest stable release downloads when the native updater
+is disabled.
 
 Installed macOS clients predating this still read
 `meetkorus.dev/desktop/releases/darwin/arm64/RELEASES.json` and the DMG download
