@@ -11,7 +11,7 @@
       > {{ $t('surface.settingsConnectionsPanel.addRemote') }} </el-button>
     </template>
 
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsConnectionsPanel.remoteAppAgents')"
       title-id="settings-connections-remotes-title"
     >
@@ -86,7 +86,7 @@
         </div>
         <RemoteEngineConnections v-if="connection.status === 'ready'" class="settings-connections-panel__engines" :connection="connection" />
       </article>
-    </SettingsSection>
+    </FormSection>
 
     <SettingsDevicePairingSection
       :settings="settings"
@@ -108,7 +108,7 @@
       append-to-body
     >
       <form class="app-form-dialog" @submit.prevent="saveConnectionSettings">
-        <FormDialogField
+        <FormField
           :label="$t('surface.settingsConnectionsPanel.sourceFolder')"
           label-for="settings-connection-source-folder"
         >
@@ -127,7 +127,7 @@
               @click="openSettingsFolderPicker"
             > {{ $t('surface.settingsConnectionsPanel.browse') }} </button>
           </div>
-        </FormDialogField>
+        </FormField>
         <p
           v-if="settingsError"
           class="settings-connections-panel__error"
@@ -212,12 +212,12 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import RemoteEngineConnections from './RemoteEngineConnections.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormSection from '../shared/form/FormSection.vue';
 
 const props = withDefaults(defineProps<{
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;

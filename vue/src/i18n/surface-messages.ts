@@ -964,7 +964,10 @@ export const surfaceMessages = {
     "appshots": "Screenshots",
     "plugins": "Plugins",
     "integrations": "Integrations",
-    "connections": "Connections"
+    "connections": "Connections",
+    "groupApp": "App",
+    "groupAgents": "Agents",
+    "groupWorkspace": "Workspace"
   },
   "settingsView": {
     "settings": "Settings"

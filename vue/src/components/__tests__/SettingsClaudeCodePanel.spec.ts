@@ -7,12 +7,12 @@ describe('SettingsClaudeCodePanel', () => {
   it('groups account, location, and enable in that order and keeps the enable toggle available', async () => {
     const setEnabled = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsClaudeCodePanel, { props: { setEnabled, home: { homePath: '/app/claude-home', isolated: true, shareSkills: true } }, global: { components: { ElSwitch } } });
-    expect(wrapper.findAll('.settings-section')).toHaveLength(1);
-    expect(wrapper.findAll('.settings-row__copy strong').map(row => row.text())).toEqual(['Account', 'Location', 'Enable engine']);
+    expect(wrapper.findAll('.form-section')).toHaveLength(1);
+    expect(wrapper.findAll('.form-row__copy strong').map(row => row.text())).toEqual(['Account', 'Location', 'Enable engine']);
     await wrapper.get('button').trigger('click');
     expect(wrapper.emitted('connect')).toHaveLength(1);
     await wrapper.setProps({ connected: true, authentication: { kind: 'claude', connected: true, state: { loggedIn: true, account: { type: 'subscription', email: 'user@example.com', subscription: 'max' } } } });
-    expect(wrapper.findAll('.settings-row')[0]!.text()).toContain('user@example.com · max');
+    expect(wrapper.findAll('.form-row')[0]!.text()).toContain('user@example.com · max');
     expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('true');
     await wrapper.get('[role="switch"]').trigger('click');
     await flushPromises();
@@ -28,7 +28,7 @@ describe('SettingsClaudeCodePanel', () => {
     await wrapper.findAll('button').find(button => button.text() === 'Customize')!.trigger('click');
     expect(wrapper.emitted('customize')).toEqual([[]]);
     await wrapper.setProps({ connected: false, enabled: true, authentication: { kind: 'claude', connected: false, state: { loggedIn: false } } });
-    const account = wrapper.findAll('.settings-row')[0]!;
+    const account = wrapper.findAll('.form-row')[0]!;
     expect(account.text()).not.toContain('user@example.com');
     expect(account.text()).toContain('Disconnected');
     expect(account.findAll('button').map(button => button.text())).toContain('Connect');

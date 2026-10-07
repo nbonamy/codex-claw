@@ -1,14 +1,14 @@
 <template>
   <component
     :is="as"
-    class="settings-row"
+    class="form-row"
   >
-    <span class="settings-row__copy">
+    <span class="form-row__copy">
       <strong>{{ title }}</strong>
       <span v-if="description">{{ description }}</span>
       <span
         v-if="error"
-        class="settings-row__error"
+        class="form-row__error"
       >
         {{ error }}
       </span>
@@ -16,7 +16,7 @@
     </span>
     <span
       v-if="$slots.control"
-      class="settings-row__control"
+      class="form-row__control"
     >
       <slot name="control" />
     </span>
@@ -37,39 +37,39 @@ withDefaults(defineProps<{
 </script>
 
 <style scoped>
-.settings-row {
+.form-row {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
   align-items: center;
   gap: var(--space-16);
-  padding: var(--space-10) var(--space-12);
+  padding: var(--space-8);
 }
 
-.settings-row__copy {
+.form-row__copy {
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-.settings-row__copy strong {
+.form-row__copy strong {
   color: var(--color-text);
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-22);
-}
-
-.settings-row__copy span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-14);
   line-height: var(--line-height-20);
 }
 
-.settings-row__copy .settings-row__error {
+.form-row__copy span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
+}
+
+.form-row__copy .form-row__error {
   color: var(--color-danger, #c2410c);
 }
 
-.settings-row__control {
+.form-row__control {
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -79,12 +79,12 @@ withDefaults(defineProps<{
 }
 
 @media (max-width: 780px) {
-  .settings-row {
+  .form-row {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
   }
 
-  .settings-row__control {
+  .form-row__control {
     justify-self: start;
   }
 }

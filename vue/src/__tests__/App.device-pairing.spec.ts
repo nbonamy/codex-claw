@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ElMenu, ElMenuItem, ElMessageBox, ElSwitch } from 'element-plus';
+import { ElMenu, ElMenuItem, ElMenuItemGroup, ElMessageBox, ElSwitch } from 'element-plus';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import App from '../App.vue';
 import { installBackendFixture } from '../test/backend-fixture';
@@ -25,7 +25,7 @@ it('routes Settings Connections device pairing through the real app chain to the
   api.revokePairedDevice.mockResolvedValue(undefined);
   vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never);
 
-  const wrapper = mount(App, { attachTo: document.body, global: { components: { ElMenu, ElMenuItem, ElSwitch } } });
+  const wrapper = mount(App, { attachTo: document.body, global: { components: { ElMenu, ElMenuItem, ElMenuItemGroup, ElSwitch } } });
   await flushPromises();
   emitAppCommand({ type: 'open-settings' });
   await flushPromises();

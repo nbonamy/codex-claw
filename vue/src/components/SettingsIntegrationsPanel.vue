@@ -1,7 +1,7 @@
 <template>
   <SettingsPanelFrame :title="$t('surface.settingsIntegrationsPanel.integrations')" title-id="settings-integrations-title">
     <template #banner><SettingsIntegrationBanner /></template>
-    <SettingsSection v-for="connection in integrations" :key="connection.provider">
+    <FormSection v-for="connection in integrations" :key="connection.provider">
       <article class="settings-integrations-panel__integration">
         <div class="settings-integrations-panel__identity">
           <span class="settings-integrations-panel__icon" aria-hidden="true">
@@ -25,7 +25,7 @@
       <div v-if="authorization?.provider === connection.provider && authorization.userCode && connection.status === 'connecting'" class="settings-integrations-panel__authorization">
         <WorkAuthorizationSteps :authorization="authorization" @open="emit('open-authorization', connection.provider)" />
       </div>
-    </SettingsSection>
+    </FormSection>
     <p v-if="error" class="settings-integrations-panel__detail">{{ error }}</p>
   </SettingsPanelFrame>
 </template>
@@ -40,7 +40,7 @@ import { BacklogIcon, GitHubIcon, LinearIcon } from '../shared/icons/app-icons';
 import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';
 import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormSection from '../shared/form/FormSection.vue';
 
 const props = withDefaults(defineProps<{
   authorization?: WorkProviderAuthorization | null;

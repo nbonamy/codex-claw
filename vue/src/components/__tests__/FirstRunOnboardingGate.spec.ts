@@ -27,7 +27,7 @@ function mountGate(overrides: Partial<InstanceType<typeof FirstRunOnboardingGate
       workProviderAuthorization: null,
       ...overrides,
     },
-    global: { stubs: { LocalClaudeAuthenticationDialog: false, FormDialog: false, FormDialogField: false, teleport: true } },
+    global: { stubs: { LocalClaudeAuthenticationDialog: false, FormDialog: false, FormField: false, teleport: true } },
   });
 }
 

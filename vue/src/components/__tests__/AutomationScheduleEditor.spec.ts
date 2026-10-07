@@ -18,29 +18,30 @@ async function choose(wrapper: ReturnType<typeof editor>, label: string, text: s
   const row = [...list!.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(row => row.textContent === text);
   expect(row, text).toBeDefined(); row!.click(); await flushPromises();
 }
+async function toggleDay(wrapper: ReturnType<typeof editor>, day: string) {
+  await wrapper.get(`button[aria-label="${day}"]`).trigger('click'); await flushPromises();
+}
 it('edits daily, weekday and weekly schedules through calendar controls', async () => {
   const wrapper = editor();
-  const rows = wrapper.findAll('.settings-row');
-  expect(rows.map(row => row.get('strong').text())).toEqual(['Repeat', 'Time']);
+  expect(wrapper.findAll('.form-field__label').map(label => label.text())).toEqual(['Repeat', 'Time']);
   expect(wrapper.find('[aria-label="Timezone"]').exists()).toBe(false);
-  expect(getComputedStyle(rows[0]!.element).display).toBe('grid');
-  expect(getComputedStyle(rows[0]!.get('.settings-row__control').element).justifySelf).toBe('end');
   expect(wrapper.text()).toContain('Next run:');
-  expect(wrapper.find('[aria-label="Day"]').exists()).toBe(false);
+  expect(wrapper.find('[role="group"][aria-label="Day"]').exists()).toBe(false);
   await choose(wrapper, 'Repeat', 'Weekdays');
   expect(wrapper.props('modelValue')).toEqual({ ...daily, rrule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=8;BYMINUTE=0;BYSECOND=0' });
   await choose(wrapper, 'Repeat', 'Weekly');
-  await choose(wrapper, 'Day', 'Monday'); // deselect initial Monday
-  await choose(wrapper, 'Day', 'Wednesday');
+  await toggleDay(wrapper, 'Monday'); // deselect initial Monday
+  await toggleDay(wrapper, 'Wednesday');
   expect(wrapper.props('modelValue')).toEqual({ ...daily, rrule: 'FREQ=WEEKLY;BYDAY=WE;BYHOUR=8;BYMINUTE=0;BYSECOND=0' });
-  await choose(wrapper, 'Day', 'Friday');
+  await toggleDay(wrapper, 'Friday');
   const weekly = { ...daily, rrule: 'FREQ=WEEKLY;BYDAY=WE,FR;BYHOUR=8;BYMINUTE=0;BYSECOND=0' };
   expect(wrapper.props('modelValue')).toEqual(weekly);
   wrapper.unmount();
   const reopened = editor(weekly);
   await flushPromises();
   expect(reopened.get('[aria-label="Repeat"]').element.closest('.el-select')?.textContent).toContain('Weekly');
-  await choose(reopened, 'Day', 'Monday');
+  await toggleDay(reopened, 'Monday');
+  expect(reopened.get('[aria-label="Monday"]').attributes('aria-pressed')).toBe('true');
   expect(reopened.props('modelValue')).toEqual({ ...daily, rrule: 'FREQ=WEEKLY;BYDAY=WE,FR,MO;BYHOUR=8;BYMINUTE=0;BYSECOND=0' });
   await choose(reopened, 'Repeat', 'Daily');
   await choose(reopened, 'Repeat', 'Weekly');

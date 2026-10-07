@@ -24,11 +24,11 @@ describe('SettingsPluginsPanel', () => {
     const wrapper = mount(SettingsPluginsPanel, {
     });
 
-    expect(wrapper.findAll('.settings-section__header h3').map((heading) => heading.text())).toStrictEqual([
+    expect(wrapper.findAll('.form-section__header h3').map((heading) => heading.text())).toStrictEqual([
       `${product.name}`,
       'Codex',
     ]);
-    const sections = wrapper.findAll('.settings-section');
+    const sections = wrapper.findAll('.form-section');
     expect(sections[0].text()).toContain('Computer Use');
     expect(sections[0].text()).not.toContain('Chrome');
     expect(sections[1].text()).toContain('Chrome');
@@ -108,7 +108,7 @@ describe('SettingsPluginsPanel', () => {
     });
 
     expect(wrapper.find('[aria-label="Enable Computer Use"]').exists()).toBe(false);
-    expect(wrapper.findAll('.settings-section__header h3').map((heading) => heading.text())).toStrictEqual(['Codex']);
+    expect(wrapper.findAll('.form-section__header h3').map((heading) => heading.text())).toStrictEqual(['Codex']);
   });
 
   it('opens the configured manager to install Codex plugins and MCP servers', async () => {
@@ -133,9 +133,9 @@ describe('SettingsPluginsPanel', () => {
     await wrapper.get('[aria-label="Enable Chrome"]').trigger('click');
     await flushPromises();
 
-    const sections = wrapper.findAll('.settings-section');
-    const appRows = sections[0].findAll('.settings-row');
-    const codexRows = sections[1].findAll('.settings-row');
+    const sections = wrapper.findAll('.form-section');
+    const appRows = sections[0].findAll('.form-row');
+    const codexRows = sections[1].findAll('.form-row');
     expect(appRows[0].text()).not.toContain('ChatGPT is unavailable.');
     expect(codexRows[0].text()).toContain('ChatGPT is unavailable.');
     expect(codexRows[1].text()).not.toContain('ChatGPT is unavailable.');

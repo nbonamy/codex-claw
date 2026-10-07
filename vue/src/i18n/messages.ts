@@ -7,7 +7,7 @@ export const messages = {
     schedule: 'Schedule',
     hourly: 'Every hour',
     daily: 'Every day',
-      name: 'Name', prompt: 'Prompt', target: 'Run in', team: 'Team', conversation: 'Conversation',
+      name: 'Name', namePlaceholder: 'Name this automation', enabled: 'Enabled', prompt: 'Prompt', target: 'Run in', team: 'Team', conversation: 'Conversation',
       newQuickChat: 'New Quick Chat each run', quickChat: 'Existing Quick Chat', agent: 'Existing agent',
       promptPlaceholder: 'What should happen each time this runs?',
       model: 'Model', effort: 'Reasoning effort', defaultModel: 'Default model', defaultEffort: 'Default effort',

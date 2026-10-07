@@ -31,14 +31,15 @@ describe('SettingsView', () => {
       'General',
       'Appearance',
       'Personalization',
+      'Screenshots',
       'Codex',
       'Claude Code',
       'Plugins',
-      'Integrations',
-      'Screenshots',
-      'Connections',
       'Git',
+      'Integrations',
+      'Connections',
     ]);
+    expect(wrapper.findAll('.el-menu-item-group__title').map((title) => title.text())).toStrictEqual(['App', 'Agents', 'Workspace']);
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Theme');

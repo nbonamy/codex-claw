@@ -1,6 +1,6 @@
 <template>
-  <component :is="compact ? 'div' : SettingsSection" :class="{ 'settings-engine-connection--compact': compact }">
-    <SettingsRow :title="title ?? $t('engineConnection.title')" :error="error">
+  <component :is="compact ? 'div' : FormSection" :class="{ 'settings-engine-connection--compact': compact }">
+    <FormRow :title="title ?? $t('engineConnection.title')" :error="error">
       <template #control>
         <button v-if="pending" class="app-button app-button--tertiary" type="button" aria-busy="true" :disabled="busy" @click="emit('cancel')">{{ $t('auth.cancel') }}</button>
         <el-button v-else-if="connected" :size="compact ? 'small' : undefined" :disabled="busy || saving" @click="emit('disconnect')">{{ $t('engineConnection.disconnect') }}</el-button>
@@ -14,13 +14,13 @@
         <span v-if="busy && !pending" role="status">{{ $t('auth.checking') }}</span>
         <span v-else-if="!pending && (!compact || !accountLabel)">{{ $t(connected ? 'engineConnection.connected' : 'engineConnection.disconnected') }}</span>
       </template>
-    </SettingsRow>
+    </FormRow>
     <slot />
-    <SettingsRow v-if="!compact" :title="$t('engineConnection.enabled')">
+    <FormRow v-if="!compact" :title="$t('engineConnection.enabled')">
       <template #control>
         <el-switch :model-value="connected && enabled !== false" :loading="saving" :disabled="!connected || busy || saving || pending" :aria-label="$t('engineConnection.enabled')" @update:model-value="toggle" />
       </template>
-    </SettingsRow>
+    </FormRow>
   </component>
 </template>
 
@@ -29,8 +29,8 @@ import { computed, ref } from 'vue';
 import type { ProviderAuthentication } from '@workspace/core/contracts/provider-setup';
 import { ElMessageBox } from 'element-plus';
 import { useI18n } from 'vue-i18n';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 const props = withDefaults(defineProps<{ compact?: boolean; title?: string; connected?: boolean; enabled?: boolean; busy?: boolean; pending?: boolean; error?: string | null; authentication?: ProviderAuthentication; setEnabled?: (enabled: boolean) => unknown }>(), { enabled: true });
 const emit = defineEmits<{ connect: []; disconnect: []; cancel: [] }>();
 const { t } = useI18n();
@@ -65,24 +65,24 @@ async function toggle(value: string | number | boolean) {
   min-width: 0;
 }
 
-.settings-engine-connection--compact :deep(.settings-row) {
+.settings-engine-connection--compact :deep(.form-row) {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-2) 0;
 }
 
-.settings-engine-connection--compact :deep(.settings-row__copy) {
+.settings-engine-connection--compact :deep(.form-row__copy) {
   flex-direction: row;
   align-items: center;
   gap: var(--space-6);
 }
 
-.settings-engine-connection--compact :deep(.settings-row__copy strong) {
+.settings-engine-connection--compact :deep(.form-row__copy strong) {
   flex: 0 0 100px;
 }
 
-.settings-engine-connection--compact :deep(.settings-row__copy span) {
+.settings-engine-connection--compact :deep(.form-row__copy span) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -90,7 +90,7 @@ async function toggle(value: string | number | boolean) {
   font-size: var(--font-size-12);
 }
 
-.settings-engine-connection--compact :deep(.settings-row__control) {
+.settings-engine-connection--compact :deep(.form-row__control) {
   justify-self: end;
   gap: var(--space-6);
 }

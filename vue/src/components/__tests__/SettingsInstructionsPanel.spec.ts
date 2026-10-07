@@ -7,10 +7,10 @@ it('updates the worktree initialization policy', async () => {
   const updateSettings = vi.fn().mockResolvedValue(undefined);
   const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings } });
   await flushPromises();
-  const section = wrapper.findAllComponents({ name: 'SettingsSection' })
+  const section = wrapper.findAllComponents({ name: 'FormSection' })
     .find((candidate) => candidate.text().includes('Worktrees'));
   expect(section).toBeDefined();
-  const row = section!.findAllComponents({ name: 'SettingsRow' })
+  const row = section!.findAllComponents({ name: 'FormRow' })
     .find((candidate) => candidate.text().includes('Worktree initialization'));
   expect(row).toBeDefined();
   const select = row!.findComponent({ name: 'ElSelect' });

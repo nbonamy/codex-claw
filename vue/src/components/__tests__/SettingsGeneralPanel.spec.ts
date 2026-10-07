@@ -35,7 +35,7 @@ describe('SettingsGeneralPanel', () => {
     const wrapper = mountPanel({ updateSettings });
     await flushPromises();
 
-    const celebrationRow = wrapper.findAllComponents({ name: 'SettingsRow' })
+    const celebrationRow = wrapper.findAllComponents({ name: 'FormRow' })
       .find((row) => row.text().includes('Agent celebrations'));
     expect(celebrationRow).toBeDefined();
     await celebrationRow!.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
@@ -52,9 +52,9 @@ describe('SettingsGeneralPanel', () => {
     const wrapper = mountPanel({ updateSettings });
     await flushPromises();
 
-    expect(wrapper.findAllComponents({ name: 'SettingsSection' })
+    expect(wrapper.findAllComponents({ name: 'FormSection' })
       .some((section) => section.text().includes('Voice'))).toBe(true);
-    const toggleRow = wrapper.findAllComponents({ name: 'SettingsRow' })
+    const toggleRow = wrapper.findAllComponents({ name: 'FormRow' })
       .find((candidate) => candidate.text().includes('Spoken acknowledgments'));
     expect(toggleRow).toBeDefined();
     expect(toggleRow!.text()).toContain('on-device neural voice');
@@ -68,7 +68,7 @@ describe('SettingsGeneralPanel', () => {
     await wrapper.setProps({
       settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
     });
-    const voiceSection = wrapper.findAllComponents({ name: 'SettingsSection' })
+    const voiceSection = wrapper.findAllComponents({ name: 'FormSection' })
       .find((section) => section.text().includes('Spoken acknowledgments'))!;
     expect(voiceSection.text().indexOf('Choose an on-device neural voice'))
       .toBeLessThan(voiceSection.text().indexOf('Playback rules'));
@@ -79,7 +79,7 @@ describe('SettingsGeneralPanel', () => {
     await playbackRules.get('summary').trigger('click');
     expect((playbackRules.element as HTMLDetailsElement).open).toBe(true);
 
-    const rows = wrapper.findAllComponents({ name: 'SettingsRow' });
+    const rows = wrapper.findAllComponents({ name: 'FormRow' });
     const scopeRow = rows.find((candidate) => candidate.text().includes('Choose which agents may speak'))!;
     const scopeSelect = scopeRow.findComponent({ name: 'ElSelect' });
     expect(scopeSelect.classes()).toContain('settings-general-panel__speech-scope-select');

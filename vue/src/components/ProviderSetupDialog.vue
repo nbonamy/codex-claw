@@ -8,13 +8,13 @@
     </div>
     <div v-else class="app-form-dialog">
       <p v-if="setup && !setup.installed">{{ t('auth.installExplanation') }}</p>
-      <FormDialogField :label="t('auth.conversations')" :help="t('auth.separateExplanation')">
+      <FormField :label="t('auth.conversations')" :help="t('auth.separateExplanation')">
         <el-radio-group v-model="isolated" class="provider-setup__choices" :disabled="busy || (setup?.locked && !allowReset)">
           <el-radio :value="true">{{ t('auth.separateChats') }}</el-radio>
           <el-checkbox v-if="isolated" v-model="shareSkills" class="provider-setup__skills" :disabled="busy || (setup?.locked && !allowReset)">{{ t('auth.shareSkills') }}</el-checkbox>
           <el-radio :value="false" class="provider-setup__existing">{{ t('auth.existingSetup') }}</el-radio>
         </el-radio-group>
-      </FormDialogField>
+      </FormField>
       <p v-if="setup?.locked && !allowReset">{{ t('auth.setupLocked') }}</p>
       <p v-if="error" role="alert">{{ error }}</p>
     </div>
@@ -30,7 +30,7 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 
 const props = defineProps<{ setup: ProviderSetupStatus | null; busy: boolean; error: string | null; allowReset?: boolean }>();
 const emit = defineEmits<{ close: []; save: [choice: ProviderSetupChange] }>();

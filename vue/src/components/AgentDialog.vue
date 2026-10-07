@@ -6,7 +6,7 @@
     @update:model-value="onVisibilityChanged"
   >
     <form class="app-form-dialog" @submit.prevent="submit">
-      <FormDialogField
+      <FormField
         v-if="!isEditing"
         :label="$t('surface.agentDialog.repository')"
         label-for="agent-dialog-repository"
@@ -31,9 +31,9 @@
             />
           </el-select>
         </div>
-      </FormDialogField>
+      </FormField>
 
-      <FormDialogField
+      <FormField
         v-if="!isEditing && showSourceWorktreeControl"
         :label="$t('surface.agentDialog.workIn')"
         label-for="agent-dialog-worktree"
@@ -58,9 +58,9 @@
             />
           </el-select>
         </div>
-      </FormDialogField>
+      </FormField>
 
-      <FormDialogField
+      <FormField
         v-if="!isEditing && showTeamSelector"
         :label="$t('surface.agentDialog.team')"
         label-for="agent-dialog-team"
@@ -94,9 +94,9 @@
             />
           </div>
         </div>
-      </FormDialogField>
+      </FormField>
 
-      <FormDialogField
+      <FormField
         :label="$t('surface.agentDialog.name')"
         label-for="agent-dialog-name"
       >
@@ -110,7 +110,7 @@
             :placeholder="namePlaceholder"
           />
         </div>
-      </FormDialogField>
+      </FormField>
 
       <el-alert
         v-if="errorMessage"
@@ -173,7 +173,7 @@ import { computed, ref, watch } from 'vue';
 import { agentDisplayName } from '@workspace/core/agent-display';
 import type { Agent, AgentBackend, CreateAgentInput, CreateSourceWorktreeInput, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, Team, UpdateAgentInput } from '@workspace/core/contracts';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices(() => selectedTeam.value?.id);

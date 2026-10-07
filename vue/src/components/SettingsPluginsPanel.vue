@@ -7,12 +7,12 @@
       <SettingsPluginsBanner />
     </template>
 
-    <SettingsSection
+    <FormSection
       v-if="appHostCapabilities.computerUse"
       :title="$t('surface.settingsPluginsPanel.app')"
       title-id="settings-plugins-app-title"
     >
-      <SettingsRow
+      <FormRow
         as="label"
         :title="$t('surface.settingsPluginsPanel.computerUse')"
         :error="computerUseError"
@@ -25,14 +25,14 @@
             @update:model-value="updatePlugin('computerUse', $event)"
           />
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
 
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsPluginsPanel.codex')"
       title-id="settings-plugins-codex-title"
     >
-      <SettingsRow
+      <FormRow
         as="label"
         :title="$t('surface.settingsPluginsPanel.chrome')"
         :error="chromeError"
@@ -45,8 +45,8 @@
             @update:model-value="updatePlugin('chrome', $event)"
           />
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         :title="$t('surface.settingsPluginsPanel.installCodexPluginsAndMCPServers')"
         :description="$t('surface.settingsPluginsPanel.gitHubSlackJiraLinearGmailGoogleDriveAndMore')"
         :error="pluginManagerError"
@@ -61,8 +61,8 @@
             <ChevronRightIcon aria-hidden="true" />
           </el-button>
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
   </SettingsPanelFrame>
 </template>
 
@@ -73,8 +73,8 @@ import { defaultPluginSettings } from '@workspace/core/settings';
 import { ChevronRightIcon } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsPluginsBanner from './SettingsPluginsBanner.vue';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 import { appHostCapabilities, appPlatformActions } from '../platform-api';
 
 type PendingPlugin = 'computerUse' | 'chrome';

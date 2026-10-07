@@ -5,7 +5,7 @@
   >
     <div class="settings-appshots-panel__intro">
       <span class="settings-appshots-panel__icon" aria-hidden="true">
-        <PhotoIcon />
+        <ScreenshotIcon />
       </span>
       <span>
         <strong>{{ $t('surface.settingsAppshotsPanel.takeAnAppshotToShowCodexYourFrontmostWindow') }}</strong>
@@ -13,8 +13,8 @@
       </span>
     </div>
 
-    <SettingsSection>
-      <SettingsRow
+    <FormSection>
+      <FormRow
         :title="$t('surface.settingsAppshotsPanel.hotkey')"
         :description="hotkeyDescription"
       >
@@ -31,8 +31,8 @@
             <el-option :label="$t('surface.settingsAppshotsPanel.none')" value="none" />
           </el-select>
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         :title="$t('surface.settingsAppshotsPanel.appshotDestination')"
         :description="$t('surface.settingsAppshotsPanel.chooseWhereAppshotsGoWhenYouUseTheHotkey')"
       >
@@ -45,8 +45,8 @@
             <el-option :label="$t('surface.settingsAppshotsPanel.activeAgent')" value="active-agent" />
           </el-select>
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         as="label"
         :title="$t('surface.settingsAppshotsPanel.playSoundEffect')"
         :description="$t('surface.settingsAppshotsPanel.confirmWhenTheFrontmostWindowHasBeenCaptured')"
@@ -58,8 +58,8 @@
             @update:model-value="updatePlaySound"
           />
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
   </SettingsPanelFrame>
 </template>
 
@@ -67,10 +67,10 @@
 import { translate } from '../i18n';
 import { computed } from 'vue';
 import type { AppshotHotkey, AppshotSettings, UpdateSettingsInput } from '@workspace/core/contracts';
-import { PhotoIcon } from '../shared/icons/app-icons';
+import { ScreenshotIcon } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 
 const props = defineProps<{
   settings: AppshotSettings;

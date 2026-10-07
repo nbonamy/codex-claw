@@ -395,6 +395,6 @@ button,
 .app-popover {
   padding: var(--space-2) !important;
   border-radius: var(--radius-xl) !important;
-  background-color: var(--color-background) !important;
+  background-color: var(--color-menu-background) !important;
   border-color: var(--color-border) !important;
 }

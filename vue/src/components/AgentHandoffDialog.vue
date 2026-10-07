@@ -2,20 +2,20 @@
   <FormDialog class="agent-handoff-dialog" width="480px" :model-value="true" :title="t('handoff.submit')" @update:model-value="close">
     <form id="agent-handoff-form" class="app-form-dialog agent-handoff-form" @submit.prevent="submitHandoff">
       <div class="agent-handoff-form__destination">
-        <FormDialogField :label="t('handoff.engine')">
+        <FormField :label="t('handoff.engine')">
           <BackendSelector v-model="backend" :team-id="agent.teamId" :disabled="busy" />
           <span v-if="choices.length === 1">{{ backendDisplayName(choices[0]!) }}</span>
-        </FormDialogField>
-        <FormDialogField :label="t('handoff.model')" label-for="handoff-model">
+        </FormField>
+        <FormField :label="t('handoff.model')" label-for="handoff-model">
           <el-select id="handoff-model" v-model="model" :disabled="busy || loadingModels" :aria-label="t('handoff.model')">
             <el-option :value="defaultModel" :label="t('handoff.defaultModel')" />
             <el-option v-for="choice in models" :key="choice.id" :value="choice.model" :label="choice.displayName" />
           </el-select>
-        </FormDialogField>
+        </FormField>
       </div>
-      <FormDialogField :label="t('handoff.instructions')" label-for="handoff-instructions">
+      <FormField :label="t('handoff.instructions')" label-for="handoff-instructions">
         <el-input id="handoff-instructions" v-model="instructions" type="textarea" :rows="3" :maxlength="4000" :disabled="busy" :placeholder="t('handoff.optional')" />
-      </FormDialogField>
+      </FormField>
       <p class="app-form-dialog__help agent-handoff-form__workspace" :title="agent.folder ?? undefined">{{ agent.folder }}</p>
       <p class="app-form-dialog__help">{{ t('handoff.permissions') }}</p>
       <el-alert v-if="blocker || error" :title="error || blocker || ''" type="error" :closable="false" />
@@ -42,7 +42,7 @@ import type { Agent, AgentBackend, BackendConversationRef, BackendModelOption, R
 import type { AgentHandoffInput } from '@workspace/core/agent-handoff';
 import { backendDisplayName } from '@workspace/core/backend-driver';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices } from './backend-selection';
 import AutomationExecutionConversationOverlay from './AutomationExecutionConversationOverlay.vue';

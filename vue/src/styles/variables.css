@@ -58,6 +58,8 @@
   --color-border: var(--color-outline-variant);
   --color-border-strong: var(--color-outline);
   --color-shell-main: var(--color-surface-lowest);
+  --color-menu-background: var(--color-surface-lowest);
+  --color-card-background: color-mix(in srgb, var(--color-surface) 25%, var(--color-surface-lowest));
   --color-shell-window: var(--color-shell-main);
   --shell-glass-opacity: 65%;
   --color-shell-sidebar: var(--color-surface-low);
@@ -215,6 +217,8 @@ html.dark {
   --color-border: var(--color-outline-variant);
   --color-border-strong: var(--color-outline);
   --color-dialog-body: var(--color-surface-lowest);
+  --color-menu-background: var(--color-surface-lowest);
+  --color-card-background: color-mix(in srgb, var(--color-surface) 25%, var(--color-surface-lowest));
   --color-dialog-overlay: rgba(0, 0, 0, 0.3);
   --color-overlay: rgba(13, 15, 18, 0.78);
   --color-shine: rgba(255, 255, 255, 0.72);

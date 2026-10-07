@@ -7,7 +7,7 @@
   >
     <form class="app-form-dialog" @submit.prevent="submit">
       <p class="new-project-dialog__description">{{ t('newProjectDialog.description') }}</p>
-      <FormDialogField :label="t('newProjectDialog.name')" label-for="new-project-name">
+      <FormField :label="t('newProjectDialog.name')" label-for="new-project-name">
         <div class="app-form-dialog__control app-form-dialog__input-control">
           <input
             id="new-project-name"
@@ -19,7 +19,7 @@
             autocomplete="off"
           >
         </div>
-      </FormDialogField>
+      </FormField>
       <el-alert
         v-if="validationError || error"
         :title="validationError ?? error ?? ''"
@@ -53,7 +53,7 @@
 import { nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();

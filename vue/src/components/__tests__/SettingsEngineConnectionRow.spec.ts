@@ -21,7 +21,7 @@ describe('SettingsEngineConnectionRow', () => {
     expect(dialog.attributes('aria-label')).toBe(title);
     expect(dialog.get('.el-message-box__message').text()).toBe(message);
     expect(dialog.text()).not.toContain('Error invoking remote method');
-    expect(wrapper.find('.settings-row__error').exists()).toBe(false);
+    expect(wrapper.find('.form-row__error').exists()).toBe(false);
     expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('true');
     await dialog.get('.el-message-box__btns button').trigger('click');
     await flushPromises();
@@ -30,13 +30,13 @@ describe('SettingsEngineConnectionRow', () => {
 
   it('replaces Connect with a cancellable sign-in action in the control area', async () => {
     const wrapper = mount(SettingsEngineConnectionRow, { props: { pending: true } });
-    expect(wrapper.get('.settings-row__copy').text()).toBe('Account');
+    expect(wrapper.get('.form-row__copy').text()).toBe('Account');
     expect(wrapper.findAll('button')).toHaveLength(1);
-    const cancel = wrapper.get('.settings-row__control button');
+    const cancel = wrapper.get('.form-row__control button');
     expect(cancel.text()).toBe('Cancel sign-in');
     await cancel.trigger('click');
     expect(wrapper.emitted('cancel')).toEqual([[]]);
     await wrapper.setProps({ pending: false });
-    expect(wrapper.get('.settings-row__control button').text()).toBe('Connect');
+    expect(wrapper.get('.form-row__control button').text()).toBe('Connect');
   });
 });

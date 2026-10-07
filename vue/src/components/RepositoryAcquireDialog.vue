@@ -7,7 +7,7 @@
     @update:model-value="onVisibilityChanged"
   >
     <form class="app-form-dialog" @submit.prevent="submitUrl">
-      <FormDialogField :label="t('repositories.acquire.url')" label-for="repository-acquire-url">
+      <FormField :label="t('repositories.acquire.url')" label-for="repository-acquire-url">
         <div class="app-form-dialog__control app-form-dialog__input-control">
           <input
             id="repository-acquire-url"
@@ -21,7 +21,7 @@
             spellcheck="false"
           >
         </div>
-      </FormDialogField>
+      </FormField>
       <p v-if="error" class="repository-acquire-dialog__url-error">{{ error }}</p>
     </form>
     <template v-if="backendChoices.length !== 1" #footer-left>
@@ -138,7 +138,7 @@ import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 const backend = defineModel<import('@workspace/core/contracts').AgentBackend>('backend');
 useNewAgentBackend(backend, backendChoices);
 

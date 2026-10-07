@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
-import { ElInput, ElSelect, ElOption, ElSwitch, ElButton } from 'element-plus';
+import { ElInput, ElInputNumber, ElSelect, ElOption, ElOptionGroup, ElSwitch, ElButton } from 'element-plus';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type { Automation } from '@workspace/core/contracts';
 import AutomationEditor from '../AutomationEditor.vue';
@@ -10,7 +10,7 @@ const agents = [...snapshot.agents, { ...snapshot.agents[0]!, id: 'quick', name:
 function editor(automation?: Automation) {
   return mount(AutomationEditor, { attachTo: document.body,
     props: { mode: automation ? 'edit' : 'create', agents, teams: snapshot.teams, automation },
-    global: { components: { ElInput, ElSelect, ElOption, ElSwitch, ElButton } } });
+    global: { components: { ElInput, ElInputNumber, ElSelect, ElOption, ElOptionGroup, ElSwitch, ElButton } } });
 }
 async function choose(wrapper: ReturnType<typeof editor>, label: string, option: string) {
   const control = wrapper.get(`[aria-label="${label}"]`);
@@ -34,39 +34,34 @@ describe('AutomationEditor', () => {
     });
     expect(wrapper.findAll('textarea')).toHaveLength(1);
     expect(wrapper.find('[aria-label="Coding agent"]').exists()).toBe(true);
-    const sections = wrapper.findAll('.settings-section');
-    expect(sections).toHaveLength(4);
-    expect(sections[0]!.findAll('strong').map(label => label.text())).toEqual(['Name', 'Prompt']);
-    expect(wrapper.findAll('.settings-section h3').map(label => label.text())).toEqual(['Run in', 'Schedule', 'Model']);
-    for (const section of wrapper.findAll('.automation-editor__body > *').slice(1)) {
-      expect(getComputedStyle(section.element).marginTop).toBe('var(--space-12)');
-    }
-    expect(sections[1]!.findAll('strong').map(label => label.text())).toEqual(['Team', 'Conversation']);
-    expect(wrapper.findAll('[role="combobox"]').slice(0, 2).map(control => control.attributes('aria-label'))).toEqual(['Automation target team', 'Run in']);
+    expect(wrapper.findAll('.form-section h3').map(label => label.text())).toEqual(['Run in', 'Schedule', 'Model']);
+    expect(wrapper.get('.automation-editor__header').text()).toContain('Enabled');
+    expect(wrapper.get('[aria-label="Name"]').attributes('placeholder')).toBe('Name this automation');
+    expect(wrapper.findAll('[role="combobox"]').slice(0, 2).map(control => control.attributes('aria-label'))).toEqual(['Automation target team', 'Conversation']);
+    expect(wrapper.text()).toContain('Next run:');
     expect(wrapper.text()).not.toContain('repository');
   });
 
   it('offers existing Quick Chats separately and omits fresh-chat model settings when reusing a conversation', async () => {
     const wrapper = editor();
     await wrapper.get('textarea').setValue('Update notes');
-    await choose(wrapper, 'Run in', 'Existing Quick Chat');
     await choose(wrapper, 'Conversation', 'Daily notes');
     expect(wrapper.find('[aria-label="Model"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Coding agent"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Effort"]').exists()).toBe(false);
-    expect(wrapper.findAll('.settings-section')).toHaveLength(3);
-    expect(wrapper.findAll('.settings-section h3').map(label => label.text())).toEqual(['Run in', 'Schedule']);
+    expect(wrapper.findAll('.form-section h3').map(label => label.text())).toEqual(['Run in', 'Schedule']);
+    expect(wrapper.text()).toContain('Uses this conversation’s context');
     await wrapper.get('form').trigger('submit');
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ target: { kind: 'quickChat', agentId: 'quick' } });
-    await choose(wrapper, 'Run in', 'Existing agent');
-    await wrapper.get('form').trigger('submit');
-    expect(wrapper.emitted('submit')).toHaveLength(1);
     await choose(wrapper, 'Conversation', 'Dina @ agent-workspace');
     await wrapper.get('form').trigger('submit');
     expect(wrapper.emitted('submit')?.[1]?.[0]).toMatchObject({ target: { kind: 'agent', agentId: 'agent-dina' } });
+    await choose(wrapper, 'Conversation', 'New Quick Chat each run');
+    expect(wrapper.find('[aria-label="Coding agent"]').exists()).toBe(true);
     await wrapper.setProps({ agents: [] });
+    await choose(wrapper, 'Conversation', 'New Quick Chat each run');
     await wrapper.get('form').trigger('submit');
-    expect(wrapper.emitted('submit')).toHaveLength(2);
+    expect(wrapper.emitted('submit')?.[2]?.[0]).toMatchObject({ target: { kind: 'newQuickChat' } });
   });
 
   it('retains configured model and effort on edit, and surfaces catalog and save errors', async () => {
@@ -88,7 +83,7 @@ describe('AutomationEditor', () => {
     const withModels = mount(AutomationEditor, { attachTo: document.body,
       props: { mode: 'create', agents, teams: snapshot.teams, listModels: async () => [{ id: 'model', model: 'model', displayName: 'Model',
         supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'Greater reasoning depth for complex problems' }] }] },
-      global: { components: { ElInput, ElSelect, ElOption, ElSwitch, ElButton } } });
+      global: { components: { ElInput, ElInputNumber, ElSelect, ElOption, ElOptionGroup, ElSwitch, ElButton } } });
     await flushPromises();
     await choose(withModels, 'Model', 'Model');
     await choose(withModels, 'Reasoning effort', 'high');
@@ -103,7 +98,7 @@ describe('AutomationEditor', () => {
     const wrapper = mount(AutomationEditor, { attachTo: document.body,
       props: { mode: 'edit', automation, teams: [...snapshot.teams, { id: 'other-team', name: 'Other team', agentIds: ['other-agent'] }],
         agents: [...agents, { ...agents[0]!, id: 'other-agent', teamId: 'other-team', name: 'Other worker' }] },
-      global: { components: { ElInput, ElSelect, ElOption, ElSwitch, ElButton } } });
+      global: { components: { ElInput, ElInputNumber, ElSelect, ElOption, ElOptionGroup, ElSwitch, ElButton } } });
     await flushPromises();
     expect(wrapper.get('#automation-team').element.closest('.el-select')?.textContent).toContain('Other team');
     await wrapper.get('form').trigger('submit');

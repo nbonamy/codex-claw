@@ -3,11 +3,11 @@
     :title="$t('surface.settingsAppearancePanel.appearance')"
     title-id="settings-appearance-title"
   >
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsAppearancePanel.color')"
       title-id="settings-appearance-color-title"
     >
-      <SettingsRow
+      <FormRow
         as="label"
         :title="$t('surface.settingsAppearancePanel.mode')"
         :description="$t('surface.settingsAppearancePanel.chooseHowAppFollowsLightAndDarkAppearances')"
@@ -19,8 +19,8 @@
             @update:model-value="updateMode"
           />
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         as="label"
         :title="$t('surface.settingsAppearancePanel.theme')"
         :description="$t('surface.settingsAppearancePanel.selectTheColorPaletteUsedAcrossTheApp')"
@@ -40,44 +40,44 @@
             />
           </el-select>
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
 
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsAppearancePanel.typography')"
       title-id="settings-appearance-typography-title"
     >
-      <SettingsRow
-        as="label"
-        :title="$t('surface.settingsAppearancePanel.chatFontSize')"
-        :description="$t('surface.settingsAppearancePanel.adjustConversationTextSize')"
-      >
-        <template #control>
+      <FormGrid>
+        <FormField
+          density="compact"
+          :label="$t('surface.settingsAppearancePanel.chatFontSize')"
+          :help="$t('surface.settingsAppearancePanel.adjustConversationTextSize')"
+        >
           <el-input-number
             :model-value="settings.chatFontSize"
+            :aria-label="$t('surface.settingsAppearancePanel.chatFontSize')"
             :min="11"
             :max="22"
             @update:model-value="updateNumericTheme('chatFontSize', $event)"
           />
-        </template>
-      </SettingsRow>
-      <SettingsRow
-        as="label"
-        :title="$t('surface.settingsAppearancePanel.codeFontSize')"
-        :description="$t('surface.settingsAppearancePanel.adjustMonospaceTextSizeInCodeAndCommandOutput')"
-      >
-        <template #control>
+        </FormField>
+        <FormField
+          density="compact"
+          :label="$t('surface.settingsAppearancePanel.codeFontSize')"
+          :help="$t('surface.settingsAppearancePanel.adjustMonospaceTextSizeInCodeAndCommandOutput')"
+        >
           <el-input-number
             :model-value="settings.codeFontSize"
+            :aria-label="$t('surface.settingsAppearancePanel.codeFontSize')"
             :min="11"
             :max="22"
             @update:model-value="updateNumericTheme('codeFontSize', $event)"
           />
-        </template>
-      </SettingsRow>
-    </SettingsSection>
+        </FormField>
+      </FormGrid>
+    </FormSection>
 
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsAppearancePanel.diffPreview')"
       title-id="settings-appearance-diff-preview-title"
     >
@@ -85,7 +85,7 @@
         class="settings-appearance-panel__diff-preview"
         :diff="diffPreview"
       />
-    </SettingsSection>
+    </FormSection>
   </SettingsPanelFrame>
 </template>
 
@@ -94,8 +94,10 @@ import { translate } from '../i18n';
 import { computed } from 'vue';
 import type { AppThemeSettings, UpdateSettingsInput } from '@workspace/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormField from '../shared/form/FormField.vue';
+import FormGrid from '../shared/form/FormGrid.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 import GitDiffPreviewPanel from './GitDiffPreviewPanel.vue';
 import { appThemes, themeIdForAppearance } from '../theme/themes';
 

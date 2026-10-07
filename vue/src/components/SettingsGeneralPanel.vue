@@ -3,11 +3,11 @@
     :title="$t('surface.settingsGeneralPanel.general')"
     title-id="settings-general-title"
   >
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsGeneralPanel.behavior')"
       title-id="settings-general-behavior-title"
     >
-      <SettingsRow
+      <FormRow
         v-if="appHostCapabilities.daemonManagement"
         as="label"
         :title="$t('surface.settingsGeneralPanel.preventSleepWhileAgentsRun')"
@@ -20,8 +20,8 @@
             @update:model-value="updatePreventSleep"
           />
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         v-if="appHostCapabilities.daemonManagement"
         as="label"
         :title="$t('surface.settingsGeneralPanel.keepAppReadyInTheBackground')"
@@ -57,8 +57,8 @@
             />
           </span>
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         as="label"
         :title="$t('surface.settingsGeneralPanel.agentCelebrations')"
         :description="$t('surface.settingsGeneralPanel.letAgentsCelebrateMeaningfulWinsWithVisualEffects')"
@@ -70,14 +70,14 @@
             @update:model-value="updateCelebrationsEnabled"
           />
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
 
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsGeneralPanel.voice')"
       title-id="settings-general-voice-title"
     >
-      <SettingsRow
+      <FormRow
         as="label"
         :title="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
         :description="$t('surface.settingsGeneralPanel.letAgentsSpeakBriefTaskStartAndFinishPhrases')"
@@ -89,8 +89,8 @@
             @update:model-value="updateSpokenAnnouncementsEnabled"
           />
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         v-if="settings.spokenAnnouncementsEnabled"
         :title="$t('surface.settingsGeneralPanel.voice')"
         :description="$t('surface.settingsGeneralPanel.chooseAnOnDeviceNeuralVoice')"
@@ -122,7 +122,7 @@
             </el-button>
           </span>
         </template>
-      </SettingsRow>
+      </FormRow>
       <details
         v-if="settings.spokenAnnouncementsEnabled"
         class="settings-general-panel__voice-rules"
@@ -135,7 +135,7 @@
           <ChevronDown aria-hidden="true" />
         </summary>
         <div class="settings-general-panel__voice-rules-content">
-          <SettingsRow
+          <FormRow
             :title="$t('surface.settingsGeneralPanel.scope')"
             :description="$t('surface.settingsGeneralPanel.chooseWhichAgentsMaySpeak')"
           >
@@ -156,8 +156,8 @@
                 />
               </el-select>
             </template>
-          </SettingsRow>
-          <SettingsRow
+          </FormRow>
+          <FormRow
             as="label"
             :title="$t('surface.settingsGeneralPanel.dictatedPromptsOnly')"
             :description="$t('surface.settingsGeneralPanel.speakOnlyForTasksStartedWithVoiceDictation')"
@@ -169,8 +169,8 @@
                 @update:model-value="updateSpokenAnnouncementsOnlyForDictatedPrompts"
               />
             </template>
-          </SettingsRow>
-          <SettingsRow
+          </FormRow>
+          <FormRow
             as="label"
             :title="$t('surface.settingsGeneralPanel.onlySpeakWhileFocused')"
             :description="$t('surface.settingsGeneralPanel.silenceAcknowledgmentsWhileAppIsInTheBackground')"
@@ -182,17 +182,17 @@
                 @update:model-value="updateSpokenAnnouncementsOnlyWhenFocused"
               />
             </template>
-          </SettingsRow>
+          </FormRow>
         </div>
       </details>
-    </SettingsSection>
+    </FormSection>
 
-    <SettingsSection
+    <FormSection
       v-if="appHostCapabilities.nativeFileDialogs && showSourceFolderSetting"
       :title="$t('surface.settingsGeneralPanel.sourceFolder')"
       title-id="settings-general-source-title"
     >
-      <SettingsRow
+      <FormRow
         :title="$t('surface.settingsGeneralPanel.sourceFolder')"
         :description="$t('surface.settingsGeneralPanel.discoverRepositoriesAndWorktreesWhenCreatingAgents')"
         :error="sourceFolderError"
@@ -217,15 +217,15 @@
             > {{ $t('surface.settingsGeneralPanel.clear') }} </el-button>
           </span>
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
 
-    <SettingsSection
+    <FormSection
       v-if="appHostCapabilities.systemPermissions"
       :title="$t('surface.settingsGeneralPanel.systemPermissions')"
       title-id="settings-general-permissions-title"
     >
-      <SettingsRow
+      <FormRow
         :title="$t('surface.settingsGeneralPanel.accessibility')"
         :description="accessibilityDescription"
       >
@@ -252,8 +252,8 @@
             > {{ $t('surface.settingsGeneralPanel.refresh') }} </el-button>
           </span>
         </template>
-      </SettingsRow>
-      <SettingsRow
+      </FormRow>
+      <FormRow
         :title="$t('surface.settingsGeneralPanel.screenRecording')"
         :description="screenRecordingDescription"
       >
@@ -280,8 +280,8 @@
             > {{ $t('surface.settingsGeneralPanel.refresh') }} </el-button>
           </span>
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
   </SettingsPanelFrame>
 </template>
 
@@ -292,8 +292,8 @@ import { computed, onMounted, ref } from 'vue';
 import type { AppGeneralSettings, DaemonStatus, SourceFolderState, SpokenAnnouncementScope, SpokenAnnouncementVoice, SystemPermissionsStatus, UpdateSettingsInput } from '@workspace/core/contracts';
 import { defaultSourceFolderState } from '@workspace/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 import { ChevronDown, Circle, ShieldCheckIcon } from '../shared/icons/app-icons';
 import { appHostCapabilities, appApi } from '../platform-api';
 
@@ -617,7 +617,7 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
   align-items: center;
   justify-content: space-between;
   gap: var(--space-16);
-  padding: var(--space-10) var(--space-12);
+  padding: var(--space-8);
   cursor: pointer;
   list-style: none;
 }
@@ -648,24 +648,24 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
   color: var(--color-text);
   font-size: var(--font-size-14);
   font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-22);
+  line-height: var(--line-height-20);
 }
 
 .settings-general-panel__voice-rules-copy span {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: var(--font-size-14);
-  line-height: var(--line-height-20);
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .settings-general-panel__voice-rules-content {
   border-top: 1px solid var(--color-border);
-  background: var(--color-surface-low);
+  background: var(--color-surface);
 }
 
-.settings-general-panel__voice-rules-content :deep(.settings-row + .settings-row) {
+.settings-general-panel__voice-rules-content :deep(.form-row + .form-row) {
   border-top: 1px solid var(--color-border);
 }
 

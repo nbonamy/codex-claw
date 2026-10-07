@@ -277,20 +277,20 @@
     </template>
     <FormDialog v-if="!session" v-model="automaticSettingsOpen" :title="t('automaticReview.title')" width="440px" teleported>
       <div class="app-form-dialog">
-        <FormDialogField :label="t('automaticReview.priorities')">
+        <FormField :label="t('automaticReview.priorities')">
           <el-select v-model="maxPriority" :aria-label="t('automaticReview.priorities')" :disabled="busy">
             <el-option value="p0" :label="t('automaticReview.critical')" />
             <el-option value="p1" :label="t('automaticReview.high')" />
             <el-option value="p2" :label="t('automaticReview.normal')" />
             <el-option value="p3" :label="t('automaticReview.all')" />
           </el-select>
-        </FormDialogField>
-        <FormDialogField :label="t('automaticReview.rounds')">
+        </FormField>
+        <FormField :label="t('automaticReview.rounds')">
           <el-input-number v-model="maxRounds" :aria-label="t('automaticReview.rounds')" :min="1" :max="10" :step="1" :precision="0" :disabled="busy" />
-        </FormDialogField>
-        <FormDialogField :label="t('automaticReview.autoCommit')" :help="t(autoCommit ? 'automaticReview.commitConsent' : 'automaticReview.noCommit')">
+        </FormField>
+        <FormField :label="t('automaticReview.autoCommit')" :help="t(autoCommit ? 'automaticReview.commitConsent' : 'automaticReview.noCommit')">
           <el-switch v-model="autoCommit" :aria-label="t('automaticReview.autoCommit')" :disabled="busy" />
-        </FormDialogField>
+        </FormField>
         <p class="app-form-dialog__help">{{ t('automaticReview.independent') }} {{ t('automaticReview.noPublish') }}</p>
       </div>
       <template #footer>
@@ -327,7 +327,7 @@ import type { Agent, AgentGitStatus, AppSnapshot } from "@workspace/core/contrac
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 import BackendSelector from './BackendSelector.vue';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import { useBackendChoices } from './backend-selection';
 import { useCodeReviewSettings } from './code-review-settings';
 import type { BackendModelOption } from '@workspace/core/contracts';

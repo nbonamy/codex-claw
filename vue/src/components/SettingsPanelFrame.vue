@@ -36,23 +36,23 @@ defineProps<{
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-12);
 }
 
 .settings-panel__header {
-  min-height: var(--space-16);
   display: flex;
   justify-content: space-between;
   gap: var(--space-12);
   align-items: flex-end;
-  padding-bottom: var(--space-16);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .settings-panel__header h2 {
   margin: 0;
   color: var(--color-text);
-  font-size: var(--font-size-20);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-18);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-28);
 }
 
