@@ -53,7 +53,7 @@ including script tests, and 85% statements in each of the five workspaces.
 A failing gate blocks release. Only CHANGELOG.md, the six package manifests,
 package-lock.json, and vue/src/generated/release-notes.json may change.
 
-Use `app-dod` and review the staged diff, then commit with
+Use `korus-dod` and review the staged diff, then commit with
 `chore: release prep`. Report the audited SDK version and Git
 provenance from the exact npm package, not the sibling HEAD.
 Tag creation belongs to the release command, not preparation.

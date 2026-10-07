@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="#get-korus"><strong>Get Korus for macOS</strong></a>
+  <a href="#get-korus"><strong>Get Korus for macOS, Windows, and Linux</strong></a>
   ·
   <a href="https://meetkorus.dev">Website</a>
   ·
@@ -60,8 +60,9 @@ the next desktop release.
 - **Bring your backlog** — Connect GitHub or Linear to browse issues, start
   agent work, or shape a Mission. Choose the code repository separately from a
   Linear team or project; GitHub remains the home for pull requests.
-- **Automate the queue** — Watch GitHub repositories or Linear teams and
-  projects for matching work, then start dedicated agents in worktrees.
+- **Schedule recurring work** — Send prompts to an existing agent or Quick Chat,
+  or start a fresh Quick Chat each time. Choose daily, weekday, weekly, custom,
+  or interval schedules, or ask an agent to create an automation from chat.
 
 ## From idea to delivery
 
@@ -102,15 +103,19 @@ you return.
 
 ## Get Korus
 
-Desktop packaging targets macOS on Apple silicon, Windows x64, and Linux
-x64/ARM64. See [GitHub Releases](https://github.com/nbonamy/korus/releases) for
-published installers. Prereleases require manual downloads; automatic updates
+Korus is available for macOS on Apple silicon, Windows x64, and Linux
+x64/ARM64. Download it from [GitHub Releases](https://github.com/nbonamy/korus/releases).
+Prereleases require manual downloads; automatic updates
 on macOS and installed Windows copies follow stable releases only. Windows
 installers are unsigned. Linux and portable Windows updates are manual.
 To run from source, see [Development](#development).
 
 1. Download a published installer for your platform and architecture from GitHub Releases.
-2. Install and launch Korus (on macOS, move it to Applications).
+2. Install and launch Korus:
+   - **macOS:** Open the DMG and double-click Korus to install and launch it.
+   - **Windows:** Run the installer, or extract the portable ZIP and launch Korus.
+   - **Linux:** Install the DEB or RPM for your architecture, or extract the ZIP
+     and launch Korus.
 3. Connect Codex, Claude Code, or both, then choose Continue. Only one connected
    engine is required. Claude Code supports subscription or API-key setup.
 4. Create a team, add an agent from a repository, and start coding. When both
@@ -125,7 +130,7 @@ Settings shows each engine's account, conversation location, and enabled state.
 
 Requirements:
 
-- macOS arm64, or experimental Linux/Windows x64/arm64 for development;
+- macOS arm64, Windows x64, or Linux x64/arm64;
 - Node 22.23.3 and npm 10.9.4 (the CI toolchain);
 - network access to download the pinned Codex app-server on the first build;
 
@@ -145,8 +150,7 @@ On Windows, run development from PowerShell with Node and npm installed. The
 launcher invokes npm through Node, so it does not require a Unix shell or direct
 execution of `npm.cmd`. Preparing Codex requires `tar.exe` on `PATH` (included
 with current Windows versions). It downloads and verifies the full Windows
-Codex package, including its supporting executables and resources. Native
-Windows startup remains experimental until exercised on the target machine.
+Codex package, including its supporting executables and resources.
 
 Focused project gates:
 
@@ -160,9 +164,8 @@ npm run typecheck
 Builds consume the pinned Computer Use artifact and verify its checksum. Set
 `COMPUTER_USE_LOCAL=1` in `.env` to build the helper from a sibling
 `computer-use` checkout instead.
-Windows/Linux support is experimental. Computer Use and Screenshots are currently
-macOS-only; those builds skip the Computer Use helper and do not package its
-native automation dependency.
+Computer Use and AppShots are macOS-only. Windows and Linux builds skip the
+Computer Use helper and do not package its native automation dependency.
 
 macOS release packaging signs and notarizes by default. For local packaging
 checks that do not need signing:

@@ -1,5 +1,5 @@
 ---
-name: app-testing-coverage
+name: korus-testing-coverage
 description: Use when adding tests, fixing failing tests, raising coverage, changing IPC/app contracts, testing Vue components in isolation, or verifying Korus desktop behavior.
 ---
 
