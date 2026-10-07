@@ -1,56 +1,73 @@
 ---
-description: Schedule prompts in agents or Quick Chats.
+description: Schedule recurring work in an agent or Quick Chat.
 ---
 
 # Automations
 
-An automation sends a prompt on a recurring schedule. It can run in an existing agent, an existing Quick Chat, or a new Quick Chat each time. No repository or work integration is required.
+Automations send a prompt on a schedule. Use them for a daily project summary, a weekly dependency check, or another task you want an agent to repeat. You can continue an existing conversation or start a fresh Quick Chat for each run.
 
 ## Create an automation
 
-1. Open **Automations** from the left rail.
-2. Choose **Local** or a connected remote host.
-3. Choose **New automation**.
-4. Give it a name and write the prompt.
-5. Choose where it runs:
-   - **New Quick Chat every run** starts with fresh context each time. Choose its team, coding engine, model, and effort. Empty model and effort fields use provider defaults.
-   - **Existing Quick Chat** continues the selected chat.
-   - **Existing agent** continues the selected agent in its folder or worktree.
-6. Choose **Daily**, **Weekdays**, **Weekly**, **Custom**, or **Interval**, then set the time where applicable. New schedules use your local timezone; existing schedules retain their saved timezone. Check **Next run** and save.
+1. Open **Automations** from the left rail. Choose **Local** or a connected remote host.
+2. Select **New automation** and give it a name.
+3. Write the prompt the agent should receive each time.
+4. Under **Run in**, choose a team and conversation:
+   - **Existing agent** runs in that agent's folder or worktree, with its conversation context.
+   - **Existing Quick Chat** continues a chat you already use.
+   - **New Quick Chat each run** starts with fresh context. Choose its coding engine, model, and reasoning effort, or leave the model and effort at their defaults.
+5. Set the schedule, check **Next run**, and select **Save automation**.
 
-Existing conversations keep their backend, model, effort, and approval settings. Fresh Quick Chats use the selected settings without changing your saved defaults.
+Existing conversations keep their model and permissions. A new Quick Chat needs enough information in the prompt to find the project or service you want it to use. GitHub and Linear are only needed if the task uses them.
 
-You can also ask an agent or Quick Chat to create an automation, for example “Run the refresh-work-calendar skill every day at 8 AM America/Chicago in this agent.” Specify the prompt, schedule, timezone, and destination. It appears in the same Automations view for editing or disabling.
-
-Automations are enabled by default. Their first scheduled run is the next occurrence, not immediately on saving. Calendar schedules keep their local time across daylight-saving changes; nonexistent times are skipped and repeated times run once. The host owning the automation must stay running. When it returns after missing occurrences, Korus runs once rather than replaying a backlog.
-
-Custom schedules support every-N days, selected weekdays, and days of the month. More advanced recurrence rules created through the tool are preserved in the editor rather than silently simplified.
-
-## Keep the prompt explicit
-
-An automation has the same tools and permission boundaries as its conversation. Scheduling does not grant extra permissions or automatically create worktrees, commit changes, or publish work.
-
-For example:
+For example, schedule this prompt in a repository agent:
 
 ```text
-Check the open issues in my configured repository. Summarize anything
-that needs attention. Do not edit files or change issue status.
+Summarize this repository's commits from the past week. Group them
+by feature, fix, and documentation. Flag any follow-up work mentioned
+in the commits. Do not change files.
 ```
 
-A Quick Chat can use Korus's existing tools to create a repository agent in a dedicated worktree when your prompt explicitly asks for that. Specify the repository and delivery constraints in the prompt; they are not separate automation configuration.
+The first scheduled run starts at the next occurrence, not when you save. Use the play button to try an enabled automation immediately.
 
-## Follow a run
+## Create one from chat
 
-Use the play button to run an enabled automation immediately. **View logs** shows the conversation, start time, duration, status, and any error. Its conversation action opens the recorded conversation.
+You can ask an agent or Quick Chat to set up the schedule for you:
 
-A busy target is not interrupted. Korus does not overlap runs of the same automation or dispatch two automations into the same busy conversation. A run awaiting approval remains **Needs input**; open the target conversation to respond.
+```text
+Every weekday at 9 AM Chicago time, use this conversation to check
+the project's open pull requests and summarize which need my review.
+Do not change files or post comments.
+```
 
-**Completed** means the prompt's provider turn ended successfully. It does not mean delegated agents finished, issues were closed, or changes were shipped. A daemon restart marks interrupted runs as failed rather than claiming success.
+Say what should happen, when it should run, and which conversation to use. To keep runs separate, ask for a new Quick Chat each time. Open **Automations** to check or change the resulting prompt and schedule.
 
-## Edit or remove
+## Choose a schedule
 
-Switching an automation off stops future runs, not an already-running conversation. Deleting it removes the schedule but leaves conversations and worktrees intact. Clearing history removes finished entries and preserves active runs.
+- **Daily**, **Weekdays**, or **Weekly** runs at a chosen time.
+- **Custom** supports patterns such as every two days, selected weekdays, or a day of the month.
+- **Interval** repeats every set number of minutes or hours.
 
-## When a run fails
+New calendar schedules use your local timezone and keep the same local time across daylight-saving changes. Existing schedules retain their saved timezone. Check **Next run**, especially when scheduling work on a remote computer. To use a specific timezone, include it when asking an agent to create the automation.
 
-Check the error in its execution log. Reconnect the coding engine if needed, or edit the automation when its target conversation or team no longer exists. A remote automation uses the remote host's conversations, provider connections, and permissions—not those on your local computer.
+The computer running the automation must be awake, with Korus running or [kept ready in the background](../troubleshooting/faq#can-work-continue-after-i-close-the-desktop-app). If it misses several scheduled runs, Korus runs the task once when it can resume, rather than repeating every missed run.
+
+## Check the result
+
+Open **View logs** to see each run's conversation, start time, duration, and status. Use the conversation icon beside an entry to read its messages.
+
+- **Working** means the agent is still responding.
+- **Needs input** means you need to open the agent or Quick Chat and answer a question or approval request.
+- **Completed** means the agent finished its response. Read it to see what was done and whether any follow-up remains.
+- **Failed** includes an error to help you decide what to retry or change.
+
+An automation waits if its conversation is busy; it does not interrupt your work or start overlapping runs. Remote automations use the accounts and tools available on the remote computer.
+
+Be explicit about whether the agent may edit files, commit, or publish. Scheduling a prompt does not give it extra permissions.
+
+## Change or stop an automation
+
+Edit the automation to change its prompt, conversation, or schedule. Switch it off to stop future runs. This does not stop a run already in progress; interrupt that work from its conversation if needed.
+
+Deleting an automation removes its schedule, not its conversations or worktrees. **Clear** in the log removes finished entries and keeps active runs.
+
+If a run fails, check its error and the selected conversation. Reconnect the coding engine if needed. If the conversation or team has been removed, edit the automation to choose another.

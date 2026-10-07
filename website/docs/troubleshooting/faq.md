@@ -10,7 +10,7 @@ Use your connected coding provider's account and plan. Korus supplies the worksp
 
 ## Which desktop platforms are supported?
 
-Choose macOS Apple silicon, Windows x64, or Linux x64 / ARM64 from [Downloads](__PRODUCT_DOWNLOAD_URL__). Only assets listed on a GitHub release are available to download. Computer Use and Screenshots are macOS-only.
+Choose macOS Apple silicon, Windows x64, or Linux x64 / ARM64 from [Downloads](__PRODUCT_DOWNLOAD_URL__). Computer Use and AppShots are macOS-only.
 
 ## Do agents share files?
 
@@ -28,7 +28,7 @@ Check the engine's selected setup location. A separate Korus environment has its
 
 ## Do I need GitHub to use Korus?
 
-You can skip GitHub onboarding and work in an existing local folder. Connect GitHub in **Settings → Integrations** when you want GitHub repository browsing, issue and pull-request workflows, or Automations.
+You can skip GitHub onboarding and work in an existing local folder. Connect GitHub in **Settings → Integrations** when you want GitHub repository browsing or issue and pull-request workflows. [Automations](../features/automations) do not require GitHub unless the scheduled task uses it.
 
 ## Does creating a new project create a Git worktree?
 
@@ -40,7 +40,7 @@ The selected conversation and workspace change. Background work can continue, an
 
 ## Can work continue after I close the desktop app?
 
-The background `daemon` daemon can keep agent work alive after the desktop app closes. Check **Settings → General → Keep Korus ready in the background** and the conversation state when you return. A provider question or approval can still require your response.
+Enable **Settings → General → Keep Korus ready in the background** to let agents and automations keep running after you close the desktop window. The computer must stay awake. A question or approval can still require your response; check the conversation when you return.
 
 ## Does my provider receive repository context?
 

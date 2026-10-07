@@ -57,7 +57,7 @@ The rest of the provider setup stays separate. For example, an MCP server config
 
 With reuse disabled, install the resources you need into the Korus Codex home. If Korus reports that private skills or plugins already exist when enabling sharing, leave sharing disabled to preserve them rather than treating reuse as an automatic merge.
 
-Korus supplies its own collaboration tools to agents. You do not need to add the `workspace` MCP server by hand to coordinate Korus teammates. See [Agent collaboration](../reference/agent-collaboration).
+Korus supplies its collaboration tools automatically; no extra server setup is needed to coordinate teammates. See [Agent collaboration](../reference/agent-collaboration).
 
 ## Customize Codex
 

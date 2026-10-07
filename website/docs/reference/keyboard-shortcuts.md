@@ -45,6 +45,10 @@ Some shortcuts require an active agent workspace and are suspended while a modal
 | ⌘, | Open Settings. |
 | ⌘Q | Quit through Korus's app lifecycle flow. |
 
+## AppShots
+
+Press both Command keys simultaneously while the window you want to capture is in front. Korus attaches it to the active conversation's draft. Change or disable this shortcut in **Settings → AppShots**. See [AppShots](../features/conversations#attach-an-app-window-on-macos).
+
 ## Composer commands
 
 Type `/` in the composer to discover commands. These commands are available for both Codex and Claude Code:

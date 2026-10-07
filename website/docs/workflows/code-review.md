@@ -25,36 +25,15 @@ Choose the scope deliberately. If the feature is committed on a branch, reviewin
 
 ## Automatic remediation
 
-Enable **Automatic remediation** to run the review/fix/verify loop without
-selecting findings or starting each round yourself. Choose the highest priority
-to fix (P0–P2 by default) and the maximum number of review rounds (3 by default,
-including the final verification review). **Configure** also offers **Commit
-after each fix round**, off by default. Korus remembers these choices too.
+Enable **Automatic remediation** to let an independent reviewer find, fix, and check issues over several rounds. In **Configure**, choose which priorities to fix and the maximum number of rounds. The defaults are P0–P2 and three rounds, including the final verification review.
 
-Automatic mode uses an independent reviewer and a fresh conversation for each
-review round. After remediation, the reviewer must record validation evidence
-for every fix. With commits disabled, Korus leaves the fixes uncommitted for you
-to inspect and commit. With commits enabled, Korus creates a local commit after
-each validated fix round, including existing uncommitted changes in the reviewed
-workspace—not just the fixes. The reviewer is instructed not to stage or commit
-in either mode; Korus owns the optional commit step. Both modes review again
-against the original fixed Git baseline. Neither pushes nor merges.
-Start from the repository root; the reviewed scope includes its existing
-staged, unstaged, and untracked files. Other active agents do not block automatic
-review. Avoid editing the same files concurrently: Git safety checks can still
-pause the review when the branch, HEAD, or expected working changes no longer match.
+Fixes stay uncommitted unless you enable **Commit after each fix round**. That option includes existing uncommitted changes in the reviewed workspace, not just the reviewer's fixes. Check the full diff before enabling it. Automatic review never pushes or merges.
 
-A clean review at the selected priority threshold closes the temporary reviewer
-and sends the original agent a report with fixes, verification evidence, local
-commits, and any remaining lower-priority findings. A clean review is not proof
-that the code has no defects or approval to ship.
+Each round uses a fresh review conversation. When no findings remain at the selected priorities, Korus closes the temporary reviewer and sends the result to your original conversation, including any lower-priority findings left open.
 
-Failed validation or commits, repeated findings, detected concurrent workspace
-changes, and the round limit pause automation and send a partial report instead.
-**Stop automatic review** also pauses the loop and interrupts the reviewer; it
-does not undo files or commits. After a backend restart, interrupted automatic
-reviews stay paused for inspection rather than replaying commits or fixes.
-You can continue manually after inspecting the checkout.
+Avoid editing the reviewed files while it runs. Failed checks, repeated findings, conflicting workspace changes, or reaching the round limit pause the review and return a partial report. Inspect that report and the diff before continuing manually.
+
+Use **Stop automatic review** to interrupt the reviewer. Stopping does not undo edits or local commits. An interrupted review stays paused after restarting Korus.
 
 ### Start from chat
 
@@ -65,11 +44,7 @@ unless you request overrides. It reuses your saved priority and round limits,
 but local commits stay off unless you explicitly request them—even if the panel
 previously had commits enabled.
 
-The launch response confirms that review started, not that it passed. The report
-returns to the originating conversation automatically. Avoid editing the reviewed
-files while it runs. Agents are instructed not to start this workflow for a
-generic request to review, finish, or ship work; it requires an explicit request
-for automatic review because it can modify files.
+The result returns to the same conversation. Ask specifically for an automatic review when you want fixes applied as well as findings reported.
 
 ## Inspect the findings
 
@@ -91,17 +66,7 @@ Once the round and any selected fixes are complete, choose **Review again** for 
 
 An independent reviewer starts a fresh review conversation for the next round. Finishing removes the temporary Review agent and sends a handoff to the original agent describing the remediated findings. Finishing a current-thread review clears its active review panel while leaving the agent's conversation available.
 
-Before closing, Korus saves a report in `~/.korus/reviews/` on the host running
-the review (or the configured app home). The independent review handoff includes
-its path. Reports retain inspection summaries, findings, decisions, verification
-evidence, local commits, and each round's provider session ID. Full conversations
-remain in provider-owned storage; completing a review does not delete them.
-If the report cannot be saved, the reviewer stays open and automatic mode pauses.
-
-The reviewer must explicitly confirm how many findings it registered, including
-zero for a clean round. A mismatched count prompts it to correct its findings
-before finishing. If it ends without valid confirmation, the round fails and
-automatic mode pauses; an empty findings list alone never means a clean review.
+The completion message includes the saved report's location. Use it to revisit the findings, your decisions, fixes, and verification results. If the report cannot be saved, the reviewer stays open so you can resolve the error.
 
 Review state is saved while the session is active. If a round fails, read its error, resolve the provider or workspace problem, and use **Retry review** when offered. An existing active review must finish or stop before another starts for the same target. After interrupted work resumes, check the findings and actual files before authorizing more changes.
 

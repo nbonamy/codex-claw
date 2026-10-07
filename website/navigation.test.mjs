@@ -121,6 +121,31 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         `Download fits at ${width}px`,
       );
       // Card previews must neither overlap wrapped copy nor escape their cards.
+      const automation = page.locator(".automation-console");
+      const previewBounds = await automation.boundingBox();
+      assert.ok(
+        previewBounds.x >= 0 && previewBounds.x + previewBounds.width <= width,
+        `Automation preview fits at ${width}px`,
+      );
+      for (const item of await automation
+        .locator("strong:visible, p:visible, time:visible")
+        .all()) {
+        const bounds = await item.boundingBox();
+        assert.ok(
+          bounds.x >= previewBounds.x &&
+            bounds.x + bounds.width <= previewBounds.x + previewBounds.width,
+          `Automation content stays inside its preview at ${width}px`,
+        );
+        assert.equal(
+          await item.evaluate(
+            (node) =>
+              getComputedStyle(node).display === "inline" ||
+              node.scrollWidth <= node.clientWidth + 1,
+          ),
+          true,
+          `Automation text is not clipped at ${width}px`,
+        );
+      }
       for (const card of await page.locator(".capability").all()) {
         const layout = await card.evaluate((element) => {
           const copy = element.querySelector("p");
@@ -212,6 +237,15 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
       await page.getByRole("heading", { level: 1 }).waitFor();
       assert.equal(new URL(page.url()).pathname, "/docs/");
     }
+    await page.goto(origin);
+    await page
+      .locator("#automations a[href='/docs/features/automations.html']")
+      .click();
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    assert.equal(
+      new URL(page.url()).pathname,
+      "/docs/features/automations.html",
+    );
     // OS is a shortcut, never an inferred CPU architecture or a mobile download.
     for (const [userAgent, touch, platform] of [
       ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", false, "macos"],

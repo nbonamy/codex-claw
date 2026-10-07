@@ -40,7 +40,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=github-navigation-1" />
+    <link rel="stylesheet" href="styles.css?v=scheduled-prompts-1" />
   </head>
   <body>
     <header class="site-header shell">
@@ -354,62 +354,71 @@
         <div class="shell automations-grid">
           <div
             class="automation-console reveal"
-            aria-label="Automation editor and run history preview"
+            role="img"
+            aria-label="Example automation: a project summary in an existing agent every weekday at 9 AM, with completed runs"
           >
             <header>
-              <strong>Automations</strong
-              ><button type="button" tabindex="-1">＋ New automation</button>
+              <strong>Automations</strong><span class="mono">Local</span>
             </header>
             <div class="automation-body">
               <aside>
-                <small>SOURCES</small>
+                <small>SCHEDULED PROMPTS</small>
                 <div class="active">
-                  <span>◈</span><strong>Critical issue intake</strong><i>On</i>
+                  <span>◷</span><strong>Morning review</strong><i>On</i>
                 </div>
                 <div>
-                  <span>◈</span><strong>Dependency sweep</strong><i>Daily</i>
+                  <span>◷</span><strong>Dependency check</strong><i>On</i>
                 </div>
               </aside>
-              <main>
+              <div class="automation-detail">
                 <div class="automation-title">
-                  <small>AUTOMATION</small><strong>Critical issue intake</strong
+                  <small>AUTOMATION</small><strong>Morning review</strong
                   ><span>Enabled</span>
                 </div>
-                <div class="automation-flow">
+                <div class="automation-prompt">
+                  <small>PROMPT</small>
+                  <p>
+                    Summarize recent changes to this project and flag anything
+                    that needs my attention. Do not change files.
+                  </p>
+                </div>
+                <div class="automation-settings">
                   <div>
-                    <small>WHEN</small><strong>New GitHub issue</strong
-                    ><span>label is critical</span>
+                    <small>RUN IN</small><strong>Existing agent</strong
+                    ><span>Web app</span>
                   </div>
-                  <i>→</i>
                   <div>
-                    <small>ROUTE TO</small><strong>__PRODUCT_NAME__ team</strong
-                    ><span>create a focused agent</span>
+                    <small>SCHEDULE</small><strong>Weekdays</strong
+                    ><span>9:00 AM · Chicago</span>
                   </div>
                 </div>
                 <div class="run-history">
                   <small>RECENT RUNS</small
                   ><span
-                    ><i></i><strong>#286</strong> Session created
-                    <time>2m</time></span
+                    ><i></i><strong>Today</strong> Completed
+                    <time>9:00 AM</time></span
                   ><span
-                    ><i></i><strong>#274</strong> Completed
-                    <time>1d</time></span
+                    ><i></i><strong>Yesterday</strong> Completed
+                    <time>9:00 AM</time></span
                   >
                 </div>
-              </main>
+              </div>
             </div>
           </div>
           <div class="automations-copy reveal delay-1">
             <p class="section-kicker">04 / Repeatable work</p>
             <h2>Make the repeatable<br /><span>automatic.</span></h2>
             <p>
-              Set the criteria once. Automations watch for matching work and
-              route it to an agent, so recurring intake doesn’t need the same
-              manual handoff every time. Run history keeps execution visible.
+              Give an agent a prompt and a schedule. Run a daily project
+              summary, a weekly dependency check, or your own routine in an
+              existing conversation—or a fresh Quick Chat each time.
             </p>
             <small
-              >Use Automations for recurring intake alongside Missions and
-              direct repository work.</small
+              >Set it up in Automations or ask in chat. Check each run’s result
+              in its conversation.</small
+            >
+            <a class="text-link" href="/docs/features/automations.html"
+              >Set up an automation <span aria-hidden="true">↗</span></a
             >
           </div>
         </div>

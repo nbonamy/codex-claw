@@ -22,6 +22,21 @@ Choose a model in the composer before sending when you need a particular provide
 
 The composer's **+** menu includes **Review**, **Delegate**, and **Visualize** for both engines. These open [Code Review](../workflows/code-review), request [worktree delegation](../workflows/worktrees#delegate-implementation), and open [Visualize](./visualize), respectively. The corresponding slash commands remain available.
 
+After a response, the empty composer may suggest a follow-up. It is a hint, not a draft or a sent message; it does not replace anything you have typed. Enter the request you want to send.
+
+## Attach an app window on macOS
+
+AppShots lets you show the agent a window from another app.
+
+1. Select the conversation you want to send it to in Korus.
+2. Bring the other app's window to the front.
+3. Press both Command keys at the same time. Korus returns to the front with the screenshot attached to your draft.
+4. Check the image, add your request, and send it.
+
+In **Settings → AppShots**, you can switch the shortcut to both Option keys or both Shift keys, choose **None** to disable it, and turn the capture sound on or off. Press the two keys together, rather than double-tapping one key.
+
+Screen Recording permission is required for capture; check **Settings → General → System permissions** if it fails. The shortcut does not require Input Monitoring permission. Check that the screenshot contains only what you intend to share before sending it.
+
 ## Discuss before implementation
 
 Use `/plan` to enter Plan mode, then explain what you want to decide before editing. Korus uses Codex's native Plan mode; for Claude Code, it supplies planning instructions to the conversation.
