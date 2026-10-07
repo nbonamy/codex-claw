@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { DocumentWorkspaceService } from '../../document-workspace-service';
 import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
@@ -848,6 +852,31 @@ describe('AppMcpService', () => {
     });
     expect(response.result.structuredContent).toStrictEqual({ url: 'https://example.com', title: 'Example', element: { tag: 'button' } });
     expect(execute).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: 'primary', command: 'dom', arguments: { selector: '#save' } });
+  });
+
+  it('retains display-markdown before delivery and recovers it without replaying the tool', async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), 'mcp-documents-test-'));
+    const filename = path.join(home, 'documents.json');
+    const documents = new DocumentWorkspaceService(filename);
+    const events: BackendEvent[] = [];
+    service = new AppMcpService({ snapshot: createInitialSnapshot(), retainDocument: (id, request) => documents.display(id, request), onEvent: event => events.push(event) });
+    try {
+      const url = await service.start();
+      await callTool(url, 'agent-dina', 'display-markdown', { markdown: '# Exact\n', title: 'Saved proposal' });
+      const event = events.find(event => event.type === 'client.markdownDisplayRequested');
+      expect(event).toMatchObject({ payload: { documentId: expect.any(String), title: 'Saved proposal' } });
+      const fresh = new DocumentWorkspaceService(filename);
+      const tab = (await fresh.get('desktop'))['agent-dina']!.tabs[0]!;
+      expect(await fresh.read('desktop', 'agent-dina', tab.id, async () => '')).toStrictEqual({ content: '# Exact\n' });
+    } finally { await rm(home, { recursive: true, force: true }); }
+  });
+
+  it('still displays markdown when document retention fails', async () => {
+    const events: BackendEvent[] = [];
+    service = new AppMcpService({ snapshot: createInitialSnapshot(), retainDocument: async () => { throw new Error('store is corrupt'); }, onEvent: event => events.push(event) });
+    const url = await service.start();
+    await callTool(url, 'agent-dina', 'display-markdown', { markdown: '# Still shown\n', title: 'Proposal' });
+    expect(events.find(event => event.type === 'client.markdownDisplayRequested')).toMatchObject({ payload: { kind: 'markdown', title: 'Proposal', content: '# Still shown\n' } });
   });
 
   it('displays generated Markdown, requests celebrations, and creates agents through the service boundary', async () => {

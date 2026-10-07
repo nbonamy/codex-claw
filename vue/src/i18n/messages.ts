@@ -3,6 +3,7 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    documents: { saveTabAs: 'Save {title} as…', save: 'Save', saveAs: 'Save As…', destination: 'Save on the agent’s host:', replaceFile: 'Replace the existing file?', replace: 'Replace' },
   promptAutomation: {
     schedule: 'Schedule',
     hourly: 'Every hour',

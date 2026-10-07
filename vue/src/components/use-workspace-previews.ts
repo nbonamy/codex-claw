@@ -36,7 +36,6 @@ export type WorkspacePreviewOptions = {
 /** Owns preview request races and projection into per-agent workspace tabs. */
 export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
   let filePreviewRequestId = 0;
-  let markdownPreviewId = 0;
   const gitDiffRequestIds = new Map<string, number>();
 
   async function openConversationFile(link: ConversationFileLink, agentId = options.currentAgent()?.id): Promise<void> {
@@ -216,19 +215,21 @@ export function useWorkspacePreviews(options: WorkspacePreviewOptions) {
   }
 
   function openMarkdown(request: SidePanelMarkdownRequest): void {
-    const agent = options.currentAgent();
+    const agent = request.agentId ? agentForId(request.agentId) : options.currentAgent();
     if (!agent) return;
     const subtitle = request.path;
     const workspace = options.workspaceFor(agent.id);
     const title = localizedText(request.title, translate)
       ?? (subtitle ? fileBasename(subtitle) : translate('surface.appShell.markdown'));
     if (request.purpose !== 'plan') {
-      const identifier = request.path ?? `inline-${++markdownPreviewId}`;
+      const identifier = request.documentId ?? request.path ?? crypto.randomUUID();
       const tab = request.path ? rightWorkspaceFileTab(request.path) : rightWorkspaceMarkdownTab(identifier);
       workspace.filePanels = {
         ...workspace.filePanels,
         [tab]: {
           kind: 'markdown',
+          ...(request.documentId ? { documentId: request.documentId } : {}),
+          ...(request.path ? { path: request.path } : {}),
           title,
           ...(subtitle ? { subtitle } : {}),
           content: request.content,
@@ -332,6 +333,7 @@ function filePreviewPanel(
     kind,
     title: fileBasename(filePath),
     subtitle: filePath,
+    path: filePath,
     content,
     ...(kind === 'source' ? { language: languageForFilePath(filePath) ?? null } : {}),
     state,

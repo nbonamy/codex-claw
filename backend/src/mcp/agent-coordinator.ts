@@ -359,7 +359,7 @@ export class AppMcpAgentCoordinator {
     }
 
     return this.onDisplayMarkdown(agent, {
-      ...(markdown ? { markdown } : {}),
+      ...(markdown ? { markdown: input.markdown! } : {}),
       ...(filePath ? { path: filePath } : {}),
       ...(title ? { title } : {}),
     });

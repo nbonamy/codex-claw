@@ -1,6 +1,9 @@
 import type { AgentGitDiffSection } from '@workspace/core/contracts';
 
 export type SidePanelBaseState = {
+  documentId?: string;
+  path?: string;
+  savedPath?: string;
   title: string;
   subtitle?: string;
   state: 'idle' | 'loading' | 'error';

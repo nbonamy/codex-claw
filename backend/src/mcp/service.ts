@@ -47,11 +47,13 @@ import { createQuickChatProjectToolModuleProvider } from './quick-chat-project-t
 import { createAutomaticReviewToolModuleProvider, type StartAutomaticReview } from './automatic-review-tools';
 import { createAutomationToolModuleProvider } from './automation-tools';
 import type { CreatedProject } from '../projects/project-creation-service';
+import { warnMain } from '../log';
 import type { DurableTaskService } from '../agents/durable-task-service';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
 export type AppMcpServiceOptions = {
+  retainDocument?: (agentId: string, request: import('@workspace/core/contracts').SidePanelMarkdownRequest) => Promise<import('@workspace/core/contracts').SidePanelMarkdownRequest>;
   tasks?: DurableTaskService;
   persistSnapshot?: () => Promise<void>;
   missionTools?: MissionToolPort;
@@ -72,6 +74,7 @@ export type AppMcpServiceOptions = {
 };
 
 export class AppMcpService {
+  private readonly retainDocument?: AppMcpServiceOptions['retainDocument'];
   private readonly tasks?: DurableTaskService;
   private readonly persistSnapshot?: () => Promise<void>;
   private readonly snapshot: AppSnapshot;
@@ -91,6 +94,7 @@ export class AppMcpService {
   private lastCelebrationKind?: CelebrationKind;
 
   constructor(options: AppMcpServiceOptions) {
+    this.retainDocument = options.retainDocument;
     this.tasks = options.tasks;
     this.persistSnapshot = options.persistSnapshot;
     this.snapshot = options.snapshot;
@@ -319,16 +323,15 @@ export class AppMcpService {
     const content = input.markdown ?? (resolvedPath ? await readAgentMarkdownFile(resolvedPath.absolutePath) : '');
     const title = input.title ?? (resolvedPath ? fileBasename(resolvedPath.relativePath) : 'Markdown');
 
-    this.emit({
-      agentId: agent.id,
-      type: 'client.markdownDisplayRequested',
-      payload: {
-        kind: 'markdown',
-        title,
-        ...(resolvedPath ? { path: resolvedPath.relativePath } : {}),
-        content,
-      },
-    });
+    const request: import('@workspace/core/contracts').SidePanelMarkdownRequest = {
+      kind: 'markdown', title, ...(resolvedPath ? { path: resolvedPath.relativePath } : {}), content,
+    };
+    // Retention is best-effort: a store failure must not stop the document from being shown.
+    const payload = await this.retainDocument?.(agent.id, request).catch(error => {
+      warnMain('documents', 'Failed to retain displayed document', { message: String(error) });
+      return request;
+    }) ?? request;
+    this.emit({ agentId: agent.id, type: 'client.markdownDisplayRequested', payload });
 
     return {
       success: true,

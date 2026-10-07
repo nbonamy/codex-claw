@@ -204,6 +204,8 @@ function expectSkill(value: unknown, path: string): void {
 function expectSidePanelMarkdown(value: unknown, path: string): void {
   expectRecord(value, path);
   expectLiteral(value.kind, ['markdown'], `${path}.kind`);
+  expectOptional(value, 'documentId', path, expectString);
+  expectOptional(value, 'agentId', path, expectString);
   expectOptional(value, 'purpose', path, (candidate, candidatePath) =>
     expectLiteral(candidate, ['plan'], candidatePath),
   );

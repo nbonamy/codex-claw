@@ -54,6 +54,17 @@
                 </button>
               </el-tooltip>
               <button
+                v-if="isRightWorkspaceFileTab(tab) && filePanel(tab)?.documentId && saveDocument"
+                class="right-workspace-panel__tab-save"
+                type="button"
+                :aria-label="$t('documents.saveTabAs', { title: tabLabel(tab) })"
+                :title="$t('documents.saveAs')"
+                :disabled="savingDocument"
+                @click="saveTabDocument(tab)"
+              >
+                <DownloadIcon aria-hidden="true" />
+              </button>
+              <button
                 class="right-workspace-panel__tab-close"
                 type="button"
                 :aria-label="$t('dynamic.files.closeTab', { tab: tabLabel(tab) })"
@@ -222,7 +233,7 @@
       :visualization="browserVisualization"
       :visible="visible && activeTab === 'browser'"
       @send-prompt="emit('sendPrompt', $event)"
-      @url-change="browserUrl = $event"
+      @url-change="updateBrowserUrl('browser', $event)"
     />
 
     <template v-if="browserAvailable">
@@ -235,7 +246,7 @@
         :initial-url="browserPanels[tab]!.url"
         :visible="visible && activeTab === tab"
         @send-prompt="emit('sendPrompt', $event)"
-        @url-change="browserUrls[tab] = $event"
+        @url-change="updateBrowserUrl(tab, $event)"
       />
     </template>
 
@@ -360,7 +371,7 @@ import { ElMessage } from 'element-plus';
 import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkItem } from '@workspace/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
-import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
+import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, DownloadIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
 import AppContextMenu from '../shared/menu/AppContextMenu.vue';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -403,6 +414,7 @@ import {
 const workspaceShortcuts = { changes: '⌘G', browser: '⌘B' } as const;
 
 const props = withDefaults(defineProps<{
+  saveDocument?: (tab: RightWorkspaceFileTab) => Promise<void>;
   linkDropActive?: boolean;
   browserPanels?: Partial<Record<RightWorkspaceBrowserTab, RightWorkspaceBrowserPanel>>;
   activeTab: RightWorkspaceTab | null;
@@ -465,6 +477,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   annotateVisualization: [annotation: import('./use-visualization-annotations').VisualizationAnnotationInput];
+  browserUrlChange: [tab: 'browser' | RightWorkspaceBrowserTab, url: string];
   closeTab: [tab: RightWorkspaceTab];
   cancelPlan: [];
   commentPlan: [comments: PlanReviewComment[]];
@@ -492,6 +505,20 @@ const tabListRoot = ref<HTMLElement | null>(null);
 const tabTrackRoot = ref<HTMLElement | null>(null);
 const addMenuOpen = ref(false);
 const tabContextMenu = ref<{ tab: RightWorkspaceTab; x: number; y: number } | null>(null);
+const savingDocument = ref(false);
+async function saveTabDocument(tab: RightWorkspaceFileTab): Promise<void> {
+  if (!props.saveDocument || savingDocument.value) return;
+  savingDocument.value = true;
+  try { await props.saveDocument(tab); }
+  catch (error) { ElMessage.error(String(error)); }
+  finally { savingDocument.value = false; }
+}
+function updateBrowserUrl(tab: 'browser' | RightWorkspaceBrowserTab, url: string): void {
+  if (tab === 'browser') browserUrl.value = url;
+  else browserUrls.value[tab] = url;
+  // BrowserPanel emits an empty initial state before the host opens its page.
+  if (url && !(tab === 'browser' && props.browserVisualization)) emit('browserUrlChange', tab, url);
+}
 const browserUrl = ref('');
 const browserUrls = ref<Partial<Record<RightWorkspaceBrowserTab, string>>>({});
 const browserTabs = computed(() => props.tabs.filter(isRightWorkspaceBrowserTab).filter(tab => props.browserPanels[tab]));
@@ -901,6 +928,7 @@ function urlForTab(tab: RightWorkspaceTab): string {
 }
 
 .right-workspace-panel__tab-select,
+.right-workspace-panel__tab-save,
 .right-workspace-panel__tab-close,
 .right-workspace-panel__files-toggle,
 .right-workspace-panel__add > button {
@@ -929,6 +957,7 @@ function urlForTab(tab: RightWorkspaceTab): string {
 }
 
 .right-workspace-panel__tab-select svg,
+.right-workspace-panel__tab-save svg,
 .right-workspace-panel__tab-close svg,
 .right-workspace-panel__files-toggle svg,
 .right-workspace-panel__add svg {
@@ -937,6 +966,7 @@ function urlForTab(tab: RightWorkspaceTab): string {
   height: var(--icon-md);
 }
 
+.right-workspace-panel__tab-save,
 .right-workspace-panel__tab-close {
   flex: 0 0 var(--space-12);
   display: grid;
@@ -946,6 +976,20 @@ function urlForTab(tab: RightWorkspaceTab): string {
   margin-right: var(--space-2);
   padding: 0;
   border-radius: var(--radius-full);
+}
+
+.right-workspace-panel__tab-save {
+  display: none;
+  margin-right: 0;
+}
+
+.right-workspace-panel__tab:hover .right-workspace-panel__tab-save,
+.right-workspace-panel__tab:focus-within .right-workspace-panel__tab-save {
+  display: grid;
+}
+
+.right-workspace-panel__tab-save:disabled {
+  cursor: default;
 }
 
 @container (max-width: 72px) {
@@ -965,11 +1009,13 @@ function urlForTab(tab: RightWorkspaceTab): string {
 }
 
 @container (max-width: 48px) {
+  .right-workspace-panel__tab-save,
   .right-workspace-panel__tab-close {
     display: none;
   }
 }
 
+.right-workspace-panel__tab-save:hover:not(:disabled),
 .right-workspace-panel__tab-close:hover,
 .right-workspace-panel__files-toggle:hover,
 .right-workspace-panel__add > button:hover,
