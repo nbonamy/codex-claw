@@ -7,6 +7,9 @@
       <strong>{{ title }}</strong>
       <span>{{ description }}</span>
     </div>
+    <div v-if="$slots.action" class="settings-intro__action">
+      <slot name="action" />
+    </div>
   </div>
 </template>
 
@@ -34,8 +37,14 @@ defineProps<{ kind?: SettingsIllustrationKind; title: string; description: strin
   color: var(--color-text);
 }
 
+.settings-intro__action {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 .settings-intro__copy {
   min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
 }

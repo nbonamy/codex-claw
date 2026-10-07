@@ -42,8 +42,8 @@ it('debounces both fields and flushes edits on exit', async () => {
   const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings } });
   expect(wrapper.find('button').exists()).toBe(false);
   expect(wrapper.get('textarea').attributes('rows')).toBe('6');
-  expect(wrapper.text()).toContain('Added to commit message generation prompts');
-  expect(wrapper.text()).toContain('Added to PR title/description generation prompts');
+  expect(wrapper.text()).toContain('Extra guidance for generated commit messages');
+  expect(wrapper.text()).toContain('Extra guidance for generated pull request titles and descriptions');
   expect(wrapper.get('[aria-label="Commit instructions"]').attributes('placeholder')).toBe('Add commit message guidance…');
   await vi.advanceTimersByTimeAsync(700);
   expect(updateSettings).not.toHaveBeenCalled();

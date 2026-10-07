@@ -66,13 +66,13 @@ describe('SettingsGeneralPanel', () => {
     await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(true);
-    expect(wrapper.text()).toContain('Installing...');
+    expect(wrapper.text()).toContain('Installing…');
     expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(true);
 
     resolveInstall();
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain('Installing...');
+    expect(wrapper.text()).not.toContain('Installing…');
     expect(confirm).toHaveBeenCalledWith(
       `${product.name} needs to restart to connect to the background agent.`,
       `Restart ${product.name}?`,
@@ -113,13 +113,13 @@ describe('SettingsGeneralPanel', () => {
     await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(false);
-    expect(wrapper.text()).toContain('Uninstalling...');
+    expect(wrapper.text()).toContain('Uninstalling…');
     expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(true);
 
     resolveUninstall();
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain('Uninstalling...');
+    expect(wrapper.text()).not.toContain('Uninstalling…');
   });
 
   it('restarts the app when the user accepts the daemon restart dialog', async () => {
@@ -273,8 +273,8 @@ describe('SettingsGeneralPanel', () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Screen Recording');
-    expect(wrapper.text()).toContain('Required for screenshots to capture the frontmost window.');
+    expect(wrapper.text()).toContain('Screen recording');
+    expect(wrapper.text()).toContain('Required for screenshots to capture the frontmost window');
 
     const grantButtons = wrapper.findAll('button').filter((button) => button.text() === 'Grant');
     await grantButtons.at(-1)?.trigger('click');

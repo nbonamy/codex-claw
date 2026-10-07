@@ -4,7 +4,7 @@
     title-id="settings-plugins-title"
   >
     <template #banner>
-      <SettingsIntro kind="plugins" :title="$t('surface.settingsPluginsPanel.installCodexPluginsAndMCPServers')" :description="$t('surface.settingsPluginsPanel.gitHubSlackJiraLinearGmailGoogleDriveAndMore')" />
+      <SettingsIntro kind="plugins" :title="$t('surface.settingsPluginsPanel.introTitle')" :description="$t('surface.settingsPluginsPanel.introDescription')" />
     </template>
 
     <FormSection

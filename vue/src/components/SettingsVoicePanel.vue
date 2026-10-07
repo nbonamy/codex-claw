@@ -8,131 +8,136 @@
         kind="voice"
         :title="$t('surface.settingsVoicePanel.introTitle')"
         :description="$t('surface.settingsVoicePanel.introDescription')"
-      />
-    </template>
-
-    <FormSection>
-      <FormRow
-        as="label"
-        :title="$t('surface.settingsVoicePanel.spokenAcknowledgments')"
-        :description="$t('surface.settingsVoicePanel.letAgentsSpeakBriefTaskStartAndFinishPhrases')"
       >
-        <template #control>
+        <template #action>
           <el-switch
             :model-value="settings.spokenAnnouncementsEnabled"
             :aria-label="$t('surface.settingsVoicePanel.spokenAcknowledgments')"
             @update:model-value="updateSpokenAnnouncementsEnabled"
           />
         </template>
-      </FormRow>
-      <FormRow
-        v-if="settings.spokenAnnouncementsEnabled"
+      </SettingsIntro>
+    </template>
+
+    <template v-if="settings.spokenAnnouncementsEnabled">
+      <FormSection
         :title="$t('surface.settingsVoicePanel.voice')"
-        :description="$t('surface.settingsVoicePanel.chooseAnOnDeviceNeuralVoice')"
-        :error="voicePreviewError"
+        title-id="settings-voice-choice-title"
       >
-        <template #control>
-          <span class="settings-voice-panel__actions">
+        <div class="settings-voice-panel__choice">
+          <div
+            class="settings-voice-panel__voices"
+            role="radiogroup"
+            :aria-label="$t('surface.settingsVoicePanel.voice')"
+          >
+            <div
+              v-for="option in voiceOptions"
+              :key="option.value"
+              class="settings-voice-panel__voice"
+              :class="{ 'settings-voice-panel__voice--selected': option.value === settings.spokenAnnouncementVoice }"
+            >
+              <button
+                type="button"
+                role="radio"
+                class="settings-voice-panel__voice-select"
+                :aria-checked="option.value === settings.spokenAnnouncementVoice"
+                @click="updateSpokenAnnouncementVoice(option.value)"
+              >
+                <strong>{{ option.name }}</strong>
+                <span>{{ option.accent }}</span>
+              </button>
+              <button
+                type="button"
+                class="settings-voice-panel__voice-play"
+                :disabled="previewingVoice !== null"
+                :aria-busy="previewingVoice === option.value"
+                :aria-label="$t('surface.settingsVoicePanel.previewVoiceName', { name: option.name })"
+                @click="previewVoice(option.value)"
+              >
+                <span
+                  v-if="previewingVoice === option.value"
+                  class="settings-voice-panel__spinner"
+                  aria-hidden="true"
+                />
+                <PlayerPlayIcon v-else aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <p
+            v-if="voicePreviewError"
+            class="settings-voice-panel__error"
+            role="alert"
+          >{{ voicePreviewError }}</p>
+          <p class="settings-voice-panel__help">{{ $t('surface.settingsVoicePanel.chooseAnOnDeviceNeuralVoice') }}</p>
+        </div>
+      </FormSection>
+
+      <FormSection
+        :title="$t('surface.settingsVoicePanel.whenToSpeak')"
+        title-id="settings-voice-rules-title"
+      >
+        <FormRow
+          :title="$t('surface.settingsVoicePanel.scope')"
+          :description="$t('surface.settingsVoicePanel.chooseWhichAgentsMaySpeak')"
+        >
+          <template #control>
             <el-select
-              class="settings-voice-panel__voice-select"
-              :model-value="settings.spokenAnnouncementVoice"
-              :aria-label="$t('surface.settingsVoicePanel.voice')"
-              @update:model-value="updateSpokenAnnouncementVoice"
+              class="settings-voice-panel__speech-scope-select"
+              :model-value="settings.spokenAnnouncementScope"
+              :aria-label="$t('surface.settingsVoicePanel.spokenAcknowledgmentScope')"
+              @update:model-value="updateSpokenAnnouncementScope"
             >
               <el-option
-                v-for="option in voiceOptions"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
+                :label="$t('surface.settingsVoicePanel.selectedAgentOnly')"
+                value="selected"
+              />
+              <el-option
+                :label="$t('surface.settingsVoicePanel.allAgents')"
+                value="all"
               />
             </el-select>
-            <el-button
-              size="small"
-              :loading="previewingVoice"
-              :disabled="previewingVoice"
-              :aria-label="$t('surface.settingsVoicePanel.previewVoice')"
-              @click="previewVoice"
-            >
-              {{ $t('surface.settingsVoicePanel.preview') }}
-            </el-button>
-          </span>
-        </template>
-      </FormRow>
-      <details
-        v-if="settings.spokenAnnouncementsEnabled"
-        class="settings-voice-panel__voice-rules"
-      >
-        <summary class="settings-voice-panel__voice-rules-summary">
-          <span class="settings-voice-panel__voice-rules-copy">
-            <strong>{{ $t('surface.settingsVoicePanel.playbackRules') }}</strong>
-            <span>{{ voiceRulesSummary }}</span>
-          </span>
-          <ChevronDown aria-hidden="true" />
-        </summary>
-        <div class="settings-voice-panel__voice-rules-content">
-          <FormRow
-            :title="$t('surface.settingsVoicePanel.scope')"
-            :description="$t('surface.settingsVoicePanel.chooseWhichAgentsMaySpeak')"
-          >
-            <template #control>
-              <el-select
-                class="settings-voice-panel__speech-scope-select"
-                :model-value="settings.spokenAnnouncementScope"
-                :aria-label="$t('surface.settingsVoicePanel.spokenAcknowledgmentScope')"
-                @update:model-value="updateSpokenAnnouncementScope"
-              >
-                <el-option
-                  :label="$t('surface.settingsVoicePanel.selectedAgentOnly')"
-                  value="selected"
-                />
-                <el-option
-                  :label="$t('surface.settingsVoicePanel.allAgents')"
-                  value="all"
-                />
-              </el-select>
-            </template>
-          </FormRow>
-          <FormRow
-            as="label"
-            :title="$t('surface.settingsVoicePanel.dictatedPromptsOnly')"
-            :description="$t('surface.settingsVoicePanel.speakOnlyForTasksStartedWithVoiceDictation')"
-          >
-            <template #control>
-              <el-switch
-                :model-value="settings.spokenAnnouncementsOnlyForDictatedPrompts"
-                :aria-label="$t('surface.settingsVoicePanel.dictatedPromptsOnly')"
-                @update:model-value="updateSpokenAnnouncementsOnlyForDictatedPrompts"
-              />
-            </template>
-          </FormRow>
-          <FormRow
-            as="label"
-            :title="$t('surface.settingsVoicePanel.onlySpeakWhileFocused')"
-            :description="$t('surface.settingsVoicePanel.silenceAcknowledgmentsWhileAppIsInTheBackground')"
-          >
-            <template #control>
-              <el-switch
-                :model-value="settings.spokenAnnouncementsOnlyWhenFocused"
-                :aria-label="$t('surface.settingsVoicePanel.onlySpeakWhileFocused')"
-                @update:model-value="updateSpokenAnnouncementsOnlyWhenFocused"
-              />
-            </template>
-          </FormRow>
-        </div>
-      </details>
-    </FormSection>
+          </template>
+        </FormRow>
+        <FormRow
+          as="label"
+          :title="$t('surface.settingsVoicePanel.dictatedPromptsOnly')"
+          :description="$t('surface.settingsVoicePanel.speakOnlyForTasksStartedWithVoiceDictation')"
+        >
+          <template #control>
+            <el-switch
+              :model-value="settings.spokenAnnouncementsOnlyForDictatedPrompts"
+              :aria-label="$t('surface.settingsVoicePanel.dictatedPromptsOnly')"
+              @update:model-value="updateSpokenAnnouncementsOnlyForDictatedPrompts"
+            />
+          </template>
+        </FormRow>
+        <FormRow
+          as="label"
+          :title="$t('surface.settingsVoicePanel.onlySpeakWhileFocused')"
+          :description="$t('surface.settingsVoicePanel.silenceAcknowledgmentsWhileAppIsInTheBackground')"
+        >
+          <template #control>
+            <el-switch
+              :model-value="settings.spokenAnnouncementsOnlyWhenFocused"
+              :aria-label="$t('surface.settingsVoicePanel.onlySpeakWhileFocused')"
+              @update:model-value="updateSpokenAnnouncementsOnlyWhenFocused"
+            />
+          </template>
+        </FormRow>
+      </FormSection>
+    </template>
   </SettingsPanelFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import type { AppGeneralSettings, SpokenAnnouncementScope, SpokenAnnouncementVoice, UpdateSettingsInput } from '@workspace/core/contracts';
 import { translate } from '../i18n';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsIntro from './SettingsIntro.vue';
 import FormRow from '../shared/form/FormRow.vue';
 import FormSection from '../shared/form/FormSection.vue';
-import { ChevronDown } from '../shared/icons/app-icons';
+import { PlayerPlayIcon } from '../shared/icons/app-icons';
 import { appApi } from '../platform-api';
 
 const props = defineProps<{
@@ -140,29 +145,21 @@ const props = defineProps<{
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>();
 
-const previewingVoice = ref(false);
+const previewingVoice = ref<SpokenAnnouncementVoice | null>(null);
 const voicePreviewError = ref<string | null>(null);
-const voiceOptions: Array<{ label: string; value: SpokenAnnouncementVoice }> = [
-  { label: translate('surface.settingsVoicePanel.voiceHeart'), value: 'af_heart' },
-  { label: translate('surface.settingsVoicePanel.voiceBella'), value: 'af_bella' },
-  { label: translate('surface.settingsVoicePanel.voiceNicole'), value: 'af_nicole' },
-  { label: translate('surface.settingsVoicePanel.voiceSarah'), value: 'af_sarah' },
-  { label: translate('surface.settingsVoicePanel.voiceAdam'), value: 'am_adam' },
-  { label: translate('surface.settingsVoicePanel.voiceMichael'), value: 'am_michael' },
-  { label: translate('surface.settingsVoicePanel.voiceEmma'), value: 'bf_emma' },
-  { label: translate('surface.settingsVoicePanel.voiceGeorge'), value: 'bm_george' },
-];
-const voiceRulesSummary = computed(() => [
-  translate(props.settings.spokenAnnouncementScope === 'all'
-    ? 'surface.settingsVoicePanel.allAgents'
-    : 'surface.settingsVoicePanel.selectedAgentOnly'),
-  translate(props.settings.spokenAnnouncementsOnlyForDictatedPrompts
-    ? 'surface.settingsVoicePanel.dictatedPrompts'
-    : 'surface.settingsVoicePanel.allPrompts'),
-  translate(props.settings.spokenAnnouncementsOnlyWhenFocused
-    ? 'surface.settingsVoicePanel.whileFocused'
-    : 'surface.settingsVoicePanel.inTheBackgroundToo'),
-].join(' · '));
+const voiceOptions: Array<{ name: string; accent: string; value: SpokenAnnouncementVoice }> = [
+  ['voiceHeart', 'af_heart'],
+  ['voiceBella', 'af_bella'],
+  ['voiceNicole', 'af_nicole'],
+  ['voiceSarah', 'af_sarah'],
+  ['voiceAdam', 'am_adam'],
+  ['voiceMichael', 'am_michael'],
+  ['voiceEmma', 'bf_emma'],
+  ['voiceGeorge', 'bm_george'],
+].map(([key, value]) => {
+  const [name = '', accent = ''] = translate(`surface.settingsVoicePanel.${key}`).split(' · ');
+  return { name, accent, value: value as SpokenAnnouncementVoice };
+});
 
 function updateSpokenAnnouncementsEnabled(value: boolean | string | number): void {
   void props.updateSettings?.({
@@ -197,102 +194,160 @@ function updateSpokenAnnouncementVoice(value: SpokenAnnouncementVoice): void {
   });
 }
 
-async function previewVoice(): Promise<void> {
+async function previewVoice(voice: SpokenAnnouncementVoice): Promise<void> {
   voicePreviewError.value = null;
-  previewingVoice.value = true;
+  previewingVoice.value = voice;
   try {
-    const result = await appApi?.previewSpokenAnnouncementVoice?.(
-      props.settings.spokenAnnouncementVoice,
-    );
+    const result = await appApi?.previewSpokenAnnouncementVoice?.(voice);
     if (!result?.queued) {
       voicePreviewError.value = translate('surface.settingsVoicePanel.voicePreviewUnavailable');
     }
   } catch {
     voicePreviewError.value = translate('surface.settingsVoicePanel.voicePreviewUnavailable');
   } finally {
-    previewingVoice.value = false;
+    previewingVoice.value = null;
   }
 }
 </script>
 
 <style scoped>
-.settings-voice-panel__speech-scope-select {
-  width: 220px;
-  max-width: 100%;
+.settings-voice-panel__choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8);
+}
+
+.settings-voice-panel__voices {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.settings-voice-panel__voice {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-lowest);
+}
+
+.settings-voice-panel__voice--selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
 }
 
 .settings-voice-panel__voice-select {
-  width: 190px;
-}
-
-.settings-voice-panel__voice-rules {
-  border-top: 1px solid var(--color-border);
-}
-
-.settings-voice-panel__voice-rules-summary {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-16);
-  padding: var(--space-8);
-  cursor: pointer;
-  list-style: none;
-}
-
-.settings-voice-panel__voice-rules-summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-voice-panel__voice-rules-summary svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-  transition: transform 120ms ease;
-}
-
-.settings-voice-panel__voice-rules[open] .settings-voice-panel__voice-rules-summary svg {
-  transform: rotate(180deg);
-}
-
-.settings-voice-panel__voice-rules-copy {
-  min-width: 0;
+  width: 100%;
+  min-height: var(--space-20);
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-4) var(--space-12) var(--space-4) var(--space-6);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.settings-voice-panel__voice-rules-copy strong {
-  color: var(--color-text);
+.settings-voice-panel__voice-select:focus-visible,
+.settings-voice-panel__voice-play:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.settings-voice-panel__voice-select strong {
   font-size: var(--font-size-14);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-20);
 }
 
-.settings-voice-panel__voice-rules-copy span {
-  overflow: hidden;
+.settings-voice-panel__voice-select span {
   color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  line-height: var(--line-height-16);
+}
+
+.settings-voice-panel__voice--selected .settings-voice-panel__voice-select span {
+  color: var(--color-on-primary-container);
+}
+
+.settings-voice-panel__voice-play {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: var(--space-10);
+  height: var(--space-10);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.settings-voice-panel__voice-play:hover:not(:disabled) {
+  background: var(--color-surface-high);
+  color: var(--color-text);
+}
+
+.settings-voice-panel__voice-play:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.settings-voice-panel__voice-play[aria-busy='true'] {
+  opacity: 1;
+}
+
+.settings-voice-panel__spinner {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: settings-voice-panel-spin 0.8s linear infinite;
+}
+
+@keyframes settings-voice-panel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.settings-voice-panel__voice-play svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.settings-voice-panel__speech-scope-select {
+  width: 220px;
+}
+
+.settings-voice-panel__help,
+.settings-voice-panel__error {
+  margin: 0;
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.settings-voice-panel__voice-rules-content {
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+.settings-voice-panel__help {
+  color: var(--color-text-muted);
 }
 
-.settings-voice-panel__voice-rules-content :deep(.form-row + .form-row) {
-  border-top: 1px solid var(--color-border);
+.settings-voice-panel__error {
+  color: var(--color-error);
 }
 
-.settings-voice-panel__actions {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-self: end;
-  justify-content: flex-end;
-  gap: var(--space-8);
+@media (max-width: 640px) {
+  .settings-voice-panel__voices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

@@ -10,7 +10,7 @@ describe('SettingsAppshotsPanel', () => {
       props: { settings: defaultAppshotSettings, updateSettings },
     });
 
-    expect(wrapper.text()).toContain('Take a screenshot to show Codex your frontmost window');
+    expect(wrapper.text()).toContain('Show an agent what you are looking at');
     expect(wrapper.text()).toContain('Press both Command keys simultaneously');
     expect(wrapper.findAllComponents({ name: 'ElOption' }).some((option) => option.props('label') === 'Active agent')).toBe(true);
 

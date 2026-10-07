@@ -12,135 +12,99 @@ describe('SettingsVoicePanel', () => {
     vi.restoreAllMocks();
   });
 
-  it('configures neural speech enablement, scope, voice, and preview', async () => {
+  it('keeps every option hidden until spoken acknowledgments are switched on', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
-    const previewSpokenAnnouncementVoice = vi.fn().mockResolvedValue({ queued: true });
-    setElectronTestClient({ previewSpokenAnnouncementVoice });
     const wrapper = mountPanel({ updateSettings });
     await flushPromises();
 
     expect(wrapper.get('h2').text()).toBe('Voice');
     expect(wrapper.text()).toContain('Let agents talk to you');
-    const toggleRow = wrapper.findAllComponents({ name: 'FormRow' })
-      .find((candidate) => candidate.text().includes('Spoken acknowledgments'));
-    expect(toggleRow).toBeDefined();
-    expect(toggleRow!.text()).toContain('on-device neural voice');
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Choose which agents may speak');
 
-    await toggleRow!.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', true);
-    expect(updateSettings).toHaveBeenCalledWith({
-      general: { spokenAnnouncementsEnabled: true },
-    });
+    await wrapper.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', true);
+    expect(updateSettings).toHaveBeenCalledWith({ general: { spokenAnnouncementsEnabled: true } });
+  });
 
-    await wrapper.setProps({
-      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
-    });
-    const voiceSection = wrapper.findAllComponents({ name: 'FormSection' })
-      .find((section) => section.text().includes('Spoken acknowledgments'))!;
-    expect(voiceSection.text().indexOf('Choose an on-device neural voice'))
-      .toBeLessThan(voiceSection.text().indexOf('Playback rules'));
-    const playbackRules = wrapper.get('details.settings-voice-panel__voice-rules');
-    expect((playbackRules.element as HTMLDetailsElement).open).toBe(false);
-    expect(playbackRules.get('summary').text())
-      .toContain('Selected agent only · Dictated prompts · While focused');
-    await playbackRules.get('summary').trigger('click');
-    expect((playbackRules.element as HTMLDetailsElement).open).toBe(true);
+  it('chooses a voice from tiles and updates the speaking rules', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings, settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true } });
+    await flushPromises();
+
+    const voices = wrapper.findAll('[role="radio"]');
+    expect(voices.map(voice => voice.text())).toStrictEqual([
+      'HeartAmerican', 'BellaAmerican', 'NicoleAmerican', 'SarahAmerican',
+      'AdamAmerican', 'MichaelAmerican', 'EmmaBritish', 'GeorgeBritish',
+    ]);
+    expect(voices.find(voice => voice.attributes('aria-checked') === 'true')!.text()).toBe('HeartAmerican');
+    await voices[6]!.trigger('click');
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { spokenAnnouncementVoice: 'bf_emma' } });
 
     const rows = wrapper.findAllComponents({ name: 'FormRow' });
-    const scopeRow = rows.find((candidate) => candidate.text().includes('Choose which agents may speak'))!;
-    const scopeSelect = scopeRow.findComponent({ name: 'ElSelect' });
-    expect(scopeSelect.classes()).toContain('settings-voice-panel__speech-scope-select');
-    expect(scopeSelect.props('modelValue')).toBe('selected');
-    await scopeSelect.vm.$emit('update:modelValue', 'all');
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementScope: 'all' },
-    });
+    const scope = rows.find(row => row.text().includes('Choose which agents may speak'))!.findComponent({ name: 'ElSelect' });
+    expect(scope.props('modelValue')).toBe('selected');
+    await scope.vm.$emit('update:modelValue', 'all');
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { spokenAnnouncementScope: 'all' } });
 
-    const dictatedOnlyRow = rows.find((candidate) => candidate.text().includes('Dictated prompts only'))!;
-    expect(dictatedOnlyRow.text()).toContain('tasks started with voice dictation');
-    expect(dictatedOnlyRow.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
-    await dictatedOnlyRow.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementsOnlyForDictatedPrompts: false },
-    });
+    const dictated = rows.find(row => row.text().includes('Dictated prompts only'))!.findComponent({ name: 'ElSwitch' });
+    expect(dictated.props('modelValue')).toBe(true);
+    await dictated.vm.$emit('update:modelValue', false);
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { spokenAnnouncementsOnlyForDictatedPrompts: false } });
 
-    const focusedOnlyRow = rows.find((candidate) => candidate.text().includes(`Only speak while ${product.name} is focused`))!;
-    expect(focusedOnlyRow.text()).toContain('Silence acknowledgments');
-    expect(focusedOnlyRow.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
-    await focusedOnlyRow.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementsOnlyWhenFocused: false },
-    });
+    const focused = rows.find(row => row.text().includes(`Only speak while ${product.name} is focused`))!.findComponent({ name: 'ElSwitch' });
+    expect(focused.props('modelValue')).toBe(true);
+    await focused.vm.$emit('update:modelValue', false);
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { spokenAnnouncementsOnlyWhenFocused: false } });
+  });
 
-    const voiceRow = rows.find((candidate) => candidate.text().includes('additional voices download'))!;
-    const voiceSelect = voiceRow.findComponent({ name: 'ElSelect' });
-    expect(voiceSelect.props('modelValue')).toBe('af_heart');
-    expect(voiceSelect.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
-      .toStrictEqual([
-        'Heart · American',
-        'Bella · American',
-        'Nicole · American',
-        'Sarah · American',
-        'Adam · American',
-        'Michael · American',
-        'Emma · British',
-        'George · British',
-      ]);
-    await voiceSelect.vm.$emit('update:modelValue', 'bf_emma');
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementVoice: 'bf_emma' },
-    });
-    await wrapper.setProps({
-      settings: {
-        ...defaultGeneralSettings,
-        spokenAnnouncementsEnabled: true,
-        spokenAnnouncementVoice: 'bf_emma',
-      },
-    });
-    await voiceRow.findAll('button').find((button) => button.text() === 'Preview')?.trigger('click');
+  it('previews any voice without selecting it', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const previewSpokenAnnouncementVoice = vi.fn().mockResolvedValue({ queued: true });
+    setElectronTestClient({ previewSpokenAnnouncementVoice });
+    const wrapper = mountPanel({ updateSettings, settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true } });
     await flushPromises();
+
+    await wrapper.get('[aria-label="Preview Emma"]').trigger('click');
+    await flushPromises();
+
     expect(previewSpokenAnnouncementVoice).toHaveBeenCalledWith('bf_emma');
+    expect(updateSettings).not.toHaveBeenCalled();
   });
 
   it('shows when native voice preview is unavailable', async () => {
     setElectronTestClient({
-      previewSpokenAnnouncementVoice: vi.fn().mockResolvedValue({
-        queued: false,
-        reason: 'unsupported',
-      }),
+      previewSpokenAnnouncementVoice: vi.fn().mockResolvedValue({ queued: false, reason: 'unsupported' }),
     });
-    const wrapper = mountPanel({
-      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
-    });
+    const wrapper = mountPanel({ settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true } });
     await flushPromises();
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Preview')?.trigger('click');
+    await wrapper.get('[aria-label="Preview Heart"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Voice preview could not be queued on this device.');
+    expect(wrapper.get('[role="alert"]').text()).toBe('Voice preview could not be queued on this device.');
   });
 
-  it('disables voice preview until the native operation finishes', async () => {
+  it('locks every preview and spins only the played voice until it finishes', async () => {
     let finishPreview: (result: { queued: boolean }) => void = () => {};
     const previewSpokenAnnouncementVoice = vi.fn().mockImplementation(() => (
-      new Promise<{ queued: boolean }>((resolve) => {
-        finishPreview = resolve;
-      })
+      new Promise<{ queued: boolean }>((resolve) => { finishPreview = resolve; })
     ));
     setElectronTestClient({ previewSpokenAnnouncementVoice });
-    const wrapper = mountPanel({
-      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
-    });
+    const wrapper = mountPanel({ settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true } });
     await flushPromises();
-    const preview = wrapper.findAllComponents({ name: 'ElButton' })
-      .find((button) => button.text() === 'Preview')!;
+    const previews = wrapper.findAll('button[aria-label^="Preview "]');
 
-    await preview.trigger('click');
-    expect(preview.props('disabled')).toBe(true);
+    await previews[2]!.trigger('click');
+    expect(previews.every(button => button.attributes('disabled') !== undefined)).toBe(true);
+    expect(previews.filter(button => button.attributes('aria-busy') === 'true')).toHaveLength(1);
+    expect(previews[2]!.attributes('aria-busy')).toBe('true');
+    expect(previews[2]!.find('.settings-voice-panel__spinner').exists()).toBe(true);
+    expect(wrapper.findAll('.settings-voice-panel__spinner')).toHaveLength(1);
 
     finishPreview({ queued: true });
     await flushPromises();
-    expect(preview.props('disabled')).toBe(false);
+    expect(previews.every(button => button.attributes('disabled') === undefined)).toBe(true);
+    expect(wrapper.find('.settings-voice-panel__spinner').exists()).toBe(false);
   });
 });
 
