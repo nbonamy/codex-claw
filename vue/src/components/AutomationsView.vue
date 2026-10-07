@@ -254,7 +254,7 @@ const automationColumns: AppDataListColumn[] = [
   {
     id: 'automation',
     label: translate('surface.automationsView.automation'),
-    width: 'minmax(220px, 1fr)',
+    width: 'minmax(0, 1fr)',
   },
   {
     id: 'lastExecution',
@@ -596,11 +596,13 @@ function formatShortDate(value: string): string {
 }
 
 .automations-view__content {
+  container-type: inline-size;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow: auto;
   padding-top: 0;
+  padding-inline: var(--space-12);
 }
 
 .automations-view__panel {
@@ -609,7 +611,8 @@ function formatShortDate(value: string): string {
 }
 
 .automations-view__panel--wide {
-  max-width: 1120px;
+  width: 100%;
+  max-width: 920px;
 }
 
 .automations-view__list {
@@ -763,5 +766,41 @@ function formatShortDate(value: string): string {
 .automations-view :deep(.app-data-list__actions) {
   opacity: 1;
   pointer-events: auto;
+}
+
+@container (max-width: 680px) {
+  .automations-view__list-header {
+    flex-wrap: wrap;
+    gap: var(--space-6);
+  }
+
+  .automations-view__info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .automations-view__info > * {
+    max-width: 100%;
+  }
+
+  .automations-view__list :deep(.app-data-list__row) {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+    gap: var(--space-4);
+    padding-inline: var(--space-6);
+  }
+
+  .automations-view__list :deep(.app-data-list__cell:first-child) {
+    grid-column: 1 / 3;
+  }
+
+  .automations-view__list :deep(.app-data-list__actions) {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+
+  .automations-view__meta-cell {
+    text-align: left;
+  }
 }
 </style>

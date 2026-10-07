@@ -36,7 +36,9 @@ describe('AutomationsView', () => {
     const createAutomation = vi.fn().mockResolvedValue(undefined);
     const updateAutomation = vi.fn().mockResolvedValue(undefined);
     const wrapper = view({ createAutomation, updateAutomation });
-    expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('1120px');
+    expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('920px');
+    expect(getComputedStyle(wrapper.get('.automations-view__panel').element).width).toBe('100%');
+    expect(getComputedStyle(wrapper.get('.automations-view__content').element).paddingInline).toBe('var(--space-12)');
     await wrapper.get('.automation-welcome__button').trigger('click');
     expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('720px');
     await wrapper.get('textarea').setValue('Check tasks');
@@ -49,7 +51,7 @@ describe('AutomationsView', () => {
     await wrapper.get('form').trigger('submit'); await flushPromises();
     expect(updateAutomation).toHaveBeenCalledWith(expect.objectContaining({ id: 'auto', prompt: 'Summarize tasks' }));
     expect(wrapper.find('form').exists()).toBe(false);
-    expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('1120px');
+    expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('920px');
   });
 
   it('routes remote creation and runs only to the selected host without requiring a work provider', async () => {
