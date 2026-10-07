@@ -98,6 +98,21 @@ describe('document workspace lifetime', () => {
     }
   });
 
+  it('leaves the store bytes untouched for reads and gets that change nothing', async () => {
+    const { service, filename } = await fixture();
+    await service.get('desktop');
+    const doc = await service.display('a', { kind: 'markdown', content: 'Stable' });
+    const tabId = `file:markdown:${doc.documentId}`;
+    // Reformatting makes any rewrite observable as different bytes.
+    const pretty = JSON.stringify(JSON.parse(await readFile(filename, 'utf8')), null, 2);
+    await writeFile(filename, pretty);
+    expect((await service.get('desktop')).a!.tabs).toHaveLength(1);
+    expect(await service.read('desktop', 'a', tabId, async () => '')).toStrictEqual({ content: 'Stable' });
+    expect(await readFile(filename, 'utf8')).toBe(pretty);
+    await service.get('new-client');
+    expect(JSON.parse(await readFile(filename, 'utf8')).data.clients['new-client']).toEqual({});
+  });
+
   it('serializes a close behind an in-flight save and retains only the saved file', async () => {
     const { service, filename, home } = await fixture();
     const doc = await service.display('a', { kind: 'markdown', content: 'Save before close' });

@@ -22,7 +22,17 @@ export async function saveMarkdownFile(folder: string | undefined, filePath: str
     const file = await open(temporary, 'wx', existing?.mode ?? 0o600);
     try { await file.writeFile(content, 'utf8'); await file.sync(); } finally { await file.close(); }
     if (overwrite) await rename(temporary, resolved);
-    else await link(temporary, resolved);
+    else await createExclusively(temporary, resolved, content);
   } finally { await rm(temporary, { force: true }); }
   return resolved;
+}
+
+/** Hard links give atomic exclusive creation; volumes without them fall back to exclusive open. */
+async function createExclusively(temporary: string, resolved: string, content: string): Promise<void> {
+  try { await link(temporary, resolved); }
+  catch (error) {
+    if (!['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EXDEV', 'EMLINK'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+    const file = await open(resolved, 'wx', 0o600);
+    try { await file.writeFile(content, 'utf8'); await file.sync(); } finally { await file.close(); }
+  }
 }

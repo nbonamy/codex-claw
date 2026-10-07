@@ -4,6 +4,8 @@ import type { DocumentWorkspace, DocumentWorkspaceTab, DocumentWorkspaces } from
 import type { AgentRightWorkspaceState } from './use-right-workspace-state';
 import { isRightWorkspaceBrowserTab, isRightWorkspaceFileTab, type RightWorkspaceTab } from './right-workspace';
 
+const persistDebounceMs = 250;
+
 /** Persist references and layout; never serialize content, provider state or handles. */
 export function useDocumentWorkspaces(options: {
   api?: Pick<AppApi, 'getDocumentWorkspaces' | 'updateDocumentWorkspace' | 'readWorkspaceDocument' | 'saveWorkspaceDocument'>;
@@ -15,11 +17,16 @@ export function useDocumentWorkspaces(options: {
   let restoring = true;
   const closedDuringRestore = new Map<string, Set<string>>();
   let stop: (() => void) | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let previous: DocumentWorkspaces = {};
   let pending: Promise<unknown> = Promise.resolve();
   const api = options.api;
   const ready = initialize();
-  onScopeDispose(() => { disposed = true; stop?.(); });
+  onScopeDispose(() => {
+    disposed = true;
+    stop?.();
+    if (timer !== undefined) { clearTimeout(timer); persist(capture()); }
+  });
 
   function descriptor(workspace: AgentRightWorkspaceState): DocumentWorkspace {
     return {
@@ -76,7 +83,7 @@ export function useDocumentWorkspaces(options: {
       closedDuringRestore.clear();
       previous = restored;
       persist(capture());
-      stop = watch(capture, persist, { deep: true });
+      stop = watch(capture, schedulePersist, { deep: true });
     } catch (error) { options.reportError(String(error)); }
   }
 
@@ -109,7 +116,20 @@ export function useDocumentWorkspaces(options: {
     return Object.fromEntries(Object.entries(options.workspaces).map(([id, workspace]) => [id, descriptor(workspace)]));
   }
 
+  /**
+   * Coalesce bursts such as panel-resize drags into one backend transaction. Tab
+   * openings and closings go out immediately: the backend may already hold a tab
+   * this client has not yet reported, so an open-then-close must not collapse.
+   */
+  function schedulePersist(next: DocumentWorkspaces): void {
+    const tabIds = (workspaces: DocumentWorkspaces) => JSON.stringify(Object.entries(workspaces).map(([id, workspace]) => [id, workspace.tabs.map(tab => tab.id)]));
+    if (tabIds(next) !== tabIds(previous)) { persist(next); return; }
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(() => { timer = undefined; persist(capture()); }, persistDebounceMs);
+  }
+
   function persist(next: DocumentWorkspaces): void {
+    if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
     for (const [agentId, workspace] of Object.entries(next)) {
       const before = previous[agentId];
       if (JSON.stringify(before) === JSON.stringify(workspace)) continue;

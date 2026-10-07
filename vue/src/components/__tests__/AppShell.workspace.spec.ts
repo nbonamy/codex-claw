@@ -21,6 +21,8 @@ import {
   workItem,
 } from './app-shell-test-harness';
 
+/** Workspace persistence is debounced; wait past the window. */
+const settlePersistence = async () => { await new Promise(resolve => setTimeout(resolve, 300)); await flushPromises(); };
 const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
   ...overrides,
   stubTeamRail: true,
@@ -82,6 +84,7 @@ describe('AppShell workspace and plans', () => {
     await wrapper.findAll('.browser-panel__address')[0]!.trigger('submit'); await flushPromises();
     await addresses[1]!.setValue('https://example.org/next');
     await wrapper.findAll('.browser-panel__address')[1]!.trigger('submit'); await flushPromises();
+    await settlePersistence();
     expect(stored.tabs.map(tab => tab.browser?.url)).toEqual(['https://example.com/latest?q=one#section', 'https://example.org/next']);
     wrapper.unmount(); browserOpen.mockClear();
     const restarted = mountShell(); await flushPromises();
@@ -116,7 +119,7 @@ describe('AppShell workspace and plans', () => {
     await wrapper.setProps({ activeAgent: snapshot.agents[1] });
     expect(wrapper.findAll('[aria-label="Right workspace"]')[1]!.text()).toContain('Background content');
     await wrapper.get('[aria-label="Close Background proposal tab"]').trigger('click');
-    await flushPromises();
+    await settlePersistence();
     expect(update).toHaveBeenCalledWith('agent-jesse', expect.objectContaining({ close: ['file:markdown:background'] }));
   });
 
@@ -142,8 +145,25 @@ describe('AppShell workspace and plans', () => {
     expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['saved.md']);
     expect(wrapper.find('button[aria-label^="Save "][aria-label$=" as…"]').exists()).toBe(false);
     await wrapper.get('[aria-label="Close saved.md tab"]').trigger('click');
-    await flushPromises();
+    await settlePersistence();
     expect(update).toHaveBeenLastCalledWith('agent-dina', expect.objectContaining({ close: [tabId] }));
+  });
+
+  it('coalesces a burst of layout changes into one backend update', async () => {
+    const tabId = 'file:markdown:burst';
+    const saved = { tabs: [{ id: tabId, title: 'Burst', documentId: 'burst' }], activeTab: tabId, open: false, width: 420, filesPaneOpen: false, filesPaneWidth: 280 };
+    const update = vi.fn().mockResolvedValue(saved);
+    setElectronTestClient({ getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': saved }), readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '# Burst' }), updateDocumentWorkspace: update });
+    const wrapper = mountShell(); await flushPromises();
+    await settlePersistence();
+    update.mockClear();
+    const toggle = wrapper.get('[aria-label="Toggle right workspace"]');
+    await toggle.trigger('click'); await toggle.trigger('click'); await toggle.trigger('click');
+    expect(update).not.toHaveBeenCalled();
+    await settlePersistence();
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith('agent-dina', expect.objectContaining({ open: true, upsert: [], close: [] }));
+    wrapper.unmount();
   });
 
   it('does not resurrect a tab closed while restoration is still pending', async () => {

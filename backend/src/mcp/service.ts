@@ -47,6 +47,7 @@ import { createQuickChatProjectToolModuleProvider } from './quick-chat-project-t
 import { createAutomaticReviewToolModuleProvider, type StartAutomaticReview } from './automatic-review-tools';
 import { createAutomationToolModuleProvider } from './automation-tools';
 import type { CreatedProject } from '../projects/project-creation-service';
+import { warnMain } from '../log';
 import type { DurableTaskService } from '../agents/durable-task-service';
 
 const maxMarkdownBytes = 2 * 1024 * 1024;
@@ -325,7 +326,11 @@ export class AppMcpService {
     const request: import('@workspace/core/contracts').SidePanelMarkdownRequest = {
       kind: 'markdown', title, ...(resolvedPath ? { path: resolvedPath.relativePath } : {}), content,
     };
-    const payload = this.retainDocument ? await this.retainDocument(agent.id, request) : request;
+    // Retention is best-effort: a store failure must not stop the document from being shown.
+    const payload = await this.retainDocument?.(agent.id, request).catch(error => {
+      warnMain('documents', 'Failed to retain displayed document', { message: String(error) });
+      return request;
+    }) ?? request;
     this.emit({ agentId: agent.id, type: 'client.markdownDisplayRequested', payload });
 
     return {

@@ -142,7 +142,8 @@ Rules:
   profiles; backend policy is shared. A client selecting a remote team never
   changes the remote desktop's navigation.
 - Document tabs own transient Markdown lifetime. Display persists the bytes and
-  open references before emitting a client effect. One atomic document store uses
+  open references before emitting a client effect. If retention fails, display
+  proceeds without durable backing and logs the failure. One atomic document store uses
   the same client identity as presentation preferences; closing the last reference
   collects only its backing bytes, never a repository file. File tabs retain paths
   and reopen through the owning host. Save As writes first, converts the same tab,

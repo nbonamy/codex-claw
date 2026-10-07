@@ -871,6 +871,14 @@ describe('AppMcpService', () => {
     } finally { await rm(home, { recursive: true, force: true }); }
   });
 
+  it('still displays markdown when document retention fails', async () => {
+    const events: BackendEvent[] = [];
+    service = new AppMcpService({ snapshot: createInitialSnapshot(), retainDocument: async () => { throw new Error('store is corrupt'); }, onEvent: event => events.push(event) });
+    const url = await service.start();
+    await callTool(url, 'agent-dina', 'display-markdown', { markdown: '# Still shown\n', title: 'Proposal' });
+    expect(events.find(event => event.type === 'client.markdownDisplayRequested')).toMatchObject({ payload: { kind: 'markdown', title: 'Proposal', content: '# Still shown\n' } });
+  });
+
   it('displays generated Markdown, requests celebrations, and creates agents through the service boundary', async () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));

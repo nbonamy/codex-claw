@@ -24,15 +24,20 @@ export class DocumentWorkspaceService {
   private transaction<T>(action: (store: Store) => Promise<T> | T): Promise<T> {
     const next = this.pending.catch(() => undefined).then(async () => {
       let store: Store;
+      let stored = true;
       try {
         store = storeSchema.parse(parseStoreFile(this.filename, await readFile(this.filename, 'utf8')).data);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         store = { clients: {}, documents: {} };
+        stored = false;
       }
+      const before = JSON.stringify(store);
       const result = await action(store);
       const retained = new Set(Object.values(store.clients).flatMap(workspaces => Object.values(workspaces).flatMap(workspace => workspace.tabs.flatMap(tab => tab.documentId ? [tab.documentId] : []))));
       for (const id of Object.keys(store.documents)) if (!retained.has(id)) delete store.documents[id];
+      // Reads of an unchanged store must not rewrite every retained document body.
+      if (JSON.stringify(store) === before && stored) return structuredClone(result);
       await mkdir(path.dirname(this.filename), { recursive: true, mode: 0o700 });
       const temporary = `${this.filename}.${randomUUID()}.tmp`;
       try {
