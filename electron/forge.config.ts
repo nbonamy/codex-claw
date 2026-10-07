@@ -19,6 +19,7 @@ import { copyPackagedNativeDependencies } from './build/package-native-dependenc
 import { copyPackagedNodeRuntime } from './build/package-node-runtime';
 import { desktopMetadata, writePackagedDesktopIdentity } from './build/product-metadata';
 import { prepareNativePrebuilds } from './build/prepare-native-prebuilds';
+import { speechHelperResources } from './build/package-speech-helper';
 
 import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
@@ -34,13 +35,9 @@ prepareNativePrebuilds(
 // macOS signing/notarization is release-only. Agents should set
 // APP_SKIP_SIGNING=1 for local package/build verification.
 const skipMacSigning = Boolean(process.env.TEST) || process.env.APP_SKIP_SIGNING === '1';
-const appleSpeechHelperPath = path.resolve(
-  __dirname,
-  '../node_modules/@codex-app-sdk/backend/assets/apple-speechanalyzer-cli',
-);
 const extraResource = [
   path.resolve(__dirname, 'assets/icon.png'),
-  ...(process.platform === 'darwin' ? [appleSpeechHelperPath] : []),
+  ...speechHelperResources(__dirname, process.platform),
   'resources/daemon',
   'resources/codex',
   ...(process.platform === 'darwin' ? [`.computer-use/${product.name} Computer Use.app`] : []),
