@@ -33,6 +33,7 @@ describe('agent Git IPC', () => {
     [ipcChannels.getAgentGitWorkflow, backendMethods.agentGitWorkflowGet, [], { repository: 'repo' }],
     [ipcChannels.generateAgentGitMessage, backendMethods.agentGitMessageGenerate, [{ kind: 'commit' }], { kind: 'commit', message: 'Subject' }],
     [ipcChannels.stageAgentGitFiles, backendMethods.agentGitStage, [{ paths: ['file.ts'], confirmed: true }], { repository: 'repo' }],
+    [ipcChannels.revertAgentGitChanges, backendMethods.agentGitRevert, [{ includeUntracked: false, confirmed: true }], { repository: 'repo' }],
     [ipcChannels.commitAgentGitChanges, backendMethods.agentGitCommit, [{ message: 'Subject', confirmed: true }], { repository: 'repo' }],
     [ipcChannels.pushAgentGitBranch, backendMethods.agentGitPush, [{ confirmed: true }], { repository: 'repo' }],
     [ipcChannels.pullAgentGitBranch, backendMethods.agentGitPull, [{ confirmed: true }], { upstream: 'origin/feature', branch: 'feature', conflicts: [], workflow: { repository: 'repo' } }],

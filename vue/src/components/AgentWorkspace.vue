@@ -230,6 +230,7 @@ const props = defineProps<{
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   updateAgentGitBranchFromBase: (agentId: string, input: import('@workspace/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@workspace/core/contracts').AgentGitUpdateFromBaseResult>;
   pullAgentGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitPullInput) => Promise<import('@workspace/core/contracts').AgentGitPullResult>;
+  revertAgentGitChanges?: (agentId: string, input: import('@workspace/core/contracts').AgentGitRevertInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
   updateAgent: (input: import('@workspace/core/contracts').UpdateAgentInput) => Promise<void>;
   openAgentGitDiffPreview: (agentId?: string, target?: AgentGitDiffTarget) => Promise<void>;
   openAgentIn: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
@@ -491,6 +492,7 @@ function headerBindingsFor(agentId: string | null, topRight: boolean, topLeft: b
     mergeGitBranch: props.mergeAgentGitBranch,
     updateGitBranchFromBase: props.updateAgentGitBranchFromBase,
     pullGitBranch: props.pullAgentGitBranch,
+    revertGitChanges: props.revertAgentGitChanges,
     reportBackAgentName: recipient ? agentDisplayName(recipient) : null,
     onExpandSidebar: () => emit('expand-sidebar'),
     onToggleExecutionPlan: toggleExecutionPlan,

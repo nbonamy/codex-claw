@@ -160,6 +160,7 @@ export const surfaceMessages = {
     "gitUpdateFromBaseIsNotAvailable": "Updating from the base branch is not available.",
     "openInIsNotAvailable": "Open In is not available.",
     "gitPullIsNotAvailable": "Git pull is not available.",
+    "gitRevertIsNotAvailable": "Git revert is not available.",
     "agents": "Agents",
     "permissions": "Permissions",
     "favorites": "Favorites",
@@ -446,6 +447,11 @@ export const surfaceMessages = {
     "expandAll": "Expand all"
   },
   "gitWorkflowControl": {
+    "revert": "Revert",
+    "revertChanges": "Revert uncommitted changes?",
+    "revertIncludeUntracked": "Include unversioned files",
+    "reverting": "Reverting…",
+    "changesReverted": "Changes reverted",
     "runGitAction": "Run Git action",
     "chooseGitAction": "Choose Git action",
     "gitActions": "Git actions",

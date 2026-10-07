@@ -66,6 +66,27 @@
     </template>
   </div>
 
+  <FormDialog
+    v-if="revertDialogOpen"
+    v-model="revertDialogOpen"
+    :title="$t('surface.gitWorkflowControl.revertChanges')"
+    :subtitle="`${workflow?.repository ?? ''} · ${workflow?.branch ?? ''}`"
+    width="min(440px, calc(100vw - 32px))"
+    :close-on-click-modal="!busy"
+    :close-on-press-escape="!busy"
+  >
+    <div class="git-workflow-control__dialog-form">
+      <el-checkbox v-model="revertIncludeUntracked" :disabled="busy">
+        {{ $t('surface.gitWorkflowControl.revertIncludeUntracked') }}
+      </el-checkbox>
+      <p v-if="revertError" role="alert">{{ revertError }}</p>
+    </div>
+    <template #footer>
+      <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="revertDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button>
+      <button class="app-button app-button--primary" type="button" :disabled="busy" @click="revertChanges">{{ $t(busy ? 'surface.gitWorkflowControl.reverting' : 'surface.gitWorkflowControl.revert') }}</button>
+    </template>
+  </FormDialog>
+
   <el-dialog
     v-if="commitDialogOpen"
     v-model="commitDialogOpen"
@@ -369,10 +390,11 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, MainToRendererEvent } from '@workspace/core/contracts';
-import { AlertTriangleIcon, ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, RefreshIcon, SparklesIcon } from '../shared/icons/app-icons';
+import { AlertTriangleIcon, ArrowBackUpIcon, ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, RefreshIcon, SparklesIcon } from '../shared/icons/app-icons';
 import { appApi } from '../platform-api';
 import { localizedErrorMessage } from '../i18n/errors';
 import AppMenu from '../shared/menu/AppMenu.vue';
+import FormDialog from '../shared/dialog/FormDialog.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
 
@@ -383,6 +405,7 @@ const props = withDefaults(defineProps<{
   getWorkflow?: (agentId: string) => Promise<AgentGitWorkflow>;
   generateMessage?: (agentId: string, input: AgentGitMessageGenerationInput) => Promise<AgentGitMessageGenerationResult>;
   commitChanges?: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
+  revertChanges?: (agentId: string, input: import('@workspace/core/contracts').AgentGitRevertInput) => Promise<AgentGitWorkflow>;
   pushBranch?: (agentId: string, input: AgentGitPushInput) => Promise<AgentGitWorkflow>;
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
@@ -401,6 +424,9 @@ const workflowError = ref<string | null>(null);
 const menuOpen = ref(false);
 const busy = ref(false);
 const commitDialogOpen = ref(false);
+const revertDialogOpen = ref(false);
+const revertIncludeUntracked = ref(false);
+const revertError = ref<string | null>(null);
 const pushDialogOpen = ref(false);
 const pullRequestDialogOpen = ref(false);
 const mergeDialogOpen = ref(false);
@@ -605,6 +631,7 @@ const updateEnabled = computed(() => Boolean(props.updateFromBase && workflow.va
 const pullEnabled = computed(() => Boolean(props.pullBranch && workflow.value?.upstream && currentBranchAvailable.value));
 const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
+  { id: 'revert', type: 'action', label: translate('surface.gitWorkflowControl.revert'), icon: ArrowBackUpIcon, disabled: !props.revertChanges || !commitEnabled.value },
   { id: 'pull', type: 'action', label: translate('surface.gitWorkflowControl.pull'), icon: RefreshIcon, disabled: !pullEnabled.value },
   { id: 'commit', type: 'action', label: translate('surface.gitWorkflowControl.commit'), icon: GitCommitIcon, disabled: !commitEnabled.value },
   { id: 'push', type: 'action', label: translate('surface.gitWorkflowControl.push'), icon: CloudUploadIcon, disabled: !pushEnabled.value },
@@ -677,7 +704,10 @@ onBeforeUnmount(() => {
   clearUpdateSuccessTimer();
   clearDebugOperationTimers();
 });
-watch(() => props.agent.id, () => { void loadWorkflow({ reset: true }); });
+watch([() => props.agent.id, () => props.agent.folder], () => {
+  revertDialogOpen.value = false;
+  void loadWorkflow({ reset: true });
+});
 watch(() => props.gitStatus?.updatedAt, () => {
   if (!busy.value) void loadWorkflow({ closeMenu: false });
 });
@@ -715,6 +745,25 @@ async function loadWorkflow(options: { closeMenu?: boolean; reset?: boolean } = 
   workflowLoadPromise = request;
   return request;
 }
+async function revertChanges(): Promise<void> {
+  if (!props.revertChanges || !revertDialogOpen.value || busy.value) return;
+  const agentId = props.agent.id;
+  const folder = props.agent.folder;
+  busy.value = true;
+  revertError.value = null;
+  try {
+    const result = await props.revertChanges(agentId, { confirmed: true, includeUntracked: revertIncludeUntracked.value });
+    if (props.agent.id === agentId && props.agent.folder === folder) {
+      workflow.value = result;
+      revertDialogOpen.value = false;
+      ElMessage.success(translate('surface.gitWorkflowControl.changesReverted'));
+    }
+  } catch (error) {
+    if (props.agent.id === agentId && props.agent.folder === folder) revertError.value = localizedErrorMessage(error, translate);
+  } finally {
+    busy.value = false;
+  }
+}
 function closeMenu(event: MouseEvent): void { if (!root.value?.contains(event.target as Node)) menuOpen.value = false; }
 function toggleMenu(): void {
   if (busy.value) return;
@@ -724,7 +773,12 @@ function runFirstEnabled(): void { if (firstEnabledAction.value) selectAction(fi
 async function selectAction(action: string): Promise<void> {
   if (busy.value) return;
   menuOpen.value = false;
-  if (action === 'commit' && commitEnabled.value) {
+  if (action === 'revert' && props.revertChanges && commitEnabled.value) {
+    revertIncludeUntracked.value = false;
+    revertError.value = null;
+    revertDialogOpen.value = true;
+  }
+  else if (action === 'commit' && commitEnabled.value) {
     resetCommitOperation();
     commitDialogOpen.value = true;
   }

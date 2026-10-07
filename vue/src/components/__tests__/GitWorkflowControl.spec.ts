@@ -16,6 +16,44 @@ function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('GitWorkflowControl', () => {
+  it.each([true, false])('requires confirmation before reverting, with unversioned files=%s', async (includeUntracked) => {
+    const revertChanges = vi.fn(async () => ({ ...workflow, files: [] }));
+    const wrapper = mountControl({ revertChanges });
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    const first = wrapper.findAll('[role="menuitem"]')[0]!;
+    expect(first.text()).toBe('Revert');
+    expect(first.find('svg.tabler-icon-arrow-back-up').exists()).toBe(true);
+    await first.trigger('click');
+    expect(revertChanges).not.toHaveBeenCalled();
+    expect(wrapper.get('input[type="checkbox"]').element).toHaveProperty('checked', false);
+    await submitButton(wrapper, 'Cancel').trigger('click');
+    expect(revertChanges).not.toHaveBeenCalled();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click');
+    await wrapper.get('input[type="checkbox"]').setValue(includeUntracked);
+    await submitButton(wrapper, 'Revert').trigger('click');
+    await flushPromises();
+    expect(revertChanges).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true, includeUntracked });
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('keeps failed reverts visible and cancels confirmation when the agent changes', async () => {
+    const revertChanges = vi.fn().mockRejectedValue(new Error('Repository is locked'));
+    const wrapper = mountControl({ revertChanges });
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click');
+    await submitButton(wrapper, 'Revert').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Repository is locked');
+    await wrapper.setProps({ agent: { ...agent, id: 'agent-2' } });
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    expect(revertChanges).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -238,6 +276,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     expect(wrapper.findAll('.app-menu__label').map((item) => item.text())).toStrictEqual([
+      'Revert',
       'Pull',
       'Commit',
       'Push',
@@ -252,7 +291,7 @@ describe('GitWorkflowControl', () => {
     const wrapper = mountControl({ pullBranch, getWorkflow: async () => ({ ...workflow, files: [] }) });
     await flushPromises();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Pull')!.trigger('click');
     await flushPromises();
     expect(pullBranch).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true });
     expect(wrapper.text()).toContain('Agent resolving conflicts');
@@ -264,12 +303,12 @@ describe('GitWorkflowControl', () => {
     const unavailable = mountControl({ pullBranch, getWorkflow: async () => ({ ...workflow, upstream: undefined }) });
     await flushPromises();
     await unavailable.get('.git-workflow-control__trigger').trigger('click');
-    expect(unavailable.findAll('[role="menuitem"]')[0]!.attributes('disabled')).toBeDefined();
+    expect(unavailable.findAll('[role="menuitem"]').find(item => item.text() === 'Pull')!.attributes('disabled')).toBeDefined();
     unavailable.unmount();
     const wrapper = mountControl({ pullBranch });
     await flushPromises();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Pull')!.trigger('click');
     expect(pullBranch).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('Commit your changes first');
     await submitButton(wrapper, 'Update anyway').trigger('click');

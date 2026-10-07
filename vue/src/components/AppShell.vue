@@ -300,6 +300,7 @@
         :merge-agent-git-branch="props.mergeAgentGitBranch"
         :update-agent-git-branch-from-base="props.updateAgentGitBranchFromBase"
         :pull-agent-git-branch="props.pullAgentGitBranch"
+        :revert-agent-git-changes="props.revertAgentGitChanges"
         :update-agent="props.updateAgent"
         :open-agent-git-diff-preview="openAgentGitDiffPreview"
         :open-agent-in="openAgentIn"
@@ -737,6 +738,7 @@ const props = withDefaults(defineProps<{
   mergeAgentGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitMergeInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
   updateAgentGitBranchFromBase?: (agentId: string, input: import('@workspace/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@workspace/core/contracts').AgentGitUpdateFromBaseResult>;
   pullAgentGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitPullInput) => Promise<import('@workspace/core/contracts').AgentGitPullResult>;
+  revertAgentGitChanges?: (agentId: string, input: import('@workspace/core/contracts').AgentGitRevertInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
   openInApplications?: OpenInApplicationCatalog;
   openAgentPath?: (agentId: string, application: OpenInApplication, filePath?: string) => Promise<void>;
   createAgent?: (input: CreateAgentInput) => Promise<Agent | null | void>;

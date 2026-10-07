@@ -64,6 +64,12 @@ export class AgentGitWorkflowService {
         await this.options.git.stage(requireAgentFolder(agent), paths);
         return this.workflow(agent, { refreshStatus: true });
       }
+      case backendMethods.agentGitRevert: {
+        const input = requireConfirmed(params.input, 'Reverting changes');
+        if (typeof input.includeUntracked !== 'boolean') throw new Error('Choose whether to include unversioned files.');
+        await this.options.git.revert(requireAgentFolder(agent), input.includeUntracked);
+        return this.workflow(agent, { refreshStatus: true });
+      }
       case backendMethods.agentGitCommit: {
         const folder = requireAgentFolder(agent);
         const input = requireConfirmed(params.input, 'Creating a commit');

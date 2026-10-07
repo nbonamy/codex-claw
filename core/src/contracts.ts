@@ -16,6 +16,7 @@ import type {
   AgentGitMessageGenerationResult, AgentGitPullRequestInput,
   AgentGitPushInput,
   AgentGitPullInput,
+  AgentGitRevertInput,
   AgentGitPullResult,
   AgentGitStageInput,
   AgentGitStatus,
@@ -117,6 +118,7 @@ export type {
   AgentGitPullRequestInput,
   AgentGitPushInput,
   AgentGitPullInput,
+  AgentGitRevertInput,
   AgentGitPullResult,
   AgentGitStageInput,
   AgentGitStatus,
@@ -843,6 +845,7 @@ export type AppApi = {
   commitAgentGitChanges(agentId: string, input: AgentGitCommitInput): Promise<AgentGitWorkflow>;
   pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow>;
   pullAgentGitBranch(agentId: string, input: AgentGitPullInput): Promise<AgentGitPullResult>;
+  revertAgentGitChanges(agentId: string, input: AgentGitRevertInput): Promise<AgentGitWorkflow>;
   createAgentGitBranch(agentId: string, input: AgentGitBranchInput): Promise<AgentGitWorkflow>;
   createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow>;
   mergeAgentGitBranch(agentId: string, input: AgentGitMergeInput): Promise<AgentGitWorkflow>;

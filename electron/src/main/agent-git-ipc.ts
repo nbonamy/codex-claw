@@ -34,6 +34,9 @@ export function registerAgentGitIpcHandlers(
   ipc.handle(ipcChannels.pullAgentGitBranch, (_event, agentId, input) => (
     requestAppBackend(getBackendClient(), backendMethods.agentGitPull, { agentId, input })
   ));
+  ipc.handle(ipcChannels.revertAgentGitChanges, (_event, agentId, input) => (
+    requestAppBackend(getBackendClient(), backendMethods.agentGitRevert, { agentId, input })
+  ));
   ipc.handle(ipcChannels.createAgentGitBranch, (_event, agentId, input) => (
     requestAppBackend(getBackendClient(), backendMethods.agentGitBranchCreate, { agentId, input })
   ));

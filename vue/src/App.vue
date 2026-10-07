@@ -98,6 +98,7 @@
     :merge-agent-git-branch="mergeAgentGitBranch"
     :update-agent-git-branch-from-base="updateAgentGitBranchFromBase"
     :pull-agent-git-branch="pullAgentGitBranch"
+    :revert-agent-git-changes="revertAgentGitChanges"
     :open-in-applications="openInApplications"
     :open-agent-path="openAgentPath"
     :create-agent="createAgent"
@@ -343,6 +344,7 @@ const {
   mergeAgentGitBranch,
   updateAgentGitBranchFromBase,
   pullAgentGitBranch,
+  revertAgentGitChanges,
   loadOpenInApplications,
   openAgentPath,
   createAgent,
