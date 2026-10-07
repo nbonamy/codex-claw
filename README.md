@@ -184,30 +184,6 @@ workflow.
 See [GitHub desktop releases](docs/backend-architecture.md#github-desktop-releases)
 for the target matrix, launch/monitor commands, signing setup, and publication.
 
-### App icon
-
-`electron/assets/icon.svg` is the editable icon source. Keep its background
-opaque and full-square: macOS applies the icon mask itself, and pre-rounded
-artwork can acquire an extra gray frame. Render each ICNS size directly from
-the SVG instead of resizing a raster image.
-
-To regenerate the desktop PNG, square channel icon, and ICNS on macOS
-(requires `rsvg-convert`, available through `brew install librsvg`):
-
-```bash
-icon_build_dir=$(mktemp -d)
-mkdir "$icon_build_dir/icon.iconset"
-for size in 16 32 128 256 512; do
-  rsvg-convert -w "$size" -h "$size" electron/assets/icon.svg \
-    -o "$icon_build_dir/icon.iconset/icon_${size}x${size}.png"
-  rsvg-convert -w "$((size * 2))" -h "$((size * 2))" electron/assets/icon.svg \
-    -o "$icon_build_dir/icon.iconset/icon_${size}x${size}@2x.png"
-done
-iconutil -c icns "$icon_build_dir/icon.iconset" -o electron/assets/icon.icns
-cp "$icon_build_dir/icon.iconset/icon_512x512@2x.png" electron/assets/icon.png
-cp electron/assets/icon.png electron/assets/icon-square.png
-```
-
 ## Architecture
 
 Korus separates the desktop shell from the long-running agent backend:
