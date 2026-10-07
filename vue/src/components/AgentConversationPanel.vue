@@ -54,6 +54,7 @@ import { useBackendChoices } from './backend-selection';
 import { conversationMenuCommand, type ConversationMenuCommand } from './conversation-command-menu';
 import type {
   Agent,
+  AppGeneralSettings,
   SavedPromptDraft,
   ThreadPlan,
 } from '@workspace/core/contracts';
@@ -78,6 +79,7 @@ const props = defineProps<{
   actions: AgentConversationActions;
   agents: Agent[];
   focused: boolean;
+  followUpBehavior?: AppGeneralSettings['followUpBehavior'];
   mentionGroups: readonly CodexComposerMentionGroup[];
   modelMenuItems: CodexComposerMenuItem[];
   selectModelMenuItem: NonNullable<CodexConversationPaneActions['menuSelect']>;
@@ -104,6 +106,7 @@ const provider = computed(
   () => props.view.codexSnapshot ?? props.view.claudeSnapshot,
 );
 const state = agentConversationState(() => props.view, {
+  followUpBehavior: () => props.followUpBehavior ?? 'queue',
   mentionGroups: () => props.mentionGroups,
   modelMenuItems: () => props.modelMenuItems,
 });

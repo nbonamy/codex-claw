@@ -1,6 +1,6 @@
 import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
-import { ElMessageBox } from 'element-plus';
+import { ElMessageBox, ElSegmented } from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DaemonStatus, SystemPermissionsStatus } from '@workspace/core/contracts';
 import { defaultGeneralSettings } from '@workspace/core/settings';
@@ -8,6 +8,21 @@ import { setElectronTestClient } from '../../test/client';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {
+  it('selects Queue by default and saves either follow-up choice from the segmented control', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings });
+    await flushPromises();
+    const control = wrapper.get('[aria-label="Follow-up behavior"]');
+    const option = (label: string) => control.findAll('label').find((item) => item.text() === label)!.get('input');
+    expect((option('Queue').element as HTMLInputElement).checked).toBe(true);
+    await option('Steer').setValue(true);
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { followUpBehavior: 'steer' } });
+    await wrapper.setProps({ settings: { ...defaultGeneralSettings, followUpBehavior: 'steer' } });
+    expect((option('Steer').element as HTMLInputElement).checked).toBe(true);
+    await option('Queue').setValue(true);
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { followUpBehavior: 'queue' } });
+  });
+
   beforeEach(() => { setElectronTestClient({}); });
 
   afterEach(() => {
@@ -319,7 +334,8 @@ function mountPanel(props: Record<string, unknown>) {
       ...props,
     },
     global: {
-      },
+      components: { ElSegmented },
+    },
   });
 }
 

@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { createCodexConversationPaneController, type CodexConversationPaneActions, type CodexConversationPaneState, type CodexRendererSendMessageOptions, type CodexComposerMenuItem } from '@codex-app-sdk/vue';
-import type { BackendApprovalDecision, BackendApprovalScope, ClientRequestResponse, ReasoningEffort, RendererSendPromptOptions, ApprovalPreset } from '@workspace/core/contracts';
+import type { AppGeneralSettings, BackendApprovalDecision, BackendApprovalScope, ClientRequestResponse, ReasoningEffort, RendererSendPromptOptions, ApprovalPreset } from '@workspace/core/contracts';
 import type { ThreadFlagResponse } from '@workspace/core/thread-flags';
 import { approvalPresetFromDefaults } from '@workspace/core/approval-presets';
 import { defaultBackendCommands } from '@workspace/core/backend-commands';
@@ -44,6 +44,7 @@ export type AgentConversationActions = {
 
 
 export function agentConversationState(view: () => AgentConversationView, extensions: {
+  followUpBehavior?: () => AppGeneralSettings['followUpBehavior'];
   mentionGroups?: () => NonNullable<CodexConversationPaneState['catalogs']>['mentionGroups'];
   modelMenuItems?: () => CodexComposerMenuItem[];
 } = {}): CodexConversationPaneState {
@@ -77,6 +78,7 @@ export function agentConversationState(view: () => AgentConversationView, extens
       get contextUsage() { return provider()?.contextUsage ?? view().agent.contextUsage ?? null; },
     },
     composer: {
+      get followUpBehavior() { return extensions.followUpBehavior?.() ?? 'queue'; },
       get state() { return view().composerState; },
       get attachments() { return view().attachments; },
       get placeholder() { return view().agent.suggestedPrompt || translate('surface.appShell.askForFollowUpChanges'); },

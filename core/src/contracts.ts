@@ -470,6 +470,7 @@ export type AppGeneralSettings = {
   preventSleepWhenAgentsRun: boolean;
   preventSleepWhenRemoteAccessEnabled: boolean;
   celebrationsEnabled: boolean;
+  followUpBehavior: 'queue' | 'steer';
   spokenAnnouncementsEnabled: boolean;
   spokenAnnouncementsMuted: boolean;
   spokenAnnouncementsOnlyForDictatedPrompts: boolean;

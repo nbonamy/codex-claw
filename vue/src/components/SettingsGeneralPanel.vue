@@ -8,6 +8,19 @@
       title-id="settings-general-behavior-title"
     >
       <FormRow
+        :title="$t('surface.settingsGeneralPanel.followUpBehavior')"
+        :description="$t('surface.settingsGeneralPanel.followUpShortcuts', { modifier: followUpModifier })"
+      >
+        <template #control>
+          <el-segmented
+            :model-value="settings.followUpBehavior"
+            :options="followUpOptions"
+            :aria-label="$t('surface.settingsGeneralPanel.followUpBehavior')"
+            @update:model-value="updateFollowUpBehavior"
+          />
+        </template>
+      </FormRow>
+      <FormRow
         v-if="appHostCapabilities.daemonManagement"
         as="label"
         :title="$t('surface.settingsGeneralPanel.preventSleepWhileAgentsRun')"
@@ -179,6 +192,7 @@
 </template>
 
 <script setup lang="ts">
+import { rendererPlatform } from '../renderer-platform';
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
@@ -224,6 +238,12 @@ const choosingSourceFolder = ref(false);
 const settingDaemon = ref(false);
 const daemonOperation = ref<'installing' | 'uninstalling' | null>(null);
 const sourceFolderError = ref<string | null>(null);
+
+const followUpOptions = computed(() => [
+  { label: translate('surface.settingsGeneralPanel.queue'), value: 'queue' },
+  { label: translate('surface.settingsGeneralPanel.steer'), value: 'steer' },
+]);
+const followUpModifier = rendererPlatform(navigator.platform, navigator.userAgent) === 'macos' ? '⌘' : 'Ctrl';
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
 const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
@@ -372,6 +392,11 @@ function updatePreventSleep(value: boolean | string | number): void {
       preventSleepWhenAgentsRun: value === true,
     },
   });
+}
+
+function updateFollowUpBehavior(value: string | number | boolean): void {
+  if (value !== 'queue' && value !== 'steer') return;
+  void props.updateSettings?.({ general: { followUpBehavior: value } });
 }
 
 function updateCelebrationsEnabled(value: boolean | string | number): void {

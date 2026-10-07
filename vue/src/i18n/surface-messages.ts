@@ -850,6 +850,10 @@ export const surfaceMessages = {
   "settingsGeneralPanel": {
     "general": "General",
     "behavior": "Behavior",
+    "followUpBehavior": "Follow-up behavior",
+    "followUpShortcuts": "While an agent is working, Enter uses the selected action; {modifier}+Enter uses the other",
+    "queue": "Queue",
+    "steer": "Steer",
     "advanced": "Advanced",
     "preventSleepWhileAgentsRun": "Prevent sleep while agents run",
     "keepThisComputerAwakeWhileAnAgentIsActive": "Keep this computer awake while an agent is active",

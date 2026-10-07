@@ -361,6 +361,7 @@
                 :select-model-menu-item="item => selectSplitModelMenuItem(agentId, item)"
                 :plan="focused ? plan : null" :plan-visible="planVisible" @close-plan="closePlan"
                 :saved-prompt-drafts="snapshot.general.savedPromptDrafts" :save-prompt-draft="savePromptDraft" :remove-prompt-draft="removePromptDraft"
+                :follow-up-behavior="snapshot.general.followUpBehavior"
                 :review-finding="pendingReviewClarification?.agentId === agentId ? pendingReviewClarification.finding : null"
                 :open-link="link => openSplitConversationLink(agentId, link)"
                 :open-image="(image, context) => agentWorkspace?.openConversationImage(image, context, agentId) ?? false"
@@ -2049,6 +2050,7 @@ const conversationPaneState: CodexConversationPaneState = {
     get contextUsage() { return providerConversation.value?.contextUsage ?? currentAgent.value?.contextUsage ?? null; },
   },
   composer: {
+    get followUpBehavior() { return props.snapshot.general.followUpBehavior; },
     get state() { return props.composerState; },
     get attachments() { return props.composerAttachments; },
     get placeholder() {

@@ -71,6 +71,7 @@ describe('snapshot guards', () => {
       { name: 'remote Codex version', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.codexVersion = 42 as never; } },
       { name: 'remote transport', mutate: (snapshot) => { snapshot.remoteConnections.connections[0]!.transport!.args = [42 as never]; } },
       { name: 'general settings', mutate: (snapshot) => { snapshot.general.celebrationsEnabled = 'yes' as never; } },
+      { name: 'follow-up behavior', mutate: (snapshot) => { snapshot.general.followUpBehavior = 'invalid' as never; } },
       { name: 'saved prompt draft', mutate: (snapshot) => { snapshot.general.savedPromptDrafts = [{ id: 'draft', agentId: 'agent', text: 'Prompt', createdAt: 'now' as never }]; } },
       { name: 'plugin settings', mutate: (snapshot) => { snapshot.general.plugins!.chromeEnabled = 'yes' as never; } },
       { name: 'appshot settings', mutate: (snapshot) => { snapshot.general.appshots.hotkey = 'control' as never; } },

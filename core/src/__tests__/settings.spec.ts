@@ -3,6 +3,13 @@ import { createEmptySnapshot } from '../snapshot';
 import { defaultAppshotSettings, defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings, normalizeAppshotSettings, normalizeGeneralSettings, normalizePluginSettings, normalizeSourceFolderState, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
 
 describe('settings contracts', () => {
+  it('defaults follow-ups to queue and retains only supported behavior choices', () => {
+    expect(normalizeGeneralSettings({}).followUpBehavior).toBe('queue');
+    expect(normalizeGeneralSettings({ followUpBehavior: 'steer' }).followUpBehavior).toBe('steer');
+    expect(normalizeGeneralSettings({ followUpBehavior: 'queue' }).followUpBehavior).toBe('queue');
+    expect(normalizeGeneralSettings({ followUpBehavior: 'invalid' }).followUpBehavior).toBe('queue');
+  });
+
   it('normalizes general settings', () => {
     expect(normalizeGeneralSettings({
       codexBinaryPath: ' /opt/homebrew/bin/codex ',
@@ -25,6 +32,7 @@ describe('settings contracts', () => {
       codexBinaryPath: '/opt/homebrew/bin/codex',
       claudeCodeEnabled: true,
       celebrationsEnabled: false,
+      followUpBehavior: 'queue',
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementsMuted: true,
       spokenAnnouncementsOnlyForDictatedPrompts: true,
@@ -125,6 +133,7 @@ describe('settings contracts', () => {
       codexBinaryPath: '',
       claudeCodeEnabled: false,
       celebrationsEnabled: true,
+      followUpBehavior: 'queue',
       spokenAnnouncementsEnabled: false,
       spokenAnnouncementsMuted: false,
       spokenAnnouncementsOnlyForDictatedPrompts: true,
