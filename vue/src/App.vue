@@ -130,7 +130,6 @@
     :complete-work-provider-connection="pollWorkProviderAuthorization"
     :disconnect-work-provider="disconnectWorkProvider"
     :get-automation-snapshot="getAutomationSnapshot"
-    :list-automation-work-repositories="listAutomationWorkRepositories"
     :create-automation="createAutomation"
     :update-automation="updateAutomation"
     :run-automation="runAutomation"
@@ -387,7 +386,6 @@ const {
   pollWorkProviderAuthorization,
   disconnectWorkProvider,
   getAutomationSnapshot,
-  listAutomationWorkRepositories,
   createAutomation,
   updateAutomation,
   runAutomation,

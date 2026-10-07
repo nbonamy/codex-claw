@@ -1,6 +1,6 @@
 <template>
   <el-select
-    v-if="choices.length > 1 || (preserveSelection && backend && !choices.includes(backend) && choices.length > 0)"
+    v-if="choices.length > 1 || (showSingleChoice && choices.length > 0) || (preserveSelection && backend && !choices.includes(backend) && choices.length > 0)"
     v-model="backend"
     class="backend-selector"
     :size="size"
@@ -39,6 +39,7 @@ const props = withDefaults(defineProps<{
   size?: 'small' | 'default' | 'large';
   disabled?: boolean;
   preserveSelection?: boolean;
+  showSingleChoice?: boolean;
 }>(), { size: 'default', disabled: false });
 const backend = defineModel<AgentBackend>();
 const choices = useBackendChoices(() => props.teamId);

@@ -3,6 +3,25 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+  promptAutomation: {
+    schedule: 'Schedule',
+    hourly: 'Every hour',
+    daily: 'Every day',
+      name: 'Name', prompt: 'Prompt', target: 'Run in', team: 'Team', conversation: 'Conversation',
+      newQuickChat: 'New Quick Chat each run', quickChat: 'Existing Quick Chat', agent: 'Existing agent',
+      promptPlaceholder: 'What should happen each time this runs?',
+      model: 'Model', effort: 'Reasoning effort', defaultModel: 'Default model', defaultEffort: 'Default effort',
+      inheritsSettings: 'Uses this conversation’s context, model, and permissions.',
+      missingTarget: 'Target unavailable', needsInput: 'Needs input',
+      modelsUnavailable: 'Could not load models. Use the default or enter a model ID.',
+      conversationTitle: 'Conversation',
+    },
+    automationSchedule: {
+      repeat: 'Repeat', daily: 'Daily', weekdays: 'Weekdays', weekly: 'Weekly', monthly: 'Monthly', interval: 'Interval', custom: 'Custom',
+      every: 'Every', unit: 'Unit', minutes: 'minutes', hours: 'hours', frequency: 'Frequency', days: 'Day', monthDay: 'Day of month',
+      time: 'Time', timeZone: 'Timezone', rule: 'Recurrence rule', advancedHelp: 'This custom rule is preserved. Edit its recurrence expression below.',
+      invalid: 'Choose a valid schedule, time, and timezone.', nextRun: 'Next run: {time}', noNext: 'No future occurrence',
+    },
     automaticReview: {
       title: 'Automatic remediation', description: 'Review, fix, verify, and repeat with a fresh reviewer.',
       configure: 'Configure', done: 'Done',
@@ -214,6 +233,7 @@ export const messages = {
       automations: {
         deleteExecution: 'Delete execution for {ticket}',
         everyHours: 'Every {count} hours',
+        everyDays: 'Every {count} days',
         everyMinutes: 'Every {count} minutes',
         noExecutions: 'No executions yet.',
         run: 'Run {automation}',
@@ -1090,6 +1110,11 @@ export const messages = {
               completed: 'Created project {target}',
               failed: 'Failed creating project {target}',
               running: 'Creating project {target}',
+            },
+            createAutomation: {
+              completed: 'Created automation {target}',
+              failed: 'Failed creating automation {target}',
+              running: 'Creating automation {target}',
             },
             createWorktree: {
               completed: 'Created worktree {target}',

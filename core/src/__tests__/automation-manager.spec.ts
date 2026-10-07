@@ -1,211 +1,73 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationExecutionLogEntry, CreateAutomationInput } from '../contracts';
-import {
-  clearAutomationExecutionHistoryInSnapshot,
-  completeAutomationExecutionInSnapshot,
-  createAutomationInSnapshot,
-  deleteAutomationExecutionFromSnapshot,
-  deleteAutomationFromSnapshot,
-  recordAutomationExecutionInSnapshot,
-  updateAutomationExecutionAgentConversationInSnapshot,
-  updateAutomationInSnapshot,
-} from '../automation-manager';
+import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot,
+  deleteAutomationFromSnapshot, recordAutomationExecutionInSnapshot, updateAutomationInSnapshot } from '../automation-manager';
 import { createInitialSnapshot } from '../snapshot';
+import { createQuickChatInSnapshot } from '../agent-manager';
 
-describe('automation manager', () => {
-  it('normalizes and updates the simple automation contract', () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    const automation = createAutomationInSnapshot(
-      snapshot,
-      {
-        enabled: true,
-        repositories: [
-          repository(' nbonamy/agent-workspace ', ' /src/agent-workspace '),
-          repository('nbonamy/agent-workspace', '/duplicate'),
-          repository('nbonamy/witsy', '/src/witsy'),
-        ],
-        teamId: ' team-app ',
-        selectionPrompt: ' Pick ready bugs. ',
-        assignmentPrompt: ' Fix the issue and verify it. ',
-        schedule: { intervalMinutes: 60.9 },
-      },
-      '2026-06-09T11:00:00.000Z',
-      () => 'automation-github-work',
-    );
-
-    expect(automation).toStrictEqual({
-      backend: 'codex',
-      id: 'automation-github-work',
-      name: 'nbonamy/agent-workspace +1',
-      enabled: true,
-      repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace'), repository('nbonamy/witsy', '/src/witsy')],
-      teamId: 'team-app',
-      selectionPrompt: 'Pick ready bugs.',
-      assignmentPrompt: 'Fix the issue and verify it.',
-      schedule: { intervalMinutes: 60 },
-      executionLog: [],
-      createdAt: '2026-06-09T11:00:00.000Z',
-      updatedAt: '2026-06-09T11:00:00.000Z',
-    });
-
-    expect(
-      updateAutomationInSnapshot(
-        snapshot,
-        {
-          ...automationInput(),
-          id: 'automation-github-work',
-          name: 'Nightly triage',
-          enabled: false,
-          selectionPrompt: ' ',
-          assignmentPrompt: ' ',
-          schedule: { intervalMinutes: 1_440 },
-        },
-        '2026-06-09T12:00:00.000Z',
-      ),
-    ).toMatchObject({
-      name: 'Nightly triage',
-      enabled: false,
-      repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace')],
-      teamId: 'team-app',
-      schedule: { intervalMinutes: 1_440 },
-      updatedAt: '2026-06-09T12:00:00.000Z',
-    });
-    expect(automation).not.toHaveProperty('selectionPrompt');
-    expect(automation).not.toHaveProperty('assignmentPrompt');
+function setup() {
+  const snapshot = createInitialSnapshot();
+  snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
+  return snapshot;
+}
+const input: CreateAutomationInput = { prompt: ' Check tasks. ', target: { kind: 'newQuickChat', teamId: 'team-app', backend: 'codex' }, schedule: { intervalMinutes: 60.9 } };
+function execution(id: string, status: AutomationExecutionLogEntry['status'] = 'completed'): AutomationExecutionLogEntry {
+  return { id, automationId: 'auto', status, startedAt: '2026-10-06T12:00:00Z', agentId: 'agent-dina', agentName: 'Dina' };
+}
+describe('prompt automation configuration', () => {
+  it('reanchors changed or re-enabled schedules but keeps timing when editing just the prompt', () => {
+    const snapshot = setup();
+    const schedule = { rrule: 'FREQ=DAILY;BYHOUR=8;BYMINUTE=0;BYSECOND=0', timeZone: 'America/Chicago' };
+    const automation = createAutomationInSnapshot(snapshot, { ...input, schedule, enabled: false }, '2026-10-06T12:00:00Z', () => 'auto')!;
+    updateAutomationInSnapshot(snapshot, { ...input, schedule, id: 'auto', enabled: true }, '2026-10-06T14:00:00Z');
+    expect(automation.scheduleAnchorAt).toBe('2026-10-06T14:00:00Z');
+    updateAutomationInSnapshot(snapshot, { ...input, schedule, id: 'auto', prompt: 'Changed' }, '2026-10-07T14:00:00Z');
+    expect(automation.scheduleAnchorAt).toBe('2026-10-06T14:00:00Z');
+  });
+  it('creates without a repository and edits configuration without losing run history', () => {
+    const snapshot = setup();
+    const automation = createAutomationInSnapshot(snapshot, input, 'now', () => 'auto')!;
+    expect(automation).toStrictEqual({ id: 'auto', name: 'Check tasks.', enabled: true, prompt: 'Check tasks.',
+      target: input.target, schedule: { intervalMinutes: 60 }, executionLog: [], createdAt: 'now', updatedAt: 'now' });
+    recordAutomationExecutionInSnapshot(snapshot, 'auto', execution('run'));
+    updateAutomationInSnapshot(snapshot, { ...input, id: 'auto', name: 'Nightly', enabled: false,
+      target: { kind: 'agent', agentId: 'agent-dina' } }, 'later');
+    expect(automation).toMatchObject({ name: 'Nightly', enabled: false, target: { kind: 'agent', agentId: 'agent-dina' },
+      executionLog: [execution('run')], updatedAt: 'later' });
+    expect(deleteAutomationFromSnapshot(snapshot, 'auto')).toBe(automation);
+    expect(snapshot.automations).toEqual([]);
   });
 
-  it('rejects invalid repositories, teams, schedules, and missing updates', () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.teams.push({ ...snapshot.teams[0]!, id: 'team-remote', remoteConnectionId: 'devbox' });
-    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    expect(
-      createAutomationInSnapshot(snapshot, {
-        ...automationInput(),
-        repositories: [],
-      }),
-    ).toBeNull();
-    expect(
-      createAutomationInSnapshot(snapshot, {
-        ...automationInput(),
-        repositories: [repository('', '/src/agent-workspace')],
-      }),
-    ).toBeNull();
-    expect(
-      createAutomationInSnapshot(snapshot, {
-        ...automationInput(),
-        teamId: 'missing',
-      }),
-    ).toBeNull();
-    expect(createAutomationInSnapshot(snapshot, { ...automationInput(), teamId: 'team-remote' })).toBeNull();
-    expect(
-      createAutomationInSnapshot(snapshot, {
-        ...automationInput(),
-        schedule: { intervalMinutes: 0 },
-      }),
-    ).toBeNull();
-    expect(
-      updateAutomationInSnapshot(snapshot, {
-        ...automationInput(),
-        id: 'missing',
-      }),
-    ).toBeNull();
-    expect(deleteAutomationFromSnapshot(snapshot, 'missing')).toBeNull();
-    expect(clearAutomationExecutionHistoryInSnapshot(snapshot, 'missing')).toBeNull();
+  it('validates target identity, target kind, local ownership, prompt, and schedule', () => {
+    const snapshot = setup();
+    for (const bad of [
+      { ...input, prompt: '' }, { ...input, target: { kind: 'agent', agentId: 'missing' } },
+      { ...input, target: { kind: 'quickChat', agentId: 'agent-dina' } },
+      { ...input, schedule: { intervalMinutes: 0 } }, { ...input, schedule: { intervalMinutes: NaN } },
+      { ...input, target: { kind: 'newQuickChat', teamId: 'missing', backend: 'codex' } },
+      { ...input, target: undefined },
+    ]) expect(createAutomationInSnapshot(snapshot, bad as CreateAutomationInput)).toBeNull();
+    createQuickChatInSnapshot(snapshot, { teamId: 'team-app', backend: 'claude' }, 'now', 'quick');
+    expect(createAutomationInSnapshot(snapshot, { ...input, target: { kind: 'quickChat', agentId: 'quick' } })).not.toBeNull();
+    snapshot.teams[0]!.remoteConnectionId = 'remote';
+    expect(createAutomationInSnapshot(snapshot, input)).toBeNull();
+    expect(createAutomationInSnapshot(snapshot, { ...input, target: { kind: 'agent', agentId: 'agent-dina' } })).toBeNull();
+    expect(updateAutomationInSnapshot(snapshot, { ...input, id: 'missing' })).toBeNull();
   });
 
-  it('records, completes, updates, deletes, and clears execution history', () => {
-    const snapshot = createInitialSnapshot();
-    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-    const automation = createAutomationInSnapshot(snapshot, automationInput(), '2026-06-09T11:00:00.000Z', () => 'automation-backlog');
-
-    expect(recordAutomationExecutionInSnapshot(snapshot, 'missing', execution('run-1'))).toBeNull();
-    expect(recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', execution('run-1', 'other'))).toBeNull();
-
-    const failed = execution('run-1', 'automation-backlog', 'failed');
-    failed.error = 'GitHub failed';
-    expect(recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', failed)?.lastError).toBe('GitHub failed');
-
-    const working = execution('run-1', 'automation-backlog', 'working');
-    expect(recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', working)).toMatchObject({
-      lastRunAt: working.startedAt,
-      lastCreatedCount: 1,
-      executionLog: [{ id: 'run-1', status: 'working' }],
-    });
-    expect(automation).not.toHaveProperty('lastError');
-
-    expect(
-      updateAutomationExecutionAgentConversationInSnapshot(snapshot, 'automation-backlog', 'run-1', 'agent-dina', {
-        conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-        updatedAt: '2026-06-09T12:02:00.000Z',
-      }),
-    ).toMatchObject({
-      executionLog: [
-        {
-          createdAgents: [{ conversationRef: { backend: 'codex', threadId: 'thread-dina' } }],
-        },
-      ],
-    });
-    expect(
-      updateAutomationExecutionAgentConversationInSnapshot(snapshot, 'automation-backlog', 'missing', 'agent-dina', {
-        conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-        updatedAt: '2026-06-09T12:02:00.000Z',
-      }),
-    ).toBeNull();
-
-    expect(completeAutomationExecutionInSnapshot(snapshot, 'automation-backlog', 'run-1', '2026-06-09T12:03:00.000Z')).toMatchObject({
-      executionLog: [{ status: 'completed', completedAt: '2026-06-09T12:03:00.000Z' }],
-    });
-    expect(completeAutomationExecutionInSnapshot(snapshot, 'automation-backlog', 'missing')).toBeNull();
-
-    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'automation-backlog', 'run-1', '2026-06-09T12:04:00.000Z')).toMatchObject({
-      executionLog: [],
-    });
-    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'automation-backlog', 'missing')).toBeNull();
-
-    recordAutomationExecutionInSnapshot(snapshot, 'automation-backlog', working);
-    expect(clearAutomationExecutionHistoryInSnapshot(snapshot, 'automation-backlog', '2026-06-09T12:05:00.000Z')).toMatchObject({
-      executionLog: [],
-      updatedAt: '2026-06-09T12:05:00.000Z',
-    });
-    expect(automation).not.toHaveProperty('lastRunAt');
-    expect(deleteAutomationFromSnapshot(snapshot, 'automation-backlog')?.id).toBe('automation-backlog');
+  it('preserves active runs and schedule timing when clearing history', () => {
+    const snapshot = setup();
+    const automation = createAutomationInSnapshot(snapshot, input, 'now', () => 'auto')!;
+    recordAutomationExecutionInSnapshot(snapshot, 'auto', execution('done'));
+    recordAutomationExecutionInSnapshot(snapshot, 'auto', execution('active', 'awaitingInput'));
+    const lastRunAt = automation.lastRunAt;
+    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'auto', 'active')).toBeNull();
+    clearAutomationExecutionHistoryInSnapshot(snapshot, 'auto');
+    expect(automation.executionLog).toEqual([execution('active', 'awaitingInput')]);
+    expect(automation.lastRunAt).toBe(lastRunAt);
+    automation.executionLog[0]!.status = 'completed';
+    expect(deleteAutomationExecutionFromSnapshot(snapshot, 'auto', 'active')?.executionLog).toEqual([]);
+    expect(recordAutomationExecutionInSnapshot(snapshot, 'missing', execution('run'))).toBeNull();
+    expect(recordAutomationExecutionInSnapshot(snapshot, 'auto', { ...execution('run'), automationId: 'other' })).toBeNull();
   });
 });
-
-function automationInput(): CreateAutomationInput {
-  return {
-    repositories: [repository('nbonamy/agent-workspace', '/src/agent-workspace')],
-    teamId: 'team-app',
-    selectionPrompt: 'Pick ready bugs.',
-    assignmentPrompt: 'Fix the issue.',
-    schedule: { intervalMinutes: 60 },
-  };
-}
-
-function repository(repositoryId: string, executionRepositoryPath: string) {
-  return { provider: 'github' as const, sourceId: repositoryId, executionRepositoryPath };
-}
-
-function execution(
-  id: string,
-  automationId = 'automation-backlog',
-  status: AutomationExecutionLogEntry['status'] = 'completed',
-): AutomationExecutionLogEntry {
-  return {
-    id,
-    automationId,
-    startedAt: '2026-06-09T12:01:00.000Z',
-    status,
-    createdCount: 1,
-    createdAgents: [
-      {
-        agentId: 'agent-dina',
-        agentName: 'Dina',
-        workItemId: 'github:nbonamy/agent-workspace#12',
-        workItemTitle: 'Fix cockpit',
-        workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
-      },
-    ],
-  };
-}

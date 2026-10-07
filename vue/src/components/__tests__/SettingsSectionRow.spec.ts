@@ -4,6 +4,26 @@ import SettingsRow from '../SettingsRow.vue';
 import SettingsSection from '../SettingsSection.vue';
 
 describe('SettingsSection and SettingsRow', () => {
+  it('opts into tighter row spacing without changing default sections or typography', () => {
+    const wrapper = mount({
+      components: { SettingsRow, SettingsSection },
+      template: `<div>
+        <SettingsSection><SettingsRow title="Default settings" /></SettingsSection>
+        <SettingsSection density="compact"><SettingsRow title="Compact form" /></SettingsSection>
+      </div>`,
+    }, { attachTo: document.body });
+    const rows = wrapper.findAll('.settings-row');
+    const normal = getComputedStyle(rows[0]!.element);
+    const compact = getComputedStyle(rows[1]!.element);
+    expect(normal.padding).not.toBe('');
+    expect(compact.padding).not.toBe('');
+    expect(compact.padding).not.toBe(normal.padding);
+    expect(compact.gap).not.toBe(normal.gap);
+    expect(getComputedStyle(rows[1]!.get('strong').element).fontSize)
+      .toBe(getComputedStyle(rows[0]!.get('strong').element).fontSize);
+    wrapper.unmount();
+  });
+
   it('renders a labelled settings section with grouped rows', () => {
     const wrapper = mount({
       components: { SettingsRow, SettingsSection },

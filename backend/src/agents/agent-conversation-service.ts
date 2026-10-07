@@ -71,10 +71,8 @@ export class AgentConversationService {
   isStoredConversationRef(ref: BackendConversationRef, agentId: string): boolean {
     const snapshot = this.options.getSnapshot();
     const storedAutomationConversation = snapshot.automations.some((automation) => automation.executionLog.some((entry) => (
-      entry.createdAgents.some((createdAgent) => (
-        createdAgent.agentId === agentId &&
-        Boolean(createdAgent.conversationRef && sameConversationRef(createdAgent.conversationRef, ref))
-      ))
+      entry.agentId === agentId &&
+      Boolean(entry.conversationRef && sameConversationRef(entry.conversationRef, ref))
     )));
     if (storedAutomationConversation) return true;
     const agent = this.agent(agentId);

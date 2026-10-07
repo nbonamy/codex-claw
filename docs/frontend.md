@@ -116,7 +116,7 @@ Search by behavior first.
 | Command palettes | `QuickOpenDialog` | `vue/src/shared/` |
 | Voice multiline input | `VoiceTextarea` | `vue/src/shared/` |
 | Emoji, grapheme or cropped-image identity | `IdentityPicker` (product component despite its path; keep new product dependencies out of `shared/`) | `vue/src/shared/identity/` |
-| Enabled coding backend picker | `BackendSelector` (consumes the choices `AppShell` provides once through `backend-selection`; hides itself with one backend; dialogs never read backend settings) | `vue/src/components/` |
+| Enabled coding backend picker | `BackendSelector` (consumes the choices `AppShell` provides once through `backend-selection`; hides a single choice unless explicit provider identity is needed; dialogs never read backend settings) | `vue/src/components/` |
 | Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow`, `SettingsTextareaField` | `vue/src/components/` |
 | Dense structured data | `AppDataList` | `vue/src/components/` |
 | Operation feedback | `GitOperationFeedback` | `vue/src/components/` |
@@ -139,6 +139,9 @@ Search by behavior first.
   whole row the primary target with quiet, keyboard-reachable secondary actions;
   hover and focus keep geometry stable; titlebars align to the shared appbar height;
   each pane owns its scroll axes.
+- **Form density:** `SettingsSection` supports an opt-in `compact` density for
+  grouped forms such as Automations. It tightens row spacing without shrinking
+  typography or controls; Settings panels retain the default density.
 
 ## Styling And Feedback
 

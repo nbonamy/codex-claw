@@ -79,7 +79,7 @@ const REVIEW_TOOLS = new Set(['start-automatic-review', 'mark-finding-complete',
 const VISUALIZE_TOOLS = new Set(['suggest-visualizations', 'add-visualization', 'get-visualization', 'list-visualizations', 'delete-visualization', 'replace-visualization', 'read-visualization-canvas', 'edit-visualization-canvas', 'view-visualization-canvas']);
 const AGENT_TOOLS = new Set(['create-agent', 'toggle-thread-flag', 'list-agents', 'register-agent']);
 const TASK_TOOLS = new Set(['wait-tasks', 'complete-task', 'cancel-task']);
-const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-project', 'create-worktree', 'list-repos', 'list-worktrees']);
+const WORKSPACE_TOOLS = new Set(['attach-mission-repository', 'create-automation', 'create-project', 'create-worktree', 'list-repos', 'list-worktrees']);
 const HIDDEN_HOUSEKEEPING_TOOLS = new Set(['set-status', 'finish-turn']);
 
 export const isAppToolVisible: CodexToolVisibility = (toolCall) =>

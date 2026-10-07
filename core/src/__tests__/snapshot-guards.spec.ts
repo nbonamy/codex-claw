@@ -47,10 +47,10 @@ describe('snapshot guards', () => {
       { name: 'agent plan', mutate: (snapshot) => { snapshot.agents[0]!.plan!.steps[0]!.status = 'working' as never; } },
       { name: 'agent goal', mutate: (snapshot) => { snapshot.agents[0]!.goal!.tokenBudget = 'unlimited' as never; } },
       { name: 'agent registration', mutate: (snapshot) => { snapshot.agents[0]!.isRegistered = 'yes' as never; } },
-      { name: 'automation repository', mutate: (snapshot) => { snapshot.automations[0]!.repositories[0]!.provider = 'unknown' as never; } },
-      { name: 'automation schedule', mutate: (snapshot) => { snapshot.automations[0]!.schedule.intervalMinutes = 'hourly' as never; } },
+      { name: 'automation target', mutate: (snapshot) => { snapshot.automations[0]!.target = { kind: 'unknown' } as never; } },
+      { name: 'automation schedule', mutate: (snapshot) => { snapshot.automations[0]!.schedule = { intervalMinutes: 'hourly' as never }; } },
       { name: 'automation log', mutate: (snapshot) => { snapshot.automations[0]!.executionLog[0]!.status = 'pending' as never; } },
-      { name: 'automation created agent', mutate: (snapshot) => { snapshot.automations[0]!.executionLog[0]!.createdAgents[0]!.conversationRef = { backend: 'codex', threadId: 42 as never }; } },
+      { name: 'automation created agent', mutate: (snapshot) => { snapshot.automations[0]!.executionLog[0]!.conversationRef = { backend: 'codex', threadId: 42 as never }; } },
       { name: 'backend runtime', mutate: (snapshot) => { snapshot.backendRuntimes[0]!.status = 'stopped' as never; } },
       { name: 'backend capabilities', mutate: (snapshot) => { snapshot.backendRuntimes[0]!.capabilities!.planMode = 'automatic' as never; } },
       { name: 'approval presets', mutate: (snapshot) => { snapshot.backendRuntimes[0]!.capabilities!.approvalPresets = ['later' as never]; } },
@@ -242,14 +242,10 @@ function completeSnapshot(): AppSnapshot {
     id: 'automation-1',
     name: 'Backlog',
     enabled: true,
-    repositories: [{
-      provider: 'github',
-      sourceId: 'openai/agent-workspace',
-      executionRepositoryPath: '/repo',
-    }],
-    teamId: snapshot.teams[0]!.id,
-    selectionPrompt: 'Choose work',
-    assignmentPrompt: 'Implement it',
+    prompt: 'Implement it', target: { kind: 'newQuickChat' as const, teamId: snapshot.teams[0]!.id, backend: 'codex' as const },
+
+
+
     schedule: { intervalMinutes: 60 },
     executionLog: [{
       id: 'execution-1',
@@ -257,27 +253,13 @@ function completeSnapshot(): AppSnapshot {
       startedAt: '2026-09-04T00:00:00.000Z',
       completedAt: '2026-09-04T00:01:00.000Z',
       status: 'completed',
-      createdCount: 2,
-      createdAgents: [{
-        agentId: codexAgent.id,
-        agentName: 'Dina',
-        workItemId: 'issue-1',
-        workItemTitle: 'Deep guards',
-        workItemUrl: 'https://github.com/openai/agent-workspace/issues/1',
-        conversationRef: { backend: 'codex', threadId: 'thread-codex' },
-      }, {
-        agentId: claudeAgent.id,
-        agentName: 'Claude',
-        workItemId: 'issue-2',
-        workItemTitle: 'More guards',
-        workItemUrl: 'https://github.com/openai/agent-workspace/issues/2',
-        conversationRef: { backend: 'claude', folder: '/repo', sessionId: 'session-claude' },
-      }],
+
+      agentId: codexAgent.id, agentName: 'Dina', conversationRef: { backend: 'codex', threadId: 'thread-codex' },
     }],
     createdAt: '2026-09-04T00:00:00.000Z',
     updatedAt: '2026-09-04T00:01:00.000Z',
     lastRunAt: '2026-09-04T00:00:00.000Z',
-    lastCreatedCount: 2,
+
   }];
   snapshot.queuedPrompts = [{
     id: 'prompt-1',

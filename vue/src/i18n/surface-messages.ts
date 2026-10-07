@@ -620,9 +620,8 @@ export const surfaceMessages = {
   "automationWelcome": {
     "automationsWelcome": "Automations welcome",
     "noAutomationsYet": "No automations yet",
-    "automationsWatchForMatchingWork": "Select matching GitHub or Linear work and delegate it on your schedule.",
-    "describePickupCriteriaAndAgentInstructions": "Choose backlog sources, describe what to pick up, and tell each new agent what to do.",
-    "createAutomation": "Create Automation"
+    "automationsWatchForMatchingWork": "Schedule a recurring prompt in an agent or Quick Chat.",
+    "createAutomation": "Create automation"
   },
   "automationsView": {
     "automations": "Automations",

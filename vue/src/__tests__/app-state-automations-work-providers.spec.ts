@@ -11,20 +11,6 @@ import { clearFirstRunOnboardingStage, setFirstRunOnboardingStage } from '../onb
 import { workItem } from './app-state-test-harness';
 
 describe('useAppState', () => {
-  it('loads automation catalogs on the requested host without changing the interactive backlog and exposes retryable errors', async () => {
-    const listWorkSources = vi.fn().mockResolvedValue([]);
-    const configureWorkBacklog = vi.fn();
-    const listWorkItems = vi.fn();
-    stubElectronTestWindow({ app: { listWorkSources, configureWorkBacklog, listWorkItems } });
-    const state = useAppState();
-    const location = { kind: 'remote' as const, remoteConnectionId: 'devbox' };
-    await state.listAutomationWorkRepositories('linear', location);
-    expect(listWorkSources).toHaveBeenCalledWith('linear', location);
-    expect(configureWorkBacklog).not.toHaveBeenCalled();
-    expect(listWorkItems).not.toHaveBeenCalled();
-    listWorkSources.mockRejectedValueOnce(new Error('Linear disconnected'));
-    await expect(state.listAutomationWorkRepositories('linear')).rejects.toThrow('Linear disconnected');
-  });
   afterEach(() => {
     clearConfetti();
     clearFirstRunOnboardingStage();
@@ -506,12 +492,8 @@ describe('useAppState', () => {
     const remoteSnapshot = createInitialSnapshot();
     const automationInput = {
       name: 'GitHub bugs',
-      repositories: [{
-        provider: 'github' as const,
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-      }],
-      teamId: 'team-app',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-app', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
     };
     const createdSnapshot = {
@@ -550,8 +532,8 @@ describe('useAppState', () => {
           automationId: 'automation-bugs',
           startedAt: '2026-06-09T10:02:00.000Z',
           status: 'working' as const,
-          createdCount: 1,
-          createdAgents: [],
+
+
         }],
       }],
     };

@@ -99,6 +99,9 @@ null folder reference.
 
 ## Capabilities And Policy
 
+- **Scheduling:** sessions connected to Korus exclude Claude's native cron and
+  wakeup tools through SDK `disallowedTools`. Recurring prompts use Korus's
+  persisted automations and require an explicit user request ([mcp.md](mcp.md)).
 - **Models:** local aliases `opus`, `sonnet` (default), `haiku` until a short-lived,
   non-persisting SDK query reads the live catalog on agent selection; names,
   descriptions and supported efforts come from the SDK, so the effort selector

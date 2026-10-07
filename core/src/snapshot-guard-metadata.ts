@@ -1,3 +1,5 @@
+import { isAutomationTarget } from './automation-manager';
+import { normalizeAutomationSchedule } from './automation-schedule';
 import { isWorkProviderKind } from './work-providers';
 import { isMission } from './missions';
 import { sanitizeWorkItemAssignmentSource } from './work-assignments';
@@ -278,28 +280,19 @@ function isAutomation(value: unknown): boolean {
     typeof value.id === 'string' &&
     typeof value.name === 'string' &&
     typeof value.enabled === 'boolean' &&
-    isArrayOf(value.repositories, isAutomationRepository) &&
-    typeof value.teamId === 'string' &&
-    optional(value, 'selectionPrompt', isString) &&
-    optional(value, 'assignmentPrompt', isString) &&
+    isAutomationTarget(value.target) &&
+    typeof value.prompt === 'string' &&
     isAutomationSchedule(value.schedule) &&
     isArrayOf(value.executionLog, isAutomationExecution) &&
     typeof value.createdAt === 'string' &&
     typeof value.updatedAt === 'string' &&
     optional(value, 'lastRunAt', isString) &&
-    optional(value, 'lastError', isString) &&
-    optional(value, 'lastCreatedCount', isNumber);
-}
-
-function isAutomationRepository(value: unknown): boolean {
-  return isRecord(value) &&
-    isWorkProviderKind(value.provider) &&
-    typeof value.sourceId === 'string' &&
-    typeof value.executionRepositoryPath === 'string';
+    optional(value, 'scheduleAnchorAt', isString) &&
+    optional(value, 'lastError', isString);
 }
 
 function isAutomationSchedule(value: unknown): boolean {
-  return isRecord(value) && typeof value.intervalMinutes === 'number';
+  return normalizeAutomationSchedule(value) !== null;
 }
 
 function isAutomationExecution(value: unknown): boolean {
@@ -308,21 +301,11 @@ function isAutomationExecution(value: unknown): boolean {
     typeof value.automationId === 'string' &&
     typeof value.startedAt === 'string' &&
     optional(value, 'completedAt', isString) &&
-    includes(['working', 'completed', 'failed'], value.status) &&
-    typeof value.createdCount === 'number' &&
-    isArrayOf(value.createdAgents, isAutomationCreatedAgent) &&
+    includes(['working', 'awaitingInput', 'completed', 'failed'], value.status) &&
+    optional(value, 'agentId', isString) &&
+    optional(value, 'agentName', isString) &&
+    optional(value, 'conversationRef', isBackendConversationRef) &&
     optional(value, 'error', isString);
-}
-
-function isAutomationCreatedAgent(value: unknown): boolean {
-  return isRecord(value) &&
-    typeof value.agentId === 'string' &&
-    typeof value.agentName === 'string' &&
-    typeof value.workItemId === 'string' &&
-    optional(value, 'workItemIdentifier', isString) &&
-    typeof value.workItemTitle === 'string' &&
-    typeof value.workItemUrl === 'string' &&
-    optional(value, 'conversationRef', isBackendConversationRef);
 }
 
 function isBackendConversationRef(value: unknown): boolean {

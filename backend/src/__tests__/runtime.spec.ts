@@ -28,7 +28,6 @@ const mocks = vi.hoisted(() => ({
   workIntegrationOptions: [] as unknown[],
   agentGitServices: [] as Array<{ identity: ReturnType<typeof vi.fn> }>,
   sendAgentPrompt: vi.fn(),
-  updateAutomationConversation: vi.fn(),
   loadBackendSnapshot: vi.fn(),
   ensureBackendCodexHome: vi.fn(),
   ensureBackendMissionHome: vi.fn(),
@@ -65,9 +64,6 @@ vi.mock('@workspace/core/agent-chat-service', () => ({
   sendAgentPrompt: mocks.sendAgentPrompt,
 }));
 
-vi.mock('@workspace/core/automation-manager', () => ({
-  updateAutomationExecutionAgentConversationInSnapshot: mocks.updateAutomationConversation,
-}));
 
 vi.mock('../state', () => ({
   loadBackendTasks: vi.fn().mockResolvedValue([]),
@@ -134,6 +130,8 @@ vi.mock('../automations/runner', () => ({
   AutomationRunner: class {
     constructor(options: unknown) { mocks.automationRunnerOptions.push(options); }
     runAll = mocks.automationRunAll;
+    recoverInterruptedRuns = vi.fn().mockResolvedValue(undefined);
+    handleEvent = vi.fn();
   },
 }));
 
@@ -222,8 +220,7 @@ type ServerOptions = {
 type AutomationRunnerOptions = {
   notifySnapshotUpdated(): void;
   saveSnapshot(): Promise<unknown>;
-  sendPrompt(agentId: string, prompt: string, context: { automationId: string; executionId: string }): Promise<unknown>;
-  selectWorkItems(automation: import('@workspace/core/contracts').Automation, candidates: import('@workspace/core/contracts').WorkItem[]): Promise<import('@workspace/core/contracts').WorkItem[]>;
+  sendPrompt(agentId: string, prompt: string): Promise<unknown>;
 };
 
 type SchedulerOptions = { onError(taskId: string, error: unknown): void };
@@ -434,7 +431,6 @@ describe('daemon runtime', () => {
   });
 
   it('runs automation prompts, records new conversations, and emits snapshot updates', async () => {
-    mocks.updateAutomationConversation.mockReturnValue({ agentId: 'agent-dina' });
     let titlePromise: Promise<void> | undefined;
     let startedPromise: Promise<void> | undefined;
     mocks.sendAgentPrompt.mockImplementation((_snapshot, _driver, _agentId, _prompt, _options, emit, hooks) => {
@@ -449,12 +445,12 @@ describe('daemon runtime', () => {
 
     await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
     const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
-    await expect(automations.sendPrompt('missing', 'ignore', { automationId: 'automation-1', executionId: 'run-1' }))
-      .resolves.toBe(mocks.snapshot);
+    await expect(automations.sendPrompt('missing', 'ignore'))
+      .rejects.toThrow('unavailable or busy');
     expect(mocks.sendAgentPrompt).not.toHaveBeenCalled();
 
-    await expect(automations.sendPrompt('agent-dina', 'run tests', { automationId: 'automation-1', executionId: 'run-1' }))
-      .resolves.toBe(mocks.snapshot);
+    await expect(automations.sendPrompt('agent-dina', 'run tests'))
+      .resolves.toEqual({ backend: 'codex', threadId: 'thread-42' });
     await titlePromise;
     await startedPromise;
     expect(mocks.sendAgentPrompt).toHaveBeenCalledWith(
@@ -470,19 +466,6 @@ describe('daemon runtime', () => {
       mocks.snapshot.agents[0],
       'Dina',
     );
-    expect(mocks.updateAutomationConversation).toHaveBeenCalledWith(
-      mocks.snapshot,
-      'automation-1',
-      'run-1',
-      'agent-dina',
-      expect.objectContaining({
-        conversationRef: { backend: 'codex', threadId: 'thread-42' },
-      }),
-    );
-    expect(mocks.serverEmitEvent).toHaveBeenCalledWith({
-      type: 'snapshot.updated',
-      payload: mocks.snapshot,
-    });
 
     automations.notifySnapshotUpdated();
     await automations.saveSnapshot();
@@ -492,60 +475,16 @@ describe('daemon runtime', () => {
     });
   });
 
-  it('uses hidden structured generation to select automation work across all repositories', async () => {
-    await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
-    const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
-    const item = {
-      provider: 'github' as const,
-      id: 'nbonamy/agent-workspace#12',
-      sourceId: 'nbonamy/agent-workspace',
-      sourceName: 'nbonamy/agent-workspace',
-      number: 12,
-      title: 'Fix the picker',
-      url: 'https://github.com/nbonamy/agent-workspace/issues/12',
-      state: 'open' as const,
-      assignees: [],
-      labels: [],
-      createdAt: '2026-09-04T00:00:00.000Z',
-      updatedAt: '2026-09-04T00:00:00.000Z',
-    };
-    const automation = {
-      id: 'automation-1',
-      name: 'Ready work',
-      enabled: true,
-      repositories: [
-        { provider: 'github' as const, sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/src/app' },
-        { provider: 'github' as const, sourceId: 'nbonamy/witsy', executionRepositoryPath: '/src/witsy' },
-      ],
-      teamId: 'team-app',
-      selectionPrompt: 'Only ready bugs.',
-      schedule: { intervalMinutes: 60 },
-      executionLog: [],
-      createdAt: '2026-09-04T00:00:00.000Z',
-      updatedAt: '2026-09-04T00:00:00.000Z',
-    };
-
-    await expect(automations.selectWorkItems(automation, [item])).resolves.toStrictEqual([item]);
-
-    expect(driver.generateText).toHaveBeenCalledWith(
-      mocks.snapshot.agents[0],
-      expect.objectContaining({
-        cwd: '/src/app',
-        prompt: expect.stringContaining('nbonamy/witsy (local clone: /src/witsy)'),
-        outputSchema: expect.objectContaining({ type: 'object' }),
-      }),
-    );
-  });
-
   it('handles lifecycle shutdown and nonfatal scheduler/title failures', async () => {
     let hooks: { onBackendSessionUpdated(result: unknown, isNew: boolean): Promise<void> } | undefined;
     mocks.sendAgentPrompt.mockImplementation((_snapshot, _driver, _agentId, _prompt, _options, _emit, value) => {
       hooks = value;
+      value.onPromptStarted({ backendSession: { kind: 'codex', threadId: 'thread' } });
     });
     driver.setConversationTitle.mockRejectedValue('rename failed');
     const runtime = await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
     const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
-    await automations.sendPrompt('agent-dina', 'run', { automationId: 'automation-1', executionId: 'run-1' });
+    await automations.sendPrompt('agent-dina', 'run');
     await hooks?.onBackendSessionUpdated({ backendSession: { kind: 'codex', threadId: 'thread' } }, false);
     await hooks?.onBackendSessionUpdated({ backendSession: { kind: 'codex', threadId: 'thread' } }, true);
     expect(mocks.warnMain).toHaveBeenCalledWith('conversation-title', 'failed', {
@@ -570,8 +509,8 @@ describe('daemon runtime', () => {
     mocks.drivers.clear();
     const automations = mocks.automationRunnerOptions[0] as AutomationRunnerOptions;
 
-    expect(() => automations.sendPrompt('agent-dina', 'run', { automationId: 'automation-1', executionId: 'run-1' }))
-      .toThrowError('Backend driver is not configured: codex');
+    await expect(automations.sendPrompt('agent-dina', 'run'))
+      .rejects.toThrowError('Backend driver is not configured: codex');
     await runtime.stop();
   });
 });

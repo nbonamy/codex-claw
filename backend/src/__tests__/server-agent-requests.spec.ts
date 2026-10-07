@@ -662,27 +662,16 @@ describe('AppBackendServer', () => {
       enabled: true,
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
-      repositories: [{
-        provider: 'github',
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-      }],
-      teamId: 'team-test',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-test', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'automation-exec-1',
         automationId: 'automation-bugs',
         startedAt: '2026-06-13T00:00:00.000Z',
         status: 'completed',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: 'agent-dina',
-          agentName: 'Dina',
-          workItemId: 'github:nbonamy/agent-workspace#12',
-          workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
-          conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-        }],
+
+        agentId: 'agent-dina', agentName: 'Dina', conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       }],
     }];
     const conversations = [{

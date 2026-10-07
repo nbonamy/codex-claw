@@ -19,12 +19,8 @@ describe('AppBackendServer', () => {
       enabled: true,
       createdAt: '2026-06-13T00:00:00.000Z',
       updatedAt: '2026-06-13T00:00:00.000Z',
-      repositories: [{
-        provider: 'github',
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-      }],
-      teamId: 'team-test',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-test', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'automation-exec-1',
@@ -32,15 +28,8 @@ describe('AppBackendServer', () => {
         startedAt: '2026-06-13T00:00:00.000Z',
         status: 'completed',
         completedAt: '2026-06-15T01:30:48.802Z',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: 'agent-cleaned-up',
-          agentName: 'Cleaned Up',
-          workItemId: 'github:nbonamy/agent-workspace#5',
-          workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/5',
-          conversationRef: { backend: 'codex', threadId: 'thread-cleaned-up' },
-        }],
+
+        agentId: 'agent-cleaned-up', agentName: 'Cleaned Up', conversationRef: { backend: 'codex', threadId: 'thread-cleaned-up' },
       }],
     }];
     const messages = [createTextMessage('user-thread-cleaned-up-user-1', 'agent-cleaned-up', 'done')];
@@ -90,12 +79,8 @@ describe('AppBackendServer', () => {
       id: 'automation-remote',
       name: 'Remote bugs',
       enabled: true,
-      repositories: [{
-        provider: 'github',
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/home/nicolas/src/agent-workspace',
-      }],
-      teamId: 'team-remote',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-remote', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
       executionLog: [],
       createdAt: '2026-06-14T10:00:00.000Z',
@@ -134,8 +119,8 @@ describe('AppBackendServer', () => {
     });
     const location = { kind: 'remote' as const, remoteConnectionId: 'connection-devbox' };
     const createInput = {
-      repositories: [{ provider: 'github' as const, sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/home/nicolas/src/agent-workspace' }],
-      teamId: 'team-remote',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-remote', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
     };
 
@@ -285,12 +270,8 @@ describe('AppBackendServer', () => {
     const input = {
       name: 'GitHub bugs',
       enabled: true,
-      repositories: [{
-        provider: 'github',
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-      }],
-      teamId: 'team-test',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-test', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
     };
 
@@ -310,9 +291,9 @@ describe('AppBackendServer', () => {
       id: 'automation-exec-1',
       automationId,
       startedAt: '2026-06-13T00:00:00.000Z',
-      status: 'working',
-      createdCount: 0,
-      createdAgents: [],
+      status: 'completed',
+
+
     });
     await expect(server.handleMessage({
       jsonrpc: '2.0',
@@ -325,13 +306,12 @@ describe('AppBackendServer', () => {
       id: 'automation-exec-2',
       automationId,
       startedAt: '2026-06-13T00:01:00.000Z',
-      status: 'working',
-      createdCount: 0,
-      createdAgents: [],
+      status: 'completed',
+
+
     });
     if (snapshot.automations[0]) {
       snapshot.automations[0].lastRunAt = '2026-06-13T00:01:00.000Z';
-      snapshot.automations[0].lastCreatedCount = 0;
       snapshot.automations[0].lastError = 'GitHub failed';
     }
     await expect(server.handleMessage({
@@ -340,8 +320,7 @@ describe('AppBackendServer', () => {
       method: 'automation/history/clear',
       params: { automationId },
     })).resolves.toMatchObject({ result: { automations: [{ executionLog: [] }] } });
-    expect(snapshot.automations[0]).not.toHaveProperty('lastRunAt');
-    expect(snapshot.automations[0]).not.toHaveProperty('lastCreatedCount');
+    expect(snapshot.automations[0]?.lastRunAt).toBe('2026-06-13T00:01:00.000Z');
     expect(snapshot.automations[0]).not.toHaveProperty('lastError');
 
     await expect(server.handleMessage({

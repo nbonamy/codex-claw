@@ -2,7 +2,7 @@ import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentBackendDriver, BackendEvent } from '@workspace/core/backend-driver';
 import { codexBackendCapabilities } from '@workspace/core/backend-capabilities';
-import type { Agent, AppSnapshot, Automation, BackendPublishedEvent } from '@workspace/core/contracts';
+import type { Agent, AppSnapshot, BackendPublishedEvent } from '@workspace/core/contracts';
 import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
 import { createQuickChatInSnapshot } from '@workspace/core/agent-manager';
 import { projectWorkspaceSidebar } from '@workspace/core/workspace-sidebar';
@@ -901,8 +901,10 @@ describe('AppMcpService', () => {
   it.each([
     [undefined, 'Implement the SDK contract and run focused tests.'],
     ['Read the contract. Preserve </context> literally.', '<context>\nRead the contract. Preserve &lt;/context&gt; literally.\n</context>\n\nImplement the SDK contract and run focused tests.'],
-  ])('creates a background agent and submits its visible prompt with optional instructions (%s)', async (instructions, expectedPrompt) => {
+  ])('delegates from a folderless Quick Chat into a worktree with a visible prompt and optional instructions (%s)', async (instructions, expectedPrompt) => {
     const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.sessionKind = 'quickChat';
+    snapshot.agents[0]!.folder = null;
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.agents[0]!.backendDefaults = {
       kind: 'codex',
@@ -1295,53 +1297,6 @@ describe('AppMcpService', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'workItem.assignmentUpdated' }));
   });
 
-  it('completes automation executions only after every created assignment is done and keeps the created agents', async () => {
-    const snapshot = createAutomationSnapshot({
-      createdAgents: [{
-        agentId: 'agent-one',
-        agentName: 'One',
-        workItemId: 'github:nbonamy/agent-workspace#5',
-        workItemTitle: 'Fix first issue',
-        workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/5',
-      }, {
-        agentId: 'agent-two',
-        agentName: 'Two',
-        workItemId: 'github:nbonamy/agent-workspace#6',
-        workItemTitle: 'Fix second issue',
-        workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/6',
-      }],
-    });
-    service = new AppMcpService({
-      snapshot,
-      now: () => new Date('2026-06-15T01:30:48.802Z'),
-    });
-    const url = await service.start();
-
-    await markWorkItemCompleted(url, 'agent-one', 'github:nbonamy/agent-workspace#5');
-
-    expect(snapshot.agents.map((agent) => agent.id)).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
-    expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({ status: 'working' });
-
-    await markWorkItemCompleted(url, 'agent-two', 'github:nbonamy/agent-workspace#6');
-
-    expect(snapshot.automations[0]?.executionLog[0]).toMatchObject({
-      status: 'completed',
-      completedAt: '2026-06-15T01:30:48.802Z',
-      createdAgents: [
-        expect.objectContaining({
-          agentId: 'agent-one',
-          conversationRef: { backend: 'codex', threadId: 'thread-agent-one' },
-        }),
-        expect.objectContaining({
-          agentId: 'agent-two',
-          conversationRef: { backend: 'codex', threadId: 'thread-agent-two' },
-        }),
-      ],
-    });
-    expect(snapshot.agents.map((agent) => agent.id)).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
-    expect(snapshot.teams[0]?.agentIds).toEqual(expect.arrayContaining(['agent-one', 'agent-two']));
-    expect(snapshot.teams.map((team) => team.id)).toContain('team-app');
-  });
 });
 
 function createDriver(overrides: Partial<AgentBackendDriver> = {}): AgentBackendDriver {
@@ -1391,23 +1346,6 @@ async function postJson(url: string, body: unknown): Promise<any> {
   return JSON.parse(text);
 }
 
-async function markWorkItemCompleted(url: string, agentId: string, workItemId: string): Promise<void> {
-  const response = await postJson(agentUrl(url, agentId), {
-    jsonrpc: '2.0',
-    id: `complete-${agentId}`,
-    method: 'tools/call',
-    params: {
-      name: 'update-work-item',
-      arguments: {
-        workItemId,
-        status: 'completed',
-      },
-    },
-  });
-
-  expect(response.result.isError).toBe(false);
-}
-
 function callTool(url: string, agentId: string, name: string, arguments_: Record<string, unknown>): Promise<any> {
   return postJson(agentUrl(url, agentId), {
     jsonrpc: '2.0',
@@ -1415,60 +1353,6 @@ function callTool(url: string, agentId: string, name: string, arguments_: Record
     method: 'tools/call',
     params: { name, arguments: arguments_ },
   });
-}
-
-function createAutomationSnapshot(input: {
-  createdAgents: Automation['executionLog'][number]['createdAgents'];
-}): AppSnapshot {
-  const snapshot = createEmptySnapshot();
-  snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
-  const targetTeamId = 'team-app';
-  const createdAgentIds = input.createdAgents.map((createdAgent) => createdAgent.agentId);
-  snapshot.teams[0] = {
-    ...snapshot.teams[0]!,
-    agentIds: createdAgentIds,
-    activeAgentId: createdAgentIds[0],
-  };
-  snapshot.agents = input.createdAgents.map((createdAgent) => createTestAgent(createdAgent.agentId, targetTeamId, createdAgent.agentName));
-  snapshot.activeTeamId = targetTeamId;
-  snapshot.activeAgentId = createdAgentIds[0] ?? null;
-  snapshot.automations = [{
-    id: 'automation-bugs',
-    name: 'Bug automation',
-    enabled: true,
-    createdAt: '2026-06-15T01:00:00.000Z',
-    updatedAt: '2026-06-15T01:00:00.000Z',
-    repositories: [{
-      provider: 'github',
-      sourceId: 'nbonamy/agent-workspace',
-      executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-    }],
-    teamId: targetTeamId,
-    schedule: { intervalMinutes: 60 },
-    executionLog: [{
-      id: 'automation-exec-1',
-      automationId: 'automation-bugs',
-      startedAt: '2026-06-15T01:00:00.000Z',
-      status: 'working',
-      createdCount: input.createdAgents.length,
-      createdAgents: input.createdAgents,
-    }],
-  }];
-  for (const createdAgent of input.createdAgents) {
-    const [, itemId] = createdAgent.workItemId.split(':');
-    snapshot.workBacklog.assignments[createdAgent.workItemId] = {
-      provider: 'github',
-      itemId: itemId ?? createdAgent.workItemId,
-      agentId: createdAgent.agentId,
-      assignedAt: '2026-06-15T01:00:00.000Z',
-      policy: 'complete',
-      status: 'inProgress',
-      automationId: 'automation-bugs',
-      automationExecutionId: 'automation-exec-1',
-    };
-  }
-
-  return snapshot;
 }
 
 function createTestAgent(id: string, teamId: string, name: string): Agent {

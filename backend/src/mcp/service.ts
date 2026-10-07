@@ -5,7 +5,6 @@ import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
 import { agentDisplayName } from '@workspace/core/agent-display';
 import { handoffInProgress } from '@workspace/core/agent-handoff';
 import { requireAgentFolder } from '@workspace/core/agent-folder';
-import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { resolveAgentBackend } from '@workspace/core/agent-backends';
 import type { AgentBackendDriver, BackendEvent, BackendSendResult } from '@workspace/core/backend-driver';
@@ -18,7 +17,6 @@ import type {
   AppSnapshot, CelebrationKind,
   CreateAgentInput,
   CreateSourceWorktreeInput,
-  AutomationExecutionLogEntry,
   BackendDefaults,
   BackendPublishedEvent,
   SpokenAnnouncementRequest,
@@ -30,7 +28,6 @@ import type {
   WorkBacklogAssignmentStatus
 } from '@workspace/core/contracts';
 import { updateAgentWorkspace, updateWorkItemAssignmentInSnapshot } from '@workspace/core/agent-manager';
-import { completeAutomationExecutionInSnapshot } from '@workspace/core/automation-manager';
 import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
 import { listSourceWorktrees } from '../git-worktrees';
 import { scanSourceRepositories } from '../source-repositories';
@@ -48,6 +45,7 @@ import { AgentCreationService } from '../agents/agent-creation-service';
 import type { AppMcpToolModuleProvider } from './tool-modules';
 import { createQuickChatProjectToolModuleProvider } from './quick-chat-project-tools';
 import { createAutomaticReviewToolModuleProvider, type StartAutomaticReview } from './automatic-review-tools';
+import { createAutomationToolModuleProvider } from './automation-tools';
 import type { CreatedProject } from '../projects/project-creation-service';
 import type { DurableTaskService } from '../agents/durable-task-service';
 
@@ -138,6 +136,8 @@ export class AppMcpService {
       hostedMcpGateway: options.hostedMcpGateway,
       reviewTools: this.reviewTools,
       toolModuleProviders: [
+        ...(options.persistSnapshot ? [createAutomationToolModuleProvider({ snapshot: this.snapshot, persist: options.persistSnapshot,
+          notify: () => this.emit({ type: 'snapshot.updated', payload: this.snapshot }) })] : []),
         ...(options.startAutomaticReview ? [createAutomaticReviewToolModuleProvider({ snapshot: this.snapshot, start: options.startAutomaticReview })] : []),
         ...(options.createProject ? [createQuickChatProjectToolModuleProvider({ snapshot: this.snapshot, createProject: options.createProject })] : []),
         ...(options.toolModuleProviders ?? []),
@@ -384,9 +384,6 @@ export class AppMcpService {
     }
 
     this.emitWorkAssignmentUpdated(agent.id, updatedAssignment);
-    if (status === 'completed') {
-      this.completeOwningAutomationExecutionIfReady(agent.id, updatedAssignment, updatedAt);
-    }
     return {
       success: true,
       workItemId,
@@ -394,46 +391,6 @@ export class AppMcpService {
       updatedAt,
       ...(updatedAssignment.note ? { note: updatedAssignment.note } : {}),
     };
-  }
-
-  private completeOwningAutomationExecutionIfReady(agentId: string, assignment: WorkBacklogAssignment, completedAt: string): void {
-    if (!assignment.automationId || !assignment.automationExecutionId) {
-      return;
-    }
-
-    const automation = this.snapshot.automations.find((candidate) => candidate.id === assignment.automationId);
-    const execution = automation?.executionLog.find((candidate) => candidate.id === assignment.automationExecutionId);
-    if (!automation || !execution || execution.status !== 'working') {
-      return;
-    }
-
-    const allCreatedAssignmentsCompleted = execution.createdAgents.every((createdAgent) => (
-      this.snapshot.workBacklog.assignments[createdAgent.workItemId]?.status === 'completed'
-    ));
-    if (!allCreatedAssignmentsCompleted) {
-      return;
-    }
-
-    this.preserveAutomationExecutionConversationRefs(execution);
-    const completedAutomation = completeAutomationExecutionInSnapshot(this.snapshot, automation.id, execution.id, completedAt);
-    if (!completedAutomation) {
-      return;
-    }
-
-    this.emitSnapshotUpdated(agentId);
-  }
-
-  private preserveAutomationExecutionConversationRefs(execution: AutomationExecutionLogEntry): void {
-    for (const createdAgent of execution.createdAgents) {
-      if (createdAgent.conversationRef) {
-        continue;
-      }
-      const agent = this.snapshot.agents.find((candidate) => candidate.id === createdAgent.agentId);
-      const conversationRef = agent ? conversationRefFromAgent(agent) : null;
-      if (conversationRef) {
-        createdAgent.conversationRef = conversationRef;
-      }
-    }
   }
 
   private async listSourceRepositories(): Promise<SourceRepository[]> {

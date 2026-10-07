@@ -564,8 +564,8 @@ describe('AppController', () => {
     const createInput: CreateAutomationInput = {
       name: 'GitHub bugs',
       enabled: true,
-      repositories: [{ provider: 'github', sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/repo' }],
-      teamId: 'team-app',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-app', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
     };
     const updateInput: UpdateAutomationInput = {
@@ -603,8 +603,8 @@ describe('AppController', () => {
     const createInput: CreateAutomationInput = {
       name: 'Remote bugs',
       enabled: true,
-      repositories: [{ provider: 'github', sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/repo' }],
-      teamId: 'team-remote',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-remote', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
     };
 
@@ -627,8 +627,7 @@ function automationFixture(teamId = 'team-app'): Automation {
     id: 'automation-bugs',
     name: 'GitHub bugs',
     enabled: true,
-    repositories: [{ provider: 'github', sourceId: 'nbonamy/agent-workspace', executionRepositoryPath: '/repo' }],
-    teamId,
+    prompt: 'Check tasks', target: { kind: 'newQuickChat', teamId, backend: 'codex' },
     schedule: { intervalMinutes: 60 },
     executionLog: [],
     createdAt: '2026-06-09T12:00:00.000Z',

@@ -3,10 +3,6 @@ import path from 'node:path';
 import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
 import type { Agent, BackendConversationRef, SystemPermissionsStatus } from '@workspace/core/contracts';
 import { formatConversationTitle, shouldSyncConversationTitleFromAgent } from '@workspace/core/conversation-title';
-import { requireAgentFolder } from '@workspace/core/agent-folder';
-import { createAgentFromInput } from '@workspace/core/agent-manager';
-import { updateAutomationExecutionAgentConversationInSnapshot } from '@workspace/core/automation-manager';
-import { automationSelectionOutputSchema, automationSelectionPrompt, parseAutomationSelection } from '@workspace/core/automation-prompts';
 import type { AgentBackendDriver, BackendSendResult } from '@workspace/core/backend-driver';
 import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
 import { BackendDriverRpc, createBackendDriver, createDefaultBackendDrivers, type BackendDriverRegistryOptions } from './driver-rpc';
@@ -165,55 +161,25 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
   const automationRunner = new AutomationRunner({
     requireConnectedEngine: backend => server.requireConnectedEngine(backend),
     getSnapshot: () => snapshot,
-    listWorkItems: workIntegrations,
-    createWorktree: async (input) => (await worktreeManager.create(input)).worktree,
     notifySnapshotUpdated: () => server.emitEvent({
       type: 'snapshot.updated',
       payload: snapshot,
     }),
     saveSnapshot: () => saveBackendSnapshot(snapshot),
-    selectWorkItems: async (automation, candidates) => {
-      const backend = await server.requireConnectedEngine(automation.backend ?? 'codex');
-      const folder = automation.repositories[0]?.executionRepositoryPath ?? '';
-      const pickerAgent = snapshot.agents.find((agent) => agent.teamId === automation.teamId && agent.backend === backend)
-        ?? createAgentFromInput({ name: null, folder, backend, teamId: automation.teamId });
-      const driver = requireBackendDriver(backendDrivers, pickerAgent);
-      if (!driver.generateText) {
-        throw new Error('The selected automation backend cannot evaluate work item criteria.');
-      }
-      const result = await driver.generateText(pickerAgent, {
-        cwd: folder,
-        prompt: automationSelectionPrompt(automation, candidates),
-        developerInstructions: 'Return only the IDs of eligible work items that match the supplied criteria. Never invent an ID or include an item outside the supplied candidate list.',
-        outputSchema: automationSelectionOutputSchema,
-      });
-      return parseAutomationSelection(result.text, candidates);
-    },
-    sendPrompt: (agentId, prompt, context) => {
-      const agent = snapshot.agents.find((candidate) => candidate.id === agentId);
-      if (!agent) {
-        return Promise.resolve(snapshot);
+    sendPrompt: (agentId, prompt) => new Promise<BackendConversationRef>((resolve, reject) => {
+      const agent = snapshot.agents.find(candidate => candidate.id === agentId);
+      if (!agent || agent.status.type === 'working' || agent.status.type === 'awaitingInput') {
+        reject(new Error('The automation target is unavailable or busy.'));
+        return;
       }
       const driver = requireBackendDriver(backendDrivers, agent);
       mcpService.recordPromptInputMethod(agentId, 'typed');
-      sendAgentPrompt(snapshot, driver, agentId, prompt, undefined, (event) => server.emitEvent(event), {
+      sendAgentPrompt(snapshot, driver, agentId, prompt, undefined, event => server.emitEvent(event), {
         onBackendSessionUpdated: (_result, wasNewSession) => setNewConversationTitle(agent, driver, wasNewSession),
-        onPromptStarted: async (result) => {
-          const automation = updateAutomationExecutionAgentConversationInSnapshot(snapshot, context.automationId, context.executionId, agentId, {
-            conversationRef: conversationRefFromSendResult(agent, result),
-            updatedAt: new Date().toISOString(),
-          });
-          if (automation) {
-            await saveBackendSnapshot(snapshot);
-            server.emitEvent({
-              type: 'snapshot.updated',
-              payload: snapshot,
-            });
-          }
-        },
+        onPromptStarted: result => resolve(conversationRefFromSendResult(agent, result)),
+        onPromptFailed: reject,
       });
-      return Promise.resolve(snapshot);
-    },
+    }),
   });
   const scheduler = new RuntimeScheduler({
     onError: (taskId, error) => {
@@ -260,7 +226,7 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     visualizeService,
     driverRpc,
     onEvent: options.emitEvent,
-    onBackendEventApplied: (event) => { mcpService.handleBackendEvent(event); tasks.handleEvent(event); },
+    onBackendEventApplied: (event) => { mcpService.handleBackendEvent(event); tasks.handleEvent(event); automationRunner.handleEvent(event); },
     saveSnapshot: (nextSnapshot) => saveBackendSnapshot(nextSnapshot),
     ensureMissionHome: ensureBackendMissionHome,
     deleteMissionHome: deleteBackendMissionHome,
@@ -300,6 +266,7 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
   });
   mcpService.setDriverRpc(driverRpc);
   mcpService.setEventSink((event) => server.emitEvent(event));
+  await automationRunner.recoverInterruptedRuns();
   await tasks.recover();
   scheduler.start();
   void server.initialize().catch((error) => warnMain('startup', 'backend initialization failed', {
@@ -343,5 +310,5 @@ function setNewConversationTitle(agent: Agent, driver: AgentBackendDriver, wasNe
 function conversationRefFromSendResult(agent: Agent, result: BackendSendResult): BackendConversationRef {
   return result.backendSession.kind === 'codex'
     ? { backend: 'codex', threadId: result.backendSession.threadId }
-    : { backend: 'claude', folder: requireAgentFolder(agent), sessionId: result.backendSession.transcriptSessionId ?? result.backendSession.sessionId };
+    : { backend: 'claude', folder: agent.folder, sessionId: result.backendSession.transcriptSessionId ?? result.backendSession.sessionId };
 }

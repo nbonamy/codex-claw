@@ -242,11 +242,10 @@ export type {
 } from './contracts/conversation';
 export type {
   Automation,
-  AutomationExecutionCreatedAgent,
   AutomationExecutionLogEntry,
   AutomationExecutionStatus,
   AutomationLocation,
-  AutomationWorkSourceTarget,
+  AutomationTarget,
   AutomationSchedule,
   CreateAutomationInput,
   WorkSourceConfiguration,

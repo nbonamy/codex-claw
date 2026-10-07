@@ -1,6 +1,7 @@
 <template>
   <section
     class="settings-section"
+    :class="{ 'settings-section--compact': density === 'compact' }"
     :aria-labelledby="title ? titleId : undefined"
   >
     <header
@@ -19,6 +20,7 @@
 defineProps<{
   title?: string;
   titleId?: string;
+  density?: 'default' | 'compact';
 }>();
 </script>
 
@@ -53,5 +55,18 @@ defineProps<{
 
 .settings-section__group :deep(.settings-row + .settings-row) {
   border-top: 1px solid var(--color-border);
+}
+
+.settings-section--compact .settings-section__header {
+  padding-bottom: var(--space-4);
+}
+
+.settings-section--compact + .settings-section--compact {
+  margin-top: var(--space-12);
+}
+
+.settings-section--compact .settings-section__group :deep(.settings-row) {
+  gap: var(--space-4);
+  padding: var(--space-6);
 }
 </style>

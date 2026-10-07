@@ -62,9 +62,9 @@ Open **Settings → Integrations** and connect the service you want to use:
 
 Linear does not require pasting an API key or registering your own OAuth application in Settings. **Cancel** stops an in-progress authorization; use **Connect** to retry. If the build reports that Linear sign-in is not configured, use a build with Linear configuration rather than entering credentials in chat. **Disconnect** removes Korus's connection to that service without disconnecting the other integration or your coding engines.
 
-In backlog pickers, choose the provider first, then its **Repository** or **Team / project**. Browsing only offers connected providers; with one connected provider, the provider selector is hidden. Automation setup also lets you select a disconnected provider and directs you to connect it before saving.
+In backlog pickers, choose the provider first, then its **Repository** or **Team / project**. Browsing only offers connected providers; with one connected provider, the provider selector is hidden.
 
-A Linear team or project identifies **where the issue lives**, not **where code runs**. Work started from a repository uses that repository. Without a repository context, choose a **Code repository** before starting. For unattended work, [automations](../features/automations) require a saved repository for every Linear source.
+A Linear team or project identifies **where the issue lives**, not **where code runs**. Work started from a repository uses that repository. Without a repository context, choose a **Code repository** before starting. [Automations](../features/automations) schedule prompts independently of work sources; include the repository in the prompt when asking a Quick Chat to create an agent or worktree.
 
 Git branches, commits, pushes, and pull requests still belong to the code repository. Linear supplies backlog work; it does not replace GitHub's pull-request workflow. See [Browse and start backlog work](../features/workspace#browse-and-start-backlog-work) and [Missions](../workflows/missions) for the entry points.
 

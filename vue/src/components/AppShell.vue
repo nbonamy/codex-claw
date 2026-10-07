@@ -173,20 +173,15 @@
         :delete-automation-execution="deleteAutomationExecution"
         :delete-automation="deleteAutomation"
         :get-automation-snapshot="getAutomationSnapshot"
-        :load-work-repositories="listAutomationWorkRepositories"
-        :current-repository="currentAgent?.workspace?.kind === 'git' ? { path: currentAgent.workspace.primaryWorktreeRoot, remoteConnectionId: snapshot.teams.find(team => team.id === currentAgent?.teamId)?.remoteConnectionId } : undefined"
-        :list-source-repositories="listSourceRepositories"
         :automations="snapshot.automations"
+        :agents="snapshot.agents"
+        :missions="snapshot.missions"
+        :list-models="listHandoffModels"
         :read-conversation-messages="readConversationMessages"
         :remote-connections="snapshot.remoteConnections.connections"
         :run-automation="runAutomation"
-        :source-repositories="sourceRepositories"
         :teams="snapshot.teams"
         :update-automation="updateAutomation"
-        :work-backlog="snapshot.workBacklog"
-        :work-backlog-error="workBacklogError"
-        :work-backlog-status="workBacklogStatus"
-        :work-repositories-by-provider="workRepositoriesByProvider"
       />
       <CockpitView
         v-else-if="cockpitVisible"
@@ -771,7 +766,6 @@ const props = withDefaults(defineProps<{
   setDaemonEnabled?: (enabled: boolean) => Promise<void>;
   restartApp?: () => Promise<void>;
   getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
-  listAutomationWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkSource[]>;
   createAutomation?: (input: CreateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
   runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
@@ -924,7 +918,6 @@ const props = withDefaults(defineProps<{
   setDaemonEnabled: async () => undefined,
   restartApp: async () => undefined,
   getAutomationSnapshot: async () => createEmptySnapshot(),
-  listAutomationWorkRepositories: async () => [],
   createAutomation: async () => undefined,
   updateAutomation: async () => undefined,
   runAutomation: async () => undefined,

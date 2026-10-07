@@ -1,79 +1,56 @@
 ---
-description: Connect work integrations and automate the intake of matching work.
+description: Schedule prompts in agents or Quick Chats.
 ---
 
 # Automations
 
-Automations periodically check configured GitHub or Linear sources, select open work items, and start a dedicated agent in a worktree for each selected item. They are useful for recurring issue triage and implementation work.
+An automation sends a prompt on a recurring schedule. It can run in an existing agent, an existing Quick Chat, or a new Quick Chat each time. No repository or work integration is required.
 
-## Connect the work source
-
-Before creating an automation:
-
-1. Connect [GitHub or Linear](../providers/#connect-github-or-linear) in **Settings → Integrations**.
-2. Add the code repositories to Korus so each has a configured local clone. GitHub sources must match those clones. For Linear, choose a code repository separately for each team or project you want to watch.
-3. Create the destination team and connect the provider you want its agents to use. See [Providers](../providers/).
-
-For a remote automation, these prerequisites apply on the selected remote host. A clone or integration connection on your Mac does not supply the remote host's setup.
-
-## Define the work to watch
+## Create an automation
 
 1. Open **Automations** from the left rail.
-2. Choose **Local** or a connected remote host in the location selector.
-3. Choose **New automation** or the creation action on the empty screen.
-4. Choose the backlog provider, then the GitHub repositories or Linear teams/projects to watch. **Refresh** reloads the source list; **Retry** retries a failed load.
-5. For each Linear source, select **Code repository for …**. Confirm any prefilled repository: this saved mapping is where its worktrees will be created. A scheduled run cannot pause to ask where the code belongs.
-6. Select the destination **Team** and coding engine, independently of the backlog provider.
-7. Choose the **Run** interval: every 5, 15, or 30 minutes; hourly; every 6 or 12 hours; or daily. The default is hourly.
-8. Write the **Selection prompt** and **Assignment prompt**, then choose **Save automation**.
+2. Choose **Local** or a connected remote host.
+3. Choose **New automation**.
+4. Give it a name and write the prompt.
+5. Choose where it runs:
+   - **New Quick Chat every run** starts with fresh context each time. Choose its team, coding engine, model, and effort. Empty model and effort fields use provider defaults.
+   - **Existing Quick Chat** continues the selected chat.
+   - **Existing agent** continues the selected agent in its folder or worktree.
+6. Choose **Daily**, **Weekdays**, **Weekly**, **Custom**, or **Interval**, then set the time where applicable. New schedules use your local timezone; existing schedules retain their saved timezone. Check **Next run** and save.
 
-Changing the backlog provider clears the source selections and Linear repository mappings. Select and verify them again before saving.
+Existing conversations keep their backend, model, effort, and approval settings. Fresh Quick Chats use the selected settings without changing your saved defaults.
 
-The selection prompt decides *which items* qualify. The assignment prompt tells each created agent *what to do* with its item.
+You can also ask an agent or Quick Chat to create an automation, for example “Run the refresh-work-calendar skill every day at 8 AM America/Chicago in this agent.” Specify the prompt, schedule, timezone, and destination. It appears in the same Automations view for editing or disabling.
 
-**Selection prompt example:**
+Automations are enabled by default. Their first scheduled run is the next occurrence, not immediately on saving. Calendar schedules keep their local time across daylight-saving changes; nonexistent times are skipped and repeated times run once. The host owning the automation must stay running. When it returns after missing occurrences, Korus runs once rather than replaying a backlog.
+
+Custom schedules support every-N days, selected weekdays, and days of the month. More advanced recurrence rules created through the tool are preserved in the editor rather than silently simplified.
+
+## Keep the prompt explicit
+
+An automation has the same tools and permission boundaries as its conversation. Scheduling does not grant extra permissions or automatically create worktrees, commit changes, or publish work.
+
+For example:
 
 ```text
-Select only open issues labeled docs with a clear requested change.
-Do not select pull requests or issues that need a product decision.
+Check the open issues in my configured repository. Summarize anything
+that needs attention. Do not edit files or change issue status.
 ```
 
-**Assignment prompt example:**
+A Quick Chat can use Korus's existing tools to create a repository agent in a dedicated worktree when your prompt explicitly asks for that. Specify the repository and delivery constraints in the prompt; they are not separate automation configuration.
 
-```text
-Read the relevant guide and implementation before editing documentation.
-Make the requested change, check the documentation build, and leave the
-diff ready for review. Do not commit, push, or change the source issue's status.
-```
+## Follow a run
 
-::: warning Selection defaults
-New automations are enabled by default. Leaving **Selection prompt** empty selects every eligible open, unassigned item in the chosen sources, including pull requests for GitHub. Use a narrow selection prompt or switch the automation off before saving while you configure it.
-:::
+Use the play button to run an enabled automation immediately. **View logs** shows the conversation, start time, duration, status, and any error. Its conversation action opens the recorded conversation.
 
-## Follow the resulting work
+A busy target is not interrupted. Korus does not overlap runs of the same automation or dispatch two automations into the same busy conversation. A run awaiting approval remains **Needs input**; open the target conversation to respond.
 
-The play button runs an enabled automation immediately. Use **View logs** to inspect its executions, created agents, status, and errors. The conversation action on an execution opens its recorded agent conversation.
+**Completed** means the prompt's provider turn ended successfully. It does not mean delegated agents finished, issues were closed, or changes were shipped. A daemon restart marks interrupted runs as failed rather than claiming success.
 
-Each selected item gets an agent in the destination team and a repository worktree. Items already assigned in Korus are skipped, including a Linear issue encountered through both a team and a project source, so another scheduled check does not create a second assignment for them.
+## Edit or remove
 
-An execution with no matches updates the last execution time without creating agents or a log entry. When agents finish their assigned work, the execution can become **Completed**. That is Korus's local work status; it does not by itself confirm that a Linear or GitHub issue was closed, a pull request merged, or changes deployed.
+Switching an automation off stops future runs, not an already-running conversation. Deleting it removes the schedule but leaves conversations and worktrees intact. Clearing history removes finished entries and preserves active runs.
 
-## Review delivery
+## When a run fails
 
-Inspect the created agents and their diffs as you would for manually assigned work. Put delivery constraints such as “leave changes uncommitted for review” in the assignment prompt when that is the workflow you want.
-
-Use the automation's action menu to edit or delete it. Switching it off stops future intake; deleting it stops the rule from creating more agents. Removing an execution or clearing history removes the recorded history, rather than acting as a worktree cleanup workflow.
-
-## When something does not run
-
-| Symptom | What to check |
-| --- | --- |
-| No source choices | The selected integration is connected on this host and your account can access the source. GitHub repositories also need a configured clone. Try **Refresh** or **Retry**. |
-| Save is unavailable | Select a source, a team, and an available coding engine. Map every Linear source to a configured code repository and resolve any source-loading error. |
-| Play button is unavailable | The automation is switched on. |
-| No new agents | Items are open, match the selection prompt, and have no existing Korus assignment. |
-| Failed execution | Open its logs; check integration authorization, coding-engine connection, and the saved clone/worktree error shown. Repair an unavailable repository mapping before retrying. |
-
-Schedules run on the host that owns the automation. That host must remain running and able to reach the backlog service and selected coding engine. A disconnected integration or invalid code-repository mapping prevents new work from starting.
-
-Use [parallel agents](../workflows/parallel-agents) and [worktrees](../workflows/worktrees) when an automation creates work that may overlap other tasks.
+Check the error in its execution log. Reconnect the coding engine if needed, or edit the automation when its target conversation or team no longer exists. A remote automation uses the remote host's conversations, provider connections, and permissions—not those on your local computer.

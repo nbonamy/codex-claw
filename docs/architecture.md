@@ -317,15 +317,31 @@ wiring, never branches in assignment, Mission, Settings or automation code.
   computer hosting `daemon`. Scopes are `read,write`; no client secret exists.
   Failed refresh requires reconnection, and an in-flight callback cannot restore a
   disconnected account.
-- A backlog source is not an execution repository. Global batch starts and
-  automations name the code repository explicitly; Korus never infers a clone from
+- A backlog source is not an execution repository. Global batch starts name the
+  code repository explicitly; Korus never infers a clone from
   a Linear team or project name.
 - Assignments are provider-neutral records keyed by provider and item ID. Agents
   update status through `update-work-item`; the record survives deletion of its
   agent, and Korus status never changes the tracker's own workflow state.
-- Automations select eligible work, optionally via backend-owned structured
-  generation whose returned IDs are validated against the candidate set before any
-  worktree is created. Generated agents and worktrees are kept for review.
+- Automations schedule prompts on their owning daemon, independently of backlog
+  sources and repositories. Existing agents and Quick Chats retain their provider
+  settings; fresh Quick Chats use the automation's provider settings without
+  changing user defaults. Repository selection and worktree creation belong to
+  the conversation's existing tools, not the scheduler.
+- Calendar schedules store an RRULE and an IANA timezone. A stable creation or
+  re-enable/schedule-edit anchor preserves custom interval phases. The shared
+  recurrence module uses `rrule-temporal` for validation and occurrence queries;
+  UI previews and daemon dispatch use the same calculation. The first occurrence
+  is strictly after the anchor. Missed occurrences coalesce into one catch-up run,
+  recorded at dispatch time, rather than a backlog replay. Local times remain
+  stable across DST; nonexistent times are skipped and repeated times run once.
+  Elapsed-minute intervals remain a separate schedule shape. Neither mode depends
+  on provider-native scheduling or cloud services.
+- The runner reserves each execution before dispatch, avoids overlapping work in
+  the same conversation, and records provider turn completion rather than treating
+  an idle coordination status as success. Approval requests retain the run as
+  awaiting input. Interrupted runs fail explicitly on daemon restart; history
+  cleanup never deletes conversations or active executions.
 
 ## In-app Browser
 

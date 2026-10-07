@@ -1,7 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { GlobalWorkItemQuery, WorkProviderKind } from '@workspace/core/contracts';
 import type { WorkProviderToken } from '@workspace/core/work-integration-tokens';
-import { createAutomationInSnapshot } from '@workspace/core/automation-manager';
 import { mockWorkProvider as provider, mockWorkSource, mockWorkItem, registerMockWorkProvider } from '@workspace/core/__tests__/fixtures/mock-work-provider';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { workBacklogAssignmentFromWorkItem } from '@workspace/core/work-assignments';
@@ -9,8 +8,6 @@ import { workItemAssignmentPrompt, workItemBranchName } from '@workspace/core/wo
 import { AppBackendServer } from '../../server';
 import { WorkIntegrationManager } from '../manager';
 import type { WorkProviderDriver } from '../types';
-import { AutomationRunner } from '../../automations/runner';
-import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../../state-persistence';
 
 let unregister: (() => void) | undefined;
 afterEach(() => { unregister?.(); });
@@ -49,25 +46,5 @@ it('routes a registered third source with opaque IDs through the protocol, assig
     expect(workItemAssignmentPrompt(item)).toContain('this Mock work source issue');
     expect(workItemAssignmentPrompt(item)).toContain('Backlog source: Product');
     expect(workItemBranchName(item)).toBe('fix/task-blue');
-    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
-    const automation = createAutomationInSnapshot(snapshot, {
-      repositories: [{ provider, sourceId: source.id, executionRepositoryPath: '/code/repository' }],
-      teamId: snapshot.teams[0]!.id, schedule: { intervalMinutes: 60 },
-    })!;
-    expect(automation).not.toBeNull();
-    const createWorktree = vi.fn(async ({ branchName }: { branchName: string }) => ({ name: branchName, path: '/code/task-worktree' }));
-    const sendPrompt = vi.fn(async () => {});
-    const runner = new AutomationRunner({
-      getSnapshot: () => snapshot, listWorkItems: manager, createWorktree, sendPrompt,
-      saveSnapshot: async () => {}, notifySnapshotUpdated: () => {},
-    });
-    await runner.runAutomation(automation.id);
-    expect(createWorktree).toHaveBeenCalledWith({ repoPath: '/code/repository', branchName: 'automation/task-blue', reuseExisting: true });
-    expect(sendPrompt).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Backlog source: Product'), expect.objectContaining({ automationId: automation.id, workItemId: `${provider}:${item.id}` }));
-    const restored = snapshotFromPersistedState(JSON.parse(JSON.stringify(persistedStateFromSnapshot(snapshot))));
-    expect(restored.automations[0]?.repositories).toEqual(automation.repositories);
-    expect(restored.workBacklog.assignments[`${provider}:${item.id}`]?.item).toMatchObject({
-      id: item.id, sourceId: source.id, identifier: item.identifier, body: item.body,
-    });
   } finally { await server.close(); }
 });

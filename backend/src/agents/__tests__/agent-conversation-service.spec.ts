@@ -85,27 +85,16 @@ describe('AgentConversationService', () => {
       id: 'automation-1',
       name: 'Automation',
       enabled: true,
-      repositories: [{
-        provider: 'github',
-        sourceId: 'openai/agent-workspace',
-        executionRepositoryPath: '/repo',
-      }],
-      teamId: 'team-1',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-1', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'execution-1',
         automationId: 'automation-1',
         startedAt: '2026-09-02T00:00:00.000Z',
         status: 'completed',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: agent.id,
-          agentName: 'Dina',
-          workItemId: 'github:openai/agent-workspace#1',
-          workItemTitle: 'Fix it',
-          workItemUrl: 'https://github.com/openai/agent-workspace/issues/1',
-          conversationRef: { backend: 'claude', folder: '/repo', sessionId: 'session-1' },
-        }],
+
+        agentId: agent.id, agentName: 'Dina', conversationRef: { backend: 'claude', folder: '/repo', sessionId: 'session-1' },
       }],
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',

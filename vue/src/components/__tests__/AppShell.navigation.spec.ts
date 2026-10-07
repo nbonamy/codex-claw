@@ -394,12 +394,8 @@ describe('AppShell navigation and teams', () => {
       id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
-      repositories: [{
-        provider: 'github',
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-      }],
-      teamId: 'team-app',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-app', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
       executionLog: [{
         id: 'automation-exec-1',
@@ -407,15 +403,8 @@ describe('AppShell navigation and teams', () => {
         startedAt: '2026-06-09T10:00:00.000Z',
         completedAt: '2026-06-09T10:01:00.000Z',
         status: 'completed',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: 'agent-jesse',
-          agentName: 'Jesse',
-          workItemId: 'github:nbonamy/agent-workspace#12',
-          workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
-          conversationRef: { backend: 'codex', threadId: 'thread-jesse' },
-        }],
+
+        agentId: 'agent-jesse', agentName: 'Jesse', conversationRef: { backend: 'codex', threadId: 'thread-jesse' },
       }],
       createdAt: '2026-06-09T09:59:00.000Z',
       updatedAt: '2026-06-09T10:01:00.000Z',
@@ -440,7 +429,7 @@ describe('AppShell navigation and teams', () => {
 
     await wrapper.get('[aria-label="Automations"]').trigger('click');
     await wrapper.get('[aria-label="View logs for GitHub bugs"]').trigger('click');
-    await wrapper.get('[aria-label="View conversation for github:nbonamy/agent-workspace#12"]').trigger('click');
+    await wrapper.get('[aria-label="View conversation for automation-exec-1"]').trigger('click');
     await flushPromises();
 
     expect(readConversationMessages).toHaveBeenCalledWith({ backend: 'codex', threadId: 'thread-jesse' }, 'agent-jesse');
