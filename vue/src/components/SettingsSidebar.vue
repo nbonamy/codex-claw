@@ -16,6 +16,10 @@
           <PaletteIcon aria-hidden="true" />
           <span>{{ $t('surface.settingsSidebar.appearance') }}</span>
         </el-menu-item>
+        <el-menu-item index="voice">
+          <MicrophoneIcon aria-hidden="true" />
+          <span>{{ $t('surface.settingsSidebar.voice') }}</span>
+        </el-menu-item>
         <el-menu-item index="personalization">
           <UserIcon aria-hidden="true" />
           <span>{{ $t('surface.instructionSettings.personalization') }}</span>
@@ -59,7 +63,7 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
-import { AffiliateIcon, GitBranchIcon, PaletteIcon, PuzzleIcon, ScreenshotIcon, SettingsIcon, TerminalIcon, UserIcon } from '../shared/icons/app-icons';
+import { AffiliateIcon, GitBranchIcon, MicrophoneIcon, PaletteIcon, PuzzleIcon, ScreenshotIcon, SettingsIcon, TerminalIcon, UserIcon } from '../shared/icons/app-icons';
 import BackendIcon from './BackendIcon.vue';
 import { appHostCapabilities } from '../platform-api';
 
@@ -72,7 +76,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'personalization' || tab === 'git' || tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
+  if (tab === 'personalization' || tab === 'voice' || tab === 'git' || tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
     emit('select', tab);
   }
 }

@@ -11,6 +11,10 @@
       > {{ $t('surface.settingsConnectionsPanel.addRemote') }} </el-button>
     </template>
 
+    <template #banner>
+      <SettingsIntro kind="connections" :title="$t('surface.settingsConnectionsPanel.introTitle')" :description="$t('surface.settingsConnectionsPanel.introDescription')" />
+    </template>
+
     <FormSection
       :title="$t('surface.settingsConnectionsPanel.remoteAppAgents')"
       title-id="settings-connections-remotes-title"
@@ -217,6 +221,7 @@ import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import RemoteEngineConnections from './RemoteEngineConnections.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
+import SettingsIntro from './SettingsIntro.vue';
 import FormSection from '../shared/form/FormSection.vue';
 
 const props = withDefaults(defineProps<{

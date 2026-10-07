@@ -24,6 +24,11 @@
           :restart-app="restartApp"
           :update-settings="updateSettings"
         />
+        <SettingsVoicePanel
+          v-else-if="activeTab === 'voice'"
+          :settings="generalSettings"
+          :update-settings="updateSettings"
+        />
         <SettingsInstructionsPanel
           v-else-if="activeTab === 'git'"
           :settings="generalSettings"
@@ -129,6 +134,7 @@ import SettingsPersonalizationPanel from './SettingsPersonalizationPanel.vue';
 import SettingsIntegrationsPanel from './SettingsIntegrationsPanel.vue';
 import SettingsPluginsPanel from './SettingsPluginsPanel.vue';
 import SettingsSidebar from './SettingsSidebar.vue';
+import SettingsVoicePanel from './SettingsVoicePanel.vue';
 import type { SettingsTab } from './settings-tabs';
 import type { ProviderConnection } from '@workspace/core/contracts/provider-setup';
 import { appHostCapabilities } from '../platform-api';

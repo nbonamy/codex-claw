@@ -52,6 +52,7 @@ export {
   IconLayoutSidebarLeftCollapse as PanelLeftCloseIcon,
   IconLayoutSidebarLeftExpand as PanelLeftOpenIcon,
   IconLogout as QuitIcon,
+  IconMicrophone as MicrophoneIcon,
   IconPalette as PaletteIcon,
   IconPencil as PencilIcon,
   IconPhoto as PhotoIcon,

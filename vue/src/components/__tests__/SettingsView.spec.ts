@@ -30,6 +30,7 @@ describe('SettingsView', () => {
     expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).toStrictEqual([
       'General',
       'Appearance',
+      'Voice',
       'Personalization',
       'Screenshots',
       'Codex',

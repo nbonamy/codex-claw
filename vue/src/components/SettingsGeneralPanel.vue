@@ -74,120 +74,6 @@
     </FormSection>
 
     <FormSection
-      :title="$t('surface.settingsGeneralPanel.voice')"
-      title-id="settings-general-voice-title"
-    >
-      <FormRow
-        as="label"
-        :title="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
-        :description="$t('surface.settingsGeneralPanel.letAgentsSpeakBriefTaskStartAndFinishPhrases')"
-      >
-        <template #control>
-          <el-switch
-            :model-value="settings.spokenAnnouncementsEnabled"
-            :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgments')"
-            @update:model-value="updateSpokenAnnouncementsEnabled"
-          />
-        </template>
-      </FormRow>
-      <FormRow
-        v-if="settings.spokenAnnouncementsEnabled"
-        :title="$t('surface.settingsGeneralPanel.voice')"
-        :description="$t('surface.settingsGeneralPanel.chooseAnOnDeviceNeuralVoice')"
-        :error="voicePreviewError"
-      >
-        <template #control>
-          <span class="settings-general-panel__actions">
-            <el-select
-              class="settings-general-panel__voice-select"
-              :model-value="settings.spokenAnnouncementVoice"
-              :aria-label="$t('surface.settingsGeneralPanel.voice')"
-              @update:model-value="updateSpokenAnnouncementVoice"
-            >
-              <el-option
-                v-for="option in voiceOptions"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
-              />
-            </el-select>
-            <el-button
-              size="small"
-              :loading="previewingVoice"
-              :disabled="previewingVoice"
-              :aria-label="$t('surface.settingsGeneralPanel.previewVoice')"
-              @click="previewVoice"
-            >
-              {{ $t('surface.settingsGeneralPanel.preview') }}
-            </el-button>
-          </span>
-        </template>
-      </FormRow>
-      <details
-        v-if="settings.spokenAnnouncementsEnabled"
-        class="settings-general-panel__voice-rules"
-      >
-        <summary class="settings-general-panel__voice-rules-summary">
-          <span class="settings-general-panel__voice-rules-copy">
-            <strong>{{ $t('surface.settingsGeneralPanel.playbackRules') }}</strong>
-            <span>{{ voiceRulesSummary }}</span>
-          </span>
-          <ChevronDown aria-hidden="true" />
-        </summary>
-        <div class="settings-general-panel__voice-rules-content">
-          <FormRow
-            :title="$t('surface.settingsGeneralPanel.scope')"
-            :description="$t('surface.settingsGeneralPanel.chooseWhichAgentsMaySpeak')"
-          >
-            <template #control>
-              <el-select
-                class="settings-general-panel__speech-scope-select"
-                :model-value="settings.spokenAnnouncementScope"
-                :aria-label="$t('surface.settingsGeneralPanel.spokenAcknowledgmentScope')"
-                @update:model-value="updateSpokenAnnouncementScope"
-              >
-                <el-option
-                  :label="$t('surface.settingsGeneralPanel.selectedAgentOnly')"
-                  value="selected"
-                />
-                <el-option
-                  :label="$t('surface.settingsGeneralPanel.allAgents')"
-                  value="all"
-                />
-              </el-select>
-            </template>
-          </FormRow>
-          <FormRow
-            as="label"
-            :title="$t('surface.settingsGeneralPanel.dictatedPromptsOnly')"
-            :description="$t('surface.settingsGeneralPanel.speakOnlyForTasksStartedWithVoiceDictation')"
-          >
-            <template #control>
-              <el-switch
-                :model-value="settings.spokenAnnouncementsOnlyForDictatedPrompts"
-                :aria-label="$t('surface.settingsGeneralPanel.dictatedPromptsOnly')"
-                @update:model-value="updateSpokenAnnouncementsOnlyForDictatedPrompts"
-              />
-            </template>
-          </FormRow>
-          <FormRow
-            as="label"
-            :title="$t('surface.settingsGeneralPanel.onlySpeakWhileFocused')"
-            :description="$t('surface.settingsGeneralPanel.silenceAcknowledgmentsWhileAppIsInTheBackground')"
-          >
-            <template #control>
-              <el-switch
-                :model-value="settings.spokenAnnouncementsOnlyWhenFocused"
-                :aria-label="$t('surface.settingsGeneralPanel.onlySpeakWhileFocused')"
-                @update:model-value="updateSpokenAnnouncementsOnlyWhenFocused"
-              />
-            </template>
-          </FormRow>
-        </div>
-      </details>
-    </FormSection>
-
-    <FormSection
       v-if="appHostCapabilities.nativeFileDialogs && showSourceFolderSetting"
       :title="$t('surface.settingsGeneralPanel.sourceFolder')"
       title-id="settings-general-source-title"
@@ -289,12 +175,12 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import type { AppGeneralSettings, DaemonStatus, SourceFolderState, SpokenAnnouncementScope, SpokenAnnouncementVoice, SystemPermissionsStatus, UpdateSettingsInput } from '@workspace/core/contracts';
+import type { AppGeneralSettings, DaemonStatus, SourceFolderState, SystemPermissionsStatus, UpdateSettingsInput } from '@workspace/core/contracts';
 import { defaultSourceFolderState } from '@workspace/core/settings';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import FormRow from '../shared/form/FormRow.vue';
 import FormSection from '../shared/form/FormSection.vue';
-import { ChevronDown, Circle, ShieldCheckIcon } from '../shared/icons/app-icons';
+import { Circle, ShieldCheckIcon } from '../shared/icons/app-icons';
 import { appHostCapabilities, appApi } from '../platform-api';
 
 const defaultPermissionsStatus: SystemPermissionsStatus = {
@@ -331,29 +217,6 @@ const choosingSourceFolder = ref(false);
 const settingDaemon = ref(false);
 const daemonOperation = ref<'installing' | 'uninstalling' | null>(null);
 const sourceFolderError = ref<string | null>(null);
-const previewingVoice = ref(false);
-const voicePreviewError = ref<string | null>(null);
-const voiceOptions: Array<{ label: string; value: SpokenAnnouncementVoice }> = [
-  { label: translate('surface.settingsGeneralPanel.voiceHeart'), value: 'af_heart' },
-  { label: translate('surface.settingsGeneralPanel.voiceBella'), value: 'af_bella' },
-  { label: translate('surface.settingsGeneralPanel.voiceNicole'), value: 'af_nicole' },
-  { label: translate('surface.settingsGeneralPanel.voiceSarah'), value: 'af_sarah' },
-  { label: translate('surface.settingsGeneralPanel.voiceAdam'), value: 'am_adam' },
-  { label: translate('surface.settingsGeneralPanel.voiceMichael'), value: 'am_michael' },
-  { label: translate('surface.settingsGeneralPanel.voiceEmma'), value: 'bf_emma' },
-  { label: translate('surface.settingsGeneralPanel.voiceGeorge'), value: 'bm_george' },
-];
-const voiceRulesSummary = computed(() => [
-  translate(props.settings.spokenAnnouncementScope === 'all'
-    ? 'surface.settingsGeneralPanel.allAgents'
-    : 'surface.settingsGeneralPanel.selectedAgentOnly'),
-  translate(props.settings.spokenAnnouncementsOnlyForDictatedPrompts
-    ? 'surface.settingsGeneralPanel.dictatedPrompts'
-    : 'surface.settingsGeneralPanel.allPrompts'),
-  translate(props.settings.spokenAnnouncementsOnlyWhenFocused
-    ? 'surface.settingsGeneralPanel.whileFocused'
-    : 'surface.settingsGeneralPanel.inTheBackgroundToo'),
-].join(' · '));
 
 const showSourceFolderSetting = computed(() => Boolean(props.sourceFolder));
 const sourceFolderState = computed(() => props.sourceFolder ?? defaultSourceFolderState);
@@ -512,56 +375,6 @@ function updateCelebrationsEnabled(value: boolean | string | number): void {
   });
 }
 
-function updateSpokenAnnouncementsEnabled(value: boolean | string | number): void {
-  void props.updateSettings?.({
-    general: {
-      spokenAnnouncementsEnabled: value === true,
-    },
-  });
-}
-
-function updateSpokenAnnouncementScope(value: SpokenAnnouncementScope): void {
-  void props.updateSettings?.({
-    general: { spokenAnnouncementScope: value },
-  });
-}
-
-function updateSpokenAnnouncementsOnlyForDictatedPrompts(value: boolean | string | number): void {
-  void props.updateSettings?.({
-    general: { spokenAnnouncementsOnlyForDictatedPrompts: value === true },
-  });
-}
-
-function updateSpokenAnnouncementsOnlyWhenFocused(value: boolean | string | number): void {
-  void props.updateSettings?.({
-    general: { spokenAnnouncementsOnlyWhenFocused: value === true },
-  });
-}
-
-function updateSpokenAnnouncementVoice(value: SpokenAnnouncementVoice): void {
-  voicePreviewError.value = null;
-  void props.updateSettings?.({
-    general: { spokenAnnouncementVoice: value },
-  });
-}
-
-async function previewVoice(): Promise<void> {
-  voicePreviewError.value = null;
-  previewingVoice.value = true;
-  try {
-    const result = await appApi?.previewSpokenAnnouncementVoice?.(
-      props.settings.spokenAnnouncementVoice,
-    );
-    if (!result?.queued) {
-      voicePreviewError.value = translate('surface.settingsGeneralPanel.voicePreviewUnavailable');
-    }
-  } catch {
-    voicePreviewError.value = translate('surface.settingsGeneralPanel.voicePreviewUnavailable');
-  } finally {
-    previewingVoice.value = false;
-  }
-}
-
 async function updateDaemonEnabled(value: boolean | string | number): Promise<void> {
   const enabled = value === true;
   daemonOperation.value = enabled ? 'installing' : 'uninstalling';
@@ -598,77 +411,6 @@ async function promptForRestartAfterDaemonChange(enabled: boolean): Promise<void
 </script>
 
 <style scoped>
-.settings-general-panel__speech-scope-select {
-  width: 220px;
-  max-width: 100%;
-}
-
-.settings-general-panel__voice-select {
-  width: 190px;
-}
-
-.settings-general-panel__voice-rules {
-  border-top: 1px solid var(--color-border);
-}
-
-.settings-general-panel__voice-rules-summary {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-16);
-  padding: var(--space-8);
-  cursor: pointer;
-  list-style: none;
-}
-
-.settings-general-panel__voice-rules-summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-general-panel__voice-rules-summary svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-  transition: transform 120ms ease;
-}
-
-.settings-general-panel__voice-rules[open] .settings-general-panel__voice-rules-summary svg {
-  transform: rotate(180deg);
-}
-
-.settings-general-panel__voice-rules-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-general-panel__voice-rules-copy strong {
-  color: var(--color-text);
-  font-size: var(--font-size-14);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-20);
-}
-
-.settings-general-panel__voice-rules-copy span {
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-general-panel__voice-rules-content {
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.settings-general-panel__voice-rules-content :deep(.form-row + .form-row) {
-  border-top: 1px solid var(--color-border);
-}
-
 .settings-general-panel__actions {
   min-width: 0;
   display: inline-flex;

@@ -39,17 +39,17 @@ describe('SettingsIntegrationsPanel', () => {
     expect(wrapper.emitted('disconnect')).toEqual([['linear'], ['linear']]);
   });
 
-  it('renders a decorative banner and matching provider logos', () => {
+  it('renders an intro banner and matching provider logos', () => {
     const wrapper = mountPanel({
       connections: [{ provider: 'github', status: 'disconnected' }],
     });
 
     const title = wrapper.get('#settings-integrations-title');
-    const banner = wrapper.get('.settings-integrations-banner');
+    const banner = wrapper.get('.settings-intro');
 
     expect(title.element.compareDocumentPosition(banner.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(banner.attributes('aria-hidden')).toBe('true');
-    expect(banner.text()).toBe('');
+    expect(banner.get('svg').attributes('aria-hidden')).toBe('true');
+    expect(banner.text()).toContain('Connect your work tools');
     expect(wrapper.find('svg.github-icon').exists()).toBe(true);
     expect(wrapper.find('img.github-icon').exists()).toBe(false);
     const linearLogo = wrapper.get('svg.linear-icon');

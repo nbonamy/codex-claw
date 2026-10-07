@@ -4,7 +4,7 @@
     title-id="settings-plugins-title"
   >
     <template #banner>
-      <SettingsPluginsBanner />
+      <SettingsIntro kind="plugins" :title="$t('surface.settingsPluginsPanel.installCodexPluginsAndMCPServers')" :description="$t('surface.settingsPluginsPanel.gitHubSlackJiraLinearGmailGoogleDriveAndMore')" />
     </template>
 
     <FormSection
@@ -72,7 +72,7 @@ import type { AppPluginSettings, AppPluginStatus, UpdateSettingsInput } from '@w
 import { defaultPluginSettings } from '@workspace/core/settings';
 import { ChevronRightIcon } from '../shared/icons/app-icons';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsPluginsBanner from './SettingsPluginsBanner.vue';
+import SettingsIntro from './SettingsIntro.vue';
 import FormRow from '../shared/form/FormRow.vue';
 import FormSection from '../shared/form/FormSection.vue';
 import { appHostCapabilities, appPlatformActions } from '../platform-api';

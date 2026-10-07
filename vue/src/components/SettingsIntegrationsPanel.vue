@@ -1,6 +1,8 @@
 <template>
   <SettingsPanelFrame :title="$t('surface.settingsIntegrationsPanel.integrations')" title-id="settings-integrations-title">
-    <template #banner><SettingsIntegrationBanner /></template>
+    <template #banner>
+      <SettingsIntro kind="integrations" :title="$t('surface.settingsIntegrationsPanel.introTitle')" :description="$t('surface.settingsIntegrationsPanel.introDescription')" />
+    </template>
     <FormSection v-for="connection in integrations" :key="connection.provider">
       <article class="settings-integrations-panel__integration">
         <div class="settings-integrations-panel__identity">
@@ -38,7 +40,7 @@ import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';
 import { BacklogIcon, GitHubIcon, LinearIcon } from '../shared/icons/app-icons';
 import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';
-import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
+import SettingsIntro from './SettingsIntro.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import FormSection from '../shared/form/FormSection.vue';
 

@@ -3,6 +3,9 @@
     :title="$t('surface.settingsAppearancePanel.appearance')"
     title-id="settings-appearance-title"
   >
+    <template #banner>
+      <SettingsIntro kind="appearance" :title="$t('surface.settingsAppearancePanel.introTitle')" :description="$t('surface.settingsAppearancePanel.introDescription')" />
+    </template>
     <FormSection
       :title="$t('surface.settingsAppearancePanel.color')"
       title-id="settings-appearance-color-title"
@@ -94,6 +97,7 @@ import { translate } from '../i18n';
 import { computed } from 'vue';
 import type { AppThemeSettings, UpdateSettingsInput } from '@workspace/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsIntro from './SettingsIntro.vue';
 import FormField from '../shared/form/FormField.vue';
 import FormGrid from '../shared/form/FormGrid.vue';
 import FormRow from '../shared/form/FormRow.vue';

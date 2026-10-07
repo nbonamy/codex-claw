@@ -1,5 +1,8 @@
 <template>
   <SettingsPanelFrame :title="$t('surface.instructionSettings.personalization')" title-id="settings-personalization-title">
+    <template #banner>
+      <SettingsIntro kind="personalization" :title="$t('surface.instructionSettings.personalizationIntroTitle')" :description="$t('surface.instructionSettings.personalizationIntroDescription')" />
+    </template>
     <div class="settings-personalization__toolbar">
           <el-select class="settings-personalization__engine" :model-value="engine" :disabled="busy" :aria-label="$t('surface.instructionSettings.engine')" @update:model-value="selectEngine">
             <el-option :label="$t('surface.settingsSidebar.codex')" value="codex" />
@@ -24,6 +27,7 @@ import type { AgentBackend, AppApi } from '@workspace/core/contracts';
 import { appApi } from '../platform-api';
 import { translate } from '../i18n';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsIntro from './SettingsIntro.vue';
 
 const props = defineProps<{ api?: Pick<AppApi, 'readEngineInstructions' | 'saveEngineInstructions'> }>();
 const engine = ref<AgentBackend>('codex');

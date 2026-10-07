@@ -3,6 +3,11 @@
     :title="$t('surface.settingsCodexPanel.codex')"
     title-id="settings-codex-title"
   >
+    <template #banner>
+      <SettingsIntro :title="$t('surface.settingsCodexPanel.introTitle')" :description="$t('surface.settingsCodexPanel.introDescription')">
+        <BackendIcon backend="codex" monochrome class="settings-intro-logo" />
+      </SettingsIntro>
+    </template>
     <SettingsEngineConnectionRow :authentication="authentication" :connected="connected" :enabled="settings.providerEnabled?.codex !== false" :set-enabled="setEnabled" :busy="connectionBusy" :pending="loginPending" :error="connectionError" @connect="emit('connect')" @disconnect="emit('disconnect')" @cancel="emit('cancel')">
       <SettingsEngineSetupRow :home="settings.providerHomes?.codex" @customize="emit('customize')" />
     </SettingsEngineConnectionRow>
@@ -68,6 +73,8 @@ import { ref, watch } from 'vue';
 import type { AppGeneralSettings, UpdateSettingsInput } from '@workspace/core/contracts';
 import { appHostCapabilities, appPlatformActions } from '../platform-api';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsIntro from './SettingsIntro.vue';
+import BackendIcon from './BackendIcon.vue';
 import FormRow from '../shared/form/FormRow.vue';
 import FormSection from '../shared/form/FormSection.vue';
 import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
