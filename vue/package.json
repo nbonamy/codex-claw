@@ -29,8 +29,8 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "0.14.0",
-    "@codex-app-sdk/vue": "0.14.0",
+    "@codex-app-sdk/core": "0.14.1",
+    "@codex-app-sdk/vue": "0.14.1",
     "@workspace/core": "0.28.0",
     "@excalidraw/excalidraw": "0.18.1",
     "@excalidraw/mermaid-to-excalidraw": "2.2.2",
