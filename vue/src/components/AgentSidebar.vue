@@ -786,7 +786,12 @@ function onResizePointerEnd(event: PointerEvent): void {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--color-shell-sidebar);
+  /* Paint the header and body in one layer so their translucent tints never stack. */
+  background: linear-gradient(
+    to bottom,
+    var(--color-shell-rail) 0 var(--workbench-appbar-height),
+    var(--color-shell-sidebar) var(--workbench-appbar-height) 100%
+  );
   user-select: none;
 }
 
@@ -800,7 +805,6 @@ function onResizePointerEnd(event: PointerEvent): void {
   padding-left: var(--space-16);
   padding-right: var(--space-8);
   color: var(--color-text);
-  background: var(--color-shell-rail);
   border-bottom: 1px solid var(--color-shell-appbar-divider);
   -webkit-app-region: drag;
 }

@@ -35,7 +35,10 @@ export function applyAppTheme(settings: AppThemeSettings): void {
   root.style.setProperty('--color-shell-sidebar', nativeMacOSSidebar
     ? 'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)'
     : theme.appearance === 'dark' ? 'var(--color-surface-lowest)' : 'var(--color-surface-low)');
-  root.style.setProperty('--color-shell-rail', 'color-mix(in srgb, var(--color-shell-main) 92%, black)');
+  const railTint = 'color-mix(in srgb, var(--color-shell-main) 92%, black)';
+  root.style.setProperty('--color-shell-rail', nativeMacOSSidebar
+    ? `color-mix(in srgb, ${railTint} var(--shell-glass-opacity), transparent)`
+    : railTint);
   root.style.setProperty('--app-ui-font-size', `${settings.uiFontSize}px`);
   root.style.setProperty('--chat-font-size', `${settings.chatFontSize}px`);
   root.style.setProperty('--code-font-size', `${settings.codeFontSize}px`);

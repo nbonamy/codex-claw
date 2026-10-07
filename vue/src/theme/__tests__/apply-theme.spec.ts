@@ -56,7 +56,7 @@ describe('applyAppTheme', () => {
     expect(root.style.getPropertyValue('--code-font-size')).toBe('12px');
   });
 
-  it('preserves macOS sidebar translucency but uses an opaque rail to avoid overlapping tints', () => {
+  it('gives the macOS rail the sidebar translucency with a darker tint', () => {
     document.documentElement.dataset.platform = 'macos';
 
     applyAppTheme({
@@ -72,7 +72,7 @@ describe('applyAppTheme', () => {
       'color-mix(in srgb, var(--color-shell-main) var(--shell-glass-opacity), transparent)',
     );
     expect(root.style.getPropertyValue('--color-shell-rail')).toBe(
-      'color-mix(in srgb, var(--color-shell-main) 92%, black)',
+      'color-mix(in srgb, color-mix(in srgb, var(--color-shell-main) 92%, black) var(--shell-glass-opacity), transparent)',
     );
   });
 

@@ -10,6 +10,15 @@ import type { Agent, AgentBackend } from '@workspace/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
+  it('does not stack an extra header background over the sidebar tint', () => {
+    const wrapper = mount(AgentSidebar, {
+      attachTo: document.body,
+      props: { agents: [], activeAgentId: null, teamName: 'Team' },
+    });
+    expect(getComputedStyle(wrapper.get('header').element).background).toBe('rgba(0, 0, 0, 0)');
+    wrapper.unmount();
+  });
+
   it('hides idle dots at rest without hiding unread or working indicators', async () => {
     const idle: Agent = { ...agents[0]!, status: { type: 'idle' } };
     const wrapper = mount(AgentSidebar, {
