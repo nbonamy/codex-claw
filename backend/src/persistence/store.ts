@@ -9,9 +9,9 @@ import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { backupFile } from './backup';
 import { joinPersistedState, splitPersistedState, type StoreFiles, type VisualizationData } from './layout';
-import { migrateData, type Migration } from './migrations';
+import { migrateData, rosterMigrations, type Migration } from './migrations';
 import { parseData, rosterSchema, settingsSchema, visualizationSchema } from './schema';
-import { StoreFormatError, parseStoreFile, serializeStoreFile, storeSchemaVersion } from './store-format';
+import { StoreFormatError, parseStoreFile, serializeStoreFile, storeSchemaVersion, rosterSchemaVersion } from './store-format';
 
 const rosterFile = 'roster.json';
 const settingsFile = 'settings.json';
@@ -22,9 +22,8 @@ const legacyFile = 'state.json';
 /** Left in place of the legacy file: it is not JSON, so builds that predate the store refuse to start. */
 const retiredMarker = '# agent-workspace: this file was replaced by roster.json, settings.json and visualizations/.\n# It is not JSON on purpose, so an older build fails to start instead of creating an empty state.\n';
 
-/** Steps for files older than the current schema. Version 1 is the first, so there are none yet. */
 const fileMigrations = {
-  roster: [] as readonly Migration[],
+  roster: rosterMigrations,
   settings: [] as readonly Migration[],
   visualization: [] as readonly Migration[],
 };
@@ -121,15 +120,22 @@ export class AppStateStore {
   }
 
   private async readLayout(rosterText: string): Promise<AppSnapshot> {
-    const rosterEnvelope = parseStoreFile(rosterFile, rosterText);
+    const rosterEnvelope = parseStoreFile(rosterFile, rosterText, rosterSchemaVersion);
     const settingsText = await readIfExists(this.absolute(settingsFile));
     if (settingsText === null) throw new StoreFormatError(`${settingsFile} is missing. Restore it from the ${backupsDirectory} folder.`);
     const settingsEnvelope = parseStoreFile(settingsFile, settingsText);
     const files: StoreFiles = {
-      roster: parseData(rosterFile, rosterSchema, migrateData(rosterFile, rosterEnvelope.data, rosterEnvelope.schemaVersion, storeSchemaVersion, fileMigrations.roster)),
+      roster: parseData(rosterFile, rosterSchema, migrateData(rosterFile, rosterEnvelope.data, rosterEnvelope.schemaVersion, rosterSchemaVersion, fileMigrations.roster)),
       settings: parseData(settingsFile, settingsSchema, migrateData(settingsFile, settingsEnvelope.data, settingsEnvelope.schemaVersion, storeSchemaVersion, fileMigrations.settings)),
       visualizations: [],
     };
+    // Establish downgrade protection on load, before any ordinary snapshot save.
+    // Keep the original bytes in a verified backup before changing the envelope.
+    if (rosterEnvelope.schemaVersion < rosterSchemaVersion) {
+      await backupFile(this.absolute(rosterFile), this.absolute(backupsDirectory), `roster-v${rosterEnvelope.schemaVersion}`);
+      rosterText = serializeStoreFile(files.roster, rosterSchemaVersion);
+      await writeFileAtomically(this.absolute(rosterFile), rosterText);
+    }
     const written = new Map([[rosterFile, rosterText], [settingsFile, settingsText]]);
     for (const { relative, text } of await this.readVisualizationFiles()) {
       try {
@@ -167,7 +173,7 @@ export class AppStateStore {
     const files = new Map<string, string>();
     for (const visualization of visualizations) files.set(visualizationPath(visualization), serializeStoreFile(visualization));
     files.set(settingsFile, serializeStoreFile(settings));
-    files.set(rosterFile, serializeStoreFile(roster));
+    files.set(rosterFile, serializeStoreFile(roster, rosterSchemaVersion));
     return files;
   }
 

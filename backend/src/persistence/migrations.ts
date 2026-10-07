@@ -6,6 +6,13 @@ export type Migration<From = unknown, To = unknown> = {
   up(value: From): To;
 };
 
+/** Roster v2 protects prompt targets and calendar schedules from repository-loop readers.
+ * The envelope upgrade preserves data; the entity loader retains the no-conversion
+ * policy for obsolete loops. No other file kind changes version. */
+export const rosterMigrations: readonly Migration[] = [
+  { from: 1, to: 2, up: (value: unknown) => value },
+];
+
 /**
  * Applies contiguous steps until `target`. A step is written against the frozen
  * shape of its own version, never against the live contracts.
