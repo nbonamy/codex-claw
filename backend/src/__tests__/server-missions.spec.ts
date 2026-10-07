@@ -270,7 +270,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
     expect(instructions).toMatch(/^<context>\n/);
     expect(instructions).toContain("Treat the user's first message as the beginning of requirements shaping");
     expect(instructions).toContain(repo);
-    expect(instructions).toContain(join(missionHome, 'skills', 'mission-shape-requirements', 'SKILL.md'));
+    expect(instructions).toContain('read-skill with name="mission-shape-requirements"');
     expect(instructions).not.toContain('/skills/grill-with-docs/SKILL.md');
     expect(server.missionContext(run.workerId!)).toEqual({ missionId: current().id, runId: run.id, stage: 'requirements' });
     await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'agent/prompt/send', params: { agentId: run.workerId, prompt: 'Build team billing' } });
@@ -302,7 +302,7 @@ it('prepares a mission without a provider turn, then starts it from the first us
     const ticketsRun = current().execution!.runs.at(-1)!;
     expect(refreshedContexts.at(-1)).toMatchObject({
       context: { missionId: current().id, runId: ticketsRun.id, stage: 'tickets' },
-      instructions: expect.stringContaining(join(missionHome, 'skills', 'mission-to-tickets', 'SKILL.md')),
+      instructions: expect.stringContaining('read-skill with name="mission-to-tickets"'),
     });
     expect(refreshedContexts.at(-1)?.instructions).toContain('Owners can pay');
     await vi.waitFor(() => expect(snapshot.queuedPrompts).toEqual([

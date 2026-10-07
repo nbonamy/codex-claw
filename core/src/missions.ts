@@ -139,7 +139,7 @@ function isMissionExecution(v: unknown): v is MissionExecution {
       && (run.ticketIndex === undefined || (Number.isInteger(run.ticketIndex) && (run.ticketIndex as number) >= 0))
       && (run.repositoryPath === undefined || (text(run.repositoryPath) && !!run.repositoryPath.trim()))
       && (run.implementationResult === undefined || (record(run.implementationResult) && text(run.implementationResult.changes) && text(run.implementationResult.tests)))
-      && Array.isArray(run.skills) && run.skills.every(skill => record(skill) && text(skill.name) && text(skill.path))
+      && Array.isArray(run.skills) && run.skills.every(skill => record(skill) && text(skill.name) && (skill.path === undefined || text(skill.path)))
       && text(run.feedback) && text(run.startedAt)
       && (run.finishedAt === undefined || text(run.finishedAt))
       && (run.summary === undefined || text(run.summary)) && (run.error === undefined || text(run.error))

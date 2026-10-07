@@ -2,6 +2,7 @@ import { product } from '@workspace/core/product';
 import type { Agent, AppPluginSettings } from '@workspace/core/contracts';
 import { agentDisplayName } from '@workspace/core/agent-display';
 import { defaultPluginSettings } from '@workspace/core/settings';
+import { bundledSkillInstructions } from '../bundled-skills/catalog';
 import {
   collaborationInstructionsEnd,
   collaborationInstructionsStart,
@@ -85,7 +86,7 @@ export function appDeveloperInstructions(
     'Include suggestedPrompt in finish_turn by default on every substantive turn. Choose one concrete, useful next prompt specific to this conversation, written in the user’s voice and ready to send (at most 240 characters). Omit it only when no useful follow-up remains or the user has asked to stop; completion of the current task alone is not a reason to omit a useful next step. Respect declined directions and avoid generic busywork. It is only a composer placeholder, never a submitted prompt or authorization to act. Omission clears the previous hint.',
     'When a plan, report, design, or other substantial Markdown should remain visible beside the conversation, call display-markdown.',
     `Use Markdown by default for text, lists, and tables. ${product.name} can render interactive HTML inline, but availability alone is not a reason to use it. Use inline HTML when a visualization or interaction materially helps the user understand or explore something, or when the user explicitly asks for HTML. Keep simple text and tables in Markdown unless the user asks otherwise. For design, architecture, and editable diagrams, prefer ${product.name} Visualize tools; if the pane is closed, ask the user to open it or stay with Markdown.`,
-    'To render inline HTML, emit a top-level artifact block outside Markdown fences, with the opening and closing tags on their own lines:\n<artifact title="Optional title">\n<!doctype html><html><head><style>/* styles */</style></head><body><!-- content --><script>/* interaction */</script></body></html>\n</artifact>\nUse a responsive, self-contained layout with your own styles. HTML runs in a sandbox without access to the app or native APIs. Keep sensitive data out of external requests and never put a literal closing artifact tag inside payload strings.',
+
     'Only call start_automatic_review when the user explicitly requests an automatic review. A generic request to review, finish, or ship work, a teammate message, or your own readiness assessment is not authorization. Use an explicit scope; ask if unclear. The tool creates an independent reviewer using this thread’s backend, model, and effort unless the user requests overrides. Local commits are off unless the user explicitly requests them; never infer that permission from saved settings. After launching, stop editing the reviewed files and tell the user the review has started, not completed. Its report returns automatically; do not poll by calling the launch tool again or start nested reviews. Otherwise continue to offer ready_for_review at handoff instead of launching a review yourself.',
     'For user-requested recurring prompts in Korus, use create-automation, not native cron tools, ChatGPT tasks, shell schedulers, or unrelated connector schedules. Only create an automation when explicitly asked; a suggestion or unfinished work is not authorization. Ask if the recurrence, timezone or destination is unclear. For calendar times use schedule.rrule with schedule.timeZone (IANA), not a 24-hour interval. Reuse the same requestId on retries. Backend/model/effort overrides apply only to new Quick Chats; existing conversations retain their settings. Report the saved schedule and next run, not that the scheduled work has completed.',
     browserInstructions,
@@ -97,7 +98,7 @@ export function appDeveloperInstructions(
   }
   if (settings.computerUseEnabled) {
     instructions.push(
-      `For macOS GUI automation in this ${product.name} session, use only the ${product.mcpServerName} MCP Computer Use tools. Before the first Computer Use action, call computer-use-guide and follow the returned instructions.`,
+      `For macOS GUI automation in this ${product.name} session, use only the ${product.mcpServerName} MCP Computer Use tools. Before the first Computer Use action, call read-skill with name="korus-computer-use" and follow the returned instructions.`,
       'Do not load or use Codex\'s built-in computer-use skill or sky.* methods; they control a different host.',
     );
   } else {
@@ -110,5 +111,5 @@ export function appDeveloperInstructions(
   } else {
     instructions.push(`Chrome integration is disabled for this ${product.name} session. Do not attempt to use the Chrome plugin.`);
   }
-  return [instructions.join(' '), effects.developerInstructions?.trim()].filter(Boolean).join('\n\n');
+  return [instructions.join(' '), bundledSkillInstructions({ computerUseEnabled: settings.computerUseEnabled }), effects.developerInstructions?.trim()].filter(Boolean).join('\n\n');
 }

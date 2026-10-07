@@ -9,7 +9,7 @@ import { createMission, type MissionArtifacts } from '@workspace/core/missions';
 import type { MissionExecutionInput } from '@workspace/core/mission-execution';
 import { MissionService } from '../mission-service';
 import { MissionExecutionService } from '../mission-execution-service';
-import { FileMissionSkillStore } from '../mission-skill-store';
+import { missionStageSkills, readBundledSkill } from '../bundled-skills/catalog';
 import { createSourceWorktree, readWorktreeHead } from '../git-worktrees';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 const exec = promisify(execFile);
@@ -32,13 +32,12 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
     let disk: unknown;
     const store = new MissionService(snapshot, async value => { disk = persistedStateFromSnapshot(value); });
     const artifactContents = new Map<string, string>();
-    const missionSkills = new FileMissionSkillStore(async () => folder);
     const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder,
       readArtifact: async (_missionId, stage) => artifactContents.get(stage) ?? '',
       writeArtifact: async (_missionId, stage, content) => { artifactContents.set(stage, content); return { size: content.length }; },
       validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {}, refreshConversationContext: async () => {}, continueStage: async () => {}, startRemediation: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
-      ensureStageSkills: (missionId, stage) => missionSkills.ensure(missionId, stage),
+      ensureStageSkills: async (_missionId, stage) => missionStageSkills(stage),
       interrupt: async () => {},
     });
     const current = () => snapshot.missions![0]!;
@@ -66,6 +65,9 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
         await service.waitForLaunches();
         const run = current().execution!.runs.at(-1)!;
         expect(run.status).toBe('running');
+        expect(run.skills).toHaveLength(1);
+        expect(run.skills[0]).not.toHaveProperty('path');
+        expect(readBundledSkill(run.skills[0]!.name, { missionStage: stage }).markdown).toContain('---\nname:');
         const artifacts = structuredClone(current().artifacts);
         if (stage === 'requirements') {
           await service.agentFinished(run.workerId!); // Question/answer rounds remain part of the same stage.

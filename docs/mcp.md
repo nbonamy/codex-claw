@@ -42,6 +42,13 @@ by mutating user-global tool config.
   the workflows models do not reliably infer from schemas. They distinguish
   engine-native subagents (inside the Codex/Claude session) from Korus co-agents
   (`create-agent`); ambiguous requests to delegate require a clarifying question.
+- App-owned procedures are bundled Markdown skills, loaded on demand through
+  `read-skill`. Injected instructions contain their catalog and essential policy,
+  not full skill bodies or filesystem paths. The reader serves only registered
+  names and rechecks feature enablement and the caller's active Mission stage;
+  it cannot read personal skills or arbitrary files. Loading a skill grants no
+  permission to perform its actions. The daemon bundle carries the same content
+  on desktop and remote hosts, independent of provider filesystem permissions.
 - Codex approval of an MCP tool call arrives as `mcpServer/elicitation/request`.
   Korus never auto-accepts it: it becomes a `confirm_tool` request, resolved by the
   user (`allow`, `allow_conversation` and `always_allow` map to `accept` with
@@ -198,7 +205,7 @@ runs under Electron main, which executes it only in response to
 together with no compatibility layer. Tools appear only when the user enables
 Computer Use in Settings → Plugins; Chrome control is the bundled ChatGPT plugin, not
 a Korus tool, and Korus disables Codex's `node_repl` MCP server unless Chrome is
-enabled. Instructions require calling `computer-use-guide` before the first action;
+enabled. Instructions require loading `korus-computer-use` through `read-skill` before the first action;
 cross-tool workflow lives there, not in descriptions.
 
 Invariants the tool schemas cannot enforce:

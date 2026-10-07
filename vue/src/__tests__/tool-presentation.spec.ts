@@ -62,6 +62,7 @@ describe(`${product.name} tool presentation`, () => {
     ['create-worktree', GitBranchIcon, 'Created worktree feature/tool-icons'],
     ['create-project', GitBranchIcon, 'Created project new-product'],
     ['display-markdown', MarkdownIcon, 'Displayed Review notes'],
+    ['read-skill', MarkdownIcon, 'Loaded skill'],
     ['set-mission-title', TargetArrowIcon, 'Named mission'],
     ['attach-mission-repository', GitBranchIcon, 'Attached mission repository'],
     ['list-mission-artifacts', MarkdownIcon, 'Checked mission artifacts'],

@@ -6,6 +6,9 @@ import { presentAppToolTitle } from '../tool-title-presenter';
 
 describe(`${product.name} tool title presenter`, () => {
   it.each([
+    ['korus.read-skill', { name: 'korus-inline-html' }, 'running', 'Loading skill korus-inline-html'],
+    ['mcp__korus__read_skill', { name: 'korus-inline-html' }, 'completed', 'Loaded skill korus-inline-html'],
+    ['korus.read-skill', { name: 'korus-inline-html' }, 'error', 'Could not load skill korus-inline-html'],
     ['korus.create-automation', { name: 'Daily check' }, 'running', 'Creating automation Daily check'],
     ['mcp__korus__create-automation', { name: 'Daily check' }, 'completed', 'Created automation Daily check'],
     ['korus.create-automation', {}, 'error', 'Failed creating automation'],

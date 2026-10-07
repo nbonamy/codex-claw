@@ -268,7 +268,9 @@ publishes only after saving.
 - Canonical artifacts are Markdown under `$APP_HOME/missions/<id>/artifacts`.
   Workers reach them through identity-bound MCP tools with optimistic revisions;
   the renderer and providers get metadata, never file access. Stage skills are
-  materialized under the Mission home so workflow behavior is provider-neutral.
+  bundled in the daemon and loaded through `read-skill`, scoped to the caller's
+  assigned stage. Persisted skill references use names; legacy paths are accepted
+  on read but never used to load instructions.
 - Each ticket names exactly one repository. Worktrees are created only for
   affected repositories when code work begins, sharing one Mission suffix and
   branch name. Repositories run in parallel, work within one repository is

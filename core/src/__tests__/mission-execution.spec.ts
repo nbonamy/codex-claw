@@ -21,7 +21,8 @@ it('carries the assigned stage, accepted artifacts, workspace, skills and revisi
     expect(prompt).not.toContain('Run ID:');
     expect(prompt).toContain('/isolated');
     expect(prompt).toContain('a'.repeat(40));
-    expect(prompt).toContain(`/mission/skills/mission-${stage}/SKILL.md`);
+    expect(prompt).toContain(`read-skill with name="mission-${stage}"`);
+    expect(prompt).not.toContain(`/mission/skills/mission-${stage}/SKILL.md`);
     expect(prompt).toContain('Check permissions');
     expect(prompt).toContain('User-provided context and feedback:');
     expect(prompt).toContain('Only owners');
@@ -80,7 +81,8 @@ it('validates persisted execution records and dependency graphs before admitting
   expect(isMission(mission)).toBe(true);
   expect(pendingMissionRun(mission)).toBe(run);
   expect(() => updateMission(snapshot, { id: mission.id, revision: 0, artifacts: mission.artifacts, stageAgentIds: {}, action: 'save' })).toThrow('current mission run');
-  for (const change of [{ status: 'unknown' }, { stage: 'unknown' }, { memberId: null }, { workerId: false }, { ticketIndex: -1 }, { skills: [{ name: 'x' }] }, { feedback: null }, { startedAt: null }, { finishedAt: false }, { summary: false }, { error: false }, { proposal: {} }]) {
+  expect(isMission({ ...mission, execution: { ...mission.execution, runs: [{ ...run, skills: [{ name: 'mission-shape-requirements' }] }] } })).toBe(true);
+  for (const change of [{ status: 'unknown' }, { stage: 'unknown' }, { memberId: null }, { workerId: false }, { ticketIndex: -1 }, { skills: [{ name: 'x', path: 42 }] }, { feedback: null }, { startedAt: null }, { finishedAt: false }, { summary: false }, { error: false }, { proposal: {} }]) {
     expect(isMission({ ...mission, execution: { ...mission.execution, runs: [{ ...run, ...change }] } })).toBe(false);
   }
   expect(isMission({ ...mission, execution: { ...mission.execution, workspace: { path: '/repo', branch: 'x', baseSha: 'bad' } } })).toBe(false);

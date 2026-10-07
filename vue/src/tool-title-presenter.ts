@@ -7,6 +7,7 @@ type ToolPhase = 'completed' | 'failed' | 'running';
 type AgentNameResolver = (identifier: string) => string | undefined;
 
 const TOOL_KEYS: Record<string, string> = {
+  'read-skill': 'readSkill',
   'wait-tasks': 'waitTasks',
   'complete-task': 'completeTask',
   'cancel-task': 'cancelTask',
@@ -153,7 +154,7 @@ function toolTarget(
         ? [args.title, args.path]
         : tool === 'create-agent'
             ? [phase === 'completed' ? resultString(result, 'agentName') : undefined, args.name, args.branchName, args.repoPath]
-            : tool === 'create-project' || tool === 'create-automation'
+            : tool === 'create-project' || tool === 'create-automation' || tool === 'read-skill'
               ? [args.name]
               : tool === 'create-worktree'
               ? [args.branchName, args.destinationPath]

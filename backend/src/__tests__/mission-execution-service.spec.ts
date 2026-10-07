@@ -8,6 +8,7 @@ import { createMission, updateMission, type MissionArtifacts, type MissionStage 
 import { MissionService } from '../mission-service';
 import { MissionExecutionService } from '../mission-execution-service';
 import { FileMissionArtifactStore } from '../mission-artifact-store';
+import { missionStageSkills } from '../bundled-skills/catalog';
 
 function setup() {
   const snapshot = createInitialSnapshot();
@@ -26,10 +27,7 @@ function setup() {
     refreshConversationContext: vi.fn().mockResolvedValue(undefined),
     continueStage: vi.fn().mockResolvedValue(undefined),
     startRemediation: vi.fn().mockResolvedValue(undefined),
-    ensureStageSkills: vi.fn(async (_missionId: string, stage) => [{
-      name: `mission-${stage}`,
-      path: `/app/missions/mission/skills/mission-${stage}/SKILL.md`,
-    }]),
+    ensureStageSkills: vi.fn(async (_missionId: string, stage: MissionStage) => missionStageSkills(stage)),
     interrupt: vi.fn().mockResolvedValue(undefined) };
   const service = new MissionExecutionService(ports);
   const current = () => snapshot.missions![0]!;
@@ -397,7 +395,7 @@ describe('mission execution', () => {
     await h.service.refreshOwnedSkills();
 
     expect(h.current().execution!.runs[0]!.skills).toStrictEqual([
-      { name: 'mission-requirements', path: '/app/missions/mission/skills/mission-requirements/SKILL.md' },
+      { name: 'mission-shape-requirements' },
     ]);
   });
 
@@ -463,7 +461,7 @@ describe('mission execution', () => {
     const worker = h.snapshot.agents.find(agent => agent.id === run.workerId)!;
     expect(worker).toMatchObject({ folder: '/app/missions/mission', backend: h.originalAgents[0]!.backend, status: { type: 'idle' } });
     expect(worker).not.toHaveProperty('backendSession');
-    expect(run.skills).toStrictEqual([{ name: 'mission-requirements', path: '/app/missions/mission/skills/mission-requirements/SKILL.md' }]);
+    expect(run.skills).toStrictEqual([{ name: 'mission-shape-requirements' }]);
     const instructions = h.service.developerInstructionsForAgent(run.workerId!);
     expect(instructions).toMatch(/^<context>\n/);
     expect(instructions).toContain(h.originalAgents[0]!.folder);
@@ -504,7 +502,7 @@ describe('mission execution', () => {
     expect(h.current().execution!.runs[0]!.status).toBe('accepted');
     expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'preparing', workerId: run.workerId });
     await h.service.waitForLaunches();
-    expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'running', workerId: run.workerId, skills: [{ name: 'mission-tickets', path: '/app/missions/mission/skills/mission-tickets/SKILL.md' }] });
+    expect(h.current().execution!.runs[1]).toMatchObject({ stage: 'tickets', status: 'running', workerId: run.workerId, skills: [{ name: 'mission-to-tickets' }] });
     expect(h.service.contextForAgent(run.workerId!)).toEqual({ missionId: mission.id, runId: h.current().execution!.runs[1]!.id, stage: 'tickets' });
     expect(h.service.developerInstructionsForAgent(run.workerId!)).toContain('Continue as the same Mission orchestrator');
     expect(h.ports.refreshConversationContext).toHaveBeenCalledWith(worker);
