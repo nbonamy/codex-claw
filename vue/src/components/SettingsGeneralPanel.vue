@@ -22,43 +22,6 @@
         </template>
       </FormRow>
       <FormRow
-        v-if="appHostCapabilities.daemonManagement"
-        as="label"
-        :title="$t('surface.settingsGeneralPanel.keepAppReadyInTheBackground')"
-        :description="daemonDescription"
-        :error="daemonStatusError"
-      >
-        <template #control>
-          <span class="settings-general-panel__actions">
-            <span
-              class="settings-general-panel__status"
-              :class="{
-                'settings-general-panel__status--loading': daemonOperation !== null,
-              }"
-            >
-              <span
-                v-if="daemonOperation !== null"
-                class="settings-general-panel__spinner"
-                aria-hidden="true"
-              />
-              <Circle
-                v-else
-                class="settings-general-panel__status-icon"
-                :class="{ 'settings-general-panel__status-icon--ok': daemonEnabled }"
-                aria-hidden="true"
-              />
-              {{ daemonStatusLabel }}
-            </span>
-            <el-switch
-              :model-value="daemonEnabled"
-              :disabled="daemonSwitchDisabled"
-              :aria-label="$t('surface.settingsGeneralPanel.keepAppReadyInTheBackground')"
-              @update:model-value="updateDaemonEnabled"
-            />
-          </span>
-        </template>
-      </FormRow>
-      <FormRow
         as="label"
         :title="$t('surface.settingsGeneralPanel.agentCelebrations')"
         :description="$t('surface.settingsGeneralPanel.letAgentsCelebrateMeaningfulWinsWithVisualEffects')"
@@ -164,6 +127,50 @@
               size="small"
               @click="loadPermissions"
             > {{ $t('surface.settingsGeneralPanel.refresh') }} </el-button>
+          </span>
+        </template>
+      </FormRow>
+    </FormSection>
+
+    <FormSection
+      v-if="appHostCapabilities.daemonManagement"
+      :title="$t('surface.settingsGeneralPanel.advanced')"
+      title-id="settings-general-advanced-title"
+    >
+      <FormRow
+        v-if="appHostCapabilities.daemonManagement"
+        as="label"
+        :title="$t('surface.settingsGeneralPanel.keepAppReadyInTheBackground')"
+        :description="daemonDescription"
+        :error="daemonStatusError"
+      >
+        <template #control>
+          <span class="settings-general-panel__actions">
+            <span
+              class="settings-general-panel__status"
+              :class="{
+                'settings-general-panel__status--loading': daemonOperation !== null,
+              }"
+            >
+              <span
+                v-if="daemonOperation !== null"
+                class="settings-general-panel__spinner"
+                aria-hidden="true"
+              />
+              <Circle
+                v-else
+                class="settings-general-panel__status-icon"
+                :class="{ 'settings-general-panel__status-icon--ok': daemonEnabled }"
+                aria-hidden="true"
+              />
+              {{ daemonStatusLabel }}
+            </span>
+            <el-switch
+              :model-value="daemonEnabled"
+              :disabled="daemonSwitchDisabled"
+              :aria-label="$t('surface.settingsGeneralPanel.keepAppReadyInTheBackground')"
+              @update:model-value="updateDaemonEnabled"
+            />
           </span>
         </template>
       </FormRow>

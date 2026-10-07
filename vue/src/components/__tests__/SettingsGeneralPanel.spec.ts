@@ -61,8 +61,9 @@ describe('SettingsGeneralPanel', () => {
     expect(wrapper.text()).toContain(`Keep ${product.name} ready in the background`);
     expect(wrapper.text()).toContain('Off');
 
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', true);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', true);
     await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(true);
@@ -108,8 +109,9 @@ describe('SettingsGeneralPanel', () => {
 
     await flushPromises();
 
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', false);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', false);
     await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(false);
@@ -133,8 +135,9 @@ describe('SettingsGeneralPanel', () => {
     });
 
     await flushPromises();
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', true);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', true);
     await flushPromises();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(true);
@@ -152,8 +155,9 @@ describe('SettingsGeneralPanel', () => {
     });
 
     await flushPromises();
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', false);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', false);
     await flushPromises();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(false);
@@ -173,7 +177,9 @@ describe('SettingsGeneralPanel', () => {
 
     expect(wrapper.text()).toContain('Unavailable');
     expect(wrapper.text()).toContain('No packaged daemon runtime was found.');
-    expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1].props('disabled')).toBe(true);
+    const advanced = wrapper.findAllComponents({ name: 'FormSection' }).find((section) => section.text().includes('Advanced'))!;
+    expect(advanced.text()).toContain(`Keep ${product.name} ready in the background`);
+    expect(advanced.findComponent({ name: 'ElSwitch' }).props('disabled')).toBe(true);
   });
 
   it('chooses and clears the configured source folder', async () => {

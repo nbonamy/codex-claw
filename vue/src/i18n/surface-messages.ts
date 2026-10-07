@@ -850,6 +850,7 @@ export const surfaceMessages = {
   "settingsGeneralPanel": {
     "general": "General",
     "behavior": "Behavior",
+    "advanced": "Advanced",
     "preventSleepWhileAgentsRun": "Prevent sleep while agents run",
     "keepThisComputerAwakeWhileAnAgentIsActive": "Keep this computer awake while an agent is active",
     "agentCelebrations": "Agent celebrations",
