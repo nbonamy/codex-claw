@@ -270,7 +270,7 @@ function selectTab(tab: SettingsTab): void {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-32) 0;
+  padding: var(--space-32) var(--space-16);
 }
 
 .settings-view__panel {

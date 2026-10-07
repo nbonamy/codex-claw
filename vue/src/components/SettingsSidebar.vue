@@ -142,7 +142,12 @@ function selectTab(tab: string): void {
 }
 
 .settings-sidebar :deep(.el-menu-item.is-active) {
-  color: var(--color-text);
-  background: var(--color-surface-high);
+  color: var(--color-on-primary-container);
+  font-weight: var(--font-weight-semibold);
+  background: var(--color-primary-container);
+}
+
+.settings-sidebar :deep(.el-menu-item.is-active svg) {
+  color: var(--color-primary);
 }
 </style>

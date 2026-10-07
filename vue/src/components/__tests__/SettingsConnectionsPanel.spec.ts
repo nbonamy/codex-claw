@@ -15,6 +15,12 @@ describe('codexPairingUrl', () => {
   });
 });
 
+async function expandAll(wrapper: ReturnType<typeof mount>) {
+  for (const toggle of wrapper.findAll('.settings-connections-panel__identity')) {
+    if (toggle.attributes('aria-expanded') === 'false') await toggle.trigger('click');
+  }
+}
+
 describe('SettingsConnectionsPanel', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -110,6 +116,8 @@ describe('SettingsConnectionsPanel', () => {
 
     expect(wrapper.text()).toContain('devbox');
     expect(wrapper.text()).toContain('nicolas@devbox.internal');
+    expect(wrapper.text()).not.toContain('Ready (daemon 0.1.0)');
+    await expandAll(wrapper);
     expect(wrapper.text()).toContain('Ready (daemon 0.1.0)');
 
     await wrapper.get('[aria-label="Connection settings for devbox"]').trigger('click');
@@ -186,6 +194,9 @@ describe('SettingsConnectionsPanel', () => {
         },
     });
 
+    expect(wrapper.findAll('[aria-label="Upgrade available"]')).toHaveLength(1);
+    expect(wrapper.find('.settings-connections-panel__upgrade').exists()).toBe(false);
+    await expandAll(wrapper);
     const upgrade = wrapper.get('.settings-connections-panel__upgrade');
     expect(upgrade.text()).toBe('Upgrade');
     await upgrade.trigger('click');
@@ -216,6 +227,7 @@ describe('SettingsConnectionsPanel', () => {
       },
     });
 
+    await expandAll(wrapper);
     expect(wrapper.get('.settings-connections-panel__detail').text()).toContain('Claude 2.1.283');
   });
 
@@ -227,6 +239,8 @@ describe('SettingsConnectionsPanel', () => {
     const wrapper = mount(SettingsConnectionsPanel, {
       props: { connections: [ready], settings: { preventSleepWhenRemoteAccessEnabled: true } },
     });
+    expect(wrapper.find('.remote-engine-connections').exists()).toBe(false);
+    await expandAll(wrapper);
     expect(wrapper.find('.remote-engine-connections').exists()).toBe(true);
     await wrapper.setProps({ connections: [{ ...ready, status: 'error' }] });
     expect(wrapper.find('.remote-engine-connections').exists()).toBe(false);

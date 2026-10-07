@@ -96,11 +96,11 @@ describe('AppShell authentication and conversation', () => {
       await flushPromises();
       expect(disconnectProvider).toHaveBeenCalledExactlyOnceWith(backend);
       expect(setProviderEnabled).not.toHaveBeenCalled();
-      expect(wrapper.get('.form-row__error').text()).toBe('Sign-out failed');
+      expect(wrapper.get('.engine-hero__error').text()).toBe('Sign-out failed');
       await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
       await flushPromises();
       expect(disconnectProvider).toHaveBeenCalledTimes(2);
-      expect(wrapper.find('.form-row__error').exists()).toBe(false);
+      expect(wrapper.find('.engine-hero__error').exists()).toBe(false);
       snapshot.providerConnections[0]!.connected = false;
       await wrapper.setProps({ snapshot: { ...snapshot } });
       await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
@@ -424,7 +424,7 @@ describe('AppShell authentication and conversation', () => {
     await flushPromises();
     await wrapper.get('.settings-menu').findAll('[role="menuitem"]').find(item => item.text().startsWith('Settings'))!.trigger('click');
     await wrapper.get('.settings-sidebar').findAll('.el-menu-item').find(item => item.text() === 'Codex')!.trigger('click');
-    expect(wrapper.get('.settings-view .form-row').text()).toContain('cached@example.com');
+    expect(wrapper.get('.settings-view .engine-hero__summary').text()).toContain('cached@example.com');
     expect(getCodexAuthentication).not.toHaveBeenCalled();
   });
 

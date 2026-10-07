@@ -767,15 +767,11 @@ export const surfaceMessages = {
     "shift": "Shift"
   },
   "settingsClaudeCodePanel": {
-    "introTitle": "Use Claude Code as a coding agent",
-    "introDescription": "Connect your account and choose how Claude Code is set up for new agents.",
     "claudeCode": "Claude Code",
     "enableClaudeCodeExperimental": "Enable Claude Code (experimental)",
     "showClaudeCodeAsAnExperimentalOptionWhenCreatingAgents": "Show Claude Code as an experimental option when creating agents."
   },
   "settingsCodexPanel": {
-    "introTitle": "Use Codex as a coding agent",
-    "introDescription": "Connect your account and choose how Codex runs for new agents.",
     "codex": "Codex",
     "chatGPT": "ChatGPT",
     "launchChatGPT": "Launch ChatGPT",
@@ -818,6 +814,7 @@ export const surfaceMessages = {
     "delete": "Delete",
     "sSHSettings": "SSH settings",
     "upgrade": "Upgrade",
+    "upgradeAvailable": "Upgrade available",
     "syncing": "Syncing...",
     "sync": "Sync",
     "ready": "Ready",

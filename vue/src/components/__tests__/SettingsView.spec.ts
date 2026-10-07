@@ -87,7 +87,7 @@ describe('SettingsView', () => {
 
     await wrapper.setProps({ activeTab: 'claude-code' } as never);
 
-    expect(wrapper.text()).toContain('Account');
+    expect(wrapper.get('.engine-hero__copy strong').text()).toBe('Claude Code');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Codex executable');

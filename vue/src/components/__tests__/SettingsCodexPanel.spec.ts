@@ -21,8 +21,9 @@ describe('SettingsCodexPanel', () => {
     expect(wrapper.find('input[aria-label="Share skills and plugins with ChatGPT"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('Codex executable');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
-    const connectionBlock = wrapper.findAll('.form-section')[0]!;
-    expect(connectionBlock.findAll('.form-row__copy strong').map(row => row.text())).toEqual(['Account', 'Location', 'Enable engine']);
+    const hero = wrapper.get('.engine-hero');
+    expect(hero.get('.engine-hero__copy strong').text()).toBe('Codex');
+    expect(hero.findAll('.engine-hero__details .form-row__copy strong').map(row => row.text())).toEqual(['Location', 'Enable engine']);
   });
 
   it('launches ChatGPT and keeps launch failures visible', async () => {

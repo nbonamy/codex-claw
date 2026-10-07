@@ -9,6 +9,9 @@
       class="form-section__header"
     >
       <h3 :id="titleId">{{ title }}</h3>
+      <div v-if="$slots.actions" class="form-section__actions">
+        <slot name="actions" />
+      </div>
     </header>
     <div class="form-section__group">
       <slot />
@@ -34,7 +37,19 @@ defineProps<{
 }
 
 .form-section__header {
+  min-height: var(--space-10);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
   padding: 0 0 var(--space-4);
+}
+
+.form-section__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .form-section__header h3 {
