@@ -24,10 +24,14 @@ exact starting diff; any other pre-existing change blocks the audit. Do not
 stash, discard, stage, commit, or absorb unrelated changes.
 
 Confirm Korus's branch/upstream without pulling or switching branches. Resolve
-`<sdk-version>` from `package-lock.json`'s installed `@codex-app-sdk/backend`
-entry and require every SDK workspace declaration to pin that exact numeric
-version, with all consumed SDK packages in the lockfile resolving to the same
-published version. Resolve `<sdk-head>` with `npm view @codex-app-sdk/backend@<sdk-version>
+`<sdk-version>` from the backend workspace's SDK dependency and its matching
+`package-lock.json` entry. npm may install packages under a workspace's
+`node_modules` or hoist them to the root; follow resolution from each consuming
+workspace rather than requiring a root entry. Require every SDK declaration
+to pin that exact numeric version and all SDK lockfile entries, including
+nested/transitive copies, to resolve to the same published version with registry
+tarball URLs and integrity hashes. Apply the same lookup to the baseline lockfile.
+Resolve `<sdk-head>` with `npm view @codex-app-sdk/backend@<sdk-version>
 gitHead --registry=https://registry.npmjs.org`. Require a full commit SHA.
 The audit ends at that published commit, even if the sibling checkout is newer.
 Use the sibling repository as a read-only Git object database if available;
