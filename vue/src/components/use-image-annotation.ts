@@ -182,6 +182,7 @@ export function useImageAnnotation(options: {
         annotations: draft.annotations,
         fileName: attachment.name,
         imageNumber: number,
+        pixelRatio: draft.pixelRatio,
       })), prompt), promptOptions(nextOptions));
     } catch (error) {
       draftsByAgentId[agentId] = savedDrafts;

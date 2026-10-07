@@ -35,6 +35,7 @@ export type ImageAnnotationPromptGroup = {
   annotations: readonly ImageAnnotation[];
   fileName: string;
   imageNumber: number;
+  pixelRatio?: number;
 };
 
 export type ImageAnnotationPalette = {
@@ -59,11 +60,19 @@ export function formatImageAnnotationPrompt(
     '',
     ...groups.flatMap((group, index) => [
       `Image ${group.imageNumber} — ${group.fileName}`,
-      ...group.annotations.map((annotation) => `${annotation.number}. ${annotation.comment.trim()}`),
+      ...group.annotations.map((annotation) => `${annotation.number}. ${annotationPromptText(annotation, group.pixelRatio)}`),
       ...(index === groups.length - 1 ? [] : ['']),
     ]),
   ].join('\n');
   return [prompt, annotationText].filter(Boolean).join('\n\n');
+}
+
+/** A measurement needs no comment: its length is the instruction. */
+function annotationPromptText(annotation: ImageAnnotation, pixelRatio?: number): string {
+  const comment = annotation.comment.trim();
+  const length = annotationPixelLength(annotation, pixelRatio);
+  if (comment || length === null) return comment;
+  return `${annotation.tool === 'measure-horizontal' ? 'Horizontal' : 'Vertical'} gap: ${length}px`;
 }
 
 export const defaultImageAnnotationPalette: ImageAnnotationPalette = {

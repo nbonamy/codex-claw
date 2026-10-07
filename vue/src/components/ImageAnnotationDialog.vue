@@ -138,6 +138,7 @@
               :description="activeComment.description"
               :initial-value="activeComment.initialValue"
               :label="$t('surface.imageAnnotationDialog.imageAnnotationComment')"
+              :optional="activeComment.optional"
               :placement="activeComment.placement"
               :placeholder="$t('surface.imageAnnotationDialog.whatShouldChange')"
               strategy="fixed"
@@ -162,7 +163,7 @@
                 <span class="image-annotation-dialog__comment-number">{{ annotation.number }}</span>
                 <span>
                   <strong>{{ toolLabel(annotation.tool) }}</strong>
-                  <small>{{ annotation.comment || $t('surface.imageAnnotationDialog.addAComment') }}</small>
+                  <small>{{ annotation.comment || annotationLength(annotation) || $t('surface.imageAnnotationDialog.addAComment') }}</small>
                 </span>
               </button>
               <button
@@ -295,6 +296,7 @@ const activeComment = ref<{
   description: string;
   initialValue: string;
   isNew: boolean;
+  optional: boolean;
   placement: 'above' | 'below';
 } | null>(null);
 let annotationId = 0;
@@ -724,6 +726,7 @@ function openComment(annotation: ImageAnnotation, isNew = false): void {
     description: annotationDescription(annotation),
     initialValue: annotation.comment,
     isNew,
+    optional: isMeasurementTool(annotation.tool),
     placement: annotationAnchor(annotation).y > canvasSize.value.height * 0.6 ? 'above' : 'below',
   };
 }
@@ -777,6 +780,11 @@ function annotationDescription(annotation: ImageAnnotation): string {
   return measurement === null
     ? `${toolLabel(annotation.tool)} annotation ${annotation.number}`
     : `${toolLabel(annotation.tool)} annotation ${annotation.number}: ${measurement}px`;
+}
+
+function annotationLength(annotation: ImageAnnotation): string {
+  const length = annotationPixelLength(annotation, pixelRatio.value);
+  return length === null ? '' : `${length}px`;
 }
 
 function removeAnnotation(annotationIdToRemove: string): void {

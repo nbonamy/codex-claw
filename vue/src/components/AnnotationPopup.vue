@@ -72,6 +72,8 @@ const props = withDefaults(defineProps<{
   description?: string;
   initialValue?: string;
   label?: string;
+  /** The host accepts an empty comment (for example a measurement that speaks for itself). */
+  optional?: boolean;
   placement?: 'above' | 'below';
   placeholder?: string;
   strategy?: 'absolute' | 'fixed';
@@ -81,6 +83,7 @@ const props = withDefaults(defineProps<{
   description: '',
   commandEnterSubmit: false,
   initialValue: '',
+  optional: false,
   label: translate('surface.annotationPopup.annotationComment'),
   placement: 'below',
   placeholder: translate('surface.annotationPopup.enterComment'),
@@ -117,7 +120,7 @@ const voiceTranscribing = computed(() => voiceController.isTranscribing.value);
 const submitDisabled = computed(() => (
   voiceTranscribing.value
   || voiceSubmitPending.value
-  || (!voiceRecording.value && !draft.value.trim())
+  || (!props.optional && !voiceRecording.value && !draft.value.trim())
 ));
 const positionStyle = computed(() => {
   const popupWidth = props.width ?? 320;
@@ -202,7 +205,7 @@ async function submit(eventName: 'command-submit' | 'submit' = 'submit'): Promis
   }
 
   const comment = draft.value.trim();
-  if (!comment) {
+  if (!comment && !props.optional) {
     input.value?.focus();
     return;
   }
