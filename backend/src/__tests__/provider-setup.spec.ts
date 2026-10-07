@@ -52,8 +52,8 @@ function addRosterLinks(snapshot: import('@workspace/core/contracts').AppSnapsho
     activeAgentId: removedId, activeAgentByTeam: { 'team-test': removedId }, agentOrderByTeam: { 'team-test': [removedId, survivingId] },
     externalApplications: { [removedId]: 'vscode' }, general: { savedPromptDrafts: [{ id: 'draft', agentId: removedId, text: 'draft', createdAt: 1 }] },
   } };
-  snapshot.automations = [{ id: 'automation-test', name: 'Issues',  enabled: false, prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-test', backend: 'claude' },  schedule: { intervalMinutes: 60 }, createdAt: 'now', updatedAt: 'now', executionLog: [{
-    id: 'execution-test', automationId: 'automation-test', startedAt: 'now', status: 'completed',
+  snapshot.automations = [{ id: 'automation-test', name: 'Issues',  enabled: true, prompt: 'Check tasks', target: { kind: 'agent' as const, agentId: removedId },  schedule: { intervalMinutes: 60 }, createdAt: 'now', updatedAt: 'now', executionLog: [{
+    id: 'execution-test', automationId: 'automation-test', startedAt: 'now', status: 'working',
     agentId: removedId, agentName: 'Old agent',
   }] }];
   const mission = createMission(snapshot, { outcome: 'Ship a feature', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: survivingId });

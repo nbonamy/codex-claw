@@ -299,6 +299,30 @@ describe('ImageAnnotationDialog', () => {
     expect(context.fillText).toHaveBeenCalledWith('398px', 429, 296);
   });
 
+  it('saves a measurement without a comment and lists its length, while other tools still need a comment', async () => {
+    const wrapper = await mountDialog();
+    const canvas = annotationCanvas(wrapper);
+    await wrapper.get('[aria-label="Measure horizontal gap"]').trigger('click');
+    dispatchPointer(canvas, 'pointermove', 200, 100);
+    dispatchPointer(canvas, 'pointerdown', 200, 100);
+    dispatchPointer(canvas, 'pointerup', 200, 100);
+    await nextTick();
+    await nextTick();
+    expect(wrapper.get('.annotation-popup button[type="submit"]').attributes('disabled')).toBeUndefined();
+    await wrapper.get('form.annotation-popup').trigger('submit');
+    await nextTick();
+    expect(wrapper.find('form.annotation-popup').exists()).toBe(false);
+    expect(wrapper.get('.image-annotation-dialog__comment small').text()).toBe('798px');
+
+    await wrapper.get('[aria-label="Arrow"]').trigger('click');
+    dispatchPointer(canvas, 'pointerdown', 30, 30);
+    dispatchPointer(canvas, 'pointermove', 180, 90);
+    dispatchPointer(canvas, 'pointerup', 180, 90);
+    await nextTick();
+    await nextTick();
+    expect(wrapper.get('.annotation-popup button[type="submit"]').attributes('disabled')).toBeDefined();
+  });
+
   it('reports logical dimensions and gaps in Retina mode', async () => {
     const wrapper = await mountDialog();
     const canvas = annotationCanvas(wrapper);

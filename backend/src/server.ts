@@ -10,7 +10,7 @@ import { isProviderConnection, type ProviderAuthentication } from '@workspace/co
 import { MissionExecutionService } from './mission-execution-service';
 import { applyMissionDebugFixture } from './mission-debug-fixtures';
 import { createVisualizeDebugFixture } from './visualize-debug-fixtures';
-import { FileMissionSkillStore } from './mission-skill-store';
+import { missionStageSkills } from './bundled-skills/catalog';
 import { featureStages, type DeleteMissionInput, type Mission, type MissionReviewDebugState, type MissionStage } from '@workspace/core/missions';
 import type { MissionExecutionInput, MissionResultInput } from '@workspace/core/mission-execution';
 import { MissionService } from './mission-service';
@@ -300,7 +300,6 @@ export class AppBackendServer {
       await rm(await ensureMissionHome(missionId), { recursive: true, force: true });
     });
     this.missionArtifacts = options.missionArtifactStore ?? new FileMissionArtifactStore(ensureMissionHome);
-    const missionSkills = new FileMissionSkillStore(ensureMissionHome);
     this.missionExecution = new MissionExecutionService({
       getHead: readWorktreeHead,
       snapshot: this.snapshot,
@@ -322,7 +321,7 @@ export class AppBackendServer {
         if (identity.kind !== 'git') throw new Error('Choose a Git repository.');
       },
       createWorktree: input => this.requireDriverRpc().handle(backendMethods.sourceWorktreeCreate, { input }) as Promise<SourceWorktree>,
-      ensureStageSkills: (missionId, stage) => missionSkills.ensure(missionId, stage),
+      ensureStageSkills: async (_missionId, stage) => missionStageSkills(stage),
       refreshWorkspace: async agentId => { await this.agentWorkspaces.refreshIdentity(agentId); },
       refreshConversationContext: async agent => {
         await this.requireDriverRpc().refreshConversationContext(agent);

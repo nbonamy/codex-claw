@@ -35,6 +35,7 @@ describe('agent Git IPC', () => {
     [ipcChannels.stageAgentGitFiles, backendMethods.agentGitStage, [{ paths: ['file.ts'], confirmed: true }], { repository: 'repo' }],
     [ipcChannels.commitAgentGitChanges, backendMethods.agentGitCommit, [{ message: 'Subject', confirmed: true }], { repository: 'repo' }],
     [ipcChannels.pushAgentGitBranch, backendMethods.agentGitPush, [{ confirmed: true }], { repository: 'repo' }],
+    [ipcChannels.pullAgentGitBranch, backendMethods.agentGitPull, [{ confirmed: true }], { upstream: 'origin/feature', branch: 'feature', conflicts: [], workflow: { repository: 'repo' } }],
     [ipcChannels.createAgentGitBranch, backendMethods.agentGitBranchCreate, [{ name: 'feat/test', confirmed: true }], { repository: 'repo' }],
     [ipcChannels.createAgentGitPullRequest, backendMethods.agentGitPullRequestCreate, [{ title: 'Title', body: 'Body', confirmed: true }], { repository: 'repo' }],
     [ipcChannels.mergeAgentGitBranch, backendMethods.agentGitMerge, [{ strategy: 'merge', deleteBranch: false, deleteWorktree: false, confirmed: true }], { repository: 'repo' }],

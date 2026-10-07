@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const backendBundle = path.join(rootDir, 'backend/dist/daemon.mjs');
@@ -16,6 +18,9 @@ if (process.argv.includes('--help')) {
   console.log('Builds daemon once, watches backend output, then starts Electron without restarting daemon on bundle changes.');
   process.exit(0);
 }
+
+dotenv.config({ path: path.join(rootDir, '.env'), quiet: true });
+const sdkAssets = sdkAssetsPath();
 
 await run('npm', ['run', 'build:codex']);
 await run('npm', ['run', 'build:computer-use']);
@@ -40,9 +45,25 @@ const electronDev = start('npm', ['run', 'start:electron'], {
     APP_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
     APP_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex',
       ...(process.platform === 'win32' ? ['bin', 'codex.exe'] : ['codex'])),
-    CODEX_APP_SDK_ASSETS_PATH: path.join(rootDir, 'node_modules', '@codex-app-sdk', 'backend', 'assets'),
+    CODEX_APP_SDK_ASSETS_PATH: sdkAssets,
   },
 });
+
+function sdkAssetsPath() {
+  if (process.env.CODEX_APP_SDK_SOURCE === '1') {
+    // Match the sibling checkout used by vite.sdk-aliases.ts.
+    return path.resolve(rootDir, '../codex-app-sdk/packages/backend/assets');
+  }
+  // SDK exports do not expose assets/package.json. Follow the backend
+  // workspace's Node search order, supporting both nested and hoisted installs.
+  const require = createRequire(path.join(rootDir, 'backend/package.json'));
+  const packageName = '@codex-app-sdk/backend';
+  const packageRoot = (require.resolve.paths(packageName) ?? [])
+    .map((directory) => path.join(directory, packageName))
+    .find((directory) => existsSync(path.join(directory, 'package.json')));
+  if (!packageRoot) throw new Error(`Required dependency is missing: ${packageName}`);
+  return path.join(packageRoot, 'assets');
+}
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {

@@ -90,6 +90,11 @@ export function resetProviderRoster(snapshot: AppSnapshot, ids: string[]): () =>
     for (const automation of snapshot.automations) {
       const previous = before.automations.find(item => item.id === automation.id);
       automation.executionLog = restoreRemovedItems(automation.executionLog, previous?.executionLog ?? [], run => run.id, run => removed.has(run.agentId ?? ''));
+      // Removing agents disables their schedules and fails their runs; undo that too.
+      if (previous && ((previous.target.kind !== 'newQuickChat' && removed.has(previous.target.agentId)) || previous.executionLog.some(run => removed.has(run.agentId ?? '')))) {
+        Object.assign(automation, { enabled: previous.enabled, updatedAt: previous.updatedAt });
+        if (previous.lastError === undefined) delete automation.lastError; else automation.lastError = previous.lastError;
+      }
     }
     for (const mission of snapshot.missions ?? []) {
       const previous = before.missions?.find(item => item.id === mission.id);

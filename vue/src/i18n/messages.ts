@@ -13,7 +13,7 @@ export const messages = {
       promptPlaceholder: 'What should happen each time this runs?',
       model: 'Model', effort: 'Reasoning effort', defaultModel: 'Default model', defaultEffort: 'Default effort',
       inheritsSettings: 'Uses this conversation’s context, model, and permissions.',
-      missingTarget: 'Target unavailable', needsInput: 'Needs input',
+      missingTarget: 'Target unavailable', invalidTarget: 'This chat no longer exists. Edit the automation to choose another.', needsInput: 'Needs input',
       modelsUnavailable: 'Could not load models. Use the default or enter a model ID.',
       conversationTitle: 'Conversation',
     },
@@ -110,7 +110,7 @@ export const messages = {
       runStatus: { preparing: 'Preparing workspace', running: 'Stage in progress', awaitingReview: 'Awaiting your review', accepted: 'Accepted', cancelled: 'Stopped', failed: 'Failed' },
       new: 'New mission', title: 'Missions',
       actions: 'Mission actions', deleteMission: 'Delete {mission}', deleteTitle: 'Delete {mission}?', deleteAction: 'Delete mission',
-      deleteDescription: 'The mission, conversations, artifacts, and generated skills will be deleted.',
+      deleteDescription: 'The mission, conversations, and artifacts will be deleted.',
       deleteWorktreeChoice: 'This mission created {count} worktree. Keep it for later, or delete it with its local branch. Deleting it discards any uncommitted changes.',
       deleteWorktreesChoice: 'This mission created {count} worktrees. Keep them for later, or delete them with their local branches. Deleting them discards any uncommitted changes.',
       createdWorktrees: 'Mission worktrees', keepWorktrees: 'Keep worktrees', deleteMissionAndWorktrees: 'Delete mission and worktrees',
@@ -233,6 +233,7 @@ export const messages = {
       },
       automations: {
         deleteExecution: 'Delete execution for {ticket}',
+        enable: 'Enable {automation}',
         everyHours: 'Every {count} hours',
         everyDays: 'Every {count} days',
         everyMinutes: 'Every {count} minutes',
@@ -1015,6 +1016,11 @@ export const messages = {
               completed: 'Loaded Computer Use guide',
               failed: 'Failed loading Computer Use guide',
               running: 'Loading Computer Use guide',
+            },
+            readSkill: {
+              completed: 'Loaded skill {target}',
+              failed: 'Could not load skill {target}',
+              running: 'Loading skill {target}',
             },
             computerUseLaunchApp: {
               completed: 'Launched {target}',

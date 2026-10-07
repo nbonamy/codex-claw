@@ -1,5 +1,9 @@
 <template>
   <section class="cockpit-view" :aria-label="$t('surface.cockpitView.backlog')">
+    <WorkspaceHeader class="cockpit-view__app-header" sidebar-collapsed>
+      <h1 class="workspace-header__title">{{ $t('surface.cockpitView.backlog') }}</h1>
+    </WorkspaceHeader>
+    <div class="cockpit-view__body">
     <aside class="cockpit-view__navigation" :aria-label="$t('surface.cockpitView.backlogNavigation')">
       <nav>
         <BacklogSourceSelector class="cockpit-view__provider" size="small" full-width :provider="workProvider ?? 'github'" :providers="workProviders ?? []" :show-source="false" @select-provider="emit('select-work-provider', $event)" />
@@ -68,9 +72,8 @@
     </aside>
 
     <div class="cockpit-view__workspace">
-      <header class="cockpit-view__header">
+      <header v-if="workBacklog" class="cockpit-view__header">
         <div class="cockpit-view__frame">
-          <h1>{{ $t('surface.cockpitView.backlog') }}</h1>
           <div v-if="workBacklog" class="cockpit-view__summary" :aria-label="$t('surface.cockpitView.workSummaryFilters')">
             <button
               v-for="metric in summaryMetrics"
@@ -127,6 +130,7 @@
 
       <div v-else class="cockpit-view__empty"> {{ $t('surface.cockpitView.connectAWorkProviderToBuildYourOperatorInbox') }} </div>
     </div>
+    </div>
   </section>
 </template>
 
@@ -140,6 +144,7 @@ import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { ExternalLinkIcon } from '../shared/icons/app-icons';
 import CockpitWorkInbox from './CockpitWorkInbox.vue';
 import BacklogSourceSelector from './BacklogSourceSelector.vue';
+import WorkspaceHeader from '../shared/WorkspaceHeader.vue';
 
 type CockpitWorkBacklog = {
   assignments: Record<string, WorkBacklogAssignment>;
@@ -272,8 +277,21 @@ function selectWorkView(view: InboxView): void {
   flex: 1 1 auto;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
   color: var(--color-text);
   background: var(--color-shell-main);
+}
+
+.cockpit-view__app-header {
+  padding-inline: var(--space-20);
+  font-size: var(--font-size-16);
+}
+
+.cockpit-view__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cockpit-view__navigation {
@@ -283,7 +301,7 @@ function selectWorkView(view: InboxView): void {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: var(--space-24) var(--space-12) var(--space-16);
+  padding: var(--space-8) var(--space-12) var(--space-16);
   border-right: 1px solid var(--color-border);
   background: var(--color-shell-sidebar);
 }
@@ -503,7 +521,6 @@ function selectWorkView(view: InboxView): void {
 .cockpit-view__header {
   box-sizing: border-box;
   display: flex;
-  min-height: 168px;
   padding: var(--space-8) var(--space-16);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
@@ -513,14 +530,6 @@ function selectWorkView(view: InboxView): void {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-}
-
-.cockpit-view__header h1 {
-  margin: 0;
-  font-size: var(--font-size-28);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-32);
-  letter-spacing: -0.02em;
 }
 
 .cockpit-view__empty {

@@ -71,6 +71,34 @@ async function setup(parentBackend: 'codex' | 'claude') {
 }
 
 describe('durable tasks through authenticated MCP and real provider adapters', () => {
+  it.each([
+    { durable: false, parent: 'codex', permissionMode: 'auto' },
+    { durable: true, parent: 'codex', permissionMode: 'auto' },
+    { durable: true, parent: 'claude', permissionMode: 'default' },
+  ] as const)('applies saved $permissionMode permissions and the explicit model before startup ($parent parent, durable: $durable)', async ({ durable, parent, permissionMode }) => {
+    const f = await setup(parent);
+    f.snapshot.general.providerApprovalDefaults = { claude: permissionMode };
+    f.snapshot.general.providerModelDefaults = { claude: { model: 'opus', reasoningEffort: 'low', serviceTier: null } };
+    f.parent.backendDefaults = parent === 'codex'
+      ? { kind: 'codex', model: 'codex-parent-model', reasoningEffort: 'max' }
+      : { kind: 'claude', model: 'opus', reasoningEffort: 'max', permissionMode: 'bypassPermissions' };
+    const creating = f.call(f.parent.id, 'create-agent', {
+      repoPath: '/repo', backend: 'claude', prompt: 'Perform the assignment',
+      model: 'claude-sonnet-5-5', reasoningEffort: 'high',
+      ...(durable ? { requestId: 'configured-worker', task: { title: 'Configured worker', doneWhen: 'Verified' } } : {}),
+    });
+    await vi.waitFor(() => expect(f.claudeSdk.inputs).toHaveLength(1));
+    f.claudeSdk.emit({ type: 'system', subtype: 'init', session_id: 'claude-worker', model: 'claude-sonnet-5-5' });
+    const created = await creating;
+    expect(created.isError).toBe(false);
+    expect(f.claudeSdk.options[0]).toMatchObject({ model: 'claude-sonnet-5-5', effort: 'high', permissionMode });
+    const worker = f.snapshot.agents.find(agent => agent.id === created.structuredContent.agentId)!;
+    expect(worker.backendDefaults).toStrictEqual({
+      kind: 'claude', model: 'claude-sonnet-5-5', reasoningEffort: 'high', userSelectedModel: true, permissionMode,
+    });
+    if (durable) expect((await f.store.load()).agents.find(agent => agent.id === worker.id)?.backendDefaults).toStrictEqual(worker.backendDefaults);
+  });
+
   it('honors Stop while automatic parent delivery is awaiting a turn identity', async () => {
     const f = await setup('codex');
     const created = await f.call(f.parent.id, 'create-agent', { repoPath: '/repo', backend: 'codex', prompt: 'Perform the assignment', requestId: 'stopped-delivery', task: { title: 'Assignment', doneWhen: 'Verified' } });

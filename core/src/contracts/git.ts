@@ -135,6 +135,14 @@ export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?:
 
 export type AgentGitUpdateFromBaseInput = { confirmed: boolean; allowDirty?: boolean };
 
+export type AgentGitPullInput = { confirmed: boolean; allowDirty?: boolean };
+export type AgentGitPullResult = {
+  workflow: AgentGitWorkflow;
+  upstream: string;
+  branch: string;
+  conflicts: string[];
+};
+
 export type AgentGitUpdateFromBaseResult = {
   workflow: AgentGitWorkflow;
   baseBranch: string;

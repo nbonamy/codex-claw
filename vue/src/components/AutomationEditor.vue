@@ -70,6 +70,7 @@
           </template>
         </SettingsRow>
       </SettingsSection>
+      <p v-if="targetRemoved" class="automation-editor__notice" role="alert">{{ $t('promptAutomation.invalidTarget') }}</p>
       <p v-if="error" class="automation-editor__notice" role="alert">{{ error }}</p>
     </div>
     <footer class="automation-editor__footer">
@@ -103,12 +104,15 @@ const form = reactive({
   kind: target?.kind ?? 'newQuickChat' as AutomationTarget['kind'],
   teamId: target?.kind === 'newQuickChat' ? target.teamId
     : props.agents.find(agent => target && agent.id === target.agentId)?.teamId ?? props.teams[0]?.id ?? '',
-  agentId: target && target.kind !== 'newQuickChat' ? target.agentId : '',
+  agentId: target && target.kind !== 'newQuickChat' && props.agents.some(agent => agent.id === target.agentId) ? target.agentId : '',
   backend: (target?.kind === 'newQuickChat' ? target.backend : undefined) as AgentBackend | undefined,
   model: target?.kind === 'newQuickChat' ? target.model ?? '' : '',
   reasoningEffort: target?.kind === 'newQuickChat' ? target.reasoningEffort ?? '' : '',
 });
 const schedule = ref<AutomationSchedule>(props.automation?.schedule ?? { rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0;BYSECOND=0', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+// The saved conversation was removed; keep saving blocked until the user picks another.
+const targetRemoved = computed(() => Boolean(target && target.kind !== 'newQuickChat' && form.kind === target.kind && !form.agentId
+  && !props.agents.some(agent => agent.id === target.agentId)));
 const promptBusy = ref(false);
 const models = ref<BackendModelOption[]>([]);
 const modelsLoading = ref(false);

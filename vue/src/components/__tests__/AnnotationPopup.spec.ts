@@ -86,6 +86,16 @@ describe('AnnotationPopup', () => {
     expect(wrapper.emitted('submit')).toStrictEqual([['Make this clearer.']]);
   });
 
+  it('accepts an empty comment only when the host marks the comment optional', async () => {
+    const popup = (optional?: boolean) => mount(AnnotationPopup, { props: { anchor: { x: 0, y: 0, width: 0, height: 0 }, ...(optional ? { optional } : {}) } });
+    const required = popup();
+    expect(required.get('button[type="submit"]').attributes('disabled')).toBeDefined();
+    const optionalPopup = popup(true);
+    expect(optionalPopup.get('button[type="submit"]').attributes('disabled')).toBeUndefined();
+    await optionalPopup.get('form').trigger('submit');
+    expect(optionalPopup.emitted('submit')).toStrictEqual([['']]);
+  });
+
   it('keeps empty input open and emits cancel on Escape', async () => {
     const wrapper = mount(AnnotationPopup, {
       props: { anchor: { x: 0, y: 0, width: 0, height: 0 } },

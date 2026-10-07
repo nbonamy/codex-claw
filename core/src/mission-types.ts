@@ -42,7 +42,8 @@ export type MissionRun = {
   ticketIndex?: number;
   repositoryPath?: string;
   status: 'preparing' | 'running' | 'awaitingReview' | 'accepted' | 'cancelled' | 'failed';
-  skills: { name: string; path: string }[];
+  // Paths are retained only when reading older saved runs; skills load by name over MCP.
+  skills: { name: string; path?: string }[];
   feedback: string;
   startedAt: string;
   finishedAt?: string;

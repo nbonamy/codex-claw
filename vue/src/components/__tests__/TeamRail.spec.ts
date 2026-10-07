@@ -44,6 +44,18 @@ const remoteConnection: RemoteConnection = {
 };
 
 describe('TeamRail', () => {
+  it('matches the selection ring to the selected team color', async () => {
+    const wrapper = mountRail({ teams, activeTeamId: 'team-app' });
+    expect(getComputedStyle(wrapper.get(`[aria-label="${product.name}"]`).element).outlineColor)
+      .toBe('rgb(27, 79, 178)');
+
+    await wrapper.setProps({ activeTeamId: 'team-sk' });
+    expect(getComputedStyle(wrapper.get('[aria-label="Skwad"]').element).outlineColor)
+      .toBe('rgb(70, 168, 87)');
+    expect(getComputedStyle(wrapper.get(`[aria-label="${product.name}"]`).element).outline)
+      .toBe('');
+  });
+
   it('renders teams and marks the active team', () => {
     const wrapper = mountRail({
       teams,
@@ -53,7 +65,13 @@ describe('TeamRail', () => {
     expect(wrapper.get('[aria-label="Cockpit"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Backlog"]').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[aria-label="Skwad"]').text()).toBe('SK');
-    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
+    const brandedTeam = wrapper.get(`[aria-label="${product.name}"]`);
+    expect(brandedTeam.text()).toBe('');
+    expect(brandedTeam.get('svg').attributes('fill')).toBe('currentColor');
+    expect(brandedTeam.get('svg').attributes('aria-hidden')).toBe('true');
+    const markStyle = getComputedStyle(brandedTeam.get('svg').element);
+    expect(markStyle.width).toBe('var(--icon-md)');
+    expect(markStyle.height).toBe('var(--icon-md)');
     expect(wrapper.get(`[aria-label="${product.name}"]`).attributes('aria-pressed')).toBe('true');
     expect(wrapper.get('[aria-label="Skwad"]').attributes('aria-pressed')).toBe('false');
     expect((wrapper.get('[aria-label="Skwad"]').element as HTMLButtonElement).style.backgroundColor).toBe('rgb(70, 168, 87)');
@@ -81,6 +99,8 @@ describe('TeamRail', () => {
 
     expect(expanded.classes()).toContain('team-rail--agent-sidebar-expanded');
     expect(collapsed.classes()).not.toContain('team-rail--agent-sidebar-expanded');
+    expect(getComputedStyle(expanded.get('.team-rail__header').element).background).toBe('var(--color-shell-rail)');
+    expect(getComputedStyle(collapsed.get('.team-rail__header').element).background).toBe('var(--color-shell-collapsed-header)');
   });
 
   it('shows a corner indicator on teams containing unread agents', () => {
@@ -123,11 +143,21 @@ describe('TeamRail', () => {
 
   it('falls back to team initials when no avatar is set', () => {
     const wrapper = mountRail({
-      teams: [teams[1]],
+      teams: [{ ...teams[1], name: 'Research' }],
       activeTeamId: null,
     });
 
-    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe(product.name.slice(0, 2).toUpperCase());
+    expect(wrapper.get('[aria-label="Research"]').text()).toBe('RE');
+  });
+
+  it('switches between the product mark and the saved avatar when a team is renamed', async () => {
+    const team = { ...teams[0], name: product.name };
+    const wrapper = mountRail({ teams: [team], activeTeamId: team.id });
+    expect(wrapper.get(`[aria-label="${product.name}"]`).find('svg').exists()).toBe(true);
+    expect(wrapper.get(`[aria-label="${product.name}"]`).text()).toBe('');
+    await wrapper.setProps({ teams: [{ ...team, name: 'Research' }] });
+    expect(wrapper.get('[aria-label="Research"]').find('svg').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Research"]').text()).toBe('SK');
   });
 
   it('falls back to the default team color when none is set', () => {
@@ -189,35 +219,30 @@ describe('TeamRail', () => {
     expect(wrapper.emitted('select-backlog')).toStrictEqual([[]]);
   });
 
-  it('refreshes the cockpit icon from team colors', async () => {
-    const wrapper = mountRail({
-      teams: [teams[0]],
-      activeTeamId: 'team-sk',
-    });
-
-    expect(cockpitSquareBackgrounds(wrapper)).toStrictEqual([
-      'rgb(70, 168, 87)',
-      'transparent',
-      'transparent',
-      'transparent',
-    ]);
-
-    await (wrapper as unknown as { setProps: (props: { teams: Team[] }) => Promise<void> }).setProps({
-      teams: [
-        {
-          ...teams[0],
-          color: '#0093FF',
-        },
-        teams[1],
-      ],
-    });
-
-    expect(cockpitSquareBackgrounds(wrapper)).toStrictEqual([
-      'rgb(0, 147, 255)',
-      'rgb(27, 79, 178)',
-      'transparent',
-      'transparent',
-    ]);
+  it('keeps navigation borderless until selected and matches all active navigation to the add-team surface', async () => {
+    const wrapper = mountRail({ teams, activeTeamId: 'team-sk' });
+    const cockpit = wrapper.get('[aria-label="Cockpit"]');
+    const add = wrapper.get('[aria-label="Create team"]');
+    expect(cockpit.get('svg').attributes('stroke')).toBe('currentColor');
+    expect(wrapper.find('[role="separator"]').exists()).toBe(false);
+    const navigation = [
+      ['cockpitActive', 'Cockpit'], ['backlogActive', 'Backlog'],
+      ['automationsActive', 'Automations'], ['settingsActive', 'Settings menu'],
+    ] as const;
+    for (const [, label] of navigation) {
+      const style = getComputedStyle(wrapper.get(`[aria-label="${label}"]`).element);
+      expect(style.borderTopWidth).toBe('0px');
+      expect(style.opacity).toBe('0.6');
+      expect(style.padding).toBe('0px');
+    }
+    for (const [mode, label] of navigation) {
+      await wrapper.setProps({ cockpitActive: false, backlogActive: false, automationsActive: false, settingsActive: false, [mode]: true });
+      const active = wrapper.get(`[aria-label="${label}"]`);
+      const style = getComputedStyle(active.element);
+      expect(style.background).toBe(getComputedStyle(add.element).background);
+      expect(style.borderRadius).toBe(getComputedStyle(add.element).borderRadius);
+      expect(style.opacity).toBe('1');
+    }
   });
 
   it('emits automations selection and marks it active', async () => {
@@ -263,11 +288,18 @@ describe('TeamRail', () => {
     expect(mute.element.compareDocumentPosition(automations.element) & Node.DOCUMENT_POSITION_FOLLOWING)
       .not.toBe(0);
     expect(mute.attributes('aria-pressed')).toBe('false');
-    await mute.trigger('click');
-    expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
-
+    const unmutedStyle = getComputedStyle(mute.element);
+    expect(unmutedStyle.opacity).toBe('0.6');
+    expect(unmutedStyle.borderTopWidth).toBe('0px');
     await wrapper.setProps({ spokenAnnouncementsMuted: true });
     expect(wrapper.get('[aria-label="Unmute spoken acknowledgments (⇧⌘M)"]').attributes('aria-pressed')).toBe('true');
+    const mutedStyle = getComputedStyle(mute.element);
+    expect(mutedStyle.opacity).toBe(unmutedStyle.opacity);
+    expect(mutedStyle.color).toBe(unmutedStyle.color);
+    expect(mutedStyle.background).toBe(unmutedStyle.background);
+    expect(mutedStyle.borderTopWidth).toBe('0px');
+    await mute.trigger('click');
+    expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
   });
 
   it('hides global speech mute when spoken acknowledgments are disabled', () => {
@@ -622,10 +654,4 @@ function mockRect(element: Element, rect: { top: number; height: number }): void
     y: rect.top,
     toJSON: () => undefined,
   });
-}
-
-function cockpitSquareBackgrounds(wrapper: ReturnType<typeof mountRail>): string[] {
-  return wrapper
-    .findAll('.cockpit-icon__square')
-    .map((square) => (square.element as HTMLElement).style.backgroundColor);
 }

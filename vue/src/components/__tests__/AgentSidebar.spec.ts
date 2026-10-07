@@ -10,6 +10,31 @@ import type { Agent, AgentBackend } from '@workspace/core/contracts';
 import { agents } from './agent-sidebar-test-harness';
 
 describe('AgentSidebar sessions', () => {
+  it('does not stack an extra header background over the sidebar tint', () => {
+    const wrapper = mount(AgentSidebar, {
+      attachTo: document.body,
+      props: { agents: [], activeAgentId: null, teamName: 'Team' },
+    });
+    expect(getComputedStyle(wrapper.get('header').element).background).toBe('rgba(0, 0, 0, 0)');
+    wrapper.unmount();
+  });
+
+  it('hides idle dots at rest without hiding unread or working indicators', async () => {
+    const idle: Agent = { ...agents[0]!, status: { type: 'idle' } };
+    const wrapper = mount(AgentSidebar, {
+      attachTo: document.body,
+      props: { agents: [idle], activeAgentId: idle.id, teamName: 'Team' },
+    });
+    const dot = () => wrapper.get('.agent-sidebar__status').element;
+    expect(getComputedStyle(dot()).visibility).toBe('hidden');
+
+    await wrapper.setProps({ activeAgentId: null, unreadAgentIds: [idle.id] });
+    expect(getComputedStyle(dot()).visibility).toBe('visible');
+    await wrapper.setProps({ unreadAgentIds: [], agents: [{ ...idle, status: { type: 'working' } }] });
+    expect(getComputedStyle(dot()).visibility).toBe('visible');
+    wrapper.unmount();
+  });
+
   it('clips long repository text inside its label without clipping the icon or actions', () => {
     const source = agents[0]!;
     const name = 'a-very-long-project-name-that-does-not-fit-in-the-sidebar';
@@ -96,7 +121,7 @@ describe('AgentSidebar sessions', () => {
     expect(row.find('[aria-label="Working"]').exists()).toBe(true);
   });
 
-  it('renders repository headers, branch sessions, statuses, and active selection', () => {
+  it('renders the selected team name, repository headers, branch sessions, statuses, and active selection', async () => {
     const wrapper = mount(AgentSidebar, {
       props: {
         agents,
@@ -108,7 +133,10 @@ describe('AgentSidebar sessions', () => {
       },
     });
 
-    expect(wrapper.get('.agent-sidebar__header').text()).toContain('Sessions');
+    expect(wrapper.get('.agent-sidebar__header strong').text()).toBe(product.name);
+    await wrapper.setProps({ teamName: 'Research' });
+    expect(wrapper.get('.agent-sidebar__header strong').text()).toBe('Research');
+    expect(wrapper.get('.agent-sidebar__header strong').attributes('title')).toBe('Research');
     expect(wrapper.text()).toContain('id8');
     expect(wrapper.text()).toContain('Dina');
     expect(wrapper.text()).toContain('multi-llm-ts');

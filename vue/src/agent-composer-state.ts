@@ -540,7 +540,9 @@ export function createAgentComposerState(options: {
       const current = configuration(agentId);
       const agent = snapshot().agents.find((candidate) => candidate.id === agentId);
       if (!current.pendingSelection && agent?.backendDefaults?.userSelectedModel !== true) {
-        if (settings.model !== undefined) current.selectedModelId = settings.model;
+        if (settings.model !== undefined) {
+          current.selectedModelId = current.models.find(model => modelMatchesSelection(model, settings.model ?? null))?.id ?? settings.model;
+        }
         if (settings.reasoningEffort !== undefined) current.selectedReasoningEffort = settings.reasoningEffort;
         if ('serviceTier' in settings && settings.serviceTier !== undefined) {
           current.selectedServiceTier = settings.serviceTier;

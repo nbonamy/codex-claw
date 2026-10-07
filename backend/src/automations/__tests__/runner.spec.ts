@@ -71,6 +71,21 @@ describe('scheduled prompts', () => {
     expect(automation.executionLog[0]).toMatchObject({ status: 'failed', error: expect.stringContaining('restart') });
   });
 
+  it('fails a run whose conversation was removed so the schedule is not blocked forever', async () => {
+    const { snapshot, automation, sendPrompt, saveSnapshot } = setup();
+    let now = new Date('2026-10-06T12:00:00Z');
+    const runner = new AutomationRunner({ getSnapshot: () => snapshot, sendPrompt, saveSnapshot, notifySnapshotUpdated: vi.fn(), now: () => now });
+    await runner.runAutomation('auto');
+    const chat = automation.executionLog[0]!.agentId!;
+    expect(automation.executionLog[0]).toMatchObject({ status: 'working' });
+    snapshot.agents = snapshot.agents.filter(agent => agent.id !== chat);
+    now = new Date('2026-10-06T13:00:00Z');
+    await runner.runAll();
+    expect(automation.executionLog.map(run => run.status)).toStrictEqual(['working', 'failed']);
+    expect(automation.executionLog[1]).toMatchObject({ error: 'The automation conversation was removed.', completedAt: '2026-10-06T13:00:00.000Z' });
+    expect(sendPrompt).toHaveBeenCalledTimes(2);
+  });
+
   it('waits a full interval after re-enabling rather than using an old last run', () => {
     const { automation } = setup();
     automation.createdAt = '2026-10-01T12:00:00Z';

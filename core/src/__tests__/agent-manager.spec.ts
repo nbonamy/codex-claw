@@ -16,6 +16,7 @@ import {
   updateWorkItemAssignmentInSnapshot,
   updateAgentFromInput,
 } from '../agent-manager';
+import { createAutomationInSnapshot, recordAutomationExecutionInSnapshot } from '../automation-manager';
 import { createInitialSnapshot } from '../snapshot';
 import { createTeamInSnapshot } from '../team-manager';
 import type { Agent, WorkItem } from '../contracts';
@@ -532,6 +533,20 @@ describe('agent-manager', () => {
     expect(snapshot.teams[0].agentIds).toStrictEqual(['agent-jesse']);
     expect(snapshot.activeAgentId).toBe('agent-jesse');
     expect(snapshot.workBacklog.assignments).toStrictEqual({});
+  });
+
+  it('disables automations targeting a closed agent and fails its active run', () => {
+    const snapshot = createInitialSnapshot();
+    const base = { prompt: 'Check', schedule: { intervalMinutes: 60 } };
+    const targeted = createAutomationInSnapshot(snapshot, { ...base, target: { kind: 'agent', agentId: 'agent-dina' } }, 'created', () => 'targeted')!;
+    const other = createAutomationInSnapshot(snapshot, { ...base, target: { kind: 'agent', agentId: 'agent-jesse' } }, 'created', () => 'other')!;
+    recordAutomationExecutionInSnapshot(snapshot, 'targeted', { id: 'run', automationId: 'targeted', status: 'working', startedAt: 'started', agentId: 'agent-dina' });
+
+    closeAgentInSnapshot(snapshot, 'agent-dina');
+
+    expect(targeted.enabled).toBe(false);
+    expect(targeted.executionLog[0]).toMatchObject({ status: 'failed' });
+    expect(other.enabled).toBe(true);
   });
 
   it('closes the last active team agent without selecting another team agent', () => {

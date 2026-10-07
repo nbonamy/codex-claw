@@ -268,7 +268,9 @@ publishes only after saving.
 - Canonical artifacts are Markdown under `$APP_HOME/missions/<id>/artifacts`.
   Workers reach them through identity-bound MCP tools with optimistic revisions;
   the renderer and providers get metadata, never file access. Stage skills are
-  materialized under the Mission home so workflow behavior is provider-neutral.
+  bundled in the daemon and loaded through `read-skill`, scoped to the caller's
+  assigned stage. Persisted skill references use names; legacy paths are accepted
+  on read but never used to load instructions.
 - Each ticket names exactly one repository. Worktrees are created only for
   affected repositories when code work begins, sharing one Mission suffix and
   branch name. Repositories run in parallel, work within one repository is
@@ -347,7 +349,12 @@ wiring, never branches in assignment, Mission, Settings or automation code.
   the same conversation, and records provider turn completion rather than treating
   an idle coordination status as success. Approval requests retain the run as
   awaiting input. Interrupted runs fail explicitly on daemon restart; history
-  cleanup never deletes conversations or active executions.
+  cleanup never deletes conversations or active executions. Closing an agent or
+  team disables the automations targeting it and fails their active runs (a run
+  whose conversation vanished never gets a turn event and would block its schedule
+  forever; the scheduler tick repeats that sweep as a safety net). A disabled
+  automation with a missing target can be re-saved off but not on until it is
+  re-targeted.
 
 ## In-app Browser
 

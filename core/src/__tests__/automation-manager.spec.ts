@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationExecutionLogEntry, CreateAutomationInput } from '../contracts';
 import { clearAutomationExecutionHistoryInSnapshot, createAutomationInSnapshot, deleteAutomationExecutionFromSnapshot,
-  deleteAutomationFromSnapshot, recordAutomationExecutionInSnapshot, updateAutomationInSnapshot } from '../automation-manager';
+  deleteAutomationFromSnapshot, disableUnavailableAutomationsInSnapshot, failOrphanedAutomationExecutionsInSnapshot,
+  recordAutomationExecutionInSnapshot, updateAutomationInSnapshot } from '../automation-manager';
 import { createInitialSnapshot } from '../snapshot';
 import { createQuickChatInSnapshot } from '../agent-manager';
 
@@ -69,5 +70,50 @@ describe('prompt automation configuration', () => {
     expect(deleteAutomationExecutionFromSnapshot(snapshot, 'auto', 'active')?.executionLog).toEqual([]);
     expect(recordAutomationExecutionInSnapshot(snapshot, 'missing', execution('run'))).toBeNull();
     expect(recordAutomationExecutionInSnapshot(snapshot, 'auto', { ...execution('run'), automationId: 'other' })).toBeNull();
+  });
+
+  it('disables automations whose conversation is gone and refuses to re-enable them', () => {
+    const snapshot = setup();
+    const agentTarget = { kind: 'agent', agentId: 'agent-dina' } as const;
+    const stale = createAutomationInSnapshot(snapshot, { ...input, target: agentTarget }, 'created', () => 'stale')!;
+    const fresh = createAutomationInSnapshot(snapshot, input, 'created', () => 'fresh')!;
+    const alreadyOff = createAutomationInSnapshot(snapshot, { ...input, target: agentTarget, enabled: false }, 'created', () => 'off')!;
+    expect(disableUnavailableAutomationsInSnapshot(snapshot, 'later')).toBe(false);
+    snapshot.agents = snapshot.agents.filter(agent => agent.id !== 'agent-dina');
+    expect(disableUnavailableAutomationsInSnapshot(snapshot, 'later')).toBe(true);
+    expect(stale).toMatchObject({ enabled: false, updatedAt: 'later' });
+    expect(fresh).toMatchObject({ enabled: true, updatedAt: 'created' });
+    expect(alreadyOff.updatedAt).toBe('created');
+    expect(disableUnavailableAutomationsInSnapshot(snapshot, 'again')).toBe(false);
+    expect(updateAutomationInSnapshot(snapshot, { ...input, id: 'stale', target: agentTarget, enabled: true })).toBeNull();
+    expect(stale.enabled).toBe(false);
+    // Automations saved before this guard can still be switched off, but not re-targeted to a missing chat.
+    fresh.target = agentTarget;
+    expect(updateAutomationInSnapshot(snapshot, { ...input, id: 'fresh', target: agentTarget, enabled: false })).not.toBeNull();
+    expect(fresh.enabled).toBe(false);
+    expect(updateAutomationInSnapshot(snapshot, { ...input, id: 'fresh', target: { kind: 'agent', agentId: 'other-missing' }, enabled: false })).toBeNull();
+  });
+
+  it('disables new Quick Chat automations when their team is gone', () => {
+    const snapshot = setup();
+    const automation = createAutomationInSnapshot(snapshot, input, 'created', () => 'auto')!;
+    snapshot.teams = [];
+    expect(disableUnavailableAutomationsInSnapshot(snapshot, 'later')).toBe(true);
+    expect(automation.enabled).toBe(false);
+  });
+
+  it('fails active runs whose conversation was removed so the automation can run again', () => {
+    const snapshot = setup();
+    const automation = createAutomationInSnapshot(snapshot, input, 'created', () => 'auto')!;
+    recordAutomationExecutionInSnapshot(snapshot, 'auto', { ...execution('done'), startedAt: '2026-10-06T10:00:00Z' });
+    recordAutomationExecutionInSnapshot(snapshot, 'auto', { ...execution('live', 'working'), agentId: 'agent-jesse' });
+    recordAutomationExecutionInSnapshot(snapshot, 'auto', { ...execution('gone', 'awaitingInput'), agentId: 'removed' });
+    recordAutomationExecutionInSnapshot(snapshot, 'auto', { ...execution('pending', 'working'), agentId: undefined });
+    expect(failOrphanedAutomationExecutionsInSnapshot(snapshot, 'now')).toBe(true);
+    const status = (id: string) => automation.executionLog.find(run => run.id === id)!;
+    expect(status('gone')).toMatchObject({ status: 'failed', completedAt: 'now', error: 'The automation conversation was removed.' });
+    expect(automation).toMatchObject({ lastError: 'The automation conversation was removed.', updatedAt: 'now' });
+    expect(['done', 'live', 'pending'].map(id => status(id).status)).toStrictEqual(['completed', 'working', 'working']);
+    expect(failOrphanedAutomationExecutionsInSnapshot(snapshot, 'again')).toBe(false);
   });
 });

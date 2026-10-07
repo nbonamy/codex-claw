@@ -171,7 +171,7 @@ describe('AgentGitWorkflowService', () => {
     expect(persistAndEmitSnapshot).toHaveBeenCalledOnce();
   });
 
-  it('hands merge conflicts to the affected agent with branch context', async () => {
+  it.each(['base', 'pull'] as const)('hands %s merge conflicts to the affected agent with branch context', async (source) => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0] as Agent;
     agent.folder = '/repo-feature';
@@ -180,6 +180,7 @@ describe('AgentGitWorkflowService', () => {
       branch: 'feature/demo',
       conflicts: ['src/app.ts', 'src/state.ts'],
     });
+    const pull = vi.fn().mockResolvedValue({ upstream: 'origin/feature/demo', branch: 'feature/demo', conflicts: ['src/app.ts', 'src/state.ts'] });
     const workflow = vi.fn().mockResolvedValue({
       repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
       baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
@@ -194,7 +195,7 @@ describe('AgentGitWorkflowService', () => {
       releaseConversation: vi.fn(),
       getSnapshot: () => snapshot,
       getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
-      git: { updateFromBase, workflow } as unknown as AgentGitService,
+      git: { updateFromBase, pull, workflow } as unknown as AgentGitService,
       persistAndEmitSnapshot: vi.fn(),
       refreshGitStatus: vi.fn(),
       refreshWorkspaceIdentity: vi.fn(),
@@ -202,26 +203,28 @@ describe('AgentGitWorkflowService', () => {
     });
 
     await expect(service.execute({
-      method: backendMethods.agentGitUpdateFromBase,
+      method: source === 'pull' ? backendMethods.agentGitPull : backendMethods.agentGitUpdateFromBase,
       agentId: agent.id,
       params: { input: { confirmed: true, allowDirty: true } },
     }, agent)).resolves.toMatchObject({
-      baseBranch: 'main',
+      ...(source === 'pull' ? { upstream: 'origin/feature/demo' } : { baseBranch: 'main' }),
       branch: 'feature/demo',
       conflicts: ['src/app.ts', 'src/state.ts'],
       workflow: { branch: 'feature/demo' },
     });
 
-    expect(updateFromBase).toHaveBeenCalledWith('/repo-feature', true);
-    expect(sendPrompt).toHaveBeenCalledWith(agent.id, expect.stringMatching(
-      /merged `main` into `feature\/demo`[\s\S]*src\/app\.ts[\s\S]*resolve the merge conflicts/i,
+    expect(source === 'pull' ? pull : updateFromBase).toHaveBeenCalledWith('/repo-feature', true);
+    expect(sendPrompt).toHaveBeenCalledExactlyOnceWith(agent.id, expect.stringContaining(
+      `Git merged \`${source === 'pull' ? 'origin/feature/demo' : 'main'}\` into \`feature/demo\``,
     ));
+    expect(sendPrompt.mock.calls[0]![1]).toMatch(/src\/app\.ts[\s\S]*resolve the merge conflicts/i);
   });
 
-  it('does not prompt the agent after a clean base-branch update', async () => {
+  it.each(['base', 'pull'] as const)('does not prompt the agent after a clean %s update', async (source) => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0] as Agent;
     const updateFromBase = vi.fn().mockResolvedValue({ baseBranch: 'main', branch: 'feature/demo', conflicts: [] });
+    const pull = vi.fn().mockResolvedValue({ upstream: 'origin/feature/demo', branch: 'feature/demo', conflicts: [] });
     const workflow = vi.fn().mockResolvedValue({
       repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
       baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
@@ -232,12 +235,12 @@ describe('AgentGitWorkflowService', () => {
       applyEvent: vi.fn(), archiveConversation: vi.fn(), delegatedWorkReports: {} as DelegatedWorkReportPort,
       driverRequest: vi.fn(), releaseConversation: vi.fn(), getSnapshot: () => snapshot,
       getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
-      git: { updateFromBase, workflow } as unknown as AgentGitService,
+      git: { updateFromBase, pull, workflow } as unknown as AgentGitService,
       persistAndEmitSnapshot: vi.fn(), refreshGitStatus: vi.fn(), refreshWorkspaceIdentity: vi.fn(), sendPrompt,
     });
 
     await service.execute({
-      method: backendMethods.agentGitUpdateFromBase,
+      method: source === 'pull' ? backendMethods.agentGitPull : backendMethods.agentGitUpdateFromBase,
       agentId: agent.id,
       params: { input: { confirmed: true } },
     }, agent);

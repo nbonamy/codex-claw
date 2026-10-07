@@ -64,6 +64,20 @@ describe('image annotation geometry', () => {
     ].join('\n'));
   });
 
+  it('describes a measurement without a comment by its pixel length, honouring Retina scale', () => {
+    const measure = (tool: 'measure-horizontal' | 'measure-vertical', comment: string, id: string, number: number): ImageAnnotation => ({
+      id, number, tool, comment, start: tool === 'measure-horizontal' ? { x: 10, y: 5 } : { x: 5, y: 10 },
+      end: tool === 'measure-horizontal' ? { x: 59, y: 5 } : { x: 5, y: 59 } });
+    expect(formatImageAnnotationPrompt([{ imageNumber: 1, fileName: 'home.png', pixelRatio: 2, annotations: [
+      measure('measure-horizontal', '', 'first', 1),
+      measure('measure-vertical', '  Too tall.  ', 'second', 2),
+      measure('measure-vertical', '', 'third', 3),
+    ] }])).toBe([
+      'Image annotations:', '', 'Image 1 — home.png',
+      '1. Horizontal gap: 24px', '2. Too tall.', '3. Vertical gap: 24px',
+    ].join('\n'));
+  });
+
   it('omits the empty-instructions placeholder when only image annotations are submitted', () => {
     expect(formatImageAnnotationPrompt([{
       imageNumber: 1,

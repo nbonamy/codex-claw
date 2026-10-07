@@ -27,7 +27,7 @@
         :aria-pressed="cockpitActive"
         @click="emit('select-cockpit')"
       >
-        <CockpitIcon :teams="teams" />
+        <DashboardIcon aria-hidden="true" />
       </button>
 
       <button
@@ -41,7 +41,10 @@
         ]"
         type="button"
         v-bind="clientTeamOrderUpdate.dragItemAttributes(team.id)"
-        :style="{ backgroundColor: team.color ?? defaultTeamColor }"
+        :style="{
+          backgroundColor: team.color ?? defaultTeamColor,
+          outlineColor: isTeamActive(team.id) ? team.color ?? defaultTeamColor : undefined,
+        }"
         :aria-label="teamAriaLabel(team)"
         :aria-pressed="isTeamActive(team.id)"
         @click="emit('select-team', team.id)"
@@ -52,7 +55,14 @@
         @drop="clientTeamOrderUpdate.onDrop(team.id, $event)"
         @dragend="clientTeamOrderUpdate.onDragEnd"
       >
-        {{ team.avatar ?? teamInitials(team.name) }}
+        <ProductMarkIcon
+          v-if="team.name === product.name"
+          class="team-rail__product-mark"
+          fill="currentColor"
+          stroke="none"
+          aria-hidden="true"
+        />
+        <template v-else>{{ team.avatar ?? teamInitials(team.name) }}</template>
         <span
           v-if="showsTeamActivityIndicator(team.id)"
           class="team-rail__unread-indicator"
@@ -137,10 +147,10 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AccountRateLimits, AgentBackend, AppSnapshot, CodexAccount, RemoteConnection, ReorderTeamsInput, Team } from '@workspace/core/contracts';
 import { defaultTeamColor } from '@workspace/core/team-colors';
+import { product } from '@workspace/core/product';
 import { teamInitials } from '@workspace/core/team-manager';
-import { ClockHour8Icon, BacklogIcon, PlusIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
+import { ClockHour8Icon, BacklogIcon, DashboardIcon, PlusIcon, ProductMarkIcon, VolumeIcon, VolumeOffIcon } from '../shared/icons/app-icons';
 import { useListReorderDrag } from '../shared/use-list-reorder-drag';
-import CockpitIcon from './CockpitIcon.vue';
 import SettingsMenu from './SettingsMenu.vue';
 import TeamContextMenu from './TeamContextMenu.vue';
 import { confirmCloseTeam } from './team-close-confirmation';
@@ -316,12 +326,12 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   user-select: none;
 }
 
-.team-rail--agent-sidebar-expanded::after {
+.team-rail::after {
   content: "";
   position: absolute;
   z-index: 1;
   top: var(--workbench-appbar-height);
-  right: -1px;
+  right: 0;
   bottom: 0;
   width: 1px;
   background: var(--color-shell-rail-divider);
@@ -355,12 +365,18 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   color: var(--team-text-color);
   font-size: var(--font-size-12);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-16);
   cursor: pointer;
+}
+
+.team-rail__product-mark {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  vertical-align: middle;
 }
 
 .team-rail__team:not(.team-rail__team--active, .list-reorder-drag--dragging) {
@@ -393,6 +409,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--team-rail-button-size);
   display: grid;
   place-items: center;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-full);
   color: var(--team-rail-icon-color);
@@ -401,7 +418,10 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit:not(.team-rail__cockpit--active),
-.team-rail__backlog:not(.team-rail__backlog--active) {
+.team-rail__backlog:not(.team-rail__backlog--active),
+.team-rail__automations:not(.team-rail__automations--active),
+.team-rail__speech-mute,
+:deep() .settings-menu__trigger:not(.settings-menu__trigger--active) {
   opacity: 0.6;
 }
 
@@ -417,50 +437,51 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   outline: none;
 }
 
-.team-rail__cockpit--active,
-.team-rail__backlog--active,
-.team-rail__automations--active,
-.team-rail__speech-mute--active {
-  color: var(--team-rail-icon-active-color);
-  opacity: 1;
-}
-
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
 .team-rail__backlog:hover,
-.team-rail__backlog:focus-visible {
+.team-rail__backlog:focus-visible,
+.team-rail__automations:hover,
+.team-rail__automations:focus-visible,
+.team-rail__speech-mute:hover,
+.team-rail__speech-mute:focus-visible,
+:deep() .settings-menu__trigger:hover,
+:deep() .settings-menu__trigger:focus-visible {
   opacity: 1;
 }
 
 .team-rail__backlog {
   padding: 0;
+}
+
+.team-rail__cockpit {
+  margin-top: calc(var(--space-4) * -1);
+}
+
+.team-rail__backlog--active,
+.team-rail__cockpit--active,
+.team-rail__automations--active {
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
-  background: var(--color-surface-lowest);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+  opacity: 1;
 }
 
-.team-rail__backlog--active {
-  border-color: currentColor;
-  background: var(--color-primary-container);
-}
-
-.team-rail__automations svg,
-.team-rail__speech-mute svg,
-.team-rail__new svg,
-:deep() .settings-menu__trigger svg {
+.team-rail__new svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
   stroke-width: 1.25px;
   transform: scale(1.15);
 }
 
-.team-rail__backlog svg {
+.team-rail__backlog svg,
+.team-rail__cockpit svg,
+.team-rail__automations svg,
+.team-rail__speech-mute svg,
+:deep() .settings-menu__trigger svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
-}
-
-:deep() .settings-menu__trigger svg {
-  transform: scale(0.9);
 }
 
 .team-rail__team::before,
@@ -540,7 +561,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--color-border);
+  border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-lg);
   color: var(--color-text-muted);
   background: var(--color-surface-low);
@@ -558,6 +579,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   place-items: center;
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
+  padding: 0;
   color: var(--team-rail-icon-color);
 }
 
@@ -568,7 +590,11 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 :deep() .settings-menu__trigger--active {
-  color: var(--team-rail-icon-active-color);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+  opacity: 1;
 }
 
 .team-rail__bottom {

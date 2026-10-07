@@ -32,7 +32,7 @@ export default defineConfig({
     environment: 'jsdom',
     css: {
       // Opt in only components with valuable runtime CSS assertions.
-      include: [/Settings(Section|Row)\.vue/, /AutomationsView\.vue/, /Automation(Schedule)?Editor\.vue/, /AnnotationOverlayApp\.vue/, /MissionWorkspace\.css/, /Mission(Conversation|Stage)Rail\.vue/, /WorkspaceHeader\.vue/, /AgentSidebar\.vue/, /SettingsSidebar\.vue/, /Backend(Icon|Selector)\.vue/, /SourcePreviewPanel\.vue/, /CodeReviewPanel\.vue/, /ReviewFindingList\.vue/, /MissionShipBoard\.vue/, /MissionImplementationBoard\.css/, /MissionImplementationTicketCard\.vue/, /RepositorySessionSourceDialog\.vue/, /RightWorkspacePanel\.vue/, /WorkspaceLinkDropTarget\.vue/, /AgentWorkspace\.vue/, /ConversationPane\.vue/, /SplitLayoutControl\.vue/, /ProviderSetupDialog\.vue/, /BacklogSourceSelector\.vue/, /base\.css/, /el-select\.css/],
+      include: [/AppMenu\.vue/, /TeamRail\.vue/, /Settings(Section|Row|Menu)\.vue/, /AutomationsView\.vue/, /Automation(Schedule)?Editor\.vue/, /AnnotationOverlayApp\.vue/, /MissionWorkspace\.css/, /Mission(Conversation|Stage)Rail\.vue/, /WorkspaceHeader\.vue/, /AgentSidebar\.vue/, /SettingsSidebar\.vue/, /Backend(Icon|Selector)\.vue/, /SourcePreviewPanel\.vue/, /CodeReviewPanel\.vue/, /ReviewFindingList\.vue/, /MissionShipBoard\.vue/, /MissionImplementationBoard\.css/, /MissionImplementationTicketCard\.vue/, /RepositorySessionSourceDialog\.vue/, /RightWorkspacePanel\.vue/, /WorkspaceLinkDropTarget\.vue/, /AgentWorkspace\.vue/, /ConversationPane\.vue/, /SplitLayoutControl\.vue/, /ProviderSetupDialog\.vue/, /BacklogSourceSelector\.vue/, /base\.css/, /el-select\.css/],
     },
     pool: 'vmThreads',
     vmMemoryLimit: '2GB',

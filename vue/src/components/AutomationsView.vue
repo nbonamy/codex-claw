@@ -1,14 +1,14 @@
 <template>
   <section class="automations-view" :aria-label="$t('surface.automationsView.automations')">
-    <div class="automations-view__header" />
+    <WorkspaceHeader class="automations-view__header" sidebar-collapsed>
+      <h1 id="automations-title" class="workspace-header__title">{{ $t('surface.automationsView.automations') }}</h1>
+    </WorkspaceHeader>
 
     <main class="automations-view__content">
       <div class="automations-view__panel" :class="{ 'automations-view__panel--wide': !editorVisible && !logAutomation }">
-        <SettingsPanelFrame :title="$t('surface.automationsView.automations')" title-id="automations-title">
+        <section aria-labelledby="automations-title">
           <div v-if="!editorVisible && !logAutomation" class="automations-view__list-header">
             <div class="automations-view__location-heading">
-              <h3>{{ $t('surface.automationsView.automations') }}</h3>
-              <ChevronRightIcon aria-hidden="true" />
               <el-select
                 v-model="selectedLocationValue"
                 class="automations-view__location-select"
@@ -65,8 +65,7 @@
           <div v-else class="automations-view__list">
             <AppDataList :aria-label="$t('surface.automationsView.automations')" :columns="automationColumns" :rows="automationRows">
               <template #cell-automation="{ row }">
-                <div class="automations-view__automation-cell">
-                  <span class="automations-view__status" :data-enabled="row.enabled" />
+                <div class="automations-view__automation-cell" :data-enabled="row.enabled">
                   <div class="automations-view__info">
                     <strong>{{ row.name }}</strong>
                     <span>{{ row.sourceLine }}</span>
@@ -78,12 +77,15 @@
                 <span class="automations-view__meta-cell">{{ row.lastExecution }}</span>
               </template>
 
-              <template #cell-executionCount="{ row }">
-                <span class="automations-view__meta-cell">{{ row.executionCount }}</span>
-              </template>
-
               <template #actions="{ row }">
                 <div class="automations-view__row-actions">
+                  <el-switch
+                    size="small"
+                    :model-value="Boolean(row.enabled)"
+                    :disabled="togglingAutomationId === row.id"
+                    :aria-label="$t('dynamic.automations.enable', { automation: row.name })"
+                    @change="toggleAutomation(row.id, $event === true)"
+                  />
                   <button
                     type="button"
                     :aria-label="$t('dynamic.automations.run', { automation: row.name })"
@@ -135,7 +137,7 @@
 
             <div v-if="operationError" class="automations-view__error" role="alert">{{ operationError }}</div>
           </div>
-        </SettingsPanelFrame>
+        </section>
       </div>
     </main>
   </section>
@@ -160,7 +162,7 @@ import type {
 } from '@workspace/core/contracts';
 import { agentDisplayName } from '@workspace/core/agent-display';
 import { automationCalendarDescription } from '@workspace/core/automation-schedule';
-import { canTargetAutomationAgent, automationExecutionIsActive } from '@workspace/core/automation-manager';
+import { automationExecutionIsActive, automationTargetIsAvailable, canTargetAutomationAgent } from '@workspace/core/automation-manager';
 import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
@@ -170,8 +172,8 @@ import AutomationEditor from './AutomationEditor.vue';
 import { provideBackendHost } from './backend-selection';
 import AutomationExecutionLog from './AutomationExecutionLog.vue';
 import AutomationWelcome from './AutomationWelcome.vue';
-import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import { ChevronRightIcon, DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
+import WorkspaceHeader from '../shared/WorkspaceHeader.vue';
+import { DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(
   defineProps<{
@@ -218,6 +220,7 @@ const locationStatus = ref<LocationStatus>('idle');
 const locationError = ref<string | null>(null);
 const operationError = ref<string | null>(null);
 const saving = ref(false);
+const togglingAutomationId = ref<string | null>(null);
 let locationLoadId = 0;
 
 const editorVisible = computed(() => (editorMode.value === 'create' ? creating.value : Boolean(editingAutomation.value)));
@@ -237,12 +240,10 @@ provideBackendHost(() => selectedRemoteConnectionId.value
   : null);
 const locationAutomations = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.automations ?? []) : props.automations));
 const locationTeams = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.teams ?? []) : props.teams).filter(team => !team.remoteConnectionId));
-const locationAgents = computed(() => {
-  const teams = isRemoteLocation.value ? remoteSnapshot.value?.teams ?? [] : props.teams;
-  const missions = isRemoteLocation.value ? remoteSnapshot.value?.missions ?? [] : props.missions;
-  return (isRemoteLocation.value ? remoteSnapshot.value?.agents ?? [] : props.agents)
-    .filter(agent => canTargetAutomationAgent({ teams, missions }, agent));
-});
+const locationTargets = computed(() => isRemoteLocation.value
+  ? { teams: remoteSnapshot.value?.teams ?? [], agents: remoteSnapshot.value?.agents ?? [], missions: remoteSnapshot.value?.missions ?? [] }
+  : { teams: props.teams, agents: props.agents, missions: props.missions });
+const locationAgents = computed(() => locationTargets.value.agents.filter(agent => canTargetAutomationAgent(locationTargets.value, agent)));
 const editingAutomation = computed(() =>
   editingAutomationId.value ? (locationAutomations.value.find((automation) => automation.id === editingAutomationId.value) ?? null) : null,
 );
@@ -259,12 +260,6 @@ const automationColumns: AppDataListColumn[] = [
   {
     id: 'lastExecution',
     label: translate('surface.automationsView.lastExecution'),
-    width: 'max-content',
-    align: 'end',
-  },
-  {
-    id: 'executionCount',
-    label: translate('surface.automationsView.executions'),
     width: 'max-content',
     align: 'end',
   },
@@ -286,7 +281,6 @@ const automationMenuItems: AppMenuItem[] = [
 ];
 const automationRows = computed<AppDataListRow[]>(() =>
   locationAutomations.value.map((automation) => ({
-    executionCount: automationExecutionCountLabel(automation),
     id: automation.id,
     enabled: automation.enabled,
     running: automation.executionLog.some(automationExecutionIsActive),
@@ -357,6 +351,23 @@ async function saveAutomation(input: CreateAutomationInput): Promise<void> {
     closeEditor();
   } catch (error) { operationError.value = error instanceof Error ? error.message : String(error); }
   finally { saving.value = false; }
+}
+
+async function toggleAutomation(automationId: string, enabled: boolean): Promise<void> {
+  const automation = locationAutomations.value.find(candidate => candidate.id === automationId);
+  if (!automation) return;
+  operationError.value = null;
+  if (enabled && !automationTargetIsAvailable(locationTargets.value, automation.target)) {
+    operationError.value = translate('promptAutomation.invalidTarget');
+    return;
+  }
+  togglingAutomationId.value = automationId;
+  try {
+    const { id, name, prompt, target, schedule } = automation;
+    // Store objects are reactive proxies; IPC needs plain data.
+    refreshLocationFromSnapshot(await updateLocationAutomation({ id, name, enabled, prompt, target: { ...target }, schedule: { ...schedule } }));
+  } catch (error) { operationError.value = error instanceof Error ? error.message : String(error); }
+  finally { togglingAutomationId.value = null; }
 }
 
 async function runAutomation(automationId: string): Promise<void> {
@@ -532,9 +543,9 @@ function requestLocation(): AutomationLocation | undefined {
 
 function automationSourceLabel(automation: Automation): string {
   const target = automation.target;
+  if (!automationTargetIsAvailable(locationTargets.value, target)) return translate('promptAutomation.missingTarget');
   if (target.kind === 'newQuickChat') return translate('promptAutomation.newQuickChat');
-  const agent = locationAgents.value.find(agent => agent.id === target.agentId);
-  return agent ? agentDisplayName(agent) : translate('promptAutomation.missingTarget');
+  return agentDisplayName(locationTargets.value.agents.find(agent => agent.id === target.agentId)!);
 }
 
 function automationScheduleLabel(automation: Automation): string {
@@ -552,11 +563,6 @@ function automationLastExecutionLabel(automation: Automation): string {
   }
 
   return formatShortDate(automation.lastRunAt);
-}
-
-function automationExecutionCountLabel(automation: Automation): string {
-  const count = automation.executionLog.length;
-  return `${count} ${count === 1 ? 'execution' : 'executions'}`;
 }
 
 function formatShortDate(value: string): string {
@@ -580,19 +586,14 @@ function formatShortDate(value: string): string {
   min-width: 0;
   min-height: 0;
   display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--color-shell-main);
 }
 
 .automations-view__header {
-  position: absolute;
-  top: 0;
-  left: var(--team-rail-width);
-  height: var(--workbench-appbar-height);
-  width: calc(100% - var(--team-rail-width));
-  background: var(--color-shell-main);
-  border-bottom: 1px solid var(--color-border);
-  -webkit-app-region: drag;
+  padding-inline: var(--space-20);
+  font-size: var(--font-size-16);
 }
 
 .automations-view__content {
@@ -601,7 +602,7 @@ function formatShortDate(value: string): string {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding-top: 0;
+  padding-top: var(--space-12);
   padding-inline: var(--space-12);
 }
 
@@ -638,20 +639,6 @@ function formatShortDate(value: string): string {
   gap: var(--space-8);
 }
 
-.automations-view__location-heading h3 {
-  margin: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-16);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-24);
-}
-
-.automations-view__location-heading svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--color-text-muted);
-}
-
 .automations-view__location-select {
   width: 160px;
 }
@@ -680,18 +667,8 @@ function formatShortDate(value: string): string {
   gap: var(--space-12);
 }
 
-.automations-view__status {
-  flex: 0 0 12px;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--color-text-muted);
-  border-radius: var(--radius-full);
-  background: var(--color-text-muted);
-}
-
-.automations-view__status[data-enabled="true"] {
-  border-color: var(--color-success);
-  background: var(--color-success);
+.automations-view__automation-cell[data-enabled="false"] strong {
+  color: var(--color-text-muted);
 }
 
 .automations-view__info {
@@ -733,7 +710,11 @@ function formatShortDate(value: string): string {
 .automations-view__row-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-4);
+}
+
+.automations-view__row-actions .el-switch {
+  margin-inline: var(--space-8) var(--space-6);
 }
 
 .automations-view__row-actions button {

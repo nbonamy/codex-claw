@@ -1,8 +1,10 @@
 import { mount } from '@vue/test-utils';
+import { computed, nextTick, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
-import type { Agent, WorkItem } from '@workspace/core/contracts';
+import type { Agent, AgentBackend, WorkItem } from '@workspace/core/contracts';
 import CockpitAgentCard from '../CockpitAgentCard.vue';
+import { backendChoicesKey } from '../backend-selection';
 
 type CockpitAgentCardProps = {
   agent: Agent;
@@ -12,6 +14,30 @@ type CockpitAgentCardProps = {
 };
 
 describe('CockpitAgentCard', () => {
+  it.each([
+    ['codex', 'Codex', new URL('../../shared/icons/chatgpt-icon.svg', import.meta.url).href],
+    ['claude', 'Claude Code', new URL('../../shared/icons/claude-code-icon.svg', import.meta.url).href],
+  ] as const)('shows the %s icon above status only with multiple enabled backends', async (backend, label, icon) => {
+    const enabled = ref<AgentBackend[]>([backend]);
+    const wrapper = mount(CockpitAgentCard, {
+      props: { agent: { ...idleAgent(), backend }, draggedWorkItem: null, dropTarget: false },
+      global: { provide: { [backendChoicesKey as symbol]: computed(() => enabled.value) } },
+    });
+
+    expect(wrapper.find('[role="img"]').exists()).toBe(false);
+    enabled.value = ['codex', 'claude'];
+    await nextTick();
+    const backendIcon = wrapper.get(`[role="img"][aria-label="${label}"]`);
+    expect(backendIcon.attributes('title')).toBe(label);
+    expect(backendIcon.get('img').attributes('src')).toBe(icon);
+    expect(backendIcon.element.nextElementSibling?.textContent?.trim()).toBe('Idle');
+
+    enabled.value = [backend];
+    await nextTick();
+    expect(wrapper.find('[role="img"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('uses the default repository icon when no custom icon is configured', async () => {
     const wrapper = mountCard();
 

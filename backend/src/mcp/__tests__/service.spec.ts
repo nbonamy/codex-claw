@@ -28,6 +28,29 @@ describe('AppMcpService', () => {
     service = null;
   });
 
+  it('loads bundled skills over authenticated MCP without filesystem access and rechecks feature enablement', async () => {
+    const snapshot = createInitialSnapshot();
+    let enabled = false;
+    const execute = vi.fn();
+    service = new AppMcpService({ snapshot, computerUseEnabled: () => enabled,
+      computerUse: { execute, status: vi.fn(), stop: vi.fn(), requestAccessibility: vi.fn() } });
+    const url = await service.start();
+    const read = (name: string) => callTool(url, 'agent-dina', 'read-skill', { name });
+    const html = (await read('korus-inline-html')).result;
+    expect(html).toMatchObject({ isError: false, structuredContent: { name: 'korus-inline-html', loaded: true } });
+    expect(html.content[0].text).toMatch(/^<artifact title="[^"]+">\n<!doctype html><html>[\s\S]*?<\/html>\n<\/artifact>$/m);
+    for (const name of ['../../settings.json', '/etc/passwd', 'missing', 'korus-computer-use', 'mission-review']) {
+      expect((await read(name)).result.isError).toBe(true);
+    }
+    enabled = true;
+    expect((await read('korus-computer-use')).result).toMatchObject({
+      isError: false, content: [{ type: 'text', text: expect.stringContaining('computer-use-list-windows') }],
+    });
+    enabled = false;
+    expect((await read('korus-computer-use')).result.isError).toBe(true);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('returns recoverable round-count errors over MCP and persists an accepted inspection', async () => {
     const snapshot = createInitialSnapshot();
     const owner = snapshot.agents[0]!;
@@ -489,6 +512,9 @@ describe('AppMcpService', () => {
     });
     const missionTools = ['set-mission-title', 'list-mission-artifacts', 'read-mission-artifact', 'write-mission-artifact', 'upsert-mission-ticket', 'submit-mission-result'];
     const workerToolNames = workerTools.result.tools.map((tool: { name: string }) => tool.name);
+    expect((await callTool(url, 'agent-dina', 'read-skill', { name: 'mission-shape-requirements' })).result.isError).toBe(false);
+    expect((await callTool(url, 'agent-dina', 'read-skill', { name: 'mission-review' })).result.isError).toBe(true);
+    expect((await callTool(url, 'agent-jesse', 'read-skill', { name: 'mission-shape-requirements' })).result.isError).toBe(true);
     expect(workerToolNames).toEqual(expect.arrayContaining(missionTools));
     expect(workerToolNames).not.toContain('set-mission-execution-policy');
     expect(workerToolNames).toContain('finish_turn');
@@ -507,6 +533,7 @@ describe('AppMcpService', () => {
     expect(onSetMissionTitle).toHaveBeenCalledWith('agent-dina', 'Add team billing');
 
     active = false;
+    expect((await callTool(url, 'agent-dina', 'read-skill', { name: 'mission-shape-requirements' })).result.isError).toBe(true);
     const inactiveTools = await postJson(agentUrl(url, 'agent-dina'), {
       jsonrpc: '2.0', id: 5, method: 'tools/list', params: {},
     });
@@ -986,6 +1013,7 @@ describe('AppMcpService', () => {
           kind: 'codex',
           model: 'gpt-5.6-sol',
           reasoningEffort: 'high',
+          userSelectedModel: true,
         },
       }),
       expectedPrompt,
@@ -1052,6 +1080,8 @@ describe('AppMcpService', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.general.claudeCodeEnabled = true;
+    snapshot.general.providerApprovalDefaults = { claude: 'auto' };
+    snapshot.general.providerModelDefaults = { claude: { model: 'sonnet', reasoningEffort: 'medium', serviceTier: null } };
     snapshot.agents[0]!.backendDefaults = {
       kind: 'codex',
       model: 'gpt-5.6-sol',
@@ -1076,9 +1106,14 @@ describe('AppMcpService', () => {
       kind: 'codex',
       model: 'gpt-6-astra',
       reasoningEffort: 'max',
+      userSelectedModel: true,
     });
     expect(snapshot.agents.find((agent) => agent.name === 'Claude worker')?.backendDefaults).toStrictEqual({
       kind: 'claude',
+      model: 'sonnet',
+      reasoningEffort: 'medium',
+      userSelectedModel: true,
+      permissionMode: 'auto',
     });
   });
 

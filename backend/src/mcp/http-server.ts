@@ -12,6 +12,7 @@ import type { HostedMcpGateway, HostedMcpServerId } from './hosted-mcp-gateway';
 import type { ReviewToolRegistry } from '../review/review-tool-registry';
 import { createCollaborationToolModuleProvider } from './collaboration-tools';
 import { createMissionToolModuleProvider } from './mission-tools';
+import { createSkillToolModuleProvider } from './skill-tools';
 import { createMissionReviewToolModuleProvider } from './mission-review-tools';
 import {
   createBrowserToolModuleProvider,
@@ -50,6 +51,7 @@ export class AppMcpHttpServer {
     this.toolModuleProviders = [
       createCollaborationToolModuleProvider(this.coordinator),
       createMissionToolModuleProvider(this.coordinator),
+      createSkillToolModuleProvider(this.coordinator, () => Boolean(options.computerUse) && computerUseEnabled()),
       createMissionReviewToolModuleProvider(this.coordinator),
       createComputerUseToolModuleProvider(options.computerUse, computerUseEnabled),
       createBrowserToolModuleProvider(options.browser),

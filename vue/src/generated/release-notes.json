@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.28.1",
+  "currentVersion": "0.29.0",
   "releases": [
+    {
+      "version": "0.29.0",
+      "releasedAt": "2026-10-07",
+      "sourceSha256": "4edef3a5268c3a3309892ad7769eac3a5ab62f6d61c31c25326464963e49e676",
+      "markdown": "### New features\n\n- Interactive HTML previews in assistant messages support charts, small tools,\n  and other visual explanations directly in the conversation. Resize previews,\n  inspect their source, or copy and download the HTML.\n- Pull the current branch's upstream from the Git menu. If the pull produces\n  conflicts, the agent receives a request to resolve them.\n- Enable or disable automations directly from the automation list.\n- Windows and Linux Help menus include About Korus and Check for Updates.\n  Platforms without automatic updates open the latest release downloads.\n\n### Improvements and fixes\n\n- The model picker lists models directly, with supported reasoning efforts in\n  each model's submenu. Selecting a model preserves a compatible effort;\n  choosing an effort selects both together.\n- A quieter team rail, consistent navigation states and headers, and lighter\n  menu typography improve navigation. The sidebar shows the selected team's\n  name, and teams named Korus use the app logo.\n- Cockpit cards show provider icons when multiple backends are enabled. Idle\n  sidebar indicators stay hidden until the individual agent is hovered.\n- Image annotations are preserved when sending a prompt. Measurement\n  annotations can be submitted without a comment.\n- Delegated agents display explicit model selections correctly and use their\n  provider's saved permissions before the first prompt.\n- Agents load Korus's HTML, Visualize, Computer Use, and Mission guidance on\n  demand through a shared tool, without needing filesystem access to skills.\n- Automation storage is protected against overwrites by incompatible older\n  builds. Removing a target conversation disables its schedules and marks\n  abandoned runs as failed instead of leaving them stuck.\n- Local SDK development resolves transcription helpers from the selected SDK\n  checkout instead of a hard-coded root dependency path."
+    },
     {
       "version": "0.28.1",
       "releasedAt": "2026-10-06",

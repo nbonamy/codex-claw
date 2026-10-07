@@ -15,6 +15,13 @@ import {
   type SavedImageAnnotations,
 } from './image-annotation';
 
+type CapturedImageAnnotations = {
+  agentId: string | undefined;
+  attachments: CodexNativeAttachment[];
+  composerState: CodexComposerState;
+  drafts: Record<string, SavedImageAnnotations>;
+};
+
 type AttachmentAnnotationTarget = {
   agentId: string;
   attachment: CodexNativeAttachment;
@@ -109,15 +116,29 @@ export function useImageAnnotation(options: {
     debugVisible.value = true;
   }
 
+  /**
+   * The composer clears its attachments right after handing the prompt over, which prunes the drafts.
+   * Callers that await anything before `forward` must capture first, while the drafts still exist.
+   */
+  function capture(): CapturedImageAnnotations {
+    const agentId = options.currentAgentId();
+    return {
+      agentId,
+      attachments: options.composerAttachments().map((attachment) => ({ ...attachment })),
+      composerState: { ...options.composerState() },
+      drafts: Object.fromEntries(Object.entries(agentId ? draftsByAgentId[agentId] ?? {} : {}).map(([reference, draft]) => [reference, cloneDraft(draft)])),
+    };
+  }
+
   async function forward(
     prompt: string,
     sendOptions: CodexRendererSendMessageOptions | undefined,
     send: (nextPrompt: string, nextOptions?: RendererSendPromptOptions) => void | Promise<void>,
+    captured: CapturedImageAnnotations = capture(),
   ): Promise<void> {
-    const agentId = options.currentAgentId();
-    const savedByReference = agentId ? draftsByAgentId[agentId] ?? {} : {};
+    const { agentId, drafts: savedByReference } = captured;
     let imageNumber = 0;
-    const annotatedImages = options.composerAttachments().flatMap((attachment) => {
+    const annotatedImages = captured.attachments.flatMap((attachment) => {
       if (attachment.type !== 'image') return [];
       imageNumber += 1;
       const draft = savedByReference[attachment.reference];
@@ -131,11 +152,8 @@ export function useImageAnnotation(options: {
     if (!nativeApi?.capabilities.attachments) {
       throw new Error(translate('surface.appShell.annotatedImagesCannotBePreparedByThisHost'));
     }
-    const composerState = { ...options.composerState() };
-    const composerAttachments = options.composerAttachments().map((attachment) => ({ ...attachment }));
-    const savedDrafts = Object.fromEntries(
-      Object.entries(savedByReference).map(([reference, draft]) => [reference, cloneDraft(draft)]),
-    );
+    const { composerState, attachments: composerAttachments } = captured;
+    const savedDrafts = savedByReference;
     try {
       const ingested = await nativeApi.ingestAttachments(annotatedImages.map(({ draft }) => ({
         name: draft.fileName,
@@ -164,6 +182,7 @@ export function useImageAnnotation(options: {
         annotations: draft.annotations,
         fileName: attachment.name,
         imageNumber: number,
+        pixelRatio: draft.pixelRatio,
       })), prompt), promptOptions(nextOptions));
     } catch (error) {
       draftsByAgentId[agentId] = savedDrafts;
@@ -201,6 +220,7 @@ export function useImageAnnotation(options: {
 
   return {
     activeCounts,
+    capture,
     close,
     fileName,
     forward,

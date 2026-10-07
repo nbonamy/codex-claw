@@ -10,6 +10,7 @@ import type {
   AgentGitOperationProgress,
   AgentGitPullRequest,
   AgentGitUpdateFromBaseResult,
+  AgentGitPullResult,
   AgentGitWorkflow,
   AppSnapshot,
 } from '@workspace/core/contracts';
@@ -47,7 +48,7 @@ export type AgentGitWorkflowServiceOptions = {
 export class AgentGitWorkflowService {
   constructor(private readonly options: AgentGitWorkflowServiceOptions) {}
 
-  async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult> {
+  async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult | AgentGitPullResult> {
     const { method, agentId, params } = request;
     switch (method) {
       case backendMethods.agentGitDiffGet:
@@ -123,6 +124,14 @@ export class AgentGitWorkflowService {
         return this.merge(agent, agentId, params);
       case backendMethods.agentGitUpdateFromBase:
         return this.updateFromBase(agent, agentId, params);
+      case backendMethods.agentGitPull: {
+        const input = requireConfirmed(params.input, 'Pulling a branch');
+        const result = await this.options.git.pull(requireAgentFolder(agent), input.allowDirty === true);
+        if (result.conflicts.length > 0) {
+          this.options.sendPrompt(agentId, conflictResolutionPrompt({ ...result, baseBranch: result.upstream }));
+        }
+        return { ...result, workflow: await this.workflow(agent, { refreshStatus: true }) };
+      }
     }
   }
 

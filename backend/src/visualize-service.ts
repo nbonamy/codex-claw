@@ -67,15 +67,7 @@ export class VisualizeService {
   }
 
   developerInstructions(): string {
-    return [
-      `${product.name} exposes Visualize MCP tools for the current conversation, but they work only while its Visualize pane is open.`,
-      'Use them for Visualize requests to publish diagrams and suggestions, and keep chat secondary. Tool availability alone does not mean Visualize mode is active.',
-      'Use list-visualizations to discover the current selection and get-visualization before replacing an existing visualization. Use add-visualization when the user asks for a new one.',
-      SUPPORTED_MERMAID_GUIDANCE,
-      'Editable canvases are authoritative after import. Use read-visualization-canvas for the selection and revision, then edit-visualization-canvas for a single batch of targeted edits. Never replace a canvas or reimport its original source over user edits. Request all elements only when selection context is insufficient.',
-      'Use the current conversation and existing visualizations as the source of truth. Do not browse, search the repository, inspect files, run commands, or do background research unless the user explicitly asks for outside evidence.',
-      'If the Visualize pane is closed, handle the conversation normally and do not claim that Visualize mode is active.',
-    ].join(' ');
+    return 'Visualize tools work only while the pane is open. Before using them, call read-skill with name="korus-visualize". If the pane is closed, handle the conversation normally. In Visualize, use conversation context only unless the user explicitly requests outside research.';
   }
 
   async enter(agentId: string): Promise<{ created: boolean; visualize: VisualizeSession }> {

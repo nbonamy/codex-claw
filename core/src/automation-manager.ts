@@ -20,22 +20,25 @@ export function canTargetAutomationAgent(snapshot: Pick<AppSnapshot, 'teams' | '
       || mission.execution?.memberIds.includes(agent.id) || mission.execution?.runs.some(run => run.workerId === agent.id));
 }
 
-function normalize(snapshot: AppSnapshot, input: CreateAutomationInput) {
+/** A target is usable only while its conversation (or the team for a fresh Quick Chat) is still local and eligible. */
+export function automationTargetIsAvailable(snapshot: Pick<AppSnapshot, 'teams' | 'agents' | 'missions'>, target: AutomationTarget): boolean {
+  if (target.kind === 'newQuickChat') return snapshot.teams.some(team => team.id === target.teamId && !team.remoteConnectionId);
+  const agent = snapshot.agents.find(item => item.id === target.agentId);
+  return Boolean(agent && canTargetAutomationAgent(snapshot, agent) && (target.kind === 'quickChat') === (agent.sessionKind === 'quickChat'));
+}
+
+function normalize(snapshot: AppSnapshot, input: CreateAutomationInput, staleTarget?: AutomationTarget) {
   const schedule = normalizeAutomationSchedule(input.schedule);
   if (!isAutomationTarget(input.target) || typeof input.prompt !== 'string' || !input.prompt.trim()
     || !schedule) return null;
-  let target: AutomationTarget = { ...input.target };
-  if (target.kind === 'newQuickChat') {
-    const teamId = target.teamId.trim();
-    if (!snapshot.teams.some(team => team.id === teamId && !team.remoteConnectionId)) return null;
-    target = { ...target, teamId, backend: resolveAgentBackend(snapshot, target.backend) };
-  } else {
-    const agentId = target.agentId.trim();
-    const agent = snapshot.agents.find(agent => agent.id === agentId);
-    if (!agent || !canTargetAutomationAgent(snapshot, agent)
-      || (target.kind === 'quickChat') !== (agent.sessionKind === 'quickChat')) return null;
-    target = { kind: target.kind, agentId };
-  }
+  let target: AutomationTarget;
+  if (input.target.kind === 'newQuickChat') {
+    const teamId = input.target.teamId.trim();
+    target = { ...input.target, teamId, backend: resolveAgentBackend(snapshot, input.target.backend) };
+  } else target = { kind: input.target.kind, agentId: input.target.agentId.trim() };
+  // A schedule whose conversation is gone can still be switched off, never on or re-targeted to a missing one.
+  const keepsStaleTarget = input.enabled === false && JSON.stringify(target) === JSON.stringify(staleTarget);
+  if (!keepsStaleTarget && !automationTargetIsAvailable(snapshot, target)) return null;
   return { name: input.name?.trim() || input.prompt.trim().split('\n')[0]!.slice(0, 80), enabled: input.enabled !== false,
     prompt: input.prompt.trim(), target, schedule };
 }
@@ -52,7 +55,7 @@ export function createAutomationInSnapshot(snapshot: AppSnapshot, input: CreateA
 
 export function updateAutomationInSnapshot(snapshot: AppSnapshot, input: UpdateAutomationInput, updatedAt = new Date().toISOString()): Automation | null {
   const automation = snapshot.automations.find(item => item.id === input.id);
-  const normalized = normalize(snapshot, input);
+  const normalized = normalize(snapshot, input, automation?.target);
   if (!automation || !normalized) return null;
   if (JSON.stringify(automation.schedule) !== JSON.stringify(normalized.schedule) || (!automation.enabled && normalized.enabled)) {
     automation.scheduleAnchorAt = updatedAt;
@@ -89,6 +92,45 @@ export function deleteAutomationExecutionFromSnapshot(snapshot: AppSnapshot, aut
   automation.executionLog = automation.executionLog.filter(item => item.id !== executionId);
   automation.updatedAt = updatedAt;
   return automation;
+}
+
+export const automationConversationRemovedMessage = 'The automation conversation was removed.';
+
+export function failAutomationExecution(automation: Automation, run: AutomationExecutionLogEntry, error: string, completedAt: string): void {
+  Object.assign(run, { status: 'failed', error, completedAt });
+  automation.lastError = error;
+  automation.updatedAt = completedAt;
+}
+
+/** Closing a conversation or team must not leave a schedule that can only fail; the user re-targets it before re-enabling. */
+export function disableUnavailableAutomationsInSnapshot(snapshot: AppSnapshot, updatedAt = new Date().toISOString()): boolean {
+  let changed = false;
+  for (const automation of snapshot.automations) {
+    if (!automation.enabled || automationTargetIsAvailable(snapshot, automation.target)) continue;
+    automation.enabled = false;
+    automation.updatedAt = updatedAt;
+    changed = true;
+  }
+  return changed;
+}
+
+/** A run whose conversation vanished never receives a turn event, so it would stay active (and block the schedule) forever. */
+export function failOrphanedAutomationExecutionsInSnapshot(snapshot: AppSnapshot, completedAt = new Date().toISOString()): boolean {
+  let changed = false;
+  for (const automation of snapshot.automations) {
+    for (const run of automation.executionLog) {
+      if (!automationExecutionIsActive(run) || !run.agentId || snapshot.agents.some(agent => agent.id === run.agentId)) continue;
+      failAutomationExecution(automation, run, automationConversationRemovedMessage, completedAt);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/** Call after removing agents or teams so schedules never outlive their conversation. */
+export function releaseRemovedAutomationTargetsInSnapshot(snapshot: AppSnapshot, at = new Date().toISOString()): void {
+  failOrphanedAutomationExecutionsInSnapshot(snapshot, at);
+  disableUnavailableAutomationsInSnapshot(snapshot, at);
 }
 
 export function recordAutomationExecutionInSnapshot(snapshot: AppSnapshot, automationId: string, entry: AutomationExecutionLogEntry): Automation | null {

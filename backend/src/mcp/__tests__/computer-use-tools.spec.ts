@@ -37,20 +37,6 @@ describe('Computer Use MCP tools', () => {
     registerComputerUseTools(server as unknown as McpServer, computerUse);
   });
 
-  it('returns a model-readable operating guide', async () => {
-    const guideResult = await handlers.get('computer-use-guide')?.({});
-    expect(guideResult).toMatchObject({
-      content: [{
-        type: 'text',
-        text: expect.any(String),
-      }],
-      structuredContent: { loaded: true },
-      isError: false,
-    });
-    const result = guideResult as { content: Array<{ text: string }> };
-    expect(result.content[0]?.text.trim().length).toBeGreaterThan(0);
-  });
-
   it('recovers each baseline after a lost observation without repeating an action', async () => {
     vi.mocked(computerUse.execute)
       .mockRejectedValueOnce(new Error('stdio request timed out'))
@@ -123,7 +109,6 @@ describe('Computer Use MCP tools', () => {
 
   it('registers the complete Computer Use surface', () => {
     expect([...handlers.keys()]).toStrictEqual([
-      'computer-use-guide',
       'computer-use-status',
       'computer-use-request-accessibility',
       'computer-use-request-screen-recording',

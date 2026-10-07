@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { reactive } from 'vue';
 import { ElInput, ElSelect, ElOption, ElSwitch, ElButton, ElPopover, ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
@@ -36,6 +37,9 @@ describe('AutomationsView', () => {
     const createAutomation = vi.fn().mockResolvedValue(undefined);
     const updateAutomation = vi.fn().mockResolvedValue(undefined);
     const wrapper = view({ createAutomation, updateAutomation });
+    expect(wrapper.findAll('h1, h2, h3').filter(heading => heading.text() === 'Automations')).toHaveLength(1);
+    expect(wrapper.get('header h1').text()).toBe('Automations');
+    expect(getComputedStyle(wrapper.get('.automations-view__content').element).paddingTop).toBe('var(--space-12)');
     expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('920px');
     expect(getComputedStyle(wrapper.get('.automations-view__panel').element).width).toBe('100%');
     expect(getComputedStyle(wrapper.get('.automations-view__content').element).paddingInline).toBe('var(--space-12)');
@@ -130,5 +134,38 @@ describe('AutomationsView', () => {
     expect(deleteAutomationExecution).toHaveBeenCalledWith('auto', 'done');
     await wrapper.findAll('button').find(button => button.text() === 'Clear')!.trigger('click'); await flushPromises();
     expect(clearAutomationHistory).toHaveBeenCalledWith('auto');
+  });
+
+  it('switches an automation on and off from the list without an execution count column', async () => {
+    // The app store hands out reactive proxies, which cannot cross the IPC boundary (structured clone).
+    const updateAutomation = vi.fn(async (input: unknown) => { structuredClone(input); });
+    const wrapper = view({ updateAutomation, automations: reactive([automation({ executionLog: [
+      { id: 'one', automationId: 'auto', status: 'completed', startedAt: '2026-10-06T10:00:00Z' },
+      { id: 'two', automationId: 'auto', status: 'completed', startedAt: '2026-10-06T11:00:00Z' },
+    ] })]) });
+    expect(wrapper.text()).not.toMatch(/Executions|2 executions/);
+    const toggle = wrapper.get<HTMLInputElement>('[aria-label="Enable Morning"]');
+    expect(toggle.element.checked).toBe(true);
+    await toggle.trigger('click'); await flushPromises();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(updateAutomation).toHaveBeenCalledWith({ id: 'auto', name: 'Morning', enabled: false, prompt: 'Check tasks',
+      target: { kind: 'newQuickChat', teamId: 'team-app', backend: 'codex' }, schedule: { intervalMinutes: 60 } });
+    await wrapper.setProps({ automations: [automation({ enabled: false })] });
+    await wrapper.get('[aria-label="Enable Morning"]').trigger('click'); await flushPromises();
+    expect(updateAutomation).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'auto', enabled: true }));
+  });
+
+  it('reports a failed switch and warns instead of re-enabling an automation whose chat was removed', async () => {
+    const updateAutomation = vi.fn().mockRejectedValueOnce(new Error('Save failed')).mockResolvedValue(undefined);
+    const gone = { kind: 'agent' as const, agentId: 'removed' };
+    const wrapper = view({ updateAutomation, automations: [automation({ enabled: false, target: gone })] });
+    expect(wrapper.text()).toContain('Target unavailable');
+    await wrapper.get('[aria-label="Enable Morning"]').trigger('click'); await flushPromises();
+    expect(updateAutomation).not.toHaveBeenCalled();
+    expect(wrapper.get('[role="alert"]').text()).toBe('This chat no longer exists. Edit the automation to choose another.');
+    await wrapper.setProps({ automations: [automation({ target: gone })] });
+    await wrapper.get('[aria-label="Enable Morning"]').trigger('click'); await flushPromises();
+    expect(updateAutomation).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, target: gone }));
+    expect(wrapper.get('[role="alert"]').text()).toBe('Save failed');
   });
 });

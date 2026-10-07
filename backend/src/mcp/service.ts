@@ -496,11 +496,12 @@ export class AppMcpService {
         name: input.name?.trim() || null,
         folder,
         backend: progress.backend,
-        backendDefaults: delegatedBackendDefaults(caller, input),
         delegatedByAgentId: caller.id,
         teamId: input.teamId ?? caller.teamId,
       };
       const createdAgent = this.agentCreation.create(createInput, { select: false, ...(intendedId ? { id: intendedId } : {}) });
+      // Creation applies the target provider's saved model and approval policy first.
+      createdAgent.backendDefaults = { ...createdAgent.backendDefaults, ...delegatedBackendDefaults(caller, input) };
       if (this.resolveWorkspaceIdentity) {
         const workspace = await this.resolveWorkspaceIdentity(folder);
         updateAgentWorkspace(this.snapshot, createdAgent.id, workspace, workspace.updatedAt);
@@ -613,7 +614,7 @@ function delegatedBackendDefaults(caller: Agent, input: McpCreateAgentInput): Ba
   const reasoningEffort = input.reasoningEffort?.trim() || callerDefaults?.reasoningEffort;
 
   const settings = {
-    ...(model ? { model } : {}),
+    ...(model ? { model, userSelectedModel: true } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
   };
   return { kind: backend, ...settings };
