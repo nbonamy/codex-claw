@@ -28,12 +28,23 @@
         <strong>{{ displayName }}</strong>
         <span v-if="agent.folder">{{ folderBasename(agent.folder) }}</span>
       </div>
-      <span
-        class="cockpit-view__agent-state"
-        :data-status="agent.status.type"
-      >
-        {{ agentStatusLabel(agent.status.type, t) }}
-      </span>
+      <div class="cockpit-view__agent-meta">
+        <span
+          v-if="backendChoices.length > 1"
+          class="cockpit-view__agent-backend"
+          role="img"
+          :aria-label="backendDisplayName(agent.backend)"
+          :title="backendDisplayName(agent.backend)"
+        >
+          <BackendIcon :backend="agent.backend" />
+        </span>
+        <span
+          class="cockpit-view__agent-state"
+          :data-status="agent.status.type"
+        >
+          {{ agentStatusLabel(agent.status.type, t) }}
+        </span>
+      </div>
     </header>
 
     <div class="cockpit-view__agent-body">
@@ -68,9 +79,12 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Agent, WorkItem } from '@workspace/core/contracts';
 import { agentDisplayName } from '@workspace/core/agent-display';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 import { agentCanReceivePrompt, agentStatusLabel, agentStatusText, folderBasename } from '../shared/agent-display';
 import { FolderRootIcon, SendIcon } from '../shared/icons/app-icons';
 import AgentAvatar from './AgentAvatar.vue';
+import BackendIcon from './BackendIcon.vue';
+import { useBackendChoices } from './backend-selection';
 import { relativeSessionDate } from './use-session-history';
 
 const props = defineProps<{
@@ -92,6 +106,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const backendChoices = useBackendChoices(() => props.agent.teamId);
 
 const promptDraft = ref('');
 const canReceivePrompt = computed(() => agentCanReceivePrompt(props.agent));
@@ -286,6 +301,17 @@ function dropWorkItem(event: DragEvent): void {
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
   line-height: var(--line-height-18);
+}
+
+.cockpit-view__agent-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.cockpit-view__agent-backend {
+  display: flex;
 }
 
 .cockpit-view__agent-state {
