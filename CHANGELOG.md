@@ -4,6 +4,15 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.28.1] - 2026-10-06
+
+### Improvements and fixes
+
+- Press Tab in an empty composer to accept a suggested follow-up prompt, ready
+  to edit or send. Accepting a suggestion does not send it automatically.
+- Composer placeholders use a lighter color to distinguish suggestions from
+  your draft.
+
 ## [0.28.0] - 2026-10-06
 
 ### New features
