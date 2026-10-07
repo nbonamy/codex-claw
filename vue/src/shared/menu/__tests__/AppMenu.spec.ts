@@ -1,11 +1,22 @@
+import '../../../styles/base.css';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import { PencilIcon, SwitchHorizontalIcon } from '../../icons/app-icons';
 import AppMenu from '../AppMenu.vue';
 import type { AppMenuItem } from '../app-menu';
-import '../../../styles/base.css';
 
 describe('AppMenu', () => {
+  it('uses compact regular-weight menu labels', () => {
+    const wrapper = mount(AppMenu, {
+      attachTo: document.body,
+      props: { ariaLabel: 'Actions', items: [{ id: 'edit', type: 'action', label: 'Edit' }] },
+    });
+    try {
+      expect(getComputedStyle(wrapper.get('[role="menuitem"]').element).fontSize).toBe('var(--font-size-13-5)');
+      expect(getComputedStyle(wrapper.get('.app-menu__label').element).fontWeight).toBe('var(--font-weight-regular)');
+    } finally { wrapper.unmount(); }
+  });
+
   it('keeps selected diff scopes accessible without a check column', async () => {
     const items: AppMenuItem[] = [
       { id: 'branch', type: 'radio', label: 'Branch', value: '+12 -4', checked: false, icon: PencilIcon },

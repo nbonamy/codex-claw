@@ -205,7 +205,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
   border-radius: var(--radius-xl);
   color: var(--color-text);
   background: transparent;
-  font-size: var(--font-size-14);
+  font-size: var(--font-size-13-5);
   text-align: left;
   cursor: pointer;
 }
@@ -283,7 +283,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
 }
 
 .app-menu__label {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
 }
 
 .app-menu__description,
