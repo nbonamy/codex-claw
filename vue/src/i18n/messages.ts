@@ -50,7 +50,7 @@ export const messages = {
       name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',
       cancelLabel: 'Cancel Linear authorization',
       cancel: 'Cancel',
-      setup: 'Connect your Linear account for backlog work.',
+      setup: 'Connect your Linear account for backlog work',
       signedInAs: 'Signed in as {account}',
     },
     handoff: {

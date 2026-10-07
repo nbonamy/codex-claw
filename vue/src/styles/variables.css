@@ -183,16 +183,24 @@ html.dark {
   --color-primary: #7DA6FF;
   --color-on-primary: #081B3F;
   --color-primary-container: #17356E;
+  --color-on-primary-container: #C9DBFF;
   --shell-glass-opacity: 88%;
   --color-shell-collapsed-header: var(--color-shell-main);
   /* Semantic */
   --color-error: #FF8A78;
   --color-on-error: #3D0B05;
   --color-error-container: #4A1710;
+  --color-on-error-container: #FFB8AB;
 
   --color-success: #5ED9A6;
   --color-on-success: #022A1B;
   --color-success-container: #0C3A2A;
+  --color-on-success-container: #A6EFCF;
+
+  --color-warning: #F2B35B;
+  --color-on-warning: #3A2200;
+  --color-warning-container: #3F2B0B;
+  --color-on-warning-container: #FFD9A3;
 
   /* Surfaces — neutral gray scale */
   --color-surface: #0D0F12;
