@@ -66,8 +66,8 @@ Be explicit about whether the agent may edit files, commit, or publish. Scheduli
 
 ## Change or stop an automation
 
-Edit the automation to change its prompt, conversation, or schedule. Switch it off to stop future runs. This does not stop a run already in progress; interrupt that work from its conversation if needed.
+Edit the automation to change its prompt, conversation, or schedule. Use the switch in the list to turn it off or on; switching it off stops future runs. This does not stop a run already in progress; interrupt that work from its conversation if needed.
 
 Deleting an automation removes its schedule, not its conversations or worktrees. **Clear** in the log removes finished entries and keeps active runs.
 
-If a run fails, check its error and the selected conversation. Reconnect the coding engine if needed. If the conversation or team has been removed, edit the automation to choose another.
+If a run fails, check its error and the selected conversation. Reconnect the coding engine if needed. If you close the agent, Quick Chat, or team an automation runs in, Korus switches the automation off and ends any run in progress. Edit it to choose another conversation, then switch it back on.

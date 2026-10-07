@@ -347,7 +347,12 @@ wiring, never branches in assignment, Mission, Settings or automation code.
   the same conversation, and records provider turn completion rather than treating
   an idle coordination status as success. Approval requests retain the run as
   awaiting input. Interrupted runs fail explicitly on daemon restart; history
-  cleanup never deletes conversations or active executions.
+  cleanup never deletes conversations or active executions. Closing an agent or
+  team disables the automations targeting it and fails their active runs (a run
+  whose conversation vanished never gets a turn event and would block its schedule
+  forever; the scheduler tick repeats that sweep as a safety net). A disabled
+  automation with a missing target can be re-saved off but not on until it is
+  re-targeted.
 
 ## In-app Browser
 

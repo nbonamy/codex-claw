@@ -632,7 +632,6 @@ export const surfaceMessages = {
     "automationActions": "Automation actions",
     "automation": "Automation",
     "lastExecution": "Last execution",
-    "executions": "Executions",
     "edit": "Edit",
     "delete": "Delete",
     "deleteAutomation": "Delete automation?",

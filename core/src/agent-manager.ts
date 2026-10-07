@@ -12,6 +12,7 @@ import type {
   WorkBacklogAssignment,
   WorkBacklogAssignmentStatus,
 } from './contracts';
+import { releaseRemovedAutomationTargetsInSnapshot } from './automation-manager';
 import { createEntityId, createUniqueEntityId, type IdGenerator } from './ids';
 import { workBacklogAssignmentFromWorkItem, workItemAssignmentKey, type WorkItemAssignmentSource } from './work-assignments';
 import { agentDisplayName } from './agent-display';
@@ -592,6 +593,7 @@ export function closeAgentInSnapshot(snapshot: AppSnapshot, agentId: string): Ag
   }
 
   snapshot.agents = snapshot.agents.filter((candidate) => candidate.id !== agentId);
+  releaseRemovedAutomationTargetsInSnapshot(snapshot);
   delete snapshot.agentRequests?.[agentId];
   delete snapshot.backendApprovals[agentId];
   snapshot.workBacklog.assignments = Object.fromEntries(

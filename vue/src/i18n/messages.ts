@@ -12,7 +12,7 @@ export const messages = {
       promptPlaceholder: 'What should happen each time this runs?',
       model: 'Model', effort: 'Reasoning effort', defaultModel: 'Default model', defaultEffort: 'Default effort',
       inheritsSettings: 'Uses this conversation’s context, model, and permissions.',
-      missingTarget: 'Target unavailable', needsInput: 'Needs input',
+      missingTarget: 'Target unavailable', invalidTarget: 'This chat no longer exists. Edit the automation to choose another.', needsInput: 'Needs input',
       modelsUnavailable: 'Could not load models. Use the default or enter a model ID.',
       conversationTitle: 'Conversation',
     },
@@ -232,6 +232,7 @@ export const messages = {
       },
       automations: {
         deleteExecution: 'Delete execution for {ticket}',
+        enable: 'Enable {automation}',
         everyHours: 'Every {count} hours',
         everyDays: 'Every {count} days',
         everyMinutes: 'Every {count} minutes',

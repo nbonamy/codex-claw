@@ -2,6 +2,8 @@ export { default as GitHubIcon } from './GitHubIcon.vue';
 export { default as LinearIcon } from './LinearIcon.vue';
 export { default as BacklogIcon } from './BacklogIcon.vue';
 export { default as ProductMarkIcon } from './ProductMarkIcon.vue';
+// Softer corners than Tabler's sharp play triangle.
+export { default as PlayerPlayIcon } from './PlayerPlayIcon.vue';
 
 export {
   IconAffiliate as AffiliateIcon,
@@ -52,7 +54,6 @@ export {
   IconLogout as QuitIcon,
   IconPalette as PaletteIcon,
   IconPencil as PencilIcon,
-  IconPlayerPlay as PlayerPlayIcon,
   IconPhoto as PhotoIcon,
   IconPlus as PlusIcon,
   IconCirclePlus as PlusCircleIcon,

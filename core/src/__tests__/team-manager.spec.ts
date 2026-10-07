@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptySnapshot, createInitialSnapshot } from '../snapshot';
 import { closeTeamInSnapshot, createTeamInSnapshot, reorderTeamInSnapshot, selectTeam, teamInitials, updateTeamInSnapshot } from '../team-manager';
 import { createMission } from '../missions';
+import { createAutomationInSnapshot } from '../automation-manager';
 
 describe('team-manager', () => {
   it('creates a team with initials, selected color, and no default agent', () => {
@@ -165,6 +166,20 @@ describe('team-manager', () => {
     expect(snapshot.agents).toStrictEqual([]);
     expect(snapshot.activeTeamId).toBe(skwadTeam.id);
     expect(snapshot.activeAgentId).toBeNull();
+  });
+
+  it('disables new Quick Chat automations of a closed team', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    const skwadTeam = createTeamInSnapshot(snapshot, { name: 'Skwad', color: '#46A857' }, '2026-06-05T10:11:12.000Z');
+    const target = (teamId: string) => ({ kind: 'newQuickChat', teamId, backend: 'codex' }) as const;
+    const closing = createAutomationInSnapshot(snapshot, { prompt: 'Check', schedule: { intervalMinutes: 60 }, target: target('team-app') }, 'created', () => 'closing')!;
+    const staying = createAutomationInSnapshot(snapshot, { prompt: 'Check', schedule: { intervalMinutes: 60 }, target: target(skwadTeam.id) }, 'created', () => 'staying')!;
+
+    closeTeamInSnapshot(snapshot, 'team-app');
+
+    expect(closing.enabled).toBe(false);
+    expect(staying.enabled).toBe(true);
   });
 
   it('closes an inactive team without changing the current active agent', () => {

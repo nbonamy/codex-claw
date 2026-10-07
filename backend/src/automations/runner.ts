@@ -1,7 +1,7 @@
 import type { Agent, AppSnapshot, Automation, AutomationExecutionLogEntry, BackendConversationRef, MainToRendererEvent } from '@workspace/core/contracts';
 import { createQuickChatInSnapshot } from '@workspace/core/agent-manager';
 import { agentDisplayName } from '@workspace/core/agent-display';
-import { automationExecutionIsActive, canTargetAutomationAgent, recordAutomationExecutionInSnapshot } from '@workspace/core/automation-manager';
+import { automationExecutionIsActive, canTargetAutomationAgent, failAutomationExecution, failOrphanedAutomationExecutionsInSnapshot, recordAutomationExecutionInSnapshot } from '@workspace/core/automation-manager';
 import { createEntityId } from '@workspace/core/ids';
 import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
 import { warnMain } from '../log';
@@ -33,6 +33,8 @@ export class AutomationRunner {
   }
 
   async runAll(): Promise<void> {
+    // Safety net: whatever removed a conversation, its active run can never finish on its own.
+    if (failOrphanedAutomationExecutionsInSnapshot(this.options.getSnapshot(), this.now().toISOString())) await this.publish();
     for (const automation of [...this.options.getSnapshot().automations]) {
       if (automationIsDue(automation, this.now())) await this.runAutomation(automation.id);
     }
@@ -119,9 +121,7 @@ export class AutomationRunner {
   }
 
   private fail(automation: Automation, run: AutomationExecutionLogEntry, error: string): void {
-    Object.assign(run, { status: 'failed', error, completedAt: this.now().toISOString() });
-    automation.lastError = error;
-    automation.updatedAt = run.completedAt!;
+    failAutomationExecution(automation, run, error, this.now().toISOString());
   }
 
   private now(): Date { return this.options.now?.() ?? new Date(); }

@@ -115,4 +115,17 @@ describe('AutomationEditor', () => {
     await wrapper.get('form').trigger('submit');
     expect(wrapper.emitted('submit')?.[1]?.[0]).toMatchObject({ target: { kind: 'agent', agentId: 'agent-dina' } });
   });
+
+  it('warns and blocks saving when the automation chat no longer exists until another is chosen', async () => {
+    const wrapper = editor({ id: 'auto', name: 'Morning', enabled: false, prompt: 'Check', target: { kind: 'agent', agentId: 'removed' },
+      schedule: { intervalMinutes: 60 }, executionLog: [], createdAt: '', updatedAt: '' });
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toBe('This chat no longer exists. Edit the automation to choose another.');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')).toBeUndefined();
+    await choose(wrapper, 'Conversation', 'Dina @ agent-workspace');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ target: { kind: 'agent', agentId: 'agent-dina' } });
+  });
 });
