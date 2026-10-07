@@ -228,7 +228,7 @@
       :visualization="browserVisualization"
       :visible="visible && activeTab === 'browser'"
       @send-prompt="emit('sendPrompt', $event)"
-      @url-change="browserUrl = $event"
+      @url-change="updateBrowserUrl('browser', $event)"
     />
 
     <template v-if="browserAvailable">
@@ -241,7 +241,7 @@
         :initial-url="browserPanels[tab]!.url"
         :visible="visible && activeTab === tab"
         @send-prompt="emit('sendPrompt', $event)"
-        @url-change="browserUrls[tab] = $event"
+        @url-change="updateBrowserUrl(tab, $event)"
       />
     </template>
 
@@ -472,6 +472,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   annotateVisualization: [annotation: import('./use-visualization-annotations').VisualizationAnnotationInput];
+  browserUrlChange: [tab: 'browser' | RightWorkspaceBrowserTab, url: string];
   closeTab: [tab: RightWorkspaceTab];
   cancelPlan: [];
   commentPlan: [comments: PlanReviewComment[]];
@@ -506,6 +507,12 @@ async function saveActiveDocument(): Promise<void> {
   try { await props.saveDocument(props.activeTab); }
   catch (error) { ElMessage.error(String(error)); }
   finally { savingDocument.value = false; }
+}
+function updateBrowserUrl(tab: 'browser' | RightWorkspaceBrowserTab, url: string): void {
+  if (tab === 'browser') browserUrl.value = url;
+  else browserUrls.value[tab] = url;
+  // BrowserPanel emits an empty initial state before the host opens its page.
+  if (url && !(tab === 'browser' && props.browserVisualization)) emit('browserUrlChange', tab, url);
 }
 const browserUrl = ref('');
 const browserUrls = ref<Partial<Record<RightWorkspaceBrowserTab, string>>>({});

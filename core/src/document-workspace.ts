@@ -3,6 +3,7 @@ export type DocumentWorkspaceTab = {
   id: string;
   title: string;
   path?: string;
+  browser?: { id: string; url: string };
   documentId?: string;
   /** Set only by a successful backend Save As. */
   savedPath?: string;

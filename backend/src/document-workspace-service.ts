@@ -10,7 +10,7 @@ type StoredDocument = { agentId: string; content: string };
 type Store = { clients: Record<string, DocumentWorkspaces>; documents: Record<string, StoredDocument> };
 
 const identity = z.string().min(1).refine(value => !['__proto__', 'constructor', 'prototype'].includes(value));
-const tabSchema = z.strictObject({ id: identity, title: z.string(), path: z.string().optional(), documentId: identity.optional(), savedPath: z.string().optional() });
+const tabSchema = z.strictObject({ id: identity, title: z.string(), browser: z.strictObject({ id: identity, url: z.string() }).optional(), path: z.string().optional(), documentId: identity.optional(), savedPath: z.string().optional() });
 const layoutSchema = z.strictObject({ activeTab: z.string().nullable(), open: z.boolean(), width: z.number().finite(), filesPaneOpen: z.boolean(), filesPaneWidth: z.number().finite() });
 const workspaceSchema = layoutSchema.extend({ tabs: z.array(tabSchema) });
 const changeSchema = layoutSchema.partial().extend({ upsert: z.array(tabSchema).optional(), close: z.array(identity).optional() });

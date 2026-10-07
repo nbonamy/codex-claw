@@ -373,7 +373,10 @@ sandboxed `<webview>` with a per-agent persistent partition; Electron main
 validates the guest and owns navigation and annotation policy. The renderer never
 receives the guest's `WebContents`, cookies or page-scripting access, and
 annotations arrive as structured metadata the renderer batches into one prompt.
-Page state is ephemeral. The MCP `browser-open` tool reaches the same surface
+Open browser tabs retain their browser identity and latest URL in the per-client
+workspace store. Restoring a tab navigates through the normal host browser API;
+page contents, navigation history and live guest handles remain ephemeral.
+The MCP `browser-open` tool reaches the same surface
 through `client/browser/open`; inactive agent workspaces stay mounted but hidden
 so browser tools keep working without changing the user's selection.
 

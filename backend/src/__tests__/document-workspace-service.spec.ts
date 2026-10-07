@@ -14,6 +14,19 @@ async function fixture() {
 }
 
 describe('document workspace lifetime', () => {
+  it('retains each browser identity and latest URL through a fresh service', async () => {
+    const { service, filename } = await fixture();
+    const tabs = [
+      { id: 'browser', title: 'browser', browser: { id: 'primary', url: 'https://example.com/start' } },
+      { id: 'browser:docs', title: 'Docs', browser: { id: 'docs', url: 'https://example.org/docs' } },
+    ];
+    await service.apply('desktop', 'a', { upsert: tabs, activeTab: 'browser:docs', open: true });
+    tabs[0]!.browser.url = 'https://example.com/latest?q=one#section';
+    await service.apply('desktop', 'a', { upsert: [tabs[0]!] });
+    expect((await new DocumentWorkspaceService(filename).get('desktop')).a).toMatchObject({ tabs, activeTab: 'browser:docs', open: true });
+    expect(await new DocumentWorkspaceService(filename).get('other-client')).toEqual({});
+  });
+
   it('restores exact content, identities and per-agent layout through a fresh service and releases only the last reference', async () => {
     const { service, filename } = await fixture();
     await service.get('desktop');

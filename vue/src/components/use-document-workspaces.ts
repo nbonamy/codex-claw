@@ -2,7 +2,7 @@ import { onScopeDispose, watch } from 'vue';
 import type { AppApi } from '@workspace/core/contracts';
 import type { DocumentWorkspace, DocumentWorkspaceTab, DocumentWorkspaces } from '@workspace/core/document-workspace';
 import type { AgentRightWorkspaceState } from './use-right-workspace-state';
-import { isRightWorkspaceFileTab, type RightWorkspaceTab } from './right-workspace';
+import { isRightWorkspaceBrowserTab, isRightWorkspaceFileTab, type RightWorkspaceTab } from './right-workspace';
 
 /** Persist references and layout; never serialize content, provider state or handles. */
 export function useDocumentWorkspaces(options: {
@@ -23,7 +23,14 @@ export function useDocumentWorkspaces(options: {
 
   function descriptor(workspace: AgentRightWorkspaceState): DocumentWorkspace {
     return {
-      tabs: workspace.tabs.flatMap(id => {
+      tabs: workspace.tabs.flatMap<DocumentWorkspaceTab>(id => {
+        if (id === 'browser' && !workspace.browserVisualization) {
+          return [{ id, title: id, browser: { id: workspace.browserId, url: workspace.browserInitialUrl } }];
+        }
+        if (isRightWorkspaceBrowserTab(id)) {
+          const browser = workspace.browserPanels[id];
+          return [{ id, title: browser?.title ?? id, ...(browser ? { browser: { id: browser.browserId, url: browser.url } } : {}) }];
+        }
         const panel = isRightWorkspaceFileTab(id) ? workspace.filePanels[id] : undefined;
         // Provider plan/diff/image payloads remain owned by their original surfaces.
         if (isRightWorkspaceFileTab(id) && !panel?.documentId && !panel?.path && !panel?.savedPath) return [];
@@ -45,7 +52,16 @@ export function useDocumentWorkspaces(options: {
         const hadLocalTabs = workspace.tabs.length > 0 || closedDuringRestore.has(agentId);
         for (const tab of saved.tabs) {
           if (closedDuringRestore.get(agentId)?.has(tab.id)) continue;
-          if (!workspace.tabs.includes(tab.id as RightWorkspaceTab)) workspace.tabs.push(tab.id as RightWorkspaceTab);
+          const alreadyOpen = workspace.tabs.includes(tab.id as RightWorkspaceTab);
+          if (!alreadyOpen) {
+            workspace.tabs.push(tab.id as RightWorkspaceTab);
+            if (tab.browser && tab.id === 'browser') {
+              workspace.browserId = tab.browser.id;
+              workspace.browserInitialUrl = tab.browser.url;
+            } else if (tab.browser && isRightWorkspaceBrowserTab(tab.id as RightWorkspaceTab)) {
+              workspace.browserPanels[tab.id as `browser:${string}`] = { browserId: tab.browser.id, url: tab.browser.url, title: tab.title };
+            }
+          }
           if (isRightWorkspaceFileTab(tab.id as RightWorkspaceTab)) restorePanel(agentId, tab);
         }
         if (!hadLocalTabs) {

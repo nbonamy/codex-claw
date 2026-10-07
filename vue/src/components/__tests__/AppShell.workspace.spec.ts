@@ -47,6 +47,51 @@ afterEach(() => {
 });
 
 describe('AppShell workspace and plans', () => {
+  it('persists browser navigation and reopens primary and additional browsers in a fresh workspace', async () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    let stored: import('@workspace/core/document-workspace').DocumentWorkspace = {
+      tabs: [
+        { id: 'browser', title: 'browser', browser: { id: 'primary', url: 'https://example.com/start' } },
+        { id: 'browser:docs', title: 'Docs', browser: { id: 'docs', url: 'https://example.org/docs' } },
+      ], activeTab: 'browser', open: true, width: 420, filesPaneOpen: false, filesPaneWidth: 280,
+    };
+    const browserState = (url: string) => ({ url, title: '', canGoBack: false, canGoForward: false });
+    const browserOpen = vi.fn(async (_agent: string, _browser: string, url: string) => browserState(url));
+    setElectronTestClient({
+      getDocumentWorkspaces: async () => ({ 'agent-dina': structuredClone(stored) }),
+      updateDocumentWorkspace: async (_agent, change) => {
+        for (const tab of change.upsert ?? []) {
+          const index = stored.tabs.findIndex(old => old.id === tab.id);
+          if (index < 0) stored.tabs.push(structuredClone(tab)); else stored.tabs[index] = structuredClone(tab);
+        }
+        stored = { ...stored, activeTab: change.activeTab ?? stored.activeTab };
+        return structuredClone(stored);
+      },
+      browserOpen, browserNavigate: vi.fn(async (_agent, _browser, url) => browserState(url)),
+      browserSetBounds: vi.fn().mockResolvedValue(undefined), browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined), browserGetZoom: vi.fn().mockResolvedValue(1),
+    });
+    const wrapper = mountShell(); await flushPromises();
+    expect(wrapper.findAll('webview')).toHaveLength(2);
+    wrapper.findAll('webview').forEach((guest, index) => readyBrowserGuest(guest.element, 42 + index));
+    await flushPromises();
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com/start', 42);
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'docs', 'https://example.org/docs', 43);
+    const addresses = wrapper.findAll('[aria-label="Browser address"]');
+    await addresses[0]!.setValue('https://example.com/latest?q=one#section');
+    await wrapper.findAll('.browser-panel__address')[0]!.trigger('submit'); await flushPromises();
+    await addresses[1]!.setValue('https://example.org/next');
+    await wrapper.findAll('.browser-panel__address')[1]!.trigger('submit'); await flushPromises();
+    expect(stored.tabs.map(tab => tab.browser?.url)).toEqual(['https://example.com/latest?q=one#section', 'https://example.org/next']);
+    wrapper.unmount(); browserOpen.mockClear();
+    const restarted = mountShell(); await flushPromises();
+    restarted.findAll('webview').forEach((guest, index) => readyBrowserGuest(guest.element, 52 + index));
+    await flushPromises();
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com/latest?q=one#section', 52);
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'docs', 'https://example.org/next', 53);
+    restarted.unmount();
+  });
+
   it('restores document tabs, selected tab and collapsed layout, and retains an inactive-agent display', async () => {
     const tabId = 'file:markdown:restored';
     const saved = { tabs: [{ id: tabId, title: 'Restored proposal', documentId: 'restored' }], activeTab: tabId, open: false, width: 610, filesPaneOpen: false, filesPaneWidth: 280 };
