@@ -4,6 +4,36 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.28.0] - 2026-10-06
+
+### New features
+
+- Automations send recurring prompts to an existing agent or Quick Chat, or
+  start a fresh Quick Chat each time. Existing conversations keep their model
+  and permissions; new chats can use a provider, model, and reasoning effort
+  of your choice.
+- Schedule daily, weekday, weekly, or custom recurrences with a next-run
+  preview. Calendar schedules follow your local timezone across daylight
+  saving changes; interval schedules remain available.
+- Ask an agent to create an automation directly from chat, including requests
+  such as "every day at 8 AM." Scheduled work runs while the owning Korus
+  daemon is running.
+
+### Improvements and fixes
+
+- The automation editor groups conversation, schedule, and model settings in
+  compact sections. Agent choices include their repository, long chat titles
+  truncate, and the automation list adapts to smaller windows.
+- AppShots captures a specific window of the frontmost app, keeping its
+  screenshot and accessibility context aligned.
+- The macOS AppShots hotkey no longer requires Input Monitoring permission.
+
+### Compatibility
+
+- Scheduled prompts replace repository-based automation loops. Existing loop
+  definitions are not migrated and must be recreated; their agents and
+  worktrees are preserved.
+
 ## [0.27.2] - 2026-10-06
 
 ### New features
