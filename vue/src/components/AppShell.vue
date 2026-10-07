@@ -2890,6 +2890,7 @@ function forwardSteerPrompt(prompt: string, options?: RendererSendPromptOptions)
 }
 
 async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  const capturedImages = imageAnnotation.capture();
   await backendSwitch.settled();
   requireConnectedConversation();
   await forwardCodexPromptWithVisualizationAnnotations(
@@ -2902,12 +2903,14 @@ async function forwardCodexPrompt(prompt: string, options?: CodexRendererSendMes
         nextPrompt,
         nextOptions,
         forwardPrompt,
+        capturedImages,
       ),
     ),
   );
 }
 
 async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSendMessageOptions): Promise<void> {
+  const capturedImages = imageAnnotation.capture();
   requireConnectedConversation();
   await forwardCodexPromptWithVisualizationAnnotations(
     prompt,
@@ -2919,6 +2922,7 @@ async function forwardCodexSteerPrompt(prompt: string, options?: CodexRendererSe
         nextPrompt,
         nextOptions,
         forwardSteerPrompt,
+        capturedImages,
       ),
     ),
   );

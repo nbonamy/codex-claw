@@ -163,10 +163,11 @@ export function useAgentConversation(options: {
   async function forward(prompt: string, sendOptions: CodexRendererSendMessageOptions | undefined, send: AgentConversationActions['send']): Promise<void> {
     const id = agentId();
     if (!id) return;
+    const capturedImages = imageAnnotation.capture();
     await options.beforeSubmit?.();
     await visualizationAnnotation.forward(prompt, sendOptions, (text, visualOptions) =>
       chatTextAnnotation.forward(text, visualOptions, (annotatedText, textOptions) =>
-        imageAnnotation.forward(annotatedText, textOptions, (finalText, finalOptions) => send(id, finalText, finalOptions))));
+        imageAnnotation.forward(annotatedText, textOptions, (finalText, finalOptions) => send(id, finalText, finalOptions), capturedImages)));
   }
   const actions: CodexConversationPaneActions = {
     clearGoal: () => options.actions.clearGoal(agentId()),
