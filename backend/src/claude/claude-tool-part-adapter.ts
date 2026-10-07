@@ -211,11 +211,10 @@ function statusInput(input: Record<string, unknown>): Record<string, unknown> {
 }
 
 function finishTurnInput(input: Record<string, unknown>): Record<string, unknown> {
-  const celebration = recordValue(input.celebration);
   return {
     ...(typeof input.flag === 'string' ? { flag: input.flag } : {}),
-    ...(celebration && typeof celebration.kind === 'string'
-      ? { celebration: { kind: celebration.kind } }
+    ...(typeof input.celebration === 'boolean'
+      ? { celebration: input.celebration }
       : {}),
   };
 }

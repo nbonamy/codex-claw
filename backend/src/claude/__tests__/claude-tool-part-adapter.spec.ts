@@ -166,14 +166,14 @@ describe('Claude tool part adapter', () => {
       input: {
         flag: 'ready_for_review',
         announcement: { text: 'A private completion phrase.' },
-        celebration: { kind: 'stars' },
+        celebration: true,
       },
     });
 
     expect(part).toMatchObject({
       input: {
         flag: 'ready_for_review',
-        celebration: { kind: 'stars' },
+        celebration: true,
       },
     });
     expect(JSON.stringify(part)).not.toContain('private completion phrase');

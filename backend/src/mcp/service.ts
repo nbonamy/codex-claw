@@ -88,6 +88,7 @@ export class AppMcpService {
   private readonly promptInputMethodsByAgentId = new Map<string, SendPromptOptions['inputMethod']>();
   private readonly reviewTools = new ReviewToolRegistry();
   private readonly agentCreation: AgentCreationService;
+  private lastCelebrationKind?: CelebrationKind;
 
   constructor(options: AppMcpServiceOptions) {
     this.tasks = options.tasks;
@@ -120,7 +121,7 @@ export class AppMcpService {
         void this.deliverUnreadAgentMessages(agentId);
       },
       onDisplayMarkdown: (agent, input) => this.displayMarkdownForAgent(agent, input),
-      onCelebrate: (agent, kind) => this.celebrateForAgent(agent, kind),
+      onCelebrate: (agent) => this.celebrateForAgent(agent),
       onAnnounce: (agent, phase, text) => this.announceForAgent(agent, phase, text),
       onUpdateWorkItem: (agent, workItemId, status, note) => this.updateWorkItemForAgent(agent, workItemId, status, note),
       onListSourceRepositories: () => this.listSourceRepositories(),
@@ -337,7 +338,11 @@ export class AppMcpService {
     };
   }
 
-  private celebrateForAgent(agent: Agent, kind: CelebrationKind): CelebrationResponse {
+  private celebrateForAgent(agent: Agent): CelebrationResponse {
+    const kinds: CelebrationKind[] = ['confetti', 'stars', 'shapes', 'schoolPride'];
+    const choices = kinds.filter(kind => kind !== this.lastCelebrationKind);
+    const kind = choices[Math.floor(Math.random() * choices.length)]!;
+    this.lastCelebrationKind = kind;
     this.emit({
       agentId: agent.id,
       type: 'client.celebrationRequested',

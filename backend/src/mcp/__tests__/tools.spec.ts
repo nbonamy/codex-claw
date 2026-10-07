@@ -146,11 +146,11 @@ describe(`${product.name} MCP tool registration`, () => {
     ['finish_turn', {
       flag: 'ready_for_review',
       announcement: { text: 'Done.' },
-      celebration: { kind: 'stars' },
+      celebration: true,
     }, 'finishTurn', ['agent-dina', {
       flag: 'ready_for_review',
       announcement: { text: 'Done.' },
-      celebration: { kind: 'stars' },
+      celebration: true,
     }]],
     ['update-work-item', { workItemId: 'github:o/r#1', status: 'readyForReview' }, 'updateWorkItem', ['agent-dina', 'github:o/r#1', 'readyForReview', undefined]],
     ['update-work-item', { workItemId: 'github:o/r#1', status: 'blocked', note: 'Need API access' }, 'updateWorkItem', ['agent-dina', 'github:o/r#1', 'blocked', 'Need API access']],

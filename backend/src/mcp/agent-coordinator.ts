@@ -98,7 +98,7 @@ export type FinishTurnInput = {
   flag?: ThreadFlagId;
   suggestedPrompt?: string;
   announcement?: { text: string };
-  celebration?: { kind: CelebrationKind };
+  celebration?: boolean;
 };
 
 export type UpdateWorkItemResponse =
@@ -164,7 +164,7 @@ export type AppMcpAgentCoordinatorOptions = {
   onAgentUpdated?: (agent: Agent) => void;
   onInboxMessage?: (agentId: string, messageId: string) => void;
   onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
-  onCelebrate?: (agent: Agent, kind: CelebrationKind) => CelebrationResponse | Promise<CelebrationResponse>;
+  onCelebrate?: (agent: Agent) => CelebrationResponse | Promise<CelebrationResponse>;
   onAnnounce?: (agent: Agent, phase: AnnouncementPhase, text: string) => AnnouncementResponse | Promise<AnnouncementResponse>;
   onUpdateWorkItem?: (agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string) => UpdateWorkItemResponse | Promise<UpdateWorkItemResponse>;
   onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
@@ -189,7 +189,7 @@ export class AppMcpAgentCoordinator {
   private readonly onAgentUpdated?: (agent: Agent) => void;
   private readonly onInboxMessage?: (agentId: string, messageId: string) => void;
   private readonly onDisplayMarkdown?: (agent: Agent, input: DisplayMarkdownInput) => DisplayMarkdownResponse | Promise<DisplayMarkdownResponse>;
-  private readonly onCelebrate?: (agent: Agent, kind: CelebrationKind) => CelebrationResponse | Promise<CelebrationResponse>;
+  private readonly onCelebrate?: (agent: Agent) => CelebrationResponse | Promise<CelebrationResponse>;
   private readonly onAnnounce?: (agent: Agent, phase: AnnouncementPhase, text: string) => AnnouncementResponse | Promise<AnnouncementResponse>;
   private readonly onUpdateWorkItem?: (agent: Agent, workItemId: string, status: WorkBacklogAssignmentStatus, note?: string) => UpdateWorkItemResponse | Promise<UpdateWorkItemResponse>;
   private readonly onListSourceRepositories?: () => SourceRepository[] | Promise<SourceRepository[]>;
@@ -334,7 +334,7 @@ export class AppMcpAgentCoordinator {
         ? this.onAnnounce!(agent, normalizedAnnouncement.phase, normalizedAnnouncement.text)
         : undefined,
       input.celebration
-        ? this.onCelebrate!(agent, input.celebration.kind)
+        ? this.onCelebrate!(agent)
         : undefined,
     ]);
     return {

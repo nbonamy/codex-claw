@@ -93,7 +93,7 @@ export function appDeveloperInstructions(
   ];
   if (effects.celebrationsEnabled !== false) {
     instructions.push(
-      'After a meaningful win—especially a successful release, major feature, migration, or hard fix—include one celebration in finish_turn. Pick a fitting kind and vary it from the most recent visible celebration.',
+      'After a meaningful win—especially a successful release, major feature, migration, or hard fix—request a celebration in finish_turn with celebration: true. Korus chooses the visual effect.',
     );
   }
   if (settings.computerUseEnabled) {

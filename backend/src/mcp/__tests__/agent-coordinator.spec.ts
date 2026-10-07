@@ -100,7 +100,7 @@ describe('AppMcpAgentCoordinator', () => {
     await expect(coordinator.finishTurn('agent-dina', {
       flag: 'delegate_to_worktree',
       announcement: { text: '  Ready to hand off.  ' },
-      celebration: { kind: 'stars' },
+      celebration: true,
     })).resolves.toStrictEqual({
       success: true,
       status: null,
@@ -114,7 +114,7 @@ describe('AppMcpAgentCoordinator', () => {
       },
     });
     expect(onAnnounce).toHaveBeenCalledWith(agents[0], 'finish', 'Ready to hand off.');
-    expect(onCelebrate).toHaveBeenCalledWith(agents[0], 'stars');
+    expect(onCelebrate).toHaveBeenCalledWith(agents[0]);
     expect(agents[0]!.statusText).toBeUndefined();
     expect(agents[0]!.threadFlags).toStrictEqual({ delegate_to_worktree: true });
     await expect(coordinator.finishTurn('agent-dina', { flag: 'ready_for_review' }))
