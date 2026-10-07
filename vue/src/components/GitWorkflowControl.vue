@@ -346,7 +346,7 @@
     :close-on-press-escape="!updateOperationRunning"
     destroy-on-close
   >
-    <template #header><div class="app-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !updateOperationConfirming }"><h2 class="app-dialog__title">{{ updateDialogTitle }}</h2><template v-if="updateOperation.status === 'confirmingDirty'"><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.commitYourChangesFirst') }}</span><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.updatingWithUncommittedChangesCanCauseConflicts', { branch: baseBranch }) }}</span></template><span v-else-if="updateOperation.status === 'confirmingRequired'" class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.branchMustIncludeLatestChanges', { branch: baseBranch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
+    <template #header><div class="app-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !updateOperationConfirming }"><h2 class="app-dialog__title">{{ updateDialogTitle }}</h2><template v-if="updateOperation.status === 'confirmingDirty'"><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.commitYourChangesFirst') }}</span><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.updatingWithUncommittedChangesCanCauseConflicts', { branch: updateBranch }) }}</span></template><span v-else-if="updateOperation.status === 'confirmingRequired'" class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.branchMustIncludeLatestChanges', { branch: baseBranch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <GitOperationFeedback
       v-if="!updateOperationConfirming"
       :status="updateFeedbackStatus"
@@ -387,6 +387,7 @@ const props = withDefaults(defineProps<{
   createPullRequest?: (agentId: string, input: AgentGitPullRequestInput) => Promise<AgentGitWorkflow>;
   mergeBranch?: (agentId: string, input: AgentGitMergeInput) => Promise<AgentGitWorkflow>;
   updateFromBase?: (agentId: string, input: AgentGitUpdateFromBaseInput) => Promise<AgentGitUpdateFromBaseResult>;
+  pullBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitPullInput) => Promise<import('@workspace/core/contracts').AgentGitPullResult>;
   reportBackAgentName?: string | null;
 }>(), { presentation: 'menu' });
 
@@ -404,6 +405,7 @@ const pushDialogOpen = ref(false);
 const pullRequestDialogOpen = ref(false);
 const mergeDialogOpen = ref(false);
 const updateDialogOpen = ref(false);
+const updateSource = ref<'base' | 'upstream'>('base');
 const commitMessageInput = ref<HTMLTextAreaElement | null>(null);
 const squashCommitMessageInput = ref<HTMLTextAreaElement | null>(null);
 const commitMessage = ref('');
@@ -552,12 +554,13 @@ const mergeOperationDetail = computed(() => mergeOperation.value.status === 'err
       ? translate('surface.gitWorkflowControl.mergingChangesAndCleaningUpTheLinkedWorktree')
       : translate('surface.gitWorkflowControl.mergingChangesIntoTheBaseWorktree'));
 const baseBranch = computed(() => workflow.value?.baseBranch ?? 'base');
+const updateBranch = computed(() => updateSource.value === 'upstream' ? workflow.value?.upstream ?? 'upstream' : baseBranch.value);
 const updateOperationConfirming = computed(() => updateOperation.value.status === 'confirmingDirty'
   || updateOperation.value.status === 'confirmingRequired');
 const mergeDialogTitle = computed(() => mergeTargetDirtyWarning.value
   ? translate('surface.gitWorkflowControl.commitChangesInBranchFirst', { branch: baseBranch.value })
   : translate('surface.gitWorkflowControl.mergeBranch'));
-const updateDialogTitle = computed(() => resumeMergeAfterUpdate.value
+const updateDialogTitle = computed(() => updateSource.value === 'upstream' ? translate('surface.gitWorkflowControl.pull') : resumeMergeAfterUpdate.value
   ? translate('surface.gitWorkflowControl.updateFromBranchRequired', { branch: baseBranch.value })
   : translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }));
 const updateOperationRunning = computed(() => updateOperation.value.status === 'updating');
@@ -569,7 +572,7 @@ const updateFeedbackStatus = computed<'running' | 'success' | 'warning' | 'error
       ? 'error'
       : 'running');
 const updateOperationTitle = computed(() => updateOperation.value.status === 'updating'
-  ? translate('surface.gitWorkflowControl.updatingFromBranch', { branch: baseBranch.value })
+  ? translate('surface.gitWorkflowControl.updatingFromBranch', { branch: updateBranch.value })
   : updateOperation.value.status === 'success'
     ? translate('surface.gitWorkflowControl.branchUpdated')
     : updateOperation.value.status === 'conflicts'
@@ -582,11 +585,11 @@ const updateOperationDetail = computed(() => updateOperation.value.status === 'c
       updateOperation.value.count === 1
         ? 'surface.gitWorkflowControl.agentAskedToResolveOneConflict'
         : 'surface.gitWorkflowControl.agentAskedToResolveConflicts',
-      { count: updateOperation.value.count, branch: baseBranch.value },
+      { count: updateOperation.value.count, branch: updateBranch.value },
     ) + (props.presentation === 'delivery' ? ` ${translate('surface.gitWorkflowControl.reviewResolvedChanges')}` : '')
   : updateOperation.value.status === 'error'
     ? updateOperation.value.message
-    : workflow.value?.branch ? `${baseBranch.value} → ${workflow.value.branch}` : baseBranch.value);
+    : workflow.value?.branch ? `${updateBranch.value} → ${workflow.value.branch}` : updateBranch.value);
 
 const commitEnabled = computed(() => workflow.value === null
   ? !workflowError.value && (props.gitStatus?.changedFiles ?? 0) > 0
@@ -599,8 +602,10 @@ const mergeEnabled = computed(() => currentBranchAvailable.value && !integration
 const canMerge = computed(() => mergeStrategy.value === 'merge' || Boolean(squashCommitMessage.value.trim()));
 const prEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
 const updateEnabled = computed(() => Boolean(props.updateFromBase && workflow.value?.isLinkedWorktree && workflow.value.baseBranch && currentBranchAvailable.value));
+const pullEnabled = computed(() => Boolean(props.pullBranch && workflow.value?.upstream && currentBranchAvailable.value));
 const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
+  { id: 'pull', type: 'action', label: translate('surface.gitWorkflowControl.pull'), icon: RefreshIcon, disabled: !pullEnabled.value },
   { id: 'commit', type: 'action', label: translate('surface.gitWorkflowControl.commit'), icon: GitCommitIcon, disabled: !commitEnabled.value },
   { id: 'push', type: 'action', label: translate('surface.gitWorkflowControl.push'), icon: CloudUploadIcon, disabled: !pushEnabled.value },
   ...(updateEnabled.value ? [{ id: 'update-from-base', type: 'action' as const, label: translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }), icon: RefreshIcon }] : []),
@@ -741,8 +746,9 @@ async function selectAction(action: string): Promise<void> {
       busy.value = false;
     }
   }
-  else if (action === 'update-from-base' && updateEnabled.value) {
+  else if ((action === 'update-from-base' && updateEnabled.value) || (action === 'pull' && pullEnabled.value)) {
     resetUpdateOperation();
+    updateSource.value = action === 'pull' ? 'upstream' : 'base';
     updateDialogOpen.value = true;
     if (!workflow.value?.files.length) void updateFromBase(false);
   }
@@ -987,13 +993,14 @@ async function merge(pushAfter: boolean): Promise<void> {
   }
 }
 async function updateFromBase(allowDirty: boolean): Promise<void> {
-  if (!props.updateFromBase) return;
+  const update = updateSource.value === 'upstream' ? props.pullBranch : props.updateFromBase;
+  if (!update) return;
   clearUpdateSuccessTimer();
   busy.value = true;
   workflowError.value = null;
   updateOperation.value = { status: 'updating' };
   try {
-    const result = await props.updateFromBase(props.agent.id, {
+    const result = await update(props.agent.id, {
       confirmed: true,
       ...(allowDirty ? { allowDirty: true } : {}),
     });
@@ -1149,6 +1156,7 @@ function clearMergeSuccessTimer(): void {
   }
 }
 function resetUpdateOperation(): void {
+  updateSource.value = 'base';
   clearUpdateSuccessTimer();
   resumeMergeAfterUpdate.value = false;
   updateOperation.value = { status: 'confirmingDirty' };

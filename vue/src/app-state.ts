@@ -916,6 +916,11 @@ export function useAppState() {
     return appApi.updateAgentGitBranchFromBase(agentId, input);
   }
 
+  async function pullAgentGitBranch(agentId: string, input: import('@workspace/core/contracts').AgentGitPullInput): Promise<import('@workspace/core/contracts').AgentGitPullResult> {
+    if (!appApi?.pullAgentGitBranch) throw new Error(translate('surface.app-state.gitPullIsNotAvailable'));
+    return appApi.pullAgentGitBranch(agentId, input);
+  }
+
   async function loadOpenInApplications(): Promise<void> {
     if (!appHostCapabilities.openInApplications || !appApi?.getOpenInApplications) return;
     openInApplications.value = await appApi.getOpenInApplications();
@@ -1721,6 +1726,7 @@ export function useAppState() {
     createAgentGitPullRequest,
     mergeAgentGitBranch,
     updateAgentGitBranchFromBase,
+    pullAgentGitBranch,
     loadOpenInApplications,
     openAgentPath,
     createAgent,

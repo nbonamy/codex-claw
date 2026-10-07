@@ -72,6 +72,7 @@ const requestTimeoutByMethod = {
   [backendMethods.agentGitPullRequestCreate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitMerge]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitUpdateFromBase]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.agentGitPull]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGoalClear]: QUICK_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGoalUpdate]: QUICK_REQUEST_TIMEOUT_MS,
   [backendMethods.agentConversationLoad]: LONG_RUNNING_REQUEST_TIMEOUT_MS,

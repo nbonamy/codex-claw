@@ -61,6 +61,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   stageAgentGitFiles: [backendMethods.agentGitStage, named('agentId', 'input')],
   commitAgentGitChanges: [backendMethods.agentGitCommit, named('agentId', 'input')],
   pushAgentGitBranch: [backendMethods.agentGitPush, named('agentId', 'input')],
+  pullAgentGitBranch: [backendMethods.agentGitPull, named('agentId', 'input')],
   createAgentGitBranch: [backendMethods.agentGitBranchCreate, named('agentId', 'input')],
   createAgentGitPullRequest: [backendMethods.agentGitPullRequestCreate, named('agentId', 'input')],
   mergeAgentGitBranch: [backendMethods.agentGitMerge, named('agentId', 'input')],

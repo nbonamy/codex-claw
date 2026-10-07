@@ -238,12 +238,43 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     expect(wrapper.findAll('.app-menu__label').map((item) => item.text())).toStrictEqual([
+      'Pull',
       'Commit',
       'Push',
       'Merge',
       'Create PR',
     ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
+  });
+
+  it('pulls the tracked branch and shows the agent conflict handoff', async () => {
+    const pullBranch = vi.fn().mockResolvedValue({ workflow, upstream: 'origin/feature/demo', branch: 'feature/demo', conflicts: ['a.ts'] });
+    const wrapper = mountControl({ pullBranch, getWorkflow: async () => ({ ...workflow, files: [] }) });
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click');
+    await flushPromises();
+    expect(pullBranch).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true });
+    expect(wrapper.text()).toContain('Agent resolving conflicts');
+    expect(wrapper.text()).toContain('origin/feature/demo');
+  });
+
+  it('disables pull without an upstream and asks before pulling dirty work', async () => {
+    const pullBranch = vi.fn().mockResolvedValue({ workflow, upstream: 'origin/feature/demo', branch: 'feature/demo', conflicts: [] });
+    const unavailable = mountControl({ pullBranch, getWorkflow: async () => ({ ...workflow, upstream: undefined }) });
+    await flushPromises();
+    await unavailable.get('.git-workflow-control__trigger').trigger('click');
+    expect(unavailable.findAll('[role="menuitem"]')[0]!.attributes('disabled')).toBeDefined();
+    unavailable.unmount();
+    const wrapper = mountControl({ pullBranch });
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click');
+    expect(pullBranch).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('Commit your changes first');
+    await submitButton(wrapper, 'Update anyway').trigger('click');
+    await flushPromises();
+    expect(pullBranch).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true, allowDirty: true });
   });
 
   it('offers updating a linked worktree from its base branch and recommends committing dirty work first', async () => {

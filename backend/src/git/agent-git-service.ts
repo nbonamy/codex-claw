@@ -528,6 +528,25 @@ export class AgentGitService {
     }
   }
 
+  async pull(folder: string, allowDirty = false): Promise<{ upstream: string; branch: string; conflicts: string[] }> {
+    const current = await this.workflow(folder);
+    if (!current.branch || current.detached) throw new Error('Check out a branch before pulling.');
+    if (!current.upstream) throw new Error('Set an upstream branch before pulling.');
+    const readConflicts = async () => (await this.runGit(folder, ['diff', '--name-only', '--diff-filter=U', '-z'])).stdout.split('\0').filter(Boolean);
+    if ((await readConflicts()).length > 0) throw new Error('Resolve the existing conflicts before pulling.');
+    if (current.files.length > 0 && !allowDirty) throw new Error('Commit your changes before pulling.');
+    const result = { upstream: current.upstream, branch: current.branch, conflicts: [] as string[] };
+    try {
+      // Merge the configured upstream, regardless of global rebase/ff-only/autostash preferences.
+      await this.runGit(folder, ['pull', '--no-rebase', '--ff', '--no-edit', '--no-autostash']);
+      return result;
+    } catch (error) {
+      const conflicts = await readConflicts();
+      if (conflicts.length === 0) throw error;
+      return { ...result, conflicts };
+    }
+  }
+
   async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string): Promise<AgentGitMergeResult> {
     const normalizedCommitMessage = commitMessage?.trim();
     if (strategy === 'squash' && !normalizedCommitMessage) throw new Error('Enter a squash commit message.');
