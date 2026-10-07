@@ -4,6 +4,41 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.29.0] - 2026-10-07
+
+### New features
+
+- Interactive HTML previews in assistant messages support charts, small tools,
+  and other visual explanations directly in the conversation. Resize previews,
+  inspect their source, or copy and download the HTML.
+- Pull the current branch's upstream from the Git menu. If the pull produces
+  conflicts, the agent receives a request to resolve them.
+- Enable or disable automations directly from the automation list.
+- Windows and Linux Help menus include About Korus and Check for Updates.
+  Platforms without automatic updates open the latest release downloads.
+
+### Improvements and fixes
+
+- The model picker lists models directly, with supported reasoning efforts in
+  each model's submenu. Selecting a model preserves a compatible effort;
+  choosing an effort selects both together.
+- A quieter team rail, consistent navigation states and headers, and lighter
+  menu typography improve navigation. The sidebar shows the selected team's
+  name, and teams named Korus use the app logo.
+- Cockpit cards show provider icons when multiple backends are enabled. Idle
+  sidebar indicators stay hidden until the individual agent is hovered.
+- Image annotations are preserved when sending a prompt. Measurement
+  annotations can be submitted without a comment.
+- Delegated agents display explicit model selections correctly and use their
+  provider's saved permissions before the first prompt.
+- Agents load Korus's HTML, Visualize, Computer Use, and Mission guidance on
+  demand through a shared tool, without needing filesystem access to skills.
+- Automation storage is protected against overwrites by incompatible older
+  builds. Removing a target conversation disables its schedules and marks
+  abandoned runs as failed instead of leaving them stuck.
+- Local SDK development resolves transcription helpers from the selected SDK
+  checkout instead of a hard-coded root dependency path.
+
 ## [0.28.1] - 2026-10-06
 
 ### Improvements and fixes
