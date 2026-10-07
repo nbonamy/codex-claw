@@ -41,7 +41,10 @@
         ]"
         type="button"
         v-bind="clientTeamOrderUpdate.dragItemAttributes(team.id)"
-        :style="{ backgroundColor: team.color ?? defaultTeamColor }"
+        :style="{
+          backgroundColor: team.color ?? defaultTeamColor,
+          outlineColor: isTeamActive(team.id) ? team.color ?? defaultTeamColor : undefined,
+        }"
         :aria-label="teamAriaLabel(team)"
         :aria-pressed="isTeamActive(team.id)"
         @click="emit('select-team', team.id)"

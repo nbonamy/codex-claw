@@ -44,6 +44,18 @@ const remoteConnection: RemoteConnection = {
 };
 
 describe('TeamRail', () => {
+  it('matches the selection ring to the selected team color', async () => {
+    const wrapper = mountRail({ teams, activeTeamId: 'team-app' });
+    expect(getComputedStyle(wrapper.get(`[aria-label="${product.name}"]`).element).outlineColor)
+      .toBe('rgb(27, 79, 178)');
+
+    await wrapper.setProps({ activeTeamId: 'team-sk' });
+    expect(getComputedStyle(wrapper.get('[aria-label="Skwad"]').element).outlineColor)
+      .toBe('rgb(70, 168, 87)');
+    expect(getComputedStyle(wrapper.get(`[aria-label="${product.name}"]`).element).outline)
+      .toBe('');
+  });
+
   it('renders teams and marks the active team', () => {
     const wrapper = mountRail({
       teams,
