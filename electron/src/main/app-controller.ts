@@ -1613,7 +1613,15 @@ export class AppController {
 
   private runManualUpdateCheck(): void {
     if (!this.autoUpdateService || !this.manualUpdateCheckController) return;
-    if (!this.manualUpdateCheckController.begin(this.autoUpdateService.getStatus())) return;
+    const status = this.autoUpdateService.getStatus();
+    if (status.state === 'disabled' && process.platform !== 'darwin') {
+      void this.openExternal(`${product.repositoryUrl}/releases/latest`)
+        .catch((error) => warnMain('updates', 'failed to open release downloads', {
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      return;
+    }
+    if (!this.manualUpdateCheckController.begin(status)) return;
     if (!this.autoUpdateService.check()) this.manualUpdateCheckController.cancel();
     this.refreshAppMenu();
   }

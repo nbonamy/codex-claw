@@ -1,6 +1,6 @@
 ---
 name: prepare-release
-description: Prepare and launch a Korus release by auditing changes, confirming version and prerelease/latest channel, validating and pushing the release commit, then starting the single release command and handing back the run link. Use when asked to prepare or cut a release, including $prepare-release.
+description: Prepare and launch a Korus release with the latest SDK changes published to npm and consumed by Korus, then audit changes, confirm version/channel, validate, push, and dispatch the GitHub build. Use when asked to prepare or cut a release, including $prepare-release.
 ---
 
 # Prepare Release
@@ -10,17 +10,41 @@ commands, required environments/secrets, target limitations, and recovery.
 The build source is an immutable remote tag. Dependencies
 come from published packages and `package-lock.json`, never a live sibling SDK.
 
-## Audit and confirm version and channel
+## Publish and consume the SDK first
 
 1. Require a clean Korus worktree. Preserve existing changes and stop if dirty.
-2. Read and execute `../update-changelog/SKILL.md`. Require audited user-visible
-   outcomes, app/SDK baselines, the pinned SDK release's Git provenance, and an
-   exact semantic-version recommendation. Stop if the audit recommends no release.
-3. Present the evidence and recommendation before version edits. An explicit
+2. Identify the latest completed `codex-app-sdk` changes intended for this release.
+   Compare their source commit with npm's published version and `gitHead`; the
+   currently locked version or a working local SDK build is not proof they ship.
+   Resolve unfinished or ambiguous SDK scope with Nicolas before proceeding.
+3. If those changes are unpublished, release a new SDK version through the SDK
+   repository's release workflow and required gates. Coordinate with its active
+   owner rather than running a competing release. Obtain SDK publication approval
+   if it has not already been given; pause Korus preparation until publication
+   is verified. Reuse an existing published version only if it includes all the
+   intended changes. Never republish an existing version.
+4. Verify every consumed `@codex-app-sdk/*` package is available from npm at the
+   selected version, with registry provenance covering the intended SDK commit.
+   Update all Korus `@codex-app-sdk/*` declarations together to exact numeric pins
+   for the selected published version. Refresh `package-lock.json` with the CI
+   Node/npm toolchain and verify every consumed SDK package resolves to that
+   same version. Preserve the local-development opt-in; release dependencies
+   must resolve to npm tarballs, not sibling paths, source aliases, or local
+   overrides.
+5. Record this dependency-only diff for the changelog audit. Keep it uncommitted
+   until the Korus version/channel is confirmed; include it in release prep.
+
+## Audit and confirm version and channel
+
+1. Read and execute `../update-changelog/SKILL.md`, passing the recorded SDK
+   dependency refresh as its only allowed pre-existing diff. Require audited
+   user-visible outcomes, app/SDK baselines, the locked SDK release's Git provenance,
+   and an exact semantic-version recommendation. Stop if the audit recommends no release.
+2. Present the evidence and recommendation before Korus version edits. An explicit
    user-supplied version can be used after checking it against the audit.
    Otherwise obtain confirmation of the recommended version. Require a plain
    semantic version greater than the current one and an unused Git tag.
-4. Confirm the release channel alongside the version: **prerelease** (manual
+3. Confirm the release channel alongside the version: **prerelease** (manual
    downloads, no auto-update) or **latest** (stable, advances auto-update). Use
    an explicitly supplied choice; otherwise ask before preparing. Do not infer
    latest from "release" or "publish".

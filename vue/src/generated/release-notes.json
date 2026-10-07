@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.28.0",
+  "currentVersion": "0.28.1",
   "releases": [
+    {
+      "version": "0.28.1",
+      "releasedAt": "2026-10-06",
+      "sourceSha256": "6c29e4bfe3d7083177cc62559e20e91e9c3279c2448e1ffb27c75631cb9b0d6b",
+      "markdown": "### Improvements and fixes\n\n- Press Tab in an empty composer to accept a suggested follow-up prompt, ready\n  to edit or send. Accepting a suggestion does not send it automatically.\n- Composer placeholders use a lighter color to distinguish suggestions from\n  your draft."
+    },
     {
       "version": "0.28.0",
       "releasedAt": "2026-10-06",

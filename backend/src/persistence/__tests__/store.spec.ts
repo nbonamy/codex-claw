@@ -7,7 +7,7 @@ import type { AppSnapshot } from '@workspace/core/contracts';
 import type { Visualization } from '@workspace/core/visualize';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../../state-persistence';
 import { AppStateStore } from '../store';
-import { StoreFormatError } from '../store-format';
+import { StoreFormatError, parseStoreFile } from '../store-format';
 
 const visualization = (id: string): Visualization => ({ id, title: id, content: { kind: 'mermaid', source: 'flowchart LR; A --> B' }, createdAt: '2026-09-21T12:00:00.000Z', updatedAt: '2026-09-21T12:00:00.000Z' });
 
@@ -25,7 +25,72 @@ function snapshotWithVisualizations(): AppSnapshot {
   return snapshot;
 }
 
+function snapshotWithCalendar(): AppSnapshot {
+  const snapshot = createInitialSnapshot();
+  snapshot.automations = [{ id: 'calendar', name: 'Daily refresh', enabled: true, prompt: 'Refresh calendar',
+    target: { kind: 'agent', agentId: snapshot.agents[0]!.id },
+    schedule: { rrule: 'FREQ=DAILY;BYHOUR=8;BYMINUTE=0;BYSECOND=0', timeZone: 'America/Chicago' },
+    createdAt: '2026-10-07T01:19:04.000Z', updatedAt: '2026-10-07T01:19:04.000Z', executionLog: [] }];
+  return snapshot;
+}
+
 describe('AppStateStore', () => {
+  it('protects calendar automations from schema-1 readers and retains them across restart', async () => {
+    const snapshot = snapshotWithCalendar();
+    await new AppStateStore(home).save(snapshot);
+    const roster = await readFile(file('roster.json'), 'utf8');
+
+    // Released schema-1 builds must fail before their old entity sanitizer drops the schedule.
+    expect(() => parseStoreFile('roster.json', roster, 1)).toThrowError(/supports up to schema 1/);
+    const restarted = new AppStateStore(home);
+    const restored = await restarted.load();
+    expect(restored.automations).toStrictEqual(snapshot.automations);
+    restored.agents[0]!.name = 'Renamed after restart';
+    await restarted.save(restored);
+    expect((await new AppStateStore(home).load()).automations).toStrictEqual(snapshot.automations);
+  });
+
+  it('backs up and protects an existing v1 roster on load without losing prompt schedules or converting old loops', async () => {
+    const snapshot = snapshotWithCalendar();
+    await new AppStateStore(home).save(snapshot);
+    const roster = await readJson('roster.json');
+    roster.schemaVersion = 1;
+    (roster.data.automations as unknown[]).push({ id: 'old-loop', name: 'Old loop', enabled: true,
+      teamId: snapshot.teams[0]!.id, backend: 'codex', repositories: [{ provider: 'github', id: 'org/repo' }],
+      schedule: { intervalMinutes: 60 }, createdAt: '', updatedAt: '', executionLog: [] });
+    const original = JSON.stringify(roster);
+    await writeFile(file('roster.json'), original);
+    const settings = await readFile(file('settings.json'), 'utf8');
+
+    const store = new AppStateStore(home);
+    const restored = await store.load();
+    expect(restored.automations).toStrictEqual(snapshot.automations);
+    expect(restored.agents.map(agent => agent.id)).toStrictEqual(snapshot.agents.map(agent => agent.id));
+    expect(() => parseStoreFile('roster.json', original, 1)).not.toThrow();
+    const protectedRoster = await readFile(file('roster.json'), 'utf8');
+    expect(() => parseStoreFile('roster.json', protectedRoster, 1)).toThrowError(StoreFormatError);
+    const backups = await readdir(file('backups'));
+    expect(backups).toHaveLength(1);
+    expect(await readFile(file('backups', backups[0]!), 'utf8')).toBe(original);
+    expect(await readFile(file('settings.json'), 'utf8')).toBe(settings);
+
+    await store.save(restored);
+    expect((await new AppStateStore(home).load()).automations).toStrictEqual(snapshot.automations);
+    expect(await readdir(file('backups'))).toStrictEqual(backups);
+  });
+
+  it('does not rewrite an old roster when its upgrade backup fails', async () => {
+    await new AppStateStore(home).save(snapshotWithCalendar());
+    const roster = await readJson('roster.json');
+    roster.schemaVersion = 1;
+    const original = JSON.stringify(roster);
+    await writeFile(file('roster.json'), original);
+    await writeFile(file('backups'), 'not a directory');
+
+    await expect(new AppStateStore(home).load()).rejects.toThrow();
+    expect(await readFile(file('roster.json'), 'utf8')).toBe(original);
+  });
+
   it('starts empty without creating files, then writes the versioned layout on the first save', async () => {
     const store = new AppStateStore(home);
     expect(await store.load()).toStrictEqual(createEmptySnapshot());
@@ -34,7 +99,7 @@ describe('AppStateStore', () => {
     await store.save(snapshotWithVisualizations());
 
     expect((await readdir(home)).sort()).toStrictEqual(['roster.json', 'settings.json', 'visualizations']);
-    expect((await readJson('roster.json')).schemaVersion).toBe(1);
+    expect((await readJson('roster.json')).schemaVersion).toBe(2);
     expect((await readJson('settings.json')).schemaVersion).toBe(1);
     const [directory] = await readdir(file('visualizations'));
     expect(directory).toMatch(/^app-[0-9a-f]{8}$/);
@@ -104,7 +169,7 @@ describe('AppStateStore', () => {
 
   it('refuses a roster written by a newer build and leaves it untouched', async () => {
     await new AppStateStore(home).save(createInitialSnapshot());
-    const newer = JSON.stringify({ schemaVersion: 2, writtenBy: 'daemon 9.9.9', data: {} });
+    const newer = JSON.stringify({ schemaVersion: 3, writtenBy: 'daemon 9.9.9', data: {} });
     await writeFile(file('roster.json'), newer);
 
     await expect(new AppStateStore(home).load()).rejects.toThrowError(/daemon 9\.9\.9/);

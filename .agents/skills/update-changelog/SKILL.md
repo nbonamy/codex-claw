@@ -11,19 +11,27 @@ history when this skill is explicitly invoked.
 
 ## 1. Require clean release inputs
 
-Before any mutation, require Korus to be clean:
+Before any mutation, inspect Korus's starting diff:
 
 ```bash
 git status --short
 ```
 
-Abort if the command returns any entry. Do not stash, discard, stage,
-commit, or absorb existing changes.
+For a standalone audit, abort if the command returns any entry. When called by
+`prepare-release`, allow only the dependency-only package manifest/lockfile diff
+that its SDK preflight created from a clean worktree. Record and preserve that
+exact starting diff; any other pre-existing change blocks the audit. Do not
+stash, discard, stage, commit, or absorb unrelated changes.
 
 Confirm Korus's branch/upstream without pulling or switching branches. Resolve
-`<sdk-version>` from `package-lock.json`'s installed `@codex-app-sdk/backend`
-entry and require all SDK workspace dependencies to use that same published
-version. Resolve `<sdk-head>` with `npm view @codex-app-sdk/backend@<sdk-version>
+`<sdk-version>` from the backend workspace's SDK dependency and its matching
+`package-lock.json` entry. npm may install packages under a workspace's
+`node_modules` or hoist them to the root; follow resolution from each consuming
+workspace rather than requiring a root entry. Require every SDK declaration
+to pin that exact numeric version and all SDK lockfile entries, including
+nested/transitive copies, to resolve to the same published version with registry
+tarball URLs and integrity hashes. Apply the same lookup to the baseline lockfile.
+Resolve `<sdk-head>` with `npm view @codex-app-sdk/backend@<sdk-version>
 gitHead --registry=https://registry.npmjs.org`. Require a full commit SHA.
 The audit ends at that published commit, even if the sibling checkout is newer.
 Use the sibling repository as a read-only Git object database if available;
@@ -136,9 +144,10 @@ git diff --check
 git status --short
 ```
 
-Only `CHANGELOG.md` may be modified in Korus; the SDK repository is read-only.
-Recheck that the locked SDK version/provenance did not change and review the
-complete changelog diff.
+Only `CHANGELOG.md` may change during the audit; any recorded SDK dependency
+refresh must remain unchanged. The SDK repository is read-only during this
+skill. Recheck that the locked SDK version/provenance did not change during the
+audit and review the complete changelog diff.
 
 Return a concise audit result for Nicolas or the calling release skill:
 

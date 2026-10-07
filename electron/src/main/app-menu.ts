@@ -74,11 +74,11 @@ export function buildAppMenuTemplate(
     buildAgentMenu(callbacks),
     ...(options.debugMode ? [buildDebugMenu(callbacks)] : []),
     buildWindowMenu(callbacks, platform),
-    buildHelpMenu(callbacks),
+    buildHelpMenu(callbacks, options, platform),
   ];
 }
 
-function buildHelpMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
+function buildHelpMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions, platform: NodeJS.Platform): MenuItemConstructorOptions {
   return {
     label: mainT('menu.help'),
     submenu: [
@@ -86,6 +86,13 @@ function buildHelpMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions 
         label: mainT('menu.whatsNew'),
         click: () => callbacks.sendAppCommand({ type: 'open-whats-new' }),
       },
+      ...(platform !== 'darwin' ? [
+        ...(options.updateStatus && callbacks.checkForUpdates && callbacks.installUpdate
+          ? [createUpdateMenuItem(options.updateStatus, callbacks, true)]
+          : []),
+        { type: 'separator' as const },
+        { label: mainT('menu.aboutApp'), role: 'about' as const },
+      ] : []),
     ],
   };
 }
@@ -343,7 +350,7 @@ function buildAppMenu(callbacks: AppMenuCallbacks, options: AppMenuOptions): Men
   };
 }
 
-function createUpdateMenuItem(status: DesktopUpdateStatus, callbacks: AppMenuCallbacks): MenuItemConstructorOptions {
+function createUpdateMenuItem(status: DesktopUpdateStatus, callbacks: AppMenuCallbacks, manualDownloads = false): MenuItemConstructorOptions {
   if (status.state === 'downloaded') {
     return {
       label: mainT('menu.installUpdate'),
@@ -353,7 +360,7 @@ function createUpdateMenuItem(status: DesktopUpdateStatus, callbacks: AppMenuCal
 
   const busy = status.state === 'checking' || status.state === 'downloading';
   return {
-    enabled: status.state !== 'disabled' && !busy,
+    enabled: (status.state !== 'disabled' || manualDownloads) && !busy,
     label: busy ? mainT('menu.checkingForUpdates') : mainT('menu.checkForUpdates'),
     click: callbacks.checkForUpdates,
   };

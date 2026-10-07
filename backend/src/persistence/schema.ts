@@ -6,7 +6,7 @@ import { StoreFormatError } from './store-format';
 import type { RosterAgent, RosterData, SettingsData, VisualizationData } from './layout';
 
 /*
- * Schema version 1 of the three file kinds. The file structure and the engine block are
+ * Roster schema 2; settings and visualization schema 1. The file structure and the engine block are
  * strict. Entities that keep their long-standing shape (agents' inner fields, missions,
  * automations, settings...) are checked as objects here and repaired by the existing
  * entity sanitizers when the state is joined back together.

@@ -11,6 +11,7 @@ const messages = {
     'install.failed': `Could not install ${product.name}`,
     'install.manual': `Drag ${product.name} to Applications, then open it from there.`,
     'menu.app': `${product.name}`,
+    'menu.aboutApp': `About ${product.name}`,
     'menu.agent': 'Agent',
     'menu.browser': 'Browser',
     'menu.checkForUpdates': 'Check for Updates...',
