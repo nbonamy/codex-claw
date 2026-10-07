@@ -52,6 +52,7 @@ import type { DurableTaskService } from '../agents/durable-task-service';
 const maxMarkdownBytes = 2 * 1024 * 1024;
 
 export type AppMcpServiceOptions = {
+  retainDocument?: (agentId: string, request: import('@workspace/core/contracts').SidePanelMarkdownRequest) => Promise<import('@workspace/core/contracts').SidePanelMarkdownRequest>;
   tasks?: DurableTaskService;
   persistSnapshot?: () => Promise<void>;
   missionTools?: MissionToolPort;
@@ -72,6 +73,7 @@ export type AppMcpServiceOptions = {
 };
 
 export class AppMcpService {
+  private readonly retainDocument?: AppMcpServiceOptions['retainDocument'];
   private readonly tasks?: DurableTaskService;
   private readonly persistSnapshot?: () => Promise<void>;
   private readonly snapshot: AppSnapshot;
@@ -91,6 +93,7 @@ export class AppMcpService {
   private lastCelebrationKind?: CelebrationKind;
 
   constructor(options: AppMcpServiceOptions) {
+    this.retainDocument = options.retainDocument;
     this.tasks = options.tasks;
     this.persistSnapshot = options.persistSnapshot;
     this.snapshot = options.snapshot;
@@ -319,16 +322,11 @@ export class AppMcpService {
     const content = input.markdown ?? (resolvedPath ? await readAgentMarkdownFile(resolvedPath.absolutePath) : '');
     const title = input.title ?? (resolvedPath ? fileBasename(resolvedPath.relativePath) : 'Markdown');
 
-    this.emit({
-      agentId: agent.id,
-      type: 'client.markdownDisplayRequested',
-      payload: {
-        kind: 'markdown',
-        title,
-        ...(resolvedPath ? { path: resolvedPath.relativePath } : {}),
-        content,
-      },
-    });
+    const request: import('@workspace/core/contracts').SidePanelMarkdownRequest = {
+      kind: 'markdown', title, ...(resolvedPath ? { path: resolvedPath.relativePath } : {}), content,
+    };
+    const payload = this.retainDocument ? await this.retainDocument(agent.id, request) : request;
+    this.emit({ agentId: agent.id, type: 'client.markdownDisplayRequested', payload });
 
     return {
       success: true,

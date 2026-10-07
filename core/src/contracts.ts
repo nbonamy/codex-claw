@@ -515,6 +515,8 @@ export type ClientState = {
 };
 
 export type SidePanelMarkdownRequest = {
+  agentId?: string;
+  documentId?: string;
   kind: 'markdown';
   purpose?: 'plan';
   title?: AppText;
@@ -835,6 +837,11 @@ export type AppApi = {
   listBackendPlugins(agentId: string): Promise<BackendPluginSummary[]>;
   listBackendSkills(agentId: string): Promise<BackendSkillSummary[]>;
   listAgentFiles(agentId: string): Promise<AgentFileSearchItem[]>;
+  getDocumentWorkspaces(): Promise<import('./document-workspace').DocumentWorkspaces>;
+  updateDocumentWorkspace(agentId: string, change: import('./document-workspace').DocumentWorkspaceChange): Promise<import('./document-workspace').DocumentWorkspace>;
+  readWorkspaceDocument(agentId: string, tabId: string): Promise<import('./document-workspace').DocumentReadResult>;
+  saveWorkspaceDocument(agentId: string, input: import('./document-workspace').DocumentSaveInput): Promise<import('./document-workspace').DocumentWorkspace>;
+  chooseDocumentSavePath(defaultPath: string): Promise<string | null>;
   previewAgentFile(agentId: string, filePath: string): Promise<AgentFilePreviewResult>;
   readAgentFileChunk(agentId: string, filePath: string, offset: number): Promise<import('./contracts/workspace').AgentFileChunk>;
   getAgentGitDiff(agentId: string, target?: AgentGitDiffTarget): Promise<import('./contracts/git').AgentGitDiff>;

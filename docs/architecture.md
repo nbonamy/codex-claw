@@ -115,6 +115,7 @@ target, archive the displaced conversation, then persist the new reference.
 | --- | --- |
 | `roster.json` | teams, agents, automations, missions, work assignments, review ledgers |
 | `settings.json` | preferences, theme, source folder, remote connections, work integrations |
+| `document-workspaces.json` | per-client, per-agent open tab references and transient Markdown backing bytes |
 | `tasks.json` | durable delegated tasks (additive; absent means none) |
 | `visualizations/<repo>-<hash>/<id>.json` | user content, one file per visualization |
 | `backups/` | verified copies taken before a migration |
@@ -140,6 +141,15 @@ Rules:
 - Navigation, ordering and presentation settings are per-client preference
   profiles; backend policy is shared. A client selecting a remote team never
   changes the remote desktop's navigation.
+- Document tabs own transient Markdown lifetime. Display persists the bytes and
+  open references before emitting a client effect. One atomic document store uses
+  the same client identity as presentation preferences; closing the last reference
+  collects only its backing bytes, never a repository file. File tabs retain paths
+  and reopen through the owning host. Save As writes first, converts the same tab,
+  then releases its transient reference. A failed save retains the original bytes.
+  The local backend retains forwarded remote displays for its own clients; remote
+  file reads and saves still route to the owning host. No provider traffic is replayed
+  to restore tabs, and no document library or closed-tab history is retained.
 - Not persisted: provider transcripts, live provider request handles, runtime
   catalogs, finished plans/goals, resolved plan reviews, subagent activity,
   provider connection observations, browser page state.
