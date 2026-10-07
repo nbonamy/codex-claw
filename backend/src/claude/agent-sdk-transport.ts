@@ -588,6 +588,7 @@ function claudeQueryOptions(
       ...(params.appendSystemPrompt ? { append: params.appendSystemPrompt } : {}),
     },
     tools: { type: 'preset', preset: 'claude_code' },
+    ...(params.mcpServerUrl ? { disallowedTools: ['CronCreate', 'CronDelete', 'CronList', 'ScheduleWakeup'] } : {}),
     settingSources: ['user', 'project', 'local'],
     includePartialMessages: true,
     extraArgs: { 'replay-user-messages': null },

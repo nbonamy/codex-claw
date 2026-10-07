@@ -84,7 +84,7 @@ export function agentConversationState(view: () => AgentConversationView, extens
     composer: {
       get state() { return view().composerState; },
       get attachments() { return view().attachments; },
-      get placeholder() { return translate('surface.appShell.askForFollowUpChanges'); },
+      get placeholder() { return view().agent.suggestedPrompt || translate('surface.appShell.askForFollowUpChanges'); },
       get approvalPreset() { return approvalPreset(); },
       get leadingMenuItems() { return [...permissionMenuItems(view()), ...conversationCommandMenuItems()]; },
       get modelMenuItems() { return extensions.modelMenuItems?.(); },

@@ -127,6 +127,15 @@ conversation or sequence cursor outlives the backend instance.
 
 ## Runtime And Packaging
 
+- On macOS, launching a packaged app outside Applications installs it through
+  Electron's native relocation API before creating backend resources or taking
+  the single-instance lock. Electron relaunches the installed copy or focuses an
+  already running installation. A write-access preflight keeps protected installs
+  out of Electron's destructive privileged replacement path; users authorize those
+  installations through Finder instead, with the existing app untouched. Ordinary
+  replacement requires confirmation; cancellation or failure exits without starting
+  the daemon. Installer diagnostics use the main log. The DMG presents one app icon;
+  its background SVG and 1x/2x PNG assets share the Finder window's logical size.
 - Desktop ships a private, checksum-verified Node runtime beside the daemon bundle
   (`Resources/runtime/node`, `Resources/daemon/korusd` + `daemon.mjs`). No system
   Node is required and the launcher is never put on `PATH`.

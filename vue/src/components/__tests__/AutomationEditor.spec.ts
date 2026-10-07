@@ -1,108 +1,118 @@
-import { describe, expect, it } from 'vitest';
-import { automation, mountEditor } from './automation-editor-test-harness';
-import { flushPromises } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { ElInput, ElSelect, ElOption, ElSwitch, ElButton } from 'element-plus';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
+import type { Automation } from '@workspace/core/contracts';
+import AutomationEditor from '../AutomationEditor.vue';
 
-describe('AutomationEditor submission', () => {
-  it('configures Linear sources with explicit code repositories, reopens them, and clears stale choices on provider changes', async () => {
-    const sources = ['Engineering', 'Engineering / Login'].map((name, index) => ({
-      provider: 'linear' as const, id: index ? 'linear:eng:login' : 'linear:eng', owner: 'ENG', name, fullName: name,
-      url: 'https://linear.app/acme', isPrivate: true,
-    }));
-    const connections = [{ provider: 'linear' as const, status: 'connected' as const }];
-    const wrapper = mountEditor({ connections, repositories: sources });
-    async function choose(label: string, option: string) {
-      const control = wrapper.get(`[aria-label="${label}"]`);
-      await control.trigger('click');
-      await flushPromises();
-      const listbox = document.getElementById(control.attributes('aria-controls')!);
-      const element = [...listbox!.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(el => el.textContent === option);
-      expect(element).toBeDefined();
-      element!.click();
-      await flushPromises();
-    }
-    await choose('Backlog provider', 'Linear');
-    await choose('Team / project', 'Engineering / Login');
-    await choose('Team / project', 'Engineering');
+const snapshot = createInitialSnapshot();
+const agents = [...snapshot.agents, { ...snapshot.agents[0]!, id: 'quick', name: 'Daily notes', folder: null, sessionKind: 'quickChat' as const }];
+function editor(automation?: Automation) {
+  return mount(AutomationEditor, { attachTo: document.body,
+    props: { mode: automation ? 'edit' : 'create', agents, teams: snapshot.teams, automation },
+    global: { components: { ElInput, ElSelect, ElOption, ElSwitch, ElButton } } });
+}
+async function choose(wrapper: ReturnType<typeof editor>, label: string, option: string) {
+  const control = wrapper.get(`[aria-label="${label}"]`);
+  await control.trigger('click'); await flushPromises();
+  const list = document.getElementById(control.attributes('aria-controls')!);
+  const row = [...list!.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(row => row.textContent === option);
+  expect(row).toBeDefined(); row!.click(); await flushPromises();
+}
+describe('AutomationEditor', () => {
+  it('defaults to a new Quick Chat and saves one prompt without repository or backlog prerequisites', async () => {
+    const wrapper = editor();
+    await flushPromises();
     await wrapper.get('form').trigger('submit');
     expect(wrapper.emitted('submit')).toBeUndefined();
-    await choose('Code repository for Engineering / Login', 'agent-workspace');
-    await choose('Code repository for Engineering', 'witsy');
-    await wrapper.findAll('textarea')[0]!.setValue('Ready bugs');
-    await wrapper.findAll('textarea')[1]!.setValue('Fix and verify');
+    await wrapper.get('textarea').setValue('  Check my tasks.  ');
+    await wrapper.get('[aria-label="Name"]').setValue('Morning');
     await wrapper.get('form').trigger('submit');
-    const input = wrapper.emitted('submit')![0]![0];
-    expect(input).toMatchObject({ repositories: [
-      { provider: 'linear', sourceId: 'linear:eng', executionRepositoryPath: '/Users/nbonamy/src/witsy' },
-      { provider: 'linear', sourceId: 'linear:eng:login', executionRepositoryPath: '/Users/nbonamy/src/agent-workspace' },
-    ], selectionPrompt: 'Ready bugs', assignmentPrompt: 'Fix and verify' });
-    wrapper.unmount();
-    const reopened = mountEditor({ connections, repositories: sources, automation: automation(input as Parameters<typeof automation>[0]) });
-    await reopened.get('form').trigger('submit');
-    expect(reopened.emitted('submit')![0]![0]).toEqual(input);
-    await reopened.get('[aria-label="Backlog provider"]').trigger('click');
-    await flushPromises();
-    [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(el => el.textContent === 'GitHub')!.click();
-    await flushPromises();
-    expect(reopened.find('[aria-label="Code repository for Engineering / Login"]').exists()).toBe(false);
-    await reopened.get('form').trigger('submit');
-    expect(reopened.emitted('submit')).toHaveLength(1);
-  });
-  it('emits repositories, team, schedule, both prompts, and enabled state', async () => {
-    const wrapper = mountEditor();
-    const selects = wrapper.findAllComponents({ name: 'ElSelect' });
-    await selects[1]!.vm.$emit('update:modelValue', ['github:nbonamy/agent-workspace', 'github:nbonamy/witsy']);
-    await selects[3]!.vm.$emit('update:modelValue', 360);
-    const textareas = wrapper.findAll('textarea');
-    await textareas[0]!.setValue('  Pick bugs labeled ready.  ');
-    await textareas[1]!.setValue('  Triage the issue and verify the fix.  ');
-    await wrapper.find('form').trigger('submit');
-
-    expect(wrapper.emitted('submit')).toStrictEqual([
-      [
-        {
-          backend: 'codex',
-          enabled: true,
-          repositories: [
-            {
-              provider: 'github',
-              sourceId: 'nbonamy/agent-workspace',
-              executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-            },
-            {
-              provider: 'github',
-              sourceId: 'nbonamy/witsy',
-              executionRepositoryPath: '/Users/nbonamy/src/witsy',
-            },
-          ],
-          teamId: 'team-app',
-          selectionPrompt: 'Pick bugs labeled ready.',
-          assignmentPrompt: 'Triage the issue and verify the fix.',
-          schedule: { intervalMinutes: 360 },
-        },
-      ],
-    ]);
-  });
-
-  it('preserves the name and values when editing', async () => {
-    const wrapper = mountEditor({ automation: automation() });
-
-    await wrapper.find('form').trigger('submit');
-
     expect(wrapper.emitted('submit')?.[0]?.[0]).toStrictEqual({
-      backend: 'codex',
-      name: 'GitHub bugs',
-      enabled: true,
-      repositories: [
-        {
-          provider: 'github',
-          sourceId: 'nbonamy/agent-workspace',
-          executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-        },
-      ],
-      teamId: 'team-app',
-      selectionPrompt: 'Pick ready bugs.',
-      assignmentPrompt: 'Fix the issue and run tests.',
-      schedule: { intervalMinutes: 60 },
+      name: 'Morning', enabled: true, prompt: 'Check my tasks.',
+      target: { kind: 'newQuickChat', teamId: 'team-app', backend: 'codex' }, schedule: { rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0;BYSECOND=0', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
     });
+    expect(wrapper.findAll('textarea')).toHaveLength(1);
+    expect(wrapper.find('[aria-label="Coding agent"]').exists()).toBe(true);
+    const sections = wrapper.findAll('.settings-section');
+    expect(sections).toHaveLength(4);
+    expect(sections[0]!.findAll('strong').map(label => label.text())).toEqual(['Name', 'Prompt']);
+    expect(wrapper.findAll('.settings-section h3').map(label => label.text())).toEqual(['Run in', 'Schedule', 'Model']);
+    for (const section of wrapper.findAll('.automation-editor__body > *').slice(1)) {
+      expect(getComputedStyle(section.element).marginTop).toBe('var(--space-12)');
+    }
+    expect(sections[1]!.findAll('strong').map(label => label.text())).toEqual(['Team', 'Conversation']);
+    expect(wrapper.findAll('[role="combobox"]').slice(0, 2).map(control => control.attributes('aria-label'))).toEqual(['Automation target team', 'Run in']);
+    expect(wrapper.text()).not.toContain('repository');
+  });
+
+  it('offers existing Quick Chats separately and omits fresh-chat model settings when reusing a conversation', async () => {
+    const wrapper = editor();
+    await wrapper.get('textarea').setValue('Update notes');
+    await choose(wrapper, 'Run in', 'Existing Quick Chat');
+    await choose(wrapper, 'Conversation', 'Daily notes');
+    expect(wrapper.find('[aria-label="Model"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Coding agent"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Effort"]').exists()).toBe(false);
+    expect(wrapper.findAll('.settings-section')).toHaveLength(3);
+    expect(wrapper.findAll('.settings-section h3').map(label => label.text())).toEqual(['Run in', 'Schedule']);
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ target: { kind: 'quickChat', agentId: 'quick' } });
+    await choose(wrapper, 'Run in', 'Existing agent');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')).toHaveLength(1);
+    await choose(wrapper, 'Conversation', 'Dina @ agent-workspace');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')?.[1]?.[0]).toMatchObject({ target: { kind: 'agent', agentId: 'agent-dina' } });
+    await wrapper.setProps({ agents: [] });
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')).toHaveLength(2);
+  });
+
+  it('retains configured model and effort on edit, and surfaces catalog and save errors', async () => {
+    const automation: Automation = { id: 'auto', name: 'Check', enabled: true, prompt: 'Check tasks',
+      target: { kind: 'newQuickChat', teamId: 'team-app', backend: 'codex', model: 'chosen', reasoningEffort: 'high' },
+      schedule: { intervalMinutes: 90 }, executionLog: [], createdAt: '', updatedAt: '' };
+    const wrapper = editor(automation);
+    await wrapper.setProps({ listModels: vi.fn().mockRejectedValue(new Error('offline')), error: 'Could not save' });
+    await flushPromises();
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ target: automation.target, schedule: automation.schedule });
+    expect(wrapper.get('[role="alert"]').text()).toBe('Could not save');
+    await wrapper.setProps({ saving: true });
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')).toHaveLength(1);
+  });
+
+  it('uses short effort names instead of provider descriptions', async () => {
+    const withModels = mount(AutomationEditor, { attachTo: document.body,
+      props: { mode: 'create', agents, teams: snapshot.teams, listModels: async () => [{ id: 'model', model: 'model', displayName: 'Model',
+        supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'Greater reasoning depth for complex problems' }] }] },
+      global: { components: { ElInput, ElSelect, ElOption, ElSwitch, ElButton } } });
+    await flushPromises();
+    await choose(withModels, 'Model', 'Model');
+    await choose(withModels, 'Reasoning effort', 'high');
+    await withModels.get('textarea').setValue('Check tasks');
+    await withModels.get('form').trigger('submit');
+    expect(withModels.emitted('submit')?.[0]?.[0]).toMatchObject({ target: { model: 'model', reasoningEffort: 'high' } });
+  });
+
+  it('initializes the selected conversation team and clears the conversation when changing teams', async () => {
+    const automation: Automation = { id: 'auto', name: 'Check', enabled: true, prompt: 'Check tasks',
+      target: { kind: 'agent', agentId: 'other-agent' }, schedule: { intervalMinutes: 60 }, executionLog: [], createdAt: '', updatedAt: '' };
+    const wrapper = mount(AutomationEditor, { attachTo: document.body,
+      props: { mode: 'edit', automation, teams: [...snapshot.teams, { id: 'other-team', name: 'Other team', agentIds: ['other-agent'] }],
+        agents: [...agents, { ...agents[0]!, id: 'other-agent', teamId: 'other-team', name: 'Other worker' }] },
+      global: { components: { ElInput, ElSelect, ElOption, ElSwitch, ElButton } } });
+    await flushPromises();
+    expect(wrapper.get('#automation-team').element.closest('.el-select')?.textContent).toContain('Other team');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ target: automation.target });
+    await choose(wrapper, 'Automation target team', snapshot.teams[0]!.name);
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')).toHaveLength(1);
+    await choose(wrapper, 'Conversation', 'Dina @ agent-workspace');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')?.[1]?.[0]).toMatchObject({ target: { kind: 'agent', agentId: 'agent-dina' } });
   });
 });

@@ -1,5 +1,5 @@
 ---
-name: app-live-preview
+name: korus-live-preview
 description: Use when interactively dogfooding any Korus feature from a worktree in the in-app browser, especially with seeded state, reload persistence, UI workflows, or branch-local backend changes.
 ---
 

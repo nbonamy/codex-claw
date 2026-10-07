@@ -25,7 +25,7 @@ NODE
 done
 
 # Validate the exact GitHub release/asset links before touching the server.
-# With no explicit tag, use the verified releases page, never /latest.
+# Stable aliases follow future releases without a website version pin.
 APP_WEBSITE_VERIFY_DOWNLOADS=1 npm --prefix "$ROOT_DIR/.." run build:website
 
 echo "Deploying website to ${HOST}:${REMOTE_ROOT}"

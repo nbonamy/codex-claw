@@ -36,11 +36,17 @@ export async function captureAppshot(options: CaptureAppshotOptions = {}): Promi
     platform,
     resourcesPath: process.resourcesPath,
   };
+  // The helper requires an explicit window target for window-scoped commands.
+  const windows = await execute({ command: 'list_windows', arguments: { pid }, options: helperOptions });
+  if (!windows.ok) throw new Error(windows.error);
+  const windowId = frontmostWindowId(record(windows.result)?.windows);
+  if (windowId === undefined) throw new Error('The frontmost application has no window to capture.');
+
   const [screenshot, accessibility] = await Promise.all([
-    execute({ command: 'screenshot', arguments: { pid, scope: 'window' }, options: helperOptions }),
+    execute({ command: 'screenshot', arguments: { pid, scope: 'window', window_id: windowId }, options: helperOptions }),
     execute({
       command: 'get_app_state',
-      arguments: { pid, includeScreenshot: false, maxDepth: 16, maxNodes: 3_000, maxTextCharacters: 30_000, showCursor: false },
+      arguments: { pid, window_id: windowId, includeScreenshot: false, maxDepth: 16, maxNodes: 3_000, maxTextCharacters: 30_000, showCursor: false },
       options: helperOptions,
     }),
   ]);
@@ -71,6 +77,16 @@ export async function captureAppshot(options: CaptureAppshotOptions = {}): Promi
     ...(stringValue(appResult?.localizedName) ? { appName: stringValue(appResult?.localizedName) } : {}),
     ...(stringValue(windowResult?.title) ? { windowTitle: stringValue(windowResult?.title) } : {}),
   };
+}
+
+function frontmostWindowId(windows: unknown): number | undefined {
+  const candidates = (Array.isArray(windows) ? windows : [])
+    .map(record)
+    .filter((window): window is Record<string, unknown> => typeof window?.window_id === 'number');
+  const target = candidates.find((window) => window.is_key === true)
+    ?? candidates.find((window) => window.is_minimized !== true)
+    ?? candidates[0];
+  return target?.window_id as number | undefined;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

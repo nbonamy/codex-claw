@@ -1,5 +1,5 @@
 ---
-name: app-frontend-dev
+name: korus-frontend-dev
 description: Use when working on Korus frontend development, including Vue components, Element Plus controls, app shell, agent/team/Bench UI, chat rendering, artifact panes, design tokens, themes, or frontend component tests.
 ---
 

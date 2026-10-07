@@ -4,14 +4,15 @@ description: Download and install the Korus desktop app.
 
 # Installation
 
-[Choose your platform](__PRODUCT_DOWNLOAD_URL__): **macOS Apple silicon**, **Windows x64**, or **Linux x64 / ARM64**. Downloads are hosted on GitHub Releases; choose an asset listed on the release page. Computer Use and Screenshots are macOS-only.
+[Choose your platform](__PRODUCT_DOWNLOAD_URL__): **macOS Apple silicon**, **Windows x64**, or **Linux x64 / ARM64**. Computer Use and AppShots are macOS-only.
 
 ## Install on macOS
 
 1. Open [Downloads](__PRODUCT_DOWNLOAD_URL__) and choose the macOS DMG for Apple silicon.
-2. Open the DMG and move Korus to Applications.
-3. Launch Korus. The first-run screen checks your coding engines and offers **Connect Codex**, **Connect Claude Code**, and **Customize** for each one.
-4. Choose how each engine should store its setup before connecting it. Follow the steps below, then open a repository.
+2. Open the DMG and double-click Korus. It installs in Applications and launches. If an installed copy needs replacing, confirm **Replace**; your chats and settings are kept.
+3. If Korus asks you to use Finder, choose **Open Applications**, drag Korus there from the DMG, and approve the installation in Finder. Then open Korus from Applications.
+4. The first-run screen checks your coding engines and offers **Connect Codex**, **Connect Claude Code**, and **Customize** for each one.
+5. Choose how each engine should store its setup before connecting it. Follow the steps below, then open a repository.
 
 ## Install on Windows
 
@@ -23,7 +24,7 @@ Choose **x64** or **ARM64** to match your system, then select the **DEB**, **RPM
 
 ## Updates
 
-Install updates manually from GitHub Releases. Check the release notes and download the build for your platform and architecture.
+Packaged macOS and installed Windows apps receive stable releases through the app's updater. Linux, portable Windows, and prereleases use manual downloads from GitHub Releases. Choose the build for your platform and architecture.
 
 ## Choose separate or existing provider setup
 
@@ -62,7 +63,7 @@ For a first task, choose a small local repository whose branch and existing chan
 
 ## Development builds
 
-Contributors can run the app from source. The repository README describes the required Node.js toolchain, sibling SDK checkout, and development commands.
+For source installation and development instructions, see the [repository README](https://github.com/nbonamy/korus#readme).
 
 Experimental source builds may expose behavior that differs from the desktop release. When reporting a problem, include the app version and whether you are using a release or a development build.
 

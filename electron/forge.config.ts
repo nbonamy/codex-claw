@@ -51,14 +51,14 @@ const extraResource = [
 let osxPackagerConfig = {}
 const isDarwin = process.platform == 'darwin';
 const dmgOptions: MakerDMGConfig = {
+  title: `Install ${product.name}`,
   icon: './assets/icon.icns',
-  // background: './assets/dmg_background.png',
-  // additionalDMGOptions: {
-  //   window: {
-  //     size: { width: 658, height: 492 },
-  //     position: { x: 500, y: 400 },
-  //   }
-  // }
+  background: './assets/dmg-background.png',
+  iconSize: 128,
+  contents: (options) => [{ x: 280, y: 252, type: 'file', path: options.appPath }],
+  additionalDMGOptions: {
+    window: { size: { width: 560, height: 400 } },
+  },
 }
 
 if (isDarwin && !skipMacSigning) {

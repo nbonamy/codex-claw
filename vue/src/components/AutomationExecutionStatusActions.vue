@@ -17,6 +17,7 @@
       <button
         type="button"
         :aria-label="$t('dynamic.automations.deleteExecution', { ticket })"
+        :disabled="status === 'working' || status === 'awaitingInput'"
         @click.stop="emit('delete-execution')"
       >
         <Trash2Icon aria-hidden="true" />
@@ -59,7 +60,8 @@ const emit = defineEmits<{
   justify-items: end;
 }
 
-.automation-execution-log__status[data-status="working"] {
+.automation-execution-log__status[data-status="working"],
+.automation-execution-log__status[data-status="awaitingInput"] {
   color: var(--color-warning);
 }
 

@@ -428,6 +428,7 @@ describe('agent-manager', () => {
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     const agent = snapshot.agents[0];
     agent.backendSession = { kind: 'codex', threadId: 'thread-old' };
+    agent.suggestedPrompt = 'Continue the old work';
     agent.contextUsage = {
       totalTokens: 397_740,
       inputTokens: 320_000,
@@ -473,6 +474,7 @@ describe('agent-manager', () => {
       updatedAt: '2026-06-05T10:11:12.000Z',
     });
     expect(snapshot.agents[0].backendSession).toBeUndefined();
+    expect(snapshot.agents[0].suggestedPrompt).toBeUndefined();
     expect(snapshot.agents[0].contextUsage).toBeUndefined();
     expect(snapshot.agents[0].plan).toBeUndefined();
     expect(snapshot.agents[0].goal).toBeUndefined();

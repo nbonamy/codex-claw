@@ -35,6 +35,7 @@ import { createOpenInProvider, resolveProjectPath, type OpenInProvider } from '.
 import { installLocalMediaProtocol as installLocalMediaProtocolHandler, LocalMediaRegistry, withRendererMediaUrls } from './local-media';
 import { createRuntimeSpokenAnnouncementQueue, PolicyAwareSpokenAnnouncementQueue, type SpokenAnnouncementQueue } from './spoken-announcements';
 import { registerAgentGitIpcHandlers } from './agent-git-ipc';
+import { installMacAppBeforeStartup } from './mac-install';
 
 type AppLifecycle = Pick<typeof app, 'exit' | 'quit' | 'relaunch'>;
 type BadgeApplication = Pick<typeof app, 'setBadgeCount'>;
@@ -1517,9 +1518,7 @@ export class AppController {
   }
 
   private async getSystemPermissions(): Promise<SystemPermissionsStatus> {
-    const permissions = await this.requireBackendClient().request<SystemPermissionsStatus>(backendMethods.systemPermissionsGet);
-    if (permissions.accessibility.trusted) this.syncAppshotsKeyMonitor();
-    return permissions;
+    return this.requireBackendClient().request<SystemPermissionsStatus>(backendMethods.systemPermissionsGet);
   }
 
   private async openAccessibilitySettings(): Promise<SystemPermissionsStatus> {
@@ -1984,6 +1983,7 @@ export class AppController {
 }
 
 export function startMainApp(): void {
+  if (installMacAppBeforeStartup()) return;
   initializeMainLogging();
   installProcessErrorLogging();
   const controller = new AppController(

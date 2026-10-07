@@ -242,11 +242,10 @@ export type {
 } from './contracts/conversation';
 export type {
   Automation,
-  AutomationExecutionCreatedAgent,
   AutomationExecutionLogEntry,
   AutomationExecutionStatus,
   AutomationLocation,
-  AutomationWorkSourceTarget,
+  AutomationTarget,
   AutomationSchedule,
   CreateAutomationInput,
   WorkSourceConfiguration,
@@ -366,6 +365,8 @@ export type Agent = {
   /** Durable only while a review workflow is active; removed when the user finishes it. */
   codeReview?: import('./code-review').CodeReviewSession;
   threadFlags?: import('./thread-flags').ThreadFlags;
+  /** Optional next-prompt hint, never composer draft text. Cleared on a new prompt or conversation reset. */
+  suggestedPrompt?: string;
   goal?: ThreadGoal;
   visualize?: import('./visualize').VisualizeSession;
   isRegistered?: boolean;

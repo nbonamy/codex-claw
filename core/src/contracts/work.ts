@@ -137,27 +137,14 @@ export type WorkItem = {
   updatedAt: string;
 };
 
-export type AutomationWorkSourceTarget = {
-  provider: WorkProviderKind;
-  sourceId: string;
-  executionRepositoryPath: string;
-};
+export type AutomationTarget =
+  | { kind: 'agent'; agentId: string }
+  | { kind: 'quickChat'; agentId: string }
+  | { kind: 'newQuickChat'; teamId: string; backend: import('./shared').AgentBackend; model?: string; reasoningEffort?: string };
 
-export type AutomationSchedule = {
-  intervalMinutes: number;
-};
+export type AutomationSchedule = { intervalMinutes: number } | { rrule: string; timeZone: string };
 
-export type AutomationExecutionStatus = 'working' | 'completed' | 'failed';
-
-export type AutomationExecutionCreatedAgent = {
-  agentId: string;
-  agentName: string;
-  workItemId: string;
-  workItemIdentifier?: string;
-  workItemTitle: string;
-  workItemUrl: string;
-  conversationRef?: BackendConversationRef;
-};
+export type AutomationExecutionStatus = 'working' | 'awaitingInput' | 'completed' | 'failed';
 
 export type AutomationExecutionLogEntry = {
   id: string;
@@ -165,28 +152,25 @@ export type AutomationExecutionLogEntry = {
   startedAt: string;
   completedAt?: string;
   status: AutomationExecutionStatus;
-  createdCount: number;
-  createdAgents: AutomationExecutionCreatedAgent[];
+  agentId?: string;
+  agentName?: string;
+  conversationRef?: BackendConversationRef;
   error?: string;
 };
 
 export type Automation = {
-  /** Absent only in legacy snapshots, whose engine was Codex. */
-  backend?: import('../contracts').AgentBackend;
   id: string;
   name: string;
   enabled: boolean;
-  repositories: AutomationWorkSourceTarget[];
-  teamId: string;
-  selectionPrompt?: string;
-  assignmentPrompt?: string;
+  prompt: string;
+  target: AutomationTarget;
   schedule: AutomationSchedule;
   executionLog: AutomationExecutionLogEntry[];
   createdAt: string;
   updatedAt: string;
   lastRunAt?: string;
+  scheduleAnchorAt?: string;
   lastError?: string;
-  lastCreatedCount?: number;
 };
 
 export type AutomationLocation =
@@ -199,13 +183,10 @@ export type AutomationLocation =
   };
 
 export type CreateAutomationInput = {
-  backend?: import('../contracts').AgentBackend;
   name?: string;
   enabled?: boolean;
-  repositories: AutomationWorkSourceTarget[];
-  teamId: string;
-  selectionPrompt?: string;
-  assignmentPrompt?: string;
+  prompt: string;
+  target: AutomationTarget;
   schedule: AutomationSchedule;
 };
 

@@ -36,7 +36,9 @@ Use a [Mission](./workflows/missions) to move through Requirements, Tickets, Imp
 
 Korus provides the workspace around your coding agent. Your selected provider supplies model access, account authentication, and usage limits. See the [provider guides](./providers/) for setup.
 
-For issue-driven work, connect [GitHub or Linear](./providers/#connect-github-or-linear), [browse the backlog](./features/workspace#browse-and-start-backlog-work), and choose the code repository where the agent should work. Use [automations](./features/automations) for recurring intake.
+For issue-driven work, connect [GitHub or Linear](./providers/#connect-github-or-linear), [browse the backlog](./features/workspace#browse-and-start-backlog-work), and choose the code repository where the agent should work.
+
+Use [Automations](./features/automations) to schedule recurring prompts in an agent or Quick Chat.
 
 ::: tip Looking for developer documentation?
 This guide covers using Korus. Architecture, protocol, frontend, and testing notes live in the repository's `docs/` directory.

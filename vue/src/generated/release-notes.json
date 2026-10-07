@@ -1,7 +1,19 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.27.1",
+  "currentVersion": "0.28.0",
   "releases": [
+    {
+      "version": "0.28.0",
+      "releasedAt": "2026-10-06",
+      "sourceSha256": "a7877ff4d73d0bc1873e9575f91d2104bf5a042a553c18ea0d5c686188abb5d5",
+      "markdown": "### New features\n\n- Automations send recurring prompts to an existing agent or Quick Chat, or\n  start a fresh Quick Chat each time. Existing conversations keep their model\n  and permissions; new chats can use a provider, model, and reasoning effort\n  of your choice.\n- Schedule daily, weekday, weekly, or custom recurrences with a next-run\n  preview. Calendar schedules follow your local timezone across daylight\n  saving changes; interval schedules remain available.\n- Ask an agent to create an automation directly from chat, including requests\n  such as \"every day at 8 AM.\" Scheduled work runs while the owning Korus\n  daemon is running.\n\n### Improvements and fixes\n\n- The automation editor groups conversation, schedule, and model settings in\n  compact sections. Agent choices include their repository, long chat titles\n  truncate, and the automation list adapts to smaller windows.\n- AppShots captures a specific window of the frontmost app, keeping its\n  screenshot and accessibility context aligned.\n- The macOS AppShots hotkey no longer requires Input Monitoring permission.\n\n### Compatibility\n\n- Scheduled prompts replace repository-based automation loops. Existing loop\n  definitions are not migrated and must be recreated; their agents and\n  worktrees are preserved."
+    },
+    {
+      "version": "0.27.2",
+      "releasedAt": "2026-10-06",
+      "sourceSha256": "e40b8446d2818dab4d4c7d18c2d75109e9b61fe81509b3580b4332ac4d404514",
+      "markdown": "### New features\n\n- Agents suggest useful follow-up prompts in the empty composer after finishing\n  a turn. Suggestions stay with their conversation without changing your draft\n  or sending anything automatically.\n\n### Improvements and fixes\n\n- A redesigned macOS installer lets you double-click Korus to install and launch\n  it. Installations requiring administrator access are handed off to Finder\n  without changing the existing app.\n- Website download links follow the latest stable release for each platform."
+    },
     {
       "version": "0.27.1",
       "releasedAt": "2026-10-06",

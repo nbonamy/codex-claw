@@ -30,6 +30,7 @@ const agentFieldPolicy = {
   planReview: 'persisted',
   codeReview: 'persisted',
   threadFlags: 'persisted',
+  suggestedPrompt: 'persisted',
   goal: 'persisted',
   visualize: 'persisted',
   isRegistered: 'runtime',

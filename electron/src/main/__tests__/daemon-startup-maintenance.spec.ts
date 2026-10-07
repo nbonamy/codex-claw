@@ -148,20 +148,16 @@ function activeAutomationSnapshot() {
     id: 'automation-bugs',
     name: 'Bugs',
     enabled: true,
-    repositories: [{
-      provider: 'github',
-      sourceId: 'nabocorp/agent-workspace',
-      executionRepositoryPath: '/Users/nicolas/src/agent-workspace',
-    }],
-    teamId: 'team-app',
+    prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-app', backend: 'codex' as const },
+
     schedule: { intervalMinutes: 60 },
     executionLog: [{
       id: 'execution-1',
       automationId: 'automation-bugs',
       startedAt: '2026-06-14T10:00:00.000Z',
       status: 'working',
-      createdCount: 0,
-      createdAgents: [],
+
+
     }],
     createdAt: '2026-06-14T10:00:00.000Z',
     updatedAt: '2026-06-14T10:00:00.000Z',

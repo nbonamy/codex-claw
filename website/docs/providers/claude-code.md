@@ -65,7 +65,7 @@ Configure Claude-specific external tools for the selected home or project using 
 
 The **Codex** section in **Settings → Plugins** manages Codex resources; it is not a Claude plugin manager. Selecting **Reuse my existing skills** for Claude does not share the Codex plugin catalog or copy MCP configuration from another provider.
 
-Korus supplies the `workspace` collaboration tools to Claude agents itself. Despite the server name, you do not need Codex installed or a manual MCP entry to use those Korus tools with Claude Code. See [Agent collaboration](../reference/agent-collaboration).
+Claude agents can use Korus's collaboration tools without installing Codex or configuring an extra server. See [Agent collaboration](../reference/agent-collaboration).
 
 ## Connection problems
 

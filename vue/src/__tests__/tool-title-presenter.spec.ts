@@ -6,6 +6,9 @@ import { presentAppToolTitle } from '../tool-title-presenter';
 
 describe(`${product.name} tool title presenter`, () => {
   it.each([
+    ['korus.create-automation', { name: 'Daily check' }, 'running', 'Creating automation Daily check'],
+    ['mcp__korus__create-automation', { name: 'Daily check' }, 'completed', 'Created automation Daily check'],
+    ['korus.create-automation', {}, 'error', 'Failed creating automation'],
     ['workspace.start_automatic_review', {}, 'running', 'Starting automatic review'],
     [`${product.mcpServerName}.start_automatic_review`, {}, 'completed', 'Started automatic review'],
     ['workspace.start_automatic_review', {}, 'error', 'Could not start automatic review'],

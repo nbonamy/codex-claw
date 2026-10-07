@@ -1,5 +1,5 @@
 ---
-name: app-dod
+name: korus-dod
 description: Use before handoff, commit, push, or declaring Korus work ready. Verify scope, tests, typecheck/lint, documentation, and worktree hygiene with proportional evidence.
 ---
 

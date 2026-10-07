@@ -2,7 +2,7 @@ import { product } from '@workspace/core/product';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { AppStateStore } from '../persistence/store';
 import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
@@ -13,6 +13,8 @@ import { AutomationRunner } from '../automations/runner';
 import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot } from '@workspace/core/settings';
 import { projectClientSnapshot } from '@workspace/core/client-preferences';
 import type { RemoteConnection } from '@workspace/core/contracts';
+
+vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 let tempDir: string | null = null;
 
@@ -44,17 +46,24 @@ describe('state persistence', () => {
     expect(restored.general.providerModelDefaults).toStrictEqual(snapshot.general.providerModelDefaults);
     expect(restored.general.providerApprovalDefaults).toStrictEqual(snapshot.general.providerApprovalDefaults);
   });
-  it('creates, updates and runs a remote Linear automation, then reloads its configuration, assignment and execution identity', async () => {
+  it('drops repository-based automation definitions without migrating or deleting their agents', () => {
+    const snapshot = createInitialSnapshot();
+    const persisted = persistedStateFromSnapshot(snapshot);
+    const restored = snapshotFromPersistedState({ ...persisted, automations: [{
+      id: 'old-rule', name: 'Old rule', enabled: true, teamId: snapshot.teams[0]!.id,
+      backend: 'codex', repositories: [{ provider: 'github', id: 'org/repo' }],
+      selectionPrompt: 'Select bugs', assignmentPrompt: 'Fix them',
+      schedule: { intervalMinutes: 60 }, executionLog: [], createdAt: '', updatedAt: '',
+    }] });
+    expect(restored.automations).toEqual([]);
+    expect(restored.agents.map(agent => agent.id)).toEqual(snapshot.agents.map(agent => agent.id));
+  });
+  it.each(['claude', 'antigravity'] as const)('creates, updates and runs a remote %s prompt automation, then reloads its configuration and conversation', async backend => {
     const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();
-    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    snapshot.providerConnections = [{ backend, installed: true, connected: true, checking: false }];
     const runner = new AutomationRunner({ getSnapshot: () => snapshot,
-      listWorkItems: { listItems: async () => [{ provider: 'linear', id: 'linear:uuid', identifier: 'ENG-12', sourceId: 'linear:eng:project',
-        sourceName: 'Engineering', number: 12, title: 'Login', url: 'https://linear.app/acme/issue/ENG-12', body: 'Steps', state: 'open', labels: [],
-        createdAt: '2026-10-04T12:00:00Z', updatedAt: '2026-10-04T12:00:00Z' }] },
-      selectWorkItems: async (_automation, items) => items,
-      createWorktree: async input => { expect(input.repoPath).toBe('/remote/code'); return { name: input.branchName, path: '/remote/code-worktree' }; },
-      sendPrompt: async () => {}, saveSnapshot: () => persistence.save(snapshot), notifySnapshotUpdated: () => {},
+      sendPrompt: async () => ({ backend, sessionId: 'remote-chat', folder: null }), saveSnapshot: () => persistence.save(snapshot), notifySnapshotUpdated: () => {},
     });
     const remote = new AppBackendServer({ version: 'test', snapshot, automationRunner: runner, saveSnapshot: value => persistence.save(value) });
     const localSnapshot = createInitialSnapshot();
@@ -67,9 +76,9 @@ describe('state persistence', () => {
       }, close: async () => {},
     } as never });
     const location = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
-    const input = { name: 'Engineering bugs', enabled: false, backend: 'claude', teamId: snapshot.teams[0]!.id,
-      repositories: [{ provider: 'linear', sourceId: 'linear:eng:project', executionRepositoryPath: '/remote/code' }],
-      selectionPrompt: 'Ready bugs', assignmentPrompt: 'Fix and verify', schedule: { intervalMinutes: 360 } };
+    const input = { name: 'Engineering bugs', enabled: false,
+      prompt: 'Fix and verify', target: { kind: 'newQuickChat' as const, teamId: snapshot.teams[0]!.id, backend },
+        schedule: { intervalMinutes: 360 } };
     try {
       expect(await server.handleMessage({ jsonrpc: '2.0', id: 'create', method: 'automation/create', params: { input, location } })).not.toHaveProperty('error');
       const id = snapshot.automations[0]!.id;
@@ -78,11 +87,10 @@ describe('state persistence', () => {
       const saved = await persistence.load();
       expect(isAppSnapshot(saved)).toBe(true);
       expect(saved.automations).toEqual([expect.objectContaining({ ...input, id, enabled: true })]);
-      expect(saved.automations[0]?.executionLog[0]?.createdAgents[0]).toMatchObject({ workItemId: 'linear:linear:uuid', workItemIdentifier: 'ENG-12', workItemUrl: 'https://linear.app/acme/issue/ENG-12' });
-      expect(saved.workBacklog.assignments['linear:linear:uuid']).toMatchObject({ item: { identifier: 'ENG-12', body: 'Steps' }, status: 'inProgress' });
+      expect(saved.automations[0]?.executionLog[0]).toMatchObject({ status: 'working', conversationRef: { backend, sessionId: 'remote-chat', folder: null } });
       expect(localSnapshot.automations).toEqual([]);
       expect(localSnapshot.workBacklog.assignments).toEqual({});
-      const invalid = { ...input, repositories: [{ ...input.repositories[0], executionRepositoryPath: '' }] };
+      const invalid = { ...input, prompt: '' };
       expect(await server.handleMessage({ jsonrpc: '2.0', id: 'invalid', method: 'automation/create', params: { input: invalid, location } })).toHaveProperty('error');
       expect(snapshot.automations).toHaveLength(1);
     } finally { await server.close(); await remote.close(); }
@@ -367,18 +375,22 @@ describe('state persistence', () => {
     expect(restored.agents[0].codeReview).toStrictEqual(snapshot.agents[0].codeReview);
   });
 
-  it('round-trips valid thread flags and drops invalid persisted values', () => {
+  it('round-trips valid turn suggestions and drops invalid persisted values', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0].threadFlags = {
       delegate_to_worktree: true,
       ready_for_review: true,
     };
+    snapshot.agents[0].suggestedPrompt = 'Review the changes';
     const persisted = persistedStateFromSnapshot(snapshot) as unknown as {
       agents: Array<Record<string, unknown>>;
     };
 
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags)
       .toStrictEqual({ delegate_to_worktree: true, ready_for_review: true });
+    expect(snapshotFromPersistedState(persisted).agents[0].suggestedPrompt).toBe('Review the changes');
+    persisted.agents[0].suggestedPrompt = 123;
+    expect(snapshotFromPersistedState(persisted).agents[0].suggestedPrompt).toBeUndefined();
     persisted.agents[0].threadFlags = { delegate_to_worktree: false };
     expect(snapshotFromPersistedState(persisted).agents[0].threadFlags).toBeUndefined();
   });
@@ -1007,47 +1019,30 @@ describe('state persistence', () => {
       id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
-      repositories: [{
-        provider: 'github',
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-      }],
-      teamId: 'team-app',
-      selectionPrompt: 'Pick regressions that are ready to fix.',
-      assignmentPrompt: 'Start by reproducing the issue.',
+      prompt: 'Start by reproducing the issue.', target: { kind: 'newQuickChat' as const, teamId: 'team-app', backend: 'codex' as const },
+
+
+
       schedule: { intervalMinutes: 60 },
       createdAt: '2026-06-09T10:00:00.000Z',
       updatedAt: '2026-06-09T10:01:00.000Z',
       lastRunAt: '2026-06-09T10:02:00.000Z',
-      lastCreatedCount: 1,
+
       executionLog: [{
         id: 'automation-exec-1',
         automationId: 'automation-bugs',
         startedAt: '2026-06-09T10:02:00.000Z',
         completedAt: '2026-06-09T10:03:00.000Z',
         status: 'completed',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: 'agent-dina',
-          agentName: 'Dina',
-          workItemId: 'github:nbonamy/agent-workspace#12',
-          workItemTitle: 'Fix cockpit',
-          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/12',
-          conversationRef: { backend: 'codex', threadId: 'thread-dina' },
-        }],
+
+        agentId: 'agent-dina', agentName: 'Dina', conversationRef: { backend: 'codex', threadId: 'thread-dina' },
       }, {
         id: 'automation-exec-2',
         automationId: 'automation-bugs',
         startedAt: '2026-06-09T10:04:00.000Z',
         status: 'working',
-        createdCount: 1,
-        createdAgents: [{
-          agentId: 'agent-jesse',
-          agentName: 'Jesse',
-          workItemId: 'github:nbonamy/agent-workspace#13',
-          workItemTitle: 'Fix automation timestamps',
-          workItemUrl: 'https://github.com/nbonamy/agent-workspace/issues/13',
-        }],
+
+        agentId: 'agent-jesse', agentName: 'Jesse',
       }],
     }];
 
@@ -1056,7 +1051,7 @@ describe('state persistence', () => {
 
     expect(persisted.automations).toStrictEqual(snapshot.automations);
     expect(persisted).not.toHaveProperty('loops');
-    expect(restored.automations).toStrictEqual(snapshot.automations.map(automation => ({ ...automation, backend: 'codex' })));
+    expect(restored.automations).toStrictEqual(snapshot.automations);
 
   });
 

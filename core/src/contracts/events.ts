@@ -37,10 +37,11 @@ type WorkBacklogAssignmentUpdatedPayload = Omit<WorkBacklogAssignment, 'policy' 
   policy?: WorkBacklogAssignmentPolicy;
   status: WorkBacklogAssignmentStatus | 'working';
 };
-type AgentUpdatedPayload = Omit<Partial<Agent>, 'threadFlags' | 'id' | 'statusText'> & {
+type AgentUpdatedPayload = Omit<Partial<Agent>, 'threadFlags' | 'id' | 'statusText' | 'suggestedPrompt'> & {
   id: string;
   threadFlags?: import('../thread-flags').ThreadFlags | null;
   statusText?: string | null;
+  suggestedPrompt?: string | null;
 };
 type ThreadMode = 'default' | 'plan';
 type TurnEventContext = {

@@ -23,20 +23,7 @@
 
     <template #cell-ticket="{ row }">
       <div class="automation-execution-log__ticket-cell">
-        <a
-          v-if="triggerUrlForRow(row)"
-          :href="triggerUrlForRow(row)"
-          target="_blank"
-          rel="noreferrer"
-        >
-          {{ row.ticket }}
-        </a>
-        <span
-          v-else
-          class="automation-execution-log__muted"
-        >
-          -
-        </span>
+        <span>{{ row.agentName }}</span>
         <p
           v-if="row.error"
           class="automation-execution-log__error"
@@ -97,6 +84,7 @@ const emit = defineEmits<{
 }>();
 
 type SelectedConversation = {
+  executionId: string;
   agentId: string;
   agentName: string;
   error: string | null;
@@ -117,7 +105,7 @@ const executionCountLabel = computed(() => (
 
 const executionColumns: AppDataListColumn[] = [{
   id: 'ticket',
-  label: translate('surface.automationExecutionLog.ticket'),
+  label: translate('promptAutomation.conversationTitle'),
   width: 'minmax(0, 1fr)',
 }, {
   id: 'startedAt',
@@ -137,23 +125,23 @@ const executionColumns: AppDataListColumn[] = [{
 }];
 
 const executionRows = computed<AppDataListRow[]>(() => entries.value.map((entry) => ({
-  agentId: entry.createdAgents[0]?.agentId ?? '',
-  agentName: entry.createdAgents[0]?.agentName ?? 'Agent',
-  conversationRef: entry.createdAgents[0]?.conversationRef ?? null,
+  agentId: entry.agentId ?? '',
+  agentName: entry.agentName ?? 'Agent',
+  conversationRef: entry.conversationRef ?? null,
   id: entry.id,
   duration: formatDuration(entry.startedAt, entry.completedAt),
   error: entry.error ?? '',
   startedAt: entry.startedAt,
   status: entry.status,
   statusLabel: statusLabel(entry.status),
-  ticket: entry.createdAgents[0]?.workItemIdentifier ?? entry.createdAgents[0]?.workItemId ?? '',
+  ticket: entry.id,
   time: formatDate(entry.startedAt),
-  triggerUrl: entry.createdAgents[0]?.workItemUrl ?? '',
 })));
 
 const selectedConversationMessages = computed<RendererMessage[]>(() => selectedConversation.value?.messages ?? []);
 
 function statusLabel(status: AutomationExecutionStatus): string {
+  if (status === 'awaitingInput') return translate('promptAutomation.needsInput');
   if (status === 'completed') {
     return translate('surface.automationExecutionLog.completed');
   }
@@ -164,12 +152,8 @@ function startedAtForRow(row: AppDataListRow): string {
   return typeof row.startedAt === 'string' ? row.startedAt : '';
 }
 
-function triggerUrlForRow(row: AppDataListRow): string {
-  return typeof row.triggerUrl === 'string' ? row.triggerUrl : '';
-}
-
 function statusForRow(row: AppDataListRow): AutomationExecutionStatus {
-  return row.status === 'completed' || row.status === 'failed' || row.status === 'working'
+  return row.status === 'completed' || row.status === 'failed' || row.status === 'working' || row.status === 'awaitingInput'
     ? row.status
     : 'working';
 }
@@ -218,12 +202,13 @@ async function openConversation(row: AppDataListRow): Promise<void> {
 
   const conversationRef = conversationRefForRow(row);
   selectedConversation.value = {
+    executionId: executionIdForRow(row),
     agentId,
     agentName: agentNameForRow(row),
     error: null,
     loading: Boolean(conversationRef),
     messages: [],
-    ticket: ticketForRow(row),
+    ticket: formatDate(startedAtForRow(row)),
   };
 
   if (!conversationRef) {
@@ -232,7 +217,7 @@ async function openConversation(row: AppDataListRow): Promise<void> {
 
   try {
     const messages = await props.readConversationMessages(conversationRef, agentId);
-    if (selectedConversation.value?.agentId === agentId && selectedConversation.value.ticket === ticketForRow(row)) {
+    if (selectedConversation.value?.executionId === executionIdForRow(row)) {
       selectedConversation.value = {
         ...selectedConversation.value,
         loading: false,
@@ -240,7 +225,7 @@ async function openConversation(row: AppDataListRow): Promise<void> {
       };
     }
   } catch (error) {
-    if (selectedConversation.value?.agentId === agentId && selectedConversation.value.ticket === ticketForRow(row)) {
+    if (selectedConversation.value?.executionId === executionIdForRow(row)) {
       selectedConversation.value = {
         ...selectedConversation.value,
         error: error instanceof Error ? error.message : String(error),
@@ -278,8 +263,7 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
   return (candidate.backend === 'claude' || candidate.backend === 'antigravity') &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0 &&
-    typeof candidate.folder === 'string' &&
-    candidate.folder.trim().length > 0;
+    (candidate.folder === null || typeof candidate.folder === 'string');
 }
 
 function formatDate(value: string): string {

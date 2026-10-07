@@ -1,352 +1,144 @@
-import type {
-  Agent,
-  AppSnapshot,
-  Automation,
-  AutomationExecutionLogEntry,
-  AutomationWorkSourceTarget,
-  CreateSourceWorktreeInput,
-  SourceWorktree,
-  WorkItem,
-  WorkProviderKind,
-} from '@workspace/core/contracts';
-import { assignWorkItemToAgentInSnapshot, createAgentInSnapshot } from '@workspace/core/agent-manager';
+import type { Agent, AppSnapshot, Automation, AutomationExecutionLogEntry, BackendConversationRef, MainToRendererEvent } from '@workspace/core/contracts';
+import { createQuickChatInSnapshot } from '@workspace/core/agent-manager';
 import { agentDisplayName } from '@workspace/core/agent-display';
-import { recordAutomationExecutionInSnapshot } from '@workspace/core/automation-manager';
-import { createEntityId, type IdGenerator } from '@workspace/core/ids';
-import { workItemAssignmentKey } from '@workspace/core/work-assignments';
-import { workItemAssignmentPrompt, workItemBranchName, workItemDisplayIdentifier, workProviderLabel } from '@workspace/core/work-item-prompts';
-import { logMain, warnMain } from '../log';
-
-type WorkItemLister = {
-  listItems(provider: WorkProviderKind, sourceId: string): Promise<WorkItem[]>;
-};
-
-type AutomationPromptContext = {
-  automationId: string;
-  executionId: string;
-  workItemId: string;
-};
+import { automationExecutionIsActive, canTargetAutomationAgent, recordAutomationExecutionInSnapshot } from '@workspace/core/automation-manager';
+import { createEntityId } from '@workspace/core/ids';
+import { providerConversationEventView } from '@workspace/core/provider-conversation-event';
+import { warnMain } from '../log';
+import { nextAutomationRunAt } from '@workspace/core/automation-schedule';
 
 export type AutomationRunnerOptions = {
   getSnapshot: () => AppSnapshot;
-  listWorkItems: WorkItemLister;
   notifySnapshotUpdated: () => void;
   saveSnapshot: () => Promise<void>;
-  sendPrompt: (agentId: string, prompt: string, context: AutomationPromptContext) => Promise<unknown>;
-  selectWorkItems?: (automation: Automation, candidates: WorkItem[]) => Promise<WorkItem[]>;
-  createWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
-  createExecutionId?: IdGenerator;
+  sendPrompt: (agentId: string, prompt: string) => Promise<BackendConversationRef>;
   now?: () => Date;
   requireConnectedEngine?: (backend: Agent['backend']) => Promise<unknown>;
 };
 
-type CreatedAutomationAssignment = {
-  agent: Agent;
-  item: WorkItem;
-};
-
 export class AutomationRunner {
-  private readonly pendingAssignments = new Set<string>();
+  private readonly dispatching = new Set<string>();
   constructor(private readonly options: AutomationRunnerOptions) {}
 
+  /** A daemon restart cannot claim that interrupted runs finished successfully. */
+  async recoverInterruptedRuns(): Promise<void> {
+    let changed = false;
+    for (const automation of this.options.getSnapshot().automations) {
+      for (const run of automation.executionLog.filter(automationExecutionIsActive)) {
+        this.fail(automation, run, 'Automation interrupted by a daemon restart.');
+        changed = true;
+      }
+    }
+    if (changed) await this.publish();
+  }
+
   async runAll(): Promise<void> {
-    const now = this.now();
-    const automations = [...this.snapshot().automations].filter((automation) => automationIsDue(automation, now));
-    for (const automation of automations) {
-      await this.runAutomation(automation.id);
+    for (const automation of [...this.options.getSnapshot().automations]) {
+      if (automationIsDue(automation, this.now())) await this.runAutomation(automation.id);
     }
   }
 
   async runAutomation(automationId: string): Promise<void> {
-    const automation = this.snapshot().automations.find((candidate) => candidate.id === automationId);
-    if (!automation || !automation.enabled) {
-      logMain('automation-runner', 'skipped', {
-        automationId,
-        reason: automation ? 'disabled' : 'missing',
-      });
-      return;
-    }
-
-    const executionId = this.createExecutionId();
-    const startedAt = this.now().toISOString();
-    const createdAssignments: CreatedAutomationAssignment[] = [];
-    logMain('automation-runner', 'started', {
-      automationId: automation.id,
-      executionId,
-      repositoryCount: automation.repositories.length,
-    });
+    const snapshot = this.options.getSnapshot();
+    const automation = snapshot.automations.find(item => item.id === automationId);
+    if (!automation?.enabled || this.dispatching.has(automationId) || automation.executionLog.some(automationExecutionIsActive)) return;
+    const target = { ...automation.target };
+    // Reserve an existing conversation before yielding, including across different schedules.
+    const existing = target.kind === 'newQuickChat' ? undefined : snapshot.agents.find(agent => agent.id === target.agentId);
+    if (existing && (existing.status.type === 'working' || existing.status.type === 'awaitingInput'
+      || snapshot.automations.some(item => item.executionLog.some(run => run.agentId === existing.id && automationExecutionIsActive(run))))) return;
+    this.dispatching.add(automationId);
+    const run: AutomationExecutionLogEntry = { id: createEntityId('automation-exec'), automationId, startedAt: this.now().toISOString(), status: 'working',
+      ...(existing ? { agentId: existing.id, agentName: agentDisplayName(existing) } : {}) };
+    recordAutomationExecutionInSnapshot(snapshot, automationId, run);
     try {
-      await this.options.requireConnectedEngine?.(automation.backend ?? 'codex');
-      await this.createAssignmentsForAutomation(automation, executionId, startedAt, createdAssignments);
-      if (createdAssignments.length === 0) {
-        automation.lastRunAt = startedAt;
-        automation.lastCreatedCount = 0;
-        automation.updatedAt = startedAt;
-        delete automation.lastError;
-        await this.publishSnapshotUpdate();
-        logMain('automation-runner', 'completed without assignments', {
-          automationId: automation.id,
-          executionId,
-        });
+      if (target.kind !== 'newQuickChat' && (!existing || !canTargetAutomationAgent(snapshot, existing)
+        || (target.kind === 'quickChat') !== (existing.sessionKind === 'quickChat')
+        || snapshot.teams.some(team => team.id === existing.teamId && team.remoteConnectionId))) throw new Error('The automation target is no longer available.');
+      if (target.kind === 'newQuickChat' && !snapshot.teams.some(team => team.id === target.teamId && !team.remoteConnectionId)) throw new Error('The automation team is no longer available.');
+      await this.options.requireConnectedEngine?.(existing?.backend ?? (target.kind === 'newQuickChat' ? target.backend : 'codex'));
+      if (!snapshot.automations.includes(automation) || !automation.enabled) {
+        this.fail(automation, run, 'Automation was disabled or deleted before dispatch.');
+        await this.publish();
         return;
       }
-      const entry = createAutomationExecutionEntry(automation.id, executionId, startedAt, 'working', createdAssignments);
-      recordAutomationExecutionInSnapshot(this.snapshot(), automation.id, entry);
-      await this.publishSnapshotUpdate();
-      logMain('automation-runner', 'recorded assignments', {
-        automationId: automation.id,
-        executionId,
-        createdCount: createdAssignments.length,
-      });
-
-      let promptError: string | null = null;
-      for (const assignment of createdAssignments) {
-        const workItemId = workItemAssignmentKey(assignment.item);
-        try {
-          logMain('automation-runner', 'dispatching prompt', {
-            automationId: automation.id,
-            executionId,
-            agentId: assignment.agent.id,
-            workItemId,
-          });
-          await this.options.sendPrompt(
-            assignment.agent.id,
-            workItemAssignmentPrompt(assignment.item, {
-              assignment: automation.assignmentPrompt,
-              completionPolicy: 'complete',
-            }),
-            {
-              automationId: automation.id,
-              executionId,
-              workItemId,
-            },
-          );
-        } catch (error) {
-          promptError = error instanceof Error ? error.message : String(error);
-          warnMain('automation-runner', 'prompt dispatch failed', {
-            automationId: automation.id,
-            executionId,
-            agentId: assignment.agent.id,
-            workItemId,
-            message: promptError,
-          });
+      let agent = existing;
+      if (target.kind === 'newQuickChat') {
+        const id = createEntityId('agent');
+        createQuickChatInSnapshot(snapshot, { teamId: target.teamId, backend: target.backend }, run.startedAt, id, { select: false });
+        agent = snapshot.agents.find(item => item.id === id)!;
+        agent.name = automation.name;
+        if (target.model) {
+          agent.backendDefaults = { ...agent.backendDefaults!, model: target.model, userSelectedModel: true, reasoningEffort: target.reasoningEffort };
+        } else if (target.reasoningEffort) {
+          agent.backendDefaults = { ...agent.backendDefaults!, reasoningEffort: target.reasoningEffort };
         }
       }
-
-      if (promptError) {
-        recordAutomationExecutionInSnapshot(this.snapshot(), automation.id, {
-          ...entry,
-          completedAt: this.now().toISOString(),
-          status: 'failed',
-          error: promptError,
-        });
-        await this.publishSnapshotUpdate();
-        warnMain('automation-runner', 'failed', {
-          automationId: automation.id,
-          executionId,
-          createdCount: createdAssignments.length,
-          message: promptError,
-        });
+      if (!agent || !snapshot.agents.includes(agent)) throw new Error('The automation target is no longer available.');
+      run.agentId = agent.id;
+      run.agentName = agentDisplayName(agent);
+      await this.publish();
+      if (!snapshot.automations.includes(automation) || !automation.enabled || !snapshot.agents.includes(agent)) {
+        throw new Error('The automation or its target was removed or disabled before dispatch.');
       }
+      if (agent.status.type === 'working' || agent.status.type === 'awaitingInput') throw new Error('The automation target became busy before dispatch.');
+      run.conversationRef = await this.options.sendPrompt(agent.id, automation.prompt);
+      await this.publish();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      recordAutomationExecutionInSnapshot(
-        this.snapshot(),
-        automation.id,
-        createAutomationExecutionEntry(
-          automation.id,
-          executionId,
-          startedAt,
-          'failed',
-          createdAssignments,
-          message,
-          this.now().toISOString(),
-        ),
-      );
-      await this.publishSnapshotUpdate();
-      warnMain('automation-runner', 'failed', {
-        automationId: automation.id,
-        executionId,
-        createdCount: createdAssignments.length,
-        message,
-      });
+      this.fail(automation, run, error instanceof Error ? error.message : String(error));
+      await this.publish();
+    } finally {
+      this.dispatching.delete(automationId);
     }
   }
 
-  private async createAssignmentsForAutomation(
-    automation: Automation,
-    executionId: string,
-    createdAt: string,
-    createdAssignments: CreatedAutomationAssignment[],
-  ): Promise<void> {
-    const candidates: Array<{ item: WorkItem; repository: AutomationWorkSourceTarget }> = [];
-    const seen = new Set<string>();
-    for (const repository of automation.repositories) {
-      if (!repository.executionRepositoryPath.trim()) throw new Error(`Choose a code repository for ${repository.sourceId}.`);
-      const items = await this.options.listWorkItems.listItems(repository.provider, repository.sourceId);
-      const matchingItems = matchingAutomationItems(items, repository);
-      logMain('automation-runner', 'listed work items', {
-        automationId: automation.id,
-        executionId,
-        sourceId: repository.sourceId,
-        itemCount: items.length,
-        matchingCount: matchingItems.length,
-      });
-
-      for (const item of matchingItems) {
-        const assignmentKey = workItemAssignmentKey(item);
-        const existingAssignment = this.snapshot().workBacklog.assignments[assignmentKey];
-        if (existingAssignment || seen.has(assignmentKey) || this.pendingAssignments.has(assignmentKey)) {
-          logMain('automation-runner', 'skipped already assigned item', {
-            automationId: automation.id,
-            executionId,
-            workItemId: assignmentKey,
-          });
-          continue;
+  handleEvent(event: MainToRendererEvent): void {
+    if (!event.agentId) return;
+    const view = providerConversationEventView(event);
+    for (const automation of this.options.getSnapshot().automations) {
+      const run = automation.executionLog.find(item => item.agentId === event.agentId && automationExecutionIsActive(item));
+      if (!run) continue;
+      if (view.type === 'turn.completed') {
+        const payload = view.payload as { status?: string; turn?: { status?: string; error?: { message?: string } }; error?: { message?: string } } | null;
+        const status = payload?.turn?.status ?? payload?.status;
+        if (status === 'failed' || status === 'interrupted' || payload?.error || payload?.turn?.error) {
+          this.fail(automation, run, payload?.turn?.error?.message ?? payload?.error?.message ?? `Turn ${status ?? 'failed'}.`);
+        } else {
+          run.status = 'completed';
+          run.completedAt = this.now().toISOString();
+          automation.updatedAt = run.completedAt;
         }
-        seen.add(assignmentKey);
-        candidates.push({ item, repository });
-      }
-    }
-
-    if (candidates.length === 0) return;
-    const selectedItems = automation.selectionPrompt
-      ? await this.requireWorkItemSelector()(automation, candidates.map(({ item }) => item))
-      : candidates.map(({ item }) => item);
-    const selectedIds = new Set(selectedItems.map(workItemAssignmentKey));
-    for (const { item, repository } of candidates) {
-      const assignmentKey = workItemAssignmentKey(item);
-      if (!selectedIds.has(assignmentKey) || this.snapshot().workBacklog.assignments[assignmentKey] || this.pendingAssignments.has(assignmentKey)) continue;
-      this.pendingAssignments.add(assignmentKey);
-      try {
-        const agent = await this.createAgentForAutomation(automation, repository, item, createdAt);
-        if (!agent) continue;
-
-        assignWorkItemToAgentInSnapshot(this.snapshot(), agent.id, item, createdAt, {
-          automationExecutionId: executionId,
-          automationId: automation.id,
-          policy: 'complete',
-        });
-        createdAssignments.push({ agent, item });
-        logMain('automation-runner', 'created assignment', {
-          automationId: automation.id,
-          executionId,
-          agentId: agent.id,
-          workItemId: assignmentKey,
-        });
-      } finally {
-        this.pendingAssignments.delete(assignmentKey);
-      }
+      } else if (event.type === 'agent.statusChanged') {
+        if (event.payload.type === 'error') this.fail(automation, run, typeof event.payload.message === 'string' ? event.payload.message : event.payload.message.key);
+        else if (event.payload.type === 'awaitingInput') run.status = 'awaitingInput';
+        else if (event.payload.type === 'working') run.status = 'working';
+        else continue; // finish_turn clears status before the provider actually ends its turn.
+      } else continue;
+      void this.publish().catch(error => warnMain('automations', 'could not save run status', { message: String(error) }));
     }
   }
 
-  private requireWorkItemSelector(): NonNullable<AutomationRunnerOptions['selectWorkItems']> {
-    if (!this.options.selectWorkItems) {
-      throw new Error('Automation work item selection is not available.');
-    }
-    return this.options.selectWorkItems;
+  private fail(automation: Automation, run: AutomationExecutionLogEntry, error: string): void {
+    Object.assign(run, { status: 'failed', error, completedAt: this.now().toISOString() });
+    automation.lastError = error;
+    automation.updatedAt = run.completedAt!;
   }
 
-  private async createAgentForAutomation(
-    automation: Automation,
-    repository: AutomationWorkSourceTarget,
-    item: WorkItem,
-    createdAt: string,
-  ): Promise<Agent | null> {
-    const team = this.snapshot().teams.find((candidate) => candidate.id === automation.teamId);
-    if (!team || team.remoteConnectionId) {
-      throw new Error(`Team is no longer available for automation "${automation.name}".`);
-    }
-
-    const worktree = await this.options.createWorktree({
-      repoPath: repository.executionRepositoryPath,
-      branchName: automationBranchName(item),
-      reuseExisting: true,
-    });
-    if (this.snapshot().workBacklog.assignments[workItemAssignmentKey(item)]) return null;
-    const previousAgentIds = new Set(this.snapshot().agents.map((agent) => agent.id));
-    createAgentInSnapshot(
-      this.snapshot(),
-      {
-        name: dedicatedTeamName(item),
-        folder: worktree.path,
-        backend: automation.backend ?? 'codex',
-        teamId: team.id,
-      },
-      createdAt,
-      undefined,
-      { select: false },
-    );
-    const agent = this.snapshot().agents.find((candidate) => !previousAgentIds.has(candidate.id));
-    if (!agent) {
-      throw new Error(`Agent could not be created for automation "${automation.name}".`);
-    }
-    return agent;
-  }
-
-  private async publishSnapshotUpdate(): Promise<void> {
+  private now(): Date { return this.options.now?.() ?? new Date(); }
+  private async publish(): Promise<void> {
     await this.options.saveSnapshot();
     this.options.notifySnapshotUpdated();
   }
-
-  private snapshot(): AppSnapshot {
-    return this.options.getSnapshot();
-  }
-
-  private now(): Date {
-    return this.options.now?.() ?? new Date();
-  }
-
-  private createExecutionId(): string {
-    return this.options.createExecutionId?.() ?? createEntityId('automation-exec');
-  }
-}
-
-export function matchingAutomationItems(items: WorkItem[], repository: AutomationWorkSourceTarget): WorkItem[] {
-  return items.filter((item) => {
-    return item.provider === repository.provider && item.sourceId === repository.sourceId && item.state === 'open';
-  });
 }
 
 export function automationIsDue(automation: Automation, now: Date): boolean {
-  if (!automation.enabled) return false;
+  if (!automation.enabled || automation.executionLog.some(automationExecutionIsActive)) return false;
+  const next = nextAutomationRunAt(automation);
+  if (next !== null) return Date.parse(next) <= now.getTime();
+  if ('rrule' in automation.schedule) {
+    return false;
+  }
   if (!automation.lastRunAt) return true;
-  const lastRunAt = new Date(automation.lastRunAt).getTime();
-  return !Number.isFinite(lastRunAt) || now.getTime() - lastRunAt >= automation.schedule.intervalMinutes * 60_000;
-}
-
-function dedicatedTeamName(item: WorkItem): string {
-  return `${workProviderLabel(item.provider)} ${workItemDisplayIdentifier(item)}`;
-}
-
-function automationBranchName(item: WorkItem): string {
-  return workItemBranchName(item, 'automation');
-}
-
-function createAutomationExecutionEntry(
-  automationId: string,
-  executionId: string,
-  startedAt: string,
-  status: AutomationExecutionLogEntry['status'],
-  assignments: CreatedAutomationAssignment[],
-  error?: string,
-  completedAt?: string,
-): AutomationExecutionLogEntry {
-  return {
-    id: executionId,
-    automationId,
-    startedAt,
-    status,
-    createdCount: assignments.length,
-    createdAgents: assignments.map(({ agent, item }) => ({
-      agentId: agent.id,
-      agentName: agentDisplayName(agent),
-      workItemId: workItemAssignmentKey(item),
-      ...(item.identifier ? { workItemIdentifier: item.identifier } : {}),
-      workItemTitle: item.title,
-      workItemUrl: item.url,
-    })),
-    ...(completedAt ? { completedAt } : {}),
-    ...(error ? { error } : {}),
-  };
+  const last = Date.parse(automation.lastRunAt);
+  return !Number.isFinite(last) || now.getTime() - last >= automation.schedule.intervalMinutes * 60_000;
 }

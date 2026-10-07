@@ -1,6 +1,6 @@
 ---
 name: prepare-release
-description: Prepare and launch a Korus release by auditing changes, confirming version and prerelease/latest channel, validating and pushing the release commit, then running the single release command and reporting its progress. Use when asked to prepare or cut a release, including $prepare-release.
+description: Prepare and launch a Korus release by auditing changes, confirming version and prerelease/latest channel, validating and pushing the release commit, then starting the single release command and handing back the run link. Use when asked to prepare or cut a release, including $prepare-release.
 ---
 
 # Prepare Release
@@ -53,12 +53,12 @@ including script tests, and 85% statements in each of the five workspaces.
 A failing gate blocks release. Only CHANGELOG.md, the six package manifests,
 package-lock.json, and vue/src/generated/release-notes.json may change.
 
-Use `app-dod` and review the staged diff, then commit with
+Use `korus-dod` and review the staged diff, then commit with
 `chore: release prep`. Report the audited SDK version and Git
 provenance from the exact npm package, not the sibling HEAD.
 Tag creation belongs to the release command, not preparation.
 
-## Push, launch, and monitor
+## Push, launch, and hand back
 
 Push the release commit to the default branch and verify its remote SHA. Then run
 exactly one command for the confirmed channel:
@@ -71,10 +71,12 @@ It requires the clean, pushed default branch, creates the missing remote
 four platform builds → publish) and watches it. The final job stages the
 installers on a draft and publishes the channel; there is no second workflow.
 
-Run it in the background and follow its output, which has one line per job state
-change. Tell Nicolas when the run starts (with the run URL) and report each build
-finishing or failing, not every poll. If your session loses the process, resume with
-`npm run release:watch -- <run-id>`.
+Build and publication take roughly 20 minutes. Run the command in the background,
+capture the run ID and URL once dispatch is confirmed, then end the turn so Nicolas
+can continue other work. Leave the workflow running; do not occupy the conversation
+with polling or wait for publication unless he explicitly asks for monitoring.
+On a later request to check progress, inspect that exact run or resume with
+`npm run release:watch -- <run-id>`; do not dispatch another build.
 
 On failure, report the failed job and the log excerpt the command printed. Ask
 before retrying with `gh run rerun <run-id> --failed`, then resume watching. A
@@ -94,6 +96,8 @@ report outstanding native checks honestly.
 
 Distinguish prepared, committed, pushed, built, draft-staged, native-tested,
 published prerelease, and published stable.
-Include version, commit/tag, SDK version/provenance, Actions run URL, release URL,
-gates, and outstanding target checks. Celebrate a completed
+At launch, report version/channel, commit/tag, SDK version/provenance, passed local
+gates, and the Actions run URL; clearly state that build/publication are pending.
+After a requested completion check, include the release URL and outstanding native
+target checks. Celebrate a completed
 publication through `finish_turn`; preparation or staging alone is not publication.

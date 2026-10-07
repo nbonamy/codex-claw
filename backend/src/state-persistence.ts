@@ -5,7 +5,9 @@ import { isThreadFlags } from '@workspace/core/thread-flags';
 import { backendCodexHomeDir } from './state';
 import { isPlanReview } from '@workspace/core/plan-review';
 import { sanitizeClientPreferences } from '@workspace/core/client-preferences';
-import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionCreatedAgent, AutomationExecutionLogEntry, AutomationExecutionStatus, AutomationWorkSourceTarget, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@workspace/core/contracts';
+import { isAutomationTarget } from '@workspace/core/automation-manager';
+import { normalizeAutomationSchedule } from '@workspace/core/automation-schedule';
+import type { AccountRateLimits, Agent, AgentBackend, AgentContextUsage, AgentSubagentTree, AgentWorkspaceIdentity, AppGeneralSettings, AppSnapshot, BackendDefaults, BackendSession, Automation, AutomationExecutionLogEntry, OpenInApplication, RemoteConnection, RemoteConnectionStatus, RemoteConnectionTransport, RemoteConnectionsState, SourceFolderState, SubagentActivity, SubagentNode, SubagentOperation, Team, ThreadGoal, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep, WorkBacklogAssignment, WorkBacklogState, WorkIntegrationConnection, WorkIntegrationStatus, WorkProviderKind, WorkProviderSettings } from '@workspace/core/contracts';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
 import { isCodexApprovalPreset, isCodexApprovalsReviewer } from '@workspace/core/codex-approval-presets';
 import { normalizeGeneralSettings, normalizeSourceFolderState, normalizeThemeSettings } from '@workspace/core/settings';
@@ -65,6 +67,7 @@ export type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' 
   planReview?: import('@workspace/core/plan-review').PlanReview;
   codeReview?: import('@workspace/core/code-review').CodeReviewSession;
   threadFlags?: import('@workspace/core/thread-flags').ThreadFlags;
+  suggestedPrompt?: string;
   goal?: ThreadGoal;
   visualize?: Omit<VisualizeSession, 'visualizations'> & { visualizations?: Visualization[] };
   statusText?: string;
@@ -137,6 +140,7 @@ function persistedAgentFromSnapshot(agent: Agent, libraries?: RepositoryVisualiz
     ...(agent.contextUsage ? { contextUsage: { ...agent.contextUsage } } : {}),
     ...(agent.plan ? { plan: cloneThreadPlan(agent.plan) } : {}),
     ...(agent.threadFlags ? { threadFlags: structuredClone(agent.threadFlags) } : {}),
+    ...(agent.suggestedPrompt ? { suggestedPrompt: agent.suggestedPrompt } : {}),
     ...(agent.planReview ? { planReview: { ...agent.planReview } } : {}),
     ...(agent.codeReview ? { codeReview: cloneCodeReviewSession(agent.codeReview) } : {}),
     ...(agent.goal ? { goal: { ...agent.goal } } : {}),
@@ -384,6 +388,7 @@ function sanitizeAgent(value: unknown, libraries: RepositoryVisualizations): Age
     ...(contextUsage ? { contextUsage } : {}),
     ...(plan ? { plan } : {}),
     ...(isThreadFlags(value.threadFlags) ? { threadFlags: structuredClone(value.threadFlags) } : {}),
+    ...(typeof value.suggestedPrompt === 'string' && value.suggestedPrompt.trim() ? { suggestedPrompt: value.suggestedPrompt.trim() } : {}),
     ...(isPlanReview(value.planReview) ? { planReview: { ...value.planReview } } : {}),
     ...(isCodeReviewSession(value.codeReview)
       ? { codeReview: cloneCodeReviewSession(value.codeReview) }
@@ -992,184 +997,37 @@ function sanitizeWorkProviderSetting(value: unknown): WorkProviderSettings | nul
 }
 
 function cloneAutomation(automation: Automation): Automation {
-  return {
-    ...automation,
-    repositories: automation.repositories.map((repository) => ({ ...repository })),
-    schedule: { ...automation.schedule },
-    executionLog: (automation.executionLog ?? []).map(cloneAutomationExecutionEntry),
-  };
-}
-
-function cloneAutomationExecutionEntry(entry: AutomationExecutionLogEntry): AutomationExecutionLogEntry {
-  return {
-    ...entry,
-    createdAgents: entry.createdAgents.map((createdAgent) => ({
-      ...createdAgent,
-      ...(createdAgent.conversationRef ? { conversationRef: { ...createdAgent.conversationRef } } : {}),
-    })),
-  };
+  return { ...automation, target: { ...automation.target }, schedule: { ...automation.schedule },
+    executionLog: automation.executionLog.map(entry => ({ ...entry, ...(entry.conversationRef ? { conversationRef: { ...entry.conversationRef } } : {}) })) };
 }
 
 function sanitizeAutomation(value: unknown): Automation | null {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    typeof value.name !== 'string' ||
-    typeof value.createdAt !== 'string' ||
-    typeof value.updatedAt !== 'string'
-  ) {
-    return null;
-  }
-
-  const repositories = Array.isArray(value.repositories)
-    ? value.repositories.map(sanitizeAutomationRepository).filter((repository): repository is AutomationWorkSourceTarget => Boolean(repository))
-    : [];
-  const teamId = optionalTrimmedString(value.teamId);
-  const rawIntervalMinutes = isRecord(value.schedule) ? value.schedule.intervalMinutes : null;
-  const intervalMinutes = typeof rawIntervalMinutes === 'number' && Number.isFinite(rawIntervalMinutes)
-    ? Math.max(1, Math.floor(rawIntervalMinutes))
-    : null;
-  if (repositories.length === 0 || !teamId || !intervalMinutes) {
-    return null;
-  }
-
-  const lastCreatedCount = typeof value.lastCreatedCount === 'number' && Number.isFinite(value.lastCreatedCount)
-    ? Math.max(0, Math.floor(value.lastCreatedCount))
-    : undefined;
+  const schedule = isRecord(value) ? normalizeAutomationSchedule(value.schedule) : null;
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string'
+    || typeof value.createdAt !== 'string' || typeof value.updatedAt !== 'string'
+    || !isAutomationTarget(value.target) || typeof value.prompt !== 'string' || !value.prompt.trim()
+    || !schedule) return null;
   const automationId = value.id;
-  const executionLog = Array.isArray(value.executionLog)
-    ? value.executionLog.map((entry) => sanitizeAutomationExecutionEntry(entry, automationId)).filter((entry): entry is AutomationExecutionLogEntry => Boolean(entry))
-    : [];
-
-  return {
-    id: value.id,
-    name: value.name.trim() || 'Automation',
-    backend: sanitizeBackend(value.backend) ?? 'codex',
-    enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
-    repositories,
-    teamId,
-    ...(optionalTrimmedString(value.selectionPrompt) ? { selectionPrompt: optionalTrimmedString(value.selectionPrompt)! } : {}),
-    ...(optionalTrimmedString(value.assignmentPrompt) ? { assignmentPrompt: optionalTrimmedString(value.assignmentPrompt)! } : {}),
-    schedule: { intervalMinutes },
-    executionLog,
-    createdAt: value.createdAt,
-    updatedAt: value.updatedAt,
+  const executionLog: AutomationExecutionLogEntry[] = Array.isArray(value.executionLog) ? value.executionLog.flatMap(entry => {
+    if (!isRecord(entry) || typeof entry.id !== 'string' || typeof entry.startedAt !== 'string' || entry.automationId !== automationId
+      || !['working', 'awaitingInput', 'completed', 'failed'].includes(String(entry.status))) return [];
+    return [{ id: entry.id, automationId, startedAt: entry.startedAt, status: entry.status as AutomationExecutionLogEntry['status'],
+      ...(typeof entry.agentId === 'string' ? { agentId: entry.agentId } : {}),
+      ...(typeof entry.agentName === 'string' ? { agentName: entry.agentName } : {}),
+      ...(typeof entry.completedAt === 'string' ? { completedAt: entry.completedAt } : {}),
+      ...(typeof entry.error === 'string' ? { error: entry.error } : {}),
+      ...(isRecord(entry.conversationRef) && entry.conversationRef.backend === 'codex' && typeof entry.conversationRef.threadId === 'string'
+        ? { conversationRef: { backend: 'codex' as const, threadId: entry.conversationRef.threadId } }
+        : isRecord(entry.conversationRef) && (entry.conversationRef.backend === 'claude' || entry.conversationRef.backend === 'antigravity') && typeof entry.conversationRef.sessionId === 'string'
+          && (entry.conversationRef.folder === null || typeof entry.conversationRef.folder === 'string')
+          ? { conversationRef: { backend: entry.conversationRef.backend, folder: entry.conversationRef.folder, sessionId: entry.conversationRef.sessionId } } : {}),
+    }];
+  }) : [];
+  return { id: value.id, name: value.name, enabled: value.enabled !== false, prompt: value.prompt, target: { ...value.target },
+    schedule, executionLog, createdAt: value.createdAt, updatedAt: value.updatedAt,
+    ...(typeof value.scheduleAnchorAt === 'string' ? { scheduleAnchorAt: value.scheduleAnchorAt } : {}),
     ...(typeof value.lastRunAt === 'string' ? { lastRunAt: value.lastRunAt } : {}),
-    ...(typeof value.lastError === 'string' && value.lastError.trim() ? { lastError: value.lastError } : {}),
-    ...(lastCreatedCount !== undefined ? { lastCreatedCount } : {}),
-  };
-}
-
-function sanitizeAutomationExecutionEntry(value: unknown, automationId: string): AutomationExecutionLogEntry | null {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    typeof value.startedAt !== 'string' ||
-    !isAutomationExecutionStatus(value.status) ||
-    !Array.isArray(value.createdAgents)
-  ) {
-    return null;
-  }
-
-  const entryAutomationId = optionalTrimmedString(value.automationId)
-    ?? optionalTrimmedString(value.loopId)
-    ?? automationId;
-  if (entryAutomationId !== automationId) {
-    return null;
-  }
-
-  const createdAgents = value.createdAgents
-    .map(sanitizeAutomationExecutionCreatedAgent)
-    .filter((createdAgent): createdAgent is AutomationExecutionCreatedAgent => Boolean(createdAgent));
-  const createdCount = typeof value.createdCount === 'number' && Number.isFinite(value.createdCount)
-    ? Math.max(0, Math.floor(value.createdCount))
-    : createdAgents.length;
-
-  return {
-    id: value.id,
-    automationId,
-    startedAt: value.startedAt,
-    status: value.status,
-    createdCount,
-    createdAgents,
-    ...(typeof value.completedAt === 'string' ? { completedAt: value.completedAt } : {}),
-    ...(typeof value.error === 'string' && value.error.trim() ? { error: value.error } : {}),
-  };
-}
-
-function sanitizeAutomationExecutionCreatedAgent(value: unknown): AutomationExecutionCreatedAgent | null {
-  if (
-    !isRecord(value) ||
-    typeof value.agentId !== 'string' ||
-    typeof value.workItemId !== 'string' ||
-    typeof value.workItemTitle !== 'string' ||
-    typeof value.workItemUrl !== 'string'
-  ) {
-    return null;
-  }
-
-  return {
-    agentId: value.agentId,
-    agentName: typeof value.agentName === 'string' && value.agentName.trim() ? value.agentName : value.agentId,
-    workItemId: value.workItemId,
-    ...(typeof value.workItemIdentifier === 'string' ? { workItemIdentifier: value.workItemIdentifier } : {}),
-    workItemTitle: value.workItemTitle,
-    workItemUrl: value.workItemUrl,
-    ...(sanitizeBackendConversationRef(value.conversationRef) ?? legacyCodexConversationRef(value.conversationId)),
-  };
-}
-
-function sanitizeBackendConversationRef(value: unknown): Partial<Pick<AutomationExecutionCreatedAgent, 'conversationRef'>> | null {
-  if (!isRecord(value) || typeof value.backend !== 'string') {
-    return null;
-  }
-
-  if (value.backend === 'codex' && typeof value.threadId === 'string' && value.threadId.trim()) {
-    return {
-      conversationRef: {
-        backend: 'codex',
-        threadId: value.threadId,
-      },
-    };
-  }
-
-  if (
-    (value.backend === 'claude' || value.backend === 'antigravity') &&
-    (value.folder === null || (typeof value.folder === 'string' && value.folder.trim())) &&
-    typeof value.sessionId === 'string' &&
-    value.sessionId.trim()
-  ) {
-    return {
-      conversationRef: {
-        backend: value.backend,
-        folder: value.folder,
-        sessionId: value.sessionId,
-      },
-    };
-  }
-
-  return null;
-}
-
-function legacyCodexConversationRef(value: unknown): Partial<Pick<AutomationExecutionCreatedAgent, 'conversationRef'>> {
-  return typeof value === 'string' && value.trim()
-    ? { conversationRef: { backend: 'codex', threadId: value } }
-    : {};
-}
-
-function isAutomationExecutionStatus(value: unknown): value is AutomationExecutionStatus {
-  return value === 'working' || value === 'completed' || value === 'failed';
-}
-
-function sanitizeAutomationRepository(value: unknown): AutomationWorkSourceTarget | null {
-  if (!isRecord(value) || !isWorkProvider(value.provider)) {
-    return null;
-  }
-  const sourceId = optionalTrimmedString(value.sourceId);
-  const executionRepositoryPath = optionalTrimmedString(value.executionRepositoryPath);
-  return sourceId && executionRepositoryPath
-    ? { provider: value.provider, sourceId, executionRepositoryPath }
-    : null;
+    ...(typeof value.lastError === 'string' ? { lastError: value.lastError } : {}) };
 }
 
 function optionalTrimmedString(value: unknown): string | null {

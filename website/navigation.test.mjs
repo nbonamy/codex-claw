@@ -76,6 +76,31 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         );
       }
       const header = page.getByRole("banner");
+      const github = header.getByRole("link", { name: "GitHub", exact: true });
+      assert.equal(
+        await github.isVisible(),
+        true,
+        `GitHub is visible at ${width}px`,
+      );
+      assert.equal(
+        await github.getAttribute("href"),
+        "https://github.com/nbonamy/korus",
+      );
+      await github.focus();
+      assert.equal(
+        await github.evaluate((node) => node === document.activeElement),
+        true,
+      );
+      const headerLinks = await header.locator("a:visible").all();
+      let previousRight = 0;
+      for (const link of headerLinks) {
+        const rect = await link.boundingBox();
+        assert.ok(
+          rect.x >= previousRight && rect.x + rect.width <= width,
+          `Header links fit without overlap at ${width}px`,
+        );
+        previousRight = rect.x + rect.width;
+      }
       const docs = header.getByRole("link", { name: "Docs", exact: true });
       assert.equal(
         await docs.isVisible(),
@@ -96,6 +121,31 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         `Download fits at ${width}px`,
       );
       // Card previews must neither overlap wrapped copy nor escape their cards.
+      const automation = page.locator(".automation-console");
+      const previewBounds = await automation.boundingBox();
+      assert.ok(
+        previewBounds.x >= 0 && previewBounds.x + previewBounds.width <= width,
+        `Automation preview fits at ${width}px`,
+      );
+      for (const item of await automation
+        .locator("strong:visible, p:visible, time:visible")
+        .all()) {
+        const bounds = await item.boundingBox();
+        assert.ok(
+          bounds.x >= previewBounds.x &&
+            bounds.x + bounds.width <= previewBounds.x + previewBounds.width,
+          `Automation content stays inside its preview at ${width}px`,
+        );
+        assert.equal(
+          await item.evaluate(
+            (node) =>
+              getComputedStyle(node).display === "inline" ||
+              node.scrollWidth <= node.clientWidth + 1,
+          ),
+          true,
+          `Automation text is not clipped at ${width}px`,
+        );
+      }
       for (const card of await page.locator(".capability").all()) {
         const layout = await card.evaluate((element) => {
           const copy = element.querySelector("p");
@@ -187,6 +237,15 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
       await page.getByRole("heading", { level: 1 }).waitFor();
       assert.equal(new URL(page.url()).pathname, "/docs/");
     }
+    await page.goto(origin);
+    await page
+      .locator("#automations a[href='/docs/features/automations.html']")
+      .click();
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    assert.equal(
+      new URL(page.url()).pathname,
+      "/docs/features/automations.html",
+    );
     // OS is a shortcut, never an inferred CPU architecture or a mobile download.
     for (const [userAgent, touch, platform] of [
       ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", false, "macos"],

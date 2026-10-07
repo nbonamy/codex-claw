@@ -78,6 +78,10 @@ by mutating user-global tool config.
   readiness at every handoff (omit it when review is deferred or the user asked for
   immediate commit/push). Flags are persisted app state cleared with the
   conversation runtime.
+- Prompt suggestions are agent-scoped Korus metadata, not provider conversation
+  state or draft text. The renderer uses the SDK's placeholder contract; a
+  suggestion never authorizes or submits work. Suggestions reuse the active
+  model's finish-turn call rather than invoking a separate model.
 
 ### Delegation
 
@@ -103,8 +107,27 @@ by mutating user-global tool config.
   inside the caller's folder, be regular files and fit the preview limit (renderer
   previews, by contrast, accept paths outside the agent folder).
 - `update-work-item` changes the caller's own assignment status (`blocked` requires
-  a note); completing the last assignment of an automation execution completes it
-  while keeping its agents and worktrees.
+  a note). Automation completion is owned by the scheduled conversation's turn,
+  not by work-item status.
+
+### Scheduled prompts
+
+`create-automation` uses the same persisted automation definitions and scheduler
+as the UI. It is available to local agents and Quick Chats, excluding managed
+review and Mission workers. Targets stay within the caller's team. Existing
+conversations retain their backend, model, effort and approvals; overrides are
+accepted only for new Quick Chats. Caller-scoped request IDs make retries
+idempotent, and success means the schedule was saved, not that its prompt ran.
+
+Descriptions and injected instructions require an explicit user request and
+direct Korus scheduling to this tool rather than other schedulers. This is
+model-facing policy, not independent consent verification. Calendar requests use
+an RRULE and IANA timezone through the same recurrence module as the UI and
+daemon; elapsed intervals are a separate choice. The response includes the next
+occurrence. Missed occurrences coalesce into one catch-up run when the daemon returns.
+Claude sessions connected to Korus disable native cron/wakeup tools through the
+SDK's tool-denial option; Codex uses the scheduling instructions without a
+native-tool suppression claim.
 
 ### Automatic review
 

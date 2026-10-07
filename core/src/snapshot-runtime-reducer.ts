@@ -65,12 +65,16 @@ export function applyRuntimeEventToSnapshot(
     if (agent) {
       const statusText = event.payload.statusText;
       const threadFlags = event.payload.threadFlags;
+      const suggestedPrompt = event.payload.suggestedPrompt;
       Object.assign(agent, event.payload);
       if (statusText === null) {
         delete agent.statusText;
       }
       if (threadFlags === null) {
         delete agent.threadFlags;
+      }
+      if (suggestedPrompt === null) {
+        delete agent.suggestedPrompt;
       }
     }
     return;

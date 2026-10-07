@@ -52,9 +52,9 @@ function addRosterLinks(snapshot: import('@workspace/core/contracts').AppSnapsho
     activeAgentId: removedId, activeAgentByTeam: { 'team-test': removedId }, agentOrderByTeam: { 'team-test': [removedId, survivingId] },
     externalApplications: { [removedId]: 'vscode' }, general: { savedPromptDrafts: [{ id: 'draft', agentId: removedId, text: 'draft', createdAt: 1 }] },
   } };
-  snapshot.automations = [{ id: 'automation-test', name: 'Issues', backend: 'claude', enabled: false, repositories: [], teamId: 'team-test', schedule: { intervalMinutes: 60 }, createdAt: 'now', updatedAt: 'now', executionLog: [{
-    id: 'execution-test', automationId: 'automation-test', startedAt: 'now', status: 'completed', createdCount: 1,
-    createdAgents: [{ agentId: removedId, agentName: 'Old agent', workItemId: 'issue', workItemTitle: 'Feature', workItemUrl: 'https://example.com/issue' }],
+  snapshot.automations = [{ id: 'automation-test', name: 'Issues',  enabled: false, prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-test', backend: 'claude' },  schedule: { intervalMinutes: 60 }, createdAt: 'now', updatedAt: 'now', executionLog: [{
+    id: 'execution-test', automationId: 'automation-test', startedAt: 'now', status: 'completed',
+    agentId: removedId, agentName: 'Old agent',
   }] }];
   const mission = createMission(snapshot, { outcome: 'Ship a feature', workflowType: 'shapeAndShipFeature', teamId: 'team-test', orchestratorMemberId: survivingId });
   mission.stageAgentIds = { requirements: removedId };
@@ -96,7 +96,7 @@ describe('provider onboarding setup', () => {
     expect(mission.execution!.memberIds).toEqual(['other']);
     expect(mission.execution!.runs).toEqual([]);
     expect(mission.execution!.deliveries).toEqual([]);
-    expect(snapshot.automations[0]!.executionLog[0]!.createdAgents).toEqual([]);
+    expect(snapshot.automations[0]!.executionLog).toEqual([]);
     expect(snapshot.workBacklog.assignments).toEqual({});
     expect(snapshot.agentGitStatuses).toEqual({});
     expect(snapshot.turnGitDiffs).toEqual({});

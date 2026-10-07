@@ -1,307 +1,158 @@
 <template>
   <form class="automation-editor" @submit.prevent="submit">
     <header class="automation-editor__header">
-      <div>
-        <h3>
-          {{ mode === 'edit' ? $t('surface.automationEditor.editAutomation') : $t('surface.automationEditor.createAutomation') }}
-        </h3>
-        <p>{{ $t('surface.automationEditor.runPromptAcrossRepositories') }}</p>
-      </div>
-      <el-switch
-        v-model="form.enabled"
-        :aria-label="$t('surface.automationEditor.automationEnabled')"
-        :active-text="$t('surface.automationEditor.on')"
-        :inactive-text="$t('surface.automationEditor.off')"
-      />
+      <h3>{{ $t(mode === 'edit' ? 'surface.automationEditor.editAutomation' : 'surface.automationEditor.createAutomation') }}</h3>
+      <el-switch v-model="form.enabled" :aria-label="$t('surface.automationEditor.automationEnabled')" />
     </header>
-
     <div class="automation-editor__body">
-      <BacklogSourceSelector :provider="provider" :providers="workProviderKinds" :show-source="false" @select-provider="selectProvider" />
-      <div v-if="!providerConnected" class="automation-editor__notice">
-        {{ $t('automationSources.connect', { provider: providerLabel }) }}
-      </div>
-      <div v-if="error" class="automation-editor__notice">{{ error }}</div>
-
-      <section class="automation-editor__section">
-        <div class="automation-editor__source-heading">
-          <label for="automation-editor-repositories">{{ sourceLabel }}</label>
-          <el-button v-if="providerConnected" text size="small" :disabled="loading" @click="emit('load-repositories', provider)">{{ $t(error ? 'backlogSource.retry' : 'automationSources.refresh') }}</el-button>
-        </div>
-        <el-select
-          id="automation-editor-repositories"
-          v-model="form.repositoryIds"
-          filterable
-          multiple
-          collapse-tags
-          collapse-tags-tooltip
-          :max-collapse-tags="3"
-          :placeholder="sourceLabel"
-          :aria-label="!workProviderDefinition(provider).repositoryBacked ? sourceLabel : $t('surface.automationEditor.automationRepositories')"
-          :loading="loading"
-          :disabled="!providerConnected || loading || repositoryOptions.length === 0"
-        >
-          <el-option v-for="repository in repositoryOptions" :key="repository.value" :label="repository.label" :value="repository.value" />
-        </el-select>
-        <p v-if="providerConnected && !loading && repositoryOptions.length === 0" class="automation-editor__help">
-          {{ $t(!workProviderDefinition(provider).repositoryBacked ? 'automationSources.noSources' : 'surface.automationEditor.noConfiguredGitHubRepositories') }}
-        </p>
-      </section>
-
-      <section v-for="source in selectedWorkSources" :key="source.value" class="automation-editor__section">
-        <label :for="`automation-code-${source.value}`">{{ $t('automationSources.codeRepositoryFor', { source: source.label }) }}</label>
-        <el-select :id="`automation-code-${source.value}`" v-model="executionPaths[source.value]" filterable
-          :aria-label="$t('automationSources.codeRepositoryFor', { source: source.label })" :placeholder="$t('backlogSource.chooseCodeRepository')">
-          <el-option v-for="repository in sourceRepositories" :key="repository.path" :value="repository.path" :label="repository.name" />
-        </el-select>
-      </section>
-
-      <div class="automation-editor__grid">
-        <section class="automation-editor__section">
-          <label for="automation-editor-team">{{ $t('surface.automationEditor.team') }}</label>
-          <el-select
-            id="automation-editor-team"
-            v-model="form.teamId"
-            filterable
-            :placeholder="$t('surface.automationEditor.selectTeam')"
-            :aria-label="$t('surface.automationEditor.automationTargetTeam')"
-          >
-            <el-option v-for="team in teams" :key="team.id" :label="team.name" :value="team.id" />
-          </el-select>
-        </section>
-
-        <section class="automation-editor__section">
-          <label for="automation-editor-schedule">{{ $t('surface.automationEditor.run') }}</label>
-          <el-select
-            id="automation-editor-schedule"
-            v-model="form.intervalMinutes"
-            :aria-label="$t('surface.automationEditor.automationSchedule')"
-          >
-            <el-option v-for="option in scheduleOptions" :key="option.value" :label="option.label" :value="option.value" />
-          </el-select>
-        </section>
-      </div>
-
-      <section class="automation-editor__section automation-editor__prompt-section">
-        <label for="automation-editor-selection-prompt">{{ $t('surface.automationEditor.selectionPrompt') }}</label>
-        <p class="automation-editor__help">
-          {{ $t('surface.automationEditor.selectionPromptHelp') }}
-        </p>
-        <VoiceTextarea
-          id="automation-editor-selection-prompt"
-          v-model="form.selectionPrompt"
-          :label="$t('surface.automationEditor.selectionPrompt')"
-          :rows="5"
-          :placeholder="$t('surface.automationEditor.selectionPromptPlaceholder')"
-          @busy-change="selectionPromptBusy = $event"
-        />
-      </section>
-
-      <section class="automation-editor__section automation-editor__prompt-section">
-        <label for="automation-editor-assignment-prompt">{{ $t('surface.automationEditor.assignmentPrompt') }}</label>
-        <p class="automation-editor__help">
-          {{ $t('surface.automationEditor.assignmentPromptHelp') }}
-        </p>
-        <VoiceTextarea
-          id="automation-editor-assignment-prompt"
-          v-model="form.assignmentPrompt"
-          :label="$t('surface.automationEditor.assignmentPrompt')"
-          :rows="5"
-          :placeholder="$t('surface.automationEditor.assignmentPromptPlaceholder')"
-          @busy-change="assignmentPromptBusy = $event"
-        />
-      </section>
+      <SettingsSection density="compact">
+        <SettingsRow :title="$t('promptAutomation.name')">
+          <template #control>
+            <el-input id="automation-name" v-model="form.name" :aria-label="$t('promptAutomation.name')" />
+          </template>
+        </SettingsRow>
+        <SettingsRow class="automation-editor__prompt" :title="$t('promptAutomation.prompt')">
+          <template #control>
+            <VoiceTextarea id="automation-prompt" v-model="form.prompt" :label="$t('promptAutomation.prompt')" :rows="3"
+              :placeholder="$t('promptAutomation.promptPlaceholder')" @busy-change="promptBusy = $event" />
+          </template>
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection density="compact" :title="$t('promptAutomation.target')" title-id="automation-run-in">
+        <SettingsRow :title="$t('promptAutomation.team')">
+          <template #control>
+            <el-select id="automation-team" v-model="form.teamId" :aria-label="$t('surface.automationEditor.automationTargetTeam')">
+              <el-option v-for="team in teams" :key="team.id" :value="team.id" :label="team.name" />
+            </el-select>
+          </template>
+        </SettingsRow>
+        <SettingsRow :title="$t('promptAutomation.conversation')">
+          <template #control>
+            <el-select id="automation-target" v-model="form.kind" :aria-label="$t('promptAutomation.target')">
+              <el-option value="newQuickChat" :label="$t('promptAutomation.newQuickChat')" />
+              <el-option value="quickChat" :label="$t('promptAutomation.quickChat')" />
+              <el-option value="agent" :label="$t('promptAutomation.agent')" />
+            </el-select>
+          </template>
+        </SettingsRow>
+        <SettingsRow v-if="form.kind !== 'newQuickChat'" :title="$t(form.kind === 'agent' ? 'promptAutomation.agent' : 'promptAutomation.quickChat')"
+          :description="$t('promptAutomation.inheritsSettings')">
+          <template #control>
+            <el-select id="automation-agent" v-model="form.agentId" filterable fit-input-width :aria-label="$t('promptAutomation.conversation')"
+              :placeholder="$t(form.kind === 'agent' ? 'promptAutomation.agent' : 'promptAutomation.quickChat')">
+              <el-option v-for="agent in targetAgents" :key="agent.id" :value="agent.id" :label="conversationLabel(agent)" :title="conversationLabel(agent)" />
+            </el-select>
+          </template>
+        </SettingsRow>
+      </SettingsSection>
+      <AutomationScheduleEditor v-model="schedule" :automation="automation" />
+      <SettingsSection v-if="form.kind === 'newQuickChat'" density="compact" :title="$t('promptAutomation.model')" title-id="automation-model">
+        <SettingsRow :title="$t('handoff.engine')">
+          <template #control>
+            <BackendSelector v-model="form.backend" class="automation-editor__backend" :team-id="form.teamId"
+              :preserve-selection="Boolean(automation)" show-single-choice />
+          </template>
+        </SettingsRow>
+        <SettingsRow :title="$t('promptAutomation.model')" :description="modelsError ? $t('promptAutomation.modelsUnavailable') : undefined">
+          <template #control>
+            <el-select v-model="form.model" filterable allow-create clearable :loading="modelsLoading"
+              :aria-label="$t('promptAutomation.model')" :placeholder="$t('promptAutomation.defaultModel')">
+              <el-option v-for="model in models" :key="model.model" :value="model.model" :label="model.displayName" />
+            </el-select>
+          </template>
+        </SettingsRow>
+        <SettingsRow :title="$t('promptAutomation.effort')">
+          <template #control>
+            <el-select v-model="form.reasoningEffort" filterable allow-create clearable :aria-label="$t('promptAutomation.effort')"
+              :placeholder="$t('promptAutomation.defaultEffort')">
+              <el-option v-for="effort in efforts" :key="effort.reasoningEffort" :value="effort.reasoningEffort" :label="effort.reasoningEffort" />
+            </el-select>
+          </template>
+        </SettingsRow>
+      </SettingsSection>
+      <p v-if="error" class="automation-editor__notice" role="alert">{{ error }}</p>
     </div>
-
     <footer class="automation-editor__footer">
-      <BackendSelector v-model="form.backend" :team-id="form.teamId" :preserve-selection="Boolean(automation)" />
       <el-button @click="emit('cancel')">{{ $t('surface.automationEditor.cancel') }}</el-button>
-      <el-button type="primary" native-type="submit" :disabled="!canSubmit">
-        {{ $t('surface.automationEditor.saveAutomation') }}
-      </el-button>
+      <el-button type="primary" native-type="submit" :disabled="!canSubmit" :loading="saving">{{ $t('surface.automationEditor.saveAutomation') }}</el-button>
     </footer>
   </form>
 </template>
 
 <script setup lang="ts">
-import { workProviderDefinition, workProviderKinds } from '@workspace/core/work-providers';
-import type {
-  Automation,
-  AutomationWorkSourceTarget,
-  CreateAutomationInput,
-  SourceRepository,
-  Team,
-  WorkIntegrationConnection,
-  WorkSource,
-  WorkProviderKind,
-} from '@workspace/core/contracts';
-import { canonicalGitRemoteIdentity } from '@workspace/core/git-remote';
 import { computed, reactive, ref, watch } from 'vue';
-import { translate } from '../i18n';
+import type { Agent, AgentBackend, Automation, AutomationSchedule, AutomationTarget, BackendModelOption, CreateAutomationInput, Team } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { normalizeAutomationSchedule } from '@workspace/core/automation-schedule';
+import AutomationScheduleEditor from './AutomationScheduleEditor.vue';
 import VoiceTextarea from '../shared/VoiceTextarea.vue';
+import SettingsSection from './SettingsSection.vue';
+import SettingsRow from './SettingsRow.vue';
 import BackendSelector from './BackendSelector.vue';
-import BacklogSourceSelector from './BacklogSourceSelector.vue';
-import { workProviderLabel } from '@workspace/core/work-item-prompts';
 import { useBackendChoices } from './backend-selection';
 
-const props = withDefaults(
-  defineProps<{
-    connections?: WorkIntegrationConnection[];
-    loading?: boolean;
-    error?: string | null;
-    automation?: Automation | null;
-    mode: 'create' | 'edit';
-    repositories: WorkSource[];
-    sourceRepositories?: SourceRepository[];
-    currentRepositoryPath?: string;
-    teams: Team[];
-  }>(),
-  {
-    connections: () => [],
-    loading: false,
-    error: null,
-    automation: null,
-    sourceRepositories: () => [],
-    currentRepositoryPath: '',
-  },
-);
-
-const emit = defineEmits<{
-  cancel: [];
-  'load-repositories': [provider: WorkProviderKind];
-  submit: [input: CreateAutomationInput];
-}>();
-
-const scheduleOptions = [
-  { value: 5, label: translate('surface.automationEditor.every5Minutes') },
-  { value: 15, label: translate('surface.automationEditor.every15Minutes') },
-  { value: 30, label: translate('surface.automationEditor.every30Minutes') },
-  { value: 60, label: translate('surface.automationEditor.everyHour') },
-  { value: 360, label: translate('surface.automationEditor.every6Hours') },
-  { value: 720, label: translate('surface.automationEditor.every12Hours') },
-  { value: 1_440, label: translate('surface.automationEditor.everyDay') },
-];
-
+const props = withDefaults(defineProps<{
+  automation?: Automation | null; mode: 'create' | 'edit'; agents: Agent[]; teams: Team[];
+  error?: string | null; saving?: boolean;
+  listModels?: (agentId: string, backend: AgentBackend) => Promise<BackendModelOption[]>;
+}>(), { automation: null, error: null, saving: false, listModels: async () => [] });
+const emit = defineEmits<{ cancel: []; submit: [input: CreateAutomationInput] }>();
+const target = props.automation?.target;
 const form = reactive({
-  backend: props.automation ? props.automation.backend ?? 'codex' : undefined as import('@workspace/core/contracts').AgentBackend | undefined,
-  enabled: props.automation?.enabled ?? true,
-  repositoryIds: props.automation?.repositories.map(repositoryValue) ?? [],
-  teamId: props.automation?.teamId ?? props.teams[0]?.id ?? '',
-  selectionPrompt: props.automation?.selectionPrompt ?? '',
-  assignmentPrompt: props.automation?.assignmentPrompt ?? '',
-  intervalMinutes: props.automation?.schedule.intervalMinutes ?? 60,
+  name: props.automation?.name ?? '', prompt: props.automation?.prompt ?? '', enabled: props.automation?.enabled ?? true,
+  kind: target?.kind ?? 'newQuickChat' as AutomationTarget['kind'],
+  teamId: target?.kind === 'newQuickChat' ? target.teamId
+    : props.agents.find(agent => target && agent.id === target.agentId)?.teamId ?? props.teams[0]?.id ?? '',
+  agentId: target && target.kind !== 'newQuickChat' ? target.agentId : '',
+  backend: (target?.kind === 'newQuickChat' ? target.backend : undefined) as AgentBackend | undefined,
+  model: target?.kind === 'newQuickChat' ? target.model ?? '' : '',
+  reasoningEffort: target?.kind === 'newQuickChat' ? target.reasoningEffort ?? '' : '',
 });
-const selectionPromptBusy = ref(false);
+const schedule = ref<AutomationSchedule>(props.automation?.schedule ?? { rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0;BYSECOND=0', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+const promptBusy = ref(false);
+const models = ref<BackendModelOption[]>([]);
+const modelsLoading = ref(false);
+const modelsError = ref(false);
 const engineChoices = useBackendChoices(() => form.teamId);
-const assignmentPromptBusy = ref(false);
-const provider = ref<WorkProviderKind>(props.automation?.repositories[0]?.provider ?? props.connections.find(connection => connection.status === 'connected')?.provider ?? workProviderKinds[0]!);
-const providerLabel = computed(() => workProviderLabel(provider.value));
-const sourceLabel = computed(() => translate(workProviderDefinition(provider.value).sourceLabel.key));
-const executionPaths = reactive<Record<string, string>>(Object.fromEntries(
-  (props.automation?.repositories ?? []).map(target => [repositoryValue(target), target.executionRepositoryPath]),
-));
-
-const providerConnected = computed(() => props.connections.find(connection => connection.provider === provider.value)?.status === 'connected');
-const repositoryOptions = computed(() => {
-  const sourceRepositoryByIdentity = new Map(
-    props.sourceRepositories.flatMap((repository) => (repository.remoteIdentity ? [[repository.remoteIdentity, repository] as const] : [])),
-  );
-  const options = props.repositories.flatMap((repository) => {
-    if (repository.provider !== provider.value) return [];
-    if (!workProviderDefinition(repository.provider).repositoryBacked) {
-      const target: AutomationWorkSourceTarget = { provider: repository.provider, sourceId: repository.id, executionRepositoryPath: executionPaths[repositoryValue({ provider: repository.provider, sourceId: repository.id })] ?? '' };
-      return [{ value: repositoryValue(target), label: repository.fullName, target }];
-    }
-    const identity = canonicalGitRemoteIdentity(repository.url);
-    const sourceRepository = identity ? sourceRepositoryByIdentity.get(identity) : undefined;
-    if (!sourceRepository || !workProviderDefinition(repository.provider).repositoryBacked) return [];
-    const target: AutomationWorkSourceTarget = {
-      provider: repository.provider,
-      sourceId: repository.id,
-      executionRepositoryPath: sourceRepository.path,
-    };
-    return [{ value: repositoryValue(target), label: repository.fullName, target }];
-  });
-
-  for (const repository of props.automation?.repositories ?? []) {
-    if (repository.provider !== provider.value || !workProviderDefinition(repository.provider).repositoryBacked) continue;
-    const value = repositoryValue(repository);
-    if (!options.some((option) => option.value === value)) {
-      options.push({
-        value,
-        label: repository.sourceId,
-        target: repository,
-      });
-    }
-  }
-  return options.sort((left, right) => left.label.localeCompare(right.label));
-});
-const selectedWorkSources = computed(() => !workProviderDefinition(provider.value).repositoryBacked
-  ? repositoryOptions.value.filter(option => form.repositoryIds.includes(option.value)) : []);
-const canSubmit = computed(
-  () =>
-    providerConnected.value && !props.loading && !props.error &&
-    form.repositoryIds.length > 0 &&
-    form.repositoryIds.every(value => repositoryOptions.value.some(option => option.value === value
-      && (workProviderDefinition(provider.value).repositoryBacked || props.sourceRepositories.some(repository => repository.path === option.target.executionRepositoryPath)))) &&
-    Boolean(form.teamId) &&
-    Boolean(form.backend && (engineChoices.value.includes(form.backend) || form.backend === props.automation?.backend || (props.automation && !props.automation.backend && form.backend === 'codex'))) &&
-    Number.isFinite(form.intervalMinutes) &&
-    form.intervalMinutes >= 1 &&
-    !selectionPromptBusy.value &&
-    !assignmentPromptBusy.value,
-);
-
-watch([provider, providerConnected], (_, previous) => {
-  if (providerConnected.value && (previous[0] !== undefined || !props.repositories.some(repository => repository.provider === provider.value))) emit('load-repositories', provider.value);
+const targetAgents = computed(() => props.agents.filter(agent => agent.teamId === form.teamId && (form.kind === 'quickChat') === (agent.sessionKind === 'quickChat')));
+function conversationLabel(agent: Agent): string {
+  const name = agentDisplayName(agent);
+  if (agent.sessionKind === 'quickChat') return name;
+  const repository = agent.workspace?.kind === 'git' ? agent.workspace.repositoryName
+    : agent.folder?.split(/[\\/]/).filter(Boolean).at(-1);
+  return repository ? `${name} @ ${repository}` : name;
+}
+const efforts = computed(() => models.value.find(model => model.model === form.model)?.supportedReasoningEfforts ?? []);
+const canSubmit = computed(() => !props.saving && !promptBusy.value && Boolean(form.prompt.trim()) && normalizeAutomationSchedule(schedule.value) !== null &&
+  (form.kind === 'newQuickChat'
+    ? props.teams.some(team => team.id === form.teamId) && Boolean(form.backend && engineChoices.value.includes(form.backend))
+    : targetAgents.value.some(agent => agent.id === form.agentId)));
+watch([() => form.kind, () => form.teamId], () => { form.agentId = ''; });
+watch(() => form.backend, (_backend, previous) => { if (previous) { form.model = ''; form.reasoningEffort = ''; } });
+watch(() => form.model, (_model, previous) => { if (previous) form.reasoningEffort = ''; });
+watch([() => form.backend, () => props.agents[0]?.id, () => form.kind], async ([backend, agentId, kind], _previous, cleanup) => {
+  let current = true;
+  cleanup(() => { current = false; });
+  models.value = [];
+  modelsError.value = false;
+  modelsLoading.value = false;
+  if (!backend || !agentId || kind !== 'newQuickChat') return;
+  modelsLoading.value = true;
+  try { const result = await props.listModels(agentId, backend); if (current) models.value = result.filter(model => !model.hidden); }
+  catch { if (current) modelsError.value = true; }
+  finally { if (current) modelsLoading.value = false; }
 }, { immediate: true });
-
-watch(() => form.repositoryIds, values => {
-  if (workProviderDefinition(provider.value).repositoryBacked || !props.sourceRepositories.some(repository => repository.path === props.currentRepositoryPath)) return;
-  for (const value of values) executionPaths[value] ??= props.currentRepositoryPath;
-}, { deep: true });
-
-function selectProvider(value: WorkProviderKind): void {
-  if (provider.value === value) return;
-  form.repositoryIds = [];
-  for (const key of Object.keys(executionPaths)) delete executionPaths[key];
-  provider.value = value;
-}
-
-watch(
-  () => props.teams,
-  (teams) => {
-    if (!form.teamId && teams[0]) form.teamId = teams[0].id;
-  },
-);
-
-function submit(): void {
+function submit() {
   if (!canSubmit.value) return;
-  const selectedValues = new Set(form.repositoryIds);
-  emit('submit', {
-    ...(props.automation?.name ? { name: props.automation.name } : !workProviderDefinition(provider.value).repositoryBacked ? { name: selectedWorkSources.value.map(source => source.label).join(', ') } : {}),
-    enabled: form.enabled,
-    backend: form.backend,
-    repositories: repositoryOptions.value.filter((option) => selectedValues.has(option.value)).map((option) => option.target),
-    teamId: form.teamId,
-    ...(form.selectionPrompt.trim() ? { selectionPrompt: form.selectionPrompt.trim() } : {}),
-    ...(form.assignmentPrompt.trim() ? { assignmentPrompt: form.assignmentPrompt.trim() } : {}),
-    schedule: { intervalMinutes: form.intervalMinutes },
-  });
-}
-
-function repositoryValue(repository: Pick<AutomationWorkSourceTarget, 'provider' | 'sourceId'>): string {
-  return `${repository.provider}:${repository.sourceId}`;
+  const target: AutomationTarget = form.kind === 'newQuickChat'
+    ? { kind: 'newQuickChat', teamId: form.teamId, backend: form.backend!,
+      ...(form.model.trim() ? { model: form.model.trim() } : {}),
+      ...(form.reasoningEffort.trim() ? { reasoningEffort: form.reasoningEffort.trim() } : {}) }
+    : { kind: form.kind, agentId: form.agentId };
+  emit('submit', { name: form.name.trim(), enabled: form.enabled, prompt: form.prompt.trim(), target, schedule: schedule.value });
 }
 </script>
-
 <style scoped>
-.automation-editor__source-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-8);
-}
-
 .automation-editor {
   max-height: calc(100vh - var(--workbench-appbar-height) - var(--space-32));
   min-height: 0;
@@ -319,77 +170,57 @@ function repositoryValue(repository: Pick<AutomationWorkSourceTarget, 'provider'
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-16);
-  padding-bottom: var(--space-12);
+  padding-bottom: var(--space-6);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-shell-main);
 }
 
-.automation-editor__header h3,
-.automation-editor__header p,
-.automation-editor__help {
-  margin: 0;
-}
-
 .automation-editor__header h3 {
+  margin: 0;
   color: var(--color-text);
   font-size: var(--font-size-18);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-24);
 }
 
-.automation-editor__header p,
-.automation-editor__help,
-.automation-editor__notice {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-13);
-  line-height: var(--line-height-18);
-}
-
 .automation-editor__body {
   min-height: 0;
-  display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
-  gap: var(--space-20);
   overflow-y: auto;
-  padding: var(--space-20) var(--space-12) var(--space-20) 0;
+  padding: var(--space-8) var(--space-6) var(--space-8) 0;
   scrollbar-width: thin;
 }
 
+.automation-editor__body > * + * {
+  margin-top: var(--space-12);
+}
+
+.automation-editor .el-input,
+.automation-editor .el-select,
+.automation-editor__backend {
+  width: 220px;
+}
+
+.automation-editor__prompt {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.automation-editor__prompt :deep(.settings-row__control) {
+  justify-self: stretch;
+}
+
+.automation-editor__prompt .voice-textarea {
+  width: 100%;
+}
+
 .automation-editor__notice {
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-18);
   padding: var(--space-10) var(--space-12);
   border: 1px solid var(--color-warning-container);
   border-radius: var(--radius-md);
   color: var(--color-on-warning-container);
   background: var(--color-warning-container);
-}
-
-.automation-editor__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-16);
-}
-
-.automation-editor__section {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.automation-editor__section label {
-  color: var(--color-text);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-18);
-}
-
-.automation-editor__prompt-section {
-  gap: var(--space-4);
-}
-
-.automation-editor__prompt-section + .automation-editor__prompt-section {
-  padding-top: var(--space-4);
 }
 
 .automation-editor__footer {
@@ -399,7 +230,7 @@ function repositoryValue(repository: Pick<AutomationWorkSourceTarget, 'provider'
   flex: 0 0 auto;
   display: flex;
   justify-content: flex-end;
-  padding-top: var(--space-12);
+  padding-top: var(--space-6);
   border-top: 1px solid var(--color-border);
   background: var(--color-shell-main);
 }

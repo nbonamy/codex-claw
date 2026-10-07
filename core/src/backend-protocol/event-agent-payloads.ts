@@ -258,6 +258,7 @@ function expectAgentUpdate(value: unknown, path: string): void {
     },
   );
   expectOptional(value, 'contextUsage', path, expectContextUsage);
+  expectOptional(value, 'suggestedPrompt', path, (candidate, candidatePath) => expectNullable(candidate, candidatePath, expectString));
   expectOptional(value, 'plan', path, expectPlan);
   expectOptional(value, 'goal', path, expectGoal);
   expectOptional(value, 'threadFlags', path, (candidate, candidatePath) => expectNullable(candidate, candidatePath, (flagValue, flagPath) => expectKnownShape(flagValue, flagPath, isThreadFlags, 'thread flags')));

@@ -396,12 +396,8 @@ describe('snapshot runtime reducer', () => {
       id: 'automation-bugs',
       name: 'GitHub bugs',
       enabled: true,
-      repositories: [{
-        provider: 'github',
-        sourceId: 'nbonamy/agent-workspace',
-        executionRepositoryPath: '/Users/nbonamy/src/agent-workspace',
-      }],
-      teamId: 'team-app',
+      prompt: 'Check tasks', target: { kind: 'newQuickChat' as const, teamId: 'team-app', backend: 'codex' as const },
+
       schedule: { intervalMinutes: 60 },
       executionLog: [],
       createdAt: '2026-06-09T10:00:00.000Z',
@@ -490,6 +486,7 @@ describe('snapshot runtime reducer', () => {
   it('removes nullable agent collaboration state when explicitly cleared', () => {
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.statusText = 'Reviewing MCP shape';
+    snapshot.agents[0]!.suggestedPrompt = 'Review the changes';
     snapshot.agents[0]!.threadFlags = { delegate_to_worktree: true };
 
     applyMainEventToSnapshot(snapshot, {
@@ -500,6 +497,7 @@ describe('snapshot runtime reducer', () => {
         id: 'agent-dina',
         threadFlags: null,
         statusText: null,
+        suggestedPrompt: null,
         updatedAt: '2026-06-05T00:00:02.000Z',
       },
       occurredAt: '2026-06-05T00:00:02.000Z',
@@ -507,6 +505,7 @@ describe('snapshot runtime reducer', () => {
 
     expect(snapshot.agents[0]!.statusText).toBeUndefined();
     expect(snapshot.agents[0]!.threadFlags).toBeUndefined();
+    expect(snapshot.agents[0]!.suggestedPrompt).toBeUndefined();
   });
 
   it('applies work backlog assignment updates from MCP tools', () => {

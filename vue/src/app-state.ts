@@ -1078,11 +1078,6 @@ export function useAppState() {
     return appApi.getAutomationSnapshot(location);
   }
 
-  async function listAutomationWorkRepositories(provider: WorkProviderKind, location?: AutomationLocation): Promise<WorkSource[]> {
-    if (!appApi?.listWorkSources) throw new Error('Backlog sources are unavailable.');
-    return appApi.listWorkSources(provider, location);
-  }
-
   async function createAutomation(input: CreateAutomationInput, location?: AutomationLocation): Promise<AppSnapshot | void> {
     if (!appApi?.createAutomation) {
       return;
@@ -1774,7 +1769,6 @@ export function useAppState() {
     openWorkProviderAuthorization,
     configureWorkBacklog,
     getAutomationSnapshot,
-    listAutomationWorkRepositories,
     createAutomation,
     updateAutomation,
     runAutomation,

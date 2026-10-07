@@ -3,7 +3,7 @@
     <div class="automations-view__header" />
 
     <main class="automations-view__content">
-      <div class="automations-view__panel">
+      <div class="automations-view__panel" :class="{ 'automations-view__panel--wide': !editorVisible && !logAutomation }">
         <SettingsPanelFrame :title="$t('surface.automationsView.automations')" title-id="automations-title">
           <div v-if="!editorVisible && !logAutomation" class="automations-view__list-header">
             <div class="automations-view__location-heading">
@@ -32,17 +32,14 @@
           <AutomationEditor
             v-if="editorVisible"
             :key="editorKey"
-            :connections="locationWorkBacklog.connections"
             :automation="editingAutomation"
             :mode="editorMode"
-            :repositories="Object.values(locationWorkRepositoriesByProvider).flat()"
-            :loading="catalogLoading"
-            :error="catalogError"
-            :source-repositories="locationSourceRepositories"
-            :current-repository-path="currentRepository?.remoteConnectionId === (selectedRemoteConnectionId ?? undefined) ? currentRepository?.path : undefined"
+            :agents="locationAgents"
+            :list-models="listModels"
+            :saving="saving"
+            :error="operationError"
             :teams="locationTeams"
             @cancel="closeEditor"
-            @load-repositories="loadProviderRepositories"
             @submit="saveAutomation"
           />
 
@@ -90,7 +87,7 @@
                   <button
                     type="button"
                     :aria-label="$t('dynamic.automations.run', { automation: row.name })"
-                    :disabled="!row.enabled"
+                    :disabled="!row.enabled || Boolean(row.running)"
                     @click="runAutomation(row.id)"
                   >
                     <PlayerPlayIcon aria-hidden="true" />
@@ -136,9 +133,7 @@
               </template>
             </AppDataList>
 
-            <div v-if="workBacklogStatus === 'error' && workBacklogError" class="automations-view__error">
-              {{ workBacklogError }}
-            </div>
+            <div v-if="operationError" class="automations-view__error" role="alert">{{ operationError }}</div>
           </div>
         </SettingsPanelFrame>
       </div>
@@ -149,8 +144,11 @@
 <script setup lang="ts">
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type {
+  Agent,
+  AgentBackend,
+  BackendModelOption,
   AppSnapshot,
   BackendConversationRef,
   CreateAutomationInput,
@@ -158,11 +156,11 @@ import type {
   AutomationLocation,
   RemoteConnection,
   RendererMessage,
-  SourceRepository,
   UpdateAutomationInput,
-  WorkProviderKind,
-  WorkSource,
 } from '@workspace/core/contracts';
+import { agentDisplayName } from '@workspace/core/agent-display';
+import { automationCalendarDescription } from '@workspace/core/automation-schedule';
+import { canTargetAutomationAgent, automationExecutionIsActive } from '@workspace/core/automation-manager';
 import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import AppDataList from './AppDataList.vue';
 import type { AppDataListColumn, AppDataListRow } from './app-data-list';
@@ -182,20 +180,15 @@ const props = withDefaults(
     deleteAutomationExecution?: (automationId: string, executionId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     deleteAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     getAutomationSnapshot?: (location?: AutomationLocation) => Promise<AppSnapshot>;
-    listSourceRepositories?: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
-    loadWorkRepositories?: (provider: WorkProviderKind, location?: AutomationLocation) => Promise<WorkSource[] | void>;
     automations: Automation[];
+    agents: Agent[];
+    missions?: AppSnapshot['missions'];
+    listModels?: (agentId: string, backend: AgentBackend) => Promise<BackendModelOption[]>;
     remoteConnections?: RemoteConnection[];
     runAutomation?: (automationId: string, location?: AutomationLocation) => Promise<AppSnapshot | void>;
     readConversationMessages?: (ref: BackendConversationRef, agentId: string, location?: AutomationLocation) => Promise<RendererMessage[]>;
-    sourceRepositories?: SourceRepository[];
-    currentRepository?: { path: string; remoteConnectionId?: string };
     teams: AppSnapshot['teams'];
     updateAutomation?: (input: UpdateAutomationInput, location?: AutomationLocation) => Promise<AppSnapshot | void>;
-    workBacklog: AppSnapshot['workBacklog'];
-    workBacklogError?: string | null;
-    workBacklogStatus?: 'notLoaded' | 'loading' | 'loaded' | 'error';
-    workRepositoriesByProvider?: Partial<Record<WorkProviderKind, WorkSource[]>>;
   }>(),
   {
     clearAutomationHistory: async () => undefined,
@@ -203,16 +196,12 @@ const props = withDefaults(
     deleteAutomationExecution: async () => undefined,
     deleteAutomation: async () => undefined,
     getAutomationSnapshot: async () => createEmptySnapshot(),
-    listSourceRepositories: async () => [],
-    loadWorkRepositories: async () => undefined,
     readConversationMessages: async () => [],
+    listModels: async () => [],
+    missions: () => [],
     remoteConnections: () => [],
     runAutomation: async () => undefined,
-    sourceRepositories: () => [],
     updateAutomation: async () => undefined,
-    workBacklogError: null,
-    workBacklogStatus: 'notLoaded',
-    workRepositoriesByProvider: () => ({}),
   },
 );
 
@@ -225,16 +214,11 @@ const logAutomationId = ref<string | null>(null);
 const openMenuAutomationId = ref<string | null>(null);
 const selectedLocationValue = ref('local');
 const remoteSnapshot = ref<AppSnapshot | null>(null);
-const remoteSourceRepositories = ref<SourceRepository[]>([]);
-const remoteWorkRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkSource[]>>>({});
-const localWorkRepositoriesByProvider = ref<Partial<Record<WorkProviderKind, WorkSource[]>>>({});
 const locationStatus = ref<LocationStatus>('idle');
 const locationError = ref<string | null>(null);
-const catalogError = ref<string | null>(null);
-const catalogLoading = ref(false);
-let catalogLoadId = 0;
+const operationError = ref<string | null>(null);
+const saving = ref(false);
 let locationLoadId = 0;
-const emptyLocationSnapshot = createEmptySnapshot();
 
 const editorVisible = computed(() => (editorMode.value === 'create' ? creating.value : Boolean(editingAutomation.value)));
 const creating = ref(false);
@@ -253,13 +237,12 @@ provideBackendHost(() => selectedRemoteConnectionId.value
   : null);
 const locationAutomations = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.automations ?? []) : props.automations));
 const locationTeams = computed(() => (isRemoteLocation.value ? (remoteSnapshot.value?.teams ?? []) : props.teams).filter(team => !team.remoteConnectionId));
-const locationWorkBacklog = computed(() =>
-  isRemoteLocation.value ? (remoteSnapshot.value?.workBacklog ?? emptyLocationSnapshot.workBacklog) : props.workBacklog,
-);
-const locationSourceRepositories = computed(() => (isRemoteLocation.value ? remoteSourceRepositories.value : props.sourceRepositories));
-const locationWorkRepositoriesByProvider = computed(() =>
-  isRemoteLocation.value ? remoteWorkRepositoriesByProvider.value : { ...props.workRepositoriesByProvider, ...localWorkRepositoriesByProvider.value },
-);
+const locationAgents = computed(() => {
+  const teams = isRemoteLocation.value ? remoteSnapshot.value?.teams ?? [] : props.teams;
+  const missions = isRemoteLocation.value ? remoteSnapshot.value?.missions ?? [] : props.missions;
+  return (isRemoteLocation.value ? remoteSnapshot.value?.agents ?? [] : props.agents)
+    .filter(agent => canTargetAutomationAgent({ teams, missions }, agent));
+});
 const editingAutomation = computed(() =>
   editingAutomationId.value ? (locationAutomations.value.find((automation) => automation.id === editingAutomationId.value) ?? null) : null,
 );
@@ -267,15 +250,11 @@ const logAutomation = computed(() =>
   logAutomationId.value ? (locationAutomations.value.find((automation) => automation.id === logAutomationId.value) ?? null) : null,
 );
 const editorKey = computed(() => editingAutomation.value?.id ?? `create-${creating.value ? 'open' : 'closed'}`);
-const initialProviderConnection = computed(
-  () => locationWorkBacklog.value.connections.find((connection) => connection.status === 'connected') ?? null,
-);
-const initialProviderSources = computed(() => initialProviderConnection.value ? locationWorkRepositoriesByProvider.value[initialProviderConnection.value.provider] ?? [] : []);
 const automationColumns: AppDataListColumn[] = [
   {
     id: 'automation',
     label: translate('surface.automationsView.automation'),
-    width: 'minmax(220px, 1fr)',
+    width: 'minmax(0, 1fr)',
   },
   {
     id: 'lastExecution',
@@ -310,27 +289,19 @@ const automationRows = computed<AppDataListRow[]>(() =>
     executionCount: automationExecutionCountLabel(automation),
     id: automation.id,
     enabled: automation.enabled,
+    running: automation.executionLog.some(automationExecutionIsActive),
     error: automation.lastError ?? '',
     lastExecution: automationLastExecutionLabel(automation),
     name: automation.name,
     source: automationSourceLabel(automation),
-    sourceLine: `${automationTeamName(automation)} · ${automationSourceLabel(automation)} · ${automationScheduleLabel(automation)}`,
+    sourceLine: `${automationSourceLabel(automation)} · ${automationScheduleLabel(automation)}`,
   })),
 );
-
-onMounted(() => {
-  if (initialProviderConnection.value?.status === 'connected' && initialProviderSources.value.length === 0) {
-    void loadInitialSources();
-  }
-});
 
 watch(selectedLocationValue, () => {
   closeEditor();
   closeLog();
-  remoteWorkRepositoriesByProvider.value = {};
-  catalogLoadId += 1;
-  catalogError.value = null;
-  catalogLoading.value = false;
+  operationError.value = null;
   void loadSelectedLocation();
 });
 
@@ -348,6 +319,7 @@ function openCreate(): void {
   editingAutomationId.value = null;
   logAutomationId.value = null;
   creating.value = true;
+  operationError.value = null;
 }
 
 function openEdit(automationId: string): void {
@@ -375,20 +347,23 @@ function closeLog(): void {
 }
 
 async function saveAutomation(input: CreateAutomationInput): Promise<void> {
-  const nextSnapshot =
-    editorMode.value === 'edit' && editingAutomation.value
-      ? await updateLocationAutomation({
-          ...input,
-          id: editingAutomation.value.id,
-        })
+  saving.value = true;
+  operationError.value = null;
+  try {
+    const nextSnapshot = editorMode.value === 'edit' && editingAutomation.value
+      ? await updateLocationAutomation({ ...input, id: editingAutomation.value.id })
       : await createLocationAutomation(input);
-  refreshLocationFromSnapshot(nextSnapshot);
-  closeEditor();
+    refreshLocationFromSnapshot(nextSnapshot);
+    closeEditor();
+  } catch (error) { operationError.value = error instanceof Error ? error.message : String(error); }
+  finally { saving.value = false; }
 }
 
 async function runAutomation(automationId: string): Promise<void> {
   openMenuAutomationId.value = null;
-  refreshLocationFromSnapshot(await runLocationAutomation(automationId));
+  operationError.value = null;
+  try { refreshLocationFromSnapshot(await runLocationAutomation(automationId)); }
+  catch (error) { operationError.value = error instanceof Error ? error.message : String(error); }
 }
 
 function setMenuVisible(automationId: string, visible: boolean): void {
@@ -412,7 +387,7 @@ async function confirmDeleteAutomation(automationId: string): Promise<void> {
 
   try {
     await ElMessageBox.confirm(
-      `Automation "${automation.name}" will stop creating agents.`,
+      `Automation "${automation.name}" will stop sending scheduled prompts.`,
       translate('surface.automationsView.deleteAutomation'),
       {
         cancelButtonText: translate('common.cancel'),
@@ -438,7 +413,7 @@ async function confirmClearAutomationHistory(automationId: string): Promise<void
 
   try {
     await ElMessageBox.confirm(
-      `Execution history for "${automation.name}" will be cleared.`,
+      `Finished execution history for "${automation.name}" will be cleared. Active runs are kept.`,
       translate('surface.automationsView.clearHistory'),
       {
         cancelButtonText: translate('common.cancel'),
@@ -477,30 +452,6 @@ async function confirmDeleteAutomationExecution(payload: { executionId: string; 
   refreshLocationFromSnapshot(await deleteLocationAutomationExecution(automation.id, execution.id));
 }
 
-async function loadInitialSources(): Promise<void> {
-  if (initialProviderConnection.value) await loadProviderRepositories(initialProviderConnection.value.provider);
-}
-
-async function loadProviderRepositories(provider: WorkProviderKind): Promise<void> {
-  const location = requestLocation();
-  const loadId = ++catalogLoadId;
-  catalogError.value = null;
-  catalogLoading.value = true;
-  try {
-    const repositories = location ? await props.loadWorkRepositories(provider, location) : await props.loadWorkRepositories(provider);
-    if (loadId !== catalogLoadId) return;
-    if (location?.kind === 'remote' && repositories) {
-      remoteWorkRepositoriesByProvider.value = { ...remoteWorkRepositoriesByProvider.value, [provider]: repositories };
-    } else if (repositories) {
-      localWorkRepositoriesByProvider.value = { ...localWorkRepositoriesByProvider.value, [provider]: repositories };
-    }
-  } catch (error) {
-    if (loadId === catalogLoadId) catalogError.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    if (loadId === catalogLoadId) catalogLoading.value = false;
-  }
-}
-
 async function readLocationConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
   const location = requestLocation();
   return location ? props.readConversationMessages(ref, agentId, location) : props.readConversationMessages(ref, agentId);
@@ -511,11 +462,7 @@ async function loadSelectedLocation(): Promise<void> {
   locationError.value = null;
   if (!isRemoteLocation.value) {
     remoteSnapshot.value = null;
-    remoteSourceRepositories.value = [];
     locationStatus.value = 'idle';
-    if (initialProviderConnection.value?.status === 'connected' && initialProviderSources.value.length === 0) {
-      await loadInitialSources();
-    }
     return;
   }
 
@@ -526,24 +473,12 @@ async function loadSelectedLocation(): Promise<void> {
       return;
     }
     remoteSnapshot.value = snapshot;
-    const sourceRepositories = selectedRemoteConnectionId.value ? await props.listSourceRepositories(selectedRemoteConnectionId.value) : [];
-    if (loadId !== locationLoadId) {
-      return;
-    }
-    remoteSourceRepositories.value = sourceRepositories;
-    if (initialProviderConnection.value?.status === 'connected') {
-      await loadInitialSources();
-    }
-    if (loadId !== locationLoadId) {
-      return;
-    }
     locationStatus.value = 'idle';
   } catch (error) {
     if (loadId !== locationLoadId) {
       return;
     }
     remoteSnapshot.value = null;
-    remoteSourceRepositories.value = [];
     locationStatus.value = 'error';
     locationError.value = error instanceof Error ? error.message : String(error);
   }
@@ -596,15 +531,14 @@ function requestLocation(): AutomationLocation | undefined {
 }
 
 function automationSourceLabel(automation: Automation): string {
-  const names = automation.repositories.map((repository) => repository.sourceId);
-  return names.length <= 2 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
-}
-
-function automationTeamName(automation: Automation): string {
-  return locationTeams.value.find((team) => team.id === automation.teamId)?.name ?? translate('surface.automationsView.missingTeam');
+  const target = automation.target;
+  if (target.kind === 'newQuickChat') return translate('promptAutomation.newQuickChat');
+  const agent = locationAgents.value.find(agent => agent.id === target.agentId);
+  return agent ? agentDisplayName(agent) : translate('promptAutomation.missingTarget');
 }
 
 function automationScheduleLabel(automation: Automation): string {
+  if ('rrule' in automation.schedule) return `${automationCalendarDescription(automation.schedule, automation.scheduleAnchorAt ?? automation.createdAt)} · ${automation.schedule.timeZone}`;
   const minutes = automation.schedule.intervalMinutes;
   if (minutes < 60) return translate('dynamic.automations.everyMinutes', { count: minutes });
   if (minutes === 60) return translate('surface.automationEditor.everyHour');
@@ -662,16 +596,23 @@ function formatShortDate(value: string): string {
 }
 
 .automations-view__content {
+  container-type: inline-size;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow: auto;
   padding-top: 0;
+  padding-inline: var(--space-12);
 }
 
 .automations-view__panel {
   max-width: 720px;
   margin: 0 auto;
+}
+
+.automations-view__panel--wide {
+  width: 100%;
+  max-width: 920px;
 }
 
 .automations-view__list {
@@ -825,5 +766,41 @@ function formatShortDate(value: string): string {
 .automations-view :deep(.app-data-list__actions) {
   opacity: 1;
   pointer-events: auto;
+}
+
+@container (max-width: 680px) {
+  .automations-view__list-header {
+    flex-wrap: wrap;
+    gap: var(--space-6);
+  }
+
+  .automations-view__info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .automations-view__info > * {
+    max-width: 100%;
+  }
+
+  .automations-view__list :deep(.app-data-list__row) {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+    gap: var(--space-4);
+    padding-inline: var(--space-6);
+  }
+
+  .automations-view__list :deep(.app-data-list__cell:first-child) {
+    grid-column: 1 / 3;
+  }
+
+  .automations-view__list :deep(.app-data-list__actions) {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+
+  .automations-view__meta-cell {
+    text-align: left;
+  }
 }
 </style>

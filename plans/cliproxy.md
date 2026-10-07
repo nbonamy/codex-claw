@@ -161,13 +161,13 @@ Suggested commits:
 
 ### 3. Add the settings UI
 
-- [ ] Read docs/frontend.md and app-frontend-dev before UI changes.
+- [ ] Read docs/frontend.md and korus-frontend-dev before UI changes.
 - [ ] Implement the shared connection editor and consistent provider controls.
 - [ ] Wire Test connection, masked saved-key state and dashboard opening.
 - [ ] Cover loading, invalid configuration, offline proxy and authentication
   failure without discarding the user's input or changing active routing.
 - [ ] Verify the rendered workflow against a branch-faithful isolated backend
-  using app-live-preview.
+  using korus-live-preview.
 
 Suggested commit: `feat: add cliproxyapi connection setup`.
 
@@ -178,7 +178,7 @@ Suggested commit: `feat: add cliproxyapi connection setup`.
   connection conventions changed. Add concise user setup guidance in the
   existing guide structure after reading website/README.md.
 - [ ] Run affected tests, typechecks and lint, plus the cross-cutting test gate
-  and appropriate coverage checks required by app-dod.
+  and appropriate coverage checks required by korus-dod.
 - [ ] Run git diff --check and inspect git status. Do not update CHANGELOG.md,
   package/sign a release, merge or push as part of this implementation.
 - [ ] Report limitations, configuration mode, runtime versions, test results and
@@ -189,7 +189,7 @@ Commit checkpoints are proposed boundaries, not authorization to commit/push.
 
 ## Test strategy
 
-Use docs/testing.md, app-testing-coverage and the mandatory test-audit
+Use docs/testing.md, korus-testing-coverage and the mandatory test-audit
 value gate. Tests must protect user behavior or owned boundaries, not source
 text. Keep detailed provider wire tests in the owning SDK repository.
 

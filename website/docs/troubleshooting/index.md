@@ -31,7 +31,7 @@ Read the [provider setup overview](../providers/) before making another change. 
 
 Provider authentication and Korus's GitHub integration are separate connections. Open **Settings → Integrations** and complete Korus's GitHub authorization. Check that the authorized account can access the intended repository.
 
-If you skipped GitHub during onboarding, local folder tasks still work. Connect GitHub when you need repository browsing, issue and pull-request intake, or Automations.
+If you skipped GitHub during onboarding, local folder tasks still work. Connect GitHub when you need repository browsing or issue and pull-request workflows. Automations only need GitHub if their prompt calls for it.
 
 ## A task is waiting
 

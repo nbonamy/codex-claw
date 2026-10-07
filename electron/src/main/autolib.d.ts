@@ -11,6 +11,8 @@ declare module 'autolib' {
     isKeyMonitorRunning(): boolean;
     startKeyMonitor(callback: (event: KeyMonitorEvent) => void): number;
     stopKeyMonitor(): number;
+    startModifierMonitor?(callback: (event: KeyMonitorEvent) => void): number;
+    stopModifierMonitor?(): number;
   };
 
   const autolib: Autolib;

@@ -7,7 +7,6 @@ import { resolveDownloads } from "./downloads.mjs";
 
 const downloads = await resolveDownloads({
   product,
-  tag: process.env.APP_WEBSITE_RELEASE_TAG,
   verify: process.env.APP_WEBSITE_VERIFY_DOWNLOADS === "1",
 });
 
@@ -122,6 +121,7 @@ await writeFile(
   landing
     .replaceAll("__PRODUCT_NAME__", product.name)
     .replaceAll("__PRODUCT_WEBSITE_URL__", product.websiteUrl)
+    .replaceAll("__PRODUCT_REPOSITORY_URL__", product.repositoryUrl)
     .replaceAll("__PRODUCT_RELEASE_URL__", downloads.releaseUrl),
 );
 await cp(new URL("docs/.vitepress/dist/", source), new URL("docs/", output), {

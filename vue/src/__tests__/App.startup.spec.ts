@@ -5,16 +5,20 @@ import type { RendererSnapshotState } from '@workspace/core/contracts';
 import { createClientApiMock } from '../test/client-api-mock';
 import { deferred } from './app-state-test-harness';
 
-beforeEach(() => {
+let App: typeof import('../App.vue')['default'];
+let setElectronTestClient: typeof import('../test/client')['setElectronTestClient'];
+
+beforeEach(async () => {
   vi.resetModules();
   window.sessionStorage.clear();
+  // Cold module loading is fixture setup, not part of the startup behavior budget.
+  ({ setElectronTestClient } = await import('../test/client'));
+  ({ default: App } = await import('../App.vue'));
 });
 afterEach(() => window.sessionStorage.clear());
 
-async function mountStartup(api: ReturnType<typeof createClientApiMock>['api']) {
-  const { setElectronTestClient } = await import('../test/client');
+function mountStartup(api: ReturnType<typeof createClientApiMock>['api']) {
   setElectronTestClient(api);
-  const { default: App } = await import('../App.vue');
   return mount(App);
 }
 

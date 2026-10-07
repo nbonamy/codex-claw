@@ -56,7 +56,7 @@ export function resetProviderRoster(snapshot: AppSnapshot, ids: string[]): () =>
     if (preferences.general?.savedPromptDrafts) preferences.general.savedPromptDrafts = preferences.general.savedPromptDrafts.filter(draft => !removed.has(draft.agentId));
   }
   for (const automation of snapshot.automations) {
-    for (const execution of automation.executionLog) execution.createdAgents = execution.createdAgents.filter(agent => !removed.has(agent.agentId));
+    automation.executionLog = automation.executionLog.filter(run => !removed.has(run.agentId ?? ''));
   }
   for (const mission of snapshot.missions ?? []) {
     mission.stageAgentIds = Object.fromEntries(Object.entries(mission.stageAgentIds).filter(([, id]) => !removed.has(id)));
@@ -89,10 +89,7 @@ export function resetProviderRoster(snapshot: AppSnapshot, ids: string[]): () =>
     snapshot.clientPreferences = before.clientPreferences;
     for (const automation of snapshot.automations) {
       const previous = before.automations.find(item => item.id === automation.id);
-      for (const execution of automation.executionLog) {
-        const original = previous?.executionLog.find(item => item.id === execution.id);
-        execution.createdAgents = restoreRemovedItems(execution.createdAgents, original?.createdAgents ?? [], agent => agent.agentId, agent => removed.has(agent.agentId));
-      }
+      automation.executionLog = restoreRemovedItems(automation.executionLog, previous?.executionLog ?? [], run => run.id, run => removed.has(run.agentId ?? ''));
     }
     for (const mission of snapshot.missions ?? []) {
       const previous = before.missions?.find(item => item.id === mission.id);

@@ -1762,7 +1762,7 @@ export class AppBackendServer {
           async (agent) => {
             const options = params.options as SendPromptOptions | undefined;
             const result = this.agentPrompts.send(agentId, prompt, options);
-            if (prompt.trim() || options?.attachments?.length) this.clearReviewReadinessForNewPrompt(agent);
+            if (prompt.trim() || options?.attachments?.length) this.clearTurnSuggestionsForNewPrompt(agent);
             await this.persistSnapshotOnly();
             return result;
           },
@@ -1779,7 +1779,7 @@ export class AppBackendServer {
           }
           const result = await this.handleAgentDriverRequest(agent, backendMethods.driverPromptSteer, { agent, prompt, options }) as BackendSendResult;
           agent.backendSession = result.backendSession;
-          this.clearReviewReadinessForNewPrompt(agent);
+          this.clearTurnSuggestionsForNewPrompt(agent);
           await this.persistSnapshotOnly();
           return this.snapshot;
         });
@@ -2941,8 +2941,8 @@ export class AppBackendServer {
     this.onBackendEventApplied?.(fullEvent);
   }
 
-  private clearReviewReadinessForNewPrompt(agent: Agent): void {
-    if (agent.threadFlags?.ready_for_review !== true) return;
+  private clearTurnSuggestionsForNewPrompt(agent: Agent): void {
+    if (agent.threadFlags?.ready_for_review !== true && agent.suggestedPrompt === undefined) return;
     const threadFlags = { ...agent.threadFlags };
     delete threadFlags.ready_for_review;
     this.applyAndEmitBackendEvent({
@@ -2951,6 +2951,7 @@ export class AppBackendServer {
       payload: {
         id: agent.id,
         threadFlags: Object.keys(threadFlags).length > 0 ? threadFlags : null,
+        suggestedPrompt: null,
         updatedAt: new Date().toISOString(),
       },
     });
