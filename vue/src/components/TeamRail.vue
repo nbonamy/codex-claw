@@ -30,8 +30,6 @@
         <DashboardIcon aria-hidden="true" />
       </button>
 
-      <div class="team-rail__separator" role="separator" />
-
       <button
         v-for="team in teams"
         :key="team.id"
@@ -328,12 +326,12 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   user-select: none;
 }
 
-.team-rail--agent-sidebar-expanded::after {
+.team-rail::after {
   content: "";
   position: absolute;
   z-index: 1;
   top: var(--workbench-appbar-height);
-  right: -1px;
+  right: 0;
   bottom: 0;
   width: 1px;
   background: var(--color-shell-rail-divider);
@@ -411,6 +409,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   height: var(--team-rail-button-size);
   display: grid;
   place-items: center;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-full);
   color: var(--team-rail-icon-color);
@@ -419,7 +418,10 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__cockpit:not(.team-rail__cockpit--active),
-.team-rail__backlog:not(.team-rail__backlog--active) {
+.team-rail__backlog:not(.team-rail__backlog--active),
+.team-rail__automations:not(.team-rail__automations--active),
+.team-rail__speech-mute,
+:deep() .settings-menu__trigger:not(.settings-menu__trigger--active) {
   opacity: 0.6;
 }
 
@@ -435,18 +437,16 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   outline: none;
 }
 
-.team-rail__cockpit--active,
-.team-rail__backlog--active,
-.team-rail__automations--active,
-.team-rail__speech-mute--active {
-  color: var(--team-rail-icon-active-color);
-  opacity: 1;
-}
-
 .team-rail__cockpit:hover,
 .team-rail__cockpit:focus-visible,
 .team-rail__backlog:hover,
-.team-rail__backlog:focus-visible {
+.team-rail__backlog:focus-visible,
+.team-rail__automations:hover,
+.team-rail__automations:focus-visible,
+.team-rail__speech-mute:hover,
+.team-rail__speech-mute:focus-visible,
+:deep() .settings-menu__trigger:hover,
+:deep() .settings-menu__trigger:focus-visible {
   opacity: 1;
 }
 
@@ -459,23 +459,16 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__backlog--active,
-.team-rail__cockpit--active {
+.team-rail__cockpit--active,
+.team-rail__automations--active {
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   color: var(--color-text-muted);
   background: var(--color-surface-low);
+  opacity: 1;
 }
 
-.team-rail__separator {
-  width: calc(var(--team-rail-button-size) * 0.7);
-  border-top: 1px solid var(--color-border-strong);
-  margin: var(--space-4) 0;
-}
-
-.team-rail__automations svg,
-.team-rail__speech-mute svg,
-.team-rail__new svg,
-:deep() .settings-menu__trigger svg {
+.team-rail__new svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
   stroke-width: 1.25px;
@@ -483,13 +476,12 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 .team-rail__backlog svg,
-.team-rail__cockpit svg {
+.team-rail__cockpit svg,
+.team-rail__automations svg,
+.team-rail__speech-mute svg,
+:deep() .settings-menu__trigger svg {
   width: var(--icon-xl);
   height: var(--icon-xl);
-}
-
-:deep() .settings-menu__trigger svg {
-  transform: scale(0.9);
 }
 
 .team-rail__team::before,
@@ -587,6 +579,7 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
   place-items: center;
   width: var(--team-rail-button-size);
   height: var(--team-rail-button-size);
+  padding: 0;
   color: var(--team-rail-icon-color);
 }
 
@@ -597,7 +590,11 @@ function closeFloatingUiOnEscape(event: KeyboardEvent): void {
 }
 
 :deep() .settings-menu__trigger--active {
-  color: var(--team-rail-icon-active-color);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  background: var(--color-surface-low);
+  opacity: 1;
 }
 
 .team-rail__bottom {

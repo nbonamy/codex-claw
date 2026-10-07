@@ -47,7 +47,8 @@ describe('BacklogView', () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mountView(snapshot, []);
 
-    expect(wrapper.get('h1').text()).toBe('Backlog');
+    expect(wrapper.findAll('h1')).toHaveLength(1);
+    expect(wrapper.get('.workspace-header h1').text()).toBe('Backlog');
     expect(wrapper.get('[data-tone="working"] span').text()).toBe('working');
     expect(wrapper.get('[data-tone="working"] strong').text()).toBe('0');
     expect(wrapper.get('[data-tone="review"] span').text()).toBe('ready for review');

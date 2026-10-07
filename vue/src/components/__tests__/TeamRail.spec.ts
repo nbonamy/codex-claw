@@ -219,21 +219,29 @@ describe('TeamRail', () => {
     expect(wrapper.emitted('select-backlog')).toStrictEqual([[]]);
   });
 
-  it('separates monochrome navigation from teams and matches active navigation to the add-team surface', async () => {
+  it('keeps navigation borderless until selected and matches all active navigation to the add-team surface', async () => {
     const wrapper = mountRail({ teams, activeTeamId: 'team-sk' });
     const cockpit = wrapper.get('[aria-label="Cockpit"]');
-    const backlog = wrapper.get('[aria-label="Backlog"]');
     const add = wrapper.get('[aria-label="Create team"]');
     expect(cockpit.get('svg').attributes('stroke')).toBe('currentColor');
-    expect(cockpit.element.nextElementSibling?.getAttribute('role')).toBe('separator');
-    expect(getComputedStyle(cockpit.element).borderTopWidth).toBe('0px');
-    expect(getComputedStyle(backlog.element).borderTopWidth).toBe('0px');
-    for (const mode of ['cockpitActive', 'backlogActive'] as const) {
-      await wrapper.setProps({ cockpitActive: mode === 'cockpitActive', backlogActive: mode === 'backlogActive' });
-      const active = mode === 'cockpitActive' ? cockpit : backlog;
+    expect(wrapper.find('[role="separator"]').exists()).toBe(false);
+    const navigation = [
+      ['cockpitActive', 'Cockpit'], ['backlogActive', 'Backlog'],
+      ['automationsActive', 'Automations'], ['settingsActive', 'Settings menu'],
+    ] as const;
+    for (const [, label] of navigation) {
+      const style = getComputedStyle(wrapper.get(`[aria-label="${label}"]`).element);
+      expect(style.borderTopWidth).toBe('0px');
+      expect(style.opacity).toBe('0.6');
+      expect(style.padding).toBe('0px');
+    }
+    for (const [mode, label] of navigation) {
+      await wrapper.setProps({ cockpitActive: false, backlogActive: false, automationsActive: false, settingsActive: false, [mode]: true });
+      const active = wrapper.get(`[aria-label="${label}"]`);
       const style = getComputedStyle(active.element);
       expect(style.background).toBe(getComputedStyle(add.element).background);
       expect(style.borderRadius).toBe(getComputedStyle(add.element).borderRadius);
+      expect(style.opacity).toBe('1');
     }
   });
 
@@ -280,11 +288,18 @@ describe('TeamRail', () => {
     expect(mute.element.compareDocumentPosition(automations.element) & Node.DOCUMENT_POSITION_FOLLOWING)
       .not.toBe(0);
     expect(mute.attributes('aria-pressed')).toBe('false');
-    await mute.trigger('click');
-    expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
-
+    const unmutedStyle = getComputedStyle(mute.element);
+    expect(unmutedStyle.opacity).toBe('0.6');
+    expect(unmutedStyle.borderTopWidth).toBe('0px');
     await wrapper.setProps({ spokenAnnouncementsMuted: true });
     expect(wrapper.get('[aria-label="Unmute spoken acknowledgments (⇧⌘M)"]').attributes('aria-pressed')).toBe('true');
+    const mutedStyle = getComputedStyle(mute.element);
+    expect(mutedStyle.opacity).toBe(unmutedStyle.opacity);
+    expect(mutedStyle.color).toBe(unmutedStyle.color);
+    expect(mutedStyle.background).toBe(unmutedStyle.background);
+    expect(mutedStyle.borderTopWidth).toBe('0px');
+    await mute.trigger('click');
+    expect(wrapper.emitted('toggle-speech-mute')).toStrictEqual([[]]);
   });
 
   it('hides global speech mute when spoken acknowledgments are disabled', () => {

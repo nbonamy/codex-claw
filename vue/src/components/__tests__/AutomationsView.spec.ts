@@ -37,6 +37,9 @@ describe('AutomationsView', () => {
     const createAutomation = vi.fn().mockResolvedValue(undefined);
     const updateAutomation = vi.fn().mockResolvedValue(undefined);
     const wrapper = view({ createAutomation, updateAutomation });
+    expect(wrapper.findAll('h1, h2, h3').filter(heading => heading.text() === 'Automations')).toHaveLength(1);
+    expect(wrapper.get('header h1').text()).toBe('Automations');
+    expect(getComputedStyle(wrapper.get('.automations-view__content').element).paddingTop).toBe('var(--space-12)');
     expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('920px');
     expect(getComputedStyle(wrapper.get('.automations-view__panel').element).width).toBe('100%');
     expect(getComputedStyle(wrapper.get('.automations-view__content').element).paddingInline).toBe('var(--space-12)');

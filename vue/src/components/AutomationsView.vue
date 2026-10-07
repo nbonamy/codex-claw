@@ -1,14 +1,14 @@
 <template>
   <section class="automations-view" :aria-label="$t('surface.automationsView.automations')">
-    <div class="automations-view__header" />
+    <WorkspaceHeader class="automations-view__header" sidebar-collapsed>
+      <h1 id="automations-title" class="workspace-header__title">{{ $t('surface.automationsView.automations') }}</h1>
+    </WorkspaceHeader>
 
     <main class="automations-view__content">
       <div class="automations-view__panel" :class="{ 'automations-view__panel--wide': !editorVisible && !logAutomation }">
-        <SettingsPanelFrame :title="$t('surface.automationsView.automations')" title-id="automations-title">
+        <section aria-labelledby="automations-title">
           <div v-if="!editorVisible && !logAutomation" class="automations-view__list-header">
             <div class="automations-view__location-heading">
-              <h3>{{ $t('surface.automationsView.automations') }}</h3>
-              <ChevronRightIcon aria-hidden="true" />
               <el-select
                 v-model="selectedLocationValue"
                 class="automations-view__location-select"
@@ -137,7 +137,7 @@
 
             <div v-if="operationError" class="automations-view__error" role="alert">{{ operationError }}</div>
           </div>
-        </SettingsPanelFrame>
+        </section>
       </div>
     </main>
   </section>
@@ -172,8 +172,8 @@ import AutomationEditor from './AutomationEditor.vue';
 import { provideBackendHost } from './backend-selection';
 import AutomationExecutionLog from './AutomationExecutionLog.vue';
 import AutomationWelcome from './AutomationWelcome.vue';
-import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import { ChevronRightIcon, DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
+import WorkspaceHeader from '../shared/WorkspaceHeader.vue';
+import { DotsVerticalIcon, LogsIcon, PencilIcon, PlayerPlayIcon, Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(
   defineProps<{
@@ -586,19 +586,14 @@ function formatShortDate(value: string): string {
   min-width: 0;
   min-height: 0;
   display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--color-shell-main);
 }
 
 .automations-view__header {
-  position: absolute;
-  top: 0;
-  left: var(--team-rail-width);
-  height: var(--workbench-appbar-height);
-  width: calc(100% - var(--team-rail-width));
-  background: var(--color-shell-main);
-  border-bottom: 1px solid var(--color-border);
-  -webkit-app-region: drag;
+  padding-inline: var(--space-20);
+  font-size: var(--font-size-16);
 }
 
 .automations-view__content {
@@ -607,7 +602,7 @@ function formatShortDate(value: string): string {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding-top: 0;
+  padding-top: var(--space-12);
   padding-inline: var(--space-12);
 }
 
@@ -642,20 +637,6 @@ function formatShortDate(value: string): string {
   display: flex;
   align-items: center;
   gap: var(--space-8);
-}
-
-.automations-view__location-heading h3 {
-  margin: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-16);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-24);
-}
-
-.automations-view__location-heading svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--color-text-muted);
 }
 
 .automations-view__location-select {
