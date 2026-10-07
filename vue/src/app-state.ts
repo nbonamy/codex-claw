@@ -930,6 +930,11 @@ export function useAppState() {
     return appApi.pullAgentGitBranch(agentId, input);
   }
 
+  async function revertAgentGitChanges(agentId: string, input: import('@workspace/core/contracts').AgentGitRevertInput): Promise<AgentGitWorkflow> {
+    if (!appApi) throw new Error(translate('surface.app-state.gitRevertIsNotAvailable'));
+    return appApi.revertAgentGitChanges(agentId, input);
+  }
+
   async function loadOpenInApplications(): Promise<void> {
     if (!appHostCapabilities.openInApplications || !appApi?.getOpenInApplications) return;
     openInApplications.value = await appApi.getOpenInApplications();
@@ -1737,6 +1742,7 @@ export function useAppState() {
     mergeAgentGitBranch,
     updateAgentGitBranchFromBase,
     pullAgentGitBranch,
+    revertAgentGitChanges,
     loadOpenInApplications,
     openAgentPath,
     createAgent,

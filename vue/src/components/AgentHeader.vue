@@ -73,6 +73,7 @@
         :merge-branch="mergeGitBranch"
         :update-from-base="updateGitBranchFromBase"
         :pull-branch="pullGitBranch"
+        :revert-changes="revertGitChanges"
         :report-back-agent-name="reportBackAgentName"
       />
       <OpenInControl
@@ -165,6 +166,7 @@ const props = withDefaults(defineProps<{
   mergeGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitMergeInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
   updateGitBranchFromBase?: (agentId: string, input: import('@workspace/core/contracts').AgentGitUpdateFromBaseInput) => Promise<import('@workspace/core/contracts').AgentGitUpdateFromBaseResult>;
   pullGitBranch?: (agentId: string, input: import('@workspace/core/contracts').AgentGitPullInput) => Promise<import('@workspace/core/contracts').AgentGitPullResult>;
+  revertGitChanges?: (agentId: string, input: import('@workspace/core/contracts').AgentGitRevertInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
 }>(), { workspaceToggleAvailable: true, workspaceToggleDisabled: undefined });
 
 const emit = defineEmits<{

@@ -26,6 +26,27 @@ describe('AppMcpService', () => {
     buildFeatures.antigravity = false;
     await service?.stop();
     service = null;
+    vi.restoreAllMocks();
+  });
+
+  it('chooses celebration effects itself without consecutive repeats and accepts only a boolean request', async () => {
+    const events: BackendEvent[] = [];
+    service = new AppMcpService({ snapshot: createInitialSnapshot(), onEvent: event => events.push(event) });
+    const url = await service.start();
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(0.99);
+    for (const kind of ['confetti', 'stars', 'schoolPride']) {
+      const response = await callTool(url, 'agent-dina', 'finish_turn', { celebration: true });
+      expect(response.result.structuredContent).toMatchObject({ celebration: { requested: true, kind } });
+      expect(events.at(-1)).toMatchObject({ type: 'client.celebrationRequested', agentId: 'agent-dina', payload: { kind } });
+    }
+    events.length = 0;
+    for (const input of [{}, { celebration: false }]) {
+      const response = await callTool(url, 'agent-dina', 'finish_turn', input);
+      expect(response.result.structuredContent).toStrictEqual({ success: true, status: null });
+    }
+    expect(events.some(event => event.type === 'client.celebrationRequested')).toBe(false);
+    const invalid = await callTool(url, 'agent-dina', 'finish_turn', { celebration: { kind: 'stars' } });
+    expect(invalid.result.isError).toBe(true);
   });
 
   it('loads bundled skills over authenticated MCP without filesystem access and rechecks feature enablement', async () => {
@@ -859,7 +880,7 @@ describe('AppMcpService', () => {
 
     const celebrationResponse = await postJson(callerUrl, {
       jsonrpc: '2.0', id: 2, method: 'tools/call',
-      params: { name: 'finish_turn', arguments: { celebration: { kind: 'shapes' } } },
+      params: { name: 'finish_turn', arguments: { celebration: true } },
     });
     expect(celebrationResponse.result.structuredContent).toStrictEqual({
       success: true,
@@ -867,14 +888,14 @@ describe('AppMcpService', () => {
       celebration: {
         success: true,
         requested: true,
-        kind: 'shapes',
+        kind: expect.any(String),
         message: 'Celebration requested; each client decides whether to display it.',
       },
     });
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-dina',
       type: 'client.celebrationRequested',
-      payload: { kind: 'shapes' },
+      payload: { kind: celebrationResponse.result.structuredContent.celebration.kind },
     }));
 
     const createResponse = await postJson(callerUrl, {
@@ -1126,7 +1147,7 @@ describe('AppMcpService', () => {
     const url = await service.start();
 
     const response = await callTool(url, 'agent-dina', 'finish_turn', {
-      celebration: { kind: 'schoolPride' },
+      celebration: true,
     });
 
     expect(response.result.structuredContent).toStrictEqual({
@@ -1135,7 +1156,7 @@ describe('AppMcpService', () => {
       celebration: {
         success: true,
         requested: true,
-        kind: 'schoolPride',
+        kind: expect.any(String),
         message: 'Celebration requested; each client decides whether to display it.',
       },
     });
@@ -1151,7 +1172,7 @@ describe('AppMcpService', () => {
     const url = await service.start();
 
     const response = await callTool(url, 'agent-jesse', 'finish_turn', {
-      celebration: { kind: 'stars' },
+      celebration: true,
     });
 
     expect(response.result.structuredContent).toStrictEqual({
@@ -1160,7 +1181,7 @@ describe('AppMcpService', () => {
       celebration: {
         success: true,
         requested: true,
-        kind: 'stars',
+        kind: expect.any(String),
         message: 'Celebration requested; each client decides whether to display it.',
       },
     });
@@ -1323,12 +1344,12 @@ describe('AppMcpService', () => {
     const url = await service.start();
 
     const response = await callTool(url, 'agent-dina', 'finish_turn', {
-      celebration: { kind: 'confetti' },
+      celebration: true,
     });
 
     expect(response.result.structuredContent).toMatchObject({
       status: null,
-      celebration: { requested: true, kind: 'confetti' },
+      celebration: { requested: true, kind: expect.any(String) },
     });
     expect(events).toContainEqual(expect.objectContaining({ type: 'client.celebrationRequested' }));
   });

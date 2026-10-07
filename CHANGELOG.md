@@ -13,12 +13,15 @@ All notable Korus changes are recorded here.
   inspect their source, or copy and download the HTML.
 - Pull the current branch's upstream from the Git menu. If the pull produces
   conflicts, the agent receives a request to resolve them.
+- Revert uncommitted changes from the Git menu, with confirmation and an option
+  to include unversioned files, off by default.
 - Enable or disable automations directly from the automation list.
 - Windows and Linux Help menus include About Korus and Check for Updates.
   Platforms without automatic updates open the latest release downloads.
 
 ### Improvements and fixes
 
+- Celebration effects are chosen randomly by Korus, without consecutive repeats.
 - The model picker lists models directly, with supported reasoning efforts in
   each model's submenu. Selecting a model preserves a compatible effort;
   choosing an effort selects both together.

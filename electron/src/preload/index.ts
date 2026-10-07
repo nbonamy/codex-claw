@@ -63,6 +63,7 @@ const api: AppApi = {
   mergeAgentGitBranch: (agentId: string, input: AgentGitMergeInput) => ipc.invoke(ipcChannels.mergeAgentGitBranch, agentId, input),
   updateAgentGitBranchFromBase: (agentId: string, input: AgentGitUpdateFromBaseInput) => ipc.invoke(ipcChannels.updateAgentGitBranchFromBase, agentId, input),
   pullAgentGitBranch: (agentId, input) => ipc.invoke(ipcChannels.pullAgentGitBranch, agentId, input),
+  revertAgentGitChanges: (agentId, input) => ipc.invoke(ipcChannels.revertAgentGitChanges, agentId, input),
   getOpenInApplications: () => ipc.invoke(ipcChannels.getOpenInApplications),
   openAgentPath: (agentId: string, application: OpenInApplication, filePath?: string) => ipc.invoke(ipcChannels.openAgentPath, agentId, application, filePath),
   chooseAgentFolder: () => ipc.invoke(ipcChannels.chooseAgentFolder),

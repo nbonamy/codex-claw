@@ -10,6 +10,7 @@ import type {
   AgentGitStageInput,
   AgentGitUpdateFromBaseInput,
   AgentGitPullInput,
+  AgentGitRevertInput,
   AgentGitPullResult,
   AgentGitUpdateFromBaseResult,
   AgentGitDiffTarget,
@@ -183,6 +184,10 @@ export type AppBackendRequestMap = {
   [backendMethods.agentGitPull]: {
     params: { agentId: string; input: AgentGitPullInput };
     result: AgentGitPullResult;
+  };
+  [backendMethods.agentGitRevert]: {
+    params: { agentId: string; input: AgentGitRevertInput };
+    result: AgentGitWorkflow;
   };
 };
 

@@ -94,6 +94,8 @@ guaranteed: the result confirms `requested`, not `displayed`.
   single call. Flags come from a strict allowlist in core and describe typed thread
   state, not presentation. `announcement.text` is trimmed to 160 characters
   and the phase is implied by the tool.
+- Celebration requests are boolean. The daemon randomly chooses a visual effect,
+  excluding its previous choice; receiving clients still apply display eligibility.
 - Spoken acknowledgments: `daemon` applies persisted enablement and dictated-input
   policy and sends the provider-neutral `client/spokenAnnouncement/queue` request
   with no voice or client assumption. Electron picks the current client's voice,

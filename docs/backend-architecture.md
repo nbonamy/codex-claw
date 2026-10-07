@@ -188,6 +188,8 @@ one line per job state change. Never move a release tag.
   builds, publish. Because it is dispatched from the tag, the workflow, scripts and
   app source all come from the same immutable commit; a release-tooling fix means a
   new version.
+- Quality checks run on Linux; macOS-only signing cleanup tests gate the macOS
+  build. Publishing requires both the shared quality gate and every native build.
 - Only the final job has contents-write permission. It requires every platform to
   ship its full installer set, stages them on a draft release, then publishes the
   requested channel. Published releases are never modified; an interrupted run

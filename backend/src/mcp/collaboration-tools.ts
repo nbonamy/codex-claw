@@ -91,9 +91,7 @@ function registerCollaborationTools(
     announcement: z.object({
       text: z.string().trim().min(1).max(160).describe('One brief natural completion phrase, at most 160 characters.'),
     }).optional().describe('Optional spoken completion acknowledgment. The finish phase is implied.'),
-    celebration: z.object({
-      kind: z.enum(['confetti', 'stars', 'shapes', 'schoolPride']).default('confetti'),
-    }).optional().describe('Optional visual celebration for a meaningful win.'),
+    celebration: z.boolean().optional().describe('Set true to celebrate a meaningful win. Korus chooses the visual effect.'),
   };
   if (allowProposedActions) {
     server.registerTool('finish_turn', {
@@ -106,7 +104,7 @@ function registerCollaborationTools(
       agentId: callerAgentId,
       flag: input.flag ?? null,
       announcementTextLength: input.announcement?.text.length ?? null,
-      celebration: input.celebration?.kind ?? null,
+      celebration: input.celebration ?? false,
     }, () => coordinator.finishTurn(callerAgentId, input)));
   } else {
     server.registerTool('finish_turn', {
@@ -115,7 +113,7 @@ function registerCollaborationTools(
     }, input => loggedToolResult('finish_turn', {
       agentId: callerAgentId,
       announcementTextLength: input.announcement?.text.length ?? null,
-      celebration: input.celebration?.kind ?? null,
+      celebration: input.celebration ?? false,
     }, () => coordinator.finishTurn(callerAgentId, input)));
   }
 

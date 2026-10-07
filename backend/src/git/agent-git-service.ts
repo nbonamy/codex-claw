@@ -397,6 +397,16 @@ export class AgentGitService {
     await this.runGit(folder, ['commit', '-m', normalized]);
   }
 
+  async revert(folder: string, includeUntracked: boolean): Promise<void> {
+    const root = (await this.runGit(folder, ['rev-parse', '--show-toplevel'])).stdout.trim();
+    // Validate HEAD before deleting anything; an unborn repository has nothing to restore.
+    await this.runGit(root, ['rev-parse', '--verify', 'HEAD']);
+    // Clean first so the current ignore rules still protect local files. A single
+    // force flag deliberately leaves nested repositories alone; never use -x.
+    if (includeUntracked) await this.runGit(root, ['clean', '-fd', '--', '.']);
+    await this.runGit(root, ['restore', '--source=HEAD', '--staged', '--worktree', '--', '.']);
+  }
+
   async push(folder: string, remote: string, branch: string, setUpstream: boolean): Promise<void> {
     await this.runGit(folder, setUpstream
       ? ['push', '--set-upstream', remote, branch]

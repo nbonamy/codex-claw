@@ -7,6 +7,37 @@ import type { AgentGitService } from '../agent-git-service';
 import { AgentGitWorkflowService, parseAgentGitRequest } from '../agent-git-workflow-service';
 
 describe('AgentGitWorkflowService', () => {
+  it('requires explicit revert consent and an unversioned-file choice before refreshing the affected agent', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0] as Agent;
+    agent.folder = '/repo';
+    const revert = vi.fn().mockResolvedValue(undefined);
+    const workflow = vi.fn().mockResolvedValue({ folder: '/repo', files: [] });
+    const refreshGitStatus = vi.fn();
+    const service = new AgentGitWorkflowService({
+      applyEvent: vi.fn(), archiveConversation: vi.fn(),
+      delegatedWorkReports: {} as DelegatedWorkReportPort,
+      driverRequest: vi.fn(), releaseConversation: vi.fn(),
+      getSnapshot: () => snapshot,
+      getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
+      git: { revert, workflow } as unknown as AgentGitService,
+      persistAndEmitSnapshot: vi.fn(), refreshGitStatus,
+      refreshWorkspaceIdentity: vi.fn(), sendPrompt: vi.fn(),
+    });
+    for (const input of [{ confirmed: false, includeUntracked: true }, { confirmed: true }, { confirmed: true, includeUntracked: 'true' }]) {
+      await expect(service.execute({ method: backendMethods.agentGitRevert, agentId: agent.id, params: { input } }, agent)).rejects.toThrow();
+    }
+    expect(revert).not.toHaveBeenCalled();
+    for (const includeUntracked of [true, false]) {
+      await expect(service.execute({
+        method: backendMethods.agentGitRevert, agentId: agent.id,
+        params: { input: { confirmed: true, includeUntracked } },
+      }, agent)).resolves.toStrictEqual({ folder: '/repo', files: [], githubConnected: false });
+      expect(revert).toHaveBeenLastCalledWith('/repo', includeUntracked);
+      expect(refreshGitStatus).toHaveBeenLastCalledWith(agent.id);
+    }
+  });
+
   it('recognizes only agent Git methods and preserves their params for routing', () => {
     const params = { agentId: 'agent-1', input: { paths: ['file.ts'], confirmed: true } };
 

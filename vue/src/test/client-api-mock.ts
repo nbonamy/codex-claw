@@ -84,6 +84,7 @@ export function createClientApiMock(
     mergeAgentGitBranch: unscripted('mergeAgentGitBranch'),
     updateAgentGitBranchFromBase: unscripted('updateAgentGitBranchFromBase'),
     pullAgentGitBranch: unscripted('pullAgentGitBranch'),
+    revertAgentGitChanges: unscripted('revertAgentGitChanges'),
     getOpenInApplications: unscripted('getOpenInApplications'),
     openAgentPath: unscripted('openAgentPath'),
     chooseAgentFolder: unscripted('chooseAgentFolder'),
