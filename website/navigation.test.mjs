@@ -76,6 +76,31 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         );
       }
       const header = page.getByRole("banner");
+      const github = header.getByRole("link", { name: "GitHub", exact: true });
+      assert.equal(
+        await github.isVisible(),
+        true,
+        `GitHub is visible at ${width}px`,
+      );
+      assert.equal(
+        await github.getAttribute("href"),
+        "https://github.com/nbonamy/korus",
+      );
+      await github.focus();
+      assert.equal(
+        await github.evaluate((node) => node === document.activeElement),
+        true,
+      );
+      const headerLinks = await header.locator("a:visible").all();
+      let previousRight = 0;
+      for (const link of headerLinks) {
+        const rect = await link.boundingBox();
+        assert.ok(
+          rect.x >= previousRight && rect.x + rect.width <= width,
+          `Header links fit without overlap at ${width}px`,
+        );
+        previousRight = rect.x + rect.width;
+      }
       const docs = header.getByRole("link", { name: "Docs", exact: true });
       assert.equal(
         await docs.isVisible(),

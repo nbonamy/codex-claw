@@ -89,7 +89,7 @@ input {
 .nav-links {
   display: flex;
   gap: 31px;
-  margin-left: 100px;
+  margin-left: 20px;
 }
 .nav-links a,
 .text-link {
@@ -107,13 +107,13 @@ input {
   align-items: center;
   gap: 20px;
 }
-.header-docs {
+.header-link {
   color: var(--ink);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
 }
-.header-docs:hover {
+.header-link:hover {
   color: var(--blue);
 }
 .header-cta {
@@ -1122,6 +1122,10 @@ input {
 }
 
 @media (max-width: 1040px) {
+  .nav-links {
+    gap: 16px;
+    margin-left: 0;
+  }
   .hero {
     grid-template-columns: minmax(0, 1fr);
     padding-top: 70px;
