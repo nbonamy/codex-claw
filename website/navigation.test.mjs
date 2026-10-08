@@ -68,6 +68,9 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         ".hero h1",
         ".hero-lede",
         ".hero-actions .button",
+        ".showcase-stage",
+        '[role="tab"] >> nth=0',
+        '[role="tab"] >> nth=2',
       ]) {
         const bounds = await page.locator(selector).boundingBox();
         assert.ok(
@@ -121,35 +124,13 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         `Download fits at ${width}px`,
       );
       // Card previews must neither overlap wrapped copy nor escape their cards.
-      const automation = page.locator(".automation-console");
-      const previewBounds = await automation.boundingBox();
-      assert.ok(
-        previewBounds.x >= 0 && previewBounds.x + previewBounds.width <= width,
-        `Automation preview fits at ${width}px`,
-      );
-      for (const item of await automation
-        .locator("strong:visible, p:visible, time:visible")
-        .all()) {
-        const bounds = await item.boundingBox();
-        assert.ok(
-          bounds.x >= previewBounds.x &&
-            bounds.x + bounds.width <= previewBounds.x + previewBounds.width,
-          `Automation content stays inside its preview at ${width}px`,
-        );
-        assert.equal(
-          await item.evaluate(
-            (node) =>
-              getComputedStyle(node).display === "inline" ||
-              node.scrollWidth <= node.clientWidth + 1,
-          ),
-          true,
-          `Automation text is not clipped at ${width}px`,
-        );
-      }
       for (const card of await page.locator(".capability").all()) {
         const layout = await card.evaluate((element) => {
+          const preview = element.querySelector(
+            ".capability-shot, .product-film",
+          );
+          if (!preview) return null;
           const copy = element.querySelector("p");
-          const preview = copy.nextElementSibling;
           const a = copy.getBoundingClientRect();
           const b = preview.getBoundingClientRect();
           const outer = element.getBoundingClientRect();
@@ -165,6 +146,7 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
               b.bottom <= outer.bottom,
           };
         });
+        if (!layout) continue;
         assert.equal(
           layout.overlap,
           false,
@@ -174,6 +156,19 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
           layout.contained,
           true,
           `Card preview escapes its card at ${width}px`,
+        );
+      }
+      // Product screenshots load and stay inside the viewport.
+      for (const shot of await page.locator(".capability-shot").all()) {
+        await shot.scrollIntoViewIfNeeded();
+        await page.waitForFunction(
+          (node) => node.complete && node.naturalWidth > 0,
+          await shot.elementHandle(),
+        );
+        const bounds = await shot.boundingBox();
+        assert.ok(
+          bounds.x >= 0 && bounds.x + bounds.width <= width,
+          `Screenshot fits at ${width}px`,
         );
       }
       const films = page.locator(".product-film");
@@ -192,12 +187,12 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
           );
         }
       }
-      assert.equal(await films.count(), 5);
+      assert.equal(await films.count(), 2);
       const intro = await page.locator(".hero").boundingBox();
-      const mission = await films.first().boundingBox();
+      const project = await films.first().boundingBox();
       assert.ok(
-        mission.y >= intro.y + intro.height,
-        "Films follow the text-led introduction",
+        project.y >= intro.y + intro.height,
+        "Click-to-play films follow the hero",
       );
       for (const film of await films.all()) {
         const bounds = await film.boundingBox();
@@ -346,10 +341,129 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
         assert.equal(await shortcut.getAttribute("href"), installerUrl);
       await visitor.close();
     }
-    // Fetch media only after intent; exercise decoding, controls and single playback.
+    // The hero previews its films muted, in tab order, loading only the selected one.
+    const heroRequests = [];
+    const hero = await browser.newPage();
+    hero.on("request", (request) => {
+      if (/\.(mp4|vtt)$/.test(request.url()))
+        heroRequests.push(new URL(request.url()).pathname);
+    });
+    await hero.goto(origin);
+    const heroFilms = new Set(
+      await hero.evaluate(() =>
+        [...document.querySelectorAll(".showcase [data-src]")].map(
+          (node) => `/${node.dataset.src}`,
+        ),
+      ),
+    );
+    const heroVideo = (name) => hero.locator(`#showcase-${name}`);
+    const playing = (name) =>
+      hero.waitForFunction((id) => {
+        const video = document.getElementById(id);
+        return video.currentTime > 0 && !video.paused;
+      }, `showcase-${name}`);
+    await playing("delegation");
+    assert.equal(
+      await heroVideo("delegation").evaluate(
+        (video) => video.muted && !video.controls,
+      ),
+      true,
+      "The hero preview plays muted without controls",
+    );
+    assert.deepEqual(
+      [...new Set(heroRequests)],
+      [`/${await heroVideo("delegation").getAttribute("data-src")}`],
+    );
+    const tabs = hero.getByRole("tab");
+    assert.equal(await tabs.count(), 3);
+    await tabs.nth(1).click();
+    await playing("review");
+    assert.equal(await tabs.nth(1).getAttribute("aria-selected"), "true");
+    assert.equal(await tabs.nth(0).getAttribute("aria-selected"), "false");
+    assert.equal(
+      await heroVideo("delegation").evaluate((video) => video.paused),
+      true,
+      "Switching tabs pauses the previous film",
+    );
+    await tabs.nth(1).press("ArrowRight");
+    await playing("mission");
+    assert.equal(
+      await tabs.nth(2).evaluate((tab) => tab === document.activeElement),
+      true,
+      "Arrow keys move between tabs",
+    );
+    // A preview that finishes hands over to the next tab.
+    await heroVideo("mission").evaluate((video) => {
+      video.currentTime = video.duration - 0.2;
+    });
+    await playing("delegation");
+    assert.equal(await tabs.nth(0).getAttribute("aria-selected"), "true");
+    const watch = hero.getByRole("link", { name: "Watch with sound" });
+    await watch.click();
+    await hero.waitForFunction(() => {
+      const video = document.getElementById("showcase-delegation");
+      return (
+        !video.muted &&
+        video.controls &&
+        video.textTracks[0].mode === "showing" &&
+        video.currentTime > 0
+      );
+    });
+    assert.equal(await watch.isVisible(), false);
+    // A watched film stays put when it ends rather than advancing.
+    await heroVideo("delegation").evaluate((video) => {
+      video.currentTime = video.duration - 0.2;
+    });
+    await hero.waitForFunction(
+      () => document.getElementById("showcase-delegation").ended,
+    );
+    assert.equal(await tabs.nth(0).getAttribute("aria-selected"), "true");
+    await hero.locator(".product-film .film-cover").first().click();
+    await hero.waitForFunction(
+      () => document.querySelector(".product-film video").currentTime > 0,
+    );
+    assert.equal(
+      await heroVideo("delegation").evaluate((video) => video.paused),
+      true,
+      "Starting another film pauses the hero",
+    );
+    await tabs.nth(1).click();
+    await playing("review");
+    assert.equal(
+      await hero.evaluate(
+        () => document.querySelector(".product-film video").paused,
+      ),
+      true,
+      "Only one film plays at a time",
+    );
+    await hero.close();
+    const still = await browser.newContext({ reducedMotion: "reduce" });
+    const calm = await still.newPage();
+    const calmRequests = [];
+    calm.on("request", (request) => {
+      if (/\.(mp4|vtt)$/.test(request.url())) calmRequests.push(request.url());
+    });
+    await calm.goto(origin);
+    await calm.getByRole("tab").nth(1).click();
+    assert.equal(
+      await calm
+        .locator("#showcase-review")
+        .evaluate(
+          (video) =>
+            video.classList.contains("is-active") &&
+            video.paused &&
+            video.poster.length > 0,
+        ),
+      true,
+    );
+    assert.equal(calmRequests.length, 0, "Reduced motion keeps posters still");
+    await still.close();
+    // Fetch other media only after intent; exercise decoding, controls and single playback.
     const mediaRequests = [];
     page.on("request", (request) => {
-      if (/\.(mp4|vtt)$/.test(request.url())) mediaRequests.push(request.url());
+      const path = new URL(request.url()).pathname;
+      if (/\.(mp4|vtt)$/.test(path) && !heroFilms.has(path))
+        mediaRequests.push(path);
     });
     await page.goto(origin);
     for (const film of await page.locator(".product-film").all())
@@ -417,7 +531,7 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
           node.volume = 0.6;
         });
         await page.waitForFunction(() =>
-          [...document.querySelectorAll("video")].every(
+          [...document.querySelectorAll(".product-film video")].every(
             (video) => !video.muted && video.volume === 0.6,
           ),
         );
@@ -509,13 +623,17 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
       node.muted = true;
     });
     await page.waitForFunction(() =>
-      [...document.querySelectorAll("video")].every((video) => video.muted),
+      [...document.querySelectorAll(".product-film video")].every(
+        (video) => video.muted,
+      ),
     );
     await previous.evaluate((node) => {
       node.currentTime = node.duration - 0.1;
     });
     await page.waitForFunction(() =>
-      [...document.querySelectorAll("video")].some((video) => video.ended),
+      [...document.querySelectorAll(".product-film video")].some(
+        (video) => video.ended,
+      ),
     );
     // A disabled preference must survive opening a previously unopened film.
     await page.reload();
@@ -523,7 +641,7 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
     const unopenedFilm = page.locator(".product-film").nth(1);
     await unopenedFilm.locator(".film-cover").click();
     await page.waitForFunction(
-      () => document.getElementById("film-delegation").currentTime > 0,
+      () => document.getElementById("film-visualize").currentTime > 0,
     );
     await assertCaptionPreference(false);
     assert.equal(
@@ -535,7 +653,7 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
     await assertCaptionPreference(true);
     await page.waitForFunction(
       () =>
-        document.getElementById("film-delegation").textTracks[0]?.cues?.length >
+        document.getElementById("film-visualize").textTracks[0]?.cues?.length >
         0,
     );
     await page.route("**/media/*.vtt", (route) => route.abort());
@@ -550,7 +668,7 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
       /unavailable/,
     );
     await page.waitForFunction(
-      () => document.querySelector("video").currentTime > 0,
+      () => document.querySelector(".product-film video").currentTime > 0,
     );
     await page.unroute("**/media/*.vtt");
     await page.route("**/media/*.mp4", (route) => route.abort());
@@ -577,6 +695,11 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
     assert.equal(await noScript.locator(".download-architecture").count(), 2);
     for (const link of await noScript.locator(".download-formats a").all())
       assert.match(await link.getAttribute("href"), /^https:\/\/github\.com\//);
+    const heroLink = noScript.getByRole("link", { name: "Watch with sound" });
+    const heroMedia = await noScript.request.get(
+      new URL(await heroLink.getAttribute("href"), origin).href,
+    );
+    assert.equal(heroMedia.headers()["content-type"], "video/mp4");
     const direct = noScript.getByRole("link", { name: /^Play / }).first();
     assert.equal(
       await noScript.locator(".film-captions").first().isVisible(),
