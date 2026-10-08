@@ -163,7 +163,7 @@ describe('BackendDriverRpc', () => {
         codexHome: '/tmp/agent-workspace-isolated-home/codex-home',
         loadingStrategy: 'lazy',
         transport: {
-          command: '/app/resources/codex/codex',
+          command: expect.any(String),
         },
       });
     } finally {

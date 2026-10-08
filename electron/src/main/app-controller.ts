@@ -73,6 +73,7 @@ export class AppController {
   private shuttingDown = false;
   private connectionState: BackendConnectionState = { status: 'connecting' };
   private rendererReady = false;
+  private debugMissingEngines = false;
   private readonly pendingDeepLinkCommands: AppCommand[] = [];
   private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
   private autoUpdateService: DesktopAutoUpdateService | null = null;
@@ -284,10 +285,6 @@ export class AppController {
 
     ipc.handle(ipcChannels.chooseAgentFolder, async () => {
       return this.chooseAgentFolder();
-    });
-
-    ipc.handle(ipcChannels.chooseCodexBinary, async () => {
-      return this.chooseCodexBinary();
     });
 
     ipc.handle(ipcChannels.chooseSourceFolder, async () => {
@@ -506,7 +503,7 @@ export class AppController {
     ipc.handle(ipcChannels.setProviderEnabled, (_event, backend, enabled, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerEnabledSet, { backend, enabled, remoteConnectionId }));
     ipc.handle(ipcChannels.disconnectProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerDisconnect, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.configureProviderSetup, (_event, backend, choice) => this.requireBackendClient().request(backendMethods.providerSetupConfigure, { backend, choice }));
-    ipc.handle(ipcChannels.installProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerInstall, { backend, remoteConnectionId }));
+    ipc.handle(ipcChannels.refreshProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerRefresh, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.cancelCodexChatGptLogin, (_event, remoteConnectionId?: string, loginId?: string) => this.cancelCodexChatGptLogin(remoteConnectionId, loginId));
     ipc.handle(ipcChannels.startCodexChatGptDeviceCodeLogin, (_event, remoteConnectionId: string) => {
       return this.startCodexChatGptDeviceCodeLogin(remoteConnectionId);
@@ -695,6 +692,10 @@ export class AppController {
     this.rendererReady = false;
     this.mainWindow.webContents.on('did-start-loading', () => {
       this.rendererReady = false;
+      if (this.debugMissingEngines) {
+        this.debugMissingEngines = false;
+        this.refreshAppMenu();
+      }
     });
     this.mainWindow.webContents.on('did-finish-load', () => {
       this.rendererReady = true;
@@ -1160,7 +1161,7 @@ export class AppController {
   }
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
-    const previousDebugThreadFlags = this.debugThreadFlagState();
+    const previousDebugMenuState = this.debugMenuState();
     this.snapshot = snapshot;
     this.policyAwareSpokenAnnouncements.refresh();
     this.transientSnapshots.add(snapshot);
@@ -1169,17 +1170,17 @@ export class AppController {
       return withRendererMediaUrls(snapshot, this.localMediaRegistry);
     } finally {
       this.transientSnapshots.delete(snapshot);
-      this.refreshDebugThreadFlagMenuIfChanged(previousDebugThreadFlags);
+      this.refreshDebugMenuIfChanged(previousDebugMenuState);
     }
   }
 
   private async adoptBackendMutationSnapshot(nextSnapshot: AppSnapshot): Promise<AppSnapshot> {
     if (!this.snapshot) throw new Error('daemon snapshot is not available.');
-    const previousDebugThreadFlags = this.debugThreadFlagState();
+    const previousDebugMenuState = this.debugMenuState();
     replaceAppSnapshot(this.snapshot, nextSnapshot);
     this.policyAwareSpokenAnnouncements.refresh();
     this.syncPowerSaveBlocker();
-    this.refreshDebugThreadFlagMenuIfChanged(previousDebugThreadFlags);
+    this.refreshDebugMenuIfChanged(previousDebugMenuState);
     return nextSnapshot;
   }
 
@@ -1449,15 +1450,6 @@ export class AppController {
     return result.canceled ? null : result.filePaths[0] ?? null;
   }
 
-  private async chooseCodexBinary(): Promise<string | null> {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      title: mainT('dialog.codexExecutable'),
-    });
-
-    return result.canceled ? null : result.filePaths[0] ?? null;
-  }
-
   private async chooseSourceFolder(): Promise<string | null> {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -1654,10 +1646,20 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines'> {
     return {
+      getDebugMissingEngines: () => this.debugMissingEngines,
+      setDebugMissingEngines: enabled => {
+        if (app.isPackaged) return;
+        this.debugMissingEngines = enabled;
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          sendAppCommand(this.mainWindow.webContents, { type: 'debug-missing-engines', enabled });
+        }
+        this.refreshAppMenu();
+      },
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
+      hasDebugExecutionPlan: () => this.hasDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
       populateDebugVisualize: (scenario) => this.populateDebugVisualize(scenario),
       getDebugMissionStage: () => this.debugMission()?.stage,
@@ -1709,12 +1711,16 @@ export class AppController {
     return activeAgent?.threadFlags?.[id] === true;
   }
 
-  private debugThreadFlagState(snapshot = this.snapshot): string {
-    return `${this.isDebugThreadFlagSet('delegate_to_worktree', snapshot)}:${this.isDebugThreadFlagSet('ready_for_review', snapshot)}`;
+  private debugMenuState(snapshot = this.snapshot): string {
+    return `${this.isDebugThreadFlagSet('delegate_to_worktree', snapshot)}:${this.isDebugThreadFlagSet('ready_for_review', snapshot)}:${this.hasDebugExecutionPlan(snapshot)}`;
   }
 
-  private refreshDebugThreadFlagMenuIfChanged(previousValue: string): void {
-    if (!app?.isPackaged && previousValue !== this.debugThreadFlagState()) this.refreshAppMenu();
+  private refreshDebugMenuIfChanged(previousValue: string): void {
+    if (!app?.isPackaged && previousValue !== this.debugMenuState()) this.refreshAppMenu();
+  }
+
+  private hasDebugExecutionPlan(snapshot = this.snapshot): boolean {
+    return Boolean(snapshot?.agents.find(agent => agent.id === snapshot.activeAgentId)?.plan);
   }
 
   private toggleDebugExecutionPlan(): void {
@@ -1725,6 +1731,7 @@ export class AppController {
 
     void this.backendClient.request<AppSnapshot>(backendMethods.debugExecutionPlanToggle, { agentId })
       .then((snapshot) => this.adoptBackendSnapshot(snapshot))
+      .finally(() => this.refreshAppMenu())
       .catch((error) => warnMain('debug', 'failed to toggle execution plan', {
         agentId,
         detail: error instanceof Error ? error.message : String(error),
@@ -1832,7 +1839,7 @@ export class AppController {
   }
 
   private applyBackendEvent(event: AppBackendEvent, notifyRenderer: boolean): void {
-    const previousDebugThreadFlags = this.debugThreadFlagState();
+    const previousDebugMenuState = this.debugMenuState();
     const rendererEvent = eventForRenderer(event);
     const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
     for (const snapshot of this.transientSnapshots) {
@@ -1851,7 +1858,7 @@ export class AppController {
 
     this.lastBackendEventSeq = event.seq;
     this.syncPowerSaveBlocker();
-    this.refreshDebugThreadFlagMenuIfChanged(previousDebugThreadFlags);
+    this.refreshDebugMenuIfChanged(previousDebugMenuState);
     if (notifyRenderer && this.mainWindow && !this.mainWindow.isDestroyed()) {
       sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls(rendererEvent, this.localMediaRegistry));
     }

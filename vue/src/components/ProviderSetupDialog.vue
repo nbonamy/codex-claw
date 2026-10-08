@@ -7,7 +7,6 @@
       <p v-if="error" role="alert">{{ error }}</p>
     </div>
     <div v-else class="app-form-dialog">
-      <p v-if="setup && !setup.installed">{{ t('auth.installExplanation') }}</p>
       <FormField :label="t('auth.conversations')" :help="t('auth.separateExplanation')">
         <el-radio-group v-model="isolated" class="provider-setup__choices" :disabled="busy || (setup?.locked && !allowReset)">
           <el-radio :value="true">{{ t('auth.separateChats') }}</el-radio>
@@ -20,7 +19,7 @@
     </div>
     <template #footer>
       <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="emit('close')">{{ t(confirming ? 'common.cancel' : 'surface.remoteClaudeAuth.close') }}</button>
-      <button class="app-button app-button--primary" type="button" :disabled="busy || (confirming ? !acknowledged : setup?.locked && setup.installed && (!allowReset || (isolated === setup.isolated && shareSkills === setup.shareSkills)))" @click="save">{{ t(busy ? 'auth.settingUp' : confirming ? 'engineSetup.removeAndSwitch' : setup?.installed ? 'auth.saveSetup' : 'auth.installProvider') }}</button>
+      <button class="app-button app-button--primary" type="button" :disabled="busy || (confirming ? !acknowledged : setup?.locked && (!allowReset || (isolated === setup.isolated && shareSkills === setup.shareSkills)))" @click="save">{{ t(busy ? 'auth.settingUp' : confirming ? 'engineSetup.removeAndSwitch' : 'auth.saveSetup') }}</button>
     </template>
   </FormDialog>
 </template>

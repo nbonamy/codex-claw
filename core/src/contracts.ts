@@ -698,6 +698,7 @@ export type AppCommand =
   | { type: 'debug-open-code-review' }
   | { type: 'debug-open-visualize' }
   | { type: 'debug-open-markdown' }
+  | { type: 'debug-missing-engines'; enabled: boolean }
   | { type: 'debug-operation-progress'; kind: 'worktreeInitialization' | 'pullRequest' | 'merge' }
   | { type: 'edit-active-agent' }
   | { type: 'new-team' }
@@ -861,7 +862,6 @@ export type AppApi = {
   getOpenInApplications(): Promise<OpenInApplicationCatalog>;
   openAgentPath(agentId: string, application: OpenInApplication, filePath?: string): Promise<AppSnapshot>;
   chooseAgentFolder(): Promise<string | null>;
-  chooseCodexBinary(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;
   listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
@@ -927,7 +927,7 @@ export type AppApi = {
   setProviderEnabled(backend: AgentBackend, enabled: boolean, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;
   disconnectProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderAuthentication>;
   configureProviderSetup(backend: AgentBackend, choice: import('./contracts/provider-setup').ProviderSetupChange): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
-  installProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
+  refreshProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
   cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication>;
   startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<CodexChatGptDeviceCodeLogin>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;

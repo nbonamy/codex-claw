@@ -38,30 +38,32 @@
         <SettingsCodexPanel
           v-else-if="activeTab === 'codex'"
           :connected="codexConnected"
+          :installed="providerConnections?.find(engine => engine.backend === 'codex')?.installed ?? false"
+          @refresh="refreshProvider?.('codex')"
           :authentication="providerConnections?.find(engine => engine.backend === 'codex')?.authentication"
           @customize="customizeProvider?.('codex')"
           :set-enabled="enabled => setProviderEnabled?.('codex', enabled)"
-          :connection-busy="codexConnectionBusy"
+          :connection-busy="codexConnectionBusy || updatingProvider === 'codex'"
           :login-pending="codexLoginPending"
-          :connection-error="codexConnectionError"
+          :connection-error="codexConnectionError || providerSetupError"
           @connect="connectCodex"
           @disconnect="disconnectProvider?.('codex')"
           @cancel="cancelCodexLogin"
-          :choose-codex-binary="chooseCodexBinary"
           :launch-chat-gpt-app="launchChatGptApp"
           :settings="generalSettings"
-          :update-settings="updateSettings"
         />
         <SettingsClaudeCodePanel
           v-else-if="activeTab === 'claude-code'"
           :connected="claudeConnected"
+          :installed="providerConnections?.find(engine => engine.backend === 'claude')?.installed ?? false"
+          @refresh="refreshProvider?.('claude')"
           :authentication="providerConnections?.find(engine => engine.backend === 'claude')?.authentication"
           :home="generalSettings.providerHomes?.claude"
           @customize="customizeProvider?.('claude')"
           :enabled="generalSettings.providerEnabled?.claude !== false"
           :set-enabled="enabled => setProviderEnabled?.('claude', enabled)"
-          :busy="claudeConnectionBusy"
-          :error="claudeConnectionError"
+          :busy="claudeConnectionBusy || updatingProvider === 'claude'"
+          :error="claudeConnectionError || providerSetupError"
           @connect="connectClaude"
           @disconnect="disconnectProvider?.('claude')"
         />
@@ -137,6 +139,7 @@ import SettingsSidebar from './SettingsSidebar.vue';
 import SettingsVoicePanel from './SettingsVoicePanel.vue';
 import type { SettingsTab } from './settings-tabs';
 import type { ProviderConnection } from '@workspace/core/contracts/provider-setup';
+import type { AgentBackend } from '@workspace/core/contracts';
 import { appHostCapabilities } from '../platform-api';
 import appPackage from '../../package.json';
 
@@ -145,6 +148,9 @@ const appVersion = appPackage.version;
 withDefaults(defineProps<{
   codexConnected?: boolean;
   providerConnections?: ProviderConnection[];
+  refreshProvider?: (backend: AgentBackend) => Promise<void>;
+  updatingProvider?: AgentBackend | null;
+  providerSetupError?: string | null;
   customizeProvider?: (backend: 'codex' | 'claude') => unknown;
   setProviderEnabled?: (backend: 'codex' | 'claude', enabled: boolean) => unknown;
   disconnectProvider?: (backend: 'codex' | 'claude') => Promise<void>;
@@ -163,7 +169,6 @@ withDefaults(defineProps<{
   sourceFolder?: SourceFolderState;
   daemonStatus?: DaemonStatus | null;
   daemonStatusError?: string | null;
-  chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   launchChatGptApp?: () => Promise<void>;
   workBacklogConnections?: WorkIntegrationConnection[];
@@ -220,7 +225,6 @@ withDefaults(defineProps<{
   sourceFolder: () => ({ ...defaultSourceFolderState }),
   daemonStatus: null,
   daemonStatusError: null,
-  chooseCodexBinary: async () => null,
   chooseSourceFolder: async () => null,
   pollWorkProviderAuthorization: async () => undefined,
   connectWorkProvider: async () => undefined,

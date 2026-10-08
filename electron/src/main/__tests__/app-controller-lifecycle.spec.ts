@@ -69,6 +69,7 @@ vi.mock('../auto-update', () => ({
 import { app, powerMonitor, BrowserWindow } from 'electron';
 import { AppController, startMainApp } from '../app-controller';
 import { AppshotsKeyMonitor } from '../appshots-key-monitor';
+import { installAppMenu } from '../app-menu';
 import type { DesktopAutoUpdateService } from '../auto-update';
 
 let controllers: AppController[] = [];
@@ -139,6 +140,73 @@ afterEach(async () => {
 });
 
 describe('controller desktop lifecycle', () => {
+  it('synchronizes the execution-plan checkmark after removal, agent selection, and failed toggles', async () => {
+    const { controller, backend, state, emit } = setup();
+    const packaged = app.isPackaged;
+    Object.defineProperty(app, 'isPackaged', { value: false, configurable: true });
+    try {
+      const snapshot = structuredClone(state.snapshot);
+      snapshot.agents[0]!.plan = {
+        kind: 'execution', status: 'inProgress', explanation: 'Debug execution plan', markdown: '- [ ] Test',
+        steps: [{ step: 'Test', status: 'pending' }], threadId: 'debug-thread', turnId: 'debug-turn', updatedAt: '2026-10-08T00:00:00Z',
+      };
+      state.snapshot = snapshot;
+      await controller.initialize();
+      controller.createWindow();
+      const menu = native.createWindow.mock.lastCall![0];
+      expect(menu.hasDebugExecutionPlan()).toBe(true);
+      const withoutPlan = structuredClone(snapshot);
+      delete withoutPlan.agents[0]!.plan;
+      backend.request.mockImplementation(async method => method === 'debug/executionPlan/toggle' ? withoutPlan : state.clientState);
+      menu.toggleDebugExecutionPlan();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(backend.request).toHaveBeenCalledWith('debug/executionPlan/toggle', { agentId: snapshot.activeAgentId });
+      expect(vi.mocked(installAppMenu).mock.lastCall![1].hasDebugExecutionPlan!()).toBe(false);
+
+      emit({ seq: 1, occurredAt: '2026-10-08T00:00:00Z', type: 'snapshot.updated', payload: snapshot });
+      expect(vi.mocked(installAppMenu).mock.lastCall![1].hasDebugExecutionPlan!()).toBe(true);
+      const switched = structuredClone(snapshot);
+      switched.activeAgentId = snapshot.agents[1]!.id;
+      emit({ seq: 2, occurredAt: '2026-10-08T00:00:01Z', type: 'snapshot.updated', payload: switched });
+      expect(vi.mocked(installAppMenu).mock.lastCall![1].hasDebugExecutionPlan!()).toBe(false);
+
+      vi.mocked(installAppMenu).mockClear();
+      backend.request.mockRejectedValueOnce(new Error('Unavailable'));
+      menu.toggleDebugExecutionPlan();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.mocked(installAppMenu).mock.lastCall![1].hasDebugExecutionPlan!()).toBe(false);
+    } finally {
+      Object.defineProperty(app, 'isPackaged', { value: packaged, configurable: true });
+    }
+  });
+
+  it('keeps engine simulation client-only, resets it on reload, and rejects it in packaged builds', () => {
+    const { controller, window, backend } = setup();
+    const packaged = app.isPackaged;
+    Object.defineProperty(app, 'isPackaged', { value: false, configurable: true });
+    try {
+      controller.createWindow();
+      const menu = native.createWindow.mock.calls[0]![0];
+      expect(menu.getDebugMissingEngines()).toBe(false);
+      menu.setDebugMissingEngines(true);
+      expect(window.webContents.send).toHaveBeenLastCalledWith(ipcChannels.appCommand, { type: 'debug-missing-engines', enabled: true });
+      expect(vi.mocked(installAppMenu).mock.lastCall![1].getDebugMissingEngines!()).toBe(true);
+      menu.setDebugMissingEngines(false);
+      expect(window.webContents.send).toHaveBeenLastCalledWith(ipcChannels.appCommand, { type: 'debug-missing-engines', enabled: false });
+      menu.setDebugMissingEngines(true);
+      window.webContents.emit('did-start-loading');
+      expect(vi.mocked(installAppMenu).mock.lastCall![1].getDebugMissingEngines!()).toBe(false);
+      Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
+      window.webContents.send.mockClear();
+      menu.setDebugMissingEngines(true);
+      expect(menu.getDebugMissingEngines()).toBe(false);
+      expect(window.webContents.send).not.toHaveBeenCalled();
+      expect(backend.request).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(app, 'isPackaged', { value: packaged, configurable: true });
+    }
+  });
+
   it.each(['/Applications', '/Applications/Test.app'])('keeps the existing installation untouched when %s requires authorization', async (protectedPath) => {
     vi.stubGlobal('process', Object.create(process, { platform: { value: 'darwin' } }));
     vi.mocked(app.isInApplicationsFolder).mockReturnValue(false);
@@ -526,9 +594,6 @@ describe('controller desktop lifecycle', () => {
     }));
     native.dialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: ['/ignored'] });
     expect(await invoke(ipcChannels.chooseAgentFolder)).toBeNull();
-    native.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [] });
-    expect(await invoke(ipcChannels.chooseCodexBinary)).toBeNull();
-    expect(native.dialog.showOpenDialog).toHaveBeenLastCalledWith(expect.objectContaining({ properties: ['openFile'] }));
     native.dialog.showSaveDialog.mockResolvedValueOnce({ canceled: true });
     expect(await native.handlers.get(ipcChannels.chooseDocumentSavePath)!({}, '/projects/proposal.md')).toBeNull();
     native.dialog.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: '/projects/proposal.md' });

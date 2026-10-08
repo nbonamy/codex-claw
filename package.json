@@ -34,7 +34,6 @@
   "scripts": {
     "build": "npm run build:electron",
     "build:backend": "npm run build:sdk && npm run build -w @workspace/core && npm run build -w @workspace/backend && node scripts/package-backend.mjs",
-    "build:codex": "node scripts/prepare-codex-app-server.mjs",
     "build:computer-use": "node scripts/prepare-computer-use.mjs",
     "build:computer-use:local": "node scripts/prepare-computer-use.mjs --local",
     "build:electron": "node scripts/build.mjs",

@@ -4,32 +4,33 @@
     :class="{ 'app-shell--auth-gated': showOnboardingGate }"
   >
     <FirstRunOnboardingGate
-      :provider-setup="providerSetup"
+      :provider-setup="displayProviderSetup"
       :allow-setup-reset="settingsVisible"
       :customized-setup="customizedSetup"
       :setup-busy="setupBusy"
       :updating-provider="updatingProvider"
       :setup-error="setupError"
       @customize="customizeProvider"
+      @refresh-provider="refreshProvider"
       @close-setup="customizingProvider = null"
       @save-setup="saveProviderSetup"
       v-model:claude-dialog-visible="claudeDialogVisible"
       :claude-authentication="claudeAuthentication"
-      :claude-connected="claudeConnected"
-      :claude-loading="claudeLoading"
-      :claude-error="claudeError"
-      :codex-connected="codexConnected"
+      :claude-connected="!debugMissingEngines && claudeConnected"
+      :claude-loading="!debugMissingEngines && claudeLoading"
+      :claude-error="debugMissingEngines ? null : claudeError"
+      :codex-connected="!debugMissingEngines && codexConnected"
       :continuing="continuing"
       @connect-claude="connectClaude"
       @refresh-claude="refreshClaude"
       @continue="continueWithProviders"
-      :authentication="authentication"
+      :authentication="debugMissingEngines ? null : authentication"
       :authentication-cancelling="authenticationCancelling"
-      :authentication-error="authenticationError"
-      :authentication-loading="authenticationLoading"
-      :github-onboarding-visible="githubOnboardingVisible"
-      :initial-authentication-loading="initialAuthenticationLoading"
-      :onboarding-complete-visible="onboardingCompleteVisible"
+      :authentication-error="debugMissingEngines ? null : authenticationError"
+      :authentication-loading="!debugMissingEngines && authenticationLoading"
+      :github-onboarding-visible="!debugMissingEngines && githubOnboardingVisible"
+      :initial-authentication-loading="!debugMissingEngines && initialAuthenticationLoading"
+      :onboarding-complete-visible="!debugMissingEngines && onboardingCompleteVisible"
       :repository-acquire-busy="repositoryAcquireBusy"
       :repository-acquire-error="repositoryAcquireError"
       :show-login-landing="showLoginLanding"
@@ -114,16 +115,19 @@
       <BackendConnectionBanner :connection-state="connectionState" />
       <SettingsView
         v-if="settingsVisible"
-        :codex-connected="codexConnected"
-        :provider-connections="snapshot.providerConnections"
+        :codex-connected="!debugMissingEngines && codexConnected"
+        :provider-connections="displayProviderConnections"
+        :refresh-provider="refreshProvider"
+        :provider-setup-error="setupError"
+        :updating-provider="updatingProvider"
         :customize-provider="customizeProvider"
-        :claude-connected="claudeConnected"
-        :codex-connection-busy="authenticationLoading || snapshot.providerConnections?.some(engine => engine.backend === 'codex' && engine.checking)"
+        :claude-connected="!debugMissingEngines && claudeConnected"
+        :codex-connection-busy="!debugMissingEngines && (authenticationLoading || snapshot.providerConnections?.some(engine => engine.backend === 'codex' && engine.checking))"
         :set-provider-enabled="setEngineEnabled"
-        :claude-connection-busy="claudeLoading || snapshot.providerConnections?.some(engine => engine.backend === 'claude' && engine.checking)"
-        :codex-login-pending="authentication?.login.status === 'pending'"
-        :codex-connection-error="authenticationError ?? authentication?.login.error ?? snapshot.providerConnections?.find(engine => engine.backend === 'codex')?.error"
-        :claude-connection-error="claudeError ?? snapshot.providerConnections?.find(engine => engine.backend === 'claude')?.error"
+        :claude-connection-busy="!debugMissingEngines && (claudeLoading || snapshot.providerConnections?.some(engine => engine.backend === 'claude' && engine.checking))"
+        :codex-login-pending="!debugMissingEngines && authentication?.login.status === 'pending'"
+        :codex-connection-error="debugMissingEngines ? null : authenticationError ?? authentication?.login.error ?? snapshot.providerConnections?.find(engine => engine.backend === 'codex')?.error"
+        :claude-connection-error="debugMissingEngines ? null : claudeError ?? snapshot.providerConnections?.find(engine => engine.backend === 'claude')?.error"
         :connect-codex="startChatGptLogin"
         :connect-claude="connectClaude"
         :disconnect-provider="disconnectProvider"
@@ -154,7 +158,6 @@
         :revoke-paired-device="revokePairedDevice"
         :daemon-status="daemonStatus"
         :daemon-status-error="daemonStatusError"
-        :choose-codex-binary="chooseCodexBinary"
         :choose-source-folder="chooseSourceFolder"
         :connect-work-provider="connectWorkProvider"
         :open-work-provider-authorization="openWorkProviderAuthorization"
@@ -719,7 +722,6 @@ const props = withDefaults(defineProps<{
   daemonStatusError?: string | null;
   codexResourceSharingMigrationRequired?: boolean;
   chooseAgentFolder?: () => Promise<string | null>;
-  chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   listSourceFolders?: (input?: SourceFolderListInput) => Promise<SourceFolderListing>;
   sourceRepositories?: SourceRepository[];
@@ -871,7 +873,6 @@ const props = withDefaults(defineProps<{
   daemonStatusError: null,
   codexResourceSharingMigrationRequired: false,
   chooseAgentFolder: async () => null,
-  chooseCodexBinary: async () => null,
   chooseSourceFolder: async () => null,
   listSourceFolders: async () => ({ path: '', parentPath: null, entries: [] }),
   sourceRepositories: () => [],
@@ -1264,23 +1265,36 @@ const firstRunOnboarding = useFirstRunOnboarding({
 });
 const {
   claudeAuthentication, claudeConnected, claudeLoading, claudeError, claudeDialogVisible,
-  providerSetup, customizedSetup, customizingProvider, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
+  providerSetup, customizedSetup, customizingProvider, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup, refreshProvider: refreshRealProvider,
   codexConnected, continuing, connectClaude, disconnectProvider, refreshClaude, continueWithProviders,
   authentication,
   authenticationCancelling,
   authenticationError,
   authenticationLoading,
   completeVisible: onboardingCompleteVisible,
-  gated: showOnboardingGate,
+  gated: realOnboardingGate,
   githubVisible: githubOnboardingVisible,
   initialAuthenticationLoading,
-  showLogin: showLoginLanding,
+  showLogin: realLoginLanding,
   cancelChatGptLogin,
   finish: finishFirstRunOnboarding,
   load: loadAuthentication,
   startChatGptLogin,
 } = firstRunOnboarding;
-watch(showOnboardingGate, (gated) => {
+// Debug previews project display state only; onboarding and live agents retain real connections.
+const debugMissingEngines = ref(false);
+const showOnboardingGate = computed(() => debugMissingEngines.value ? !settingsVisible.value : realOnboardingGate.value);
+const showLoginLanding = computed(() => debugMissingEngines.value ? !settingsVisible.value : realLoginLanding.value);
+const displayProviderSetup = computed(() => debugMissingEngines.value
+  ? providerSetup.value.map(setup => ({ ...setup, installed: false }))
+  : providerSetup.value);
+const displayProviderConnections = computed(() => debugMissingEngines.value
+  ? props.snapshot.providerConnections?.map(engine => ({ ...engine, installed: false, connected: false, checking: false, authentication: undefined, error: undefined }))
+  : props.snapshot.providerConnections);
+async function refreshProvider(backend: AgentBackend): Promise<void> {
+  if (!debugMissingEngines.value) await refreshRealProvider(backend);
+}
+watch(() => !debugMissingEngines.value && realOnboardingGate.value, (gated) => {
   if (!appHostCapabilities.appLifecycle) return;
   void appApi?.setMenuBarVisible?.(!gated).catch((error: unknown) => {
     console.warn('Failed to update native menu visibility', error);
@@ -2336,6 +2350,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openBrowser: (command) => agentWorkspace.value?.handleBrowserOpenCommand(command),
     openDebugImageAnnotation,
     openDebugOperationProgress,
+    setDebugMissingEngines: enabled => { debugMissingEngines.value = enabled; },
     openFileQuick: () => { fileQuickOpenVisible.value = true; },
     openGitReview: openAgentGitDiffPreview,
     openMarkdown: openMarkdownRequest,

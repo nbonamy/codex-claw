@@ -129,38 +129,17 @@ function runtimeDaemonEnv(deps: RuntimeDaemonConfigDeps): NodeJS.ProcessEnv {
   const env = deps.env ?? process.env;
   const githubClientId = env.APP_GITHUB_CLIENT_ID?.trim();
   const linearClientId = env.APP_LINEAR_CLIENT_ID?.trim();
-  const bundledCodexPath = runtimeBundledCodexPath(deps);
   const runtimePath = !deps.env || env.PATH ? discoveredRuntimePath(deps) : '';
   const home = env.HOME?.trim() || (deps.homedir ?? homedir)();
 
   return {
     APP_ASSETS_PATH: runtimeDaemonAssetsPath(deps),
-    ...(bundledCodexPath ? { APP_BUNDLED_CODEX_PATH: bundledCodexPath } : {}),
     APP_HOME: runtimeDaemonHome(deps),
     HOME: home,
     ...(runtimePath ? { PATH: runtimePath } : {}),
     ...(githubClientId ? { APP_GITHUB_CLIENT_ID: githubClientId } : {}),
     ...(linearClientId ? { APP_LINEAR_CLIENT_ID: linearClientId } : {}),
   };
-}
-
-function runtimeBundledCodexPath(deps: RuntimeDaemonConfigDeps): string | null {
-  const env = deps.env ?? process.env;
-  const configured = env.APP_BUNDLED_CODEX_PATH?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const electronProcess = process as NodeJS.Process & { defaultApp?: boolean; resourcesPath?: string };
-  const resourcesPath = deps.resourcesPath ?? electronProcess.resourcesPath;
-  const defaultApp = deps.defaultApp ?? electronProcess.defaultApp;
-  if (!resourcesPath || defaultApp) {
-    return null;
-  }
-
-  const platform = deps.platform ?? process.platform;
-  const binaryPath = path.join(resourcesPath, 'codex', ...(platform === 'win32' ? ['bin', 'codex.exe'] : ['codex']));
-  return (deps.existsSync ?? existsSync)(binaryPath) ? binaryPath : null;
 }
 
 function serveArgsFromStdioArgs(args: string[]): string[] {

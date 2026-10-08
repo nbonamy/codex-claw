@@ -14,6 +14,17 @@ import {
 
 describe('AppBackendServer', () => {
 
+  it('rechecks provider installation on the owning remote host without running a local installer', async () => {
+    const snapshot = createTestSnapshot();
+    const connection = readyRemoteConnection();
+    snapshot.remoteConnections.connections = [connection];
+    const setup = { backend: 'claude', installed: true, isolated: true, shareSkills: true, locked: false, homePath: '/remote/claude' };
+    const remoteClients = { request: vi.fn().mockResolvedValue(setup) };
+    const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never });
+    expect(await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/refresh', params: { backend: 'claude', remoteConnectionId: connection.id } })).toMatchObject({ result: setup });
+    expect(remoteClients.request).toHaveBeenCalledExactlyOnceWith(connection, 'provider/refresh', { backend: 'claude', _clientId: 'remote-controller' }, expect.any(Function));
+  });
+
   it('inspects remote versions without closing or upgrading the connection', async () => {
     const snapshot = createTestSnapshot();
     snapshot.general.claudeCodeEnabled = true;

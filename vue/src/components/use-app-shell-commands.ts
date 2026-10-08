@@ -46,6 +46,7 @@ type AppShellCommandOptions = {
     closeTeam: (teamId: string) => void;
     disconnectTeam: (teamId: string) => void;
     debugMarkUnread: () => void;
+    setDebugMissingEngines: (enabled: boolean) => void;
     duplicateAgent: (agentId: string) => void;
     editAgent: (agentId: string) => void;
     forkAgent: (agentId: string) => void;
@@ -251,6 +252,11 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     // renderer observes Meta keyup. Treat the resolved command as the end of
     // the transient Command-number reveal so the sidebar cannot stay latched.
     resetQuickAgentShortcuts();
+
+    if (command.type === 'debug-missing-engines') {
+      options.actions.setDebugMissingEngines(command.enabled);
+      return;
+    }
 
     if (command.type === 'appshot-failed') {
       if (!appHostCapabilities.appshots) return;

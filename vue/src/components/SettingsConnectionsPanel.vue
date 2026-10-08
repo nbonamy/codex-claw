@@ -233,7 +233,6 @@
 import { translate } from '../i18n';
 import { ElMessageBox } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
-import { bundledCodexVersion } from '@workspace/core/codex-release';
 import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@workspace/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
@@ -444,8 +443,7 @@ onMounted(async () => {
 function canUpgrade(connection: RemoteConnection): boolean {
   const remoteVersion = connectionDaemonVersion(connection);
   return connection.status === 'ready'
-    && Boolean((remoteVersion && props.appVersion && remoteVersion !== props.appVersion)
-      || connection.codexVersion !== bundledCodexVersion);
+    && Boolean(remoteVersion && props.appVersion && remoteVersion !== props.appVersion);
 }
 
 function connectionDaemonVersion(connection: RemoteConnection): string | null {

@@ -18,7 +18,7 @@ log and socket paths, npm scripts and launchd labels stay brand-neutral.
   session implementation owns JSON-RPC framing, pending requests, timeouts and
   server callbacks; never copy lifecycle logic into a second transport.
 - Provider setup follows the same split: `ProviderLifecycle` adapters own
-  executable detection, install, home preparation and resource sharing;
+  executable detection, home preparation and resource sharing;
   `ProviderSetup` owns locking, serialization, persistence and driver replacement.
   Authentication enters through the optional `AgentBackendDriver.authenticate`
   capability; the server caches the app-owned result and never interprets
@@ -72,12 +72,10 @@ agents or automation runs prompt for a restart.
 
 ### Remote Hosts (SSH)
 
-Connection records live in `daemon`. Sync uploads the self-contained `daemon.mjs`
-and the pinned Codex release (`~/.korus/codex/<version>/bin`), ensures Claude Code
-through Anthropic's per-user installer when enabled (a Claude failure never
-disables Codex), mirrors `provider-tokens.json` and asks the remote to reload
-connections. It never copies state files, shell profiles or conversation data.
-Remote hosts discover Codex themselves when no bundle is supplied. Version
+Connection records live in `daemon`. Sync uploads the self-contained `daemon.mjs`,
+mirrors `provider-tokens.json` and asks the remote to reload connections. It never
+installs provider CLIs or copies state files, shell profiles or conversation data.
+Provider detection and authentication run on the owning host. Version
 discovery still accepts the previous `daemon` CLI name for hosts not yet upgraded.
 
 ## Development
@@ -121,14 +119,10 @@ conversation or sequence cursor outlives the backend instance.
 - The bundle imports no `electron`, leaves Node built-ins external, ships
   sourcemaps, and avoids native dependencies unless their packaging and signing
   are designed.
-- `codex-app-server-release.json` pins official Codex archive SHA-256s; preparation
-  verifies hash, architecture and executable version on the native build host.
-  macOS keeps upstream Codex signatures. Windows preparation verifies the whole
-  package, keeps its `bin/`, `codex-path/` and `codex-resources/` layout intact
-  (sandbox helpers and DLLs), checks the version from the final location because
-  running staged binaries locks the directory, and rolls back on failed validation.
-  The `extract-zip` dependency pins an overridden `yauzl`; keep its completion
-  regression test.
+- Provider CLIs are external prerequisites discovered on the owning host's PATH.
+  Development and packaging do not download, pin or bundle Codex. Release smoke
+  checks reject a bundled Codex resource directory and probe the packaged daemon's
+  health and provider detection without requiring a provider installation or login.
 - Computer Use, Screenshots and Apple speech helpers are macOS-only; packaging
   another OS does not enable them.
 - Release builds sign and notarize; use `APP_SKIP_SIGNING=1` for local
@@ -142,8 +136,7 @@ Computer Use helper is ARM64-only; Windows ARM64 is experimental. Passing builds
 not prove GUI installation, login or a full agent turn on a clean machine: do that
 acceptance check before promoting the first release for an OS. Windows installers
 are **unsigned** (SmartScreen warnings are expected; no certificate prerequisite).
-Codex is bundled; Claude Code stays a separately installed prerequisite, as do
-Git/GitHub tools.
+Codex and Claude Code are separately installed prerequisites, as are Git/GitHub tools.
 
 ## GitHub desktop releases
 

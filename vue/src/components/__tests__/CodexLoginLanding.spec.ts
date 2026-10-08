@@ -1,17 +1,50 @@
 import { product } from '@workspace/core/product';
 import { mount } from '@vue/test-utils';
 import { ElButton } from 'element-plus';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import CodexLoginLanding from '../CodexLoginLanding.vue';
 
 function mountLanding(props: InstanceType<typeof CodexLoginLanding>['$props'] = {}) {
   return mount(CodexLoginLanding, {
     props,
+    attachTo: document.body,
     global: { components: { ElButton } },
   });
 }
 
 describe('CodexLoginLanding', () => {
+  it('offers official Install links for missing CLIs and rechecks without starting login', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const wrapper = mountLanding({ providerSetup: (['codex', 'claude'] as const).map(backend => ({
+      backend, installed: false, isolated: true, shareSkills: true, homePath: '/home', locked: false,
+    })) });
+    expect(wrapper.findAll('a').map(link => [link.text(), link.attributes('href')])).toEqual([
+      ['Install', 'https://learn.chatgpt.com/docs/codex/cli#getting-started'],
+      ['Install', 'https://code.claude.com/docs/en/quickstart#step-1-install-claude-code'],
+    ]);
+    expect(wrapper.findAll('.codex-login__provider .el-button').every(button => button.attributes('disabled') !== undefined)).toBe(true);
+    for (const link of wrapper.findAll('a')) {
+      await link.trigger('click');
+      expect(open).toHaveBeenLastCalledWith(link.attributes('href'), '_blank', 'noopener,noreferrer');
+    }
+    const refresh = wrapper.get('button[aria-label="Check again"]');
+    expect(refresh.text()).toBe('');
+    expect(refresh.find('[aria-hidden="true"] svg').exists()).toBe(true);
+    expect(refresh.attributes('title')).toBe('Check again');
+    await refresh.trigger('click');
+    expect(wrapper.emitted('refresh-provider')).toEqual([['codex']]);
+    expect(wrapper.emitted('login')).toBeUndefined();
+    expect(wrapper.emitted('connect-claude')).toBeUndefined();
+    await wrapper.setProps({ updatingProvider: 'codex' });
+    expect(wrapper.findAll('.provider-install-actions .is-loading')).toHaveLength(1);
+    expect(wrapper.findAll('.provider-install-actions')[0]!.find('.is-loading').exists()).toBe(true);
+    expect(wrapper.find('.codex-login__checking').exists()).toBe(false);
+    expect(wrapper.findAll('.provider-install-actions button').every(button => button.attributes('disabled') !== undefined)).toBe(true);
+    await wrapper.setProps({ updatingProvider: null });
+    expect(wrapper.find('.provider-install-actions .is-loading').exists()).toBe(false);
+    wrapper.unmount();
+    open.mockRestore();
+  });
   it('offers independent customization and does not treat CLI detection as a connection', async () => {
     const wrapper = mountLanding({ providerSetup: [
       { backend: 'codex', installed: true, isolated: true, shareSkills: true, homePath: '/app/codex-home', locked: false },
@@ -20,7 +53,17 @@ describe('CodexLoginLanding', () => {
     const providers = wrapper.findAll('.codex-login__provider');
     expect(providers[0]!.text()).toContain('Detected');
     expect(providers[1]!.text()).not.toContain('Detected');
+    expect(providers[1]!.text()).not.toContain('Customize');
     expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+    const actionStyle = (element: Element) => {
+      const style = getComputedStyle(element);
+      return ['color', 'font-size', 'font-weight', 'line-height', 'padding', 'text-decoration'].map(property => style.getPropertyValue(property));
+    };
+    const customize = providers[0]!.get('.codex-login__detection button');
+    expect(actionStyle(providers[1]!.get('a').element)).toEqual(actionStyle(customize.element));
+    expect(actionStyle(providers[1]!.get('.provider-install-actions button').element)).toEqual(actionStyle(customize.element));
+    expect(getComputedStyle(providers[1]!.get('a').element).textDecoration).toBe('none');
+    await wrapper.setProps({ providerSetup: wrapper.props('providerSetup')!.map(setup => ({ ...setup, installed: true })) });
     await providers[1]!.get('.codex-login__detection button').trigger('click');
     expect(wrapper.emitted('customize')).toStrictEqual([['claude']]);
     await wrapper.setProps({ codexConnected: true, claudeConnected: true });
@@ -66,7 +109,9 @@ describe('CodexLoginLanding', () => {
     { backend: 'claude', index: 1, pending: { updatingProvider: 'claude' as const } },
     { backend: 'claude', index: 1, pending: { claudeLoading: true } },
   ])('keeps $backend checking feedback below the button for $pending', async ({ backend, index, pending }) => {
-    const wrapper = mountLanding();
+    const wrapper = mountLanding({ providerSetup: (['codex', 'claude'] as const).map(backend => ({
+      backend, installed: true, isolated: true, shareSkills: true, homePath: '/home', locked: false,
+    })) });
     const provider = wrapper.findAll('.codex-login__provider')[index]!;
     expect(provider.get('.codex-login__detection button').text()).toBe('Customize');
 

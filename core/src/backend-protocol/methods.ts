@@ -114,7 +114,7 @@ export const backendMethods = {
   providerEnabledSet: 'provider/enabled/set',
   providerDisconnect: 'provider/disconnect',
   providerSetupConfigure: 'provider/setup/configure',
-  providerInstall: 'provider/install',
+  providerRefresh: 'provider/refresh',
   codexLoginCancel: 'codex/authentication/login/cancel',
   codexChatGptLoginStart: 'codex/authentication/chatgpt/start',
   codexChatGptDeviceCodeLoginStart: 'codex/authentication/deviceCode/start',

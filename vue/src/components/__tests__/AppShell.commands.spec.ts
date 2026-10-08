@@ -47,6 +47,54 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it('previews missing local engines in Welcome and Settings without changing real connections', async () => {
+    let command: (value: AppCommand) => void = () => {};
+    const refreshProvider = vi.fn();
+    const configureProviderSetup = vi.fn();
+    const disconnectProvider = vi.fn();
+    window.app = {
+      onAppCommand: vi.fn(listener => { command = listener; return () => {}; }),
+      refreshProvider, configureProviderSetup, disconnectProvider,
+    } as unknown as AppApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = ['codex', 'claude'].map(backend => ({
+      backend: backend as 'codex' | 'claude', installed: true, connected: true, checking: false,
+    }));
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    expect(wrapper.find('.codex-login').exists()).toBe(false);
+
+    command({ type: 'debug-missing-engines', enabled: true });
+    await flushPromises();
+    expect(wrapper.findAll('.codex-login .provider-install-actions a')).toHaveLength(2);
+    expect(wrapper.findAll('.codex-login button').some(button => button.text() === 'Customize')).toBe(false);
+    await wrapper.get('.codex-login .provider-install-actions button').trigger('click');
+    expect(refreshProvider).not.toHaveBeenCalled();
+
+    command({ type: 'open-settings' });
+    await flushPromises();
+    expect(wrapper.find('.codex-login').exists()).toBe(false);
+    for (const label of ['Codex', 'Claude Code']) {
+      const tab = wrapper.findAll('.settings-sidebar button').find(button => button.text() === label);
+      expect(tab).toBeDefined();
+      await tab!.trigger('click');
+      await flushPromises();
+      expect(wrapper.get('.engine-hero').text()).toContain('Not detected');
+      expect(wrapper.find('.engine-hero .provider-install-actions a').exists()).toBe(true);
+      expect(wrapper.get('.engine-hero [role="switch"]').attributes('disabled')).toBeDefined();
+      await wrapper.get('.engine-hero .provider-install-actions button').trigger('click');
+    }
+    expect(refreshProvider).not.toHaveBeenCalled();
+    command({ type: 'debug-missing-engines', enabled: false });
+    await flushPromises();
+    expect(wrapper.find('.engine-hero .provider-install-actions').exists()).toBe(false);
+    expect(wrapper.get('.engine-hero').text()).toContain('Disconnect');
+    expect(snapshot.providerConnections.every(engine => engine.installed && engine.connected)).toBe(true);
+    expect(configureProviderSetup).not.toHaveBeenCalled();
+    expect(disconnectProvider).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it.each([
     { backend: 'codex' as const, command: 'delegate' },
     { backend: 'claude' as const, command: 'worktree' },

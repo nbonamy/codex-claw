@@ -3,8 +3,7 @@ import { lstat, mkdir, readlink, symlink, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { ProviderHomeSettings } from '@workspace/core/contracts/provider-setup';
 import { resolveRuntimeExecutable } from '@workspace/core/runtime-discovery';
-import { remoteClaudeInstallCommand } from '../connections/remote-claude-install';
-import { installProviderCli, providerHomePaths, type ProviderLifecycle } from '../provider-lifecycle';
+import { providerHomePaths, type ProviderLifecycle } from '../provider-lifecycle';
 
 export function createClaudeLifecycle(): ProviderLifecycle {
   const configured = process.env.CLAUDE_CONFIG_DIR;
@@ -25,7 +24,6 @@ export function createClaudeLifecycle(): ProviderLifecycle {
       }
     },
     applyHome: home => { process.env.CLAUDE_CONFIG_DIR = home.homePath; },
-    install: () => installProviderCli(remoteClaudeInstallCommand()),
   };
 }
 

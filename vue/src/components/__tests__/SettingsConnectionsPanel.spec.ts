@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SourceFolderListInput } from '@workspace/core/contracts';
 import { codexPairingUrl } from '../../device-pairing';
 import SettingsConnectionsPanel from '../SettingsConnectionsPanel.vue';
-import { bundledCodexVersion } from '@workspace/core/codex-release';
+const installedCodexVersion = '0.159.3';
 
 describe('codexPairingUrl', () => {
   it('wraps the opaque code in the ChatGPT Codex pairing deep link', () => {
@@ -183,7 +183,7 @@ describe('SettingsConnectionsPanel', () => {
           host: 'eve',
           status: 'ready',
           daemonVersion: '0.19.1',
-          codexVersion: bundledCodexVersion,
+          codexVersion: installedCodexVersion,
           detail: 'Ready (daemon 0.19.1)',
           createdAt: '2026-06-14T10:00:00.000Z',
           updatedAt: '2026-06-14T10:00:00.000Z',
@@ -206,8 +206,10 @@ describe('SettingsConnectionsPanel', () => {
     expect(checkRemoteConnection).toHaveBeenCalledWith('connection-current', true);
     expect(checkRemoteConnection).toHaveBeenCalledWith('connection-outdated');
     await wrapper.setProps({ connections: [{ ...wrapper.props('connections')![1]!, codexVersion: '0.143.0' }] });
-    expect(wrapper.findAll('.settings-connections-panel__upgrade')).toHaveLength(1);
-    await wrapper.setProps({ connections: [{ ...wrapper.props('connections')![0]!, codexVersion: bundledCodexVersion }] });
+    expect(wrapper.find('.settings-connections-panel__upgrade').exists()).toBe(false);
+    await wrapper.setProps({ connections: [{ ...wrapper.props('connections')![0]!, codexVersion: '' }] });
+    expect(wrapper.find('.settings-connections-panel__upgrade').exists()).toBe(false);
+    await wrapper.setProps({ connections: [{ ...wrapper.props('connections')![0]!, codexVersion: installedCodexVersion }] });
     expect(wrapper.find('.settings-connections-panel__upgrade').exists()).toBe(false);
   });
 

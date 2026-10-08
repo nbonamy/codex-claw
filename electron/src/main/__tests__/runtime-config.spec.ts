@@ -100,7 +100,7 @@ describe('runtime config', () => {
     });
   });
 
-  it('forwards an explicitly configured bundled Codex path to local daemon', async () => {
+  it('does not forward obsolete bundled Codex configuration to the daemon', async () => {
     const { runtimeDaemonCommand } = await import('../runtime-config');
 
     expect(runtimeDaemonCommand({
@@ -113,7 +113,6 @@ describe('runtime config', () => {
       args: ['--stdio'],
       env: {
         APP_ASSETS_PATH: path.resolve(process.cwd(), 'assets'),
-        APP_BUNDLED_CODEX_PATH: '/app/resources/codex/codex',
         APP_HOME: path.join(homedir(), `${product.homeDirectory}`),
         HOME: homedir(),
       },
@@ -133,7 +132,6 @@ describe('runtime config', () => {
         throw new Error('login shell unavailable');
       }),
       existsSync: (filePath) => filePath === `/app/resources/daemon/${product.daemonName}` ||
-        filePath === `/app/resources/codex/${platform === 'win32' ? 'bin/codex.exe' : 'codex'}` ||
         filePath === `/app/resources/runtime/${platform === 'win32' ? 'node.exe' : 'node'}`,
       homedir: () => '/Users/nicolas',
       resourcesPath: '/app/resources',
@@ -145,7 +143,6 @@ describe('runtime config', () => {
       ],
       env: {
         APP_ASSETS_PATH: '/app/resources',
-        APP_BUNDLED_CODEX_PATH: `/app/resources/codex/${platform === 'win32' ? 'bin/codex.exe' : 'codex'}`,
         APP_HOME: `/Users/nicolas/${product.homeDirectory}`,
         HOME: '/Users/nicolas',
         PATH: `/app/resources/runtime${platform === 'win32' ? ';' : ':'}/usr/bin`,

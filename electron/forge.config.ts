@@ -11,10 +11,7 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import path from 'node:path';
 import desktopPackage from './package.json';
-import {
-  shouldPreserveUpstreamCodexSignature,
-  signDarwinBinaries,
-} from './build/sign-binaries';
+import { signDarwinBinaries } from './build/sign-binaries';
 import { copyPackagedNativeDependencies } from './build/package-native-dependencies';
 import { copyPackagedNodeRuntime } from './build/package-node-runtime';
 import { desktopMetadata, writePackagedDesktopIdentity } from './build/product-metadata';
@@ -39,7 +36,6 @@ const extraResource = [
   path.resolve(__dirname, 'assets/icon.png'),
   ...speechHelperResources(__dirname, process.platform),
   'resources/daemon',
-  'resources/codex',
   ...(process.platform === 'darwin' ? [`.computer-use/${product.name} Computer Use.app`] : []),
   ...(process.platform === 'darwin' ? ['.tts/app-tts-helper'] : []),
 ];
@@ -62,7 +58,6 @@ if (isDarwin && !skipMacSigning) {
   osxPackagerConfig = {
     osxSign: {
       identity: process.env.IDENTITY_DARWIN_CODE,
-      ignore: shouldPreserveUpstreamCodexSignature,
       optionsForFile: () => { return {
         hardenedRuntime: true,
         entitlements: './build/Entitlements.darwin.plist',

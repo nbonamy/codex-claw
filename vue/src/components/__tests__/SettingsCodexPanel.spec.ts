@@ -14,12 +14,13 @@ describe('SettingsCodexPanel', () => {
     vi.restoreAllMocks();
   });
 
-  it('groups engine setup, ChatGPT launch and runtime settings without a duplicate skills toggle', () => {
+  it('shows engine setup and ChatGPT launch without an executable picker', () => {
     const wrapper = mountPanel();
 
     expect(wrapper.text()).toContain('Launch ChatGPT');
     expect(wrapper.find('input[aria-label="Share skills and plugins with ChatGPT"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Codex executable');
+    expect(wrapper.find('input[aria-label="Codex executable path"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Runtime');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     const hero = wrapper.get('.engine-hero');
     expect(hero.get('.engine-hero__copy strong').text()).toBe('Codex');
@@ -36,39 +37,6 @@ describe('SettingsCodexPanel', () => {
     expect(launchChatGptApp).toHaveBeenCalledOnce();
     expect(wrapper.text()).toContain('ChatGPT is unavailable.');
   });
-
-  it('chooses, edits, and clears the Codex executable path', async () => {
-    const chooseCodexBinary = vi.fn().mockResolvedValue('/opt/homebrew/bin/codex');
-    const updateSettings = vi.fn().mockResolvedValue(undefined);
-    const wrapper = mountPanel({ chooseCodexBinary, updateSettings });
-
-    const codexInput = wrapper.get('input[aria-label="Codex executable path"]');
-    expect(codexInput.attributes('placeholder')).toBe('Bundled Codex');
-    await codexInput.setValue('/usr/local/bin/codex');
-    await codexInput.trigger('change');
-    expect(updateSettings).toHaveBeenCalledWith({
-      general: { codexBinaryPath: '/usr/local/bin/codex' },
-    });
-
-    await wrapper.findAll('button').find((button) => button.text() === 'Choose')?.trigger('click');
-    await flushPromises();
-    expect(chooseCodexBinary).toHaveBeenCalledOnce();
-    expect(updateSettings).toHaveBeenCalledWith({
-      general: { codexBinaryPath: '/opt/homebrew/bin/codex' },
-    });
-
-    await wrapper.setProps({
-      settings: {
-        ...defaultGeneralSettings,
-        codexBinaryPath: '/opt/homebrew/bin/codex',
-      },
-    } as never);
-    await wrapper.findAll('button').find((button) => button.text() === 'Clear')?.trigger('click');
-    expect(updateSettings).toHaveBeenCalledWith({
-      general: { codexBinaryPath: '' },
-    });
-  });
-
 });
 
 function mountPanel(props: Record<string, unknown> = {}) {

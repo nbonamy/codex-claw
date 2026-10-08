@@ -1,33 +1,7 @@
 import { product } from '@workspace/core/product';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  shouldPreserveUpstreamCodexSignature,
-  signDarwinBinaries,
-} from '../sign-binaries';
-
-describe('shouldPreserveUpstreamCodexSignature', () => {
-  it('excludes only the bundled upstream Codex executables from Electron re-signing', () => {
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/Resources/codex/codex`,
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      'Contents/Resources/codex/codex',
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/Resources/codex/codex-code-mode-host`,
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      'Contents/Resources/codex/codex-code-mode-host',
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/Resources/codex/codex-helper`,
-    )).toBe(false);
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/MacOS/codex`,
-    )).toBe(false);
-  });
-});
+import { signDarwinBinaries } from '../sign-binaries';
 
 describe('signDarwinBinaries', () => {
   it('skips signing when the signing identity is not configured', () => {

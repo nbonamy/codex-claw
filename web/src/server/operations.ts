@@ -126,7 +126,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   setProviderEnabled: [backendMethods.providerEnabledSet, (args) => ({ backend: args[0], enabled: args[1], ...(args[2] ? { remoteConnectionId: args[2] } : {}) })],
   disconnectProvider: [backendMethods.providerDisconnect, (args) => ({ backend: args[0], ...(args[1] ? { remoteConnectionId: args[1] } : {}) })],
   configureProviderSetup: [backendMethods.providerSetupConfigure, named('backend', 'choice')],
-  installProvider: [backendMethods.providerInstall, named('backend', 'remoteConnectionId')],
+  refreshProvider: [backendMethods.providerRefresh, named('backend', 'remoteConnectionId')],
   cancelCodexChatGptLogin: [backendMethods.codexLoginCancel, namedOptional('remoteConnectionId', 'loginId')],
   startCodexChatGptDeviceCodeLogin: [backendMethods.codexChatGptDeviceCodeLoginStart, named('remoteConnectionId')],
   startCodexChatGptLogin: [backendMethods.codexChatGptLoginStart],
@@ -151,7 +151,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
 const desktopOnlyOperations = new Set([
   'browserClearAnnotations', 'browserClose', 'browserGoBack', 'browserGoForward', 'browserNavigate',
   'browserOpen', 'browserReload', 'browserResolveAnnotation', 'browserCopyScreenshot', 'browserGetZoom', 'browserSetAnnotationMode', 'browserSetBounds', 'browserSetZoom',
-  'browserSetVisible', 'chooseAgentFolder', 'chooseCodexBinary', 'chooseSourceFolder',
+  'browserSetVisible', 'chooseAgentFolder', 'chooseSourceFolder',
   'chooseDocumentSavePath', 'chooseSourceWorktreeDestination', 'getDaemonStatus', 'getOpenInApplications', 'getSystemPermissions',
   'getUpdateStatus', 'installUpdate', 'launchChatGptApp', 'openAccessibilitySettings', 'openAgentPath',
   'openScreenRecordingSettings', 'quit', 'reloadRenderer', 'restartApp', 'setDaemonEnabled', 'setDockBadgeCount', 'setMenuBarVisible',

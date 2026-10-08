@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { test } from 'node:test';
+import { checkPackagedDaemon } from './packaged-daemon-check.mjs';
+
+for (const scenario of ['missing providers', 'wrong version', 'invalid provider status', 'early exit']) {
+  test(`packaged runtime check: ${scenario}`, async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'app-daemon-smoke-'));
+    try {
+      const daemon = path.join(root, 'daemon.cjs');
+      writeFileSync(daemon, `
+        if (${JSON.stringify(scenario)} === 'early exit') process.exit(1);
+        require('node:readline').createInterface({ input: process.stdin }).on('line', line => {
+          const { id } = JSON.parse(line);
+          const result = id === 1 ? { ok: true, version: ${JSON.stringify(scenario === 'wrong version' ? 'old' : '1.2.3')} }
+            : ${scenario === 'invalid provider status' ? '{}' : JSON.stringify(['codex', 'claude'].map(backend => ({ backend, installed: false })))};
+          process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n');
+        });
+      `);
+      const check = checkPackagedDaemon(process.execPath, daemon, { ...process.env, PATH: '', HOME: root }, '1.2.3');
+      if (scenario === 'missing providers') await check;
+      else await assert.rejects(check, scenario === 'wrong version' ? /health\/version/ : scenario === 'early exit' ? /exited/ : /detection status/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}

@@ -72,10 +72,9 @@ adding steering, forks, goals, turn mutations or context controls.
   `user:profile`) using the configured home's login in place. It is not a stable
   public API: errors are bounded and reported separately from accounts without
   quotas, and API-key billing has no usage row.
-- Installation is explicit (onboarding or Settings, including remote hosts) via
-  Anthropic's per-user installer (`~/.local/bin/claude`); Korus never copies Claude
-  into the Codex runtime directory, and a failed remote install leaves Codex
-  available. Discovery adds `~/.local/bin` for non-interactive SSH launches.
+- Installation is user-managed. Welcome and Settings link to Anthropic's official
+  instructions and can recheck PATH on the owning host without running an installer.
+  Discovery adds `~/.local/bin` for non-interactive SSH launches.
   Onboarding offers both engines independently and needs at least one authenticated.
 
 ## History And Resume
