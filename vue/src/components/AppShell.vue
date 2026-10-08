@@ -193,6 +193,7 @@
         :repository-icons="snapshot.general.repositoryIcons"
         :teams="snapshot.teams"
         :view-mode="snapshot.general.cockpitAgentViewMode"
+        :response-previews="cockpitResponsePreviews"
         @add-agent="openNewAgent"
         @close-agent="$emit('close-agent', $event)"
         @duplicate-agent="$emit('duplicate-agent', $event)"
@@ -594,6 +595,7 @@ import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import NewProjectDialog from './NewProjectDialog.vue';
 import { preferredBackendChoices, provideBackendChoices, provideBackendSwitch } from './backend-selection';
 import CockpitView from './CockpitView.vue';
+import { cockpitResponsePreview } from './cockpit-response-preview';
 import BacklogView from './BacklogView.vue';
 import ConversationHistoryDialog from './ConversationHistoryDialog.vue';
 import AgentHandoffDialog from './AgentHandoffDialog.vue';
@@ -2293,6 +2295,9 @@ const pendingNewAgentWorktreeBranchName = computed(() => (
 ));
 const isAgentEmpty = computed(() => activeTeamAgents.value.length === 0);
 const cockpitVisible = computed(() => activeSurface.value === 'cockpit');
+const cockpitResponsePreviews = computed(() => Object.fromEntries(
+  props.snapshot.agents.map(agent => [agent.id, cockpitResponsePreview(props.agentConversationFor?.(agent.id))]),
+));
 const backlogVisible = computed(() => activeSurface.value === 'backlog');
 const automationsVisible = computed(() => activeSurface.value === 'automations');
 const settingsVisible = computed(() => activeSurface.value === 'settings');

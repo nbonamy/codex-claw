@@ -49,7 +49,7 @@
 
     <div class="cockpit-view__agent-body">
       <strong>{{ agentStatusText(agent, t) }}</strong>
-      <span v-if="showLastActivity">{{ lastActivity }}</span>
+      <span v-if="showLastActivity" :title="responsePreview || undefined">{{ responsePreview || lastActivity }}</span>
     </div>
 
     <form
@@ -93,6 +93,7 @@ const props = defineProps<{
   draggedWorkItem: WorkItem | null;
   dropTarget: boolean;
   showLastActivity?: boolean;
+  responsePreview?: string;
 }>();
 
 const emit = defineEmits<{

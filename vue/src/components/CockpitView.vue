@@ -37,6 +37,7 @@
       :forkable-agent-ids="forkableAgentIds"
       :mode="viewMode"
       :repository-icons="repositoryIcons"
+      :response-previews="responsePreviews"
       :teams="teams"
       @add-agent="emit('add-agent', $event)"
       @close-agent="emit('close-agent', $event)"
@@ -65,6 +66,7 @@ const props = defineProps<{
   agents: Agent[];
   forkableAgentIds?: string[];
   repositoryIcons?: Record<string, string>;
+  responsePreviews?: Record<string, string>;
   teams: Team[];
   viewMode: CockpitAgentViewMode;
 }>();

@@ -51,6 +51,7 @@
           :dragged-work-item="null"
           :drop-target="false"
           :show-last-activity="mode === 'recent'"
+          :response-preview="responsePreviews?.[agent.id]"
           @open-agent-menu="openAgentMenu"
           @prompt="emit('prompt-agent', $event)"
           @select="selectAgent(agent)"
@@ -109,6 +110,7 @@ const props = withDefaults(defineProps<{
   forkableAgentIds?: string[];
   mode?: CockpitAgentViewMode;
   repositoryIcons?: Record<string, string>;
+  responsePreviews?: Record<string, string>;
   teams: Team[];
 }>(), {
   mode: 'teams',

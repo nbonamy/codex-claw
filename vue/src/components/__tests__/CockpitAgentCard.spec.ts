@@ -11,6 +11,7 @@ type CockpitAgentCardProps = {
   draggedWorkItem: WorkItem | null;
   dropTarget: boolean;
   showLastActivity?: boolean;
+  responsePreview?: string;
 };
 
 describe('CockpitAgentCard', () => {
@@ -151,17 +152,21 @@ describe('CockpitAgentCard', () => {
     expect(wrapper.emitted('assign-work-item')).toBeUndefined();
   });
 
-  it('shows last activity only when requested by the overview mode', async () => {
+  it('shows the response preview instead of activity time in recent mode', async () => {
     const agent = idleAgent();
     agent.lastActivityAt = new Date().toISOString();
     agent.updatedAt = '2020-01-01T00:00:00.000Z';
-    const wrapper = mountCard({ agent });
+    const wrapper = mountCard({ agent, responsePreview: 'The provider cleanup is complete.' });
 
-    expect(wrapper.text()).not.toContain('Active now');
+    expect(wrapper.text()).not.toContain('The provider cleanup is complete.');
 
     await wrapper.setProps({ showLastActivity: true });
 
-    expect(wrapper.text()).toContain('Active now');
+    expect(wrapper.get('.cockpit-view__agent-body span').text()).toBe('The provider cleanup is complete.');
+    expect(wrapper.text()).not.toContain('Active now');
+
+    await wrapper.setProps({ responsePreview: '' });
+    expect(wrapper.get('.cockpit-view__agent-body span').text()).toBe('Active now');
   });
 });
 

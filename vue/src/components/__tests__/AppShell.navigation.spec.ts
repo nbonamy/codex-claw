@@ -7,9 +7,11 @@ import type {
 import { nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell.vue';
+import type { AgentConversationView } from '../../app-state';
 import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
 import type { Agent, WorkSource } from '@workspace/core/contracts';
 import { useConfetti } from '../../shared/confetti/use-confetti';
+import { codexConversationSnapshot, codexTextMessage } from '../../test/codex-conversation-fixtures';
 
 import {
   mountShell as mountRealShell,
@@ -372,6 +374,24 @@ describe('AppShell navigation and teams', () => {
     expect(updateSettings).toHaveBeenCalledWith({
       general: { cockpitAgentViewMode: 'recent' },
     });
+  });
+
+  it('projects each agent response into its recent cockpit card without selecting it', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.general.cockpitAgentViewMode = 'recent';
+    const wrapper = mountShell({ snapshot });
+    await wrapper.get('[aria-label="Cockpit"]').trigger('click');
+    await wrapper.setProps({ agentConversationFor: vi.fn(agentId => ({
+      codexSnapshot: codexConversationSnapshot([codexTextMessage('reply', 'assistant', `${agentId} completed.\nMore details.`)]),
+      claudeSnapshot: null,
+    } as AgentConversationView)) });
+
+    for (const agent of snapshot.agents) {
+      expect(wrapper.text()).toContain(`${agent.id} completed.`);
+    }
+    expect(wrapper.text()).not.toContain('More details.');
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    wrapper.unmount();
   });
 
   it('opens automations from the rail without keeping a team active', async () => {
