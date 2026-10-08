@@ -59,7 +59,7 @@
         <span aria-hidden="true">×</span>
         <input type="number" min="320" max="2000" :value="deviceHeight" :aria-label="$t('surface.browserPanel.viewportHeight')" @change="setDeviceDimension('height', $event)" />
       </div>
-      <button type="button" :aria-label="$t('surface.browserPanel.rotateViewport')" :title="$t('surface.browserPanel.rotateViewport')" @click="rotateDevice"><IconRotateClockwise /></button>
+      <button type="button" :aria-label="$t('surface.browserPanel.rotateViewport')" :title="$t('surface.browserPanel.rotateViewport')" @click="rotateDevice"><IconRotateRectangle /></button>
       <span class="browser-panel__device-zoom">{{ zoomPercent }}%</span>
       <button type="button" :aria-label="$t('surface.browserPanel.hideDeviceToolbar')" :title="$t('surface.browserPanel.hideDeviceToolbar')" @click="deviceToolbarVisible = false"><IconX /></button>
     </div>
@@ -90,7 +90,7 @@
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { IconArrowLeft, IconArrowRight, IconCamera, IconCirclePlus, IconCrop, IconDeviceMobile, IconDotsVertical, IconMinus, IconPlus, IconRefresh, IconRotateClockwise, IconX, IconZoom } from '@tabler/icons-vue';
+import { IconArrowLeft, IconArrowRight, IconCamera, IconCirclePlus, IconCrop, IconDeviceMobile, IconDotsVertical, IconMinus, IconPlus, IconRefresh, IconRotateRectangle, IconX, IconZoom } from '@tabler/icons-vue';
 import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type MainToRendererEvent } from '@workspace/core/contracts';
 import { browserGuestPartition } from '@workspace/core/browser-guest';
 import { browserDevicePresets, type BrowserViewportRequest } from '@workspace/core/browser-viewport';

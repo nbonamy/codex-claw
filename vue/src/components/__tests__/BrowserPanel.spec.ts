@@ -485,7 +485,9 @@ describe('BrowserPanel', () => {
     await wrapper.get<HTMLInputElement>('[aria-label="Viewport width"]').setValue('520');
     expect(mode.element.value).toBe('custom');
     expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 520px');
-    await wrapper.get('[aria-label="Rotate viewport"]').trigger('click');
+    const rotateButton = wrapper.get('[aria-label="Rotate viewport"]');
+    expect(rotateButton.find('svg.tabler-icon-rotate-rectangle').exists()).toBe(true);
+    await rotateButton.trigger('click');
     expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 844px');
     await wrapper.get('[aria-label="Hide device toolbar"]').trigger('click');
     expect(wrapper.find('.browser-panel__device-toolbar').exists()).toBe(false);
