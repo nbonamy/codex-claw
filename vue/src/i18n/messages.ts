@@ -853,16 +853,9 @@ export const messages = {
       },
       tool: {
         searchTools: {
-          target: {
-            running: 'Searching tools: {target}',
-            completed: 'Searched tools: {target}',
-            failed: 'Could not search tools: {target}',
-          },
-          empty: {
-            running: 'Searching tools',
-            completed: 'Searched tools',
-            failed: 'Could not search tools',
-          },
+          running: 'Searching tools',
+          completed: 'Searched tools',
+          failed: 'Could not search tools',
         },
         fallback: {
           completed: 'Ran {name}',

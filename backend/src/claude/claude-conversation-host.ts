@@ -401,6 +401,11 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         type: 'turn.started',
         payload: { turn: { id: turnId, backend: this.backend } },
       });
+      this.emit({
+        agentId: agent.id,
+        type: 'agent.statusChanged',
+        payload: { type: 'working' },
+      });
       if (options.recordUserMessage !== false && !/^\/compact(?:\s+.*)?$/s.test(prompt)) {
         const createdAt = new Date().toISOString();
         this.emitConversation({

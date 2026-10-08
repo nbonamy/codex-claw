@@ -94,10 +94,9 @@ export function presentAppTool(
     const phase = context.descriptor.phase === 'failed' || context.toolCall.state === 'error'
       ? 'failed'
       : context.descriptor.phase === 'completed' ? 'completed' : 'running';
-    const target = typeof context.descriptor.params.target === 'string' ? context.descriptor.params.target.trim() : '';
     return {
       icon: icons.search,
-      title: translate(`chat.tool.searchTools.${target ? 'target' : 'empty'}.${phase}`, { target }),
+      title: translate(`chat.tool.searchTools.${phase}`),
     };
   }
 

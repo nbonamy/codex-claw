@@ -38,6 +38,32 @@ describe(`Claude Agent SDK → ${product.name} backend`, () => {
   }
   afterEach(async () => { await Promise.all(servers.splice(0).map((server) => server.close())); });
 
+  it('marks a Claude reviewer working for its turn and idle only after completion', async () => {
+    const { sdk, driver, snapshot, events } = setup();
+    const reviewer = snapshot.agents[0]!;
+    const reviewing = driver.runCodeReview(reviewer, {
+      cwd: reviewer.folder!, prompt: 'Review the current diff.',
+      reviewMcpServerUrl: 'http://review.test/mcp',
+    });
+    // Keep cleanup safe when an assertion fails before the SDK completes the turn.
+    void reviewing.catch(() => undefined);
+    await vi.waitFor(() => expect(sdk.inputs).toHaveLength(1));
+    expect(reviewer.status.type).toBe('working');
+    expect(snapshot.agents[1]!.status.type).toBe('idle');
+
+    sdk.emit({ type: 'system', subtype: 'init', session_id: 'review-session' });
+    sdk.emit({ type: 'assistant', session_id: 'review-session', message: { content: [{ type: 'text', text: 'Still reviewing.' }] } });
+    await vi.waitFor(() => expect(events.some(event => event.type === 'claude.conversationEventReceived'
+      && event.payload.event.type === 'message.delta')).toBe(true));
+    expect(reviewer.status.type).toBe('working');
+
+    sdk.emit({ type: 'result', subtype: 'success', session_id: 'review-session', is_error: false });
+    await reviewing;
+    expect(reviewer.status.type).toBe('idle');
+    expect(events.filter(event => event.agentId === reviewer.id && event.type === 'agent.statusChanged')
+      .map(event => event.payload)).toEqual([{ type: 'working' }, { type: 'idle' }]);
+  });
+
   it('keeps a failed turn readable across the backend wire after refreshing its conversation', async () => {
     const { sdk, send, driver, snapshot, events } = setup();
     const pending = send('claude-a', 'keep my prompt');
