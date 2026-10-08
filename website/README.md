@@ -277,7 +277,13 @@ The narrated MP4, optional VTT captions, and review page stay ignored under
 `videos/local/review-automatic/`. Narration may extend the silent film's timing.
 Use that review page for the visible **CC · Captions** control; the editable
 `videos/review-film.html` animation viewer is silent and has no subtitle track.
-The export does not replace published website media. The tracked thumbnail is
+To include an approved standalone take in the website, copy its `narration.wav`,
+`narration.json`, and `narration-aligned.json` from
+`videos/local/review-automatic/review-film/american-male/` into
+`videos/local/narrated/review-film/american-male/`, then run
+`node videos/render-voice-comparison.mjs --all`. This regenerates the website's
+five-film manifest and exports without synthesizing new speech. Deploy through
+the website workflow below. The tracked thumbnail is
 `videos/assets/review-film-thumbnail.png`.
 
 ## Worktree delegation product film
