@@ -1,3 +1,8 @@
+import { DocumentWorkspaceService } from './document-workspace-service';
+import { saveMarkdownFile } from './document-files';
+import { previewAgentFolderFile } from './agent-files';
+import { backendHomeDir } from './state';
+import type { DocumentWorkspaceChange, DocumentSaveInput } from '@workspace/core/document-workspace';
 import { isWorkProviderKind } from '@workspace/core/work-providers';
 import { isAgentBackend } from '@workspace/core/contracts/shared';
 import { product } from '@workspace/core/product';
@@ -81,6 +86,7 @@ import { VisualizeService, directVisualizationPrompt, generateVisualizationSugge
 import { visualizeDebugScenarios, type VisualizeDebugScenario } from '@workspace/core/visualize';
 
 export type AppBackendServerOptions = {
+  documents?: DocumentWorkspaceService;
   tasks?: DurableTaskService;
   providerSetup?: import('./provider-setup').ProviderSetup;
   version: string;
@@ -170,6 +176,7 @@ export class AppBackendServer {
   private readonly inspectPluginStatus: () => Promise<AppPluginStatus>;
   private readonly agentRequests: AgentRequestRegistry;
   private readonly remoteTeams: RemoteTeamService;
+  private readonly documents: DocumentWorkspaceService;
   private readonly clientPreferences: ClientPreferencesService;
   private readonly agentPrompts: AgentPromptManager;
   private readonly planReviews: AgentPlanReviewService;
@@ -397,6 +404,7 @@ export class AppBackendServer {
       onForwardedEvent: (connectionId, event) => this.forwardRemoteBackendEvent(connectionId, event),
       onProjectedSnapshotChanged: () => { void this.emitProjectedSnapshot(); },
     });
+    this.documents = options.documents ?? new DocumentWorkspaceService(path.join(backendHomeDir(), "document-workspaces.json"));
     this.clientPreferences = new ClientPreferencesService({
       snapshot: () => this.remoteTeams.clientSnapshot(),
       save: async (id, value) => {
@@ -626,6 +634,24 @@ export class AppBackendServer {
     if (!clientId.trim() || clientId.length > 200) return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, 'Invalid client identity.');
     if (params) delete params._clientId;
     const request = { ...message, params: params && Object.keys(params).length ? params : undefined };
+    if ([backendMethods.clientWorkspaceGet, backendMethods.clientWorkspaceApply, backendMethods.clientDocumentRead, backendMethods.clientDocumentSave].some(method => method === message.method)) {
+      try {
+        if (message.method === backendMethods.clientWorkspaceGet) return createAppRpcResult(message.id, await this.documents.get(clientId));
+        const agentId = requireString(params?.agentId, 'agentId');
+        if (message.method === backendMethods.clientWorkspaceApply) return createAppRpcResult(message.id, await this.documents.apply(clientId, agentId, requireRecord(params?.change) as DocumentWorkspaceChange));
+        if (message.method === backendMethods.clientDocumentRead) return createAppRpcResult(message.id, await this.documents.read(clientId, agentId, requireString(params?.tabId, 'tabId'), async filePath => {
+          const location = await this.locationForAgentId(agentId);
+          if (!location) throw new Error('Agent not found.');
+          const result = await this.requestInLocation<import('@workspace/core/contracts').AgentFilePreviewResult>(location, backendMethods.agentFilePreview, { agentId, filePath }, () => previewAgentFolderFile(agentFolder(location.agent), filePath));
+          if (result.kind !== 'text') throw new Error('File cannot be previewed as text.');
+          return result.content ?? '';
+        }));
+        const input = requireRecord(params?.input) as DocumentSaveInput;
+        const location = await this.locationForAgentId(agentId);
+        if (!location) throw new Error('Agent not found.');
+        return createAppRpcResult(message.id, await this.documents.save(clientId, agentId, input, (filePath, content, overwrite) => this.requestInLocation(location, backendMethods.agentDocumentWrite, { agentId, filePath, content, overwrite }, () => saveMarkdownFile(agentFolder(location.agent), filePath, content, overwrite, backendHomeDir()))));
+      } catch (error) { return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error)); }
+    }
     const preferences = this.clientPreferences;
     if (preferences.supports(message.method)) {
       try { return createAppRpcResult(message.id, await preferences.update(clientId, message.method, params ?? {})); }
@@ -1283,6 +1309,11 @@ export class AppBackendServer {
           }
           return this.persistAndEmitSnapshot();
         });
+      }
+      case backendMethods.agentDocumentWrite: {
+        const params = requireRecord(message.params);
+        const agentId = requireString(params.agentId, 'agentId');
+        return this.routeAgentResultRequest(message.id, agentId, message.method, params, agent => saveMarkdownFile(agentFolder(agent), requireString(params.filePath, 'filePath'), requireString(params.content, 'content'), params.overwrite === true, backendHomeDir()));
       }
       case backendMethods.agentFilesList: {
         const agentId = requireAgentId(message.params);
@@ -2763,6 +2794,12 @@ export class AppBackendServer {
       snapshot: _snapshot,
       ...backendEvent
     } = event;
+    if (backendEvent.type === 'client.markdownDisplayRequested' && backendEvent.agentId && backendEvent.payload.purpose !== 'plan') {
+      void this.documents.display(backendEvent.agentId, backendEvent.payload).then(payload => {
+        this.emitRemoteBackendEvent(this.nextMainEvent({ ...backendEvent, payload }));
+      }).catch(error => warnMain('documents', 'Failed to retain remote document', { message: String(error) }));
+      return;
+    }
     const fullEvent = this.nextMainEvent(backendEvent);
     this.agentRequests.record(fullEvent, connectionId);
     this.emitRemoteBackendEvent(fullEvent);

@@ -12,7 +12,7 @@
         :path="existingWorktree.path"
       />
       <template v-else>
-        <FormDialogField
+        <FormField
           v-if="orderedBranches.length || branchesLoading"
           :label="$t('surface.newSourceWorktreeDialog.startFrom')"
           label-for="new-source-worktree-base-branch"
@@ -35,9 +35,9 @@
               />
             </el-select>
           </div>
-        </FormDialogField>
+        </FormField>
 
-        <FormDialogField
+        <FormField
           :label="$t('surface.newSourceWorktreeDialog.branch')"
           label-for="new-source-worktree-branch"
         >
@@ -50,9 +50,9 @@
               :placeholder="$t('repositories.worktree.branchPlaceholder')"
             />
           </div>
-        </FormDialogField>
+        </FormField>
 
-        <FormDialogField
+        <FormField
           v-if="allowDestinationOverride"
           :label="$t('surface.newSourceWorktreeDialog.folder')"
           label-for="new-source-worktree-folder"
@@ -77,7 +77,7 @@
               <FolderIcon aria-hidden="true" />
             </button>
           </div>
-        </FormDialogField>
+        </FormField>
 
       </template>
     </form>
@@ -109,7 +109,7 @@ import { computed, ref, watch } from 'vue';
 import type { AgentCreationProgress, CreateSourceWorktreeInput, SourceBranch, SourceRepository, SourceWorktree } from '@workspace/core/contracts';
 import { FolderIcon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import WorkspaceProvisioningProgressDialog from './WorkspaceProvisioningProgressDialog.vue';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 import BackendSelector from './BackendSelector.vue';

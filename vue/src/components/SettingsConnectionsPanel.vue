@@ -3,18 +3,21 @@
     :title="$t('surface.settingsConnectionsPanel.connections')"
     title-id="settings-connections-title"
   >
-    <template #actions>
-      <el-button
-        size="small"
-        type="primary"
-        @click="openAddDialog"
-      > {{ $t('surface.settingsConnectionsPanel.addRemote') }} </el-button>
+    <template #banner>
+      <SettingsIntro kind="connections" :title="$t('surface.settingsConnectionsPanel.introTitle')" :description="$t('surface.settingsConnectionsPanel.introDescription')" />
     </template>
 
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsConnectionsPanel.remoteAppAgents')"
       title-id="settings-connections-remotes-title"
     >
+      <template #actions>
+        <el-button
+          text
+          size="small"
+          @click="openAddDialog"
+        > {{ $t('surface.settingsConnectionsPanel.addRemote') }} </el-button>
+      </template>
       <div
         v-if="connections.length === 0"
         class="settings-connections-panel__empty"
@@ -24,30 +27,35 @@
         :key="connection.id"
         class="settings-connections-panel__connection"
       >
-        <div class="settings-connections-panel__identity">
+        <button
+          type="button"
+          class="settings-connections-panel__identity"
+          :aria-expanded="isExpanded(connection)"
+          :aria-controls="`connection-details-${connection.id}`"
+          @click="toggleExpanded(connection)"
+        >
           <span
             class="settings-connections-panel__dot"
             :class="`settings-connections-panel__dot--${connection.status}`"
             aria-hidden="true"
           />
-          <div class="settings-connections-panel__summary">
+          <span class="settings-connections-panel__summary">
             <strong>{{ connection.name }}</strong>
             <span>{{ connectionLabel(connection) }}</span>
-            <span
-              v-if="connection.detail"
-              class="settings-connections-panel__detail"
-            >
-              <em>{{ connection.detail }}</em>
-              <button
-                v-if="canUpgrade(connection)"
-                class="settings-connections-panel__upgrade"
-                type="button"
-                :disabled="checkingConnectionId === connection.id"
-                @click="checkConnection(connection.id)"
-              >{{ $t('surface.settingsConnectionsPanel.upgrade') }}</button>
-            </span>
-          </div>
-        </div>
+          </span>
+          <AlertTriangleIcon
+            v-if="canUpgrade(connection)"
+            class="settings-connections-panel__attention"
+            role="img"
+            :aria-label="$t('surface.settingsConnectionsPanel.upgradeAvailable')"
+            :title="$t('surface.settingsConnectionsPanel.upgradeAvailable')"
+          />
+          <ChevronDown
+            class="settings-connections-panel__chevron"
+            :class="{ 'settings-connections-panel__chevron--open': isExpanded(connection) }"
+            aria-hidden="true"
+          />
+        </button>
         <div class="settings-connections-panel__actions">
           <button
             type="button"
@@ -84,9 +92,28 @@
             />
           </el-popover>
         </div>
-        <RemoteEngineConnections v-if="connection.status === 'ready'" class="settings-connections-panel__engines" :connection="connection" />
+        <div
+          v-if="isExpanded(connection)"
+          :id="`connection-details-${connection.id}`"
+          class="settings-connections-panel__details"
+        >
+          <span
+            v-if="connection.detail"
+            class="settings-connections-panel__detail"
+          >
+            <em>{{ connection.detail }}</em>
+            <button
+              v-if="canUpgrade(connection)"
+              class="settings-connections-panel__upgrade"
+              type="button"
+              :disabled="checkingConnectionId === connection.id"
+              @click="checkConnection(connection.id)"
+            >{{ $t('surface.settingsConnectionsPanel.upgrade') }}</button>
+          </span>
+          <RemoteEngineConnections v-if="connection.status === 'ready'" class="settings-connections-panel__engines" :connection="connection" />
+        </div>
       </article>
-    </SettingsSection>
+    </FormSection>
 
     <SettingsDevicePairingSection
       :settings="settings"
@@ -108,7 +135,7 @@
       append-to-body
     >
       <form class="app-form-dialog" @submit.prevent="saveConnectionSettings">
-        <FormDialogField
+        <FormField
           :label="$t('surface.settingsConnectionsPanel.sourceFolder')"
           label-for="settings-connection-source-folder"
         >
@@ -127,7 +154,7 @@
               @click="openSettingsFolderPicker"
             > {{ $t('surface.settingsConnectionsPanel.browse') }} </button>
           </div>
-        </FormDialogField>
+        </FormField>
         <p
           v-if="settingsError"
           class="settings-connections-panel__error"
@@ -210,14 +237,15 @@ import { bundledCodexVersion } from '@workspace/core/codex-release';
 import type { AddSshConnectionInput, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput } from '@workspace/core/contracts';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
-import { DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
+import { AlertTriangleIcon, ChevronDown, DotsVerticalIcon, RefreshIcon, SettingsIcon, Trash2Icon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import RemoteFolderPickerDialog from './RemoteFolderPickerDialog.vue';
 import RemoteEngineConnections from './RemoteEngineConnections.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
 import SettingsDevicePairingSection from './SettingsDevicePairingSection.vue';
-import SettingsSection from './SettingsSection.vue';
+import SettingsIntro from './SettingsIntro.vue';
+import FormSection from '../shared/form/FormSection.vue';
 
 const props = withDefaults(defineProps<{
   addSshConnection?: (input: AddSshConnectionInput) => Promise<void>;
@@ -258,6 +286,14 @@ const props = withDefaults(defineProps<{
   updateSettings: async () => undefined,
 });
 
+const expandedConnections = ref<Record<string, boolean>>({});
+// Healthy connections stay folded; anything that needs attention opens by itself.
+function isExpanded(connection: RemoteConnection): boolean {
+  return expandedConnections.value[connection.id] ?? connection.status !== 'ready';
+}
+function toggleExpanded(connection: RemoteConnection): void {
+  expandedConnections.value = { ...expandedConnections.value, [connection.id]: !isExpanded(connection) };
+}
 const addDialogVisible = ref(false);
 const settingsDialogVisible = ref(false);
 const hosts = ref<SshHostCandidate[]>([]);
@@ -521,14 +557,19 @@ function statusLabel(status: RemoteConnection['status']): string {
 .settings-connections-panel__connection {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: var(--space-2) var(--space-6);
   padding: var(--space-6);
 }
 
-.settings-connections-panel__engines {
+.settings-connections-panel__details {
   grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   margin-left: calc(8px + var(--space-8));
+  padding-top: var(--space-4);
 }
 
 .settings-connections-panel__connection:last-child,
@@ -539,8 +580,40 @@ function statusLabel(status: RemoteConnection['status']): string {
 .settings-connections-panel__identity {
   min-width: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-8);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-connections-panel__identity:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.settings-connections-panel__attention {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+  color: var(--color-warning);
+}
+
+.settings-connections-panel__chevron {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  transition: transform 120ms ease;
+}
+
+.settings-connections-panel__chevron--open {
+  transform: rotate(180deg);
 }
 
 .settings-connections-panel__summary,
@@ -576,7 +649,6 @@ function statusLabel(status: RemoteConnection['status']): string {
 }
 
 .settings-connections-panel__detail {
-  grid-column: 1 / -1;
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-3);
@@ -635,7 +707,6 @@ function statusLabel(status: RemoteConnection['status']): string {
   flex: 0 0 auto;
   width: 8px;
   height: 8px;
-  margin-top: 6px;
   border-radius: 999px;
   background: var(--color-text-muted);
 }

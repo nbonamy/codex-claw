@@ -1,6 +1,12 @@
 import type { AppCommand, AppApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
+  getDocumentWorkspaces: "document:getDocumentWorkspaces",
+  updateDocumentWorkspace: "document:updateDocumentWorkspace",
+  readWorkspaceDocument: "document:readWorkspaceDocument",
+  saveWorkspaceDocument: "document:saveWorkspaceDocument",
+  chooseDocumentSavePath: "document:chooseDocumentSavePath",
+
   listAgentTasks: 'agent:tasks:list',
   cancelAgentTask: 'agent:task:cancel',
   startVisualize: 'agent:visualize:start',

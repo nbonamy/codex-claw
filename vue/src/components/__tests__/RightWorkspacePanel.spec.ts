@@ -68,6 +68,29 @@ function mountPanel(
 }
 
 describe('RightWorkspacePanel', () => {
+  it('saves an inactive transient tab from its own action without selecting or closing it', async () => {
+    const first = 'file:markdown:first'; const second = 'file:markdown:second'; const saved = 'file:saved.md';
+    const wrapper = mountPanel([first, second, saved], first, {
+      [first]: { kind: 'markdown', title: 'First', documentId: 'first', content: '# First', state: 'idle' },
+      [second]: { kind: 'markdown', title: 'Second', documentId: 'second', content: '# Second', state: 'idle' },
+      [saved]: { kind: 'markdown', title: 'Saved', savedPath: '/repo/saved.md', content: '# Saved', state: 'idle' },
+    });
+    let finish!: () => void;
+    const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    await wrapper.setProps({ saveDocument: save });
+    const action = wrapper.get('[aria-label="Save Second as…"]');
+    expect(wrapper.find('[aria-label="Save Saved as…"]').exists()).toBe(false);
+    expect(action.element.nextElementSibling?.getAttribute('aria-label')).toBe('Close Second tab');
+    expect(getComputedStyle(action.element).display).toBe('none');
+    await action.trigger('click');
+    expect(save).toHaveBeenCalledExactlyOnceWith(second);
+    expect(action.attributes('disabled')).toBeDefined();
+    expect(wrapper.emitted('selectTab')).toBeUndefined();
+    expect(wrapper.emitted('closeTab')).toBeUndefined();
+    finish(); await flushPromises();
+    expect(action.attributes('disabled')).toBeUndefined();
+  });
+
   it('covers the browser with a drop target without unmounting its page', async () => {
     const wrapper = mountPanel(['browser'], 'browser');
     await wrapper.setProps({ linkDropActive: true });

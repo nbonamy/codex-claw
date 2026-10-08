@@ -13,7 +13,7 @@ describe('client presentation preferences', () => {
     const service = new ClientPreferencesService({ snapshot: async () => snapshot, save });
     const secondAgent = snapshot.agents[1]!;
     await service.update('phone', backendMethods.clientNavigationSelectAgent, { agentId: secondAgent.id });
-    await service.update('phone', backendMethods.clientPreferencesUpdate, { input: { general: { agentListCompact: true } } });
+    await service.update('phone', backendMethods.clientPreferencesUpdate, { input: { general: { agentListCompact: true, followUpBehavior: 'steer' } } });
     await service.update('desktop', backendMethods.clientPreferencesUpdate, { input: { general: { agentListCompact: false } } });
     expect(snapshot.activeAgentId).toBe(original.activeAgentId);
     expect(snapshot.general).toStrictEqual(original.general);
@@ -25,6 +25,8 @@ describe('client presentation preferences', () => {
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
     expect(projectClientSnapshot(restored, 'phone').activeAgentId).toBe(secondAgent.id);
     expect(projectClientSnapshot(restored, 'phone').general.agentListCompact).toBe(true);
+    expect(projectClientSnapshot(restored, 'phone').general.followUpBehavior).toBe('steer');
+    expect(projectClientSnapshot(restored, 'desktop').general.followUpBehavior).toBe('queue');
     await expect(service.update('phone', backendMethods.clientPreferencesUpdate, { input: { sourceFolder: { path: '/repo' } } })).rejects.toThrow('Backend policies');
   });
 

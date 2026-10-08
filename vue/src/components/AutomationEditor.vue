@@ -2,74 +2,62 @@
   <form class="automation-editor" @submit.prevent="submit">
     <header class="automation-editor__header">
       <h3>{{ $t(mode === 'edit' ? 'surface.automationEditor.editAutomation' : 'surface.automationEditor.createAutomation') }}</h3>
-      <el-switch v-model="form.enabled" :aria-label="$t('surface.automationEditor.automationEnabled')" />
+      <label class="automation-editor__enabled">
+        <span>{{ $t('promptAutomation.enabled') }}</span>
+        <el-switch v-model="form.enabled" :aria-label="$t('surface.automationEditor.automationEnabled')" />
+      </label>
     </header>
     <div class="automation-editor__body">
-      <SettingsSection density="compact">
-        <SettingsRow :title="$t('promptAutomation.name')">
-          <template #control>
-            <el-input id="automation-name" v-model="form.name" :aria-label="$t('promptAutomation.name')" />
-          </template>
-        </SettingsRow>
-        <SettingsRow class="automation-editor__prompt" :title="$t('promptAutomation.prompt')">
-          <template #control>
-            <VoiceTextarea id="automation-prompt" v-model="form.prompt" :label="$t('promptAutomation.prompt')" :rows="3"
-              :placeholder="$t('promptAutomation.promptPlaceholder')" @busy-change="promptBusy = $event" />
-          </template>
-        </SettingsRow>
-      </SettingsSection>
-      <SettingsSection density="compact" :title="$t('promptAutomation.target')" title-id="automation-run-in">
-        <SettingsRow :title="$t('promptAutomation.team')">
-          <template #control>
+      <FormField density="compact" :label="$t('promptAutomation.name')" label-for="automation-name">
+        <el-input id="automation-name" v-model="form.name" :aria-label="$t('promptAutomation.name')" :placeholder="$t('promptAutomation.namePlaceholder')" />
+      </FormField>
+      <FormField density="compact" class="automation-editor__prompt" :label="$t('promptAutomation.prompt')" label-for="automation-prompt">
+        <VoiceTextarea id="automation-prompt" v-model="form.prompt" :label="$t('promptAutomation.prompt')" :rows="4"
+          :placeholder="$t('promptAutomation.promptPlaceholder')" @busy-change="promptBusy = $event" />
+      </FormField>
+      <FormSection density="compact" :title="$t('promptAutomation.target')" title-id="automation-run-in">
+        <FormGrid>
+          <FormField density="compact" :label="$t('promptAutomation.team')" label-for="automation-team">
             <el-select id="automation-team" v-model="form.teamId" :aria-label="$t('surface.automationEditor.automationTargetTeam')">
               <el-option v-for="team in teams" :key="team.id" :value="team.id" :label="team.name" />
             </el-select>
-          </template>
-        </SettingsRow>
-        <SettingsRow :title="$t('promptAutomation.conversation')">
-          <template #control>
-            <el-select id="automation-target" v-model="form.kind" :aria-label="$t('promptAutomation.target')">
-              <el-option value="newQuickChat" :label="$t('promptAutomation.newQuickChat')" />
-              <el-option value="quickChat" :label="$t('promptAutomation.quickChat')" />
-              <el-option value="agent" :label="$t('promptAutomation.agent')" />
+          </FormField>
+          <FormField density="compact" :label="$t('promptAutomation.conversation')" label-for="automation-target"
+            :help="form.kind === 'newQuickChat' ? undefined : $t('promptAutomation.inheritsSettings')">
+            <el-select id="automation-target" v-model="conversation" fit-input-width :aria-label="$t('promptAutomation.conversation')"
+              :placeholder="$t('promptAutomation.conversation')">
+              <el-option value="new" :label="$t('promptAutomation.newQuickChat')" />
+              <el-option-group v-if="quickChats.length" :label="$t('promptAutomation.quickChat')">
+                <el-option v-for="agent in quickChats" :key="agent.id" :value="`quickChat:${agent.id}`" :label="conversationLabel(agent)" :title="conversationLabel(agent)" />
+              </el-option-group>
+              <el-option-group v-if="agentChats.length" :label="$t('promptAutomation.agent')">
+                <el-option v-for="agent in agentChats" :key="agent.id" :value="`agent:${agent.id}`" :label="conversationLabel(agent)" :title="conversationLabel(agent)" />
+              </el-option-group>
             </el-select>
-          </template>
-        </SettingsRow>
-        <SettingsRow v-if="form.kind !== 'newQuickChat'" :title="$t(form.kind === 'agent' ? 'promptAutomation.agent' : 'promptAutomation.quickChat')"
-          :description="$t('promptAutomation.inheritsSettings')">
-          <template #control>
-            <el-select id="automation-agent" v-model="form.agentId" filterable fit-input-width :aria-label="$t('promptAutomation.conversation')"
-              :placeholder="$t(form.kind === 'agent' ? 'promptAutomation.agent' : 'promptAutomation.quickChat')">
-              <el-option v-for="agent in targetAgents" :key="agent.id" :value="agent.id" :label="conversationLabel(agent)" :title="conversationLabel(agent)" />
-            </el-select>
-          </template>
-        </SettingsRow>
-      </SettingsSection>
+          </FormField>
+        </FormGrid>
+      </FormSection>
       <AutomationScheduleEditor v-model="schedule" :automation="automation" />
-      <SettingsSection v-if="form.kind === 'newQuickChat'" density="compact" :title="$t('promptAutomation.model')" title-id="automation-model">
-        <SettingsRow :title="$t('handoff.engine')">
-          <template #control>
+      <FormSection v-if="form.kind === 'newQuickChat'" density="compact" :title="$t('promptAutomation.model')" title-id="automation-model">
+        <FormGrid :columns="3">
+          <FormField density="compact" :label="$t('handoff.engine')">
             <BackendSelector v-model="form.backend" class="automation-editor__backend" :team-id="form.teamId"
               :preserve-selection="Boolean(automation)" show-single-choice />
-          </template>
-        </SettingsRow>
-        <SettingsRow :title="$t('promptAutomation.model')" :description="modelsError ? $t('promptAutomation.modelsUnavailable') : undefined">
-          <template #control>
+          </FormField>
+          <FormField density="compact" :label="$t('promptAutomation.model')" :help="modelsError ? $t('promptAutomation.modelsUnavailable') : undefined">
             <el-select v-model="form.model" filterable allow-create clearable :loading="modelsLoading"
               :aria-label="$t('promptAutomation.model')" :placeholder="$t('promptAutomation.defaultModel')">
               <el-option v-for="model in models" :key="model.model" :value="model.model" :label="model.displayName" />
             </el-select>
-          </template>
-        </SettingsRow>
-        <SettingsRow :title="$t('promptAutomation.effort')">
-          <template #control>
+          </FormField>
+          <FormField density="compact" :label="$t('promptAutomation.effort')">
             <el-select v-model="form.reasoningEffort" filterable allow-create clearable :aria-label="$t('promptAutomation.effort')"
               :placeholder="$t('promptAutomation.defaultEffort')">
               <el-option v-for="effort in efforts" :key="effort.reasoningEffort" :value="effort.reasoningEffort" :label="effort.reasoningEffort" />
             </el-select>
-          </template>
-        </SettingsRow>
-      </SettingsSection>
+          </FormField>
+        </FormGrid>
+      </FormSection>
       <p v-if="targetRemoved" class="automation-editor__notice" role="alert">{{ $t('promptAutomation.invalidTarget') }}</p>
       <p v-if="error" class="automation-editor__notice" role="alert">{{ error }}</p>
     </div>
@@ -87,8 +75,9 @@ import { agentDisplayName } from '@workspace/core/agent-display';
 import { normalizeAutomationSchedule } from '@workspace/core/automation-schedule';
 import AutomationScheduleEditor from './AutomationScheduleEditor.vue';
 import VoiceTextarea from '../shared/VoiceTextarea.vue';
-import SettingsSection from './SettingsSection.vue';
-import SettingsRow from './SettingsRow.vue';
+import FormGrid from '../shared/form/FormGrid.vue';
+import FormSection from '../shared/form/FormSection.vue';
+import FormField from '../shared/form/FormField.vue';
 import BackendSelector from './BackendSelector.vue';
 import { useBackendChoices } from './backend-selection';
 
@@ -118,7 +107,20 @@ const models = ref<BackendModelOption[]>([]);
 const modelsLoading = ref(false);
 const modelsError = ref(false);
 const engineChoices = useBackendChoices(() => form.teamId);
-const targetAgents = computed(() => props.agents.filter(agent => agent.teamId === form.teamId && (form.kind === 'quickChat') === (agent.sessionKind === 'quickChat')));
+const teamAgents = computed(() => props.agents.filter(agent => agent.teamId === form.teamId));
+const quickChats = computed(() => teamAgents.value.filter(agent => agent.sessionKind === 'quickChat'));
+const agentChats = computed(() => teamAgents.value.filter(agent => agent.sessionKind !== 'quickChat'));
+const targetAgents = computed(() => form.kind === 'quickChat' ? quickChats.value : agentChats.value);
+// One select covers the fresh-chat default and every existing conversation: 'new' | 'quickChat:<id>' | 'agent:<id>'.
+const conversation = computed<string>({
+  get: () => form.kind === 'newQuickChat' ? 'new' : form.agentId ? `${form.kind}:${form.agentId}` : '',
+  set(value) {
+    if (value === 'new') { form.kind = 'newQuickChat'; form.agentId = ''; return; }
+    const separator = value.indexOf(':');
+    form.kind = value.slice(0, separator) as 'quickChat' | 'agent';
+    form.agentId = value.slice(separator + 1);
+  },
+});
 function conversationLabel(agent: Agent): string {
   const name = agentDisplayName(agent);
   if (agent.sessionKind === 'quickChat') return name;
@@ -131,7 +133,7 @@ const canSubmit = computed(() => !props.saving && !promptBusy.value && Boolean(f
   (form.kind === 'newQuickChat'
     ? props.teams.some(team => team.id === form.teamId) && Boolean(form.backend && engineChoices.value.includes(form.backend))
     : targetAgents.value.some(agent => agent.id === form.agentId)));
-watch([() => form.kind, () => form.teamId], () => { form.agentId = ''; });
+watch(() => form.teamId, () => { form.agentId = ''; });
 watch(() => form.backend, (_backend, previous) => { if (previous) { form.model = ''; form.reasoningEffort = ''; } });
 watch(() => form.model, (_model, previous) => { if (previous) form.reasoningEffort = ''; });
 watch([() => form.backend, () => props.agents[0]?.id, () => form.kind], async ([backend, agentId, kind], _previous, cleanup) => {
@@ -171,7 +173,7 @@ function submit() {
   z-index: 1;
   flex: 0 0 auto;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-16);
   padding-bottom: var(--space-6);
@@ -187,6 +189,14 @@ function submit() {
   line-height: var(--line-height-24);
 }
 
+.automation-editor__enabled {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+
 .automation-editor__body {
   min-height: 0;
   flex: 1 1 auto;
@@ -199,18 +209,8 @@ function submit() {
   margin-top: var(--space-12);
 }
 
-.automation-editor .el-input,
-.automation-editor .el-select,
 .automation-editor__backend {
-  width: 220px;
-}
-
-.automation-editor__prompt {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.automation-editor__prompt :deep(.settings-row__control) {
-  justify-self: stretch;
+  width: 100%;
 }
 
 .automation-editor__prompt .voice-textarea {

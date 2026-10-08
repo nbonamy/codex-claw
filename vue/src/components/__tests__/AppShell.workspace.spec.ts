@@ -1,5 +1,5 @@
 import { product } from '@workspace/core/product';
-import { flushPromises, mount } from '@vue/test-utils';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import type {
   CodexNativeRendererApi,
 } from '@codex-app-sdk/vue';
@@ -21,6 +21,8 @@ import {
   workItem,
 } from './app-shell-test-harness';
 
+/** Workspace persistence is debounced; wait past the window. */
+const settlePersistence = async () => { await new Promise(resolve => setTimeout(resolve, 300)); await flushPromises(); };
 const mountShell: typeof mountRealShell = (overrides = {}) => mountRealShell({
   ...overrides,
   stubTeamRail: true,
@@ -47,6 +49,199 @@ afterEach(() => {
 });
 
 describe('AppShell workspace and plans', () => {
+  it('persists browser navigation and reopens primary and additional browsers in a fresh workspace', async () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    let stored: import('@workspace/core/document-workspace').DocumentWorkspace = {
+      tabs: [
+        { id: 'browser', title: 'browser', browser: { id: 'primary', url: 'https://example.com/start' } },
+        { id: 'browser:docs', title: 'Docs', browser: { id: 'docs', url: 'https://example.org/docs' } },
+      ], activeTab: 'browser', open: true, width: 420, filesPaneOpen: false, filesPaneWidth: 280,
+    };
+    const browserState = (url: string) => ({ url, title: '', canGoBack: false, canGoForward: false });
+    const browserOpen = vi.fn(async (_agent: string, _browser: string, url: string) => browserState(url));
+    setElectronTestClient({
+      getDocumentWorkspaces: async () => ({ 'agent-dina': structuredClone(stored) }),
+      updateDocumentWorkspace: async (_agent, change) => {
+        for (const tab of change.upsert ?? []) {
+          const index = stored.tabs.findIndex(old => old.id === tab.id);
+          if (index < 0) stored.tabs.push(structuredClone(tab)); else stored.tabs[index] = structuredClone(tab);
+        }
+        stored = { ...stored, activeTab: change.activeTab ?? stored.activeTab };
+        return structuredClone(stored);
+      },
+      browserOpen, browserNavigate: vi.fn(async (_agent, _browser, url) => browserState(url)),
+      browserSetBounds: vi.fn().mockResolvedValue(undefined), browserSetVisible: vi.fn().mockResolvedValue(undefined),
+      browserClose: vi.fn().mockResolvedValue(undefined), browserGetZoom: vi.fn().mockResolvedValue(1),
+    });
+    const wrapper = mountShell(); await flushPromises();
+    expect(wrapper.findAll('webview')).toHaveLength(2);
+    wrapper.findAll('webview').forEach((guest, index) => readyBrowserGuest(guest.element, 42 + index));
+    await flushPromises();
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com/start', 42);
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'docs', 'https://example.org/docs', 43);
+    const addresses = wrapper.findAll('[aria-label="Browser address"]');
+    await addresses[0]!.setValue('https://example.com/latest?q=one#section');
+    await wrapper.findAll('.browser-panel__address')[0]!.trigger('submit'); await flushPromises();
+    await addresses[1]!.setValue('https://example.org/next');
+    await wrapper.findAll('.browser-panel__address')[1]!.trigger('submit'); await flushPromises();
+    await settlePersistence();
+    expect(stored.tabs.map(tab => tab.browser?.url)).toEqual(['https://example.com/latest?q=one#section', 'https://example.org/next']);
+    wrapper.unmount(); browserOpen.mockClear();
+    const restarted = mountShell(); await flushPromises();
+    restarted.findAll('webview').forEach((guest, index) => readyBrowserGuest(guest.element, 52 + index));
+    await flushPromises();
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'primary', 'https://example.com/latest?q=one#section', 52);
+    expect(browserOpen).toHaveBeenCalledWith('agent-dina', 'docs', 'https://example.org/next', 53);
+    restarted.unmount();
+  });
+
+  it('restores document tabs, selected tab and collapsed layout, and retains an inactive-agent display', async () => {
+    const tabId = 'file:markdown:restored';
+    const saved = { tabs: [{ id: tabId, title: 'Restored proposal', documentId: 'restored' }], activeTab: tabId, open: false, width: 610, filesPaneOpen: false, filesPaneWidth: 280 };
+    const update = vi.fn().mockResolvedValue(saved);
+    setElectronTestClient({
+      getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': saved }),
+      readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '# Exact restored content' }),
+      updateDocumentWorkspace: update,
+    });
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    const panel = wrapper.findAll('[aria-label="Right workspace"]')[0]!;
+    expect(panel.isVisible()).toBe(false);
+    expect(panel.attributes('style')).toContain('610px');
+    await wrapper.get('[aria-label="Toggle right workspace"]').trigger('click');
+    expect(wrapper.get('[role="tab"][aria-label="Restored proposal"]').attributes('aria-selected')).toBe('true');
+    expect(panel.text()).toContain('Exact restored content');
+    await wrapper.setProps({ sidePanelRequest: { kind: 'markdown', agentId: 'agent-jesse', documentId: 'background', title: 'Background proposal', content: '# Background content' } });
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    expect(panel.attributes('style')).not.toContain('display: none');
+    await wrapper.setProps({ activeAgent: snapshot.agents[1] });
+    expect(wrapper.findAll('[aria-label="Right workspace"]')[1]!.text()).toContain('Background content');
+    await wrapper.get('[aria-label="Close Background proposal tab"]').trigger('click');
+    await settlePersistence();
+    expect(update).toHaveBeenCalledWith('agent-jesse', expect.objectContaining({ close: ['file:markdown:background'] }));
+  });
+
+  it('saves through the rendered action without duplicating the tab and preserves it on cancellation or write failure', async () => {
+    const tabId = 'file:markdown:proposal';
+    const saved = { tabs: [{ id: tabId, title: 'Proposal', documentId: 'proposal' }], activeTab: tabId, open: true, width: 420, filesPaneOpen: false, filesPaneWidth: 280 };
+    const choose = vi.fn().mockResolvedValueOnce(null).mockResolvedValue('/work/saved.md');
+    const save = vi.fn().mockRejectedValueOnce(new Error('Disk full')).mockResolvedValue({ ...saved, tabs: [{ id: tabId, title: 'saved.md', savedPath: '/work/saved.md' }] });
+    const update = vi.fn().mockResolvedValue(saved);
+    setElectronTestClient({ getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': saved }), readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '# Keep this' }), updateDocumentWorkspace: update, chooseDocumentSavePath: choose, saveWorkspaceDocument: save });
+    const snapshot = createInitialSnapshot(); snapshot.agents[0]!.folder = '/work/branch';
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    const clickSave = async () => { await wrapper.get('button[aria-label^="Save "][aria-label$=" as…"]').trigger('click'); await flushPromises(); };
+    await clickSave();
+    expect(choose).toHaveBeenCalledWith('/work/branch/Proposal.md');
+    expect(save).not.toHaveBeenCalled();
+    await clickSave();
+    expect(wrapper.text()).toContain('Keep this');
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(1);
+    await clickSave();
+    expect(save).toHaveBeenLastCalledWith('agent-dina', { tabId, path: '/work/saved.md', overwrite: true });
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toStrictEqual(['saved.md']);
+    expect(wrapper.find('button[aria-label^="Save "][aria-label$=" as…"]').exists()).toBe(false);
+    await wrapper.get('[aria-label="Close saved.md tab"]').trigger('click');
+    await settlePersistence();
+    expect(update).toHaveBeenLastCalledWith('agent-dina', expect.objectContaining({ close: [tabId] }));
+  });
+
+  it('coalesces a burst of layout changes into one backend update', async () => {
+    const tabId = 'file:markdown:burst';
+    const saved = { tabs: [{ id: tabId, title: 'Burst', documentId: 'burst' }], activeTab: tabId, open: false, width: 420, filesPaneOpen: false, filesPaneWidth: 280 };
+    const update = vi.fn().mockResolvedValue(saved);
+    setElectronTestClient({ getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': saved }), readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '# Burst' }), updateDocumentWorkspace: update });
+    const wrapper = mountShell(); await flushPromises();
+    await settlePersistence();
+    update.mockClear();
+    const toggle = wrapper.get('[aria-label="Toggle right workspace"]');
+    await toggle.trigger('click'); await toggle.trigger('click'); await toggle.trigger('click');
+    expect(update).not.toHaveBeenCalled();
+    await settlePersistence();
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith('agent-dina', expect.objectContaining({ open: true, upsert: [], close: [] }));
+    wrapper.unmount();
+  });
+
+  it('does not resurrect a tab closed while restoration is still pending', async () => {
+    const tabId = 'file:markdown:race';
+    const saved = { tabs: [{ id: tabId, title: 'Race proposal', documentId: 'race' }], activeTab: tabId, open: true, width: 420, filesPaneOpen: false, filesPaneWidth: 280 };
+    let restore!: (value: Record<string, typeof saved>) => void;
+    const update = vi.fn().mockResolvedValue(saved);
+    setElectronTestClient({ getDocumentWorkspaces: () => new Promise(resolve => { restore = resolve; }), updateDocumentWorkspace: update });
+    const wrapper = mountShell();
+    await wrapper.setProps({ sidePanelRequest: { kind: 'markdown', agentId: 'agent-dina', documentId: 'race', title: 'Race proposal', content: '# Retain until closed' } });
+    await wrapper.get('[aria-label="Close Race proposal tab"]').trigger('click');
+    restore({ 'agent-dina': saved });
+    await flushPromises();
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
+    expect(update).toHaveBeenCalledWith('agent-dina', expect.objectContaining({ close: [tabId] }));
+  });
+
+  it('uses the remote owning folder and preserves the document when replacement is rejected', async () => {
+    const tabId = 'file:markdown:remote';
+    const saved = { tabs: [{ id: tabId, title: 'Remote proposal', documentId: 'remote' }], activeTab: tabId, open: true, width: 420, filesPaneOpen: false, filesPaneWidth: 280 };
+    const nativeDialog = vi.fn();
+    const save = vi.fn().mockRejectedValue(new Error('File already exists. Confirm replacement to save.'));
+    setElectronTestClient({ getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': saved }), readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '# Remote content' }), updateDocumentWorkspace: vi.fn().mockResolvedValue(saved), chooseDocumentSavePath: nativeDialog, saveWorkspaceDocument: save });
+    const snapshot = createInitialSnapshot();
+    snapshot.teams[0]!.remoteConnectionId = 'remote-test'; snapshot.agents[0]!.folder = '/remote/worktree';
+    const wrapper = mountShell({ snapshot }); await flushPromises();
+    await wrapper.get('button[aria-label^="Save "][aria-label$=" as…"]').trigger('click'); await flushPromises();
+    const box = new DOMWrapper(document.querySelector('.el-message-box')!);
+    expect((box.get('input').element as HTMLInputElement).value).toBe('/remote/worktree/Remote proposal.md');
+    expect(box.get('.el-button--primary').text()).toBe('Save');
+    await box.get('.el-button--primary').trigger('click'); await flushPromises();
+    const replacement = new DOMWrapper(Array.from(document.querySelectorAll('.el-message-box')).at(-1)!);
+    expect(replacement.text()).toContain('Replace the existing file?');
+    await replacement.get('.el-message-box__btns .el-button:not(.el-button--primary)').trigger('click'); await flushPromises();
+    expect(nativeDialog).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledExactlyOnceWith('agent-dina', { tabId, path: '/remote/worktree/Remote proposal.md', overwrite: false });
+    expect(wrapper.get('[role="tab"]').text()).toBe('Remote proposal');
+    expect(wrapper.text()).toContain('Remote content');
+  });
+
+  it('does not recreate a tab when its pending Save As finishes after it was closed', async () => {
+    const tabId = 'file:markdown:saving';
+    const saved = { tabs: [{ id: tabId, title: 'Saving', documentId: 'saving' }], activeTab: tabId, open: true, width: 420, filesPaneOpen: false, filesPaneWidth: 280 };
+    let finishSave!: (result: import('@workspace/core/document-workspace').DocumentWorkspace) => void;
+    setElectronTestClient({ getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': saved }), readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '# Content' }), updateDocumentWorkspace: vi.fn().mockResolvedValue(saved), chooseDocumentSavePath: vi.fn().mockResolvedValue('/work/saved.md'), saveWorkspaceDocument: () => new Promise(resolve => { finishSave = resolve; }) });
+    const wrapper = mountShell(); await flushPromises();
+    await wrapper.get('button[aria-label^="Save "][aria-label$=" as…"]').trigger('click'); await flushPromises();
+    await wrapper.get('[aria-label="Close Saving tab"]').trigger('click');
+    finishSave({ ...saved, tabs: [{ id: tabId, title: 'saved.md', savedPath: '/work/saved.md' }] });
+    await flushPromises();
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
+  });
+
+  it('opens every document delivered in one render batch without changing agents', async () => {
+    const wrapper = mountShell();
+    await wrapper.setProps({ markdownDisplayRequests: [
+      { kind: 'markdown', agentId: 'agent-dina', documentId: 'one', title: 'Same title', content: '# One' },
+      { kind: 'markdown', agentId: 'agent-dina', documentId: 'two', title: 'Same title', content: '# Two' },
+      { kind: 'markdown', agentId: 'agent-jesse', documentId: 'three', title: 'Background', content: '# Three' },
+    ] });
+    expect(wrapper.findAll('[role="tab"]').map(tab => tab.text())).toEqual(['Same title', 'Same title', 'Background']);
+    expect(wrapper.emitted('consume-markdown-displays')).toEqual([[3]]);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+  });
+
+  it('keeps a missing referenced file visible and closeable', async () => {
+    const tabId = 'file:missing.md';
+    setElectronTestClient({
+      getDocumentWorkspaces: vi.fn().mockResolvedValue({ 'agent-dina': { tabs: [{ id: tabId, title: 'missing.md', path: 'missing.md' }], activeTab: tabId, open: true, width: 420, filesPaneOpen: false, filesPaneWidth: 280 } }),
+      readWorkspaceDocument: vi.fn().mockResolvedValue({ content: '', error: 'File is missing. You can close this tab.' }),
+      updateDocumentWorkspace: vi.fn().mockResolvedValue({ tabs: [] }),
+    });
+    const wrapper = mountShell(); await flushPromises();
+    expect(wrapper.text()).toContain('File is missing. You can close this tab.');
+    await wrapper.get('[aria-label="Close missing.md tab"]').trigger('click');
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
+  });
+
   it('downloads an unsupported chat file without opening a workspace tab', async () => {
     const readAgentFileChunk = vi.fn().mockResolvedValue({ path: 'film.mp4', size: 2, data: 'AAE=', nextOffset: 2 });
     setElectronTestClient({ readAgentFileChunk });

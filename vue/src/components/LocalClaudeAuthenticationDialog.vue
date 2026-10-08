@@ -1,13 +1,13 @@
 <template>
   <FormDialog :model-value="modelValue" :title="$t('auth.connectClaude')" :subtitle="$t('auth.claudeLoginInstructions')" teleported @update:model-value="emit('update:modelValue', $event)">
     <div class="app-form-dialog">
-      <FormDialogField v-for="option in options" :key="option.kind" :label="$t(option.label)">
+      <FormField v-for="option in options" :key="option.kind" :label="$t(option.label)">
         <div class="claude-login-command">
           <code>{{ option.command }}</code>
           <el-button text size="small" :icon="copiedCommand === option.command ? CheckIcon : CopyIcon" :aria-label="$t(copiedCommand === option.command ? option.copiedKey : option.copyKey)" @click="copyCommand(option.command)" />
         </div>
         <p v-if="copyFailedCommand === option.command" role="alert">{{ $t('surface.remoteClaudeAuth.copyFailed') }}</p>
-      </FormDialogField>
+      </FormField>
       <p v-if="error" role="alert">{{ error }}</p>
     </div>
     <template #footer>
@@ -21,7 +21,7 @@
 import { computed, ref } from 'vue';
 import { CheckIcon, CopyIcon } from '../shared/icons/app-icons';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 
 const props = defineProps<{ modelValue: boolean; configDirectory?: string | null; loading: boolean; error: string | null }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; refresh: [] }>();

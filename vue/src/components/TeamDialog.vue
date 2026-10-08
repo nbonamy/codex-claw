@@ -6,7 +6,7 @@
     @update:model-value="onVisibilityChanged"
   >
     <form class="app-form-dialog" @submit.prevent="submit">
-      <FormDialogField
+      <FormField
         :label="$t('surface.teamDialog.connection')"
         label-for="team-dialog-connection"
       >
@@ -28,9 +28,9 @@
             />
           </el-select>
         </div>
-      </FormDialogField>
+      </FormField>
 
-      <FormDialogField
+      <FormField
         v-if="showRemoteTeamSelection"
         :label="$t('surface.teamDialog.remoteTeam')"
         label-for="team-dialog-remote-team"
@@ -53,9 +53,9 @@
             />
           </el-select>
         </div>
-      </FormDialogField>
+      </FormField>
 
-      <FormDialogField
+      <FormField
         v-if="showTeamNameInput"
         :label="$t('surface.teamDialog.name')"
         label-for="team-dialog-name"
@@ -70,9 +70,9 @@
             autofocus
           />
         </div>
-      </FormDialogField>
+      </FormField>
 
-      <FormDialogField :label="$t('surface.teamDialog.color')">
+      <FormField :label="$t('surface.teamDialog.color')">
         <div
           class="team-dialog__colors"
           role="radiogroup"
@@ -96,7 +96,7 @@
             />
           </button>
         </div>
-      </FormDialogField>
+      </FormField>
 
       <el-alert
         v-if="errorMessage"
@@ -128,7 +128,7 @@ import { computed, ref, watch } from 'vue';
 import type { CreateTeamInput, RemoteConnection, Team, UpdateTeamInput } from '@workspace/core/contracts';
 import { defaultTeamColor, teamColors } from '@workspace/core/team-colors';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 import { CheckIcon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{

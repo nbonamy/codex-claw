@@ -3,14 +3,14 @@
     :title="$t('surface.settingsCodexPanel.codex')"
     title-id="settings-codex-title"
   >
-    <SettingsEngineConnectionRow :authentication="authentication" :connected="connected" :enabled="settings.providerEnabled?.codex !== false" :set-enabled="setEnabled" :busy="connectionBusy" :pending="loginPending" :error="connectionError" @connect="emit('connect')" @disconnect="emit('disconnect')" @cancel="emit('cancel')">
+    <SettingsEngineConnectionRow backend="codex" :title="$t('surface.settingsCodexPanel.codex')" :authentication="authentication" :connected="connected" :enabled="settings.providerEnabled?.codex !== false" :set-enabled="setEnabled" :busy="connectionBusy" :pending="loginPending" :error="connectionError" @connect="emit('connect')" @disconnect="emit('disconnect')" @cancel="emit('cancel')">
       <SettingsEngineSetupRow :home="settings.providerHomes?.codex" @customize="emit('customize')" />
     </SettingsEngineConnectionRow>
-    <SettingsSection
+    <FormSection
       :title="$t('surface.settingsCodexPanel.chatGPT')"
       title-id="settings-codex-chatgpt-title"
     >
-      <SettingsRow
+      <FormRow
         :title="$t('surface.settingsCodexPanel.launchChatGPT')"
         :description="$t('surface.settingsCodexPanel.manageCodexPluginsSkillsAndSandboxPoliciesInChatGPTUsing')"
         :error="launchError"
@@ -22,15 +22,15 @@
             @click="launch"
           > {{ $t('surface.settingsCodexPanel.launchChatGPT') }} </el-button>
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
 
-    <SettingsSection
+    <FormSection
       v-if="appHostCapabilities.nativeFileDialogs"
       :title="$t('surface.settingsCodexPanel.runtime')"
       title-id="settings-codex-runtime-title"
     >
-      <SettingsRow
+      <FormRow
         :title="$t('surface.settingsCodexPanel.codexExecutable')"
         :description="$t('surface.settingsCodexPanel.leaveEmptyToUseTheBundledCodexChangingThisRestartsCodexC')"
         :error="codexBinaryError"
@@ -58,8 +58,8 @@
             > {{ $t('surface.settingsCodexPanel.clear') }} </el-button>
           </span>
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
   </SettingsPanelFrame>
 </template>
 
@@ -68,8 +68,8 @@ import { ref, watch } from 'vue';
 import type { AppGeneralSettings, UpdateSettingsInput } from '@workspace/core/contracts';
 import { appHostCapabilities, appPlatformActions } from '../platform-api';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
 import SettingsEngineSetupRow from './SettingsEngineSetupRow.vue';
 import type { ProviderAuthentication } from '@workspace/core/contracts/provider-setup';

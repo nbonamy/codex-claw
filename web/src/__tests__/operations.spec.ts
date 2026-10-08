@@ -3,6 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import { invokeAppWebOperation } from '../server/operations';
 
+it('routes document saves and layout changes through client-scoped operations', async () => {
+  const request = vi.fn().mockResolvedValue({ tabs: [] });
+  const input = { tabId: 'file:markdown:doc', path: '/work/proposal.md', overwrite: false };
+  await invokeAppWebOperation({ request }, 'saveWorkspaceDocument', ['agent', input]);
+  expect(request).toHaveBeenLastCalledWith(backendMethods.clientDocumentSave, { agentId: 'agent', input });
+  await invokeAppWebOperation({ request }, 'updateDocumentWorkspace', ['agent', { close: [input.tabId] }]);
+  expect(request).toHaveBeenLastCalledWith(backendMethods.clientWorkspaceApply, { agentId: 'agent', change: { close: [input.tabId] } });
+});
+
 describe(`${product.name} web operations`, () => {
   it.each(['sendPrompt', 'steerPrompt'])('rejects untrusted Web attachments before %s dispatch and preserves text prompts', async operation => {
     const request = vi.fn().mockResolvedValue({});

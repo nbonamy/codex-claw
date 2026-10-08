@@ -1,3 +1,4 @@
+import { DocumentWorkspaceService } from './document-workspace-service';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import path from 'node:path';
 import { sendAgentPrompt } from '@workspace/core/agent-chat-service';
@@ -107,7 +108,9 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     persist: () => saveBackendSnapshot(snapshot),
     publish: () => server?.emitEvent({ type: 'snapshot.updated', payload: snapshot }),
   });
+  const documents = new DocumentWorkspaceService(path.join(backendHomeDir(), "document-workspaces.json"));
   const mcpService: AppMcpService = new AppMcpService({
+    retainDocument: (agentId, request) => documents.display(agentId, request),
     tasks,
     persistSnapshot: () => saveBackendSnapshot(snapshot),
     missionTools: {
@@ -217,6 +220,7 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     run: () => pullRequestMonitor.check(),
   });
   server = new AppBackendServer({
+    documents,
     tasks,
     providerSetup,
     version: options.version,

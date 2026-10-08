@@ -3,7 +3,7 @@
     :title="$t('surface.settingsClaudeCodePanel.claudeCode')"
     title-id="settings-claude-code-title"
   >
-    <SettingsEngineConnectionRow :authentication="authentication" :connected="connected" :enabled="enabled" :set-enabled="setEnabled" :busy="busy" :error="error" @connect="emit('connect')" @disconnect="emit('disconnect')">
+    <SettingsEngineConnectionRow backend="claude" :title="$t('surface.settingsClaudeCodePanel.claudeCode')" :authentication="authentication" :connected="connected" :enabled="enabled" :set-enabled="setEnabled" :busy="busy" :error="error" @connect="emit('connect')" @disconnect="emit('disconnect')">
       <SettingsEngineSetupRow :home="home" @customize="emit('customize')" />
     </SettingsEngineConnectionRow>
   </SettingsPanelFrame>

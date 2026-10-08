@@ -112,19 +112,20 @@ Search by behavior first.
 | Reopen collapsed sidebar | `SidebarExpandButton` | `vue/src/shared/` |
 | Workspace header / body containment | `WorkspaceHeader`, `.workspace-header__title`, `.workspace-body` | `vue/src/shared/`, `styles/base.css` |
 | Dialog chrome and footer actions | `.app-dialog`, `.app-button` | `vue/src/styles/base.css` |
-| Form dialogs | `FormDialog`, `FormDialogField` | `vue/src/shared/dialog/` |
+| Form dialogs | `FormDialog` | `vue/src/shared/dialog/` |
+| Form structure: card, label-left rows, label-above fields | `FormSection`, `FormRow`, `FormField` | `vue/src/shared/form/` |
 | Command palettes | `QuickOpenDialog` | `vue/src/shared/` |
 | Voice multiline input | `VoiceTextarea` | `vue/src/shared/` |
 | Emoji, grapheme or cropped-image identity | `IdentityPicker` (product component despite its path; keep new product dependencies out of `shared/`) | `vue/src/shared/identity/` |
 | Enabled coding backend picker | `BackendSelector` (consumes the choices `AppShell` provides once through `backend-selection`; hides a single choice unless explicit provider identity is needed; dialogs never read backend settings) | `vue/src/components/` |
-| Settings structure | `SettingsPanelFrame`, `SettingsSection`, `SettingsRow`, `SettingsTextareaField` | `vue/src/components/` |
+| Settings structure | `SettingsPanelFrame`, `SettingsTextareaField` (compose `FormSection`/`FormRow`) | `vue/src/components/` |
 | Dense structured data | `AppDataList` | `vue/src/components/` |
 | Operation feedback | `GitOperationFeedback` | `vue/src/components/` |
 | Worktree provisioning progress | `WorkspaceProvisioningProgressDialog` | `vue/src/components/` |
 
 ## Interaction
 
-- **Dialogs:** compose `FormDialog`/`FormDialogField` (title, optional subtitle, one
+- **Dialogs:** compose `FormDialog`/`FormField` (title, optional subtitle, one
   padded body, labels above controls, divided footer, no second gutter). Footer:
   dismiss tertiary, alternatives secondary, at most one primary. Compact pickers use
   the filter as the whole top row, then loading/error/empty/results. Dialogs emit
@@ -139,9 +140,12 @@ Search by behavior first.
   whole row the primary target with quiet, keyboard-reachable secondary actions;
   hover and focus keep geometry stable; titlebars align to the shared appbar height;
   each pane owns its scroll axes.
-- **Form density:** `SettingsSection` supports an opt-in `compact` density for
-  grouped forms such as Automations. It tightens row spacing without shrinking
-  typography or controls; Settings panels retain the default density.
+- **Forms:** `FormSection` is the card; its body holds either `FormRow`s (label and
+  description left, control right: preferences, toggles, single values) or
+  `FormField`s in a two- or three-column grid (label above: related fields being
+  configured, e.g. Automations). One section may mix both. `density="compact"` tightens
+  `FormSection` rows and switches `FormField` to the grid layout; dialogs keep the
+  default.
 
 ## Styling And Feedback
 

@@ -51,6 +51,10 @@ const composerStatesByAgentId = ref<Record<string, CodexComposerState>>({});
 const composerAttachmentsByAgentId = ref<Record<string, CodexNativeAttachment[]>>({});
 const answeredClientRequestIds = ref(new Set<string>());
 const sidePanelRequest = ref<SidePanelRequest | null>(null);
+const markdownDisplayRequests = ref<Array<Extract<SidePanelRequest, { kind: 'markdown' }>>>([]);
+function consumeMarkdownDisplayRequests(count: number): void {
+  markdownDisplayRequests.value = markdownDisplayRequests.value.slice(count);
+}
 const fileActivity = ref<AgentFileActivity | null>(null);
 const openInApplications = ref<OpenInApplicationCatalog>({
   defaultApplication: 'finder',
@@ -1671,6 +1675,8 @@ export function useAppState() {
     selectedServiceTier,
     planMode,
     sidePanelRequest,
+    markdownDisplayRequests,
+    consumeMarkdownDisplayRequests,
     fileActivity,
     workProviderAuthorization,
     workRepositoriesByProvider,
@@ -2332,17 +2338,9 @@ function pruneConversationFrames(): void {
 }
 
 function syncSidePanelFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'client.markdownDisplayRequested' }>): void {
-  if (event.agentId !== snapshot.value.activeAgentId) {
-    return;
-  }
-
-  sidePanelRequest.value = {
-    kind: 'markdown',
-    content: event.payload.content,
-    ...(event.payload.purpose === 'plan' ? { purpose: 'plan' } : {}),
-    ...(appText(event.payload.title) ? { title: appText(event.payload.title)! } : {}),
-    ...(event.payload.path !== undefined ? { path: event.payload.path } : {}),
-  };
+  const request = { ...event.payload, agentId: event.agentId };
+  if (request.purpose === 'plan') sidePanelRequest.value = request;
+  else markdownDisplayRequests.value = [...markdownDisplayRequests.value, request];
 }
 
 function syncFileActivityFromMainEvent(event: Extract<RendererOnlySnapshotEvent, { type: 'workspace.fileActivityDetected' }>): void {

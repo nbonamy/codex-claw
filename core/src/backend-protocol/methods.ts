@@ -1,4 +1,9 @@
 export const backendMethods = {
+  clientWorkspaceGet: "client/workspace/get",
+  clientWorkspaceApply: "client/workspace/apply",
+  clientDocumentRead: "client/document/read",
+  clientDocumentSave: "client/document/save",
+  agentDocumentWrite: "agent/document/write",
   agentTasksList: 'agent/tasks/list',
   agentTaskCancel: 'agent/task/cancel',
   engineInstructionsRead: 'settings/instructions/read',

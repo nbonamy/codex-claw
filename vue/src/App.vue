@@ -64,6 +64,8 @@
     :composer-attachments="activeComposerAttachments"
     :update-status="updateStatus"
     :side-panel-request="sidePanelRequest"
+    :markdown-display-requests="markdownDisplayRequests"
+    @consume-markdown-displays="consumeMarkdownDisplayRequests"
     :file-activity="fileActivity"
     :work-provider-authorization="workProviderAuthorization"
     :work-repositories-by-provider="workRepositoriesByProvider"
@@ -304,6 +306,8 @@ const {
   selectedServiceTier,
   planMode,
   sidePanelRequest,
+  markdownDisplayRequests,
+  consumeMarkdownDisplayRequests,
   fileActivity,
   workProviderAuthorization,
   workRepositoriesByProvider,

@@ -1,18 +1,18 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import SettingsRow from '../SettingsRow.vue';
-import SettingsSection from '../SettingsSection.vue';
+import FormRow from '../FormRow.vue';
+import FormSection from '../FormSection.vue';
 
-describe('SettingsSection and SettingsRow', () => {
+describe('FormSection and FormRow', () => {
   it('opts into tighter row spacing without changing default sections or typography', () => {
     const wrapper = mount({
-      components: { SettingsRow, SettingsSection },
+      components: { FormRow, FormSection },
       template: `<div>
-        <SettingsSection><SettingsRow title="Default settings" /></SettingsSection>
-        <SettingsSection density="compact"><SettingsRow title="Compact form" /></SettingsSection>
+        <FormSection><FormRow title="Default settings" /></FormSection>
+        <FormSection density="compact"><FormRow title="Compact form" /></FormSection>
       </div>`,
     }, { attachTo: document.body });
-    const rows = wrapper.findAll('.settings-row');
+    const rows = wrapper.findAll('.form-row');
     const normal = getComputedStyle(rows[0]!.element);
     const compact = getComputedStyle(rows[1]!.element);
     expect(normal.padding).not.toBe('');
@@ -26,12 +26,12 @@ describe('SettingsSection and SettingsRow', () => {
 
   it('renders a labelled settings section with grouped rows', () => {
     const wrapper = mount({
-      components: { SettingsRow, SettingsSection },
+      components: { FormRow, FormSection },
       template: `
-        <SettingsSection title="Behavior" title-id="settings-behavior-title">
-          <SettingsRow title="Prevent sleep" description="Keep this computer awake" />
-          <SettingsRow title="Another option" error="Needs attention" />
-        </SettingsSection>
+        <FormSection title="Behavior" title-id="settings-behavior-title">
+          <FormRow title="Prevent sleep" description="Keep this computer awake" />
+          <FormRow title="Another option" error="Needs attention" />
+        </FormSection>
       `,
     });
 
@@ -40,25 +40,25 @@ describe('SettingsSection and SettingsRow', () => {
     expect(wrapper.text()).toContain('Prevent sleep');
     expect(wrapper.text()).toContain('Keep this computer awake');
     expect(wrapper.text()).toContain('Needs attention');
-    expect(wrapper.findAll('.settings-row')).toHaveLength(2);
+    expect(wrapper.findAll('.form-row')).toHaveLength(2);
   });
 
   it('uses article rows by default and supports label rows with controls', () => {
     const wrapper = mount({
-      components: { SettingsRow },
+      components: { FormRow },
       template: `
         <div>
-          <SettingsRow title="Plain row" />
-          <SettingsRow as="label" title="Switch row">
+          <FormRow title="Plain row" />
+          <FormRow as="label" title="Switch row">
             <template #control>
               <input type="checkbox" aria-label="Switch row" />
             </template>
-          </SettingsRow>
+          </FormRow>
         </div>
       `,
     });
 
-    const rows = wrapper.findAll('.settings-row');
+    const rows = wrapper.findAll('.form-row');
 
     expect(rows[0].element.tagName).toBe('ARTICLE');
     expect(rows[1].element.tagName).toBe('LABEL');

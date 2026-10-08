@@ -529,6 +529,13 @@ describe('controller desktop lifecycle', () => {
     native.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [] });
     expect(await invoke(ipcChannels.chooseCodexBinary)).toBeNull();
     expect(native.dialog.showOpenDialog).toHaveBeenLastCalledWith(expect.objectContaining({ properties: ['openFile'] }));
+    native.dialog.showSaveDialog.mockResolvedValueOnce({ canceled: true });
+    expect(await native.handlers.get(ipcChannels.chooseDocumentSavePath)!({}, '/projects/proposal.md')).toBeNull();
+    native.dialog.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: '/projects/proposal.md' });
+    expect(await native.handlers.get(ipcChannels.chooseDocumentSavePath)!({}, '/projects/proposal.md')).toBe('/projects/proposal.md');
+    expect(native.dialog.showSaveDialog).toHaveBeenLastCalledWith({
+      defaultPath: '/projects/proposal.md', filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }], properties: ['createDirectory', 'showOverwriteConfirmation'],
+    });
     native.dialog.showSaveDialog.mockResolvedValue({ canceled: false, filePath: '/projects/branch' });
     expect(await invoke(ipcChannels.chooseSourceWorktreeDestination, '/projects/suggested')).toBe('/projects/branch');
     expect(native.dialog.showSaveDialog).toHaveBeenCalledWith(expect.objectContaining({

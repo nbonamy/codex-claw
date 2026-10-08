@@ -155,6 +155,12 @@ export const ElMenuItemStub = defineComponent({
   template: '<button class="el-menu-item" v-bind="$attrs" :disabled="disabled" @click="activate"><slot /></button>',
 });
 
+export const ElMenuItemGroupStub = defineComponent({
+  name: 'ElMenuItemGroup',
+  props: ['title'],
+  template: '<li class="el-menu-item-group"><div class="el-menu-item-group__title">{{ title }}</div><ul><slot /></ul></li>',
+});
+
 export const ElOptionStub = defineComponent({
   name: 'ElOption',
   props: ['disabled', 'label', 'value'],
@@ -312,6 +318,7 @@ export const elementPlusStubs = {
   ElLink: ElLinkStub,
   ElMenu: ElMenuStub,
   ElMenuItem: ElMenuItemStub,
+  ElMenuItemGroup: ElMenuItemGroupStub,
   ElOption: ElOptionStub,
   ElPopover: ElPopoverStub,
   ElRadio: ElRadioStub,

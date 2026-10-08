@@ -261,6 +261,14 @@ export class AppController {
     ipc.handle(ipcChannels.listAgentTasks, (_event, agentId) => this.requireBackendClient().request(backendMethods.agentTasksList, { agentId }));
     ipc.handle(ipcChannels.cancelAgentTask, (_event, agentId, taskId) => this.requireBackendClient().request(backendMethods.agentTaskCancel, { agentId, taskId }));
 
+    ipc.handle(ipcChannels.getDocumentWorkspaces, async (_event) => this.requireBackendClient().request(backendMethods.clientWorkspaceGet, {}));
+    ipc.handle(ipcChannels.updateDocumentWorkspace, async (_event, agentId: string, change: import('@workspace/core/document-workspace').DocumentWorkspaceChange) => this.requireBackendClient().request(backendMethods.clientWorkspaceApply, { agentId, change }));
+    ipc.handle(ipcChannels.readWorkspaceDocument, async (_event, agentId: string, tabId: string) => this.requireBackendClient().request(backendMethods.clientDocumentRead, { agentId, tabId }));
+    ipc.handle(ipcChannels.saveWorkspaceDocument, async (_event, agentId: string, input: import('@workspace/core/document-workspace').DocumentSaveInput) => this.requireBackendClient().request(backendMethods.clientDocumentSave, { agentId, input }));
+    ipc.handle(ipcChannels.chooseDocumentSavePath, async (_event, defaultPath: string) => {
+      const result = await dialog.showSaveDialog({ defaultPath, filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }], properties: ['createDirectory', 'showOverwriteConfirmation'] });
+      return result.canceled ? null : result.filePath ?? null;
+    });
     ipc.handle(ipcChannels.previewAgentFile, async (_event, agentId: string, filePath: string) => {
       return this.previewAgentFile(agentId, filePath);
     });

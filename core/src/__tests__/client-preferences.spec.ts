@@ -11,6 +11,9 @@ describe('client preference projection', () => {
     expect(splitSettingsInput({ general: { savedPromptDrafts: [draft] } })).toStrictEqual({
       policy: {}, preferences: { general: { savedPromptDrafts: [draft] } },
     });
+    expect(splitSettingsInput({ general: { followUpBehavior: 'steer' } })).toStrictEqual({
+      policy: {}, preferences: { general: { followUpBehavior: 'steer' } },
+    });
   });
 
   it('projects ordering, per-team selection and appearance without mutating the shared snapshot', () => {

@@ -22,13 +22,13 @@
       :teleported="true"
     >
       <div class="app-form-dialog">
-        <FormDialogField v-for="option in loginOptions" :key="option.id" :label="$t(option.labelKey)">
+        <FormField v-for="option in loginOptions" :key="option.id" :label="$t(option.labelKey)">
           <div class="remote-claude-auth__command-row">
             <code class="remote-claude-auth__command">{{ option.command }}</code>
             <el-button text size="small" :icon="copiedCommand === option.id ? CheckIcon : CopyIcon" :aria-label="$t(copiedCommand === option.id ? option.copiedKey : option.copyKey)" @click="copyCommand(option.id)" />
           </div>
           <p v-if="copyFailedCommand === option.id" class="remote-claude-auth__error">{{ $t('surface.remoteClaudeAuth.copyFailed') }}</p>
-        </FormDialogField>
+        </FormField>
         <p v-if="error" class="remote-claude-auth__error">{{ $t('surface.remoteClaudeAuth.unavailable') }}</p>
       </div>
       <template #footer>
@@ -47,7 +47,7 @@ import type { ClaudeAuthentication, AppApi, RemoteConnection } from '@workspace/
 import { CheckIcon, CopyIcon } from '../shared/icons/app-icons';
 import { appApi } from '../platform-api';
 import FormDialog from '../shared/dialog/FormDialog.vue';
-import FormDialogField from '../shared/dialog/FormDialogField.vue';
+import FormField from '../shared/form/FormField.vue';
 
 type ClaudeAuthApi = Pick<AppApi, 'getClaudeAuthentication'>;
 const props = defineProps<{ connection: RemoteConnection; api?: ClaudeAuthApi }>();

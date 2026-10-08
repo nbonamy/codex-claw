@@ -163,6 +163,7 @@ function expectedEmptySnapshot(): AppSnapshot {
       preventSleepWhenAgentsRun: true,
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: true,
+      followUpBehavior: 'queue',
       spokenAnnouncementsEnabled: false,
       spokenAnnouncementsMuted: false,
       spokenAnnouncementsOnlyForDictatedPrompts: true,

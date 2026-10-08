@@ -4,11 +4,12 @@ import { surfaceMessages } from './surface-messages';
 export const messages = {
   en: {
     antigravity: { name: 'Antigravity', connect: 'Connect Antigravity', connected: 'Antigravity connected', enable: 'Enable Antigravity', remoteLogin: 'Sign in to Antigravity on the remote host, then retry the connection.' },
+    documents: { saveTabAs: 'Save {title} as…', save: 'Save', saveAs: 'Save As…', destination: 'Save on the agent’s host:', replaceFile: 'Replace the existing file?', replace: 'Replace' },
   promptAutomation: {
     schedule: 'Schedule',
     hourly: 'Every hour',
     daily: 'Every day',
-      name: 'Name', prompt: 'Prompt', target: 'Run in', team: 'Team', conversation: 'Conversation',
+      name: 'Name', namePlaceholder: 'Name this automation', enabled: 'Enabled', prompt: 'Prompt', target: 'Run in', team: 'Team', conversation: 'Conversation',
       newQuickChat: 'New Quick Chat each run', quickChat: 'Existing Quick Chat', agent: 'Existing agent',
       promptPlaceholder: 'What should happen each time this runs?',
       model: 'Model', effort: 'Reasoning effort', defaultModel: 'Default model', defaultEffort: 'Default effort',
@@ -51,7 +52,7 @@ export const messages = {
       name: 'Linear', connectLabel: 'Connect Linear', disconnectLabel: 'Disconnect Linear',
       cancelLabel: 'Cancel Linear authorization',
       cancel: 'Cancel',
-      setup: 'Connect your Linear account for backlog work.',
+      setup: 'Connect your Linear account for backlog work',
       signedInAs: 'Signed in as {account}',
     },
     handoff: {
@@ -65,7 +66,7 @@ export const messages = {
     engineConnection: {
       title: 'Account', connect: 'Connect', connected: 'Connected',
       disconnect: 'Disconnect', disconnected: 'Disconnected', apiKey: 'API key', subscription: 'Claude subscription', amazonBedrock: 'Amazon Bedrock',
-      enabled: 'Enable engine',
+      enabled: 'Enable engine', waiting: 'Waiting for sign-in', connectedDisabled: 'Connected · disabled',
       updateFailedTitle: 'Engine status unchanged',
       lastEngineTitle: `${product.name} needs an active engine`,
       lastEngine: 'To turn this engine off, first connect or enable another one.',

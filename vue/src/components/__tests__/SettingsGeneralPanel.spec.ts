@@ -1,6 +1,6 @@
 import { product } from '@workspace/core/product';
 import { flushPromises, mount } from '@vue/test-utils';
-import { ElMessageBox } from 'element-plus';
+import { ElMessageBox, ElSegmented } from 'element-plus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DaemonStatus, SystemPermissionsStatus } from '@workspace/core/contracts';
 import { defaultGeneralSettings } from '@workspace/core/settings';
@@ -8,6 +8,21 @@ import { setElectronTestClient } from '../../test/client';
 import SettingsGeneralPanel from '../SettingsGeneralPanel.vue';
 
 describe('SettingsGeneralPanel', () => {
+  it('selects Queue by default and saves either follow-up choice from the segmented control', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountPanel({ updateSettings });
+    await flushPromises();
+    const control = wrapper.get('[aria-label="Follow-up behavior"]');
+    const option = (label: string) => control.findAll('label').find((item) => item.text() === label)!.get('input');
+    expect((option('Queue').element as HTMLInputElement).checked).toBe(true);
+    await option('Steer').setValue(true);
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { followUpBehavior: 'steer' } });
+    await wrapper.setProps({ settings: { ...defaultGeneralSettings, followUpBehavior: 'steer' } });
+    expect((option('Steer').element as HTMLInputElement).checked).toBe(true);
+    await option('Queue').setValue(true);
+    expect(updateSettings).toHaveBeenLastCalledWith({ general: { followUpBehavior: 'queue' } });
+  });
+
   beforeEach(() => { setElectronTestClient({}); });
 
   afterEach(() => {
@@ -35,7 +50,7 @@ describe('SettingsGeneralPanel', () => {
     const wrapper = mountPanel({ updateSettings });
     await flushPromises();
 
-    const celebrationRow = wrapper.findAllComponents({ name: 'SettingsRow' })
+    const celebrationRow = wrapper.findAllComponents({ name: 'FormRow' })
       .find((row) => row.text().includes('Agent celebrations'));
     expect(celebrationRow).toBeDefined();
     await celebrationRow!.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
@@ -44,138 +59,6 @@ describe('SettingsGeneralPanel', () => {
       general: { celebrationsEnabled: false },
     });
   });
-
-  it('configures neural speech enablement, scope, voice, and preview', async () => {
-    const updateSettings = vi.fn().mockResolvedValue(undefined);
-    const previewSpokenAnnouncementVoice = vi.fn().mockResolvedValue({ queued: true });
-    setElectronTestClient({ previewSpokenAnnouncementVoice });
-    const wrapper = mountPanel({ updateSettings });
-    await flushPromises();
-
-    expect(wrapper.findAllComponents({ name: 'SettingsSection' })
-      .some((section) => section.text().includes('Voice'))).toBe(true);
-    const toggleRow = wrapper.findAllComponents({ name: 'SettingsRow' })
-      .find((candidate) => candidate.text().includes('Spoken acknowledgments'));
-    expect(toggleRow).toBeDefined();
-    expect(toggleRow!.text()).toContain('on-device neural voice');
-    expect(wrapper.text()).not.toContain('Choose which agents may speak');
-
-    await toggleRow!.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', true);
-    expect(updateSettings).toHaveBeenCalledWith({
-      general: { spokenAnnouncementsEnabled: true },
-    });
-
-    await wrapper.setProps({
-      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
-    });
-    const voiceSection = wrapper.findAllComponents({ name: 'SettingsSection' })
-      .find((section) => section.text().includes('Spoken acknowledgments'))!;
-    expect(voiceSection.text().indexOf('Choose an on-device neural voice'))
-      .toBeLessThan(voiceSection.text().indexOf('Playback rules'));
-    const playbackRules = wrapper.get('details.settings-general-panel__voice-rules');
-    expect((playbackRules.element as HTMLDetailsElement).open).toBe(false);
-    expect(playbackRules.get('summary').text())
-      .toContain('Selected agent only · Dictated prompts · While focused');
-    await playbackRules.get('summary').trigger('click');
-    expect((playbackRules.element as HTMLDetailsElement).open).toBe(true);
-
-    const rows = wrapper.findAllComponents({ name: 'SettingsRow' });
-    const scopeRow = rows.find((candidate) => candidate.text().includes('Choose which agents may speak'))!;
-    const scopeSelect = scopeRow.findComponent({ name: 'ElSelect' });
-    expect(scopeSelect.classes()).toContain('settings-general-panel__speech-scope-select');
-    expect(scopeSelect.props('modelValue')).toBe('selected');
-    await scopeSelect.vm.$emit('update:modelValue', 'all');
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementScope: 'all' },
-    });
-
-    const dictatedOnlyRow = rows.find((candidate) => candidate.text().includes('Dictated prompts only'))!;
-    expect(dictatedOnlyRow.text()).toContain('tasks started with voice dictation');
-    expect(dictatedOnlyRow.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
-    await dictatedOnlyRow.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementsOnlyForDictatedPrompts: false },
-    });
-
-    const focusedOnlyRow = rows.find((candidate) => candidate.text().includes(`Only speak while ${product.name} is focused`))!;
-    expect(focusedOnlyRow.text()).toContain('Silence acknowledgments');
-    expect(focusedOnlyRow.findComponent({ name: 'ElSwitch' }).props('modelValue')).toBe(true);
-    await focusedOnlyRow.findComponent({ name: 'ElSwitch' }).vm.$emit('update:modelValue', false);
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementsOnlyWhenFocused: false },
-    });
-
-    const voiceRow = rows.find((candidate) => candidate.text().includes('additional voices download'))!;
-    const voiceSelect = voiceRow.findComponent({ name: 'ElSelect' });
-    expect(voiceSelect.props('modelValue')).toBe('af_heart');
-    expect(voiceSelect.findAllComponents({ name: 'ElOption' }).map((option) => option.props('label')))
-      .toStrictEqual([
-        'Heart · American',
-        'Bella · American',
-        'Nicole · American',
-        'Sarah · American',
-        'Adam · American',
-        'Michael · American',
-        'Emma · British',
-        'George · British',
-      ]);
-    await voiceSelect.vm.$emit('update:modelValue', 'bf_emma');
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      general: { spokenAnnouncementVoice: 'bf_emma' },
-    });
-    await wrapper.setProps({
-      settings: {
-        ...defaultGeneralSettings,
-        spokenAnnouncementsEnabled: true,
-        spokenAnnouncementVoice: 'bf_emma',
-      },
-    });
-    await voiceRow.findAll('button').find((button) => button.text() === 'Preview')?.trigger('click');
-    await flushPromises();
-    expect(previewSpokenAnnouncementVoice).toHaveBeenCalledWith('bf_emma');
-  });
-
-  it('shows when native voice preview is unavailable', async () => {
-    setElectronTestClient({
-      previewSpokenAnnouncementVoice: vi.fn().mockResolvedValue({
-        queued: false,
-        reason: 'unsupported',
-      }),
-    });
-    const wrapper = mountPanel({
-      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
-    });
-    await flushPromises();
-
-    await wrapper.findAll('button').find((button) => button.text() === 'Preview')?.trigger('click');
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('Voice preview could not be queued on this device.');
-  });
-
-  it('disables voice preview until the native operation finishes', async () => {
-    let finishPreview: (result: { queued: boolean }) => void = () => {};
-    const previewSpokenAnnouncementVoice = vi.fn().mockImplementation(() => (
-      new Promise<{ queued: boolean }>((resolve) => {
-        finishPreview = resolve;
-      })
-    ));
-    setElectronTestClient({ previewSpokenAnnouncementVoice });
-    const wrapper = mountPanel({
-      settings: { ...defaultGeneralSettings, spokenAnnouncementsEnabled: true },
-    });
-    await flushPromises();
-    const preview = wrapper.findAllComponents({ name: 'ElButton' })
-      .find((button) => button.text() === 'Preview')!;
-
-    await preview.trigger('click');
-    expect(preview.props('disabled')).toBe(true);
-
-    finishPreview({ queued: true });
-    await flushPromises();
-    expect(preview.props('disabled')).toBe(false);
-  });
-
   it('toggles the background service through Settings', async () => {
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel');
     let resolveInstall: () => void = () => undefined;
@@ -193,18 +76,19 @@ describe('SettingsGeneralPanel', () => {
     expect(wrapper.text()).toContain(`Keep ${product.name} ready in the background`);
     expect(wrapper.text()).toContain('Off');
 
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', true);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', true);
     await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(true);
-    expect(wrapper.text()).toContain('Installing...');
+    expect(wrapper.text()).toContain('Installing…');
     expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(true);
 
     resolveInstall();
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain('Installing...');
+    expect(wrapper.text()).not.toContain('Installing…');
     expect(confirm).toHaveBeenCalledWith(
       `${product.name} needs to restart to connect to the background agent.`,
       `Restart ${product.name}?`,
@@ -240,18 +124,19 @@ describe('SettingsGeneralPanel', () => {
 
     await flushPromises();
 
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', false);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', false);
     await wrapper.vm.$nextTick();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(false);
-    expect(wrapper.text()).toContain('Uninstalling...');
+    expect(wrapper.text()).toContain('Uninstalling…');
     expect(wrapper.find('.settings-general-panel__spinner').exists()).toBe(true);
 
     resolveUninstall();
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain('Uninstalling...');
+    expect(wrapper.text()).not.toContain('Uninstalling…');
   });
 
   it('restarts the app when the user accepts the daemon restart dialog', async () => {
@@ -265,8 +150,9 @@ describe('SettingsGeneralPanel', () => {
     });
 
     await flushPromises();
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', true);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', true);
     await flushPromises();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(true);
@@ -284,8 +170,9 @@ describe('SettingsGeneralPanel', () => {
     });
 
     await flushPromises();
-    const switches = wrapper.findAllComponents({ name: 'ElSwitch' });
-    await switches[1].vm.$emit('update:modelValue', false);
+    const daemonSwitch = wrapper.findAllComponents({ name: 'ElSwitch' })
+      .find((candidate) => candidate.attributes('aria-label') === `Keep ${product.name} ready in the background`)!;
+    await daemonSwitch.vm.$emit('update:modelValue', false);
     await flushPromises();
 
     expect(setDaemonEnabled).toHaveBeenCalledWith(false);
@@ -305,7 +192,9 @@ describe('SettingsGeneralPanel', () => {
 
     expect(wrapper.text()).toContain('Unavailable');
     expect(wrapper.text()).toContain('No packaged daemon runtime was found.');
-    expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1].props('disabled')).toBe(true);
+    const advanced = wrapper.findAllComponents({ name: 'FormSection' }).find((section) => section.text().includes('Advanced'))!;
+    expect(advanced.text()).toContain(`Keep ${product.name} ready in the background`);
+    expect(advanced.findComponent({ name: 'ElSwitch' }).props('disabled')).toBe(true);
   });
 
   it('chooses and clears the configured source folder', async () => {
@@ -405,8 +294,8 @@ describe('SettingsGeneralPanel', () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Screen Recording');
-    expect(wrapper.text()).toContain('Required for screenshots to capture the frontmost window.');
+    expect(wrapper.text()).toContain('Screen recording');
+    expect(wrapper.text()).toContain('Required for screenshots to capture the frontmost window');
 
     const grantButtons = wrapper.findAll('button').filter((button) => button.text() === 'Grant');
     await grantButtons.at(-1)?.trigger('click');
@@ -445,7 +334,8 @@ function mountPanel(props: Record<string, unknown>) {
       ...props,
     },
     global: {
-      },
+      components: { ElSegmented },
+    },
   });
 }
 

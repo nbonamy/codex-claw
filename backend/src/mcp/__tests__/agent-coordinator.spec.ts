@@ -236,7 +236,7 @@ describe('AppMcpAgentCoordinator', () => {
       .toThrowError("Agent 'missing' not found. No agents are currently available.");
   });
 
-  it('displays normalized inline markdown or paths', async () => {
+  it('preserves inline markdown bytes and normalizes paths', async () => {
     const onDisplayMarkdown = vi.fn().mockResolvedValue({
       success: true,
       message: 'Displayed',
@@ -255,7 +255,7 @@ describe('AppMcpAgentCoordinator', () => {
     });
 
     await coordinator.displayMarkdown('agent-dina', { markdown: ' # Report ' });
-    expect(onDisplayMarkdown).toHaveBeenLastCalledWith(expect.anything(), { markdown: '# Report' });
+    expect(onDisplayMarkdown).toHaveBeenLastCalledWith(expect.anything(), { markdown: ' # Report ' });
   });
 
   it('validates markdown display inputs and availability', async () => {

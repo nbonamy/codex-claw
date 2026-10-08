@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.29.0",
+  "currentVersion": "0.30.0",
   "releases": [
+    {
+      "version": "0.30.0",
+      "releasedAt": "2026-10-07",
+      "sourceSha256": "656b2abc9c7886e2f9ea9eff5fd51c6da8aa6ad7df54b75bac7d55bde54ecbd5",
+      "markdown": "### New features\n\n- Open documents and browser tabs return after restarting Korus, with each\n  agent's selected tab, pane visibility, and widths restored. Unsaved documents\n  remain available until their tabs are closed.\n- Save an unsaved document to a Markdown file from its tab, with the agent's\n  repository as the default destination. Closing the saved tab keeps the file.\n- Choose Queue or Steer as the default follow-up behavior in General settings.\n  While an agent is working, Enter and the send button use that choice;\n  Cmd/Ctrl+Enter uses the other action.\n\n### Improvements and fixes\n\n- Settings have clearer sections, more consistent controls, and easier-to-scan\n  engine status and remote connections. Background service controls live in\n  the Advanced section.\n- Voice settings have a dedicated page with selectable voice tiles and\n  individual previews.\n- Automation editing uses a more compact layout with weekday buttons and a\n  clearer next-run preview.\n- Dark-theme settings controls use consistent container colors.\n- Late tool results no longer cause new assistant activity to appear above\n  the conversation's compaction divider."
+    },
     {
       "version": "0.29.0",
       "releasedAt": "2026-10-07",

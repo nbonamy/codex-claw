@@ -15,6 +15,11 @@ const EXTENDED_REQUEST_TIMEOUT_MS = 10 * 60_000;
  * and EXTENDED only for operations designed to run for several minutes.
  */
 const requestTimeoutByMethod = {
+  [backendMethods.clientWorkspaceGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.clientWorkspaceApply]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.clientDocumentRead]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.clientDocumentSave]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.agentDocumentWrite]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentTasksList]: QUICK_REQUEST_TIMEOUT_MS,
   [backendMethods.agentTaskCancel]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentHandoff]: EXTENDED_REQUEST_TIMEOUT_MS,

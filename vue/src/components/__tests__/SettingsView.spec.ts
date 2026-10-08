@@ -20,9 +20,14 @@ describe('SettingsView', () => {
     expect(wrapper.text()).not.toContain('Antigravity');
     expect(wrapper.text()).toContain('Accessibility');
     await wrapper.setProps({ providerConnections: [{ backend: 'antigravity', installed: false, connected: false, checking: false }] });
+    expect(wrapper.get('.engine-hero__copy strong').text()).toBe('Antigravity');
     await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
     expect(connectAntigravity).toHaveBeenCalledOnce();
-    expect(wrapper.findAll('.el-menu-item').some(item => item.text() === 'Antigravity')).toBe(true);
+    const agentGroup = wrapper.findAll('.el-menu-item-group').find(group => group.get('.el-menu-item-group__title').text() === 'Agents')!;
+    const antigravityTab = agentGroup.findAll('.el-menu-item').find(item => item.text() === 'Antigravity')!;
+    await antigravityTab.trigger('click');
+    await wrapper.findAll('.el-menu-item').find(item => item.text() === 'Voice')!.trigger('click');
+    expect(wrapper.emitted('selectTab')).toStrictEqual([['antigravity'], ['voice']]);
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -45,15 +50,17 @@ describe('SettingsView', () => {
     expect(wrapper.findAll('.el-menu-item').map((item) => item.text())).toStrictEqual([
       'General',
       'Appearance',
+      'Voice',
       'Personalization',
+      'Screenshots',
       'Codex',
       'Claude Code',
       'Plugins',
-      'Integrations',
-      'Screenshots',
-      'Connections',
       'Git',
+      'Integrations',
+      'Connections',
     ]);
+    expect(wrapper.findAll('.el-menu-item-group__title').map((title) => title.text())).toStrictEqual(['App', 'Agents', 'Workspace']);
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Theme');
@@ -100,7 +107,7 @@ describe('SettingsView', () => {
 
     await wrapper.setProps({ activeTab: 'claude-code' } as never);
 
-    expect(wrapper.text()).toContain('Account');
+    expect(wrapper.get('.engine-hero__copy strong').text()).toBe('Claude Code');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     expect(wrapper.text()).not.toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Codex executable');

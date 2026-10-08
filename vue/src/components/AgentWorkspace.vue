@@ -87,7 +87,9 @@
       :select-visualization="selectVisualization"
       :delete-visualization="deleteVisualization"
       :read-visualization-asset="readVisualizationAsset"
+      :save-document="saveDocumentAs ? tab => saveDocumentAs!(agent.id, tab) : undefined"
       @close-tab="closeWorkspaceTab(agent, $event)"
+      @browser-url-change="(tab, url) => updateBrowserUrl(agent.id, tab, url)"
       @cancel-plan="cancelPlanReview(agent.id)"
       @comment-plan="commentOnPlan"
       @confirm-plan="confirmPlan"
@@ -193,6 +195,7 @@ const props = defineProps<{
   addVisualizationAnnotation: (annotation: VisualizationAnnotationInput) => void;
   agentFiles: AgentFileSearchItem[];
   agentSidebarCollapsed: boolean;
+  saveDocumentAs?: (agentId: string, tabId: string) => Promise<void>;
   closeRightWorkspaceTab: (agentId: string, tab: RightWorkspaceTab) => void;
   confirmPlan: () => void;
   respondToPlanReview?: (resolution: 'accept' | 'revise' | 'cancel', feedback?: string) => Promise<void>;
@@ -296,6 +299,7 @@ const emit = defineEmits<{
 const {
   activeAttachmentAnnotationCounts,
   agentFiles,
+  saveDocumentAs,
   closeRightWorkspaceTab,
   confirmPlan,
   conversationPaneController,
@@ -523,6 +527,12 @@ function readConversationMessages(ref: BackendConversationRef, agentId: string):
 
 function openFilePreview(link: ConversationFileLink): Promise<void> {
   return props.openFilePreview(link);
+}
+
+function updateBrowserUrl(agentId: string, tab: 'browser' | RightWorkspaceBrowserTab, url: string): void {
+  const workspace = rightWorkspaceFor(agentId);
+  if (tab === 'browser') workspace.browserInitialUrl = url;
+  else if (workspace.browserPanels[tab]) workspace.browserPanels[tab]!.url = url;
 }
 
 function openRequestedBrowser(agentId: string, command: Extract<AppCommand, { type: 'open-browser' }>): void {

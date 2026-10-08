@@ -1,6 +1,6 @@
 <template>
   <SettingsPanelFrame :title="$t('antigravity.name')" title-id="settings-antigravity-title">
-    <SettingsEngineConnectionRow :authentication="authentication" :connected="connected" :enabled="enabled" :set-enabled="setEnabled" :busy="busy" :pending="pending" :error="error" @connect="emit('connect')" @disconnect="emit('disconnect')" @cancel="emit('cancel')">
+    <SettingsEngineConnectionRow backend="antigravity" :title="$t('antigravity.name')" :authentication="authentication" :connected="connected" :enabled="enabled" :set-enabled="setEnabled" :busy="busy" :pending="pending" :error="error" @connect="emit('connect')" @disconnect="emit('disconnect')" @cancel="emit('cancel')">
       <SettingsEngineSetupRow :home="home" @customize="emit('customize')" />
     </SettingsEngineConnectionRow>
   </SettingsPanelFrame>

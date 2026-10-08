@@ -66,6 +66,7 @@ vi.mock('@workspace/core/agent-chat-service', () => ({
 
 
 vi.mock('../state', () => ({
+  backendHomeDir: () => '/tmp/runtime-test-home',
   loadBackendTasks: vi.fn().mockResolvedValue([]),
   saveBackendTasks: vi.fn().mockResolvedValue(undefined),
   loadBackendSnapshot: mocks.loadBackendSnapshot,

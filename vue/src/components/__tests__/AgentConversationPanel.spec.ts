@@ -92,7 +92,7 @@ describe('AgentConversationPanel', () => {
     expect(wrapper.get('.chat-rich-text-editor').text()).toBe('Unsent split draft');
   });
 
-  it('steers the focused split Claude pane and its queued prompt to its own agent', async () => {
+  it('applies the follow-up preference in a split pane and routes both actions to its own agent', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[1]!;
     agent.backend = 'claude';
@@ -122,12 +122,18 @@ describe('AgentConversationPanel', () => {
     const wrapper = mount(AgentConversationPanel, { props: {
       view, actions, agents: snapshot.agents, focused: true, mentionGroups: [], modelMenuItems: [], selectModelMenuItem: vi.fn(),
       savedPromptDrafts: [], savePromptDraft: vi.fn(), removePromptDraft: vi.fn(), openLink: vi.fn(), openImage: vi.fn(), openVisualization: vi.fn(),
+      followUpBehavior: 'steer',
     }, global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']) } } });
     expect(wrapper.get<HTMLButtonElement>('[aria-label="Steer queued prompt now"]').element.disabled).toBe(false);
-    await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter', metaKey: true });
+    await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter' });
     await flushPromises();
     expect(actions.steer).toHaveBeenCalledExactlyOnceWith(agent.id, 'Split follow-up', undefined);
     expect(actions.send).not.toHaveBeenCalled();
+    view.composerState = { text: 'Queue this instead', selectionStart: 18, selectionEnd: 18 };
+    await flushPromises();
+    await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter', metaKey: true });
+    await flushPromises();
+    expect(actions.send).toHaveBeenCalledExactlyOnceWith(agent.id, 'Queue this instead', undefined);
     await wrapper.get('[aria-label="Steer queued prompt now"]').trigger('click');
     expect(actions.steerQueuedPrompt).toHaveBeenCalledWith(agent.id, 'queued-split', undefined);
   });

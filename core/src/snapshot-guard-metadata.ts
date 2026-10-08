@@ -526,6 +526,7 @@ function isGeneralSettings(value: unknown): boolean {
     typeof value.preventSleepWhenAgentsRun === 'boolean' &&
     typeof value.preventSleepWhenRemoteAccessEnabled === 'boolean' &&
     typeof value.celebrationsEnabled === 'boolean' &&
+    includes(['queue', 'steer'], value.followUpBehavior) &&
     typeof value.spokenAnnouncementsEnabled === 'boolean' &&
     typeof value.spokenAnnouncementsMuted === 'boolean' &&
     typeof value.spokenAnnouncementsOnlyForDictatedPrompts === 'boolean' &&

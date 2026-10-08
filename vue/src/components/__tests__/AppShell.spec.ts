@@ -96,11 +96,11 @@ describe('AppShell authentication and conversation', () => {
       await flushPromises();
       expect(disconnectProvider).toHaveBeenCalledExactlyOnceWith(backend);
       expect(setProviderEnabled).not.toHaveBeenCalled();
-      expect(wrapper.get('.settings-row__error').text()).toBe('Sign-out failed');
+      expect(wrapper.get('.engine-hero__error').text()).toBe('Sign-out failed');
       await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
       await flushPromises();
       expect(disconnectProvider).toHaveBeenCalledTimes(2);
-      expect(wrapper.find('.settings-row__error').exists()).toBe(false);
+      expect(wrapper.find('.engine-hero__error').exists()).toBe(false);
       snapshot.providerConnections[0]!.connected = false;
       await wrapper.setProps({ snapshot: { ...snapshot } });
       await wrapper.get('.settings-view').findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
@@ -124,27 +124,40 @@ describe('AppShell authentication and conversation', () => {
     }
   });
 
-  it('routes the Claude steer shortcut through the installed SDK and enables shelf steering', async () => {
+  it.each(['codex', 'claude'] as const)('applies live follow-up preferences to the %s composer without changing provider routing', async (backend) => {
     const snapshot = createInitialSnapshot();
     snapshot.general.claudeCodeEnabled = true;
-    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    snapshot.general.followUpBehavior = 'steer';
+    snapshot.providerConnections = [{ backend, installed: true, connected: true, checking: false }];
     const agent = snapshot.agents[0]!;
-    agent.backend = 'claude';
-    agent.backendDefaults = { kind: 'claude' };
-    agent.backendSession = { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' };
+    agent.backend = backend;
+    agent.backendDefaults = { kind: backend };
+    agent.backendSession = backend === 'claude'
+      ? { kind: 'claude', sessionId: 'claude-session-1', transport: 'stdio' }
+      : { kind: 'codex', threadId: 'thread-1' };
     agent.status = { type: 'working' };
     const wrapper = mountShell({
       snapshot, stubAgentWorkspace: false, realConversationPane: true,
-      claudeConversationSnapshot: claudeConversationSnapshot([], { busy: true, activeTurnId: 'turn-1' }),
+      ...(backend === 'claude'
+        ? { claudeConversationSnapshot: claudeConversationSnapshot([], { busy: true, activeTurnId: 'turn-1' }) }
+        : { codexConversationSnapshot: codexConversationSnapshot([], { busy: true, activeTurnId: 'turn-1' }) }),
       composerState: { text: 'Do this next', selectionStart: 12, selectionEnd: 12 },
       queuedPrompts: [{ id: 'queued-1', agentId: agent.id, text: 'Already queued', createdAt: '2026-10-03T00:00:00Z' }],
     });
-    await wrapper.setProps({ backendCapabilities: claudeBackendCapabilities, isSending: true });
+    await wrapper.setProps({ backendCapabilities: backend === 'claude' ? claudeBackendCapabilities : codexBackendCapabilities, isSending: true });
     expect(wrapper.get<HTMLButtonElement>('[aria-label="Steer queued prompt now"]').element.disabled).toBe(false);
-    await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter', metaKey: true });
+    await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter' });
     await flushPromises();
     expect(wrapper.emitted('steerPrompt')).toEqual([['Do this next']]);
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
+    await wrapper.setProps({
+      snapshot: { ...snapshot, general: { ...snapshot.general, followUpBehavior: 'queue' } },
+      composerState: { text: 'Save this for later', selectionStart: 18, selectionEnd: 18 },
+    });
+    await wrapper.get('.chat-rich-text-editor').trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(wrapper.emitted('sendPrompt')).toEqual([['Save this for later']]);
+    expect(wrapper.emitted('steerPrompt')).toHaveLength(1);
   });
 
   it('projects Claude approvals into the controlled pane with their exact transcript item identity', async () => {
@@ -424,7 +437,7 @@ describe('AppShell authentication and conversation', () => {
     await flushPromises();
     await wrapper.get('.settings-menu').findAll('[role="menuitem"]').find(item => item.text().startsWith('Settings'))!.trigger('click');
     await wrapper.get('.settings-sidebar').findAll('.el-menu-item').find(item => item.text() === 'Codex')!.trigger('click');
-    expect(wrapper.get('.settings-view .settings-row').text()).toContain('cached@example.com');
+    expect(wrapper.get('.settings-view .engine-hero__summary').text()).toContain('cached@example.com');
     expect(getCodexAuthentication).not.toHaveBeenCalled();
   });
 

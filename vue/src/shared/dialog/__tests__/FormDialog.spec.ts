@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { ElDialog } from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import FormDialog from '../FormDialog.vue';
-import FormDialogField from '../FormDialogField.vue';
+import FormField from '../../form/FormField.vue';
 
 describe('FormDialog', () => {
   it('teleports outside a hidden shell when requested', async () => {
@@ -83,9 +83,9 @@ function dialogStub() {
   };
 }
 
-describe('FormDialogField', () => {
+describe('FormField', () => {
   it('renders a label and help above its control', () => {
-    const wrapper = mount(FormDialogField, {
+    const wrapper = mount(FormField, {
       props: {
         label: 'Repository',
         labelFor: 'repository',

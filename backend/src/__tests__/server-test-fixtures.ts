@@ -38,6 +38,7 @@ export function createTestSnapshot(): AppSnapshot {
       preventSleepWhenAgentsRun: true,
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: true,
+      followUpBehavior: 'queue',
       spokenAnnouncementsEnabled: false,
       spokenAnnouncementsMuted: false,
       spokenAnnouncementsOnlyForDictatedPrompts: false,

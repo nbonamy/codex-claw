@@ -1278,6 +1278,7 @@ describe('state persistence', () => {
       preventSleepWhenAgentsRun: false,
       preventSleepWhenRemoteAccessEnabled: true,
       celebrationsEnabled: false,
+      followUpBehavior: 'queue',
       spokenAnnouncementsEnabled: true,
       spokenAnnouncementsMuted: true,
       spokenAnnouncementsOnlyForDictatedPrompts: true,

@@ -1,11 +1,14 @@
 <template>
   <SettingsPanelFrame :title="$t('surface.instructionSettings.git')" title-id="settings-git-title">
-    <SettingsSection
+    <template #banner>
+      <SettingsIntro kind="git" :title="$t('surface.instructionSettings.gitIntroTitle')" :description="$t('surface.instructionSettings.gitIntroDescription')" />
+    </template>
+    <FormSection
       class="settings-instructions__worktree-section"
       :title="$t('surface.instructionSettings.worktrees')"
       title-id="settings-git-worktrees-title"
     >
-      <SettingsRow
+      <FormRow
         :title="$t('surface.instructionSettings.worktreeInitialization')"
         :description="$t('surface.instructionSettings.prepareNewWorktreesBeforeAgentsStart')"
       >
@@ -21,8 +24,8 @@
             <el-option :label="$t('surface.instructionSettings.worktreeInitializationDisabled')" value="off" />
           </el-select>
         </template>
-      </SettingsRow>
-    </SettingsSection>
+      </FormRow>
+    </FormSection>
     <div class="settings-instructions__fields">
       <SettingsTextareaField
         v-for="field in fields"
@@ -43,8 +46,9 @@ import { reactive, watch } from 'vue';
 import { useDebouncedSave } from '../shared/use-debounced-save';
 import type { AppGeneralSettings, UpdateSettingsInput, WorktreeInitializationMode } from '@workspace/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import SettingsIntro from './SettingsIntro.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 import SettingsTextareaField from './SettingsTextareaField.vue';
 
 const props = defineProps<{

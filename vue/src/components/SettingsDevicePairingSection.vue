@@ -1,10 +1,10 @@
 <template>
-  <SettingsSection
+  <FormSection
     :title="$t('surface.settingsDevicePairingSection.codexDevicePairing')"
     title-id="settings-connections-device-pairing-title"
   >
     <div class="settings-device-pairing">
-      <SettingsRow
+      <FormRow
         :title="$t('surface.settingsDevicePairingSection.allowConnections')"
         :description="description"
       >
@@ -17,9 +17,9 @@
             @update:model-value="updateRemoteControlEnabled"
           />
         </template>
-      </SettingsRow>
+      </FormRow>
 
-      <SettingsRow
+      <FormRow
         v-if="remoteControlEnabled"
         as="label"
         :title="$t('surface.settingsDevicePairingSection.keepThisMacAwake')"
@@ -32,7 +32,7 @@
             @update:model-value="updateRemoteAccessKeepAwake"
           />
         </template>
-      </SettingsRow>
+      </FormRow>
 
       <p
         v-if="error"
@@ -62,7 +62,7 @@
       <template
         v-if="remoteControlEnabled"
       >
-        <SettingsRow
+        <FormRow
           :title="$t('surface.settingsDevicePairingSection.pairedDevices')"
           :description="pairedDevicesDescription"
         >
@@ -91,7 +91,7 @@
               </template>
             </span>
           </template>
-        </SettingsRow>
+        </FormRow>
         <div
           v-if="devices.length > 0"
           class="settings-device-pairing__device-list"
@@ -100,7 +100,7 @@
             class="settings-device-pairing__device-divider"
             aria-hidden="true"
           >
-          <SettingsRow
+          <FormRow
             v-for="device in devices"
             :key="device.clientId"
             :title="device.displayName || device.deviceModel || $t('surface.settingsDevicePairingSection.codexDevice')"
@@ -115,11 +115,11 @@
                 @click="confirmRevoke(device)"
               > {{ $t('surface.settingsDevicePairingSection.revoke') }} </el-button>
             </template>
-          </SettingsRow>
+          </FormRow>
         </div>
       </template>
     </div>
-  </SettingsSection>
+  </FormSection>
 </template>
 
 <script setup lang="ts">
@@ -129,8 +129,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toString as qrCodeToString } from 'qrcode';
 import type { DevicePairingSession, DevicePairingStatus, PairedDevice, UpdateSettingsInput } from '@workspace/core/contracts';
 import { codexPairingUrl } from '../device-pairing';
-import SettingsRow from './SettingsRow.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormRow from '../shared/form/FormRow.vue';
+import FormSection from '../shared/form/FormSection.vue';
 
 const props = withDefaults(defineProps<{
   getStatus?: () => Promise<DevicePairingStatus>;

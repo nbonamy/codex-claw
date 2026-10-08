@@ -1,7 +1,9 @@
 <template>
   <SettingsPanelFrame :title="$t('surface.settingsIntegrationsPanel.integrations')" title-id="settings-integrations-title">
-    <template #banner><SettingsIntegrationBanner /></template>
-    <SettingsSection v-for="connection in integrations" :key="connection.provider">
+    <template #banner>
+      <SettingsIntro kind="integrations" :title="$t('surface.settingsIntegrationsPanel.introTitle')" :description="$t('surface.settingsIntegrationsPanel.introDescription')" />
+    </template>
+    <FormSection v-for="connection in integrations" :key="connection.provider">
       <article class="settings-integrations-panel__integration">
         <div class="settings-integrations-panel__identity">
           <span class="settings-integrations-panel__icon" aria-hidden="true">
@@ -15,7 +17,7 @@
         </div>
         <div class="settings-integrations-panel__actions">
           <template v-if="connection.status === 'connected'">
-            <span class="settings-integrations-panel__connected">{{ $t('surface.settingsIntegrationsPanel.connected') }}</span>
+            <StatusPill tone="success">{{ $t('surface.settingsIntegrationsPanel.connected') }}</StatusPill>
             <el-button size="small" :aria-label="actionLabel('disconnect', connection.provider)" @click="emit('disconnect', connection.provider)">{{ $t('surface.settingsIntegrationsPanel.disconnect') }}</el-button>
           </template>
           <el-button v-else-if="connection.status === 'connecting'" size="small" :aria-label="actionLabel('cancel', connection.provider)" @click="emit('disconnect', connection.provider)">{{ $t('linearIntegration.cancel') }}</el-button>
@@ -25,7 +27,7 @@
       <div v-if="authorization?.provider === connection.provider && authorization.userCode && connection.status === 'connecting'" class="settings-integrations-panel__authorization">
         <WorkAuthorizationSteps :authorization="authorization" @open="emit('open-authorization', connection.provider)" />
       </div>
-    </SettingsSection>
+    </FormSection>
     <p v-if="error" class="settings-integrations-panel__detail">{{ error }}</p>
   </SettingsPanelFrame>
 </template>
@@ -38,9 +40,10 @@ import { translate } from '../i18n';
 import { localizedText } from '../i18n/errors';
 import { BacklogIcon, GitHubIcon, LinearIcon } from '../shared/icons/app-icons';
 import WorkAuthorizationSteps from './WorkAuthorizationSteps.vue';
-import SettingsIntegrationBanner from './SettingsIntegrationBanner.vue';
+import SettingsIntro from './SettingsIntro.vue';
+import StatusPill from '../shared/form/StatusPill.vue';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
-import SettingsSection from './SettingsSection.vue';
+import FormSection from '../shared/form/FormSection.vue';
 
 const props = withDefaults(defineProps<{
   authorization?: WorkProviderAuthorization | null;
@@ -119,12 +122,6 @@ function actionLabel(action: 'connect' | 'disconnect' | 'cancel', provider: Work
   display: flex;
   align-items: center;
   gap: var(--space-8);
-}
-
-.settings-integrations-panel__connected {
-  color: var(--color-success);
-  font-size: var(--font-size-13);
-  font-weight: var(--font-weight-semibold);
 }
 
 .settings-integrations-panel__authorization {

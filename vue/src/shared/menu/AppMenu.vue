@@ -179,7 +179,7 @@ function isSelected(item: Exclude<AppMenuItem, { type: 'separator' | 'submenu' }
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  background: var(--color-surface-lowest);
+  background: var(--color-menu-background);
   box-shadow: var(--shadow-menu);
   font-size: var(--font-size-13);
 }
