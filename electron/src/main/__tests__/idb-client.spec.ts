@@ -4,7 +4,7 @@ import { loadSync } from '@grpc/proto-loader';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IdbClient } from '../mobile/idb-client';
 const proto = path.resolve(import.meta.dirname, '../../../resources/mobile-simulator/idb.proto');
 const definition = loadSync(proto, { keepCase: true, longs: Number, defaults: true })[
@@ -54,6 +54,67 @@ afterEach(async () => {
 });
 
 describe('idb companion wire protocol', () => {
+  it('delivers framed native video across fragmented messages and cancels capture on close', async () => {
+    let stream: any;
+    let request: any;
+    const cancelled = vi.fn();
+    server.removeService(definition);
+    server.addService(definition, {
+      video_stream: (call: any) => {
+        stream = call;
+        call.on('data', (value: any) => { request = value; });
+        call.on('cancelled', cancelled);
+      },
+    });
+    const frames = vi.fn(), failed = vi.fn();
+    const stop = client.startVideo(frames, failed);
+    await vi.waitFor(() => expect(request?.start).toMatchObject({ format: 3, fps: 60 }));
+    const header = Buffer.alloc(24);
+    header[0] = 1; header[1] = 24;
+    const jpeg = Buffer.from([255, 216, 1, 2, 255, 217]);
+    const length = Buffer.alloc(4); length.writeUInt32LE(jpeg.length);
+    const bytes = Buffer.concat([header, length, jpeg, length, jpeg]);
+    stream.write({ payload: { data: bytes.subarray(0, 25) } });
+    stream.write({ payload: { data: bytes.subarray(25, 30) } });
+    stream.write({ payload: { data: bytes.subarray(30) } });
+    await vi.waitFor(() => expect(frames).toHaveBeenCalledTimes(2));
+    expect(frames).toHaveBeenLastCalledWith(jpeg);
+    stop();
+    await vi.waitFor(() => expect(cancelled).toHaveBeenCalled());
+    expect(failed).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed video framing and reports a stopped native stream', async () => {
+    let stream: any;
+    server.removeService(definition);
+    server.addService(definition, { video_stream: (call: any) => { stream = call; call.on('data', () => {}); } });
+    const failed = vi.fn();
+    client.startVideo(vi.fn(), failed);
+    await vi.waitFor(() => expect(stream).toBeDefined());
+    const bytes = Buffer.alloc(28); bytes[0] = 1; bytes[1] = 24; bytes.writeUInt32LE(20 * 1024 * 1024, 24);
+    stream.write({ payload: { data: bytes } });
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('video') })));
+    stream = undefined;
+    client.startVideo(vi.fn(), failed);
+    await vi.waitFor(() => expect(stream).toBeDefined());
+    stream.end();
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledTimes(2));
+  });
+
+  it('sends drag movement before release and releases a held touch when the pane closes', async () => {
+    const failed = vi.fn();
+    const touch = client.openTouch(failed);
+    touch.send(100, 200);
+    touch.send(110, 180);
+    await vi.waitFor(() => expect(events).toHaveLength(2));
+    expect(events.map((event: any) => [event.press.direction, event.press.action.touch.point])).toEqual([
+      [0, { x: 100, y: 200 }], [0, { x: 110, y: 180 }],
+    ]);
+    touch.close();
+    await vi.waitFor(() => expect(events).toHaveLength(3));
+    expect(events[2]).toMatchObject({ press: { direction: 1, action: { touch: { point: { x: 110, y: 180 } } } } });
+    expect(failed).not.toHaveBeenCalled();
+  });
   it('reads binary screenshots, device dimensions and accessibility over the private socket', async () => {
     expect((await client.describe()).udid).toBe('phone');
     expect(await client.screenshot()).toEqual(Buffer.from([0, 137, 255]));
@@ -70,7 +131,7 @@ describe('idb companion wire protocol', () => {
     ]);
     expect(events[2]).toMatchObject({ swipe: { start: { x: 100, y: 200 }, end: { x: 300, y: 400 }, duration: 0.5 } });
     expect(events[3]).toMatchObject({ press: { action: { button: { button: 1 } } } });
-    expect(events.slice(5).map((event: any) => [event.press.action.key.keycode, event.press.direction])).toEqual([
+    expect(events.slice(5).filter((event: any) => event.press).map((event: any) => [event.press.action.key.keycode, event.press.direction])).toEqual([
       [225, 0],
       [4, 0],
       [4, 1],
@@ -86,7 +147,7 @@ describe('idb companion wire protocol', () => {
     await client.text('0 :\\');
     await client.button('enter');
     await client.button('backspace');
-    expect(events.map((event: any) => [event.press.action.key.keycode, event.press.direction])).toEqual([
+    expect(events.filter((event: any) => event.press).map((event: any) => [event.press.action.key.keycode, event.press.direction])).toEqual([
       [39, 0],
       [39, 1],
       [44, 0],
@@ -102,6 +163,20 @@ describe('idb companion wire protocol', () => {
       [42, 0],
       [42, 1],
     ]);
+    events = [];
+    await client.text('ab');
+    expect(events.map((event: any) => (event.delay ? 'pause' : `${event.press.action.key.keycode}:${event.press.direction}`))).toEqual([
+      '4:0', '4:1', 'pause', '5:0', '5:1', 'pause',
+    ]);
+    expect(events.find((event: any) => event.delay)).toMatchObject({ delay: { duration: 0.03 } });
+    events = [];
+    await client.text('x'.repeat(250));
+    expect(events.filter((event: any) => event.delay)).toHaveLength(250);
+    events = [];
+    await client.button('volumeUp');
+    await client.button('volumeDown');
+    await client.button('power');
+    expect(events.filter((event: any) => event.press.direction === 0).map((event: any) => event.press.action.button.button)).toEqual([6, 7, 2]);
     await expect(client.button('back')).rejects.toThrow('no Back');
     await expect(client.text('é')).rejects.toThrow('ASCII');
     await client.launch('com.example.app');

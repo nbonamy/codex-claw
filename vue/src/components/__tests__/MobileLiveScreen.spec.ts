@@ -1,0 +1,261 @@
+import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import MobileLiveScreen from '../MobileLiveScreen.vue';
+import { setElectronTestClient } from '../../test/client';
+import type { MobileViewRequest, MobileViewResult } from '@workspace/core/mobile-simulator';
+
+function setup() {
+  const readers: {
+    resolve(value: MobileViewResult): void;
+    reject(error: Error): void;
+  }[] = [];
+  let serial = 0;
+  vi.stubGlobal('URL', {
+    createObjectURL: vi.fn(() => `blob:frame-${++serial}`),
+    revokeObjectURL: vi.fn(),
+  });
+  const mobileSimulatorView = vi.fn(
+    async (_agent: string, input: MobileViewRequest): Promise<MobileViewResult> => {
+      if (input.action === 'frame')
+        return new Promise((resolve, reject) => readers.push({ resolve, reject }));
+      return { viewId: 'view' };
+    },
+  );
+  setElectronTestClient({ mobileSimulatorView });
+  const wrapper = mount(MobileLiveScreen, {
+    props: { agentId: 'a', attachmentId: 'device-session', disabled: false },
+  });
+  async function frame(rotation?: 0 | 1 | 2 | 3) {
+    readers.shift()!.resolve({
+      viewId: 'view',
+      frame: {
+        mimeType: 'image/jpeg',
+        geometry: 0,
+        ...(rotation === undefined ? {} : { rotation }),
+        data: new Uint8Array([255, 216, 255, 217]),
+        width: 1200,
+        height: 2400,
+      },
+    });
+    await flushPromises();
+    await wrapper.get('img').trigger('load');
+    await flushPromises();
+  }
+  return { wrapper, mobileSimulatorView, readers, frame };
+}
+afterEach(() => vi.unstubAllGlobals());
+
+describe('MobileLiveScreen', () => {
+  it('puts working buttons on the frame, separate volume keys, following the device as it turns', async () => {
+    const { wrapper, frame } = setup();
+    await flushPromises();
+    await frame();
+    const edges = () => Object.fromEntries(wrapper.findAll('.mobile-live-screen__hw').map((button) => [button.attributes('aria-label'), button.classes().find((name) => name.includes('--'))]));
+    expect(edges()).toEqual({
+      'Volume up': 'mobile-live-screen__hw--left',
+      'Volume down': 'mobile-live-screen__hw--left',
+      Power: 'mobile-live-screen__hw--right',
+    });
+    const [up, down] = wrapper.findAll('.mobile-live-screen__hw');
+    expect(up!.attributes('style')).toContain('top: 20%');
+    expect(down!.attributes('style')).toContain('top: 31%'); // a gap remains between the two volume keys
+    await down!.trigger('click');
+    expect(wrapper.emitted('button')).toEqual([['volumeDown']]);
+    await frame(1); // clockwise quarter turn: left edge becomes the top, right edge the bottom
+    expect(edges()).toEqual({
+      'Volume up': 'mobile-live-screen__hw--top',
+      'Volume down': 'mobile-live-screen__hw--top',
+      Power: 'mobile-live-screen__hw--bottom',
+    });
+    await wrapper.setProps({ platform: 'android', disabled: true });
+    expect(wrapper.findAll('.mobile-live-screen__hw').every((button) => button.attributes('disabled') !== undefined)).toBe(true);
+  });
+
+  it('frames the device for its platform and orientation', async () => {
+    const { wrapper, frame } = setup();
+    await flushPromises();
+    await frame();
+    const device = wrapper.get('.mobile-live-screen__device');
+    expect(device.attributes('data-platform')).toBe('ios');
+    expect(device.attributes('data-landscape')).toBe('false');
+    await wrapper.setProps({ platform: 'android' });
+    expect(device.attributes('data-platform')).toBe('android');
+    await frame(1);
+    expect(wrapper.get('.mobile-live-screen__device').attributes('data-landscape')).toBe('true');
+  });
+
+  it.each([
+    [1, 'landscape', 0.25, 0.5, 600, 600],
+    [3, 'landscape', 0.75, 0.25, 1800, 300],
+    [2, 'portrait', 0.25, 0.5, 300, 1200],
+  ] as const)('sends taps in the upright space of a framebuffer shown with %i clockwise quarter turns', async (turns, shape, u, v, expectedX, expectedY) => {
+    const { wrapper, mobileSimulatorView, frame } = setup();
+    await flushPromises();
+    await frame(turns);
+    const device = wrapper.get('.mobile-live-screen__device');
+    expect(device.attributes('data-rotation')).toBe(String(turns));
+    expect(device.attributes('style')).toContain(shape === 'landscape' ? '--mobile-screen-ratio: 2' : '--mobile-screen-ratio: 0.5');
+    const image = wrapper.get('img');
+    vi.spyOn(image.element, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 400, height: 400 } as DOMRect);
+    const pointer = (name: string, x: number, y: number) =>
+      image.element.dispatchEvent(new MouseEvent(name, { button: 0, clientX: x, clientY: y, bubbles: true }));
+    pointer('pointerdown', 400 * u, 400 * v);
+    await flushPromises();
+    const touch = mobileSimulatorView.mock.calls.find(([, input]) => input.action === 'touch')![1] as { x: number; y: number };
+    expect([touch.x, touch.y]).toEqual([expectedX, expectedY]);
+  });
+
+  it('renders video during a held drag and coalesces moves without losing release', async () => {
+    const { wrapper, mobileSimulatorView, frame } = setup();
+    await flushPromises();
+    await frame();
+    const image = wrapper.get('img');
+    wrapper.get('.mobile-live-screen__device').element.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        button: 0,
+        clientX: 2,
+        clientY: 2,
+        bubbles: true,
+      }),
+    );
+    expect(mobileSimulatorView.mock.calls.some(([, input]) => input.action === 'touch')).toBe(false);
+    vi.spyOn(image.element, 'getBoundingClientRect').mockReturnValue({
+      left: 10,
+      top: 20,
+      width: 300,
+      height: 600,
+    } as DOMRect);
+    const pointer = (name: string, x: number, y: number) =>
+      image.element.dispatchEvent(
+        new MouseEvent(name, {
+          button: 0,
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+        }),
+      );
+    pointer('pointerdown', 110, 420);
+    await flushPromises();
+    expect(mobileSimulatorView).toHaveBeenCalledWith('a', {
+      action: 'touch',
+      geometry: 0,
+      attachmentId: 'device-session',
+      viewId: 'view',
+      phase: 'down',
+      x: 400,
+      y: 1600,
+    });
+    let finish!: (value: MobileViewResult) => void;
+    mobileSimulatorView.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    pointer('pointermove', 110, 320);
+    pointer('pointermove', 110, 270);
+    pointer('pointermove', 110, 220);
+    await frame();
+    expect(image.attributes('src')).toBe('blob:frame-2');
+    expect(mobileSimulatorView.mock.calls.filter(([, input]) => input.action === 'touch')).toHaveLength(2);
+    pointer('pointerup', 110, 200);
+    finish({ viewId: 'view' });
+    await flushPromises();
+    expect(
+      mobileSimulatorView.mock.calls
+        .filter(([, input]) => input.action === 'touch')
+        .map(([, input]) => input),
+    ).toEqual([
+      {
+        action: 'touch',
+        geometry: 0,
+        attachmentId: 'device-session',
+        viewId: 'view',
+        phase: 'down',
+        x: 400,
+        y: 1600,
+      },
+      {
+        action: 'touch',
+        geometry: 0,
+        attachmentId: 'device-session',
+        viewId: 'view',
+        phase: 'move',
+        x: 400,
+        y: 1200,
+      },
+      {
+        action: 'touch',
+        geometry: 0,
+        attachmentId: 'device-session',
+        viewId: 'view',
+        phase: 'up',
+        x: 400,
+        y: 720,
+      },
+    ]);
+    wrapper.unmount();
+    expect(mobileSimulatorView).toHaveBeenCalledWith('a', {
+      action: 'stop',
+      attachmentId: 'device-session',
+      viewId: 'view',
+    });
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:frame-1');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:frame-2');
+  });
+
+  it('renders Android PNG bytes and keeps the displayed frame across idle heartbeats', async () => {
+    const { wrapper, readers } = setup();
+    await flushPromises();
+    readers
+      .shift()!
+      .resolve({
+        viewId: 'view',
+        frame: {
+          data: new Uint8Array([137, 80, 78, 71]),
+          mimeType: 'image/png',
+          width: 1080,
+          height: 2400,
+          geometry: 0,
+        },
+      });
+    await flushPromises();
+    await wrapper.get('img').trigger('load');
+    await flushPromises();
+    const source = wrapper.get('img').attributes('src');
+    expect(vi.mocked(URL.createObjectURL).mock.calls[0]![0]).toHaveProperty('type', 'image/png');
+    readers.shift()!.resolve({ viewId: 'view' });
+    await flushPromises();
+    expect(wrapper.get('img').attributes('src')).toBe(source);
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(readers).toHaveLength(1);
+    wrapper.unmount();
+  });
+  it('discards old-agent frames, reports stream failure, and reconnects through the visible retry', async () => {
+    const { wrapper, mobileSimulatorView, readers, frame } = setup();
+    await flushPromises();
+    const stale = readers.shift()!;
+    await wrapper.setProps({ agentId: 'b', attachmentId: 'other-session' });
+    await flushPromises();
+    stale.resolve({
+      viewId: 'view',
+      frame: { mimeType: 'image/jpeg', geometry: 0, data: new Uint8Array([1]), width: 1200, height: 2400 },
+    });
+    await flushPromises();
+    expect(wrapper.find('img').exists()).toBe(false);
+    await frame();
+    readers.shift()!.reject(new Error('Simulator disconnected'));
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('Simulator disconnected');
+    expect(wrapper.find('img').exists()).toBe(false);
+    await wrapper.get('[role="alert"] button').trigger('click');
+    await flushPromises();
+    await frame();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(mobileSimulatorView).toHaveBeenCalledWith('b', {
+      action: 'start',
+      attachmentId: 'other-session',
+    });
+    wrapper.unmount();
+  });
+});

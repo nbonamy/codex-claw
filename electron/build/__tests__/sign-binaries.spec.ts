@@ -178,4 +178,24 @@ describe('signDarwinBinaries', () => {
     expect(execFileSync).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalled();
   });
+
+  it('signs the required helpers when the optional iOS companion was not staged', () => {
+    const execFileSync = vi.fn();
+
+    signDarwinBinaries(`/build/${product.name}.app/Contents/Resources/app`, 'x64', {
+      env: {
+        IDENTITY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
+      },
+      execFileSync,
+      existsSync: (filePath) => [
+        `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
+        `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
+        `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
+        `/build/${product.name}.app/Contents/Resources/runtime/node`,
+      ].includes(filePath),
+      logger: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(execFileSync).toHaveBeenCalledTimes(4);
+  });
 });

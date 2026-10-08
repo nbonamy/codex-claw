@@ -65,6 +65,7 @@ type AppShellCommandOptions = {
     openGitReview: () => void | Promise<void>;
     openMarkdown: (request: SidePanelMarkdownRequest) => void;
     openRightWorkspaceTab: (tab: RightWorkspaceTab, agentId?: string) => void;
+    closeRightWorkspaceTab: (tab: RightWorkspaceTab, agentId: string) => void;
     openSettings: () => void;
     openWhatsNew: () => void;
     quit: () => void | Promise<void>;
@@ -303,6 +304,11 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
     if (command.type === 'open-simulator') {
       options.actions.openRightWorkspaceTab('simulator', command.agentId);
+      return;
+    }
+
+    if (command.type === 'close-simulator') {
+      options.actions.closeRightWorkspaceTab('simulator', command.agentId);
       return;
     }
 

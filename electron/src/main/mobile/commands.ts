@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 
 /** No shell; binary output, bounded memory and an outer deadline for every native call. */
 export function runMobileCommand(file: string, args: string[], timeout = 15_000): Promise<Buffer> {
@@ -18,4 +18,11 @@ export function runMobileCommand(file: string, args: string[], timeout = 15_000)
       },
     );
   });
+}
+
+/** Starts a long-lived tool (an emulator) that must outlive this app and never inherit its stdio. */
+export function startMobileProcess(file: string, args: string[]): void {
+  const child = spawn(file, args, { detached: true, stdio: 'ignore' });
+  child.on('error', () => undefined);
+  child.unref();
 }

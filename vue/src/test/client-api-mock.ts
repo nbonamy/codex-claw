@@ -191,6 +191,7 @@ export function createClientApiMock(
     retryTurn: unscripted('retryTurn'),
     continueInterruptedTurn: unscripted('continueInterruptedTurn'),
     mobileSimulator: unscripted('mobileSimulator'),
+    mobileSimulatorView: unscripted('mobileSimulatorView'),
     browserOpen: unscripted('browserOpen'),
     browserOpenVisualization: unscripted('browserOpenVisualization'),
     browserNavigate: unscripted('browserNavigate'),

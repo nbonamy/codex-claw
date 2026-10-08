@@ -1165,9 +1165,13 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.emitted('select-agent')).toBeUndefined();
     listener({ type: 'open-simulator', agentId: 'agent-dina' });
     await flushPromises();
-    expect(wrapper.get('[aria-label="Mobile simulator"]').text()).toContain('Select a device');
+    expect(wrapper.get('[aria-label="Mobile simulator"]').text()).toContain('Choose a simulator');
     expect(mobileSimulator).toHaveBeenCalledWith('agent-dina', { action: 'list' });
     expect(wrapper.emitted('select-agent')).toBeUndefined();
+    expect(wrapper.findAll('[aria-label="Mobile simulator"]')).toHaveLength(2);
+    listener({ type: 'close-simulator', agentId: 'agent-dina' });
+    await flushPromises();
+    expect(wrapper.findAll('[aria-label="Mobile simulator"]')).toHaveLength(1);
     wrapper.unmount();
   });
 

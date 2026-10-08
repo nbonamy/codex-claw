@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 export async function prepareMobileSimulator({ root = path.resolve(import.meta.dirname, '..'), platform = process.platform, arch = process.arch } = {}) {
   if (platform !== 'darwin') return null;
   const release = JSON.parse(fs.readFileSync(path.join(root, 'mobile-simulator-release.json'), 'utf8'));
-  if (arch !== release.arch || platform !== release.platform) throw new Error(`No mobile simulator companion for ${platform}/${arch}.`);
+  // The simulator is optional: hosts without a pinned companion build without it.
+  if (arch !== release.arch || platform !== release.platform) return null;
   if (!/^\d+\.\d+\.\d+$/.test(release.version) || !/^[a-f0-9]{64}$/.test(release.sha256)) throw new Error('Invalid mobile simulator release pin.');
   const cache = path.join(root, 'electron/.mobile-simulator-artifacts', release.version);
   fs.mkdirSync(cache, { recursive: true });
@@ -38,6 +39,13 @@ export async function prepareMobileSimulator({ root = path.resolve(import.meta.d
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const directory = await prepareMobileSimulator();
-  console.log(directory ? 'Prepared pinned mobile simulator companion.' : 'Skipping macOS-only mobile simulator companion.');
+  // Development tolerates a missing companion (offline, bad cache); packaging and release builds stay strict.
+  const optional = process.argv.includes('--optional');
+  try {
+    const directory = await prepareMobileSimulator();
+    console.log(directory ? 'Prepared pinned mobile simulator companion.' : 'Skipping mobile simulator companion: no pinned build for this host.');
+  } catch (error) {
+    if (!optional) throw error;
+    console.warn(`Mobile simulator companion unavailable; iOS control is disabled. ${error instanceof Error ? error.message : error}`);
+  }
 }

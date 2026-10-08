@@ -2360,6 +2360,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openGitReview: openAgentGitDiffPreview,
     openMarkdown: openMarkdownRequest,
     openRightWorkspaceTab: (tab, agentId) => openRightWorkspaceTab(tab, agentId),
+    closeRightWorkspaceTab: (tab, agentId) => closeRightWorkspaceTabLocal(agentId, tab),
     openSettings,
     openWhatsNew,
     quit,

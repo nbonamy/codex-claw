@@ -2,6 +2,7 @@ import type { AppCommand, AppApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
   mobileSimulator: 'mobile:execute',
+  mobileSimulatorView: 'mobile:view',
   getDocumentWorkspaces: "document:getDocumentWorkspaces",
   updateDocumentWorkspace: "document:updateDocumentWorkspace",
   readWorkspaceDocument: "document:readWorkspaceDocument",

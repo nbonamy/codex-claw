@@ -90,16 +90,7 @@ export class AppController {
     isPackaged: Boolean(app?.isPackaged),
     appPath: app?.getAppPath?.() ?? process.cwd(),
     resourcesPath: process.resourcesPath,
-  })), async (agentId, deviceName) => {
-    const agent = this.snapshot?.agents.find(agent => agent.id === agentId);
-    if (!agent || !this.mainWindow || this.mainWindow.isDestroyed()) return false;
-    const result = await dialog.showMessageBox(this.mainWindow, {
-      type: 'question', buttons: ['Allow', 'Cancel'], defaultId: 1, cancelId: 1, signal: AbortSignal.timeout(60_000),
-      message: `Allow ${agent.name} to control ${deviceName}?`,
-      detail: 'The simulator pane and this agent can read the screen, type, and interact with apps until you detach the device.',
-    });
-    return result.response === 0 && Boolean(this.snapshot?.agents.some(current => current.id === agentId));
-  });
+  })));
 
   private readonly browserPane = new BrowserPane({
     onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
@@ -664,7 +655,11 @@ export class AppController {
       return this.continueInterruptedTurn(agentId);
     });
 
-    ipc.handle(ipcChannels.mobileSimulator, (_event, agentId, input) => this.executeMobileSimulator(agentId, input));
+    ipc.handle(ipcChannels.mobileSimulator, (_event, agentId, input) => this.executeMobileSimulator(agentId, input, true));
+    ipc.handle(ipcChannels.mobileSimulatorView, async (_event, agentId, input) => {
+      this.requireMobileAgent(agentId);
+      return this.mobileSimulator.view(agentId, input);
+    });
     ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string, guestWebContentsId: number) => this.browserOpen(agentId, browserId, url, guestWebContentsId));
     ipc.handle(ipcChannels.browserOpenVisualization, (_event, agentId: string, browserId: string, filePath: string, title: string, guestWebContentsId: number) => this.browserOpenVisualization(agentId, browserId, filePath, title, guestWebContentsId));
     ipc.handle(ipcChannels.browserNavigate, (_event, agentId: string, browserId: string, url: string) => this.browserNavigate(agentId, browserId, url));
@@ -1242,14 +1237,23 @@ export class AppController {
     }));
   }
 
-  private async executeMobileSimulator(agentId: string, input: MobileRequest): Promise<MobileResult> {
+  private requireMobileAgent(agentId: string): void {
     const agent = this.snapshot?.agents.find(agent => agent.id === agentId);
     if (!agent) throw new Error('Agent not found.');
     const team = this.snapshot?.teams.find(team => team.id === agent.teamId);
     if (team?.remoteConnectionId) throw new Error('Mobile simulators are available to local agents only.');
     this.mobileSimulator.retainAgents(this.snapshot!.agents.map(agent => agent.id));
-    const result = await this.mobileSimulator.execute(agentId, input);
-    if (input.action === 'attach' && this.mainWindow && !this.mainWindow.isDestroyed()) sendAppCommand(this.mainWindow.webContents, { type: 'open-simulator', agentId });
+  }
+
+  private async executeMobileSimulator(agentId: string, input: MobileRequest, userInitiated = false): Promise<MobileResult> {
+    this.requireMobileAgent(agentId);
+    const result = await this.mobileSimulator.execute(agentId, input, userInitiated);
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      // The pane follows an agent's lifecycle; a user detaching or powering off in the pane keeps it open.
+      if (input.action === 'attach') sendAppCommand(this.mainWindow.webContents, { type: 'open-simulator', agentId });
+      else if (!userInitiated && (input.action === 'detach' || input.action === 'shutdown'))
+        sendAppCommand(this.mainWindow.webContents, { type: 'close-simulator', agentId });
+    }
     return result;
   }
 

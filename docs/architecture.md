@@ -48,7 +48,7 @@ the local desktop to show UI or use an OS affordance belongs in Electron main.
 
 The local mobile simulator host owns device attachments and native command execution
 in Electron. Its pane and provider-independent MCP tool share that authority;
-[the MCP model](mcp.md#mobile-simulators) records consent and coordinate rules.
+[the MCP model](mcp.md#mobile-simulators) records the attachment and coordinate rules.
 
 Host capabilities are enforced in `daemon` as well as in the UI: a persisted
 desktop preference cannot enable a tool the host does not provide.

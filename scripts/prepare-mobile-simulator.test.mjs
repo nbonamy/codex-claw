@@ -29,7 +29,7 @@ test('stages the verified distribution, runtime resources and licenses and rejec
     fs.writeFileSync(archive, 'corrupt archive');
     await assert.rejects(prepareMobileSimulator({ root, platform: 'darwin', arch: 'arm64' }), /checksum mismatch/);
     assert.equal(fs.readFileSync(path.join(output, 'idb_companion'), 'utf8'), 'native companion');
-    await assert.rejects(prepareMobileSimulator({ root, platform: 'darwin', arch: 'x64' }), /No mobile simulator companion/);
+    assert.equal(await prepareMobileSimulator({ root, platform: 'darwin', arch: 'x64' }), null);
     assert.equal(await prepareMobileSimulator({ root, platform: 'linux', arch: 'x64' }), null);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

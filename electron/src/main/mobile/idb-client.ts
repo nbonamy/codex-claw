@@ -14,6 +14,8 @@ type Message = Record<string, unknown>;
 type Call = ClientUnaryCall | ClientWritableStream<Message> | ClientDuplexStream<Message, Message>;
 type Target = { udid: string; screen_dimensions?: { width: number; width_points: number } };
 const MAX_BYTES = 12 * 1024 * 1024;
+const KEY_DELAY_SECONDS = 0.03;
+const TEXT_CHUNK = 100;
 
 /** Only the app-owned companion's private Unix socket is accepted. No registry or network discovery. */
 export class IdbClient {
@@ -47,10 +49,103 @@ export class IdbClient {
   async screenshot(): Promise<Buffer> {
     return (await this.unary('screenshot', {})).image_data as Buffer;
   }
+  /** HID orientation: 0 portrait, 1 upside down, 2 landscape left, 3 landscape right. */
+  async setOrientation(orientation: 0 | 1 | 2 | 3): Promise<void> {
+    await this.unary('set_orientation', { orientation });
+  }
+  /** idb orientation: 1 portrait, 2 upside down, 3 landscape left, 4 landscape right; 0 when unknown. */
+  async getOrientation(): Promise<number> {
+    return Number((await this.unary('get_orientation', {})).orientation) || 0;
+  }
   async inspect(): Promise<string> {
     const value = (await this.unary('accessibility_info', { format: 0 })).json;
     if (typeof value !== 'string' || !value) throw new Error('iOS accessibility is unavailable.');
     return value.slice(0, 100_000);
+  }
+  /** Native JPEG video with Minicap length framing; no screenshot RPCs in this path. */
+  startVideo(onFrame: (jpeg: Buffer) => void, onError: (error: Error) => void): () => void {
+    if (this.closed) throw new Error('iOS bridge is closed. Attach again.');
+    const method = this.methods.video_stream!;
+    const call = this.client.makeBidiStreamRequest<Message, Message>(
+      method.path, method.requestSerialize, method.responseDeserialize,
+    );
+    this.calls.add(call);
+    let stopped = false;
+    let header = false;
+    let buffer: Buffer = Buffer.alloc(0);
+    const stop = () => {
+      stopped = true;
+      buffer = Buffer.alloc(0);
+      this.calls.delete(call);
+      call.cancel();
+    };
+    const fail = (error: Error) => {
+      if (stopped) return;
+      stop();
+      onError(error);
+    };
+    call.on('data', (value: Message) => {
+      if (stopped) return;
+      const data = (value.payload as { data?: Buffer } | undefined)?.data;
+      if (!data?.length) return;
+      if (buffer.length + data.length > MAX_BYTES) return fail(new Error('Invalid iOS video frame size.'));
+      buffer = Buffer.concat([buffer, data]);
+      if (!header) {
+        if (buffer.length < 24) return;
+        if (buffer[0] !== 1 || buffer[1] !== 24) return fail(new Error('Invalid iOS video header.'));
+        buffer = buffer.subarray(24);
+        header = true;
+      }
+      while (buffer.length >= 4) {
+        const size = buffer.readUInt32LE(0);
+        if (size < 4 || size > MAX_BYTES - 4) return fail(new Error('Invalid iOS video frame size.'));
+        if (buffer.length < size + 4) return;
+        const jpeg = buffer.subarray(4, 4 + size);
+        if (jpeg[0] !== 255 || jpeg[1] !== 216 || jpeg[size - 2] !== 255 || jpeg[size - 1] !== 217)
+          return fail(new Error('Invalid iOS video frame.'));
+        buffer = buffer.subarray(4 + size);
+        onFrame(jpeg);
+        if (stopped) return;
+      }
+    });
+    call.once('error', (error) => fail(bridgeError(error)));
+    call.once('end', () => fail(new Error('iOS video stream stopped. Reconnect the view.')));
+    call.write({ start: { fps: 60, format: 3, compression_quality: 0.7, scale_factor: 0.5 } });
+    return stop;
+  }
+
+  /** One HID RPC spans a gesture so moves arrive before pointer-up. */
+  openTouch(onError: (error: Error) => void): { send(x: number, y: number): void; close(): void } {
+    if (this.closed) throw new Error('iOS bridge is closed. Attach again.');
+    const method = this.methods.hid!;
+    let ended = false;
+    let point: { x: number; y: number } | undefined;
+    const call = this.client.makeClientStreamRequest<Message, Message>(
+      method.path, method.requestSerialize, method.responseDeserialize,
+      { deadline: Date.now() + 15_000 },
+      (error) => {
+        this.calls.delete(call);
+        if (error) onError(bridgeError(error));
+      },
+    );
+    this.calls.add(call);
+    return {
+      send: (x, y) => {
+        if (ended) throw new Error('Touch session ended.');
+        point = { x, y };
+        if (!call.write({ press: { action: { touch: { point } }, direction: 0 } })) {
+          ended = true;
+          call.end({ press: { action: { touch: { point } }, direction: 1 } });
+          throw new Error('Simulator input is busy. Release and try again.');
+        }
+      },
+      close: () => {
+        if (ended) return;
+        ended = true;
+        if (point) call.write({ press: { action: { touch: { point } }, direction: 1 } });
+        call.end();
+      },
+    };
   }
   async tap(x: number, y: number): Promise<void> {
     await this.hid(press({ touch: { point: { x, y } } }));
@@ -58,23 +153,30 @@ export class IdbClient {
   async swipe(x: number, y: number, toX: number, toY: number, duration: number): Promise<void> {
     await this.hid([{ swipe: { start: { x, y }, end: { x: toX, y: toY }, duration } }]);
   }
-  async button(button: 'home' | 'enter' | 'backspace' | 'back'): Promise<void> {
+  async button(button: 'home' | 'enter' | 'backspace' | 'back' | 'volumeUp' | 'volumeDown' | 'power'): Promise<void> {
     if (button === 'back') throw new Error('iOS has no Back button.');
-    await this.hid(
-      press(button === 'home' ? { button: { button: 1 } } : { key: { keycode: button === 'enter' ? 40 : 42 } }),
-    );
+    // idb HID buttons: 1 home, 2 lock (the side button), 6 volume up, 7 volume down.
+    const hardware = { home: 1, power: 2, volumeUp: 6, volumeDown: 7 } as const;
+    if (button in hardware) return this.hid(press({ button: { button: hardware[button as keyof typeof hardware] } }));
+    await this.hid(press({ key: { keycode: button === 'enter' ? 40 : 42 } }));
   }
   async text(text: string): Promise<void> {
     if (text.length > 2000 || !/^[\x20-\x7e]*$/.test(text))
       throw new Error('Device typing supports printable ASCII, up to 2000 characters.');
-    const events: Message[] = [];
-    for (const character of text) {
-      const [keycode, shifted] = asciiKey(character);
-      if (shifted) events.push({ press: { action: { key: { keycode: 225 } }, direction: 0 } });
-      events.push(...press({ key: { keycode } }));
-      if (shifted) events.push({ press: { action: { key: { keycode: 225 } }, direction: 1 } });
+    // iOS drops or reorders keys it cannot keep up with (a following Enter then submits a partial query),
+    // so keys are paced, and long text is sent in chunks that each fit the call deadline.
+    const characters = [...text];
+    for (let start = 0; start < characters.length; start += TEXT_CHUNK) {
+      const events: Message[] = [];
+      for (const character of characters.slice(start, start + TEXT_CHUNK)) {
+        const [keycode, shifted] = asciiKey(character);
+        if (shifted) events.push({ press: { action: { key: { keycode: 225 } }, direction: 0 } });
+        events.push(...press({ key: { keycode } }));
+        if (shifted) events.push({ press: { action: { key: { keycode: 225 } }, direction: 1 } });
+        events.push({ delay: { duration: KEY_DELAY_SECONDS } });
+      }
+      await this.hid(events);
     }
-    if (events.length) await this.hid(events);
   }
   async launch(bundleId: string): Promise<void> {
     if (this.closed) throw new Error('iOS bridge is closed. Attach again.');

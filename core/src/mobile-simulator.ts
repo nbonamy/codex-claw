@@ -7,6 +7,24 @@ export type MobileDevice = {
   owner?: string;
 };
 export type MobileAttachment = { id: string; device: MobileDevice };
+/** Desktop pane transport. Video never enters provider transcripts or app snapshots. */
+export type MobileViewRequest =
+  | { action: 'start'; attachmentId: string }
+  | { action: 'frame' | 'stop'; attachmentId: string; viewId: string }
+  | { action: 'touch'; attachmentId: string; viewId: string; phase: 'down' | 'move' | 'up'; x: number; y: number; geometry: number };
+export type MobileViewResult = {
+  viewId: string;
+  /** Native video image; coordinates use the full framebuffer, independent of encoding scale. */
+  frame?: {
+    data: Uint8Array;
+    mimeType: 'image/jpeg' | 'image/png';
+    width: number;
+    height: number;
+    geometry: number;
+    /** Clockwise quarter turns that show the framebuffer upright (iOS keeps a portrait framebuffer when rotated). */
+    rotation?: 0 | 1 | 2 | 3;
+  };
+};
 export type MobileFrame = {
   attachmentId: string;
   data: string;
@@ -33,7 +51,7 @@ export type MobileAction =
       durationMs: number;
     }
   | { action: 'text'; text: string }
-  | { action: 'button'; button: 'home' | 'back' | 'enter' | 'backspace' }
+  | { action: 'button'; button: 'home' | 'back' | 'enter' | 'backspace' | 'volumeUp' | 'volumeDown' | 'power' }
   | { action: 'launch'; appId: string };
 export type MobileRequest =
   | { action: 'list' }
@@ -42,6 +60,9 @@ export type MobileRequest =
   | { action: 'detach'; attachmentId: string }
   | { action: 'screenshot'; attachmentId: string }
   | { action: 'inspect'; attachmentId: string }
+  /** Rotation is pane-only; the agent tool never exposes it. */
+  | { action: 'rotate'; attachmentId: string }
+  | { action: 'shutdown'; attachmentId: string }
   | (MobileAction & { attachmentId: string });
 export type MobileResult = {
   catalog?: MobileCatalog;

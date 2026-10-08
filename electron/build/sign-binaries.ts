@@ -99,7 +99,8 @@ function resolveDarwinBinaryPaths(
   const computerUseHelper = computerUseAppPaths.find((binary) => existsSync(binary.path)) ?? computerUseAppPaths[0];
   const ttsHelper = ttsHelperPaths.find((binary) => existsSync(binary.path)) ?? ttsHelperPaths[0];
   const nodeRuntime = nodeRuntimePaths.find((binary) => existsSync(binary.path)) ?? nodeRuntimePaths[0];
-  const mobileCompanion = mobileCompanionPaths.find(binary => existsSync(binary.path)) ?? mobileCompanionPaths[0];
-  // Electron's outer osxSign pass also walks and signs the companion's nested Mach-O resources.
-  return [appleSpeechHelper, computerUseHelper, ttsHelper, nodeRuntime, mobileCompanion];
+  // The companion is optional (absent on hosts without a pinned build). Electron's outer osxSign
+  // pass also walks and signs its nested Mach-O resources.
+  const mobileCompanion = mobileCompanionPaths.find(binary => existsSync(binary.path));
+  return [appleSpeechHelper, computerUseHelper, ttsHelper, nodeRuntime, ...(mobileCompanion ? [mobileCompanion] : [])];
 }
