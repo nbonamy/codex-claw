@@ -220,16 +220,22 @@ accessibility is reported explicitly as screenshot fallback. Screen content is
 untrusted observation. Capture bytes are returned as MCP images and are not added
 to product snapshots or tool presentation metadata.
 
-Xcode and an iOS runtime, Meta idb (CLI and companion), or Android SDK Platform
-Tools and a running emulator are user-installed prerequisites. Korus discovers them
-and links to setup; it does not install them. idb is an external MIT-licensed
-bridge, not redistributed code or a dependency on another desktop app's helper.
-Korus starts one companion per iOS attachment on a private Unix socket, bypasses
-idb's global connection registry, and stops only that child on detach.
-Its native companion owns CoreSimulator input/accessibility; compatibility depends
-on the installed idb/Xcode pair. Xcode 27 requires idb's DTUHID input transport.
-Development overrides `APP_MOBILE_IDB_PATH` and `APP_MOBILE_COMPANION_PATH` select
-an isolated installation. ADB serial filtering admits emulator targets only.
+Xcode and an iOS runtime remain user-installed prerequisites. Korus bundles a
+pinned Meta idb companion and speaks its protobuf/gRPC protocol directly over a
+private Unix socket; Python, Homebrew and a separate idb installation are not
+required. One companion belongs to each iOS attachment. Detach closes the channel,
+cancels outstanding calls, and stops only that child. The global idb registry is
+never consulted. Native framework compatibility depends on the bundled
+companion/Xcode pair; a helper update ships with an app update.
+
+The macOS ARM64 build prepares the checksum-pinned native distribution, runtime
+resources, protocol and third-party notices before Forge copies them into app
+resources. GitHub Actions owns packaging, signing/notarization and the packaged
+helper smoke check. Development uses the same prepared assets;
+`APP_MOBILE_COMPANION_PATH` can select an isolated native installation in development
+only. Packaged apps always select their own helper. Android uses user-installed
+SDK Platform Tools and a running emulator; ADB serial filtering excludes physical
+devices. Korus does not install Xcode, runtimes or Android SDK tooling.
 
 ## Computer Use
 

@@ -123,7 +123,14 @@ conversation or sequence cursor outlives the backend instance.
   Development and packaging do not download, pin or bundle Codex. Release smoke
   checks reject a bundled Codex resource directory and probe the packaged daemon's
   health and provider detection without requiring a provider installation or login.
-- Computer Use, Screenshots and Apple speech helpers are macOS-only; packaging
+- The iOS simulator companion is a pinned native resource, prepared from an
+  upstream archive with SHA-256 verification, including cached downloads. Its
+  protocol and native dependency notices travel with the resource directory.
+  Electron uses direct gRPC on owned Unix sockets; there is no Python runtime or
+  system idb dependency. Forge signs the companion and its nested native resources;
+  GitHub Actions probes the packaged executable with a minimal PATH. Xcode and
+  simulator runtimes remain external prerequisites.
+- Computer Use, Screenshots, the iOS companion and Apple speech helpers are macOS-only; packaging
   another OS does not enable them.
 - Release builds sign and notarize; use `APP_SKIP_SIGNING=1` for local
   verification. Every build must still start the packaged backend and answer

@@ -37,7 +37,7 @@ const extraResource = [
   ...speechHelperResources(__dirname, process.platform),
   'resources/daemon',
   ...(process.platform === 'darwin' ? [`.computer-use/${product.name} Computer Use.app`] : []),
-  ...(process.platform === 'darwin' ? ['.tts/app-tts-helper'] : []),
+  ...(process.platform === 'darwin' ? ['.tts/app-tts-helper', '.mobile-simulator/mobile-simulator'] : []),
 ];
 
 // osx special configuration

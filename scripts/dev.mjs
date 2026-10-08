@@ -24,6 +24,7 @@ const sdkAssets = sdkAssetsPath();
 
 await run('npm', ['run', 'build:computer-use']);
 await run('npm', ['run', 'build:tts']);
+await run('npm', ['run', 'prepare:mobile-simulator']);
 await run('npm', ['run', 'build', '-w', '@workspace/backend']);
 
 const backendWatch = start('npm', ['run', 'dev:backend'], {

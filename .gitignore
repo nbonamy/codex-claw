@@ -26,3 +26,7 @@ native/**/.build/
 
 # Generated Linux development startup identity
 electron/.development-shell/
+
+# Verified native simulator build resources
+electron/.mobile-simulator/
+electron/.mobile-simulator-artifacts/
