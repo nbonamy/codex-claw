@@ -1,6 +1,6 @@
 {
   "name": "@workspace/vue",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "description": "Reusable Vue product shell for application hosts.",
   "private": true,
   "type": "module",
@@ -29,9 +29,9 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@codex-app-sdk/core": "0.14.3",
-    "@codex-app-sdk/vue": "0.14.3",
-    "@workspace/core": "0.29.0",
+    "@codex-app-sdk/core": "0.14.4",
+    "@codex-app-sdk/vue": "0.14.4",
+    "@workspace/core": "0.30.0",
     "@excalidraw/excalidraw": "0.18.1",
     "@excalidraw/mermaid-to-excalidraw": "2.2.2",
     "@tabler/icons-vue": "^3.44.0",

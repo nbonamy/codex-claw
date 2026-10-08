@@ -4,6 +4,32 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.30.0] - 2026-10-07
+
+### New features
+
+- Open documents and browser tabs return after restarting Korus, with each
+  agent's selected tab, pane visibility, and widths restored. Unsaved documents
+  remain available until their tabs are closed.
+- Save an unsaved document to a Markdown file from its tab, with the agent's
+  repository as the default destination. Closing the saved tab keeps the file.
+- Choose Queue or Steer as the default follow-up behavior in General settings.
+  While an agent is working, Enter and the send button use that choice;
+  Cmd/Ctrl+Enter uses the other action.
+
+### Improvements and fixes
+
+- Settings have clearer sections, more consistent controls, and easier-to-scan
+  engine status and remote connections. Background service controls live in
+  the Advanced section.
+- Voice settings have a dedicated page with selectable voice tiles and
+  individual previews.
+- Automation editing uses a more compact layout with weekday buttons and a
+  clearer next-run preview.
+- Dark-theme settings controls use consistent container colors.
+- Late tool results no longer cause new assistant activity to appear above
+  the conversation's compaction divider.
+
 ## [0.29.0] - 2026-10-07
 
 ### New features
