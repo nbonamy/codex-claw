@@ -13,13 +13,14 @@ export type ClientRequestHandlersOptions = {
   getSystemPermissionsStatus: () => SystemPermissionsStatus;
   openAccessibilitySettings: () => Promise<SystemPermissionsStatus>;
   computerUseOptions: () => ComputerUseOptions;
+  mobileSimulator?: (agentId: string, input: import('@workspace/core/mobile-simulator').MobileRequest) => Promise<import('@workspace/core/mobile-simulator').MobileResult>;
   browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
   spokenAnnouncements?: Pick<SpokenAnnouncementQueue, 'queue'>;
   spokenAnnouncementVoice?: () => SpokenAnnouncementVoice;
 };
 
-export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'browserExecute' | 'browserOpen' | 'spokenAnnouncements' | 'spokenAnnouncementVoice'> = {}): Record<string, ClientRequestHandler> {
+export function createRuntimeClientRequestHandlers(overrides: Pick<ClientRequestHandlersOptions, 'mobileSimulator' | 'browserExecute' | 'browserOpen' | 'spokenAnnouncements' | 'spokenAnnouncementVoice'> = {}): Record<string, ClientRequestHandler> {
   const spokenAnnouncements = overrides.spokenAnnouncements ?? createRuntimeSpokenAnnouncementQueue({
     appPath: app?.getAppPath?.() ?? process.cwd(),
     isPackaged: app?.isPackaged ?? false,
@@ -48,6 +49,11 @@ export function createClientRequestHandlers(options: ClientRequestHandlersOption
       const url = requireString(record.url, 'url');
       await options.openExternal(url);
       return true;
+    },
+    [backendMethods.clientMobileSimulatorExecute]: params => {
+      if (!options.mobileSimulator) throw new Error('Mobile simulators are unavailable on this host.');
+      const input = requireRecord(params);
+      return options.mobileSimulator(requireString(input.agentId, 'agentId'), requireRecord(input.input) as import('@workspace/core/mobile-simulator').MobileRequest);
     },
     [backendMethods.clientBrowserExecute]: async (params) => {
       if (!options.browserExecute) throw new Error('In-app browser tools are unavailable.');

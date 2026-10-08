@@ -705,6 +705,7 @@ export type AppCommand =
   | { type: 'new-team' }
   | { type: 'open-agent-composer'; agentId?: string; prompt?: string; submit?: boolean }
   | { type: 'open-agent-palette' }
+  | { type: 'open-simulator'; agentId: string }
   | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }
   | { type: 'open-review' }
   | { type: 'open-saved-prompt-drafts' }
@@ -960,6 +961,7 @@ export type AppApi = {
   editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot>;
   retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
   continueInterruptedTurn(agentId: string): Promise<AppSnapshot>;
+  mobileSimulator?(agentId: string, input: import('./mobile-simulator').MobileRequest): Promise<import('./mobile-simulator').MobileResult>;
   browserOpen(agentId: string, browserId: string, url: string, guestWebContentsId: number): Promise<BrowserState>;
   browserOpenVisualization(agentId: string, browserId: string, path: string, title: string, guestWebContentsId: number): Promise<BrowserState>;
   browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState>;

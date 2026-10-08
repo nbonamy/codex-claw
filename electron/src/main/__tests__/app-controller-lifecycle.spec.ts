@@ -48,6 +48,14 @@ vi.mock('node:fs', async (importOriginal) => {
   };
   return { ...original, ...overrides, default: { ...original, ...overrides } };
 });
+vi.mock('../mobile/adapter', () => ({ NativeMobileAdapter: class {
+  list = async () => ({ devices: [{ id: 'phone', name: 'iPhone', platform: 'ios', state: 'booted' }], setup: [] });
+  boot = async () => undefined;
+  detach = vi.fn();
+  screen = async () => ({ png: Buffer.from('image'), width: 1200, height: 2400, scale: 3 });
+  inspect = async () => 'Settings';
+  perform = async () => undefined;
+} }));
 vi.mock('../log', () => ({ initializeMainLogging: vi.fn(), installProcessErrorLogging: vi.fn(), logMain: vi.fn(), warnMain: vi.fn() }));
 vi.mock('../main-window', () => ({ createMainWindow: native.createWindow }));
 vi.mock('../app-menu', () => ({ installAppMenu: vi.fn() }));
@@ -140,6 +148,25 @@ afterEach(async () => {
 });
 
 describe('controller desktop lifecycle', () => {
+  it('enforces local agent consent through IPC and revokes simulator control on disconnect', async () => {
+    const { controller, state, window, disconnect } = setup();
+    const agentId = state.snapshot.agents[0]!.id;
+    state.snapshot.agents.push({ ...state.snapshot.agents[0]!, id: 'remote-agent', teamId: 'remote-team' });
+    state.snapshot.teams.push({ id: 'remote-team', name: 'Remote', agentIds: ['remote-agent'], remoteConnectionId: 'remote' });
+    await controller.initialize(); controller.createWindow();
+    await expect(invoke(ipcChannels.mobileSimulator, 'missing', { action: 'list' })).rejects.toThrow('Agent not found');
+    await expect(invoke(ipcChannels.mobileSimulator, 'remote-agent', { action: 'list' })).rejects.toThrow('local agents');
+    native.dialog.showMessageBox.mockResolvedValueOnce({ response: 1 });
+    await expect(invoke(ipcChannels.mobileSimulator, agentId, { action: 'attach', deviceId: 'phone' })).rejects.toThrow('declined');
+    native.dialog.showMessageBox.mockResolvedValueOnce({ response: 0 });
+    const { attachment } = await invoke(ipcChannels.mobileSimulator, agentId, { action: 'attach', deviceId: 'phone' });
+    expect(native.dialog.showMessageBox).toHaveBeenLastCalledWith(window, expect.objectContaining({ cancelId: 1, signal: expect.any(AbortSignal) }));
+    expect(window.webContents.send).toHaveBeenCalledWith(ipcChannels.appCommand, { type: 'open-simulator', agentId });
+    expect((await invoke(ipcChannels.mobileSimulator, agentId, { action: 'screenshot', attachmentId: attachment.id })).frame.data).toBe(Buffer.from('image').toString('base64'));
+    disconnect();
+    await expect(invoke(ipcChannels.mobileSimulator, agentId, { action: 'screenshot', attachmentId: attachment.id })).rejects.toThrow('No matching');
+  });
+
   it('synchronizes the execution-plan checkmark after removal, agent selection, and failed toggles', async () => {
     const { controller, backend, state, emit } = setup();
     const packaged = app.isPackaged;

@@ -22,7 +22,16 @@ export type MobileCatalog = {
 };
 export type MobileAction =
   | { action: 'tap'; x: number; y: number; width: number; height: number }
-  | { action: 'swipe'; x: number; y: number; toX: number; toY: number; width: number; height: number; durationMs: number }
+  | {
+      action: 'swipe';
+      x: number;
+      y: number;
+      toX: number;
+      toY: number;
+      width: number;
+      height: number;
+      durationMs: number;
+    }
   | { action: 'text'; text: string }
   | { action: 'button'; button: 'home' | 'back' | 'enter' | 'backspace' }
   | { action: 'launch'; appId: string };

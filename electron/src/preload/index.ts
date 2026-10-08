@@ -169,6 +169,7 @@ const api: AppApi = {
   editTurn: (agentId: string, turnId: string, content: string) => ipc.invoke(ipcChannels.editTurn, agentId, turnId, content),
   retryTurn: (agentId: string, turnId: string) => ipc.invoke(ipcChannels.retryTurn, agentId, turnId),
   continueInterruptedTurn: (agentId: string) => ipc.invoke(ipcChannels.continueInterruptedTurn, agentId),
+  mobileSimulator: (agentId, input) => ipc.invoke(ipcChannels.mobileSimulator, agentId, input),
   browserOpen: (agentId: string, browserId: string, url: string, guestWebContentsId: number) => ipc.invoke(ipcChannels.browserOpen, agentId, browserId, url, guestWebContentsId),
   browserOpenVisualization: (agentId: string, browserId: string, path: string, title: string, guestWebContentsId: number) => ipc.invoke(ipcChannels.browserOpenVisualization, agentId, browserId, path, title, guestWebContentsId),
   browserNavigate: (agentId: string, browserId: string, url: string) => ipc.invoke(ipcChannels.browserNavigate, agentId, browserId, url),

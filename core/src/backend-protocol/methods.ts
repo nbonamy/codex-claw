@@ -90,6 +90,7 @@ export const backendMethods = {
   clientSpokenAnnouncementQueue: 'client/spokenAnnouncement/queue',
   clientBrowserOpen: 'client/browser/open',
   clientBrowserExecute: 'client/browser/execute',
+  clientMobileSimulatorExecute: 'client/mobileSimulator/execute',
   clientComputerUseExecute: 'client/computerUse/execute',
   clientComputerUseStop: 'client/computerUse/stop',
   clientComputerUseRequestAccessibility: 'client/computerUse/requestAccessibility',

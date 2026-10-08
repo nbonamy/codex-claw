@@ -1,3 +1,6 @@
+import { MobileSimulatorService } from './mobile/service';
+import { NativeMobileAdapter } from './mobile/adapter';
+import type { MobileRequest, MobileResult } from '@workspace/core/mobile-simulator';
 import { product } from '@workspace/core/product';
 import { registerMissionIpcHandlers } from './mission-ipc';
 import type { MissionReviewDebugState, MissionStage } from '@workspace/core/missions';
@@ -82,6 +85,17 @@ export class AppController {
   private selectedMissionId: string | null = null;
   private appshotCapturePending = false;
 
+  private readonly mobileSimulator = new MobileSimulatorService(new NativeMobileAdapter(), async (agentId, deviceName) => {
+    const agent = this.snapshot?.agents.find(agent => agent.id === agentId);
+    if (!agent || !this.mainWindow || this.mainWindow.isDestroyed()) return false;
+    const result = await dialog.showMessageBox(this.mainWindow, {
+      type: 'question', buttons: ['Allow', 'Cancel'], defaultId: 1, cancelId: 1, signal: AbortSignal.timeout(60_000),
+      message: `Allow ${agent.name} to control ${deviceName}?`,
+      detail: 'The simulator pane and this agent can read the screen, type, and interact with apps until you detach the device.',
+    });
+    return result.response === 0 && Boolean(this.snapshot?.agents.some(current => current.id === agentId));
+  });
+
   private readonly browserPane = new BrowserPane({
     onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
     onViewportRequest: (request) => {
@@ -129,6 +143,7 @@ export class AppController {
       }),
     );
     this.backendClient = backendClient ?? createRuntimeAppBackendClient({
+      mobileSimulator: (agentId, input) => this.executeMobileSimulator(agentId, input),
       browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
       browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
       spokenAnnouncements: this.policyAwareSpokenAnnouncements,
@@ -644,6 +659,7 @@ export class AppController {
       return this.continueInterruptedTurn(agentId);
     });
 
+    ipc.handle(ipcChannels.mobileSimulator, (_event, agentId, input) => this.executeMobileSimulator(agentId, input));
     ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string, guestWebContentsId: number) => this.browserOpen(agentId, browserId, url, guestWebContentsId));
     ipc.handle(ipcChannels.browserOpenVisualization, (_event, agentId: string, browserId: string, filePath: string, title: string, guestWebContentsId: number) => this.browserOpenVisualization(agentId, browserId, filePath, title, guestWebContentsId));
     ipc.handle(ipcChannels.browserNavigate, (_event, agentId: string, browserId: string, url: string) => this.browserNavigate(agentId, browserId, url));
@@ -737,6 +753,7 @@ export class AppController {
     }
     this.autoUpdateService?.stop();
     this.appshotsKeyMonitor?.stop();
+    this.mobileSimulator.clear();
     this.spokenAnnouncements.dispose();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
@@ -1168,6 +1185,7 @@ export class AppController {
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
     const previousDebugMenuState = this.debugMenuState();
     this.snapshot = snapshot;
+    this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
     this.policyAwareSpokenAnnouncements.refresh();
     this.transientSnapshots.add(snapshot);
     try {
@@ -1183,6 +1201,7 @@ export class AppController {
     if (!this.snapshot) throw new Error('daemon snapshot is not available.');
     const previousDebugMenuState = this.debugMenuState();
     replaceAppSnapshot(this.snapshot, nextSnapshot);
+    this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
     this.policyAwareSpokenAnnouncements.refresh();
     this.syncPowerSaveBlocker();
     this.refreshDebugMenuIfChanged(previousDebugMenuState);
@@ -1216,6 +1235,17 @@ export class AppController {
       prompt,
       options: backendOptions,
     }));
+  }
+
+  private async executeMobileSimulator(agentId: string, input: MobileRequest): Promise<MobileResult> {
+    const agent = this.snapshot?.agents.find(agent => agent.id === agentId);
+    if (!agent) throw new Error('Agent not found.');
+    const team = this.snapshot?.teams.find(team => team.id === agent.teamId);
+    if (team?.remoteConnectionId) throw new Error('Mobile simulators are available to local agents only.');
+    this.mobileSimulator.retainAgents(this.snapshot!.agents.map(agent => agent.id));
+    const result = await this.mobileSimulator.execute(agentId, input);
+    if (input.action === 'attach' && this.mainWindow && !this.mainWindow.isDestroyed()) sendAppCommand(this.mainWindow.webContents, { type: 'open-simulator', agentId });
+    return result;
   }
 
   private async browserOpen(agentId: string, browserId: string, url: string, guestWebContentsId: number): Promise<BrowserState> {
@@ -1554,6 +1584,7 @@ export class AppController {
 
       let synchronizedSnapshot = backendState.snapshot;
       this.snapshot = synchronizedSnapshot;
+      this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
       this.policyAwareSpokenAnnouncements.refresh();
       this.clientState = backendState.clientState;
       this.lastBackendEventSeq = backendState.lastEventSeq;
@@ -1856,6 +1887,7 @@ export class AppController {
     } else if (this.snapshot) {
       if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(this.snapshot, rendererEvent);
     }
+    this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
     this.policyAwareSpokenAnnouncements.refresh();
     if (isClientState(event.clientState)) {
       this.clientState = event.clientState;
@@ -1870,6 +1902,7 @@ export class AppController {
   }
 
   private handleBackendDisconnect(error?: Error): void {
+    this.mobileSimulator.clear();
     if (this.shuttingDown) return;
     warnMain('daemon', 'backend connection lost', {
       detail: error?.message ?? 'unknown error',
