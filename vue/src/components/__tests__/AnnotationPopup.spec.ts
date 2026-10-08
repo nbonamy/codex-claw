@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const voiceMock = vi.hoisted(() => ({
   isRecording: null as { value: boolean } | null,
   isTranscribing: null as { value: boolean } | null,
+  isStarting: null as { value: boolean } | null,
+  transcript: null as { value: { finalText: string; partialText: string } } | null,
+  cancel: vi.fn(),
   onTranscript: null as ((text: string) => void) | null,
   stop: vi.fn<() => Promise<boolean>>(),
   toggle: vi.fn<() => Promise<void>>(),
@@ -14,6 +17,10 @@ vi.mock('@codex-app-sdk/vue', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@codex-app-sdk/vue')>();
   const isRecording = ref(false);
   const isTranscribing = ref(false);
+  const isStarting = ref(false);
+  const transcript = ref({ finalText: '', partialText: '' });
+  voiceMock.isStarting = isStarting;
+  voiceMock.transcript = transcript;
   voiceMock.isRecording = isRecording;
   voiceMock.isTranscribing = isTranscribing;
   voiceMock.toggle.mockImplementation(async () => {
@@ -31,7 +38,10 @@ vi.mock('@codex-app-sdk/vue', async (importOriginal) => {
         error: ref(null),
         isRecording,
         isTranscribing,
-        recorder: computed(() => null),
+        isStarting,
+        isLive: ref(true),
+        transcript,
+        cancel: voiceMock.cancel,
         stop: voiceMock.stop,
         toggle: voiceMock.toggle,
         dispose: vi.fn(),
@@ -43,13 +53,11 @@ vi.mock('@codex-app-sdk/vue', async (importOriginal) => {
 import AnnotationPopup from '../AnnotationPopup.vue';
 
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    clearRect: vi.fn(),
-    fillRect: vi.fn(),
-    fillStyle: '',
-  } as unknown as CanvasRenderingContext2D);
   if (voiceMock.isRecording) voiceMock.isRecording.value = false;
   if (voiceMock.isTranscribing) voiceMock.isTranscribing.value = false;
+  voiceMock.isStarting!.value = false;
+  voiceMock.transcript!.value = { finalText: '', partialText: '' };
+  voiceMock.cancel.mockReset();
   voiceMock.onTranscript = null;
   voiceMock.toggle.mockReset();
   voiceMock.toggle.mockImplementation(async () => {
@@ -185,7 +193,7 @@ describe('AnnotationPopup', () => {
     voiceMock.isRecording!.value = false;
     voiceMock.isTranscribing!.value = true;
     await nextTick();
-    expect(wrapper.text()).toContain('Transcribing...');
+    expect(wrapper.get('.chat-composer__audio-text').text().replace(/\s+/gu, ' ')).toBe('Before after');
 
     voiceMock.isTranscribing!.value = false;
     await nextTick();
@@ -195,23 +203,18 @@ describe('AnnotationPopup', () => {
     expect(wrapper.get<HTMLInputElement>('.annotation-popup__input').element.value).toBe('Before spoken after');
   });
 
-  it('transcribes into the draft without sending when the microphone is pressed again', async () => {
-    voiceMock.toggle.mockImplementation(async () => {
-      if (!voiceMock.isRecording!.value) {
-        voiceMock.isRecording!.value = true;
-        return;
-      }
-      voiceMock.isRecording!.value = false;
-      voiceMock.isTranscribing!.value = true;
-      await Promise.resolve();
-      voiceMock.onTranscript?.('spoken note');
-      voiceMock.isTranscribing!.value = false;
-    });
+  it('transcribes into the draft without sending when recording is stopped', async () => {
     const wrapper = mount(AnnotationPopup, {
       props: { anchor: { x: 0, y: 0, width: 0, height: 0 } },
     });
 
     await wrapper.get('[aria-label="Record voice prompt"]').trigger('click');
+    voiceMock.stop.mockImplementation(async () => {
+      voiceMock.isRecording!.value = false;
+      voiceMock.onTranscript?.('spoken note');
+      return true;
+    });
+    voiceMock.toggle.mockImplementation(async () => { await voiceMock.stop(); });
     await wrapper.get('[aria-label="Stop recording"]').trigger('click');
     await flushPromises();
 
@@ -268,5 +271,28 @@ describe('AnnotationPopup', () => {
     wrapper.unmount();
     host.remove();
     outside.remove();
+  });
+
+  it('shows live text beside the saved draft, blocks startup submission, and cancels only dictation', async () => {
+    const wrapper = mount(AnnotationPopup, { props: { anchor: { x: 0, y: 0, width: 0, height: 0 }, initialValue: 'Keep this' } });
+    voiceMock.isStarting!.value = true;
+    await nextTick();
+    expect(wrapper.get('.chat-composer__audio-text').text()).toBe('Keep this');
+    expect(wrapper.get('.annotation-popup__submit').attributes('disabled')).toBeDefined();
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.emitted('submit')).toBeUndefined();
+    voiceMock.isStarting!.value = false;
+    voiceMock.isRecording!.value = true;
+    voiceMock.transcript!.value = { finalText: 'and ', partialText: 'that' };
+    await nextTick();
+    expect(wrapper.get('.chat-composer__audio-text').text()).toBe('Keep this and that');
+    expect(wrapper.get('[aria-label="Stop recording"]').attributes('disabled')).toBeUndefined();
+    await wrapper.get('form').trigger('keydown', { key: 'Escape' });
+    expect(voiceMock.cancel).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('cancel')).toBeUndefined();
+    voiceMock.isRecording!.value = false;
+    await nextTick();
+    expect(wrapper.get<HTMLInputElement>('input').element.value).toBe('Keep this');
+    wrapper.unmount();
   });
 });

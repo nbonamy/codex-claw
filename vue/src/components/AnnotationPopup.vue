@@ -6,15 +6,18 @@
       :aria-label="label"
       :aria-description="description"
       :style="positionStyle"
-      @keydown.esc.stop.prevent="emit('cancel')"
+      @keydown.esc.stop.prevent="cancelDictationOrPopup"
       @keydown.meta.enter="submitWithCommandEnter"
       @submit.prevent="submit()"
     >
     <CodexComposerVoiceField
-      v-if="voiceVisible && (voiceRecording || voiceTranscribing)"
+      v-if="voiceVisible && voiceBusy"
       class="annotation-popup__voice-field"
-      :recorder="voiceRecorder"
       :recording="voiceRecording"
+      :starting="voiceStarting"
+      :transcript="voiceTranscript"
+      :before="voiceBefore"
+      :after="voiceAfter"
     />
     <input
       v-else
@@ -114,11 +117,21 @@ const voiceController = useCodexComposerVoice({
 const voiceButtonDisabled = computed(() => voiceController.buttonDisabled.value);
 const voiceButtonLabel = computed(() => voiceController.buttonLabel.value);
 const voiceButtonTitle = computed(() => voiceController.buttonTitle.value);
-const voiceRecorder = computed(() => voiceController.recorder.value);
 const voiceRecording = computed(() => voiceController.isRecording.value);
 const voiceTranscribing = computed(() => voiceController.isTranscribing.value);
+const voiceStarting = computed(() => voiceController.isStarting.value);
+const voiceTranscript = computed(() => voiceController.transcript.value);
+const voiceBusy = computed(() => voiceStarting.value || voiceRecording.value || voiceTranscribing.value);
+const voiceBefore = computed(() => {
+  const text = draft.value.slice(0, selectionStart.value);
+  return text && !/\s$/u.test(text) ? `${text} ` : text;
+});
+const voiceAfter = computed(() => {
+  const text = draft.value.slice(selectionEnd.value);
+  return text && !/^\s/u.test(text) ? ` ${text}` : text;
+});
 const submitDisabled = computed(() => (
-  voiceTranscribing.value
+  voiceStarting.value || voiceTranscribing.value
   || voiceSubmitPending.value
   || (!props.optional && !voiceRecording.value && !draft.value.trim())
 ));
@@ -160,6 +173,16 @@ function cancelOnOutsidePointerDown(event: Event): void {
   }
 }
 
+async function cancelDictationOrPopup(): Promise<void> {
+  if (!voiceBusy.value) {
+    emit('cancel');
+    return;
+  }
+  await voiceController.cancel();
+  await nextTick();
+  input.value?.focus();
+}
+
 function rememberSelection(): void {
   selectionStart.value = input.value?.selectionStart ?? draft.value.length;
   selectionEnd.value = input.value?.selectionEnd ?? selectionStart.value;
@@ -193,7 +216,7 @@ function submitWithCommandEnter(event: KeyboardEvent): void {
 }
 
 async function submit(eventName: 'command-submit' | 'submit' = 'submit'): Promise<void> {
-  if (voiceTranscribing.value || voiceSubmitPending.value) return;
+  if (voiceStarting.value || voiceTranscribing.value || voiceSubmitPending.value) return;
 
   if (voiceRecording.value) {
     voiceSubmitPending.value = true;

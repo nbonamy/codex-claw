@@ -274,7 +274,6 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.find('.codex-composer').exists()).toBe(false);
     expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
     await wrapper.get('.codex-conversation-pane__footer button[aria-label="Vue"]').trigger('click');
-    await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
 
     expect(wrapper.emitted('client-response')).toStrictEqual([[
       { id: question.id, payload: { answers: { framework: { answers: ['Vue'] } } } },
