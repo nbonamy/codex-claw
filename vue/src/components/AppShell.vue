@@ -2359,7 +2359,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openFileQuick: () => { fileQuickOpenVisible.value = true; },
     openGitReview: openAgentGitDiffPreview,
     openMarkdown: openMarkdownRequest,
-    openRightWorkspaceTab: (tab) => openRightWorkspaceTab(tab),
+    openRightWorkspaceTab: (tab, agentId) => openRightWorkspaceTab(tab, agentId),
     openSettings,
     openWhatsNew,
     quit,

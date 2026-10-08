@@ -1,6 +1,29 @@
 import { product } from '@workspace/core/product';
 // Component-scoped renderer copy. Keep keys stable when editing messages.
 export const surfaceMessages = {
+  mobileSimulator: {
+    "title": "Mobile simulator",
+    "tab": "Simulator",
+    "home": "Home",
+    "back": "Back",
+    "detach": "Detach",
+    "attach": "Attach",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "intro": "Run a mobile app beside this conversation. Attaching lets this agent control the selected device.",
+    "setup": "Setup guide",
+    "empty": "No simulators found. Refresh to check installed devices.",
+    "send": "Send",
+    "hint": "Click to tap · Drag to swipe · Live screen captures",
+    "device": "Simulator device",
+    "select": "Select a device",
+    "screen": "Simulator screen",
+    "textLabel": "Text to type on device",
+    "textPlaceholder": "Type on device",
+    "unavailable": "Screen unavailable",
+    "reading": "Reading device screen…",
+    "inUse": "In use"
+  },
   "instructionSettings": {
     "personalizationIntroTitle": "Tell your agents how you work",
     "personalizationIntroDescription": "Developer instructions your agents read when a session starts",

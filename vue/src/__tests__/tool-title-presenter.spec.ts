@@ -6,6 +6,7 @@ import { presentAppToolTitle } from '../tool-title-presenter';
 
 describe(`${product.name} tool title presenter`, () => {
   it.each([
+    ['korus.simulator', { action: 'screenshot' }, 'completed', 'Used simulator'],
     ['korus.read-skill', { name: 'korus-inline-html' }, 'running', 'Loading skill korus-inline-html'],
     ['mcp__korus__read_skill', { name: 'korus-inline-html' }, 'completed', 'Loaded skill korus-inline-html'],
     ['korus.read-skill', { name: 'korus-inline-html' }, 'error', 'Could not load skill korus-inline-html'],

@@ -64,7 +64,7 @@ type AppShellCommandOptions = {
     openFileQuick: () => void;
     openGitReview: () => void | Promise<void>;
     openMarkdown: (request: SidePanelMarkdownRequest) => void;
-    openRightWorkspaceTab: (tab: RightWorkspaceTab) => void;
+    openRightWorkspaceTab: (tab: RightWorkspaceTab, agentId?: string) => void;
     openSettings: () => void;
     openWhatsNew: () => void;
     quit: () => void | Promise<void>;
@@ -298,6 +298,11 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
     if (command.type === 'toggle-spoken-announcements-muted') {
       options.actions.toggleSpokenAnnouncementsMuted();
+      return;
+    }
+
+    if (command.type === 'open-simulator') {
+      options.actions.openRightWorkspaceTab('simulator', command.agentId);
       return;
     }
 

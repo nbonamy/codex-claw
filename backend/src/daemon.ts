@@ -192,7 +192,7 @@ async function serve(): Promise<void> {
 
 function runtimeFeatures(): DaemonRuntimeOptions['features'] {
   return process.env.APP_HOST === 'web'
-    ? { computerUse: false, embeddedBrowser: false }
+    ? { computerUse: false, embeddedBrowser: false, mobileSimulator: false }
     : undefined;
 }
 

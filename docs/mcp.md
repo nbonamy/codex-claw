@@ -200,6 +200,37 @@ Registered per authenticated request by independent modules
   dimensions. Hidden/closed panes cannot report a successful resize. Device presets
   change viewport size only, not user agent, touch input or pixel density.
 
+## Mobile Simulators
+
+The provider-independent simulator tool routes authenticated caller identity through
+`client/mobileSimulator/execute` to Electron's local device service. The pane uses
+the same service through typed preload IPC. It is unavailable on web hosts and to
+remote agents. A desktop consent dialog grants one agent an exclusive attachment;
+input and observations require its opaque attachment ID. Detach, agent removal,
+backend disconnect and desktop shutdown revoke that authority. Devices remain
+running and their data is never erased as cleanup.
+
+The pane pulls bounded screenshots only while visible, with one outstanding read.
+This is a live capture view, not a video decoder. Input uses screenshot pixels and
+requires the observed dimensions; the iOS adapter converts pixels to device points.
+A dimension change rejects input and requires a fresh observation. iOS accessibility
+frames remain in UI-oriented points, which can differ from the raw framebuffer
+after rotation; locate input in the screenshot. Android accessibility bounds are pixels. Missing
+accessibility is reported explicitly as screenshot fallback. Screen content is
+untrusted observation. Capture bytes are returned as MCP images and are not added
+to product snapshots or tool presentation metadata.
+
+Xcode and an iOS runtime, Meta idb (CLI and companion), or Android SDK Platform
+Tools and a running emulator are user-installed prerequisites. Korus discovers them
+and links to setup; it does not install them. idb is an external MIT-licensed
+bridge, not redistributed code or a dependency on another desktop app's helper.
+Korus starts one companion per iOS attachment on a private Unix socket, bypasses
+idb's global connection registry, and stops only that child on detach.
+Its native companion owns CoreSimulator input/accessibility; compatibility depends
+on the installed idb/Xcode pair. Xcode 27 requires idb's DTUHID input transport.
+Development overrides `APP_MOBILE_IDB_PATH` and `APP_MOBILE_COMPANION_PATH` select
+an isolated installation. ADB serial filtering admits emulator targets only.
+
 ## Computer Use
 
 A local macOS capability exposed through the same server. A signed helper (pinned in
