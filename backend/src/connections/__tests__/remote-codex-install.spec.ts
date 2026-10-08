@@ -1,15 +1,65 @@
 import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { bundledCodexVersion } from '@workspace/core/codex-release';
-import { remoteCodexInstallCommand } from '../remote-codex-install';
+import { remoteCodexInstallCommand, remoteCodexVersionCommand } from '../remote-codex-install';
 
 const temporaryRoots: string[] = [];
 afterEach(() => { for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+
+describe('remote Codex version discovery', () => {
+  function fixture() {
+    const root = mkdtempSync(path.join(tmpdir(), 'app-remote-version-'));
+    temporaryRoots.push(root);
+    const bin = path.join(root, 'bin');
+    mkdirSync(bin);
+    symlinkSync(process.execPath, path.join(bin, 'node'));
+    const install = (relativePath: string, version: string) => {
+      const binary = path.join(root, relativePath);
+      mkdirSync(path.dirname(binary), { recursive: true });
+      writeFileSync(binary, `#!/bin/sh\nprintf 'codex-cli ${version}\\n'\n`, { mode: 0o755 });
+      return binary;
+    };
+    const probe = (storedVersion?: string) => {
+      const result = spawnSync('/bin/sh', ['-c', remoteCodexVersionCommand(storedVersion)], {
+        encoding: 'utf8', env: { HOME: root, PATH: bin },
+      });
+      expect(result.status).toBe(0);
+      return result.stdout.trim();
+    };
+    return { root, install, probe };
+  }
+
+  it('discovers the managed installation when the saved version is empty and Codex is absent from PATH', () => {
+    const { install, probe } = fixture();
+    install(`${product.homeDirectory}/codex/${bundledCodexVersion}/bin/codex`, bundledCodexVersion);
+
+    expect(probe('')).toBe(`codex-cli ${bundledCodexVersion}`);
+  });
+
+  it('reports the current managed installation instead of a stale saved version', () => {
+    const { install, probe } = fixture();
+    install(`${product.homeDirectory}/codex/0.100.0/bin/codex`, '0.100.0');
+    install(`${product.homeDirectory}/codex/${bundledCodexVersion}/bin/codex`, bundledCodexVersion);
+
+    expect(probe('0.100.0')).toBe(`codex-cli ${bundledCodexVersion}`);
+  });
+
+  it('preserves an explicitly configured executable ahead of the managed installation', () => {
+    const { root, install, probe } = fixture();
+    install(`${product.homeDirectory}/codex/${bundledCodexVersion}/bin/codex`, bundledCodexVersion);
+    const custom = install('custom tools/codex', '0.100.0');
+    writeFileSync(path.join(root, product.homeDirectory, 'settings.json'), JSON.stringify({
+      data: { settings: { codexBinaryPath: custom } },
+    }));
+
+    expect(probe()).toBe('codex-cli 0.100.0');
+  });
+});
 
 describe(`${product.name}-owned remote Codex installation`, () => {
   function fixture(checksumValid: boolean) {
