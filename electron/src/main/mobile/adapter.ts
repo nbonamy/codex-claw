@@ -9,6 +9,8 @@ import path from 'node:path';
 import { runMobileCommand } from './commands';
 
 export type DeviceScreen = { png: Buffer; width: number; height: number; scale: number };
+export type DeviceFrameListener = (image: Buffer, mimeType?: 'image/jpeg' | 'image/png', geometry?: { width: number; height: number; rotation: number }) => void;
+export type DeviceView = { touch(phase: 'down' | 'move' | 'up', x: number, y: number): void | Promise<void>; stop(): void };
 export interface MobileAdapter {
   list(): Promise<MobileCatalog>;
   boot(device: MobileDevice): Promise<void>;
