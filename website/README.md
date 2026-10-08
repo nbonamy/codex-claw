@@ -243,13 +243,42 @@ deliverables. Paths are relative to `videos/local/`. Preserve the approved WAVs,
 their provenance/alignment JSON, and the reference WAVs when clearing rebuildable
 MP4s: re-rendering preserves the approved voice; synthesizing it again may not.
 
-## Code Review product film
+## Automatic code review product film
 
-`videos/review-film.html` is a separate, illustrative 50-second walkthrough of Korus's standalone `/review` command: open Review, choose branch scope and an independent reviewer, inspect structured findings, remediate the selected issues, run a second round, and finish. It is not the Mission Review stage or a captured live review. Preview it at <http://127.0.0.1:4174/videos/review-film.html> and export its MP4 and poster with:
+`videos/review-film.html` is an illustrative 56-second walkthrough of automatic
+code review: find issues, fix qualifying findings, and verify the changes in a
+fresh round. Switching models is optional; this example uses Claude to review
+Codex's work for an adversarial perspective. The user enables automatic
+remediation for critical, high, and medium findings and allows up to three
+rounds. A cleared conversation marks each independent reviewer thread. Findings,
+severity, fix progress, and verification results appear in the Review pane;
+the conversation contains brief agent updates, not duplicate finding cards.
+A fresh reviewer verifies the result, returns the report to the original
+conversation, and closes. The example finishes after two rounds with
+local commits disabled. It is a scripted promotion, not a captured live review
+or the Mission Review stage. Preview it at
+<http://127.0.0.1:4174/videos/review-film.html> and export its ignored MP4 and poster:
 
 ```bash
 node videos/render-mission-film.mjs review-film
 ```
+
+For a standalone narrated export, generate and validate one Calm American take,
+then apply the same speech and pause settings as the other films:
+
+```bash
+.app-dev/video-tts/bin/python videos/generate-local-narration.py review-film --voice american-male --output videos/local/review-automatic/review-film
+.app-dev/video-tts/bin/python videos/check-local-narration.py --voice american-male --output videos/local/review-automatic/review-film
+node videos/render-review-film.mjs
+npx vite videos/local/review-automatic --host 127.0.0.1 --port 4190 --strictPort
+```
+
+The narrated MP4, optional VTT captions, and review page stay ignored under
+`videos/local/review-automatic/`. Narration may extend the silent film's timing.
+Use that review page for the visible **CC · Captions** control; the editable
+`videos/review-film.html` animation viewer is silent and has no subtitle track.
+The export does not replace published website media. The tracked thumbnail is
+`videos/assets/review-film-thumbnail.png`.
 
 ## Worktree delegation product film
 
