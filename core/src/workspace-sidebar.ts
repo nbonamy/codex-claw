@@ -198,5 +198,8 @@ function workspaceSessionKind(agent: Agent): WorkspaceSidebarSession['kind'] {
   if (workspace?.kind !== 'git') return 'folder';
   if (!workspace.branch) return 'detached';
   if (workspace.isLinkedWorktree) return 'worktree';
-  return workspace.branch === 'main' || workspace.branch === 'master' ? 'main' : 'branch';
+  const defaultBranch = workspace.defaultBranch === undefined
+    ? (workspace.branch === 'main' || workspace.branch === 'master' ? workspace.branch : null)
+    : workspace.defaultBranch;
+  return workspace.branch === defaultBranch ? 'main' : 'branch';
 }

@@ -1447,7 +1447,6 @@ const repositoryAcquisition = useRepositoryAcquisition({
   connectGitHub: () => props.connectWorkProvider('github'),
   errorMessage: (error) => localizedErrorMessage(error, t),
   githubConnection: () => githubConnection.value,
-  listSourceBranches: (repoPath, remoteConnectionId) => props.listSourceBranches(repoPath, remoteConnectionId),
   listSourceRepositories: (remoteConnectionId) => props.listSourceRepositories(remoteConnectionId),
   loadGitHubRepositories: () => props.loadWorkRepositories('github'),
   openFolder: async (folder, teamId) => {

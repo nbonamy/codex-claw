@@ -1,3 +1,8 @@
+import { execFile } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 import { AgentGitService, parseBranchStatus, parseChangedFiles, parseCommitSummaries, parseNumstat, parsePorcelainFiles } from '../agent-git-service';
@@ -167,6 +172,33 @@ describe('agent git service parsers', () => {
     });
   });
 
+  it('detects the remote default independently of the checked-out branch and linked worktree', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'korus-branch-identity-'));
+    const repo = join(root, 'repo');
+    const worktree = join(root, 'linked');
+    const exec = promisify(execFile);
+    const run = (args: string[]) => exec('git', args, { cwd: repo });
+    try {
+      await exec('git', ['init', '--initial-branch=trunk', repo]);
+      await run(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', 'fixture']);
+      await run(['update-ref', 'refs/remotes/origin/trunk', 'HEAD']);
+      await run(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk']);
+      const service = new AgentGitService();
+      await expect(service.identity(repo)).resolves.toMatchObject({ branch: 'trunk', defaultBranch: 'trunk', isLinkedWorktree: false });
+      await run(['checkout', '-b', 'main']);
+      await expect(service.identity(repo)).resolves.toMatchObject({ branch: 'main', defaultBranch: 'trunk', isLinkedWorktree: false });
+      await run(['worktree', 'add', worktree, 'trunk']);
+      await expect(service.identity(worktree)).resolves.toMatchObject({ branch: 'trunk', defaultBranch: 'trunk', isLinkedWorktree: true });
+      await run(['checkout', '--detach']);
+      await expect(service.identity(repo)).resolves.toMatchObject({ branch: null, defaultBranch: 'trunk' });
+      await run(['symbolic-ref', '--delete', 'refs/remotes/origin/HEAD']);
+      await expect(service.identity(repo)).resolves.toMatchObject({ defaultBranch: 'main' });
+      await expect(service.identity(root)).resolves.toMatchObject({ kind: 'folder' });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('resolves lightweight workspace identity for a primary checkout', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/src/agent-workspace\n' };
@@ -182,6 +214,7 @@ describe('agent git service parsers', () => {
       repositoryName: 'agent-workspace',
       repositoryRoot: '/src/agent-workspace',
       branch: 'main',
+      defaultBranch: null,
       isLinkedWorktree: false,
       primaryWorktreeRoot: '/src/agent-workspace',
       updatedAt: '2026-08-27T12:00:00.000Z',
@@ -204,6 +237,7 @@ describe('agent git service parsers', () => {
       repositoryName: 'agent-workspace',
       repositoryRoot: '/src/agent-workspace-feature',
       branch: null,
+      defaultBranch: null,
       isLinkedWorktree: true,
       primaryWorktreeRoot: '/src/agent-workspace',
       originUrl: 'github.com:nbonamy/agent-workspace.git',

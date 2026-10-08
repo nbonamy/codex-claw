@@ -6,7 +6,7 @@ import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGit
 import { AppError } from '@workspace/core/app-error';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
 import type { AgentGitStatus } from '@workspace/core/contracts';
-import type { GitWorktreeCreateInput } from '../git-worktrees';
+import { listSourceBranches, type GitWorktreeCreateInput } from '../git-worktrees';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,11 +34,14 @@ export class AgentGitService {
   async identity(folder: string): Promise<AgentWorkspaceIdentity> {
     const updatedAt = this.now().toISOString();
     try {
-      const [rootResult, branchResult, commonDirectoryResult, originResult] = await Promise.all([
+      const [rootResult, branchResult, commonDirectoryResult, originResult, branches] = await Promise.all([
         this.runGit(folder, ['rev-parse', '--show-toplevel']),
         this.runGit(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => ({ stdout: '' })),
         this.runGit(folder, ['rev-parse', '--git-common-dir']),
         this.runGit(folder, ['remote', 'get-url', 'origin']).catch(() => ({ stdout: '' })),
+        listSourceBranches(folder, {
+          run: (_command, args, { cwd }) => this.runGit(cwd, args),
+        }).catch(() => []),
       ]);
       const repositoryRoot = resolve(rootResult.stdout.trim());
       const commonDirectory = resolve(repositoryRoot, commonDirectoryResult.stdout.trim());
@@ -52,6 +55,7 @@ export class AgentGitService {
         repositoryName: fileName(primaryWorktreeRoot),
         repositoryRoot,
         branch,
+        defaultBranch: branches.find((candidate) => candidate.isDefault)?.name ?? null,
         isLinkedWorktree: repositoryRoot !== primaryWorktreeRoot,
         primaryWorktreeRoot,
         ...(originUrl ? { originUrl } : {}),

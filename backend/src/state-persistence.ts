@@ -490,6 +490,7 @@ function sanitizeAgentWorkspace(value: unknown): AgentWorkspaceIdentity | undefi
       repositoryName: value.repositoryName,
       repositoryRoot: value.repositoryRoot,
       branch: value.branch,
+      ...(typeof value.defaultBranch === 'string' || value.defaultBranch === null ? { defaultBranch: value.defaultBranch } : {}),
       isLinkedWorktree: value.isLinkedWorktree,
       primaryWorktreeRoot: value.primaryWorktreeRoot,
       ...(originUrl ? { originUrl } : {}),
