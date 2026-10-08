@@ -41,6 +41,7 @@ describe(`${product.name} tool presentation`, () => {
     ['add-visualization', SitemapIcon, 'Created diagram'],
     ['delete-visualization', SitemapIcon, 'Deleted diagram'],
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
+    ['browser-set-viewport', BrowserIcon, 'Resized browser viewport'],
     ['computer-use-get-app-state', DeviceDesktopIcon, `Inspected ${product.name}`],
     ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],
     ['computer-use-list-windows', DeviceDesktopIcon, 'Listed Safari windows'],

@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod/v4';
 import { PRIMARY_BROWSER_ID } from '@workspace/core/contracts';
+import { parseBrowserViewport } from '@workspace/core/browser-viewport';
 import { errorToolResult, structuredToolResult } from './tool-result';
 
 export type InAppBrowserClient = {
@@ -11,6 +12,17 @@ export type InAppBrowserClient = {
 };
 
 export function registerInAppBrowserTools(server: McpServer, agentId: string, browser: InAppBrowserClient): void {
+  server.registerTool('browser-set-viewport', {
+    description: 'Resize this agent’s open in-app browser for responsive layout testing. Choose a phone/tablet/desktop preset, responsive (fluid with device toolbar), fit (normal pane), or custom width and height in CSS pixels. Resets page zoom to 100%. Presets resize only: they do not emulate mobile touch, user agent, or pixel density. Returns the measured page viewport after layout; use browser-screenshot to inspect it.',
+    inputSchema: {
+      preset: z.enum(['fit', 'responsive', 'phone', 'tablet', 'desktop']).optional(),
+      width: z.number().int().min(240).max(2000).optional(),
+      height: z.number().int().min(320).max(2000).optional(),
+    },
+  }, input => browserResult(() => {
+    parseBrowserViewport(input);
+    return browser.execute({ agentId, browserId: PRIMARY_BROWSER_ID, command: 'viewport', arguments: input });
+  }));
   const run = (command: string, arguments_: Record<string, unknown>) => browserResult(() => browser.execute({ agentId, browserId: PRIMARY_BROWSER_ID, command, arguments: arguments_ }));
   server.registerTool('browser-open', { description: `Open an HTTP, HTTPS, or workspace-local file URL in this agent's ${product.name} in-app browser. File URLs must resolve inside the agent folder. The tool waits until the browser pane has loaded before returning.`, inputSchema: { url: z.string().trim().min(1).describe('HTTP, HTTPS, or workspace-local file URL to open.') } }, ({ url }) => browserResult(() => browser.open({ agentId, browserId: PRIMARY_BROWSER_ID, url })));
   server.registerTool('browser-get-dom', { description: 'Inspect the current in-app browser page or one CSS selector. Returns URL, title, text, HTML, and bounds. Use this before browser interactions.', inputSchema: { selector: z.string().optional() } }, ({ selector }) => run('dom', selector ? { selector } : {}));

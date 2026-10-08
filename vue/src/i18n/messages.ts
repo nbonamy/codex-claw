@@ -947,6 +947,11 @@ export const messages = {
               failed: 'Failed opening {target}',
               running: 'Opening {target}',
             },
+            browserSetViewport: {
+              running: 'Resizing browser viewport',
+              completed: 'Resized browser viewport',
+              failed: 'Failed resizing browser viewport',
+            },
             browserScreenshot: {
               completed: 'Captured page screenshot',
               failed: 'Failed capturing page screenshot',

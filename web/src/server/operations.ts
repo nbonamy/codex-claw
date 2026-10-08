@@ -151,7 +151,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
 const desktopOnlyOperations = new Set([
   'browserClearAnnotations', 'browserClose', 'browserGoBack', 'browserGoForward', 'browserNavigate',
   'browserOpen', 'browserReload', 'browserResolveAnnotation', 'browserCopyScreenshot', 'browserGetZoom', 'browserSetAnnotationMode', 'browserSetBounds', 'browserSetZoom',
-  'browserSetVisible', 'chooseAgentFolder', 'chooseSourceFolder',
+  'browserSetVisible', 'browserViewportApplied', 'chooseAgentFolder', 'chooseSourceFolder',
   'chooseDocumentSavePath', 'chooseSourceWorktreeDestination', 'getDaemonStatus', 'getOpenInApplications', 'getSystemPermissions',
   'getUpdateStatus', 'installUpdate', 'launchChatGptApp', 'openAccessibilitySettings', 'openAgentPath',
   'openScreenRecordingSettings', 'quit', 'reloadRenderer', 'restartApp', 'setDaemonEnabled', 'setDockBadgeCount', 'setMenuBarVisible',

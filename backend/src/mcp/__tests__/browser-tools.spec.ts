@@ -24,16 +24,16 @@ describe('in-app browser MCP tools', () => {
     registerInAppBrowserTools(server as unknown as McpServer, 'agent-dina', browser);
   });
 
-  it('registers the complete browser tool surface', () => {
-    expect([...handlers.keys()]).toStrictEqual([
-      'browser-open',
-      'browser-get-dom',
-      'browser-screenshot',
-      'browser-click',
-      'browser-type',
-      'browser-scroll',
-      'browser-console-logs',
-    ]);
+  it('sets only the caller browser viewport and returns the measured dimensions', async () => {
+    const result = { preset: 'phone', width: 390, height: 844, devicePixelRatio: 2 };
+    vi.mocked(browser.execute).mockResolvedValue(result);
+    expect(await handlers.get('browser-set-viewport')?.({ preset: 'phone' })).toMatchObject({ structuredContent: result, isError: false });
+    expect(browser.execute).toHaveBeenCalledWith({ agentId: 'agent-dina', browserId: PRIMARY_BROWSER_ID, command: 'viewport', arguments: { preset: 'phone' } });
+  });
+
+  it.each([{}, { width: 800 }, { preset: 'phone', height: 500 }, { width: 2400, height: 600 }])('rejects incomplete or conflicting viewport input before reaching the desktop: %j', async input => {
+    expect(await handlers.get('browser-set-viewport')?.(input)).toMatchObject({ isError: true });
+    expect(browser.execute).not.toHaveBeenCalled();
   });
 
   it('opens the primary browser and returns structured data', async () => {

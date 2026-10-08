@@ -175,6 +175,7 @@ export const ipcChannels = {
   browserSetZoom: 'browser:zoom:set',
   browserCopyScreenshot: 'browser:screenshot:copy',
   browserSetBounds: 'browser:bounds:set',
+  browserViewportApplied: 'browser:viewport:applied',
   browserSetVisible: 'browser:visible:set',
   browserSetAnnotationMode: 'browser:annotation-mode:set',
   browserResolveAnnotation: 'browser:annotation:resolve',

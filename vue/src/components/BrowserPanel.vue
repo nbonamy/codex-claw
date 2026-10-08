@@ -93,6 +93,7 @@ import { ElMessage } from 'element-plus';
 import { IconArrowLeft, IconArrowRight, IconCamera, IconCirclePlus, IconCrop, IconDeviceMobile, IconDotsVertical, IconMinus, IconPlus, IconRefresh, IconRotateClockwise, IconX, IconZoom } from '@tabler/icons-vue';
 import { PRIMARY_BROWSER_ID, type BrowserAnnotation, type BrowserBounds, type BrowserState, type BrowserViewportBounds, type MainToRendererEvent } from '@workspace/core/contracts';
 import { browserGuestPartition } from '@workspace/core/browser-guest';
+import { browserDevicePresets, type BrowserViewportRequest } from '@workspace/core/browser-viewport';
 import { appClientPlatform, appApi } from '../platform-api';
 import { ArrowUpRightIcon } from '../shared/icons/app-icons';
 import AnnotationSendButton from './AnnotationSendButton.vue';
@@ -169,12 +170,18 @@ const selectionStyle = computed(() => selectionRect.value ? {
 } : undefined);
 let resizeObserver: ResizeObserver | null = null;
 let unsubscribe: (() => void) | null = null;
+let unsubscribeCommands: (() => void) | null = null;
 
 watch(() => state.value.url, (url) => emit('url-change', url), { immediate: true });
 
 onMounted(async () => {
   const initialRequestId = props.openRequestId;
   unsubscribe = appApi?.onEvent(handleEvent) ?? null;
+  unsubscribeCommands = appApi?.onAppCommand(command => {
+    if (command.type === 'set-browser-viewport' && command.agentId === props.agentId && command.browserId === props.browserId) {
+      void applyViewportRequest(command).catch(reason => { error.value = messageFor(reason); });
+    }
+  }) ?? null;
   resizeObserver = new ResizeObserver(() => {
     updateResponsiveDimensions();
     void syncBounds();
@@ -211,6 +218,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   disposed = true;
   unsubscribe?.();
+  unsubscribeCommands?.();
   resizeObserver?.disconnect();
   window.removeEventListener('resize', syncBoundsAfterWindowResize);
   document.removeEventListener('pointerdown', closeMenuOnOutsideClick);
@@ -405,12 +413,7 @@ async function selectDevicePreset(): Promise<void> {
     updateResponsiveDimensions();
     return;
   }
-  const presets: Record<string, { width: number; height: number }> = {
-    phone: { width: 390, height: 844 },
-    tablet: { width: 768, height: 1024 },
-    desktop: { width: 1280, height: 800 },
-  };
-  const preset = presets[devicePreset.value];
+  const preset = browserDevicePresets[devicePreset.value as keyof typeof browserDevicePresets];
   if (!preset) return;
   deviceWidth.value = preset.width;
   deviceHeight.value = preset.height;
@@ -432,6 +435,29 @@ function setDeviceDimension(dimension: 'width' | 'height', event: Event): void {
 function rotateDevice(): void {
   [deviceWidth.value, deviceHeight.value] = [deviceHeight.value, deviceWidth.value];
   devicePreset.value = 'custom';
+}
+
+async function applyViewportRequest(request: BrowserViewportRequest): Promise<void> {
+  const api = requireBrowserApi();
+  let failure: string | undefined;
+  try {
+    if (!browserReady || disposed || !props.visible || props.visualization) throw new Error('Open this agent’s Browser pane before changing its viewport.');
+    const configuration = request.viewport;
+    deviceToolbarVisible.value = configuration.preset !== 'fit';
+    devicePreset.value = configuration.preset === 'fit' ? 'responsive' : configuration.preset;
+    if (configuration.preset === 'custom') {
+      deviceWidth.value = configuration.width!;
+      deviceHeight.value = configuration.height!;
+    } else await selectDevicePreset();
+    await nextTick();
+    // Let the renderer and embedded webview receive the changed layout before measuring.
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    if (disposed || !props.visible) throw new Error('Browser pane is no longer visible.');
+    updateResponsiveDimensions();
+    await syncBounds();
+    await syncZoom();
+  } catch (reason) { failure = messageFor(reason); }
+  await api.browserViewportApplied(props.agentId, props.browserId, request.requestId, failure);
 }
 
 async function copyScreenshot(rect?: BrowserBounds): Promise<void> {
@@ -882,6 +908,7 @@ function messageFor(reason: unknown): string {
 }
 
 .browser-panel__viewport--device:not(.browser-panel__viewport--responsive) .browser-panel__guest-frame {
+  box-sizing: content-box;
   margin: var(--space-4) auto;
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-menu);

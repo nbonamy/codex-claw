@@ -673,6 +673,7 @@ export type AgentCreationProgress = {
 };
 
 export type AppCommand =
+  | ({ type: 'set-browser-viewport' } & import('./browser-viewport').BrowserViewportRequest)
   | {
     type: 'attach-appshot';
     accessibilityText?: string;
@@ -969,6 +970,7 @@ export type AppApi = {
   browserSetZoom(agentId: string, browserId: string, percent: number): Promise<number>;
   browserCopyScreenshot(agentId: string, browserId: string, rect?: BrowserBounds): Promise<void>;
   browserSetBounds(agentId: string, browserId: string, bounds: BrowserViewportBounds): Promise<void>;
+  browserViewportApplied(agentId: string, browserId: string, requestId: string, error?: string): Promise<void>;
   browserSetVisible(agentId: string, browserId: string, visible: boolean): Promise<void>;
   browserSetAnnotationMode(agentId: string, browserId: string, enabled: boolean): Promise<void>;
   browserResolveAnnotation(token: string, comment: string | null): Promise<void>;

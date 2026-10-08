@@ -179,6 +179,7 @@ const api: AppApi = {
   browserSetZoom: (agentId: string, browserId: string, percent: number) => ipc.invoke(ipcChannels.browserSetZoom, agentId, browserId, percent),
   browserCopyScreenshot: (agentId: string, browserId: string, rect?: BrowserBounds) => ipc.invoke(ipcChannels.browserCopyScreenshot, agentId, browserId, rect),
   browserSetBounds: (agentId: string, browserId: string, bounds: import('@workspace/core/contracts').BrowserViewportBounds) => ipc.invoke(ipcChannels.browserSetBounds, agentId, browserId, bounds),
+  browserViewportApplied: (agentId: string, browserId: string, requestId: string, error?: string) => ipc.invoke(ipcChannels.browserViewportApplied, agentId, browserId, requestId, error),
   browserSetVisible: (agentId: string, browserId: string, visible: boolean) => ipc.invoke(ipcChannels.browserSetVisible, agentId, browserId, visible),
   browserSetAnnotationMode: (agentId: string, browserId: string, enabled: boolean) => ipc.invoke(ipcChannels.browserSetAnnotationMode, agentId, browserId, enabled),
   browserResolveAnnotation: (token: string, comment: string | null) => ipc.invoke(ipcChannels.browserResolveAnnotation, token, comment),

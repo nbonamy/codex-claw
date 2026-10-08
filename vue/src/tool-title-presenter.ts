@@ -16,6 +16,7 @@ const TOOL_KEYS: Record<string, string> = {
   'browser-console-logs': 'browserConsoleLogs',
   'browser-get-dom': 'browserGetDom',
   'browser-open': 'browserOpen',
+  'browser-set-viewport': 'browserSetViewport',
   'browser-screenshot': 'browserScreenshot',
   'browser-scroll': 'browserScroll',
   'browser-type': 'browserType',

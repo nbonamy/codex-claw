@@ -195,6 +195,10 @@ Registered per authenticated request by independent modules
   selection and waits for load; other `browser-*` tools operate the sandboxed page
   through `client/browser/open|execute`. The renderer never exposes DOM, cookies or
   screenshots to page scripts.
+  Viewport changes reuse the renderer's device controls; the desktop waits for
+  the targeted pane to acknowledge layout before reading the guest's actual CSS
+  dimensions. Hidden/closed panes cannot report a successful resize. Device presets
+  change viewport size only, not user agent, touch input or pixel density.
 
 ## Computer Use
 

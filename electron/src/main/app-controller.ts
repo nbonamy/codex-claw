@@ -84,6 +84,10 @@ export class AppController {
 
   private readonly browserPane = new BrowserPane({
     onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
+    onViewportRequest: (request) => {
+      if (!this.mainWindow || this.mainWindow.isDestroyed()) throw new Error('Browser window is not available.');
+      sendAppCommand(this.mainWindow.webContents, { type: 'set-browser-viewport', ...request });
+    },
   });
 
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
@@ -650,6 +654,7 @@ export class AppController {
     ipc.handle(ipcChannels.browserSetZoom, (_event, agentId: string, browserId: string, percent: number) => this.browserPane.setZoom(agentId, browserId, percent));
     ipc.handle(ipcChannels.browserCopyScreenshot, (_event, agentId: string, browserId: string, rect?: BrowserBounds) => this.browserPane.copyScreenshot(agentId, browserId, rect));
     ipc.handle(ipcChannels.browserSetBounds, (_event, agentId: string, browserId: string, bounds: BrowserViewportBounds) => this.browserPane.setBounds(agentId, browserId, bounds));
+    ipc.handle(ipcChannels.browserViewportApplied, (_event, agentId: string, browserId: string, requestId: string, error?: string) => this.browserPane.viewportApplied(agentId, browserId, requestId, error));
     ipc.handle(ipcChannels.browserSetVisible, (_event, agentId: string, browserId: string, visible: boolean) => this.browserPane.setVisible(agentId, browserId, visible));
     ipc.handle(ipcChannels.browserSetAnnotationMode, (_event, agentId: string, browserId: string, enabled: boolean) => this.browserPane.setAnnotationMode(agentId, browserId, enabled));
     ipc.handle(ipcChannels.browserResolveAnnotation, (_event, token: string, comment: string | null) => this.browserPane.resolveAnnotation(token, comment));

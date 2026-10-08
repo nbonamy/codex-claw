@@ -670,11 +670,13 @@ describe('AppShell dialogs and commands', () => {
       observe() {}
       disconnect() {}
     });
-    let listener: (command: AppCommand) => void = () => undefined;
-    const unsubscribe = vi.fn();
+    const listeners = new Set<(command: AppCommand) => void>();
+    const listener = (command: AppCommand) => {
+      for (const nextListener of listeners) nextListener(command);
+    };
     const onAppCommand = vi.fn((nextListener: (command: AppCommand) => void) => {
-      listener = nextListener;
-      return unsubscribe;
+      listeners.add(nextListener);
+      return () => listeners.delete(nextListener);
     });
     window.app = {
       onAppCommand,
@@ -752,7 +754,7 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.text()).toContain('Edit agent');
 
     wrapper.unmount();
-    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(listeners.size).toBe(0);
   });
 
   it('persists repository icons selected from the session sidebar', async () => {

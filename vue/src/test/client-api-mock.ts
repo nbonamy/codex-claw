@@ -200,6 +200,7 @@ export function createClientApiMock(
     browserSetZoom: unscripted('browserSetZoom'),
     browserCopyScreenshot: unscripted('browserCopyScreenshot'),
     browserSetBounds: unscripted('browserSetBounds'),
+    browserViewportApplied: unscripted('browserViewportApplied'),
     browserSetVisible: unscripted('browserSetVisible'),
     browserSetAnnotationMode: unscripted('browserSetAnnotationMode'),
     browserResolveAnnotation: unscripted('browserResolveAnnotation'),

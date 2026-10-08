@@ -46,6 +46,7 @@ const BROWSER_TOOLS = new Set([
   'browser-console-logs',
   'browser-get-dom',
   'browser-open',
+  'browser-set-viewport',
   'browser-screenshot',
   'browser-scroll',
   'browser-type',
