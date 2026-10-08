@@ -1,17 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const native = vi.hoisted(() => ({ run: vi.fn() }));
+import path from 'node:path';
+const native = vi.hoisted(() => ({ run: vi.fn(), start: vi.fn(), stop: vi.fn() }));
+const wire = vi.hoisted(() => ({
+  screenshot: vi.fn(),
+  describe: vi.fn(),
+  tap: vi.fn(),
+  swipe: vi.fn(),
+  text: vi.fn(),
+  button: vi.fn(),
+  launch: vi.fn(),
+  inspect: vi.fn(),
+  close: vi.fn(),
+}));
 vi.mock('../mobile/ios-companion', () => ({
   IosCompanions: class {
     executable = 'idb_companion';
     address() {
       return '/private/bridge.sock';
     }
-    start = vi.fn();
-    stop = vi.fn();
+    start = native.start;
+    stop = native.stop;
+  },
+}));
+vi.mock('../mobile/idb-client', () => ({
+  IdbClient: class {
+    constructor() {
+      return wire;
+    }
   },
 }));
 vi.mock('../mobile/commands', () => ({ runMobileCommand: native.run }));
 import { NativeMobileAdapter } from '../mobile/adapter';
+const runtime = {
+  companionPath: 'idb_companion',
+  protoPath: path.resolve(import.meta.dirname, '../../../resources/mobile-simulator/idb.proto'),
+};
 const ios = { id: 'ios-device', name: 'iPhone', platform: 'ios' as const, state: 'booted' as const };
 const android = { id: 'emulator-5554', name: 'Pixel', platform: 'android' as const, state: 'booted' as const };
 const png = Buffer.alloc(24);
@@ -21,57 +44,103 @@ png.writeUInt32BE(2400, 20);
 const hostPlatform = process.platform;
 beforeEach(() => {
   Object.defineProperty(process, 'platform', { value: 'darwin' });
-  native.run.mockReset();
+  vi.resetAllMocks();
+  wire.describe.mockResolvedValue({ udid: ios.id, screen_dimensions: { width: 1200, width_points: 400 } });
+  wire.screenshot.mockResolvedValue(png);
 });
 afterEach(() => {
   Object.defineProperty(process, 'platform', { value: hostPlatform });
 });
 
 describe('native mobile adapters', () => {
-  it('excludes physical and offline Android devices and reports missing iOS prerequisites', async () => {
+  it('discovers only iOS simulators and online Android emulator serials, with recoverable prerequisite errors', async () => {
     native.run.mockImplementation(async (_file: string, args: string[]) => {
-      if (args[0] === 'simctl') throw new Error('no Xcode');
-      return Buffer.from(
-        'List of devices attached\nemulator-5554\tdevice\nphysical-phone\tdevice\nemulator-5556\toffline\n',
-      );
+      if (args[0] === 'simctl')
+        return Buffer.from(
+          JSON.stringify({
+            devices: {
+              'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [
+                { udid: 'ios-device', name: 'iPhone', state: 'Shutdown' },
+              ],
+              'com.apple.CoreSimulator.SimRuntime.tvOS-27-0': [{ udid: 'tv', name: 'TV', state: 'Booted' }],
+            },
+          }),
+        );
+      if (args[0] === 'devices')
+        return Buffer.from(
+          'List of devices attached\nemulator-5554\tdevice\nphysical\tdevice\nemulator-5556\toffline\n',
+        );
+      return Buffer.from('');
     });
-    const result = await new NativeMobileAdapter().list();
-    expect(result.devices).toStrictEqual([{ ...android, name: 'emulator-5554' }]);
+    const adapter = new NativeMobileAdapter(runtime);
+    expect((await adapter.list()).devices).toEqual([
+      { ...ios, state: 'shutdown' },
+      { ...android, name: 'emulator-5554' },
+    ]);
+    native.run.mockRejectedValueOnce(new Error('Xcode missing')).mockRejectedValueOnce(new Error('adb missing'));
+    expect((await adapter.list()).setup.map((item) => item.platform)).toEqual(['ios', 'android']);
+    native.run.mockResolvedValueOnce(Buffer.from('{"devices":{}}'));
+    expect((await adapter.list()).setup).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Create an iOS Simulator') }),
+    );
+    const missing = new NativeMobileAdapter({ ...runtime, protoPath: '/missing/protocol' });
+    expect((await missing.list()).setup).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('bundled iOS bridge') }),
+    );
   });
 
-  it('maps screenshot pixels to iOS points and targets the explicit UDID', async () => {
-    native.run
-      .mockResolvedValueOnce(png)
-      .mockResolvedValueOnce(Buffer.from(JSON.stringify({ screen_dimensions: { width: 1200, width_points: 400 } })))
-      .mockResolvedValue(Buffer.alloc(0));
-    const adapter = new NativeMobileAdapter();
+  it('boots the selected iOS device, verifies companion identity, and closes only its connection on detach', async () => {
+    const adapter = new NativeMobileAdapter(runtime);
+    await adapter.boot({ ...ios, state: 'shutdown' });
+    expect(native.run).toHaveBeenCalledWith('/usr/bin/xcrun', ['simctl', 'bootstatus', ios.id, '-b'], 90_000);
+    expect(native.start).toHaveBeenCalledWith(ios.id);
+    adapter.detach(ios);
+    expect(wire.close).toHaveBeenCalledOnce();
+    expect(native.stop).toHaveBeenCalledWith(ios.id);
+    await expect(adapter.screen(ios)).rejects.toThrow('disconnected');
+    wire.describe.mockResolvedValueOnce({ udid: 'different-device' });
+    await expect(adapter.boot(ios)).rejects.toThrow('different device');
+    expect(wire.close).toHaveBeenCalledTimes(2);
+  });
+
+  it('maps screenshot pixels including edges into iOS points and swipe seconds', async () => {
+    const adapter = new NativeMobileAdapter(runtime);
+    await adapter.boot(ios);
     const screen = await adapter.screen(ios);
-    await adapter.perform(ios, { action: 'tap', x: 300, y: 600, width: 1200, height: 2400 }, screen);
-    expect(native.run).toHaveBeenLastCalledWith(expect.any(String), [
-      '--companion',
-      '/private/bridge.sock',
-      'ui',
-      'tap',
-      '--udid',
-      'ios-device',
-      '100',
-      '200',
-    ]);
+    expect(screen).toEqual({ png, width: 1200, height: 2400, scale: 3 });
     await adapter.perform(ios, { action: 'tap', x: 1199, y: 2399, width: 1200, height: 2400 }, screen);
-    expect(native.run.mock.lastCall?.[1].slice(-2)).toStrictEqual(['399', '799']);
+    expect(wire.tap).toHaveBeenCalledWith(399, 799);
+    await adapter.perform(
+      ios,
+      { action: 'swipe', x: 300, y: 600, toX: 600, toY: 900, width: 1200, height: 2400, durationMs: 500 },
+      screen,
+    );
+    expect(wire.swipe).toHaveBeenCalledWith(100, 200, 200, 300, 0.5);
+    await adapter.perform(ios, { action: 'text', text: 'Hi' });
+    expect(wire.text).toHaveBeenCalledWith('Hi');
+    await adapter.perform(ios, { action: 'button', button: 'home' });
+    expect(wire.button).toHaveBeenCalledWith('home');
+    await adapter.perform(ios, { action: 'launch', appId: 'com.example.app' });
+    expect(wire.launch).toHaveBeenCalledWith('com.example.app');
+    wire.inspect.mockResolvedValue('accessibility');
+    expect(await adapter.inspect(ios)).toBe('accessibility');
   });
 
   it('rejects invalid images and missing iOS scale rather than guessing', async () => {
-    const adapter = new NativeMobileAdapter();
+    const adapter = new NativeMobileAdapter(runtime);
     native.run.mockResolvedValueOnce(Buffer.from('bad'));
     await expect(adapter.screen(android)).rejects.toThrow('invalid screenshot');
-    native.run.mockResolvedValueOnce(png).mockResolvedValueOnce(Buffer.from('{}'));
+    await adapter.boot(ios);
+    wire.describe.mockResolvedValueOnce({});
     await expect(adapter.screen(ios)).rejects.toThrow('screen scale');
+    const invalid = Buffer.from(png);
+    invalid.writeUInt32BE(10001, 16);
+    native.run.mockResolvedValueOnce(invalid);
+    await expect(adapter.screen(android)).rejects.toThrow('dimensions');
   });
 
-  it('quotes Android text at the guest shell boundary and rejects unsupported Unicode and iOS Back', async () => {
-    native.run.mockResolvedValue(Buffer.alloc(0));
-    const adapter = new NativeMobileAdapter();
+  it('quotes Android text at the guest shell boundary and rejects unsupported text', async () => {
+    const adapter = new NativeMobileAdapter(runtime);
     await adapter.perform(android, { action: 'text', text: "hello ';$(touch /x)" });
     expect(native.run).toHaveBeenLastCalledWith(expect.any(String), [
       '-s',
@@ -82,89 +151,12 @@ describe('native mobile adapters', () => {
       "'hello%s'\\'';$(touch%s/x)'",
     ]);
     await expect(adapter.perform(android, { action: 'text', text: 'é' })).rejects.toThrow('ASCII');
-    await expect(adapter.perform(ios, { action: 'button', button: 'back' })).rejects.toThrow('no Back');
-  });
-  it('discovers only iOS runtimes, boots a selected simulator, and links missing bridge setup', async () => {
-    native.run.mockImplementation(async (file: string, args: string[]) => {
-      if (args.includes('devices'))
-        return Buffer.from(
-          JSON.stringify({
-            devices: {
-              'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [{ udid: 'phone', name: 'Phone', state: 'Shutdown' }],
-              'com.apple.CoreSimulator.SimRuntime.tvOS-27-0': [{ udid: 'tv', name: 'TV', state: 'Booted' }],
-            },
-          }),
-        );
-      return Buffer.from('');
-    });
-    const adapter = new NativeMobileAdapter();
-    const catalog = await adapter.list();
-    expect(catalog.devices).toStrictEqual([{ id: 'phone', name: 'Phone', state: 'shutdown', platform: 'ios' }]);
-    await adapter.boot(catalog.devices[0]!);
-    expect(native.run).toHaveBeenCalledWith('/usr/bin/xcrun', ['simctl', 'bootstatus', 'phone', '-b'], 90_000);
-    native.run.mockResolvedValueOnce(Buffer.from('{"devices":{}}'));
-    expect((await adapter.list()).setup).toContainEqual(
-      expect.objectContaining({ platform: 'ios', message: expect.stringContaining('Create an iOS Simulator') }),
-    );
-    native.run.mockRejectedValueOnce(new Error('Xcode missing')).mockRejectedValueOnce(new Error('adb missing'));
-    expect((await adapter.list()).setup.map((item) => item.platform)).toStrictEqual(['ios', 'android']);
+    await expect(adapter.perform(android, { action: 'text', text: '%s' })).rejects.toThrow('literal %s');
   });
 
-  it('encodes iOS gestures, keyboard, foreground launch and accessibility on the private connection', async () => {
-    native.run.mockResolvedValue(Buffer.from('[]'));
-    const adapter = new NativeMobileAdapter();
-    const screen = { png, width: 1200, height: 2400, scale: 3 };
-    await adapter.perform(
-      ios,
-      { action: 'swipe', x: 300, y: 600, toX: 600, toY: 900, width: 1200, height: 2400, durationMs: 500 },
-      screen,
-    );
-    expect(native.run.mock.lastCall?.[1]).toStrictEqual([
-      '--companion',
-      '/private/bridge.sock',
-      'ui',
-      'swipe',
-      '--udid',
-      'ios-device',
-      '100',
-      '200',
-      '200',
-      '300',
-      '--duration',
-      '0.5',
-    ]);
-    await adapter.perform(ios, { action: 'text', text: '--hello' });
-    expect(native.run.mock.lastCall?.[1]).toStrictEqual([
-      '--companion',
-      '/private/bridge.sock',
-      'ui',
-      'text',
-      '--udid',
-      'ios-device',
-      '--',
-      '--hello',
-    ]);
-    await adapter.perform(ios, { action: 'button', button: 'home' });
-    expect(native.run.mock.lastCall?.[1]).toContain('HOME');
-    await adapter.perform(ios, { action: 'button', button: 'backspace' });
-    expect(native.run.mock.lastCall?.[1]).toContain('42');
-    await adapter.perform(ios, { action: 'launch', appId: 'com.test.app' });
-    expect(native.run.mock.lastCall?.[1]).toStrictEqual([
-      '--companion',
-      '/private/bridge.sock',
-      'launch',
-      '--udid',
-      'ios-device',
-      '--foreground-if-running',
-      'com.test.app',
-    ]);
-    expect(await adapter.inspect(ios)).toBe('[]');
-    adapter.detach(ios);
-  });
-
-  it('uses Android pixels and milliseconds, launches packages, and rejects non-XML accessibility output', async () => {
+  it('uses Android pixels and milliseconds, launches packages, and rejects unsuccessful launch/inspection', async () => {
     native.run.mockResolvedValue(Buffer.from('<hierarchy rotation="0"></hierarchy>'));
-    const adapter = new NativeMobileAdapter();
+    const adapter = new NativeMobileAdapter(runtime);
     await adapter.perform(android, {
       action: 'swipe',
       x: 300,
@@ -175,7 +167,7 @@ describe('native mobile adapters', () => {
       height: 2400,
       durationMs: 500,
     });
-    expect(native.run.mock.lastCall?.[1]).toStrictEqual([
+    expect(native.run.mock.lastCall?.[1]).toEqual([
       '-s',
       'emulator-5554',
       'shell',
@@ -187,11 +179,13 @@ describe('native mobile adapters', () => {
       '900',
       '500',
     ]);
+    await adapter.perform(android, { action: 'tap', x: 300, y: 600, width: 1200, height: 2400 });
+    expect(native.run.mock.lastCall?.[1]).toEqual(['-s', 'emulator-5554', 'shell', 'input', 'tap', '300', '600']);
     await adapter.perform(android, { action: 'button', button: 'back' });
-    expect(native.run.mock.lastCall?.[1]).toStrictEqual(['-s', 'emulator-5554', 'shell', 'input', 'keyevent', '4']);
+    expect(native.run.mock.lastCall?.[1]).toEqual(['-s', 'emulator-5554', 'shell', 'input', 'keyevent', '4']);
     native.run.mockResolvedValueOnce(Buffer.from('Events injected: 1'));
     await adapter.perform(android, { action: 'launch', appId: 'com.test.app' });
-    expect(native.run.mock.lastCall?.[1]).toStrictEqual([
+    expect(native.run.mock.lastCall?.[1]).toEqual([
       '-s',
       'emulator-5554',
       'shell',
@@ -202,7 +196,7 @@ describe('native mobile adapters', () => {
       'android.intent.category.LAUNCHER',
       '1',
     ]);
-    native.run.mockResolvedValueOnce(Buffer.from('No activities found to run, monkey aborted.'));
+    native.run.mockResolvedValueOnce(Buffer.from('No activities found'));
     await expect(adapter.perform(android, { action: 'launch', appId: 'com.missing.app' })).rejects.toThrow(
       'could not launch',
     );

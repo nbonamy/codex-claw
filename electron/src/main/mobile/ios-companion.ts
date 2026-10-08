@@ -1,6 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -10,10 +9,7 @@ export class IosCompanions {
     string,
     { child: ChildProcess; socket: string; directory: string; ready: boolean }
   >();
-  readonly executable =
-    [process.env.APP_MOBILE_COMPANION_PATH, '/opt/homebrew/bin/idb_companion', '/usr/local/bin/idb_companion'].find(
-      (candidate): candidate is string => Boolean(candidate && existsSync(candidate)),
-    ) ?? 'idb_companion';
+  constructor(readonly executable: string) {}
 
   async start(udid: string): Promise<void> {
     this.stop(udid);
@@ -49,7 +45,7 @@ export class IosCompanions {
           else resolve();
         };
         const failed = () =>
-          finish(new Error('Could not start idb_companion. Install the current Meta idb CLI and companion.'));
+          finish(new Error('Could not start idb_companion. Update the app and check Xcode compatibility.'));
         const exited = () =>
           finish(new Error('iOS companion stopped before it was ready. Check Xcode and idb compatibility.'));
         const data = (chunk: Buffer) => {

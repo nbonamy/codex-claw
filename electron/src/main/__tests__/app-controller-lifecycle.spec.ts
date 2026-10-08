@@ -122,7 +122,9 @@ function setup() {
   return { ...fixture, window, controller };
 }
 function invoke(channel: string, ...args: unknown[]) { return native.handlers.get(channel)!({}, ...args); }
+const originalResourcesPath = Object.getOwnPropertyDescriptor(process, 'resourcesPath');
 beforeEach(() => {
+  Object.defineProperty(process, 'resourcesPath', { value: '/test/resources', configurable: true });
   vi.clearAllMocks();
   vi.useFakeTimers();
   native.handlers.clear();
@@ -139,6 +141,8 @@ beforeEach(() => {
   vi.mocked(app.isInApplicationsFolder).mockReturnValue(true);
 });
 afterEach(async () => {
+  if (originalResourcesPath) Object.defineProperty(process, 'resourcesPath', originalResourcesPath);
+  else delete (process as unknown as Record<string, unknown>).resourcesPath;
   for (const controller of controllers) await controller.shutdown();
   controllers = [];
   app.removeAllListeners();

@@ -1,3 +1,4 @@
+import { mobileRuntimePaths } from './mobile/runtime';
 import { MobileSimulatorService } from './mobile/service';
 import { NativeMobileAdapter } from './mobile/adapter';
 import type { MobileRequest, MobileResult } from '@workspace/core/mobile-simulator';
@@ -85,7 +86,11 @@ export class AppController {
   private selectedMissionId: string | null = null;
   private appshotCapturePending = false;
 
-  private readonly mobileSimulator = new MobileSimulatorService(new NativeMobileAdapter(), async (agentId, deviceName) => {
+  private readonly mobileSimulator = new MobileSimulatorService(new NativeMobileAdapter(mobileRuntimePaths({
+    isPackaged: Boolean(app?.isPackaged),
+    appPath: app?.getAppPath?.() ?? process.cwd(),
+    resourcesPath: process.resourcesPath,
+  })), async (agentId, deviceName) => {
     const agent = this.snapshot?.agents.find(agent => agent.id === agentId);
     if (!agent || !this.mainWindow || this.mainWindow.isDestroyed()) return false;
     const result = await dialog.showMessageBox(this.mainWindow, {

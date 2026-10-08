@@ -37,7 +37,7 @@ describe('owned iOS companion transport', () => {
   it('waits for a framed readiness response on its own socket and kills only its child on detach', async () => {
     const process = child();
     native.spawn.mockReturnValue(process);
-    const bridge = new IosCompanions();
+    const bridge = new IosCompanions('idb_companion');
     const start = bridge.start('device');
     await Promise.resolve();
     expect(() => bridge.address('device')).toThrow('disconnected');
@@ -59,7 +59,7 @@ describe('owned iOS companion transport', () => {
   it('rejects a wrong socket and times out without leaving a helper running', async () => {
     const process = child();
     native.spawn.mockReturnValue(process);
-    const bridge = new IosCompanions();
+    const bridge = new IosCompanions('idb_companion');
     const start = bridge.start('device');
     await Promise.resolve();
     const failure = expect(start).rejects.toThrow('Invalid');
@@ -79,7 +79,7 @@ describe('owned iOS companion transport', () => {
   it('revokes an exited helper instead of reconnecting through the global idb registry', async () => {
     const process = child();
     native.spawn.mockReturnValue(process);
-    const bridge = new IosCompanions();
+    const bridge = new IosCompanions('idb_companion');
     const start = bridge.start('device');
     await Promise.resolve();
     process.stdout.write('{"grpc_path":"/private/mobile-test/bridge.sock"}\n');

@@ -1,3 +1,6 @@
+import { product } from '@workspace/core/product';
+import { IdbClient } from './idb-client';
+import type { MobileRuntimePaths } from './runtime';
 import { IosCompanions } from './ios-companion';
 import type { MobileAction, MobileCatalog, MobileDevice } from '@workspace/core/mobile-simulator';
 import { existsSync } from 'node:fs';
@@ -16,7 +19,11 @@ export interface MobileAdapter {
 }
 
 export class NativeMobileAdapter implements MobileAdapter {
-  private readonly companions = new IosCompanions();
+  private readonly companions: IosCompanions;
+  private readonly clients = new Map<string, IdbClient>();
+  constructor(private readonly runtime: MobileRuntimePaths) {
+    this.companions = new IosCompanions(runtime.companionPath);
+  }
   private readonly adb = executable(
     process.platform === 'win32' ? 'adb.exe' : 'adb',
     [
@@ -29,11 +36,6 @@ export class NativeMobileAdapter implements MobileAdapter {
       .filter((root): root is string => Boolean(root))
       .map((root) => path.join(root, 'platform-tools', process.platform === 'win32' ? 'adb.exe' : 'adb')),
   );
-  private readonly idb = executable('idb', [
-    process.env.APP_MOBILE_IDB_PATH ?? '',
-    '/opt/homebrew/bin/idb',
-    '/usr/local/bin/idb',
-  ]);
 
   async list(): Promise<MobileCatalog> {
     const catalog: MobileCatalog = { devices: [], setup: [] };
@@ -42,18 +44,17 @@ export class NativeMobileAdapter implements MobileAdapter {
         const result = JSON.parse(
           (await runMobileCommand('/usr/bin/xcrun', ['simctl', 'list', 'devices', 'available', '-j'])).toString(),
         );
-        const bridge = await Promise.all([
-          runMobileCommand(this.idb, ['--help']),
-          runMobileCommand(this.companions.executable, ['--version']),
-        ]).then(
-          () => true,
-          () => false,
-        );
+        const bridge =
+          existsSync(this.runtime.protoPath) &&
+          (await runMobileCommand(this.companions.executable, ['--version']).then(
+            () => true,
+            () => false,
+          ));
         if (!bridge)
           catalog.setup.push({
             platform: 'ios',
-            message: 'Install Meta idb for iOS input and accessibility (Xcode 27 requires a current build).',
-            url: 'https://fbidb.io/docs/installation',
+            message: `The bundled iOS bridge is unavailable. Update or reinstall ${product.name}, and check macOS/Xcode compatibility.`,
+            url: product.websiteUrl,
           });
         else
           for (const [runtime, devices] of Object.entries(
@@ -109,17 +110,27 @@ export class NativeMobileAdapter implements MobileAdapter {
       await runMobileCommand('/usr/bin/xcrun', ['simctl', 'boot', device.id]);
       await runMobileCommand('/usr/bin/xcrun', ['simctl', 'bootstatus', device.id, '-b'], 90_000);
     }
-    if (device.platform === 'ios') await this.companions.start(device.id);
+    if (device.platform === 'ios') {
+      await this.companions.start(device.id);
+      const client = new IdbClient(this.companions.address(device.id), this.runtime.protoPath);
+      this.clients.set(device.id, client);
+      if ((await client.describe()).udid !== device.id) {
+        this.detach(device);
+        throw new Error('iOS bridge returned a different device. Attach again.');
+      }
+    }
   }
 
   detach(device: MobileDevice): void {
+    this.clients.get(device.id)?.close();
+    this.clients.delete(device.id);
     if (device.platform === 'ios') this.companions.stop(device.id);
   }
 
   async screen(device: MobileDevice): Promise<DeviceScreen> {
     const png =
       device.platform === 'ios'
-        ? await this.ios(device, ['screenshot', '-'])
+        ? await this.ios(device).screenshot()
         : await runMobileCommand(this.adb, ['-s', device.id, 'exec-out', 'screencap', '-p']);
     if (png.length < 24 || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
       throw new Error('Device returned an invalid screenshot.');
@@ -128,18 +139,41 @@ export class NativeMobileAdapter implements MobileAdapter {
     if (!width || !height || width > 10000 || height > 10000) throw new Error('Invalid device screen dimensions.');
     let scale = 1;
     if (device.platform === 'ios') {
-      const description = JSON.parse((await this.ios(device, ['describe', '--json'])).toString());
+      const description = await this.ios(device).describe();
       const dimensions = description.screen_dimensions;
-      scale = dimensions?.width / dimensions?.width_points;
+      scale = Number(dimensions?.width) / Number(dimensions?.width_points);
       if (!Number.isFinite(scale) || scale < 1 || scale > 4)
-        throw new Error('idb did not return the device screen scale. Update idb before controlling this simulator.');
+        throw new Error(
+          'idb did not return the device screen scale. Update the app before controlling this simulator.',
+        );
     }
     return { png, width, height, scale };
   }
 
   async perform(device: MobileDevice, action: MobileAction, screen?: DeviceScreen): Promise<void> {
-    const ios = device.platform === 'ios';
-    const point = (value: number) => String(Math.floor(value / (screen?.scale ?? 1)));
+    if (device.platform === 'ios') {
+      const bridge = this.ios(device);
+      const point = (value: number) => Math.floor(value / (screen?.scale ?? 1));
+      switch (action.action) {
+        case 'tap':
+          return bridge.tap(point(action.x), point(action.y));
+        case 'swipe':
+          return bridge.swipe(
+            point(action.x),
+            point(action.y),
+            point(action.toX),
+            point(action.toY),
+            action.durationMs / 1000,
+          );
+        case 'text':
+          return bridge.text(action.text);
+        case 'button':
+          return bridge.button(action.button);
+        case 'launch':
+          return bridge.launch(action.appId);
+      }
+    }
+    const point = (value: number) => String(Math.floor(value));
     let args: string[];
     switch (action.action) {
       case 'tap':
@@ -152,31 +186,22 @@ export class NativeMobileAdapter implements MobileAdapter {
           point(action.y),
           point(action.toX),
           point(action.toY),
-          ...(ios ? ['--duration', String(action.durationMs / 1000)] : [String(action.durationMs)]),
+          String(action.durationMs),
         ];
         break;
       case 'text':
-        // adb input and idb HID text support ASCII, not a general Unicode IME.
+        // ADB input supports ASCII, not a general Unicode IME.
         if (!/^[\x20-\x7e]*$/.test(action.text))
           throw new Error('Device typing supports printable ASCII. Use app-specific tooling for Unicode input.');
-        if (!ios && action.text.includes('%s')) throw new Error('ADB cannot type a literal %s sequence.');
-        args = ['text', ...(ios ? ['--', action.text] : [shellQuote(action.text.replace(/ /g, '%s'))])];
+        if (action.text.includes('%s')) throw new Error('ADB cannot type a literal %s sequence.');
+        args = ['text', shellQuote(action.text.replace(/ /g, '%s'))];
         break;
       case 'button': {
-        if (ios && action.button === 'back') throw new Error('iOS has no Back button.');
         const keys = { home: '3', back: '4', enter: '66', backspace: '67' };
-        args = ios
-          ? action.button === 'home'
-            ? ['ui', 'button', 'HOME']
-            : ['ui', 'key', action.button === 'enter' ? '40' : '42']
-          : ['keyevent', keys[action.button]];
+        args = ['keyevent', keys[action.button]];
         break;
       }
       case 'launch':
-        if (ios) {
-          await this.ios(device, ['launch', '--foreground-if-running', action.appId]);
-          return;
-        }
         const launch = await runMobileCommand(this.adb, [
           '-s',
           device.id,
@@ -192,13 +217,11 @@ export class NativeMobileAdapter implements MobileAdapter {
           throw new Error('Android could not launch this app. Check that it is installed and has a launcher activity.');
         return;
     }
-    if (ios) await this.ios(device, args[0] === 'ui' ? args : ['ui', ...args]);
-    else await runMobileCommand(this.adb, ['-s', device.id, 'shell', 'input', ...args]);
+    await runMobileCommand(this.adb, ['-s', device.id, 'shell', 'input', ...args]);
   }
 
   async inspect(device: MobileDevice): Promise<string> {
-    if (device.platform === 'ios')
-      return (await this.ios(device, ['ui', 'describe-all', '--json'])).toString().slice(0, 100_000);
+    if (device.platform === 'ios') return this.ios(device).inspect();
     // No shared guest file: uiautomator writes directly to stdout through /dev/tty.
     const xml = (
       await runMobileCommand(this.adb, ['-s', device.id, 'exec-out', 'uiautomator', 'dump', '/dev/tty'])
@@ -207,16 +230,11 @@ export class NativeMobileAdapter implements MobileAdapter {
     return xml.slice(0, 100_000);
   }
 
-  private ios(device: MobileDevice, args: string[]) {
-    const depth = args[0] === 'ui' ? 2 : 1;
-    return runMobileCommand(this.idb, [
-      '--companion',
-      this.companions.address(device.id),
-      ...args.slice(0, depth),
-      '--udid',
-      device.id,
-      ...args.slice(depth),
-    ]);
+  private ios(device: MobileDevice): IdbClient {
+    this.companions.address(device.id); // Reject a dead helper instead of connecting to a stale socket.
+    const client = this.clients.get(device.id);
+    if (!client) throw new Error('iOS bridge disconnected. Attach again.');
+    return client;
   }
 }
 
