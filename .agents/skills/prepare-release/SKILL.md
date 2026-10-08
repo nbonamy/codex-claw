@@ -53,7 +53,7 @@ Nicolas's confirmation of the version and channel is the authorization to
 prepare, commit, push, and launch the release. Do not ask a second time. If he
 asked for local-only preparation, stop before pushing and hand him the command.
 
-## Freeze and validate
+## Freeze and check release metadata locally
 
 Move reviewed Unreleased notes under `## [<version>] - YYYY-MM-DD`. Update
 the root and five workspace package versions and internal `@workspace/*`
@@ -61,21 +61,23 @@ dependencies together using `apply_patch`. Then run:
 
 ```bash
 npm install --package-lock-only --ignore-scripts
-npm ci
-node node_modules/electron/install.js
 npm run release-notes:generate
 npm run release-notes:check
-npm run lint
-npm run test:coverage
-npm run test:scripts
 git diff --check
 git status --short
 ```
 
-Use the Node/npm versions declared in the release workflow. Require all tests,
-including script tests, and 85% statements in each of the five workspaces.
-A failing gate blocks release. Only CHANGELOG.md, the six package manifests,
-package-lock.json, and vue/src/generated/release-notes.json may change.
+Use the Node/npm versions declared in the release workflow. Only CHANGELOG.md,
+the six package manifests, package-lock.json, and
+vue/src/generated/release-notes.json may change.
+
+The GitHub quality job owns the clean install, Electron setup, lint/typechecks,
+full test suite, script tests, and 85% statement coverage in every workspace
+against published SDK packages. Run those gates once, in CI, before platform
+builds and publication; do not repeat them locally during routine release prep.
+Use focused local checks only to investigate a specific failure or when Nicolas
+explicitly requests local validation. Keep the pipeline's quality gate enabled;
+a failing gate blocks builds and publication.
 
 Use `korus-dod` and review the staged diff, then commit with
 `chore: release prep`. Report the audited SDK version and Git
@@ -120,8 +122,9 @@ report outstanding native checks honestly.
 
 Distinguish prepared, committed, pushed, built, draft-staged, native-tested,
 published prerelease, and published stable.
-At launch, report version/channel, commit/tag, SDK version/provenance, passed local
-gates, and the Actions run URL; clearly state that build/publication are pending.
+At launch, report version/channel, commit/tag, SDK version/provenance, local
+metadata checks, and the Actions run URL; clearly state that CI quality checks,
+builds, and publication are pending.
 After a requested completion check, include the release URL and outstanding native
 target checks. Celebrate a completed
 publication through `finish_turn`; preparation or staging alone is not publication.
