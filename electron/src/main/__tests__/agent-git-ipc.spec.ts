@@ -31,6 +31,8 @@ describe('agent Git IPC', () => {
 
   it.each([
     [ipcChannels.getAgentGitWorkflow, backendMethods.agentGitWorkflowGet, [], { repository: 'repo' }],
+    [ipcChannels.getAgentGitPrune, backendMethods.agentGitPruneGet, [], { repository: 'repo', baseBranch: 'main', groups: [], unavailableRemotes: [] }],
+    [ipcChannels.pruneAgentGit, backendMethods.agentGitPrune, [{ targets: [{ id: 'refs/heads/feat/web', revision: 'checked' }], confirmed: true }], { deleted: ['refs/heads/feat/web'], failed: [] }],
     [ipcChannels.generateAgentGitMessage, backendMethods.agentGitMessageGenerate, [{ kind: 'commit' }], { kind: 'commit', message: 'Subject' }],
     [ipcChannels.stageAgentGitFiles, backendMethods.agentGitStage, [{ paths: ['file.ts'], confirmed: true }], { repository: 'repo' }],
     [ipcChannels.revertAgentGitChanges, backendMethods.agentGitRevert, [{ includeUntracked: false, confirmed: true }], { repository: 'repo' }],

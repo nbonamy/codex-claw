@@ -13,6 +13,16 @@ it('routes document saves and layout changes through client-scoped operations', 
 });
 
 describe(`${product.name} web operations`, () => {
+  it('routes prune inventory and confirmed selections to the owning agent', async () => {
+    const request = vi.fn().mockResolvedValue({ deleted: [], failed: [] });
+    const input = { confirmed: true, targets: [{ id: 'refs/heads/feature', revision: 'checked' }] };
+    await invokeAppWebOperation({ request }, 'getAgentGitPrune', ['agent-remote']);
+    await invokeAppWebOperation({ request }, 'pruneAgentGit', ['agent-remote', input]);
+    expect(request.mock.calls).toStrictEqual([
+      [backendMethods.agentGitPruneGet, { agentId: 'agent-remote' }],
+      [backendMethods.agentGitPrune, { agentId: 'agent-remote', input }],
+    ]);
+  });
   it('preserves opaque source IDs, filters and cursors at the web boundary', async () => {
     const request = vi.fn().mockResolvedValue({ items: [], nextCursor: 'native:next' });
     const location = { kind: 'remote', remoteConnectionId: 'remote-owner' };

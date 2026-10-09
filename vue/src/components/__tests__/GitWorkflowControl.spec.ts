@@ -16,6 +16,19 @@ function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('GitWorkflowControl', () => {
+  it('opens repository pruning from the final menu section without deleting anything', async () => {
+    const getAgentGitPrune = vi.fn(async () => ({ repository: 'repo', baseBranch: 'main', groups: [], unavailableRemotes: [] }));
+    const pruneAgentGit = vi.fn();
+    stubElectronTestWindow({ app: { getAgentGitPrune, pruneAgentGit } });
+    const wrapper = mountControl();
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').at(-1)!.trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="dialog"]').text()).toContain('No branches to prune');
+    expect(getAgentGitPrune).toHaveBeenCalledExactlyOnceWith(agent.id);
+    expect(pruneAgentGit).not.toHaveBeenCalled();
+  });
   it.each([true, false])('requires confirmation before reverting, with unversioned files=%s', async (includeUntracked) => {
     const revertChanges = vi.fn(async () => ({ ...workflow, files: [] }));
     const wrapper = mountControl({ revertChanges });
@@ -287,6 +300,8 @@ describe('GitWorkflowControl', () => {
       '---',
       'Merge',
       'Create PR',
+      '---',
+      'Prune…',
     ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
   });

@@ -230,6 +230,21 @@ clears or changes it, Korus never re-detects.
   polls only those PRs. A merged or closed PR raises an explicit cleanup alert;
   cleanup is accepted only for an idle agent whose unshared, clean linked worktree
   still points at the recorded PR head (a closed PR keeps its remote branch).
+- Repository pruning belongs to `daemon`. A local selection bundles its branch
+  and linked worktree; remote refs are independent opt-ins. The inventory excludes
+  integration branches and the primary checkout. The agent menu is an entry point,
+  not a scope restriction: inventory and deletion run from the primary checkout,
+  even when the invoking agent uses a selected worktree. Agent ownership, locks,
+  local files (including ignored files), and unmerged commits require explicit
+  discard confirmation, not disabled selection. Confirmation is tied to the
+  inspected ref, base, destination and worktree status; execution rejects stale
+  selections and uses force removal only with discard consent. Remote deletion uses a
+  live-head lease. PR badges are context, not proof of ancestry; partial failures
+  leave remaining selections untouched and require a refreshed inventory.
+  Missing worktrees are eligible when Git marks their registration prunable or locked;
+  cleanup targets the selected registration, not a repository-wide worktree prune.
+  Unmerged remote branches require manual selection; merge status does not block
+  explicit remote deletion, and the live-head lease still guards concurrent pushes.
 
 ## Durable Delegated Tasks
 

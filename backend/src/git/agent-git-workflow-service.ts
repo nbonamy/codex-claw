@@ -12,6 +12,9 @@ import type {
   AgentGitUpdateFromBaseResult,
   AgentGitPullResult,
   AgentGitWorkflow,
+  GitPruneInventory,
+  GitPruneInput,
+  GitPruneResult,
   AppSnapshot,
 } from '@workspace/core/contracts';
 import type { DelegatedWorkReportPort } from '../agents/delegated-work-report-service';
@@ -48,9 +51,15 @@ export type AgentGitWorkflowServiceOptions = {
 export class AgentGitWorkflowService {
   constructor(private readonly options: AgentGitWorkflowServiceOptions) {}
 
-  async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult | AgentGitPullResult> {
+  async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult | AgentGitPullResult | GitPruneInventory | GitPruneResult> {
     const { method, agentId, params } = request;
     switch (method) {
+      case backendMethods.agentGitPruneGet:
+        return this.pruneInventory(agent);
+      case backendMethods.agentGitPrune: {
+        const input = requireConfirmed(params.input, 'Pruning a repository');
+        return this.options.git.pruning.prune(requireAgentFolder(agent), input as GitPruneInput, () => this.pruneOwners());
+      }
       case backendMethods.agentGitDiffGet:
         return this.getDiff(agent, parseGitDiffTarget(params.target));
       case backendMethods.agentGitWorkflowGet:
@@ -139,6 +148,28 @@ export class AgentGitWorkflowService {
         return { ...result, workflow: await this.workflow(agent, { refreshStatus: true }) };
       }
     }
+  }
+
+  private pruneOwners(): { folder: string; name: string }[] {
+    const snapshot = this.options.getSnapshot();
+    return snapshot.agents.filter(agent => agent.folder && !snapshot.teams.find(team => team.id === agent.teamId)?.remoteConnectionId)
+      .map(agent => ({ folder: agent.folder!, name: agent.name ?? agent.id }));
+  }
+
+  private async pruneInventory(agent: Agent): Promise<GitPruneInventory> {
+    const inventory = await this.options.git.pruning.inventory(requireAgentFolder(agent), this.pruneOwners());
+    const workflow = await this.options.git.workflow(requireAgentFolder(agent));
+    const integrations = this.options.getWorkIntegrations();
+    if (workflow.repository.includes('/') && await integrations.githubConnected()) {
+      // PR badges are context, never proof that a ref's current head is merged.
+      await Promise.all(inventory.groups.map(async group => {
+        const remote = group.remotes.find(target => target.name === `${workflow.remote}/${group.branch}`);
+        if (!remote) return;
+        const pr = await integrations.findPullRequest(workflow.repository, group.branch).catch(() => null);
+        if (pr && pr.headSha === remote.sha) remote.pullRequest = pr;
+      }));
+    }
+    return inventory;
   }
 
   private async getDiff(agent: Agent, target: AgentGitDiffTarget): Promise<AgentGitDiff> {

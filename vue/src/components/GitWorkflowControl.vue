@@ -383,6 +383,7 @@
       <div v-else-if="updateOperation.status === 'error'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="updateFromBase(Boolean(workflow?.files.length))">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
+  <GitPruneDialog v-if="pruneDialogOpen && appApi" :key="agent.id" v-model="pruneDialogOpen" :agent-id="agent.id" :load="appApi.getAgentGitPrune" :prune="appApi.pruneAgentGit" @pruned="loadWorkflow({ closeMenu: false })" />
 </template>
 
 <script setup lang="ts">
@@ -397,6 +398,8 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
+import GitPruneDialog from './GitPruneDialog.vue';
+import { Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   agent: Agent;
@@ -425,6 +428,7 @@ const menuOpen = ref(false);
 const busy = ref(false);
 const commitDialogOpen = ref(false);
 const revertDialogOpen = ref(false);
+const pruneDialogOpen = ref(false);
 const revertIncludeUntracked = ref(false);
 const revertError = ref<string | null>(null);
 const pushDialogOpen = ref(false);
@@ -640,6 +644,8 @@ const menuItems = computed<AppMenuItem[]>(() => [
   { id: 'separator-integration', type: 'separator' },
   { id: 'merge', type: 'action', label: translate('surface.gitWorkflowControl.merge'), icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
   { id: 'create-pr', type: 'action', label: translate('surface.gitWorkflowControl.createPR'), icon: GitForkIcon, disabled: !prEnabled.value },
+  { id: 'separator-cleanup', type: 'separator' },
+  { id: 'prune', type: 'action', label: translate('gitPrune.menu'), icon: Trash2Icon, disabled: !workflow.value || !appApi },
 ]);
 
 watch(commitDialogOpen, (open) => {
@@ -708,6 +714,7 @@ onBeforeUnmount(() => {
 });
 watch([() => props.agent.id, () => props.agent.folder], () => {
   revertDialogOpen.value = false;
+  pruneDialogOpen.value = false;
   void loadWorkflow({ reset: true });
 });
 watch(() => props.gitStatus?.updatedAt, () => {
@@ -779,6 +786,9 @@ async function selectAction(action: string): Promise<void> {
     revertIncludeUntracked.value = false;
     revertError.value = null;
     revertDialogOpen.value = true;
+  }
+  else if (action === 'prune' && workflow.value && appApi) {
+    pruneDialogOpen.value = true;
   }
   else if (action === 'commit' && commitEnabled.value) {
     resetCommitOperation();
