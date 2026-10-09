@@ -6,7 +6,23 @@ import { presentAppToolTitle } from '../tool-title-presenter';
 
 describe(`${product.name} tool title presenter`, () => {
   it.each([
-    ['korus.simulator', { action: 'screenshot' }, 'completed', 'Used simulator'],
+    ['korus.simulator', { action: 'list' }, 'completed', 'Listed simulators'],
+    ['korus.simulator', { action: 'status' }, 'completed', 'Checked simulator status'],
+    ['korus.simulator', { action: 'attach', deviceId: 'private-device-id' }, 'running', 'Opening simulator'],
+    ['korus.simulator', { action: 'attach' }, 'completed', 'Opened simulator'],
+    ['korus.simulator', { action: 'detach' }, 'completed', 'Detached simulator'],
+    ['korus.simulator', { action: 'shutdown' }, 'completed', 'Shut down simulator'],
+    ['korus.simulator', { action: 'screenshot' }, 'completed', 'Captured simulator screenshot'],
+    ['korus.simulator', { action: 'screenshot' }, 'running', 'Capturing simulator screenshot'],
+    ['korus.simulator', { action: 'screenshot' }, 'error', 'Could not capture simulator screenshot'],
+    ['korus.simulator', { action: 'inspect' }, 'completed', 'Inspected simulator screen'],
+    ['korus.simulator', { action: 'tap', x: 30, y: 40 }, 'completed', 'Tapped simulator screen'],
+    ['korus.simulator', { action: 'swipe' }, 'completed', 'Swiped simulator screen'],
+    ['korus.simulator', { action: 'text', text: 'private content' }, 'completed', 'Typed in simulator'],
+    ['korus.simulator', { action: 'button', button: 'home' }, 'completed', 'Pressed simulator button'],
+    ['korus.simulator', { action: 'launch', appId: 'com.example.app' }, 'completed', 'Launched simulator app'],
+    ['korus.simulator', {}, 'completed', 'Used simulator'],
+    ['korus.simulator', { action: 'future-action' }, 'running', 'Using simulator'],
     ['korus.read-skill', { name: 'korus-inline-html' }, 'running', 'Loading skill korus-inline-html'],
     ['mcp__korus__read_skill', { name: 'korus-inline-html' }, 'completed', 'Loaded skill korus-inline-html'],
     ['korus.read-skill', { name: 'korus-inline-html' }, 'error', 'Could not load skill korus-inline-html'],
@@ -101,6 +117,15 @@ describe(`${product.name} tool title presenter`, () => {
         result: { recipientId: 'agent-uuid', recipientName: 'Computer Use' },
       },
     })).toBe('Sent message to Computer Use');
+  });
+
+  it('uses the attached simulator name from structured results without showing its id', () => {
+    const attachment = context('mcp__korus__simulator', { action: 'attach', deviceId: 'private-device-id' }, 'completed');
+    attachment.toolCall = {
+      ...attachment.toolCall,
+      result: { structuredContent: { attachment: { id: 'private-attachment-id', device: { name: 'iPhone 18 Pro' } } } },
+    };
+    expect(presentAppToolTitle(attachment)).toBe('Opened iPhone 18 Pro');
   });
 
   it('uses the created agent name after delegation completes', () => {
