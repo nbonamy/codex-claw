@@ -8,7 +8,6 @@ import { AppBackendServer } from '../server';
 import { createTestSnapshot } from './server-test-fixtures';
 import { ReviewToolRegistry, type ReviewToolHandlers } from '../review/review-tool-registry';
 
-vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 describe('AppBackendServer code review workflow', () => {
   it.each(['reviewing', 'fixing'] as const)('resumes a persisted %s session after startup connection detection without replacing the open context', async status => {

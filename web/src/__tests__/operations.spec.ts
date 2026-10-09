@@ -13,6 +13,17 @@ it('routes document saves and layout changes through client-scoped operations', 
 });
 
 describe(`${product.name} web operations`, () => {
+  it('preserves history search options and the conversation resume target expected by the daemon', async () => {
+    const target = { storageState: 'active', ref: { backend: 'antigravity', folder: '/work', sessionId: 'native-history' } } as const;
+    const request = vi.fn().mockResolvedValue({ agents: [] });
+    await expect(invokeAppWebOperation({ request }, 'resumeAgentConversation', ['agent', target])).resolves.toStrictEqual({ agents: [] });
+    expect(request).toHaveBeenCalledExactlyOnceWith(backendMethods.agentConversationResume, { agentId: 'agent', target });
+    request.mockClear();
+    const input = { searchTerm: 'saved conversation', limit: 5 };
+    await invokeAppWebOperation({ request }, 'listAgentConversations', ['agent', input]);
+    expect(request).toHaveBeenCalledExactlyOnceWith(backendMethods.agentConversationsList, { agentId: 'agent', input });
+  });
+
   it.each(['sendPrompt', 'steerPrompt'])('rejects untrusted Web attachments before %s dispatch and preserves text prompts', async operation => {
     const request = vi.fn().mockResolvedValue({});
     for (const attachment of [{ type: 'file', path: '/private/file' }, { type: 'image', reference: 'forged-registry-id' }]) {

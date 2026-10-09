@@ -50,6 +50,7 @@ const props = defineProps<{
   compressDisabled?: boolean;
   compressVisible?: boolean;
   compactDisabled?: boolean;
+  resumeDisabled?: boolean;
   moveTargets?: Team[];
   forkDisabled?: boolean;
   openInCatalog?: OpenInApplicationCatalog;
@@ -140,6 +141,7 @@ const menuItems = computed<AppMenuItem[]>(() => [
     type: 'action',
     label: t('agents.resumeSession'),
     icon: MessageCircleIcon,
+    disabled: props.resumeDisabled === true,
   },
   {
     id: 'restart-agent',

@@ -2,7 +2,6 @@ import type { AgentBackend, AppSnapshot, SetCodexResourceSharingInput } from '@w
 import type { ProviderHomeSettings, ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
 import { createProviderLifecycles, type ProviderLifecycle } from './provider-lifecycle';
 import { localProviderAgents, resetProviderRoster, validateProviderReset } from './provider-roster-reset';
-import { isProviderReleased, requireReleasedProvider } from './provider-release';
 
 /** Owns local provider homes. Never copies authentication or moves existing chats. */
 export class ProviderSetup {
@@ -20,11 +19,6 @@ export class ProviderSetup {
 
   async initialize(): Promise<void> {
     for (const [backend, lifecycle] of this.lifecycles) {
-      if (!isProviderReleased(backend)) {
-        // History reads still need the saved home; never prepare it or persist new defaults.
-        lifecycle.applyHome?.(this.snapshot.general.providerHomes?.[backend] ?? lifecycle.home(this.snapshot));
-        continue;
-      }
       if (!this.snapshot.general.providerHomes?.[backend]) {
         this.snapshot.general.providerHomes = {
           ...this.snapshot.general.providerHomes,
@@ -39,7 +33,7 @@ export class ProviderSetup {
   }
 
   list(): ProviderSetupStatus[] {
-    return [...this.lifecycles.keys()].filter(isProviderReleased).map(backend => this.status(backend));
+    return [...this.lifecycles.keys()].map(backend => this.status(backend));
   }
 
   isChanging(backend?: AgentBackend): boolean { return this.changingBackend !== null && (!backend || this.changingBackend === backend); }
@@ -119,7 +113,6 @@ export class ProviderSetup {
   }
 
   private lifecycle(backend: AgentBackend): ProviderLifecycle {
-    requireReleasedProvider(backend);
     const lifecycle = this.lifecycles.get(backend);
     if (!lifecycle) throw new Error(`Provider setup is unavailable for ${backend}.`);
     return lifecycle;

@@ -27,7 +27,7 @@ export class AntigravityHost implements AgentBackendDriver {
   private readonly generations = new Map<string, number>();
   private readonly revisions = new Map<string, number>();
   private readonly reviewScopes = new Map<string, string>();
-  private readonly resuming = new Set<string>();
+  private readonly resuming = new Map<string, Promise<void>>();
   private readonly auxiliary = new Set<AcpSession>();
   private readonly listeners = new Set<(event: BackendEvent) => void>();
   private authentication?: AcpRuntime;
@@ -169,7 +169,8 @@ export class AntigravityHost implements AgentBackendDriver {
     if (existing?.snapshot.busy || this.opening.has(agent.id) || this.resuming.has(agent.id)) throw new Error('Finish the current Antigravity operation before resuming history.');
     // Open and validate complete replay before replacing the visible conversation.
     const generation = this.generations.get(agent.id) ?? 0;
-    this.resuming.add(agent.id);
+    let finishResume!: () => void;
+    this.resuming.set(agent.id, new Promise<void>(resolve => { finishResume = resolve; }));
     try {
       const next = await this.open(agent, target.ref.sessionId);
       if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await next.close(); throw new Error('Antigravity session was released during history loading.'); }
@@ -177,7 +178,7 @@ export class AntigravityHost implements AgentBackendDriver {
       this.sessions.set(agent.id, next);
       this.publishSnapshot(agent.id, next);
       return { backendSession: this.reference(next) };
-    } finally { this.resuming.delete(agent.id); }
+    } finally { this.resuming.delete(agent.id); finishResume(); }
   }
 
   async listConversations(agent: Agent, input?: ConversationListInput): Promise<ConversationSummary[]> {
@@ -221,7 +222,11 @@ export class AntigravityHost implements AgentBackendDriver {
   }
 
   async listModels(agent: Agent): Promise<BackendModelOption[]> {
-    const session = await this.ensure(agent);
+    const resuming = this.resuming.get(agent.id);
+    if (resuming) await resuming;
+    // Read the adopted session; a cancelled resume must not reopen the caller's old reference.
+    const session = resuming ? this.sessions.get(agent.id) : await this.ensure(agent);
+    if (!session || session.isClosed) throw new Error('Antigravity session was released during model loading.');
     const models = session.configuration.models;
     if (!record(models) || !Array.isArray(models.availableModels)) return [];
     return models.availableModels.filter(record).filter(model => typeof model.modelId === 'string').map(model => ({

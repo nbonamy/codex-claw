@@ -9,7 +9,6 @@ import type { MissionService } from './mission-service';
 import { MissionAgentTools } from './mission-agent-tools';
 import { missionAgent, missionTeamRepositories, sameSkills, shouldCompactBeforeRun, stageKickoffPrompt } from './mission-execution-policy';
 import { MissionWorkspaceService } from './mission-workspace-service';
-import { requireReleasedProvider } from './provider-release';
 
 export type MissionExecutionPorts = {
   snapshot: AppSnapshot;
@@ -525,7 +524,6 @@ export class MissionExecutionService {
     if (run.status === 'cancelled') return;
     const member = this.agent(run.memberId);
     if (!member) throw new Error('Assigned team member was removed.');
-    requireReleasedProvider(member.backend);
     const missionHome = await this.ports.ensureMissionHome(mission.id);
     const repositoryPath = run.repositoryPath ?? mission.artifacts.tickets[run.ticketIndex ?? -1]?.repositoryPath;
     const workspace = repositoryPath
@@ -617,7 +615,6 @@ export class MissionExecutionService {
     const memberId = input.memberId ?? previousOrchestratorRun?.memberId ?? execution.memberIds[0]!;
     const member = this.agent(memberId);
     if (!execution.memberIds.includes(memberId) || !member || member.teamId !== execution.teamId) throw new Error('The selected team member is unavailable.');
-    requireReleasedProvider(member.backend);
     if (input.feedback !== undefined && (typeof input.feedback !== 'string' || input.feedback.length > 20_000)) throw new Error('Invalid revision feedback.');
     const runId = createEntityId('mission-run');
     execution.runs.push({ id: runId, stage: mission.stage, memberId, ...(previousOrchestratorRun?.workerId ? { workerId: previousOrchestratorRun.workerId } : {}), status: 'preparing', skills: [], feedback: input.feedback?.trim() ?? '', startedAt: new Date().toISOString() });
@@ -637,7 +634,6 @@ export class MissionExecutionService {
     const memberId = input.memberId ?? repositoryWorker?.memberId ?? execution.memberIds[ticketIndex % execution.memberIds.length]!;
     const member = this.agent(memberId);
     if (!execution.memberIds.includes(memberId) || !member || member.teamId !== execution.teamId) throw new Error('The selected team member is unavailable.');
-    requireReleasedProvider(member.backend);
     if (input.feedback !== undefined && (typeof input.feedback !== 'string' || input.feedback.length > 20_000)) throw new Error('Invalid revision feedback.');
     const runId = createEntityId('mission-run');
     execution.runs.push({

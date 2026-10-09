@@ -50,5 +50,9 @@ it('renders the Antigravity replica, denies a native approval, and keeps unsuppo
   expect(wrapper.find('.chat-tool-confirmation').exists()).toBe(false);
   const buttons = wrapper.findAll('button').map(button => `${button.text()} ${button.attributes('aria-label') ?? ''}`).join('\n');
   expect(buttons).not.toMatch(/Retry turn|Edit message|Fork conversation|Set goal|Compact/);
+  view.history = { ...view.history, failed: true };
+  await flushPromises();
+  expect(wrapper.text()).toContain('Native Antigravity response');
+  expect(wrapper.find('.conversation-load-error').exists()).toBe(false);
   wrapper.unmount();
 });

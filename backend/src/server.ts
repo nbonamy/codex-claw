@@ -10,7 +10,6 @@ import { normalizeGitSettings } from '@workspace/core/git-preferences';
 import { readWorktreeHead } from './git-worktrees';
 import type { DurableTaskService } from './agents/durable-task-service';
 import { ProviderConnections } from './provider-connections';
-import { isProviderReleased, requireReleasedProvider } from './provider-release';
 import { backendCodexHomeDir } from './state';
 import { isProviderConnection, type ProviderAuthentication } from '@workspace/core/contracts/provider-setup';
 import { MissionExecutionService } from './mission-execution-service';
@@ -208,10 +207,9 @@ export class AppBackendServer {
     this.version = options.version;
     this.pid = options.pid ?? process.pid;
     this.snapshot = options.snapshot ?? createEmptySnapshot();
-    this.snapshot.providerConnections = this.snapshot.providerConnections?.filter(provider => isProviderReleased(provider.backend));
     if (options.providerSetup) {
       this.providerConnections = new ProviderConnections({
-        detect: () => options.providerSetup!.list().filter(provider => isProviderReleased(provider.backend)),
+        detect: () => options.providerSetup!.list(),
         enabled: backend => this.snapshot.general.providerEnabled?.[backend] !== false,
         authenticate: backend => this.authenticateProvider(backend),
         changed: connections => {
@@ -607,7 +605,6 @@ export class AppBackendServer {
   }
 
   async requireConnectedEngine(backend?: Agent['backend']): Promise<Agent['backend']> {
-    if (backend) requireReleasedProvider(backend);
     if (this.options.providerUpdates?.isUpdating(backend)) throw new Error('Provider upgrade is in progress. Try again when it finishes.');
     if (this.providerSetup?.isChanging(backend)) throw new Error('Engine setup is changing. Try again when it finishes.');
     await this.providerConnections?.refreshDisconnected(backend);
@@ -616,7 +613,6 @@ export class AppBackendServer {
   }
 
   private async authenticateProvider(backend: Agent['backend'], action: 'check' | 'cancel' | 'logout' | 'login' = 'check', loginId?: string): Promise<ProviderAuthentication> {
-    requireReleasedProvider(backend);
     return await this.requireDriverRpc().handle(backendMethods.driverProviderAuthentication, { backend, action, ...(loginId ? { loginId } : {}) }) as ProviderAuthentication;
   }
 
@@ -694,7 +690,6 @@ export class AppBackendServer {
       if (!remote && (message.method !== backendMethods.agentUpdate || input.backend !== undefined)) {
         try {
           const requested = isAgentBackend(input.backend) ? input.backend : agent?.backend;
-          if (requested) requireReleasedProvider(requested);
           if (this.providerConnections) await this.requireConnectedEngine(requested);
         } catch (error) {
           return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error));
@@ -2186,7 +2181,6 @@ export class AppBackendServer {
           return createAppRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
-        requireReleasedProvider(input.backend);
         updateSettingsInSnapshot(this.snapshot, { general: { providerEnabled: { ...this.snapshot.general.providerEnabled, [input.backend]: input.enabled } } });
         this.providerConnections.updateEnabled();
         await this.persistAndEmitSnapshot();

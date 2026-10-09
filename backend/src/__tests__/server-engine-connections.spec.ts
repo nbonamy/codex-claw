@@ -6,10 +6,37 @@ import { createTestSnapshot, readyRemoteConnection } from './server-test-fixture
 import { normalizeGeneralSettings } from '@workspace/core/settings';
 
 vi.mock('../claude/authentication', () => ({ getLocalClaudeAuthentication: vi.fn(), logoutLocalClaude: vi.fn() }));
-// Exercise the enabled build; shipped-off admission lives in release-gates.spec.ts.
-vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 describe('connected engine admission', () => {
+  it('admits connected Antigravity work and keeps authentication and disablement checks without a release gate', async () => {
+    const snapshot = createTestSnapshot();
+    let connected = false;
+    const handle = vi.fn(async (_method, params) => params.backend === 'antigravity'
+      ? { kind: 'antigravity', connected, state: { loggedIn: connected, homePath: '/acp' } }
+      : { kind: 'codex', connected: true, state: { account: { type: 'apiKey' }, requiresOpenaiAuth: false, login: { status: 'idle', error: null } } });
+    const server = new AppBackendServer({ version: 'test', snapshot,
+      driverRpc: { handle, onEvent: () => () => {}, close: async () => {} } as never,
+      providerSetup: { isChanging: () => false, list: () => [
+        { backend: 'codex', installed: true, homePath: '/codex' },
+        { backend: 'antigravity', installed: true, homePath: '/acp' },
+      ] } as never,
+    });
+    try {
+      await expect(server.requireConnectedEngine('antigravity')).rejects.toThrow('not connected');
+      connected = true;
+      const created = await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'agent/quickChat/create', params: { input: { teamId: 'team-test', backend: 'antigravity' } } });
+      expect(created).toMatchObject({ result: { agents: [expect.objectContaining({ backend: 'antigravity' })] } });
+      const agent = snapshot.agents[0]!;
+      snapshot.queuedPrompts = [{ id: 'queued', agentId: agent.id, text: 'Later', createdAt: '' }];
+      await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'provider/enabled/set', params: { backend: 'antigravity', enabled: false } });
+      expect(await server.handleMessage({ jsonrpc: '2.0', id: 3, method: 'agent/prompt/send', params: { agentId: agent.id, prompt: 'Work' } }))
+        .toMatchObject({ error: { message: expect.stringContaining('disabled') } });
+      expect(snapshot.agents).toEqual([agent]);
+      expect(snapshot.queuedPrompts).toHaveLength(1);
+      expect(snapshot.providerConnections?.find(provider => provider.backend === 'antigravity')).toMatchObject({ connected: true, enabled: false });
+    } finally { await server.close(); }
+  });
+
   it('retries an Antigravity login observation through the owning connection operation without changing enablement', async () => {
     const snapshot = createTestSnapshot();
     snapshot.general.providerEnabled = { antigravity: false };

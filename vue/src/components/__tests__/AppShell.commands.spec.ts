@@ -561,6 +561,24 @@ describe('AppShell dialogs and commands', () => {
     });
   });
 
+  it('keeps Antigravity compaction disabled in the sidebar and ignores the native command', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.app = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => { listener = nextListener; return () => undefined; }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<AppApi> as AppApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backend = 'antigravity';
+    snapshot.agents[0]!.backendSession = { kind: 'antigravity', sessionId: 'native' };
+    const wrapper = mountShell({ snapshot, realAgentSidebar: true });
+    listener({ type: 'compact-active-session' });
+    await nextTick();
+    expect(wrapper.emitted('send-agent-prompt')).toBeUndefined();
+    await wrapper.get('.agent-sidebar__agent').trigger('contextmenu');
+    const items = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.agent-context-menu [role="menuitem"]'));
+    expect(items.find(item => item.textContent?.startsWith('Compact Session'))?.disabled).toBe(true);
+  });
+
   it('compacts the active session from the native shortcut and a targeted agent from its menu', async () => {
     let listener: (command: AppCommand) => void = () => undefined;
     window.app = {

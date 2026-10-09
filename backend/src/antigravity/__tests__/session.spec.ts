@@ -13,8 +13,9 @@ import { AgentCreationService } from '../../agents/agent-creation-service';
 import { AppMcpService } from '../../mcp/service';
 import { AppBackendServer } from '../../server';
 import { BackendDriverRpc } from '../../driver-rpc';
+import { sessionMcpServer } from '../mcp-bridge';
+import { product } from '@workspace/core/product';
 
-vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 let root: string;
 const sessions: AcpSession[] = [];
@@ -35,7 +36,7 @@ const send=v=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',...v})+'\\n');
 const fs=require('node:fs'), catalogFile=require('node:path').join(process.env.GEMINI_HOME,'catalog.json');
 fs.mkdirSync(process.env.GEMINI_HOME,{recursive:true});
 const catalog=()=>fs.existsSync(catalogFile)?fs.readFileSync(catalogFile,'utf8').trim().split('\\n').map(JSON.parse):[];
-let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[], planPhase, utility;
+let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[], planPhase, utility, permissionFixture, cancelPermissionFixture;
 const update=update=>send({method:'session/update',params:{sessionId,update}});
 async function review(text,reply) {
  const server=mcpServers.find(server=>server.name==='korus');
@@ -79,10 +80,16 @@ rl.on('line',line=>{
    update({sessionUpdate:'tool_call',toolCallId:'replay-id',title:'Create file',kind:'edit',status:'completed'});
    update({sessionUpdate:'tool_call_update',toolCallId:'replay-id',status:'failed',rawOutput:'Rejected by user'});
    update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Denied.'}});
-   reply({});
+   reply({models:{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'}]}});
  } else if(v.method==='session/prompt') {
    promptId=v.id;
    const text=v.params.prompt[0].text;
+   if(text.startsWith('permission-fixture:')||text.startsWith('cancel-permission-fixture:')) {
+     permissionFixture=JSON.parse(text.slice(text.indexOf(':')+1));
+     if(text.startsWith('cancel-permission-fixture:')) {cancelPermissionFixture=true;fs.writeFileSync(require('node:path').join(process.cwd(),'cancel-permission-ready'),'');return;}
+     update({sessionUpdate:'tool_call',...permissionFixture.toolCall,status:'pending'});
+     send({id:v.id,method:'session/request_permission',params:{sessionId,...permissionFixture}});return;
+   }
    if(text.endsWith('utility-fixture')) {utility=true;send({id:211,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'unwanted-write'),content:'bad'}});return;}
    fs.appendFileSync(require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl'),JSON.stringify(text)+'\\n');
    if(text.startsWith('/plan ')) {
@@ -96,8 +103,17 @@ rl.on('line',line=>{
      update({sessionUpdate:'tool_call',toolCallId:'live-id',title:'Create file',kind:'edit',status:'pending'});
      send({id:v.id,method:'session/request_permission',params:{sessionId,toolCall:{toolCallId:text==='question'?'interaction_1':'live-id',title:text==='question'?'Which option?':'Create file'},options:text==='question'?[{optionId:'native-choice-7',name:'Proceed',kind:'allow_once'}]:[{optionId:'native-deny-9',name:'Deny',kind:'reject_once'}]}});
    } else {update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});reply({stopReason:'end_turn'});}
- } else if(v.method==='session/cancel') send({id:promptId,result:{stopReason:'cancelled'}});
+ } else if(v.method==='session/cancel') {
+   if(cancelPermissionFixture) send({id:901,method:'session/request_permission',params:{sessionId,...permissionFixture}});
+   else send({id:promptId,result:{stopReason:'cancelled'}});
+ }
  else if(!v.method) {
+   if(permissionFixture) {
+     fs.writeFileSync(require('node:path').join(process.cwd(),'permission-response.json'),JSON.stringify(v));
+     const selected=permissionFixture.options.find(option=>option.optionId===v.result?.outcome?.optionId);
+     update({sessionUpdate:'tool_call_update',toolCallId:permissionFixture.toolCall.toolCallId,status:selected?.kind.startsWith('allow_')?'completed':'failed'});
+     permissionFixture=undefined;send({id:promptId,result:{stopReason:cancelPermissionFixture?'cancelled':'end_turn'}});cancelPermissionFixture=false;return;
+   }
    if(utility) {utility=false;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:v.error?'Tools denied; text result.':'Unexpected write'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
    if(planPhase==='question') {planPhase='write';send({id:900,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'PLAN.md'),content:'# Native plan\\n\\n1. Make the scoped change.\\n2. Verify it.'}});return;}
    if(planPhase==='write') {planPhase=undefined;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'The plan is ready.'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
@@ -111,14 +127,88 @@ afterEach(async () => {
   await Promise.all(sessions.splice(0).map(session => session.close()));
   vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true });
 });
-async function open(sessionId?: string) {
+async function open(sessionId?: string, options: Partial<Parameters<typeof AcpSession.open>[0]> = {}) {
   const changed = vi.fn();
-  const session = await AcpSession.open({ agentId: 'agent', cwd: root, home: path.join(root, 'home'), mcpServers: [], sessionId, changed });
+  const session = await AcpSession.open({ agentId: 'agent', cwd: root, home: path.join(root, 'home'), mcpServers: [], sessionId, changed, ...options });
   sessions.push(session);
   return { session, changed };
 }
 
 describe('Antigravity native session', () => {
+  const mcpPermission = (tool: string) => ({
+    toolCall: { toolCallId: 'native-mcp-call', title: `${product.mcpServerName}_${tool}`, kind: 'other', rawInput: { arguments: {} },
+      _meta: { is_mcp_tool_call: true, mcp: { server: product.mcpServerName, tool } } },
+    options: [
+      { optionId: 'native-always-17', name: 'Allow Always', kind: 'allow_always' },
+      { optionId: 'native-once-42', name: 'Allow', kind: 'allow_once' },
+      { optionId: 'native-deny-9', name: 'Deny', kind: 'reject_once' },
+    ],
+  });
+
+  it.each([
+    { sessionId: undefined, mode: 'auto_edit', tool: 'set_status' },
+    { sessionId: 'stored-session', mode: 'default', tool: 'finish_turn' },
+    { sessionId: undefined, mode: 'default', tool: 'report_finding' },
+  ])('pre-authorizes the supplied Korus server in $mode for $tool (session $sessionId)', async ({ sessionId, mode, tool }) => {
+    const { session, changed } = await open(sessionId, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp?agentId=agent')] });
+    await session.setMode(mode);
+    await session.prompt(`permission-fixture:${JSON.stringify(mcpPermission(tool))}`).completion;
+    const response = JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8'));
+    expect(response.result).toStrictEqual({ outcome: { outcome: 'selected', optionId: 'native-once-42' } });
+    expect(session.snapshot.clientRequests).toEqual([]);
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+    expect(session.snapshot.turns.at(-1)?.status).toBe('completed');
+    expect(session.snapshot.messages.at(-1)?.parts).toContainEqual(expect.objectContaining({ type: 'tool', id: 'native-mcp-call', status: 'completed' }));
+  });
+
+  it.each([
+    { boundary: 'Korus not supplied to the session', registered: false },
+    { boundary: 'other MCP server', meta: { is_mcp_tool_call: true, mcp: { server: 'github', tool: 'set_status' } } },
+    { boundary: 'title or arguments impersonating Korus', meta: undefined },
+    { boundary: 'missing native MCP marker', meta: { mcp: { server: product.mcpServerName, tool: 'set_status' } } },
+    { boundary: 'missing tool identity', meta: { is_mcp_tool_call: true, mcp: { server: product.mcpServerName } } },
+    { boundary: 'command approval', kind: 'execute' },
+    { boundary: 'file approval', kind: 'edit' },
+    { boundary: 'native question', toolCallId: 'interaction_choice' },
+    { boundary: 'no native allow-once choice', alwaysOnly: true },
+  ])('keeps $boundary interactive', async scenario => {
+    const { session, changed } = await open(undefined, { mcpServers: scenario.registered === false ? [] : [sessionMcpServer('http://127.0.0.1:1/mcp')] });
+    const permission = mcpPermission('set_status');
+    const toolCall = { ...permission.toolCall, ...('meta' in scenario ? { _meta: scenario.meta } : {}),
+      ...(scenario.kind ? { kind: scenario.kind } : {}), ...(scenario.toolCallId ? { toolCallId: scenario.toolCallId } : {}) };
+    const turn = session.prompt(`permission-fixture:${JSON.stringify({ ...permission, toolCall,
+      ...(scenario.alwaysOnly ? { options: [permission.options[0]] } : {}) })}`);
+    await vi.waitFor(() => expect(session.snapshot.clientRequests).toHaveLength(1));
+    const request = session.snapshot.clientRequests[0]!;
+    expect(request.kind).toBe(scenario.toolCallId ? 'ask_user' : 'confirm_tool');
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ type: 'request.created' }));
+    session.respond({ id: request.id, outcome: scenario.alwaysOnly || scenario.toolCallId ? { kind: 'cancelled' } : { kind: 'decision', decision: 'deny' } });
+    await turn.completion;
+    const response = JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8'));
+    expect(response.result).toStrictEqual({ outcome: scenario.alwaysOnly || scenario.toolCallId ? { outcome: 'cancelled' } : { outcome: 'selected', optionId: 'native-deny-9' } });
+  });
+
+  it('rejects cross-session MCP approval requests and keeps tool-free generation disabled', async () => {
+    const mcpServers = [sessionMcpServer('http://127.0.0.1:1/mcp')];
+    const { session, changed } = await open(undefined, { mcpServers });
+    await session.prompt(`permission-fixture:${JSON.stringify({ ...mcpPermission('finish_turn'), sessionId: 'other-session' })}`).completion;
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).error).toStrictEqual({ code: -32603, message: 'Client request failed.' });
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+    const { session: utility } = await open(undefined, { mcpServers, tools: false });
+    await utility.prompt(`permission-fixture:${JSON.stringify(mcpPermission('finish_turn'))}`).completion;
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: { outcome: 'cancelled' } });
+  });
+
+  it('does not authorize a Korus MCP request arriving after cancellation', async () => {
+    const { session, changed } = await open(undefined, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp')] });
+    const turn = session.prompt(`cancel-permission-fixture:${JSON.stringify(mcpPermission('finish_turn'))}`);
+    await vi.waitFor(async () => expect(await readFile(path.join(root, 'cancel-permission-ready'), 'utf8')).toBe(''));
+    await session.interrupt(turn.turnId);
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: { outcome: 'cancelled' } });
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+    expect(session.snapshot.turns.at(-1)?.status).toBe('interrupted');
+  });
+
   it('generates auxiliary text with no MCP or filesystem tools and preserves the agent conversation', async () => {
     const host = new AntigravityHost();
     const agent: Agent = { id: 'utility', name: 'Utility', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
@@ -296,7 +386,7 @@ describe('Antigravity native session', () => {
     expect(session.snapshot).toMatchObject({ busy: false, activeTurnId: null, clientRequests: [] });
   });
 
-  it('lists only this workspace and rejects a forged folder before loading history', async () => {
+  it('validates folder-scoped history and coordinates model reads with completed or cancelled resume', async () => {
     const host = new AntigravityHost();
     const agent: Agent = { id: 'history', name: 'History', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
     try {
@@ -308,9 +398,17 @@ describe('Antigravity native session', () => {
       expect(messages[1]?.parts[0]).toMatchObject({ type: 'tool', status: 'failed' });
       expect(await host.readConversationSummary(agent, rows[0]!.ref)).toEqual(rows[0]);
       const loading = host.resumeConversation(agent, { storageState: 'active', ref: rows[0]!.ref });
+      const catalog = expect(host.listModels(agent)).resolves.toEqual([
+        { id: 'gemini-low', model: 'gemini-low', displayName: 'Gemini Low', isDefault: true },
+      ]);
       await expect(host.sendPrompt(agent, 'too early')).rejects.toThrow('history is still loading');
       await loading;
+      await catalog;
       await expect(host.readConversationMessages({ backend: 'antigravity', sessionId: rows[0]!.sessionId!, folder: path.join(root, 'home') }, agent.id)).rejects.toThrow('another workspace');
+      const cancelledLoad = expect(host.resumeConversation(agent, { storageState: 'active', ref: rows[0]!.ref })).rejects.toThrow('released during history loading');
+      const cancelledCatalog = expect(host.listModels(agent)).rejects.toThrow('released during model loading');
+      await host.releaseConversation(agent.id);
+      await Promise.all([cancelledLoad, cancelledCatalog]);
     } finally { await host.close(); }
   });
 

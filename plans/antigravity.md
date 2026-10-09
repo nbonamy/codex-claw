@@ -493,6 +493,9 @@ services now have workflow tests with only the external provider boundary faked.
   notification framing, bounded buffering, session routing and process cleanup.
 - [x] Implement proven prompt/resume/load semantics, permission responses and
   native cancellation with bounded teardown fallback.
+- [x] Pre-authorize the session-supplied Korus MCP server using native MCP metadata
+  and exact allow-once option IDs; preserve questions, built-in and hosted-server
+  approvals, session identity checks and tool-free generation restrictions.
 - [x] Surface tool denials, protocol errors and unexpected exit. CLI-specific
   `denied_actions` handling applies only if a CLI fallback is explicitly chosen.
 - [x] Add transport-boundary tests with captured sanitized protocol shapes;
@@ -508,14 +511,16 @@ round, and disposal. Two regular bridges update only their own same-repository a
 Mission workflow tests exercise worker reuse, stage acceptance and restored evidence;
 Antigravity does not receive a synthetic `/compact` between tickets. Automation and
 worktree delegation tests retain the selected provider and isolated session.
-Native-runtime review/MCP proof is still pending; the fixture tests are not live model proof.
+Native two-agent Korus MCP identity and approval isolation passed with ACP 1.3.0
+and Gemini 3.8 Flash Low. Native CodeReviewService proof remains pending; its
+fixture tests are not live model proof.
 
 - [x] Implement the provider-owned host/replica and bounded revisioned transport.
 - [x] Hydrate through native `session/load`, rebuild the provider replica atomically
   despite changed replay tool IDs, and validate session identity; prove reload
   does not lose or duplicate streamed messages or re-execute tools.
 - [x] Add safely scoped MCP configuration and normal/review-session tool discovery.
-- [ ] Verify two agents sharing a workspace retain separate MCP identities and
+- [x] Verify two agents sharing a workspace retain separate MCP identities and
   sessions; test reconnection and credential/config cleanup at the owning seam.
 - [x] Enable reviews/Missions only after their required MCP and lifecycle
   contracts work, including review round completion and session disposal.
@@ -554,8 +559,16 @@ remains pending; the branch Web flow is documented in the checkpoint below.
 
 The delegating agent approved review readiness with the following explicit live
 limitation, not merge/publication or a claim of fully live-validated support.
-Native two-agent **Korus** MCP identity and native **CodeReviewService** remediation
-remain outstanding. Initial probes denied native MCP permission requests; corrected
+Native **CodeReviewService** remediation remains outstanding. Native two-agent
+**Korus** MCP identity passed on 2026-10-09 using the production host and MCP
+service, separate same-cwd sessions, and Gemini 3.8 Flash Low. Both default and
+auto-edit sessions completed `set-status` and `finish_turn` without UI approvals;
+a terminal command still required approval and was denied. Evidence:
+`$TMPDIR/korus-acp-trust-oaCfYd/proof.json`.
+Verification passed 3,884 workspace tests, 47 script tests and full lint/typechecks;
+statement coverage passed all unchanged 85% gates (core 85.53%, backend 87.51%,
+Vue 88.10%, Electron 86.58%, Web 95.93%). No running app was restarted.
+Initial probes denied native MCP permission requests; corrected
 probes reached Google's usage limit (the runtime reported a reset in 3 days,
 5 hours). Both default Gemini 3.8 Flash and catalog-selected Gemini 3.1 Pro Low
 returned the limit message. No account change, token extraction or alternate
@@ -594,7 +607,7 @@ models. Its catalog pass-through test includes a synthetic GPT-OSS entry to
 ensure it will display one when the native contract supplies it. This requires
 an upstream-supported change before GPT-OSS can be advertised for Korus.
 
-Rerun the two native collaboration checks after quota permits work:
+Native verification procedure (two-agent MCP passed; review remains outstanding):
 
 1. Keep this worktree checked out and use an isolated scratch repository and
    APP_HOME. Revalidate paired ACP 1.3.0/protocol 2; use the user's native login
@@ -607,16 +620,17 @@ Rerun the two native collaboration checks after quota permits work:
    never production dependencies. Regenerate them from the service wiring in
    `backend/src/antigravity/__tests__/session.spec.ts` if scratch files expire.
 3. Run the MCP runner with two same-cwd agents and the actual AppMcpService URL.
-   Approve only their native `korus_set-status`/`korus_finish_turn` requests.
+   Their session-supplied Korus MCP calls must not create approval requests.
+   A built-in command must still require approval; deny it.
    Require distinct session IDs and both distinct status markers on the correct
    agent records. A completed ACP response alone is insufficient.
 4. Give the review runner a **new** scratch directory each run. Initialize a
    disposable Git repo with `add(a,b) = a+b` and a Node test, commit its baseline,
    then change the implementation to subtraction. Use real CodeReviewService,
    ReviewGit and the scoped MCP bridge with `autoCommit:false`. Approve only
-   fixture reads/test commands, the fixture-file edit and scoped review ledger
-   calls. Require finding counts `[1,0]`, remediation evidence, passing Node
-   test and reviewer disposal. Stop on quota rather than retrying or changing
+   fixture reads/test commands and the fixture-file edit; scoped Korus review
+   ledger calls are pre-authorized. Require finding counts `[1,0]`, remediation
+   evidence, passing Node test and reviewer disposal. Stop on quota rather than retrying or changing
    accounts. Capture synthetic results without credentials.
 5. Keep the deterministic review/Mission/delegation/automation workflow tests
    green; report native results separately. Remote/Web attachment transfer and
@@ -660,14 +674,17 @@ Phase 0 learnings:
 
 Implementation learnings:
 
-- Antigravity now ships behind the developer-controlled `releaseFeatures.antigravity`
-  gate in `core/src/features.ts`, defaulting off. There are no runtime overrides.
-  The daemon owns admission and advertises availability through existing setup
-  and connection contracts; saved histories and provider preferences survive.
-  Enabled-build qualification tests override only the build registry, while
-  shipped-off tests retain the real defaults. Enabling this gate still requires
-  accepting or resolving the native proof limitations recorded above.
-  Release-gate verification: all 3,375 workspace tests and 15 script tests,
+- Exercise session actions through the client and provider together: detach must
+  evict the old frame, catalog reads must await history adoption, and adapter
+  resume parameters must preserve the daemon's target contract. Gate compact
+  actions by the provider command catalog and disable unwired menu entries.
+- Trust native MCP metadata only when the daemon supplied that server to the
+  session. Selecting each call's exact allow-once option avoids broad native
+  allow-always caching; cancellation must reject later permission requests.
+- Antigravity uses ordinary installation, authentication and enablement admission;
+  its temporary developer release gate is removed. Native proof limitations remain
+  tracked independently of availability. Historical release-gate verification:
+  all 3,375 workspace tests and 15 script tests,
   full lint/typechecks, Web build, and all-workspace coverage passed (statements:
   core 85.66%, backend 87.10%, Vue 87.71%, Electron 85.04%, Web 95.93%).
   An isolated branch Web preview showed only Codex/Claude onboarding and working

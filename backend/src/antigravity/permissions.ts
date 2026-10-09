@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentRequestResponse } from '@workspace/core/agent-request';
 import type { ClientRequest } from '@workspace/core/contracts';
+import { product } from '@workspace/core/product';
 import { record } from './acp-connection';
 
 type Option = { optionId: string; name: string; kind: string };
-export function permissionRequest(params: Record<string, unknown>) {
+export function permissionRequest(params: Record<string, unknown>, sessionHasKorusMcp = false) {
   const call = params.toolCall;
   if (!record(call) || typeof call.toolCallId !== 'string' || !Array.isArray(params.options)) throw new Error('Invalid native permission request.');
   const options = params.options.filter((value): value is Option => record(value)
@@ -12,6 +13,14 @@ export function permissionRequest(params: Record<string, unknown>) {
   if (options.length !== params.options.length || !options.length) throw new Error('Invalid native permission choices.');
   const id = randomUUID();
   const question = call.toolCallId.startsWith('interaction_');
+  // Trust only native MCP identity for the server supplied by this session.
+  // Titles and tool arguments are presentation data, not authorization inputs.
+  const meta = call._meta;
+  const mcp = record(meta) && meta.mcp;
+  const allow = sessionHasKorusMcp && !question && call.kind === 'other'
+    && record(meta) && meta.is_mcp_tool_call === true && record(mcp)
+    && mcp.server === product.mcpServerName && typeof mcp.tool === 'string' && mcp.tool.trim()
+    ? options.find(option => option.kind === 'allow_once') : undefined;
   const title = typeof call.title === 'string' ? call.title : 'Antigravity permission';
   const request: ClientRequest = question ? {
     id, kind: 'ask_user', payload: { request: { itemId: call.toolCallId, blocking: true, delivery: 'tool', questions: [{
@@ -25,7 +34,8 @@ export function permissionRequest(params: Record<string, unknown>) {
       allowAlways: options.some(option => option.kind === 'allow_always'), allowConversation: false,
     } },
   };
-  return { request, answer(response: AgentRequestResponse): unknown {
+  return { request, automaticResponse: allow ? { outcome: { outcome: 'selected', optionId: allow.optionId } } : undefined,
+    answer(response: AgentRequestResponse): unknown {
     const outcome = response.outcome;
     if (outcome.kind === 'cancelled') return { outcome: { outcome: 'cancelled' } };
     let option: Option | undefined;

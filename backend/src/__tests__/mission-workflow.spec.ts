@@ -14,7 +14,6 @@ import { createSourceWorktree, readWorktreeHead } from '../git-worktrees';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 const exec = promisify(execFile);
 
-vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 it.each(['codex', 'antigravity'] as const)('keeps %s orchestrators and workers through the full Mission without inventing unsupported compaction', async backend => {
   const folder = await mkdtemp(join(tmpdir(), 'app-mission-workflow-'));

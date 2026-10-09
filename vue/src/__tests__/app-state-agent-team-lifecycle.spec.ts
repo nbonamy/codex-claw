@@ -10,6 +10,7 @@ import { clearConfetti } from '../shared/confetti/use-confetti';
 import { stubElectronTestWindow, stubLegacyElectronTestWindow } from '../test/client';
 import { clearFirstRunOnboardingStage } from '../onboarding-session';
 import { workItem, deferred } from './app-state-test-harness';
+import { emptyAntigravitySnapshot } from '@workspace/core/antigravity-conversation-replica';
 
 describe('useAppState', () => {
   afterEach(() => {
@@ -816,6 +817,37 @@ describe('useAppState', () => {
     await state.loadOlderAgentHistory('agent-dina');
 
     expect(state.snapshot.value).toBe(before);
+  });
+
+  it('clears the visible Antigravity conversation when restarting without disturbing another agent', async () => {
+    const listeners: Array<(event: MainToRendererEvent) => void> = [];
+    const initialSnapshot = createInitialSnapshot();
+    const first = initialSnapshot.agents[0]!;
+    first.backend = 'antigravity';
+    first.backendSession = { kind: 'antigravity', sessionId: 'native-first' };
+    const second = { ...first, id: 'other-antigravity', backendSession: { kind: 'antigravity' as const, sessionId: 'native-second' } };
+    initialSnapshot.agents.push(second);
+    const restartedSnapshot = structuredClone(initialSnapshot);
+    delete restartedSnapshot.agents[0]!.backendSession;
+    stubElectronTestWindow({ app: {
+      getSnapshot: vi.fn().mockResolvedValue(initialSnapshot),
+      onEvent: vi.fn(listener => { listeners.push(listener); return () => {}; }),
+      restartAgent: vi.fn().mockResolvedValue(restartedSnapshot),
+    } satisfies Partial<AppApi> });
+    const state = useAppState();
+    await state.loadSnapshot();
+    for (const [index, agent] of [first, second].entries()) {
+      if (agent.backendSession?.kind !== 'antigravity') throw new Error('Missing fixture native session');
+      const native = emptyAntigravitySnapshot(agent.id, agent.backendSession.sessionId);
+      native.messages = [{ id: agent.id + '-answer', agentId: agent.id, role: 'assistant', status: 'complete', createdAt: '', parts: [{ type: 'text', text: agent.id + ' previous answer' }] }];
+      listeners[0]?.({ seq: index + 1, occurredAt: '', agentId: agent.id, backend: 'antigravity', backendSessionId: native.sessionId,
+        type: 'antigravity.conversationSnapshotChanged', payload: { revision: 1, snapshot: native } });
+    }
+    expect(state.activeAntigravityConversationSnapshot.value?.messages).toHaveLength(1);
+    await state.restartAgent(first.id);
+    expect(state.activeAgent.value?.backendSession).toBeUndefined();
+    expect(state.activeAntigravityConversationSnapshot.value).toBeNull();
+    expect(state.agentConversationFor(second.id)?.antigravitySnapshot?.messages).toHaveLength(1);
   });
 
   it('clears a failed history state when the agent is restarted', async () => {

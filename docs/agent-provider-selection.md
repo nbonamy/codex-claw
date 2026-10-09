@@ -8,10 +8,6 @@ and review role policy beyond the lead's backend is not decided.
 - Providers are peers; any subset may be connected on a host. Installation, process
   health and authentication are distinct. Choices come from the owning host's
   `providerConnections`, never legacy enable flags or backend process health.
-- Developer release gates in `core/src/features.ts` are enforced by the owning
-  daemon, including remote hosts. Unreleased providers are absent from setup and
-  connection lists and reject new work despite saved enablement; histories and
-  preferences survive. Antigravity is gated off by default.
 - With several connected engines, creation surfaces show a selector; with one, it is
   used automatically and the selector is hidden; with none, new work is rejected and
   Settings offers connection. Existing chats stay accessible.

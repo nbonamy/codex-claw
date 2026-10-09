@@ -40,15 +40,7 @@ log and socket paths, npm scripts and launchd labels stay brand-neutral.
 - Agent creation (protocol, MCP delegation, independent review) goes through one
   `AgentCreationService`; callers only adapt their input.
 
-## Provider Release Gates And Antigravity
-
-`core/src/features.ts` fixes developer release gates for each build; there are no
-runtime overrides or persisted flag settings. The daemon enforces provider gates
-through `provider-release.ts` and advertises availability in setup/connection
-contracts. Clients follow their owning host. Gating off skips home preparation and
-auth probes, rejects new work, and preserves preferences, queues, saved-home
-routing and hosts for history, interruption and cleanup. Rebuild and restart to
-change gates; remove a temporary gate when its feature graduates.
+## Antigravity
 
 `backend/src/antigravity` detects the externally installed ACP runtime/harness and
 owns OAuth observations and the provider replica; the agy CLI is not the
@@ -69,9 +61,9 @@ separate session with MCP, built-ins and client filesystem requests disabled.
 
 Native catalogs remain authoritative; Korus never impersonates an allowlisted
 editor to expose third-party models. Native plan artifacts feed app-owned review,
-with implementation in a separate accepted turn. Antigravity is gated off pending
-native qualification; [the plan](../plans/antigravity.md) records transport evidence,
-model restrictions, attachment support and unsupported capabilities.
+with implementation in a separate accepted turn. [The plan](../plans/antigravity.md)
+records transport evidence, model restrictions, attachment support and unsupported
+capabilities.
 
 ## Transports
 

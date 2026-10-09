@@ -23,7 +23,6 @@ import { listSourceFolders } from './source-folders';
 import { detectSourceFolder, scanSourceRepositories } from './source-repositories';
 import { cloneSourceRepository } from './clone-source-repository';
 import { createSourceRepository } from './create-source-repository';
-import { requireReleasedProvider } from './provider-release';
 
 export type BackendDriverRegistryOptions = {
   appMcpServerUrl?: string | null;
@@ -148,7 +147,6 @@ export class BackendDriverRpc {
   }
 
   private async requireNewWork(backend: AgentBackend): Promise<void> {
-    requireReleasedProvider(backend);
     await this.ensureConnected?.(backend);
   }
 
@@ -169,7 +167,6 @@ export class BackendDriverRpc {
       case backendMethods.driverProviderAuthentication: {
         const record = requireRecord(params);
         const backend = requireBackend(record.backend);
-        requireReleasedProvider(backend);
         const driver = this.requireDriver(backend);
         if (!driver.authenticate) throw new Error(`Authentication is unavailable for ${backend}.`);
         const action = record.action;
@@ -279,7 +276,6 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverPromptCommandHandle: {
         const { agent } = requireAgentParams(params);
-        requireReleasedProvider(agent.backend);
         const record = requireRecord(params);
         return this.tryHandlePromptCommand(agent, requireString(record.prompt, 'prompt'));
       }
@@ -421,7 +417,6 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationResume: {
         const { agent } = requireAgentParams(params);
-        requireReleasedProvider(agent.backend);
         const record = requireRecord(params);
         const driver = this.requireDriver(agent.backend);
         if (!driver.resumeConversation) {
@@ -431,7 +426,6 @@ export class BackendDriverRpc {
       }
       case backendMethods.driverConversationFork: {
         const { agent } = requireAgentParams(params);
-        requireReleasedProvider(agent.backend);
         const record = requireRecord(params);
         const targetAgent = requireAgent(record.targetAgent, 'targetAgent');
         const turnId = record.turnId === undefined ? undefined : requireString(record.turnId, 'turnId');

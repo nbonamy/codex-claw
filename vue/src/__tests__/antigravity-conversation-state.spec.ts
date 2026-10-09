@@ -24,3 +24,25 @@ it('recovers revision gaps, replaces history atomically, and evicts frames after
   state.reconcile([{ ...agent, backendSession: { kind: 'antigravity', sessionId: 'other' } }]);
   expect(state.select(agent)).toBeNull();
 });
+
+it('retains a newly opened frame before attachment but evicts the detached session when its reference is cleared', () => {
+  const state = createAntigravityConversationState(vi.fn());
+  const agent = { ...createInitialSnapshot().agents[0]!, backend: 'antigravity' as const, backendSession: undefined };
+  const native = emptyAntigravitySnapshot(agent.id, 'native-new');
+  state.reconcile([agent]);
+  state.receive({ agentId: agent.id, backend: 'antigravity', backendSessionId: native.sessionId, seq: 1, occurredAt: '',
+    type: 'antigravity.conversationSnapshotChanged', payload: { revision: 1, snapshot: native } });
+  state.reconcile([agent]);
+  expect(state.select(agent)?.sessionId).toBe('native-new');
+  state.reconcile([{ ...agent, backendSession: { kind: 'antigravity', sessionId: 'native-new' } }]);
+  state.reconcile([agent]);
+  expect(state.select(agent)).toBeNull();
+  state.receive({ agentId: agent.id, backend: 'antigravity', backendSessionId: native.sessionId, seq: 2, occurredAt: '',
+    type: 'antigravity.conversationSnapshotChanged', payload: { revision: 2, snapshot: native } });
+  expect(state.select(agent)).toBeNull();
+  const next = emptyAntigravitySnapshot(agent.id, 'native-next');
+  state.receive({ agentId: agent.id, backend: 'antigravity', backendSessionId: next.sessionId, seq: 3, occurredAt: '',
+    type: 'antigravity.conversationSnapshotChanged', payload: { revision: 3, snapshot: next } });
+  state.reconcile([agent]);
+  expect(state.select(agent)?.sessionId).toBe('native-next');
+});

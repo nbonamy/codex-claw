@@ -10,6 +10,7 @@ import { handleAcpFileRequest } from './filesystem';
 import { validateAcpSession } from './catalog';
 import { AcpPromptJournal } from './prompt-journal';
 import type { RendererMessagePart } from '@workspace/core/contracts';
+import { product } from '@workspace/core/product';
 
 type SessionOptions = {
   agentId: string; cwd: string; home?: string; sessionId?: string;
@@ -175,7 +176,10 @@ export class AcpSession {
     }
     if (method === 'session/request_permission') {
       if (!this.active) throw new Error('Antigravity permission request has no active turn.');
-      const pending = permissionRequest(params);
+      if (this.interrupted) return { outcome: { outcome: 'cancelled' } };
+      const sessionHasKorusMcp = this.options.mcpServers.some(server => record(server) && server.name === product.mcpServerName);
+      const pending = permissionRequest(params, sessionHasKorusMcp);
+      if (pending.automaticResponse) return pending.automaticResponse;
       return new Promise(resolve => {
         this.pending.set(pending.request.id, { ...pending, resolve });
         this.transcript.event({ type: 'request.created', payload: { request: pending.request } });

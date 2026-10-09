@@ -14,7 +14,6 @@ import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot }
 import { projectClientSnapshot } from '@workspace/core/client-preferences';
 import type { RemoteConnection } from '@workspace/core/contracts';
 
-vi.mock('@workspace/core/features', () => ({ releaseFeatures: { antigravity: true } }));
 
 let tempDir: string | null = null;
 
