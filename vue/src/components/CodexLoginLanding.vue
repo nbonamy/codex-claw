@@ -313,6 +313,16 @@ const missing = (backend: AgentBackend) => props.providerSetup?.some(setup => se
   .codex-login--sign-in {
     padding-inline: var(--space-24);
   }
+
+  .codex-login__providers {
+    flex-direction: column;
+    align-items: stretch;
+    align-self: stretch;
+  }
+
+  .codex-login__providers .el-button + .el-button {
+    margin-left: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

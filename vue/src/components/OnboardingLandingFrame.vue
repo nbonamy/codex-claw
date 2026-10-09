@@ -55,4 +55,15 @@ withDefaults(defineProps<{
 .onboarding-landing-frame :deep(.onboarding-landing-title__detail) {
   color: var(--color-text-muted);
 }
+
+@media (max-width: 768px) {
+  .onboarding-landing-frame--editorial {
+    padding: var(--space-24);
+    overflow-y: auto;
+  }
+
+  .onboarding-landing-frame :deep(.onboarding-landing-title) {
+    font-size: 40px;
+  }
+}
 </style>

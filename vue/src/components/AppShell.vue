@@ -44,10 +44,15 @@
       @login="startChatGptLogin"
       @open-github-authorization="openGitHubAuthorization"
     />
+    <div
+      class="app-shell__nav"
+      :class="{ 'app-shell__nav--compact': compactViewport, 'app-shell__nav--open': compactNavOpen }"
+    >
     <AppShellNavigation
       :active-mission-id="activeSurface === 'mission' ? selectedMissionId : null"
       :mission-creation-error="missionCreationError"
       :mission-creation-pending="missionCreationPending"
+      :phone-scope="compactViewport"
       @create-mission="createNewMission"
       @delete-mission="deleteMissionFromSidebar"
       @select-mission="selectMission"
@@ -78,7 +83,7 @@
       @compress-session="$emit('compress-session', $event)"
       @compact-session="compactAgentSession($event)"
       @cleanup-pull-request="$emit('cleanup-pull-request', $event)"
-      @collapse-sidebar="agentSidebarCollapsed = true"
+      @collapse-sidebar="collapseSidebar"
       @create-agent-from-repository="openRepositorySessionSource"
       @create-agent-on-branch="createRepositorySessionOnBranch"
       @create-agent-worktree-in-repository="openRepositorySessionWorktree"
@@ -111,8 +116,18 @@
       @update-collapsed-repositories="updateCollapsedRepositories"
       @update-repository-icon="updateRepositoryIcon"
     />
+    </div>
+    <div
+      v-if="compactViewport && compactNavOpen"
+      class="app-shell__nav-backdrop"
+      aria-hidden="true"
+      @click="compactNavOpen = false"
+    />
     <section class="app-shell__content">
       <BackendConnectionBanner :connection-state="connectionState" />
+      <header v-if="compactViewport && !isAgentWorkspaceVisible && activeSurface !== 'mission'" class="app-shell__compact-bar">
+        <SidebarExpandButton :label="t('surface.agentHeader.showAgentSidebar')" @click="expandSidebar" />
+      </header>
       <SettingsView
         v-if="settingsVisible"
         :codex-connected="!debugMissingEngines && codexConnected"
@@ -229,7 +244,7 @@
         @select-work-provider="cockpitBacklogState.selectProvider"
         @select-agent="selectAgentFromCockpit"
       />
-      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed" @expand-sidebar="agentSidebarCollapsed = false" :mission="selectedMission" :implementation-start-progress="missionImplementationStartProgress" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @chat-about-review-finding="prepareMissionReviewDiscussion" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
+      <MissionWorkspace v-else-if="activeSurface === 'mission' && selectedMission" :key="selectedMission.id" :agents="snapshot.agents" :sidebar-collapsed="agentSidebarCollapsed || compactViewport" @expand-sidebar="expandSidebar" :mission="selectedMission" :implementation-start-progress="missionImplementationStartProgress" :read-mission-artifact="readMissionArtifact" :execute-mission="executeMission" :send-mission-prompt="forwardPrompt" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @chat-about-review-finding="prepareMissionReviewDiscussion" @open-conversation="emit('select-agent', $event)" @open-worktree="openMissionWorktree">
         <template #code-review="{ agentId, reviewSummary, chatAboutFinding }">
           <MissionCodeReview v-if="snapshot.agents.find(agent => agent.id === agentId) && props.getAgentGitDiff" :agent="snapshot.agents.find(agent => agent.id === agentId)!" :agents="snapshot.agents" :git-statuses="snapshot.agentGitStatuses" :get-diff="props.getAgentGitDiff" :mission="selectedMission" :review-summary="reviewSummary" :execute-mission="executeMission" :open-in-available="missionOpenInAvailable" :open-in-applications="openInApplications" @chat-about-finding="chatAboutFinding" @open-worktree="openMissionWorktree" />
         </template>
@@ -267,7 +282,7 @@
         :add-chat-text-annotation="addChatTextAnnotation"
         :add-visualization-annotation="addFocusedVisualizationAnnotation"
         :agent-files="agentFiles"
-        :agent-sidebar-collapsed="agentSidebarCollapsed"
+        :agent-sidebar-collapsed="agentSidebarCollapsed || compactViewport"
         :close-right-workspace-tab="closeRightWorkspaceTab"
         :save-document-as="saveDocumentAs"
         :commit-agent-git-changes="props.commitAgentGitChanges"
@@ -344,14 +359,14 @@
         :read-visualization-asset="props.readVisualizationAsset"
         @close-agent="$emit('close-agent', $event)"
         @clarify-code-review-finding="clarifyCodeReviewFinding"
-        @expand-sidebar="agentSidebarCollapsed = false"
+        @expand-sidebar="expandSidebar"
         @install-update="emit('install-update')"
         @remove-work-item-assignment="$emit('remove-work-item-assignment', $event)"
         @remove-review-finding-attachment="pendingReviewClarification = null"
         @send-prompt="emit('sendPrompt', $event)"
         @update:plan-mode="emit('update:planMode', $event)"
       >
-        <template v-if="props.agentConversationFor && props.agentConversationActions" #layout-control>
+        <template v-if="!compactViewport && props.agentConversationFor && props.agentConversationActions" #layout-control>
           <SplitLayoutControl :model-value="split.layout.value" @update:model-value="split.setLayout" />
         </template>
         <template v-if="split.layout.value !== 'single' && props.agentConversationFor && splitActions" #conversation="{ plan, planVisible, closePlan, headerBindingsFor }">
@@ -577,6 +592,8 @@ import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { providerUpdatePreviewKey } from './provider-update-preview';
 import { useI18n } from 'vue-i18n';
+import SidebarExpandButton from '../shared/SidebarExpandButton.vue';
+import { useCompactViewport } from '../shared/use-compact-viewport';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentBackend, AgentFileActivity } from '@workspace/core/contracts';
 import type { AddSshConnectionInput, Agent, AgentCreationProgress, AgentFilePreviewResult, AgentFileSearchItem, AgentGitStatus, AppCommand, ApprovalPreset, AppSnapshot, BackendApprovalDecision, BackendApprovalRequest, BackendApprovalScope, BackendCapabilities, BackendCommandSummary, BackendConnectionState, BackendConversationRef, BackendPermissionModeOption, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSkillSummary, ClaudeConversationSnapshot, DaemonStatus, ClientRequestResponse, CloneSourceRepositoryInput, CockpitAgentViewMode, ConversationListInput, ConversationResumeTarget, ConversationSummary, CreateAgentInput, CreateAutomationInput, CreateProjectInput, CreateQuickChatInput, CreateSourceWorktreeInput, CreateTeamInput, DesktopUpdateStatus, DevicePairingSession, DevicePairingStatus, GlobalWorkItemQuery, AutomationLocation, ModelFavorite, MoveAgentToTeamInput, OpenInApplication, OpenInApplicationCatalog, PairedDevice, ReasoningEffort, RendererMessage, ReorderAgentsInput, ReorderRepositoriesInput, ReorderTeamsInput, RendererSendPromptOptions, SetCodexResourceSharingInput, SidePanelRequest, SourceBranch, SourceFolderListing, SourceFolderListInput, SourceRepository, SourceWorktree, SshHostCandidate, Team, ThreadGoal, ThreadPlan, UpdateAgentInput, UpdateAutomationInput, UpdateRemoteConnectionInput, UpdateSettingsInput, UpdateTeamInput, WorkBacklogConfigurationInput, WorkIntegrationConnection, WorkItem, WorkItemPage, WorkItemQuery, WorkProviderAuthorization, WorkProviderKind, WorkSource } from '@workspace/core/contracts';
@@ -1022,6 +1039,16 @@ provide(codeReviewSettingsKey, { ...reviewSettings, preferences: () => props.sna
 provideBacklogConnections(() => props.snapshot.workBacklog.connections);
 const backendSwitch = provideBackendSwitch((id, backend) => props.updateAgent({ id, backend }));
 const agentSidebarCollapsed = ref(false);
+const compactViewport = useCompactViewport();
+const compactNavOpen = ref(false);
+function collapseSidebar(): void {
+  if (compactViewport.value) compactNavOpen.value = false;
+  else agentSidebarCollapsed.value = true;
+}
+function expandSidebar(): void {
+  if (compactViewport.value) compactNavOpen.value = true;
+  else agentSidebarCollapsed.value = false;
+}
 const pendingReviewClarification = ref<PendingReviewClarification | null>(null);
 const missionConversationPane = ref<{ focusComposer(): void; openSavedDraftPicker(): void; saveCurrentDraft(): Promise<void> } | null>(null);
 const activeReviewFindingAttachment = computed(() => {
@@ -1571,6 +1598,18 @@ const currentAgent = computed(() => {
 
   return activeTeamAgents.value.find((agent) => agent.id === team.activeAgentId) ?? activeTeamAgents.value[0] ?? null;
 });
+watch(
+  [compactViewport, activeSurface],
+  ([compact, surface]) => {
+    if (compact && surface !== 'agent' && surface !== 'cockpit') activeSurface.value = 'agent';
+  },
+  { immediate: true },
+);
+// Getter-per-source: a getter returning a fresh array would fire on every snapshot update.
+watch(
+  [compactViewport, () => currentAgent.value?.id, activeSurface, selectedMissionId],
+  ([compact]) => { if (!compact || compactNavOpen.value) compactNavOpen.value = false; },
+);
 watch(() => currentAgent.value?.id, (agentId) => {
   if (pendingReviewClarification.value && pendingReviewClarification.value.agentId !== agentId) {
     pendingReviewClarification.value = null;
@@ -1582,6 +1621,12 @@ const split = useSplitWorkspace({
   teamId: () => activeTeam.value?.id,
   selectAgent: id => emit('select-agent', id),
 });
+// One pane at a time on phones, including layouts restored from a team's saved workspace.
+watch(
+  [compactViewport, split.layout],
+  ([compact, layout]) => { if (compact && layout !== 'single') split.setLayout('single'); },
+  { immediate: true },
+);
 const rightWorkspaceState = useRightWorkspaceState({
   currentAgentId: () => currentAgent.value?.id,
   sharedVisibilityGroupId: () => split.layout.value === 'single' ? undefined : activeTeam.value?.id,
@@ -2323,6 +2368,8 @@ const isModalDialogVisible = computed(() => (
   || agentQuickOpenVisible.value
   || props.codexResourceSharingMigrationRequired
 ));
+// Dialogs take over the screen on phones; the drawer must not linger behind them.
+watch(isModalDialogVisible, (visible) => { if (visible) compactNavOpen.value = false; });
 const { quickAgentShortcutsVisible } = useAppShellCommands({
   state: {
     activeTeam: () => activeTeam.value,
@@ -2526,7 +2573,7 @@ function clearDebugAgentCreationTimers(): void {
 }
 
 onBeforeUnmount(clearDebugAgentCreationTimers);
-const showAgentSidebar = computed(() => (isAgentWorkspaceVisible.value || activeSurface.value === 'mission') && !agentSidebarCollapsed.value && (props.snapshot.teams.length > 0 || !!props.snapshot.missions?.length));
+const showAgentSidebar = computed(() => (isAgentWorkspaceVisible.value || activeSurface.value === 'mission') && (compactViewport.value || !agentSidebarCollapsed.value) && (props.snapshot.teams.length > 0 || !!props.snapshot.missions?.length));
 const editingAgent = computed(() => (
   editingAgentId.value ? props.snapshot.agents.find((agent) => agent.id === editingAgentId.value) ?? null : null
 ));
@@ -3135,6 +3182,7 @@ watch(() => props.fileActivity, (activity) => {
 .app-shell {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
   color: var(--color-text);
@@ -3143,6 +3191,19 @@ watch(() => props.fileActivity, (activity) => {
 
 .app-shell--auth-gated > :not(.codex-login):not(.github-onboarding):not(.onboarding-complete) {
   visibility: hidden;
+}
+
+.app-shell__nav {
+  display: contents;
+}
+
+.app-shell__compact-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: var(--workbench-appbar-height);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .app-shell__content {
@@ -3155,4 +3216,34 @@ watch(() => props.fileActivity, (activity) => {
   background: var(--color-shell-main);
 }
 
+@media (max-width: 768px) {
+  .app-shell__nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    display: flex;
+    max-width: 88vw;
+    background: var(--color-shell-window);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+  }
+
+  .app-shell__nav--open {
+    transform: none;
+  }
+
+  .app-shell__nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    background: var(--color-dialog-overlay);
+  }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  .app-shell__nav {
+    transition-duration: 1ms;
+  }
+}
 </style>

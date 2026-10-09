@@ -77,6 +77,7 @@
         :report-back-agent-name="reportBackAgentName"
       />
       <OpenInControl
+        class="agent-header__open-in"
         v-if="agent?.folder && openInAvailable && openInCatalog && openInCatalog.applications.length > 0"
         :application="effectiveOpenInApplication(agent, openInCatalog)"
         :catalog="openInCatalog"
@@ -365,4 +366,14 @@ const gitReviewAvailable = computed(() => {
   height: var(--icon-md);
 }
 
+
+/* Phones keep identity, the git workflow and the workspace toggle; the rest stays reachable from the workspace. */
+@media (max-width: 768px) {
+  .agent-header__folder,
+  .agent-header__inline-status,
+  .agent-header__git-status,
+  .agent-header__open-in {
+    display: none;
+  }
+}
 </style>

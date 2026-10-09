@@ -22,7 +22,7 @@ export type MountAppVueAppOptions = {
 export function mountAppVueApp(options: MountAppVueAppOptions) {
   document.title = product.name;
   configureAppClient(options.client);
-  applyRendererPlatform(document.documentElement, navigator.platform, navigator.userAgent);
+  applyRendererPlatform(document.documentElement, navigator.platform, navigator.userAgent, options.client.platform !== 'web');
 
   const surface = options.surface
     ?? (new URLSearchParams(window.location.search).get('surface') === 'annotation-overlay'

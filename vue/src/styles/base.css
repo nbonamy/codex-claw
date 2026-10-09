@@ -72,6 +72,10 @@ button,
   -webkit-app-region: no-drag;
 }
 
+.el-dialog {
+  max-width: calc(100vw - var(--space-16));
+}
+
 .app-dialog.el-dialog {
   overflow: visible;
   border-radius: var(--radius-xl);
