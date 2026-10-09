@@ -5,7 +5,6 @@ export const messages = {
   en: {
     gitWorkflow: {
       title: 'Workflow', pull: 'Pull strategy', update: 'Update from base',
-      rebaseInProgress: 'Rebase in progress: {branch}', continue: 'Continue rebase', abort: 'Abort rebase',
       strategies: { 'git-config': 'Git configuration', merge: 'Merge', rebase: 'Rebase', 'ff-only': 'Fast-forward only' },
     },
     providerUpdate: {

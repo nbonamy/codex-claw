@@ -77,8 +77,6 @@ describe('agent git service parsers', () => {
       if (command === 'rev-parse --verify --quiet abcdef12^{commit}') return { stdout: 'abcdef12\n' };
       if (command === 'show --format= --no-ext-diff abcdef12 --') return { stdout: 'commit diff\n' };
       if (command === 'show --format= --numstat abcdef12 --') return { stdout: '7\t3\tb.ts\n' };
-      if (command === 'branch --format=%(refname:short)') return { stdout: 'feature' };
-      if (command.startsWith('rev-parse --path-format=absolute --git-path rebase-')) return { stdout: '/nonexistent-rebase' };
       throw new Error(`Unexpected git command: ${command}`);
     });
     const service = new AgentGitService(() => new Date(), runGit);
@@ -757,15 +755,118 @@ describe('agent git service parsers', () => {
     });
   });
 
+  it('merges the checked-out base branch into a clean linked worktree', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'worktree') {
+        return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature/demo\n' };
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+    vi.spyOn(service, 'workflow').mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
+      baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [],
+    });
+
+    await expect(service.updateFromBase('/repo-feature')).resolves.toStrictEqual({
+      baseBranch: 'main',
+      branch: 'feature/demo',
+      conflicts: [],
+    });
+    expect(runGit).toHaveBeenCalledWith('/repo-feature', ['merge', '--ff', '--no-edit', '--no-autostash', 'main']);
+  });
+
+  it('blocks a dirty update unless explicitly allowed and preserves conflicts for the agent', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'worktree') {
+        return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature/demo\n' };
+      }
+      if (args[0] === 'merge') throw new Error('CONFLICT (content): Merge conflict in src/app.ts');
+      if (args[0] === 'diff') return { stdout: 'src/app.ts\0src/state.ts\0' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+    vi.spyOn(service, 'workflow').mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
+      baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
+      files: [{ path: 'notes.md', indexStatus: ' ', worktreeStatus: 'M' }], stagedFiles: [], unstagedFiles: ['notes.md'],
+    });
+
+    await expect(service.updateFromBase('/repo-feature')).rejects.toThrow('Commit your changes before updating');
+    expect(runGit).not.toHaveBeenCalled();
+
+    await expect(service.updateFromBase('/repo-feature', true)).resolves.toStrictEqual({
+      baseBranch: 'main',
+      branch: 'feature/demo',
+      conflicts: ['src/app.ts', 'src/state.ts'],
+    });
+    expect(runGit).toHaveBeenCalledWith('/repo-feature', ['diff', '--name-only', '--diff-filter=U', '-z']);
+  });
+
   it('rejects staging paths that escape the repository', async () => {
     const service = new AgentGitService(() => new Date(), vi.fn());
     await expect(service.stage('/repo', ['../secret'])).rejects.toThrow('inside the repository');
     expect(parsePorcelainFiles('R  new.ts\0old.ts\0')).toStrictEqual([{ path: 'old.ts', indexStatus: 'R', worktreeStatus: ' ' }]);
   });
 
+  it('merges a feature worktree into the main worktree and applies cleanup options', async () => {
+    const runGit = vi.fn(async (folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote' && args[1] === undefined) return { stdout: '' };
+      if (args[0] === 'status' && args.includes('--branch')) return { stdout: '## feature\n' };
+      if (args[0] === 'status') return { stdout: '' };
+      if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature\n' };
+      if (args[0] === 'branch' && args[1] === '-d') throw new Error("the branch 'feature' is not fully merged");
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+    await expect(service.merge('/repo-feature', 'squash', true, true, 'feat: combine the workflow')).resolves.toStrictEqual({
+      targetFolder: '/repo',
+    });
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--squash', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['commit', '-m', 'feat: combine the workflow']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['worktree', 'remove', '/repo-feature']);
+    const removeWorktreeCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'worktree' && args[1] === 'remove');
+    const deleteBranchCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'branch' && args[1] === '-D');
+    expect(removeWorktreeCall).toBeLessThan(deleteBranchCall);
+  });
 
+  it('continues merge cleanup when Git removed the worktree registration but left its folder', async () => {
+    let worktreeListCalls = 0;
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote') return { stdout: '' };
+      if (args[0] === 'status' && args.includes('--branch')) return { stdout: '## feature\n' };
+      if (args[0] === 'status') return { stdout: '' };
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        worktreeListCalls += 1;
+        return {
+          stdout: worktreeListCalls === 1
+            ? 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature\n'
+            : 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n',
+        };
+      }
+      if (args[0] === 'worktree' && args[1] === 'remove') {
+        throw new Error("failed to delete '/repo-feature': Directory not empty");
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
 
+    await expect(service.merge('/repo-feature', 'merge', true, true)).resolves.toStrictEqual({
+      targetFolder: '/repo',
+      warning: { type: 'worktreeFolderRetained', folder: '/repo-feature' },
+    });
 
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'feature']);
+  });
 
   it('requires a commit message before starting a squash merge', async () => {
     const runGit = vi.fn();
@@ -775,9 +876,54 @@ describe('agent git service parsers', () => {
     expect(runGit).not.toHaveBeenCalled();
   });
 
+  it('refuses to merge before main is an ancestor of the feature branch', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote') return { stdout: '' };
+      if (args[0] === 'status' && args.includes('--branch')) return { stdout: '## feature\n' };
+      if (args[0] === 'status') return { stdout: '' };
+      if (args[0] === 'worktree') {
+        return { stdout: 'worktree /repo\nHEAD main-head\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD feature-head\nbranch refs/heads/feature\n' };
+      }
+      if (args[0] === 'merge-base' && args[1] === '--is-ancestor') {
+        throw new Error('not an ancestor');
+      }
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
 
+    await expect(service.merge('/repo-feature', 'merge', true, true)).rejects.toThrow(
+      'feature is not up to date with main. Update the branch with main before merging.',
+    );
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature']);
+    expect(runGit.mock.calls.some(([, args]) => (
+      args[0] === 'merge' || args[0] === 'worktree' && args[1] === 'remove' || args[0] === 'branch' && ['-d', '-D'].includes(args[1]!)
+    ))).toBe(false);
+  });
 
+  it('refuses to merge while the target worktree has uncommitted changes', async () => {
+    const runGit = vi.fn(async (folder: string, args: string[]) => {
+      if (args[0] === 'worktree') {
+        return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature\n' };
+      }
+      if (args[0] === 'status' && folder === '/repo') return { stdout: ' M src/main-only.ts\0' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
+    vi.spyOn(service, 'workflow').mockResolvedValue({
+      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
+      baseBranch: 'main', branch: 'feature', detached: false, ahead: 0, behind: 0,
+      files: [], stagedFiles: [], unstagedFiles: [],
+    });
 
+    await expect(service.merge('/repo-feature', 'merge', false, false)).rejects.toThrow(
+      'Commit changes in main before merging.',
+    );
+    expect(runGit).toHaveBeenCalledWith('/repo', ['status', '--porcelain=v1', '-z']);
+    expect(runGit.mock.calls.some(([, args]) => args[0] === 'merge')).toBe(false);
+  });
 
   it('rejects worktree cleanup from a primary checkout', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
@@ -785,7 +931,7 @@ describe('agent git service parsers', () => {
       if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
       if (args.includes('@{upstream}')) return { stdout: '' };
       if (args[0] === 'remote') return { stdout: '' };
-      if (args[0] === 'status') return { stdout: args.includes('--branch') ? '## feature\n' : '' };
+      if (args[0] === 'status') return { stdout: '## feature\n' };
       if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/feature\n' };
       return { stdout: '' };
     });
@@ -812,7 +958,26 @@ describe('agent git service parsers', () => {
     expect(runGit.mock.calls.some(([, args]) => args[0] === 'merge' || args[0] === 'branch')).toBe(false);
   });
 
+  it('uses safe branch deletion after a merge commit without pushing the base branch', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo-feature\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote' && args[1] === undefined) return { stdout: '' };
+      if (args[0] === 'status' && args.includes('--branch')) return { stdout: '## feature\n' };
+      if (args[0] === 'status') return { stdout: '' };
+      if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature\n' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
 
+    await service.merge('/repo-feature', 'merge', true, true);
+
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--no-ff', 'feature']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'feature', 'HEAD']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['branch', '-D', 'feature']);
+    expect(runGit.mock.calls.some(([, args]) => args[0] === 'push')).toBe(false);
+  });
 
   it('resolves the base worktree as the merged-branch push target', async () => {
     const runGit = vi.fn(async (_folder: string, args: string[]) => {
@@ -829,5 +994,26 @@ describe('agent git service parsers', () => {
     await expect(service.mergeTarget('/repo-feature')).resolves.toBe('/repo');
   });
 
+  it('switches a primary feature checkout to its base branch before merging', async () => {
+    const runGit = vi.fn(async (_folder: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return { stdout: '/repo\n' };
+      if (args[0] === 'symbolic-ref') return { stdout: 'feature/demo\n' };
+      if (args.includes('@{upstream}')) return { stdout: '' };
+      if (args[0] === 'remote') return { stdout: '' };
+      if (args[0] === 'status' && args.includes('--branch')) return { stdout: '## feature/demo\n' };
+      if (args[0] === 'status') return { stdout: '' };
+      if (args[0] === 'worktree') return { stdout: 'worktree /repo\nHEAD def\nbranch refs/heads/feature/demo\n' };
+      if (args[0] === 'branch' && args.includes('--format=%(refname:short)')) return { stdout: 'feature/demo\nmain\n' };
+      return { stdout: '' };
+    });
+    const service = new AgentGitService(() => new Date(), runGit);
 
+    await expect(service.merge('/repo', 'merge', false, false)).resolves.toStrictEqual({ targetFolder: '/repo' });
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge-base', '--is-ancestor', 'main', 'feature/demo']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['switch', 'main']);
+    expect(runGit).toHaveBeenCalledWith('/repo', ['merge', '--no-ff', 'feature/demo']);
+    const freshnessCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'merge-base');
+    const switchCall = runGit.mock.calls.findIndex(([, args]) => args[0] === 'switch');
+    expect(freshnessCall).toBeLessThan(switchCall);
+  });
 });

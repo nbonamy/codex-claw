@@ -167,7 +167,6 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
     additionalDeveloperInstructions: (agent) => [
       tasks.instructions(agent.id),
-      agent.folder && agent.workspace?.kind === 'git' ? agentGitService.guidance() : undefined,
       server?.missionDeveloperInstructions(agent.id),
       visualizeService.developerInstructions(),
     ].filter(Boolean).join('\n\n') || undefined,

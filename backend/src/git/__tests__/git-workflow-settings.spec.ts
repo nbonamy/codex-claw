@@ -10,14 +10,14 @@ import { AgentGitService } from '../agent-git-service';
 import { AppBackendServer } from '../../server';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../../state-persistence';
 
-it('persists global preferences through the app boundary, applies them, and retains failed integration work', async () => {
+it('persists global strategies and applies changed settings to the existing update action', async () => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'git-preferences-boundary-')));
   const exec = promisify(execFile);
   const git = (cwd: string, args: string[]) => exec('git', args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
   let server: AppBackendServer | undefined;
   try {
     const repo = join(root, 'repo');
-    await git(root, ['init', '-b', 'release', repo]);
+    await git(root, ['init', '-b', 'main', repo]);
     await git(repo, ['config', 'user.name', 'Test']); await git(repo, ['config', 'user.email', 'test@example.invalid']);
     await git(repo, ['commit', '--allow-empty', '-m', 'base']);
     const feature = join(root, 'feature');
@@ -30,25 +30,20 @@ it('persists global preferences through the app boundary, applies them, and reta
     server = new AppBackendServer({ version: 'test', snapshot, agentGitService: service, saveSnapshot, workIntegrations: { githubConnected: async () => false } as never });
     const request = (method: string, input?: unknown) => server!.handleMessage({ jsonrpc: '2.0', id: method, method, params: { agentId: agent.id, ...(input === undefined ? {} : { input }) } });
     await server.handleMessage({ jsonrpc: '2.0', id: 'settings', method: backendMethods.settingsUpdate, params: { input: { general: { git: { pull: 'rebase', update: 'rebase' } } } } });
-    expect(await request(backendMethods.agentGitWorkflowGet)).toMatchObject({ result: { baseBranch: 'release', preferences: { pull: 'rebase', update: 'rebase' } } });
     expect(saveSnapshot).toHaveBeenCalled();
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
     expect(restored.general.git).toStrictEqual(snapshot.general.git);
-    expect(await service.guidance()).toContain('Pull: rebase; Update from base: rebase.');
-    expect(await service.guidance()).toContain('grant no authority');
     await writeFile(join(repo, 'base.txt'), 'base'); await git(repo, ['add', 'base.txt']); await git(repo, ['commit', '-m', 'base']);
     await writeFile(join(feature, 'work.txt'), 'work'); await git(feature, ['add', '.']); await git(feature, ['commit', '-m', 'work']);
     const head = (await git(repo, ['rev-parse', 'HEAD'])).stdout;
-    await expect(request(backendMethods.agentGitMerge, { strategy: 'ff-only', confirmed: true, deleteWorktree: true, deleteBranch: true, pushAfter: true })).rejects.toThrow('not up to date');
+    await server.handleMessage({ jsonrpc: '2.0', id: 'ff', method: backendMethods.settingsUpdate, params: { input: { general: { git: { update: 'ff-only' } } } } });
+    const before = (await git(feature, ['rev-parse', 'HEAD'])).stdout;
+    await expect(request(backendMethods.agentGitUpdateFromBase, { confirmed: true })).rejects.toThrow();
+    expect((await git(feature, ['rev-parse', 'HEAD'])).stdout).toBe(before);
+    await server.handleMessage({ jsonrpc: '2.0', id: 'rebase', method: backendMethods.settingsUpdate, params: { input: { general: { git: { update: 'rebase' } } } } });
+    expect(await request(backendMethods.agentGitUpdateFromBase, { confirmed: true })).toMatchObject({ result: { conflicts: [], workflow: { branch: 'work' } } });
+    expect((await git(feature, ['rev-parse', 'HEAD^'])).stdout).toBe(head);
     expect((await git(repo, ['rev-parse', 'HEAD'])).stdout).toBe(head);
     expect((await git(repo, ['worktree', 'list', '--porcelain'])).stdout).toContain(feature);
-    expect(await request(backendMethods.agentGitUpdateFromBase, { confirmed: true, expectedBranch: 'work', expectedTarget: 'release' })).toMatchObject({ result: { conflicts: [], workflow: { branch: 'work' } } });
-    expect((await git(feature, ['rev-parse', 'HEAD^'])).stdout).toBe(head);
-    const other = { ...agent, id: 'other', status: { type: 'working' as const } };
-    snapshot.agents.push(other);
-    await expect(request(backendMethods.agentGitMerge, { confirmed: true, deleteWorktree: false, deleteBranch: false })).rejects.toThrow('Another agent');
-    snapshot.agents.pop();
-    await expect(request(backendMethods.agentGitPull, { confirmed: true, strategy: 'unknown' })).rejects.toThrow('supported Git strategy');
-    await expect(request(backendMethods.agentGitRebaseRecover, { confirmed: false, action: 'abort' })).rejects.toThrow('confirmation');
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }
 });

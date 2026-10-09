@@ -4,12 +4,6 @@
     class="git-workflow-control agent-header__git-actions"
     :class="{ 'git-workflow-control--delivery': presentation === 'delivery' }"
   >
-    <div v-if="workflow?.rebase" role="status">
-      <span>{{ $t('gitWorkflow.rebaseInProgress', { branch: workflow.rebase.branch }) }}</span>
-      <button class="app-button app-button--secondary" type="button" :disabled="busy" @click="recoverRebase('continue')">{{ $t('gitWorkflow.continue') }}</button>
-      <button class="app-button app-button--tertiary" type="button" :disabled="busy" @click="recoverRebase('abort')">{{ $t('gitWorkflow.abort') }}</button>
-      <p v-if="workflowError" role="alert">{{ workflowError }}</p>
-    </div>
     <template v-if="presentation === 'delivery'">
       <button
         v-if="updateEnabled"
@@ -603,7 +597,7 @@ const updateFeedbackStatus = computed<'running' | 'success' | 'warning' | 'error
     : updateOperation.value.status === 'error'
       ? 'error'
       : 'running');
-const updateOperationTitle = computed(() => workflow.value?.rebase ? translate('gitWorkflow.rebaseInProgress', { branch: workflow.value.rebase.branch }) : updateOperation.value.status === 'updating'
+const updateOperationTitle = computed(() => updateOperation.value.status === 'updating'
   ? translate('surface.gitWorkflowControl.updatingFromBranch', { branch: updateBranch.value })
   : updateOperation.value.status === 'success'
     ? translate('surface.gitWorkflowControl.branchUpdated')
@@ -612,7 +606,7 @@ const updateOperationTitle = computed(() => workflow.value?.rebase ? translate('
       : updateOperation.value.status === 'error'
         ? translate('surface.gitWorkflowControl.branchUpdateFailed')
         : '');
-const updateOperationDetail = computed(() => workflow.value?.rebase ? workflow.value.rebase.conflicts.join(', ') : updateOperation.value.status === 'conflicts'
+const updateOperationDetail = computed(() => updateOperation.value.status === 'conflicts'
   ? translate(
       updateOperation.value.count === 1
         ? 'surface.gitWorkflowControl.agentAskedToResolveOneConflict'
@@ -628,12 +622,12 @@ const commitEnabled = computed(() => workflow.value === null
   : Boolean(workflow.value.files.length));
 const pushEnabled = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && (workflow.value?.ahead ?? props.gitStatus?.ahead ?? 0) > 0));
 const pushCapable = computed(() => Boolean(workflow.value?.branch && workflow.value?.remote && props.pushBranch));
-const currentBranchAvailable = computed(() => Boolean(workflow.value?.branch && !workflow.value?.detached && !workflow.value?.rebase));
+const currentBranchAvailable = computed(() => Boolean(workflow.value?.branch && !workflow.value?.detached));
 const integrationBranch = computed(() => ['main', 'master', 'develop', 'development', 'trunk'].includes(workflow.value?.branch ?? ''));
-const mergeEnabled = computed(() => currentBranchAvailable.value && (workflow.value?.baseBranch ? workflow.value.baseBranch !== workflow.value.branch : !integrationBranch.value));
+const mergeEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
 const canMerge = computed(() => mergeStrategy.value === 'merge' || Boolean(squashCommitMessage.value.trim()));
 const prEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
-const updateEnabled = computed(() => Boolean(props.updateFromBase && workflow.value?.baseBranch && workflow.value.baseBranch !== workflow.value.branch && currentBranchAvailable.value));
+const updateEnabled = computed(() => Boolean(props.updateFromBase && workflow.value?.isLinkedWorktree && workflow.value.baseBranch && currentBranchAvailable.value));
 const pullEnabled = computed(() => Boolean(props.pullBranch && workflow.value?.upstream && currentBranchAvailable.value));
 const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
@@ -1005,9 +999,6 @@ async function merge(pushAfter: boolean): Promise<void> {
   clearMergeSuccessTimer();
   const agentId = props.agent.id;
   const branch = workflow.value?.branch ?? 'branch';
-  const expectedTarget = workflow.value?.baseBranch;
-  const expectedHead = workflow.value?.headSha;
-  const expectedTargetHead = workflow.value?.baseHeadSha;
   const closeAgentAfterPush = pushAfter && deleteWorktree.value;
   busy.value = true;
   workflowError.value = null;
@@ -1018,14 +1009,10 @@ async function merge(pushAfter: boolean): Promise<void> {
   let mergeCreated = false;
   let cleanupWarning: MergeCleanupWarning | undefined;
   try {
-    if (!await refreshMergeWorkflow()) return;
-    if (workflow.value?.branch !== branch || workflow.value?.baseBranch !== expectedTarget) throw new Error('The source or target branch changed. Review the operation again.');
-    if (!prepareMerge()) return;
+    if (!await refreshMergeWorkflow() || !prepareMerge()) return;
     mergeOperation.value = { status: 'merging', branch, pushAfter, closeAgentAfterPush };
     const mergeResult = await props.mergeBranch!(agentId, {
       strategy: mergeStrategy.value,
-      expectedBranch: branch, expectedTarget,
-      ...(expectedHead ? { expectedHead } : {}), ...(expectedTargetHead ? { expectedTargetHead } : {}),
       ...(mergeStrategy.value === 'squash' ? { commitMessage: squashCommitMessage.value.trim() } : {}),
       deleteBranch: deleteBranch.value,
       deleteWorktree: deleteWorktree.value,
@@ -1033,7 +1020,6 @@ async function merge(pushAfter: boolean): Promise<void> {
       ...(props.reportBackAgentName ? { reportBack: reportBack.value } : {}),
       confirmed: true,
     });
-    if (mergeResult.rebase) throw new Error('Continue or abort the rebase before integrating.');
     cleanupWarning = mergeResult.warning;
     if (props.agent.id === agentId) workflow.value = mergeResult;
     mergeCreated = true;
@@ -1051,7 +1037,6 @@ async function merge(pushAfter: boolean): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
-    void loadWorkflow({ closeMenu: false });
     mergeOperation.value = { status: 'error', branch, mergeCreated, pushAfter, closeAgentAfterPush, message, ...(cleanupWarning ? { cleanupWarning } : {}) };
     if (mergeBackgrounded.value) {
       ElMessage.error(`${mergeOperationTitle.value}: ${message}`);
@@ -1060,13 +1045,6 @@ async function merge(pushAfter: boolean): Promise<void> {
   } finally {
     busy.value = false;
   }
-}
-async function recoverRebase(action: 'continue' | 'abort'): Promise<void> {
-  if (!appApi || busy.value) return;
-  busy.value = true; workflowError.value = null;
-  try { workflow.value = await appApi.recoverAgentGitRebase(props.agent.id, { action, confirmed: true }); }
-  catch (error) { workflowError.value = String(error); }
-  finally { busy.value = false; }
 }
 async function updateFromBase(allowDirty: boolean): Promise<void> {
   const update = updateSource.value === 'upstream' ? props.pullBranch : props.updateFromBase;
@@ -1077,14 +1055,11 @@ async function updateFromBase(allowDirty: boolean): Promise<void> {
   updateOperation.value = { status: 'updating' };
   try {
     const result = await update(props.agent.id, {
-      expectedBranch: workflow.value?.branch, expectedTarget: updateBranch.value,
-      ...(workflow.value?.headSha ? { expectedHead: workflow.value.headSha } : {}),
-      ...((updateSource.value === 'upstream' ? workflow.value?.upstreamHeadSha : workflow.value?.baseHeadSha) ? { expectedTargetHead: updateSource.value === 'upstream' ? workflow.value?.upstreamHeadSha : workflow.value?.baseHeadSha } : {}),
       confirmed: true,
       ...(allowDirty ? { allowDirty: true } : {}),
     });
     workflow.value = result.workflow;
-    if (result.conflicts.length > 0 || result.workflow.rebase) {
+    if (result.conflicts.length > 0) {
       updateOperation.value = { status: 'conflicts', count: result.conflicts.length };
     } else {
       updateOperation.value = { status: 'success' };

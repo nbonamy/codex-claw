@@ -13,24 +13,6 @@ import {
 } from './server-test-fixtures';
 
 describe('AppBackendServer', () => {
-  it.each([
-    ['agent/git/rebase/recover', { action: 'abort', confirmed: true }],
-  ])('routes %s to the owning daemon without local repository access', async (method, input) => {
-    const snapshot = createTestSnapshot();
-    const connection = readyRemoteConnection();
-    snapshot.remoteConnections.connections = [connection];
-    snapshot.teams = [{ id: 'team-pointer', name: 'Remote', remoteConnectionId: connection.id, remoteTeamId: 'team-remote', agentIds: [] }];
-    const remoteSnapshot = createRemoteTeamSnapshot([createRemoteAgent()]);
-    const result = { repository: 'remote/repo', branch: 'work', preferences: { pull: 'rebase', update: 'merge' } };
-    const remoteClients = { request: vi.fn().mockResolvedValueOnce({ snapshot: remoteSnapshot, lastEventSeq: 0, clientState: { sourceFolderPath: '', shouldPreventDisplaySleep: false } }).mockResolvedValue(result), close: vi.fn() };
-    const localPreferences = vi.fn();
-    const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never, agentGitService: { preferences: localPreferences } as never });
-    try {
-      expect(await server.handleMessage({ jsonrpc: '2.0', id: 1, method: method as string, params: { agentId: 'agent-remote', input } })).toMatchObject({ result });
-      expect(remoteClients.request).toHaveBeenLastCalledWith(connection, method, { agentId: 'agent-remote', input, _clientId: 'remote-controller' }, expect.any(Function));
-      expect(localPreferences).not.toHaveBeenCalled();
-    } finally { await server.close(); }
-  });
 
   it('rechecks provider installation on the owning remote host without running a local installer', async () => {
     const snapshot = createTestSnapshot();

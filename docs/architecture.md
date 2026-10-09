@@ -230,17 +230,6 @@ clears or changes it, Korus never re-detects.
   polls only those PRs. A merged or closed PR raises an explicit cleanup alert;
   cleanup is accepted only for an idle agent whose unshared, clean linked worktree
   still points at the recorded PR head (a closed PR keeps its remote branch).
-- Git workflow settings provide global Pull and Update from base defaults. An
-  operation can override its default without saving it. Integration strategy is
-  chosen in the merge dialog. Only the Git-configuration Pull choice reads effective
-  Git configuration on the owning machine; preferences never edit it.
-- Git mutations validate the displayed source and target, serialize per repository,
-  and reject active shared worktrees. Rebase recovery reads Git's native operation
-  files across restarts. Continue completes the rebase only; integrating afterward
-  is a separate confirmation. Failed integration cannot reach cleanup or push.
-  Published-history rewrites require operation-specific consent; pushes retain
-  their own authority. Agent guidance conveys defaults without granting mutations
-  or claiming to constrain independent CLI commands.
 
 ## Durable Delegated Tasks
 

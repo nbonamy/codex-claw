@@ -83,14 +83,7 @@ export type AgentPullRequestTracking = AgentGitPullRequest & {
   updatedAt: string;
 };
 
-export type GitRebaseState = { branch: string; onto: string; conflicts: string[] };
-export type GitOperationChoice = { rewritePublished?: boolean; expectedBranch?: string; expectedTarget?: string; expectedHead?: string; expectedTargetHead?: string };
 export type AgentGitWorkflow = {
-  headSha?: string;
-  baseHeadSha?: string;
-  upstreamHeadSha?: string;
-  preferences?: import('../git-preferences').GitWorkflowPreferences;
-  rebase?: GitRebaseState;
   repository: string;
   folder: string;
   isLinkedWorktree: boolean;
@@ -138,11 +131,11 @@ export type AgentCloseInput = { deleteWorktree: boolean; deleteRemoteBranch?: bo
 
 export type AgentGitPullRequestInput = { title: string; body: string; reportBack?: boolean; confirmed: boolean };
 
-export type AgentGitMergeInput = GitOperationChoice & { strategy?: import('../git-preferences').GitIntegrationStrategy; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; pushAfter?: boolean; reportBack?: boolean; confirmed: boolean };
+export type AgentGitMergeInput = { strategy: 'merge' | 'squash'; commitMessage?: string; deleteBranch: boolean; deleteWorktree: boolean; pushAfter?: boolean; reportBack?: boolean; confirmed: boolean };
 
-export type AgentGitUpdateFromBaseInput = GitOperationChoice & { strategy?: import('../git-preferences').GitUpdateStrategy; confirmed: boolean; allowDirty?: boolean };
+export type AgentGitUpdateFromBaseInput = { confirmed: boolean; allowDirty?: boolean };
 
-export type AgentGitPullInput = GitOperationChoice & { strategy?: import('../git-preferences').GitPullStrategy; confirmed: boolean; allowDirty?: boolean };
+export type AgentGitPullInput = { confirmed: boolean; allowDirty?: boolean };
 export type AgentGitRevertInput = { confirmed: boolean; includeUntracked: boolean };
 export type AgentGitPullResult = {
   workflow: AgentGitWorkflow;

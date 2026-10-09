@@ -137,7 +137,6 @@ export type AppBackendRequestMap = {
     params: { agentId: string; target?: AgentGitDiffTarget };
     result: import('../contracts').AgentGitDiff;
   };
-  [backendMethods.agentGitRebaseRecover]: { params: { agentId: string; input: { action: 'continue' | 'abort'; confirmed: boolean } }; result: AgentGitWorkflow };
   [backendMethods.agentGitWorkflowGet]: {
     params: { agentId: string };
     result: AgentGitWorkflow;

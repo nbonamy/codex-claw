@@ -1,9 +1,7 @@
 export const pullStrategies = ['git-config', 'merge', 'rebase', 'ff-only'] as const;
-export const updateStrategies = ['merge', 'rebase'] as const;
-export const integrationStrategies = ['merge', 'squash', 'rebase-ff', 'ff-only'] as const;
+export const updateStrategies = ['merge', 'rebase', 'ff-only'] as const;
 export type GitPullStrategy = typeof pullStrategies[number];
 export type GitUpdateStrategy = typeof updateStrategies[number];
-export type GitIntegrationStrategy = typeof integrationStrategies[number];
 export type GitWorkflowPreferences = {
   pull: GitPullStrategy;
   update: GitUpdateStrategy;

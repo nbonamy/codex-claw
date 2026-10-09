@@ -379,12 +379,12 @@ describe('daemon runtime', () => {
 
     const driverOptions = mocks.createDefaultBackendDrivers.mock.calls[0]?.[0] as {
       hostedMcpServerUrls(): Record<string, string>;
-      additionalDeveloperInstructions(agent: { id: string }): Promise<string | undefined>;
+      additionalDeveloperInstructions(agent: { id: string }): string | undefined;
     };
     expect(driverOptions.hostedMcpServerUrls()).toStrictEqual({
       github: 'http://127.0.0.1:4242/mcp/providers/github',
     });
-    const instructions = await driverOptions.additionalDeveloperInstructions(mocks.snapshot.agents[0]!);
+    const instructions = driverOptions.additionalDeveloperInstructions(mocks.snapshot.agents[0]!);
     expect(instructions?.startsWith('<context>\nMission contract\n</context>\n\n')).toBe(true);
     expect(instructions).toContain('read-skill with name="korus-visualize"');
     expect(mocks.missionDeveloperInstructions).toHaveBeenCalledWith('agent-dina');

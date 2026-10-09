@@ -23,8 +23,8 @@ it('automatically saves each global strategy without overwriting the other setti
   await choose(wrapper, 'Pull strategy', 'Rebase');
   expect(updateSettings).toHaveBeenNthCalledWith(1, { general: { git: { pull: 'rebase' } } });
   await wrapper.setProps({ settings: { ...defaultGeneralSettings, git: { pull: 'rebase', update: 'merge' } } });
-  await choose(wrapper, 'Update from base', 'Rebase');
-  expect(updateSettings).toHaveBeenNthCalledWith(2, { general: { git: { update: 'rebase' } } });
+  await choose(wrapper, 'Update from base', 'Fast-forward only');
+  expect(updateSettings).toHaveBeenNthCalledWith(2, { general: { git: { update: 'ff-only' } } });
   expect(updateSettings).toHaveBeenCalledTimes(2);
   wrapper.unmount();
 });

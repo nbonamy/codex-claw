@@ -16,8 +16,6 @@ import type {
 } from '@workspace/core/contracts';
 import type { DelegatedWorkReportPort } from '../agents/delegated-work-report-service';
 import type { AgentGitService } from './agent-git-service';
-import { pullStrategies, updateStrategies, integrationStrategies } from '@workspace/core/git-preferences';
-import { resolve } from 'node:path';
 
 export type AgentGitRequest = {
   method: AgentGitBackendMethod;
@@ -48,30 +46,11 @@ export type AgentGitWorkflowServiceOptions = {
 
 /** Owns the complete local workflow for app-level agent Git requests. */
 export class AgentGitWorkflowService {
-  private readonly busyRepositories = new Set<string>();
   constructor(private readonly options: AgentGitWorkflowServiceOptions) {}
 
   async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult | AgentGitPullResult> {
-    const reads: AgentGitBackendMethod[] = [backendMethods.agentGitWorkflowGet, backendMethods.agentGitDiffGet, backendMethods.agentGitMessageGenerate];
-    if (reads.includes(request.method)) return this.executeRequest(request, agent);
-    const folder = requireAgentFolder(agent);
-    if (this.options.getSnapshot().agents.some(other => other.id !== agent.id && other.folder && resolve(other.folder) === resolve(folder) && (other.status.type === 'working' || other.status.type === 'awaitingInput'))) throw new Error('Another agent is using this worktree. Wait for it to finish before changing Git state.');
-    const key = await this.options.git.repositoryKey?.(folder) ?? folder;
-    if (this.busyRepositories.has(key)) throw new Error('Another Git operation is running in this repository.');
-    this.busyRepositories.add(key);
-    try { return await this.executeRequest(request, agent); }
-    finally { this.busyRepositories.delete(key); }
-  }
-
-  private async executeRequest(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult | AgentGitPullResult> {
     const { method, agentId, params } = request;
     switch (method) {
-      case backendMethods.agentGitRebaseRecover: {
-        const input = requireConfirmed(params.input, 'Recovering a rebase');
-        if (input.action !== 'continue' && input.action !== 'abort') throw new Error('Choose Continue or Abort.');
-        await this.options.git.recoverRebase(requireAgentFolder(agent), input.action);
-        return this.workflow(agent, { refreshStatus: true });
-      }
       case backendMethods.agentGitDiffGet:
         return this.getDiff(agent, parseGitDiffTarget(params.target));
       case backendMethods.agentGitWorkflowGet:
@@ -111,7 +90,7 @@ export class AgentGitWorkflowService {
           throw new Error('Closing an agent after pushing is only available for a completed merge.');
         }
         const currentWorkflow = await this.options.git.workflow(folder);
-        const pushFolder = input.target === 'mergeTarget' && currentWorkflow.branch !== currentWorkflow.baseBranch
+        const pushFolder = input.target === 'mergeTarget' && !isIntegrationBranchName(currentWorkflow.branch)
           ? await this.options.git.mergeTarget(folder)
           : folder;
         const workflow = pushFolder === folder ? currentWorkflow : await this.options.git.workflow(pushFolder);
@@ -153,12 +132,11 @@ export class AgentGitWorkflowService {
         return this.updateFromBase(agent, agentId, params);
       case backendMethods.agentGitPull: {
         const input = requireConfirmed(params.input, 'Pulling a branch');
-        const result = await this.options.git.pull(requireAgentFolder(agent), input.allowDirty === true, operationChoice(input, pullStrategies));
-        const workflow = await this.workflow(agent, { refreshStatus: true });
-        if (result.conflicts.length > 0 && !workflow.rebase) {
+        const result = await this.options.git.pull(requireAgentFolder(agent), input.allowDirty === true);
+        if (result.conflicts.length > 0) {
           this.options.sendPrompt(agentId, conflictResolutionPrompt({ ...result, baseBranch: result.upstream }));
         }
-        return { ...result, workflow };
+        return { ...result, workflow: await this.workflow(agent, { refreshStatus: true }) };
       }
     }
   }
@@ -197,7 +175,6 @@ export class AgentGitWorkflowService {
     }
     return {
       ...workflow,
-      ...(this.options.git.preferences ? { preferences: this.options.git.preferences() } : {}),
       githubConnected,
       ...(existingPullRequest ? { existingPullRequest } : {}),
       ...(githubError ? { githubError } : {}),
@@ -294,8 +271,7 @@ export class AgentGitWorkflowService {
   private async merge(agent: Agent, agentId: string, params: Record<string, unknown>): Promise<AgentGitWorkflow> {
     const folder = requireAgentFolder(agent);
     const input = requireConfirmed(params.input, 'Merging a branch');
-    const choice = operationChoice(input, integrationStrategies);
-    const strategy = choice.strategy ?? 'merge';
+    const strategy = input.strategy === 'squash' ? 'squash' : 'merge';
     const commitMessage = strategy === 'squash' ? requireString(input.commitMessage, 'commitMessage') : undefined;
     const deleteWorktree = input.deleteWorktree === true;
     const sourceWorkflow = input.reportBack === true ? await this.workflow(agent) : null;
@@ -308,9 +284,7 @@ export class AgentGitWorkflowService {
       })
       : null;
     if (input.reportBack === true) this.emitOperationProgress(agentId, 'merge', 'delivery');
-    const targetFolderBefore = await this.options.git.mergeTarget(folder).catch(() => folder);
-    if (this.options.getSnapshot().agents.some(other => other.id !== agentId && other.folder && resolve(other.folder) === resolve(targetFolderBefore) && (other.status.type === 'working' || other.status.type === 'awaitingInput'))) throw new Error('Another agent is using the base worktree.');
-    const mergeResult = await this.options.git.merge(folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage, choice);
+    const mergeResult = await this.options.git.merge(folder, strategy, input.deleteBranch === true, deleteWorktree, commitMessage);
     const targetFolder = mergeResult.targetFolder;
     const outcome = {
       kind: 'merge' as const,
@@ -338,14 +312,13 @@ export class AgentGitWorkflowService {
 
   private async updateFromBase(agent: Agent, agentId: string, params: Record<string, unknown>): Promise<AgentGitUpdateFromBaseResult> {
     const input = requireConfirmed(params.input, 'Updating a branch from its base branch');
-    const result = await this.options.git.updateFromBase(requireAgentFolder(agent), input.allowDirty === true, operationChoice(input, updateStrategies));
-    const workflow = await this.workflow(agent, { refreshStatus: true });
-    if (result.conflicts.length > 0 && !workflow.rebase) {
+    const result = await this.options.git.updateFromBase(requireAgentFolder(agent), input.allowDirty === true);
+    if (result.conflicts.length > 0) {
       this.options.sendPrompt(agentId, conflictResolutionPrompt(result));
     }
     return {
       ...result,
-      workflow,
+      workflow: await this.workflow(agent, { refreshStatus: true }),
     };
   }
 
@@ -362,26 +335,14 @@ export class AgentGitWorkflowService {
   }
 }
 
-function operationChoice<T extends string>(input: Record<string, unknown>, choices: readonly T[]) {
-  if (input.strategy !== undefined && !choices.includes(input.strategy as T)) throw new Error('Choose a supported Git strategy.');
-  return {
-    ...(input.strategy === undefined ? {} : { strategy: input.strategy as T }),
-    ...(input.expectedBranch === undefined ? {} : { expectedBranch: requireString(input.expectedBranch, 'expectedBranch') }),
-    ...(input.expectedTarget === undefined ? {} : { expectedTarget: requireString(input.expectedTarget, 'expectedTarget') }),
-    ...(input.expectedHead === undefined ? {} : { expectedHead: requireString(input.expectedHead, 'expectedHead') }),
-    ...(input.expectedTargetHead === undefined ? {} : { expectedTargetHead: requireString(input.expectedTargetHead, 'expectedTargetHead') }),
-    ...(input.rewritePublished === true ? { rewritePublished: true } : {}),
-  };
-}
-
 function conflictResolutionPrompt(result: { baseBranch: string; branch: string; conflicts: string[] }): string {
   return [
-    `Git merged \`${result.baseBranch}\` into \`${result.branch}\`, but conflicts need to be resolved.`,
+    `Git encountered conflicts while updating \`${result.branch}\` from \`${result.baseBranch}\`.`,
     '',
     'Conflicted files:',
     ...result.conflicts.map((path) => `- ${path}`),
     '',
-    'Resolve the merge conflicts, preserve the intended changes from both branches, run the relevant tests, and commit the merge when ready.',
+    'Resolve the conflicts and preserve the intended changes from both branches. Check git status: if a rebase is in progress, stage the resolved files and run git rebase --continue, repeating for further conflicts; otherwise commit the merge when ready. Run the relevant tests. If asked to abandon the update, abort the active rebase or merge. Do not push.',
   ].join('\n');
 }
 
