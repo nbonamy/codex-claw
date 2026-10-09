@@ -243,26 +243,29 @@ describe('controller desktop lifecycle', () => {
     }
   });
 
-  it('keeps engine simulation client-only, resets it on reload, and rejects it in packaged builds', () => {
+  it.each([
+    { get: 'getDebugMissingEngines', set: 'setDebugMissingEngines', type: 'debug-missing-engines' },
+    { get: 'getDebugProviderUpgrades', set: 'setDebugProviderUpgrades', type: 'debug-provider-upgrades' },
+  ] as const)('keeps $type client-only, resets it on reload, and rejects it in packaged builds', ({ get, set, type }) => {
     const { controller, window, backend } = setup();
     const packaged = app.isPackaged;
     Object.defineProperty(app, 'isPackaged', { value: false, configurable: true });
     try {
       controller.createWindow();
       const menu = native.createWindow.mock.calls[0]![0];
-      expect(menu.getDebugMissingEngines()).toBe(false);
-      menu.setDebugMissingEngines(true);
-      expect(window.webContents.send).toHaveBeenLastCalledWith(ipcChannels.appCommand, { type: 'debug-missing-engines', enabled: true });
-      expect(vi.mocked(installAppMenu).mock.lastCall![1].getDebugMissingEngines!()).toBe(true);
-      menu.setDebugMissingEngines(false);
-      expect(window.webContents.send).toHaveBeenLastCalledWith(ipcChannels.appCommand, { type: 'debug-missing-engines', enabled: false });
-      menu.setDebugMissingEngines(true);
+      expect(menu[get]()).toBe(false);
+      menu[set](true);
+      expect(window.webContents.send).toHaveBeenLastCalledWith(ipcChannels.appCommand, { type, enabled: true });
+      expect(vi.mocked(installAppMenu).mock.lastCall![1][get]!()).toBe(true);
+      menu[set](false);
+      expect(window.webContents.send).toHaveBeenLastCalledWith(ipcChannels.appCommand, { type, enabled: false });
+      menu[set](true);
       window.webContents.emit('did-start-loading');
-      expect(vi.mocked(installAppMenu).mock.lastCall![1].getDebugMissingEngines!()).toBe(false);
+      expect(vi.mocked(installAppMenu).mock.lastCall![1][get]!()).toBe(false);
       Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
       window.webContents.send.mockClear();
-      menu.setDebugMissingEngines(true);
-      expect(menu.getDebugMissingEngines()).toBe(false);
+      menu[set](true);
+      expect(menu[get]()).toBe(false);
       expect(window.webContents.send).not.toHaveBeenCalled();
       expect(backend.request).not.toHaveBeenCalled();
     } finally {

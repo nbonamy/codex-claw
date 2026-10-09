@@ -1,6 +1,10 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { isAppMcpServerName } from '@workspace/core/product';
 import type { RendererToolPart, RendererToolPartUpdate } from '@workspace/core/contracts';
+import { classifyShellCommand, type ClassifiedShellCommand } from './claude-command-classifier';
+import { claudeToolSemantics } from './claude-tool-semantics';
+import { claudeConfigDirectory } from './config-directory';
 import type { ClaudeSdkContentBlock } from './protocol';
 
 type ClaudeToolUseBlock = Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>;
@@ -13,6 +17,8 @@ export type ClaudeToolFileActivity = {
 
 export type ClaudeToolPartOptions = {
   cwd?: string;
+  /** Skill folders searched in order; defaults to the project's and the user's Claude skills. */
+  skillRoots?: string[];
   status?: ClaudeToolStatus;
 };
 
@@ -30,6 +36,9 @@ export function claudeToolPart(
 
   if (block.name === 'Bash') {
     const command = stringValue(input.command);
+    const cwd = options.cwd && input.cwd === undefined ? options.cwd : stringValue(input.cwd);
+    const classified = command ? classifyShellCommand(command) : null;
+    const presentation = command && classified ? shellCommandPresentation(command, classified, cwd) : null;
     return toolPart(block, {
       kind: 'command',
       title: command ?? 'Bash',
@@ -37,8 +46,9 @@ export function claudeToolPart(
       input: {
         ...input,
         ...(options.cwd && input.cwd === undefined ? { cwd: options.cwd } : {}),
+        ...(presentation ? { commandActions: presentation.commandActions } : {}),
       },
-      ...(command ? { statusText: toolStatus('run', status, { target: command }) } : {}),
+      ...(command ? { statusText: presentation ? toolStatus(presentation.action, status, presentation.params) : toolStatus('run', status, { target: command }) } : {}),
       metadata,
     });
   }
@@ -164,14 +174,27 @@ export function claudeToolPart(
     });
   }
 
-  if (block.name === 'Agent') {
-    const description = stringValue(input.description);
+  const semantics = claudeToolSemantics(block.name, input);
+  if (semantics) {
     return toolPart(block, {
       kind: 'generic',
-      title: description ?? 'Agent',
+      title: semantics.title ?? block.name,
       status,
       input,
-      ...(description ? { statusText: toolStatus('explore', status, { target: description }) } : {}),
+      statusText: toolStatus(semantics.action, status, { scope: semantics.scope, operation: semantics.operation, ...semantics.params }),
+      metadata,
+    });
+  }
+
+  const skill = block.name === 'Skill' ? stringValue(input.skill) : undefined;
+  if (skill) {
+    const skillPath = findSkillFile(skill, options);
+    return toolPart(block, {
+      kind: 'command',
+      title: 'Skill',
+      status,
+      input: { ...input, ...(skillPath ? { path: skillPath } : {}) },
+      statusText: toolStatus('read', status, { target: `${skillDisplayName(skill)} Skill` }),
       metadata,
     });
   }
@@ -204,6 +227,71 @@ export function claudeToolPart(
     input: block.input,
     metadata,
   });
+}
+
+const SMALL_WORDS = /^(?:a|an|and|at|by|for|in|of|on|or|the|to)$/iu;
+
+/** Matches the conversation UI's naming of a read SKILL.md, so the link and label agree. */
+function skillDisplayName(skill: string): string {
+  const name = skill.split(':').at(-1) ?? skill;
+  return name.split(/[-_\s]+/u).filter(Boolean).map((word, index) => (
+    index > 0 && SMALL_WORDS.test(word) ? word.toLowerCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`
+  )).join(' ');
+}
+
+function findSkillFile(skill: string, options: ClaudeToolPartOptions): string | undefined {
+  const name = skill.split(':').at(-1);
+  if (!name || name.includes('/') || name.includes('\\') || name === '..') return undefined;
+  const roots = options.skillRoots ?? [
+    ...(options.cwd ? [path.join(options.cwd, '.claude', 'skills')] : []),
+    path.join(claudeConfigDirectory(), 'skills'),
+  ];
+  return roots.map((root) => path.join(root, name, 'SKILL.md')).find((candidate) => existsSync(candidate));
+}
+
+type ShellCommandPresentation = {
+  action: 'list' | 'read' | 'search';
+  params: Record<string, unknown>;
+  commandActions: Record<string, unknown>[];
+};
+
+/** Mirrors the read/list/search actions and target summaries Codex reports for the same commands. */
+function shellCommandPresentation(command: string, classified: ClassifiedShellCommand, cwd?: string): ShellCommandPresentation {
+  const resolved = (file: string) => fullPath(file, cwd) ?? file;
+  if (classified.action === 'read') {
+    const names = unique(classified.files.map((file) => path.basename(file)));
+    return {
+      action: 'read',
+      params: { names, target: summarizeTargets(names, command) },
+      commandActions: classified.files.map((file) => ({ type: 'read', command, name: path.basename(file), path: resolved(file) })),
+    };
+  }
+  if (classified.action === 'list') {
+    return {
+      action: 'list',
+      params: { targets: classified.paths, target: summarizeTargets(classified.paths, command) },
+      commandActions: classified.paths.map((target) => ({ type: 'listFiles', command, path: resolved(target) })),
+    };
+  }
+  const targets = unique(classified.paths.length
+    ? classified.paths.map((target) => (classified.pattern ? `"${classified.pattern}" in ${target}` : target))
+    : classified.pattern ? [`"${classified.pattern}"`] : []);
+  return {
+    action: 'search',
+    params: { targets, target: summarizeTargets(targets, command) },
+    commandActions: classified.paths.length
+      ? classified.paths.map((target) => ({ type: 'search', command, query: classified.pattern, path: resolved(target) }))
+      : [{ type: 'search', command, query: classified.pattern }],
+  };
+}
+
+function summarizeTargets(targets: string[], fallback: string): string {
+  if (targets.length === 0) return fallback;
+  return targets.length <= 3 ? targets.join(', ') : `${targets.slice(0, 3).join(', ')} and ${targets.length - 3} more`;
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function statusInput(input: Record<string, unknown>): Record<string, unknown> {
@@ -357,7 +445,7 @@ function toolPart(
 }
 
 function toolStatus(
-  action: 'edit' | 'explore' | 'list' | 'read' | 'run' | 'search',
+  action: 'edit' | 'list' | 'plan' | 'read' | 'run' | 'search',
   phase: ClaudeToolStatus,
   params: Record<string, unknown>,
 ): string {

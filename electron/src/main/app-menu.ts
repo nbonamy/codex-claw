@@ -32,12 +32,14 @@ export type AppMenuCallbacks = {
   setDebugThreadFlag?: (id: ThreadFlagId, value: boolean) => void;
   getDebugMissingEngines?: () => boolean;
   setDebugMissingEngines?: (enabled: boolean) => void;
+  getDebugProviderUpgrades?: () => boolean;
+  setDebugProviderUpgrades?: (enabled: boolean) => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines' | 'getDebugProviderUpgrades' | 'setDebugProviderUpgrades'>>;
 const editMenuId = 'app-edit-menu';
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
@@ -61,6 +63,8 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     setDebugThreadFlag: options.setDebugThreadFlag,
     getDebugMissingEngines: options.getDebugMissingEngines,
     setDebugMissingEngines: options.setDebugMissingEngines,
+    getDebugProviderUpgrades: options.getDebugProviderUpgrades,
+    setDebugProviderUpgrades: options.setDebugProviderUpgrades,
   };
   const menu = Menu.buildFromTemplate(buildAppMenuTemplate(callbacks, menuOptions));
   appendDraftActionsToEditMenu(menu, callbacks);
@@ -152,6 +156,10 @@ function buildDebugMenu(callbacks: AppMenuCallbacks): MenuItemConstructorOptions
             click: (item) => callbacks.setDebugThreadFlag?.('ready_for_review', item.checked),
           },
         ],
+      },
+      {
+        label: 'Backends',
+        submenu: buildDebugBackends(callbacks),
       },
       {
         label: 'UI Previews',
@@ -251,7 +259,7 @@ function buildDebugAgentFixtures(callbacks: AppMenuCallbacks): MenuItemConstruct
   ];
 }
 
-function buildDebugUiPreviews(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+function buildDebugBackends(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
   return [
     {
       label: 'Simulate Missing Local Engines',
@@ -260,6 +268,18 @@ function buildDebugUiPreviews(callbacks: AppMenuCallbacks): MenuItemConstructorO
       enabled: Boolean(callbacks.setDebugMissingEngines),
       click: item => callbacks.setDebugMissingEngines?.(item.checked),
     },
+    {
+      label: 'Simulate Available Upgrades',
+      type: 'checkbox',
+      checked: callbacks.getDebugProviderUpgrades?.() ?? false,
+      enabled: Boolean(callbacks.setDebugProviderUpgrades),
+      click: item => callbacks.setDebugProviderUpgrades?.(item.checked),
+    },
+  ];
+}
+
+function buildDebugUiPreviews(callbacks: AppMenuCallbacks): MenuItemConstructorOptions[] {
+  return [
     {
       label: 'Markdown',
       click: () => callbacks.sendAppCommand({ type: 'debug-open-markdown' }),

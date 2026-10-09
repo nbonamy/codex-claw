@@ -3,6 +3,7 @@
     <template v-for="engine in engines" :key="engine.backend">
       <SettingsEngineConnectionRow compact :backend="engine.backend" :installed="engine.installed" :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @refresh="refreshProvider(engine.backend)" @connect="connect(engine)" @disconnect="disconnect(engine.backend)" />
       <RemoteCodexAuthentication v-if="signingIn === engine.backend && engine.backend === 'codex'" :connection="connection" @connected="finishConnection" />
+      <ProviderUpdateRow v-if="engine.installed" :backend="engine.backend" :remote-connection-id="connection.id" />
       <RemoteClaudeAuthentication v-if="signingIn === engine.backend && engine.backend === 'claude'" :connection="connection" @connected="finishConnection" />
     </template>
     <p v-if="error" role="alert">{{ error }}</p>
@@ -21,6 +22,7 @@ import { translate } from '../i18n';
 import RemoteCodexAuthentication from './RemoteCodexAuthentication.vue';
 import RemoteClaudeAuthentication from './RemoteClaudeAuthentication.vue';
 import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
+import ProviderUpdateRow from './ProviderUpdateRow.vue';
 
 const props = defineProps<{ connection: RemoteConnection }>();
 const engines = ref<ProviderConnection[]>([]);

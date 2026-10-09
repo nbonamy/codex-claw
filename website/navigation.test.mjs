@@ -16,6 +16,7 @@ test("navigation, films, and cards work at desktop and phone widths", async () =
     ".html": "text/html",
     ".mp4": "video/mp4",
     ".png": "image/png",
+    ".svg": "image/svg+xml",
     ".vtt": "text/vtt",
   };
   const server = createServer(async (request, response) => {

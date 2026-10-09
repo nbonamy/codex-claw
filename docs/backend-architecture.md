@@ -23,6 +23,15 @@ log and socket paths, npm scripts and launchd labels stay brand-neutral.
   Authentication enters through the optional `AgentBackendDriver.authenticate`
   capability; the server caches the app-owned result and never interprets
   credentials or probes provider CLIs itself.
+- Provider updates are backend-owned, per installation and host. Version checks
+  never install software; explicit consent is tied to a checked installation and
+  target version. Waiting upgrades are process-local and cancellable. The runtime
+  scheduler starts them only when the provider is idle; admission is blocked while
+  its processes are stopped, updated and replaced. Conversation identities remain
+  intact. The original installation method/channel is preserved; unknown or
+  unsupported installations use official instructions. No provider is installed
+  automatically and no app restart is scheduled. Preferences and queued upgrades
+  must not be mistaken for permission to interrupt running work.
 - Domain modules never self-register global timers. A runtime scheduler runs
   registered tasks (automation scans, PR monitoring) without overlap.
 - Queued prompt delivery removes an item only after backend acceptance; transport

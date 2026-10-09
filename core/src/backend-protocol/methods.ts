@@ -109,6 +109,8 @@ export const backendMethods = {
   connectionsUpdate: 'connections/update',
   codexAuthenticationGet: 'codex/authentication/get',
   claudeAuthenticationGet: 'claude/authentication/get',
+  providerUpdateGet: 'provider/update/get',
+  providerUpdateSet: 'provider/update/set',
   providerSetupGet: 'provider/setup/get',
   providerConnectionsGet: 'provider/connections/get',
   providerUsageGet: 'provider/usage/get',

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
+import type { Agent, AppSnapshot } from '@workspace/core/contracts';
+import { ProviderUpdateRuntime } from '../provider-update-runtime';
+import type { ProviderUpdates } from '../provider-updates';
+import { createTestSnapshot } from './server-test-fixtures';
 
 const mocks = vi.hoisted(() => ({
   snapshot: {
@@ -56,6 +60,8 @@ const mocks = vi.hoisted(() => ({
   serverClose: vi.fn(),
   missionDeveloperInstructions: vi.fn(),
   createDefaultBackendDrivers: vi.fn(),
+  createBackendDriver: vi.fn(),
+  useRealDriverRpc: false,
   runtimeGitHubOAuthClientId: vi.fn(),
   warnMain: vi.fn(),
 }));
@@ -78,7 +84,7 @@ vi.mock('../state', () => ({
   backendProviderTokensFilePath: mocks.backendProviderTokensFilePath,
 }));
 
-vi.mock('../provider-setup', () => ({ ProviderSetup: class { initialize = mocks.initializeProviderSetup; } }));
+vi.mock('../provider-setup', () => ({ ProviderSetup: class { initialize = mocks.initializeProviderSetup; isChanging = () => false; } }));
 
 vi.mock('../plugin-status', () => ({
   loadPluginStatus: mocks.loadPluginStatus,
@@ -98,12 +104,18 @@ vi.mock('../mcp/service', () => ({
   },
 }));
 
-vi.mock('../driver-rpc', () => ({
-  BackendDriverRpc: class {
-    constructor(readonly drivers: unknown) {}
-  },
-  createDefaultBackendDrivers: mocks.createDefaultBackendDrivers,
-}));
+vi.mock('../driver-rpc', async importOriginal => {
+  const actual = await importOriginal<typeof import('../driver-rpc')>();
+  return {
+    BackendDriverRpc: class {
+      constructor(...args: ConstructorParameters<typeof actual.BackendDriverRpc>) {
+        if (mocks.useRealDriverRpc) return new actual.BackendDriverRpc(...args);
+      }
+    },
+    createDefaultBackendDrivers: mocks.createDefaultBackendDrivers,
+    createBackendDriver: mocks.createBackendDriver,
+  };
+});
 
 vi.mock('../work-integrations/manager', () => ({
   WorkIntegrationManager: class {
@@ -248,6 +260,7 @@ describe('daemon runtime', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.useRealDriverRpc = false;
     mocks.mcpOptions.length = 0;
     mocks.serverOptions.length = 0;
     mocks.automationRunnerOptions.length = 0;
@@ -281,6 +294,44 @@ describe('daemon runtime', () => {
     driver.generateText.mockResolvedValue({ text: '{"workItemIds":["github:nbonamy/agent-workspace#12"]}' });
   });
 
+  it('waits for local work, replaces only the upgraded provider and reloads the same conversation', async () => {
+    const snapshot: AppSnapshot = createTestSnapshot();
+    const agent: Agent = { ...mocks.snapshot.agents[0]!, backend: 'codex', backendDefaults: { kind: 'codex' }, status: { type: 'working' }, backendSession: { kind: 'codex', threadId: 'existing-thread' } };
+    snapshot.agents = [agent];
+    const events: string[] = [];
+    const driver = {
+      backend: 'codex', onEvent: () => () => {},
+      assertHandoffReady: vi.fn(async () => { events.push('ready'); }),
+      close: vi.fn(async () => { events.push('closed'); }),
+    };
+    const replacement = { backend: 'codex', onEvent: () => () => {}, loadConversation: vi.fn(async () => { events.push('restored'); }) };
+    const claude = { backend: 'claude', onEvent: () => () => {}, close: vi.fn() };
+    const installation = { executable: '/test/codex', version: '1.0.0', latestVersion: '1.1.0', method: 'native' as const, identity: 'original', command: { file: '/test/codex', args: ['update'] } };
+    const inspect = vi.spyOn(ProviderUpdateRuntime.prototype, 'inspect').mockImplementation(async () => installation);
+    const upgrade = vi.spyOn(ProviderUpdateRuntime.prototype, 'upgrade').mockImplementation(async () => { events.push('upgraded'); installation.version = '1.1.0'; });
+    mocks.loadBackendSnapshot.mockResolvedValue(snapshot);
+    mocks.useRealDriverRpc = true;
+    mocks.drivers.set('codex', driver);
+    mocks.drivers.set('claude', claude);
+    mocks.createBackendDriver.mockReturnValue(replacement);
+    let updates: ProviderUpdates | undefined;
+    try {
+      await createDaemonRuntime({ emitEvent, requestClient, version: 'test' });
+      updates = (mocks.serverOptions[0] as { providerUpdates: ProviderUpdates }).providerUpdates;
+      const checked = await updates.get('codex');
+      expect(updates.request('codex', { action: 'upgrade', confirmed: true, token: checked.token })).toMatchObject({ status: 'waiting' });
+      expect(driver.close).not.toHaveBeenCalled();
+      agent.status = { type: 'idle' };
+      const task = (mocks.schedulerTasks as SchedulerTask[]).find(task => task.id === 'provider-updates')!;
+      await task.run();
+      expect(events).toEqual(['ready', 'closed', 'upgraded', 'restored']);
+      expect(replacement.loadConversation).toHaveBeenCalledWith(agent);
+      expect(agent.backendSession).toEqual({ kind: 'codex', threadId: 'existing-thread' });
+      expect(claude.close).not.toHaveBeenCalled();
+      expect(await updates.get('codex')).toMatchObject({ status: 'current', installedVersion: '1.1.0' });
+    } finally { await updates?.close(); inspect.mockRestore(); upgrade.mockRestore(); }
+  });
+
   it('constructs the runtime services and forwards client-owned operations', async () => {
     await createDaemonRuntime({ emitEvent, requestClient, version: '1.2.3' });
 
@@ -297,6 +348,7 @@ describe('daemon runtime', () => {
     expect(mocks.schedulerStart).toHaveBeenCalledOnce();
     expect(mocks.schedulerTasks).toEqual([
       expect.objectContaining({ id: 'automations', intervalMs: 60_000, runOnStart: true }),
+      expect.objectContaining({ id: 'provider-updates', intervalMs: 2_000 }),
       expect.objectContaining({ id: 'pull-request-monitor', intervalMs: 300_000, runOnStart: true }),
     ]);
     expect(mocks.mcpSetDriverRpc).toHaveBeenCalledOnce();

@@ -123,6 +123,8 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   getCodexAuthentication: [backendMethods.codexAuthenticationGet, namedOptional('remoteConnectionId')],
   getClaudeAuthentication: [backendMethods.claudeAuthenticationGet, optionalNamed('connectionId')],
   getProviderSetup: [backendMethods.providerSetupGet, namedOptional('remoteConnectionId')],
+  getProviderUpdate: [backendMethods.providerUpdateGet, namedOptional('backend', 'remoteConnectionId', 'refresh')],
+  setProviderUpdate: [backendMethods.providerUpdateSet, namedOptional('backend', 'input', 'remoteConnectionId')],
   getProviderConnections: [backendMethods.providerConnectionsGet, namedOptional('remoteConnectionId')],
   getProviderUsage: [backendMethods.providerUsageGet, named('backend')],
   setProviderEnabled: [backendMethods.providerEnabledSet, (args) => ({ backend: args[0], enabled: args[1], ...(args[2] ? { remoteConnectionId: args[2] } : {}) })],

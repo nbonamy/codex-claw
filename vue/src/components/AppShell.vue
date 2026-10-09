@@ -575,6 +575,7 @@ import { workProviderDefinition } from '@workspace/core/work-providers';
 import { workProviderLabel, workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
 import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
+import { providerUpdatePreviewKey } from './provider-update-preview';
 import { useI18n } from 'vue-i18n';
 import debugAnnotationScreenshotUrl from '../../assets/debug-annotation.png?url';
 import type { AgentBackend, AgentFileActivity } from '@workspace/core/contracts';
@@ -1285,6 +1286,8 @@ const {
 } = firstRunOnboarding;
 // Debug previews project display state only; onboarding and live agents retain real connections.
 const debugMissingEngines = ref(false);
+const debugProviderUpgrades = ref(false);
+provide(providerUpdatePreviewKey, debugProviderUpgrades);
 const showOnboardingGate = computed(() => debugMissingEngines.value ? !settingsVisible.value : realOnboardingGate.value);
 const showLoginLanding = computed(() => debugMissingEngines.value ? !settingsVisible.value : realLoginLanding.value);
 const displayProviderSetup = computed(() => debugMissingEngines.value
@@ -2356,6 +2359,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openDebugImageAnnotation,
     openDebugOperationProgress,
     setDebugMissingEngines: enabled => { debugMissingEngines.value = enabled; },
+    setDebugProviderUpgrades: enabled => { debugProviderUpgrades.value = enabled; },
     openFileQuick: () => { fileQuickOpenVisible.value = true; },
     openGitReview: openAgentGitDiffPreview,
     openMarkdown: openMarkdownRequest,
