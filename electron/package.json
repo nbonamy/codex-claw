@@ -1,6 +1,6 @@
 {
   "name": "@workspace/electron",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "private": true,
   "description": "Native Codex team desktop app.",
   "main": ".vite/build/main.js",
@@ -26,22 +26,22 @@
     "prepare:mobile-simulator": "node ../scripts/prepare-mobile-simulator.mjs"
   },
   "dependencies": {
-    "@workspace/core": "0.30.0",
-    "@workspace/vue": "0.30.0",
+    "@codex-app-sdk/electron": "0.15.0",
+    "@grpc/grpc-js": "1.14.6",
+    "@grpc/proto-loader": "0.8.1",
+    "@workspace/core": "0.31.0",
+    "@workspace/vue": "0.31.0",
     "autolib": "github:nbonamy/witsy-autolib#v1.2.4",
-    "@codex-app-sdk/electron": "0.14.4",
     "electron-log": "^5.4.4",
     "electron-squirrel-startup": "^1.0.1",
-    "vue": "^3.5.35",
-    "@grpc/grpc-js": "1.14.6",
-    "@grpc/proto-loader": "0.8.1"
+    "vue": "^3.5.35"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
-    "@electron-forge/maker-dmg": "^7.11.2",
-    "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
     "@electron-forge/maker-rpm": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/maker-zip": "^7.11.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
     "@electron-forge/plugin-fuses": "^7.11.2",
