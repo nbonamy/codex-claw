@@ -81,6 +81,21 @@ function mountPanel(
 }
 
 describe('CodeReviewPanel', () => {
+  it.each(['Focus on retries.\nCheck error handling.', '   '])('uses edited instructions and omits blank text: %j', async instructions => {
+    const { wrapper, actions } = mountPanel();
+    await wrapper.setProps({ instructions: 'Original focus' });
+    await flushPromises();
+    const field = wrapper.get<HTMLTextAreaElement>('textarea[aria-label="Additional instructions"]');
+    expect(field.element.value).toBe('Original focus');
+    await field.setValue(instructions);
+    await wrapper.get('.code-review-panel__start').trigger('click');
+    await flushPromises();
+    const input = actions.startReview.mock.calls[0]![1] as Record<string, unknown>;
+    if (instructions.trim()) expect(input.instructions).toBe(instructions);
+    else expect(input).not.toHaveProperty('instructions');
+    wrapper.unmount();
+  });
+
   it('configures automatic review in a dialog and uses those settings when starting', async () => {
     const { wrapper, actions } = mountPanel(undefined, undefined, true, {
       backend: 'codex', automation: { enabled: true, maxPriority: 'p2', maxRounds: 3 }, providers: {},
@@ -565,6 +580,7 @@ describe('CodeReviewPanel', () => {
 
   it('offers retry when a review round fails', async () => {
     const failed = session([], 'failed');
+    failed.instructions = 'Check retry safety.';
     failed.rounds[0]!.error = 'Reviewer stopped unexpectedly.';
     const { wrapper } = mountPanel(failed);
     const startReview = vi.fn(async (_agentId: string, input: unknown) => {
@@ -580,6 +596,7 @@ describe('CodeReviewPanel', () => {
     expect(startReview).toHaveBeenCalledWith('owner', {
       scope: { type: 'uncommitted' },
       threadMode: 'independent',
+      instructions: 'Check retry safety.',
     });
     expect(wrapper.findAll('[role="alert"]').map((alert) => alert.text())).toEqual([
       'Reviewer stopped unexpectedly.',

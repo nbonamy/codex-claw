@@ -93,6 +93,14 @@ describe('code review ledger', () => {
     expect(isCodeReviewSession(restored)).toBe(false);
   });
   it('accepts only complete review setup choices', () => {
+    for (const instructions of [undefined, '', 'Focus on concurrency.\nCheck retries.']) {
+      expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent', instructions })).toBe(true);
+      expect(isCodeReviewSession({ ...session(), instructions })).toBe(true);
+    }
+    for (const instructions of [null, 1, {}, ['not a string']]) {
+      expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent', instructions })).toBe(false);
+      expect(isCodeReviewSession({ ...session(), instructions })).toBe(false);
+    }
     expect(isCodeReviewStartInput({ scope: { type: 'uncommitted' }, threadMode: 'independent' })).toBe(true);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: 'origin/main' }, threadMode: 'current' })).toBe(true);
     expect(isCodeReviewStartInput({ scope: { type: 'branch', baseRef: '' }, threadMode: 'current' })).toBe(false);

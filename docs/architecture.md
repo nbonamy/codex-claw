@@ -311,6 +311,9 @@ target and reviewer agents) plus an opaque reviewer session reference.
 - Independent reviews reset the reviewer's conversation between rounds to reduce
   anchoring; every round receives the cumulative ledger (all prior skips, fixes
   and decisions) in a `<context>` block.
+- User-supplied review instructions belong to the review session, survive retries
+  and fresh rounds, and never become saved reviewer defaults. Unsubmitted drafts
+  stay local to the agent's review tab and are discarded when that tab closes.
 - Finishing saves a report first, then removes the ledger and the review-owned
   agent. Discarding removes the ledger from any state. Reopening starts from zero.
 - Findings and the `finish_review_round` acknowledgment are model tools

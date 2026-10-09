@@ -187,6 +187,7 @@
       :agent="agent"
       :git-status="gitStatus"
       :start-review="startCodeReview"
+      v-model:instructions="codeReviewInstructions"
       :decide-finding="decideCodeReviewFinding"
       :submit-review-round="submitCodeReviewRound"
       :finish-review="finishCodeReview"
@@ -480,6 +481,7 @@ const props = withDefaults(defineProps<{
   readVisualizationAsset: async () => { throw new Error('Visualize is not available.'); },
 });
 
+const codeReviewInstructions = defineModel<string>('codeReviewInstructions', { default: '' });
 const emit = defineEmits<{
   annotateVisualization: [annotation: import('./use-visualization-annotations').VisualizationAnnotationInput];
   browserUrlChange: [tab: 'browser' | RightWorkspaceBrowserTab, url: string];

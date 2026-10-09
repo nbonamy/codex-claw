@@ -1156,19 +1156,24 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.emitted('update:composerAttachments')).toBeUndefined();
   });
 
-  it('intercepts /review and opens the app-owned review workflow without sending a provider prompt', async () => {
+  it.each(['/review', '/reviewer focus on retries'])('intercepts only the exact /review command: %s', async prompt => {
     const sendPromptAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountRealShell({ realConversationPane: true, sendPromptAction });
     const editor = wrapper.get('[role="textbox"][contenteditable]');
-    editor.element.textContent = '/review';
+    editor.element.textContent = prompt;
     await editor.trigger('input');
     await nextTick();
 
     await wrapper.get('form').trigger('submit');
     await flushPromises();
 
-    expect(sendPromptAction).not.toHaveBeenCalled();
-    expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+    if (prompt === '/review') {
+      expect(sendPromptAction).not.toHaveBeenCalled();
+      expect(wrapper.get('[aria-label="Code review"]').isVisible()).toBe(true);
+    } else {
+      expect(sendPromptAction).toHaveBeenCalledExactlyOnceWith(prompt, undefined);
+      expect(wrapper.find('[aria-label="Code review"]').exists()).toBe(false);
+    }
   });
 
   it('moves the Review pane from the source thread to an independent reviewer', async () => {
