@@ -1,12 +1,12 @@
 ---
-description: Inspect documents, plans, files, and Git changes beside the conversation.
+description: Inspect files and Git changes, and run mobile simulators beside the conversation.
 ---
 
 # Workspace & diffs
 
 The workspace beside the conversation keeps the artifacts you need for decisions within reach.
 
-Use its **+** menu to open **Files**, **Changes**, **Review**, **Visualize**, or **Browser** where supported. Tabs can be closed with their close button; right-click a tab for its tab actions.
+Use its **+** menu to open **Files**, **Changes**, **Review**, **Visualize**, **Simulator**, or **Browser** where supported. Tabs can be closed with their close button; right-click a tab for its tab actions.
 
 ## Documents and plans
 
@@ -39,6 +39,35 @@ Open **Changes** or press **⌘G** to inspect Git diffs. The agent header's diff
 The **Changes** pane's refresh action reloads the selected diff. Its **…** menu controls staged, unstaged, and untracked sections when available, word wrap, and expanding or collapsing files. Select a file in the diff to open its preview.
 
 Use the full repository diff before delivery so earlier or unrelated edits are accounted for.
+
+## Mobile simulators
+
+Run an iOS simulator or Android emulator beside your conversation. Interact with the live screen yourself, or ask your Codex or Claude agent to inspect the app, tap, swipe, type, and capture screenshots while you work on the code.
+
+### Set up a device
+
+Use the Korus desktop app with a local agent. Install the tools for your platform first:
+
+- **iOS:** Xcode and an iOS simulator runtime on your Mac.
+- **Android:** Android SDK Platform Tools and Emulator, with a configured virtual device.
+
+Open **+ → Simulator** in the workspace, choose the platform when offered, and select a device. Korus boots it if needed and shows its live screen. The pane offers setup guidance if required tools are missing.
+
+### Try the app together
+
+Use the live screen to tap, swipe, and type. The pane also has controls for rotation, Home, Android Back, and copying a screenshot.
+
+You can ask the agent to open a simulator and check a specific flow:
+
+```text
+Open the Android emulator and check the sign-in flow in our app.
+Try an invalid password, then sign in. Take screenshots of anything
+that needs fixing.
+```
+
+Each device is attached to one agent at a time. **Detach** releases it for another agent and leaves it running; **Power off** shuts it down. Neither erases its data.
+
+Simulator access is for local virtual devices, not physical phones or remote teams.
 
 ## Browse and start backlog work
 

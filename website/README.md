@@ -80,6 +80,10 @@ Refresh them with the `korus-live-preview` skill when those surfaces change,
 and bump the `?v=` query on the image URLs. Computer Use and the choice of
 agents stay text-only until a faithful capture exists.
 
+The simulator card uses `assets/screens/simulator.svg`: an illustration of the
+simulator pane with an embedded, unaltered capture of iOS Settings. The surrounding
+device frame and controls are illustrative; this is not a full app screenshot.
+
 The hero previews the selected film muted and without controls, then advances
 to the next tab when it ends. Only the selected film loads; the others stay off
 the network until chosen. With reduced motion, the hero shows posters and plays
