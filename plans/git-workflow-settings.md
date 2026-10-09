@@ -153,6 +153,9 @@ Phases 2–3 backend execution implemented: explicit/configured Pull strategies,
 merge/rebase updates, published-history confirmation, native restart-visible rebase
 state and Continue/Abort. Real-repository and service tests: 60 passing; core and
 backend typechecks pass. UI and app-boundary recovery wiring follow in phase 5.
+Phase 4 implemented: all four integration histories, explicit base overrides,
+source/target rechecks and cleanup only after success. Real repository tests
+replace overlapping command-array assertions; 62 focused tests pass.
 
 ## Completion learnings
 

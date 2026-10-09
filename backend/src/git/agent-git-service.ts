@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { GitRebase } from './git-rebase';
 import type { GitOperationChoice } from '@workspace/core/contracts/git';
 import { realpath } from 'node:fs/promises';
-import { normalizeGitSettings, resolveGitPreferences, type GitSettings, type GitPullStrategy, type GitUpdateStrategy } from '@workspace/core/git-preferences';
+import { normalizeGitSettings, resolveGitPreferences, type GitSettings, type GitPullStrategy, type GitUpdateStrategy, type GitIntegrationStrategy } from '@workspace/core/git-preferences';
 import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@workspace/core/contracts';
 import { AppError } from '@workspace/core/app-error';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
@@ -369,11 +369,12 @@ export class AgentGitService {
     const repositoryFolder = root.stdout.trim();
     const worktrees = parseWorktrees(worktreeList.stdout);
     const currentWorktreeIndex = worktrees.findIndex((item) => resolve(item.path) === resolve(repositoryFolder));
-    const baseWorktree = currentWorktreeIndex > 0 ? selectMergeTarget(worktrees, repositoryFolder) : undefined;
     const currentBranch = branch.stdout.trim();
+    const baseBranch = await this.baseBranch(folder, currentBranch, worktrees, repositoryFolder, remoteName);
+    const baseWorktree = worktrees.find(item => item.branch === baseBranch && item.path !== repositoryFolder);
     const [baseUpdateRequired, baseWorktreeDirty] = await Promise.all([
-      baseWorktree?.branch && currentBranch
-        ? this.runGit(folder, ['merge-base', '--is-ancestor', baseWorktree.branch, currentBranch]).then(() => false, () => true)
+      baseBranch && baseBranch !== currentBranch && currentBranch
+        ? this.runGit(folder, ['merge-base', '--is-ancestor', baseBranch, currentBranch]).then(() => false, () => true)
         : undefined,
       baseWorktree
         ? this.runGit(baseWorktree.path, ['status', '--porcelain=v1', '-z']).then((result) => Boolean(result.stdout))
@@ -386,7 +387,7 @@ export class AgentGitService {
       repository,
       folder: repositoryFolder,
       isLinkedWorktree: currentWorktreeIndex > 0,
-      ...(baseWorktree?.branch ? { baseBranch: baseWorktree.branch } : {}),
+      ...(baseBranch ? { baseBranch } : {}),
       ...(baseUpdateRequired !== undefined ? { baseUpdateRequired } : {}),
       ...(baseWorktreeDirty !== undefined ? { baseWorktreeDirty } : {}),
       ...(currentBranch ? { branch: currentBranch } : {}),
@@ -537,21 +538,37 @@ export class AgentGitService {
   async mergeTarget(folder: string): Promise<string> {
     const current = await this.workflow(folder);
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
-    const target = selectMergeTarget(worktrees, current.folder);
-    if (!target) throw new Error('A base worktree is required before merging.');
+    const target = worktrees.find(item => item.branch === current.baseBranch);
+    if (!target) throw new Error('Check out the selected base before pushing it.');
     return target.path;
+  }
+
+  private async baseBranch(folder: string, branch: string, worktrees: Array<{ path: string; branch?: string }>, currentFolder: string, remote?: string): Promise<string | undefined> {
+    const override = (await this.effectivePreferences(folder)).baseBranch;
+    if (override) {
+      await this.runGit(folder, ['check-ref-format', '--branch', override]);
+      await this.runGit(folder, ['show-ref', '--verify', `refs/heads/${override}`]);
+      return override;
+    }
+    if (remote) {
+      const head = (await this.runGit(folder, ['symbolic-ref', '--quiet', '--short', `refs/remotes/${remote}/HEAD`]).catch(() => ({ stdout: '' }))).stdout.trim();
+      const local = head.startsWith(`${remote}/`) ? head.slice(remote.length + 1) : '';
+      if (local && await this.localBranchExists(folder, local)) return local;
+    }
+    const checkedOut = selectMergeTarget(worktrees, currentFolder);
+    if (checkedOut?.branch) return checkedOut.branch;
+    if (isIntegrationBranch(branch)) return branch;
+    const branches = (await this.runGit(folder, ['branch', '--format=%(refname:short)'])).stdout.split(/\r?\n/).map(value => value.trim());
+    return integrationBranches.find(candidate => branches.includes(candidate));
   }
 
   async updateFromBase(folder: string, allowDirty = false, choice: GitOperationChoice & { strategy?: GitUpdateStrategy } = {}): Promise<{ baseBranch: string; branch: string; conflicts: string[] }> {
     const current = await this.workflow(folder);
-    if (!current.isLinkedWorktree) throw new Error('The current folder is not a linked worktree.');
     if (!current.branch || current.detached) throw new Error('Create or check out a branch before updating it.');
     if (current.files.length > 0 && !allowDirty) {
       throw new Error('Commit your changes before updating from the base branch.');
     }
-    const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
-    const base = selectMergeTarget(worktrees, current.folder);
-    const baseBranch = (await this.effectivePreferences(folder)).baseBranch ?? base?.branch;
+    const baseBranch = current.baseBranch;
     if (!baseBranch) throw new Error('Check out the base branch before updating this worktree.');
     await this.assertCommitRef(folder, baseBranch);
     this.assertExpected(current, baseBranch, choice);
@@ -618,31 +635,35 @@ export class AgentGitService {
     }
   }
 
-  async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string): Promise<AgentGitMergeResult> {
+  async merge(folder: string, strategy: GitIntegrationStrategy | undefined, deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string, choice: GitOperationChoice = {}): Promise<AgentGitMergeResult> {
+    strategy ??= (await this.effectivePreferences(folder)).integration;
     const normalizedCommitMessage = commitMessage?.trim();
     if (strategy === 'squash' && !normalizedCommitMessage) throw new Error('Enter a squash commit message.');
     const current = await this.workflow(folder);
     if (!current.branch || current.detached) throw new Error('Create or check out a branch before merging.');
+    if (current.files.length) throw new Error('Commit your changes before integrating.');
     if (deleteWorktree && !current.isLinkedWorktree) throw new Error('The current folder is not a linked worktree.');
     if (deleteBranch && !deleteWorktree) throw new Error('Remove the linked worktree before deleting its branch.');
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
-    const target = selectMergeTarget(worktrees, current.folder);
-    let targetFolder = target?.path;
-    let targetBranch = target?.branch;
-    let switchTargetBranch = false;
-    if (!targetFolder) {
-      if (current.isLinkedWorktree) throw new Error('A base worktree is required before merging.');
-      const branches = (await this.runGit(folder, ['branch', '--format=%(refname:short)'])).stdout
-        .split(/\r?\n/)
-        .map((branch) => branch.trim())
-        .filter(Boolean);
-      const baseBranch = integrationBranches.find((branch) => branch !== current.branch && branches.includes(branch));
-      if (!baseBranch) throw new Error('Create a local base branch before merging.');
-      targetFolder = current.folder;
-      targetBranch = baseBranch;
-      switchTargetBranch = true;
+    const targetBranch = current.baseBranch;
+    if (!targetBranch || targetBranch === current.branch) throw new Error('Select a different base branch before integrating.');
+    this.assertExpected(current, targetBranch, choice);
+    const sourceCopies = worktrees.filter(item => item.branch === current.branch);
+    if (sourceCopies.length > 1) throw new Error('The working branch is checked out in multiple worktrees.');
+    const target = worktrees.find(item => item.branch === targetBranch);
+    const targetFolder = target?.path ?? current.folder;
+    const switchTargetBranch = !target;
+    if (worktrees.filter(item => item.branch === targetBranch).length > 1) throw new Error('The base branch is checked out in multiple worktrees.');
+    if ((await this.runGit(targetFolder, ['status', '--porcelain=v1', '-z'])).stdout) throw new Error(`Commit changes in ${targetBranch} before merging.`);
+    await new GitRebase(this.runGit).assertIdle(folder);
+    if (target) await new GitRebase(this.runGit).assertIdle(targetFolder);
+    const targetHead = (await this.runGit(folder, ['rev-parse', targetBranch])).stdout.trim();
+    if (strategy === 'rebase-ff') {
+      await new GitRebase(this.runGit).start(folder, targetBranch, choice.rewritePublished === true);
+      if (await new GitRebase(this.runGit).state(folder)) throw new Error('Integration paused for rebase conflicts. Continue or abort the rebase, then integrate again.');
     }
-    if (!targetBranch) throw new Error('Check out the base branch before merging.');
+    if ((await this.runGit(folder, ['rev-parse', targetBranch])).stdout.trim() !== targetHead) throw new Error('The base changed during integration. Review the operation again.');
+    if (target && (await this.runGit(targetFolder, ['symbolic-ref', '--quiet', '--short', 'HEAD'])).stdout.trim() !== targetBranch) throw new Error('The base worktree changed branches. Review the operation again.');
     const targetDirty = Boolean((await this.runGit(targetFolder, ['status', '--porcelain=v1', '-z'])).stdout);
     if (targetDirty) throw new Error(`Commit changes in ${targetBranch} before merging.`);
     const branchIsCurrent = await this.runGit(
@@ -655,7 +676,7 @@ export class AgentGitService {
       );
     }
     if (switchTargetBranch) await this.runGit(current.folder, ['switch', targetBranch]);
-    await this.runGit(targetFolder, strategy === 'squash' ? ['merge', '--squash', current.branch] : ['merge', '--no-ff', current.branch]);
+    await this.runGit(targetFolder, ['-c', 'merge.autoStash=false', 'merge', strategy === 'squash' ? '--squash' : strategy === 'merge' ? '--no-ff' : '--ff-only', '--no-edit', '--no-autostash', current.branch]);
     if (strategy === 'squash') await this.runGit(targetFolder, ['commit', '-m', normalizedCommitMessage!]);
     let warning = deleteWorktree
       ? await this.removeMergedWorktree(targetFolder, current.folder)
@@ -663,7 +684,7 @@ export class AgentGitService {
     if (deleteBranch) {
       try {
         // Git's -d checks the upstream, which may lag behind the successful local merge.
-        if (strategy === 'merge') {
+        if (strategy !== 'squash') {
           await this.runGit(targetFolder, ['merge-base', '--is-ancestor', current.branch, 'HEAD']);
         }
         await this.runGit(targetFolder, ['branch', '-D', current.branch]);

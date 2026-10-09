@@ -43,7 +43,7 @@ export class GitRebase {
     try {
       await this.run(folder, ['-c', 'rebase.updateRefs=false', '-c', 'rebase.autoStash=false', 'rebase', '--no-autostash', ...(preserveMerges ? ['--rebase-merges'] : []), target]);
     } catch (error) {
-      if (!await this.state(folder)) throw error;
+      if (!await this.state(folder) || !(await this.conflicts(folder)).length) throw error;
     }
     return this.conflicts(folder);
   }
