@@ -1502,7 +1502,6 @@ function handleMainEvent(event: MainToRendererEvent): void {
   color: var(--color-warning);
   font-size: var(--font-size-13);
   line-height: 1.4;
-  text-align: left;
 }
 
 .git-workflow-control__uncommitted-warning svg {
@@ -1520,7 +1519,6 @@ function handleMainEvent(event: MainToRendererEvent): void {
   gap: var(--space-4);
   justify-items: start;
   padding: var(--space-10) 0 var(--space-8);
-  text-align: left;
 }
 
 .git-workflow-control__push-count {
@@ -1532,7 +1530,6 @@ function handleMainEvent(event: MainToRendererEvent): void {
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-semibold);
   line-height: 1.2;
-  text-align: left;
 }
 
 .git-workflow-control__push-destination {

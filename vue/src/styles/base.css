@@ -74,6 +74,7 @@ button,
 
 .el-dialog {
   max-width: calc(100vw - var(--space-16));
+  text-align: left;
 }
 
 .app-dialog.el-dialog {
@@ -96,6 +97,7 @@ button,
 }
 
 .app-dialog .el-dialog__footer {
+  text-align: right;
   padding: var(--space-8) var(--space-12);
   border-top: 1px solid var(--color-border);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
@@ -134,7 +136,6 @@ button,
   gap: var(--space-2);
   justify-items: start;
   margin-bottom: var(--space-4);
-  text-align: left;
 }
 
 .app-dialog__title {

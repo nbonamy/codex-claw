@@ -130,6 +130,8 @@ Search by behavior first.
   dismiss tertiary, alternatives secondary, at most one primary. Compact pickers use
   the filter as the whole top row, then loading/error/empty/results. Dialogs emit
   domain actions; the parent or composable persists and calls the backend.
+  Shared dialog styles reset inherited text alignment to left; footer actions stay
+  right-aligned. Do not add per-dialog alignment resets.
 - **Menus and tabs:** `AppMenu` gives consistent rows, roles and states; add roving
   focus and Arrow/Home/End to `AppMenu` itself while the containing overlay owns
   Escape, closing and focus return. Share one item model between inline and menu
