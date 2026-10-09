@@ -145,7 +145,7 @@ describe('runtime config', () => {
         APP_ASSETS_PATH: '/app/resources',
         APP_HOME: `/Users/nicolas/${product.homeDirectory}`,
         HOME: '/Users/nicolas',
-        PATH: `/app/resources/runtime${platform === 'win32' ? ';' : ':'}/usr/bin`,
+        PATH: `/usr/bin${platform === 'win32' ? ';' : ':'}/app/resources/runtime`,
       },
     });
   });

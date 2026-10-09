@@ -16,7 +16,7 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { withDiscoveredRuntimePath, type RuntimeDiscoveryDependencies } from '@workspace/core/runtime-discovery';
+import { resolveRuntimeLaunch, type RuntimeDiscoveryDependencies } from '@workspace/core/runtime-discovery';
 import { debugMain, logMain } from '../log';
 import {
   type ClaudePermissionRequest,
@@ -580,10 +580,11 @@ function claudeQueryOptions(
 ): ClaudeQueryOptions {
   const command = transportOptions.command ?? process.env.APP_CLAUDE_COMMAND ?? 'claude';
   const permissionMode = normalizedPermissionMode(params.permissionMode);
-  const env = claudeEnvironment(transportOptions.env, transportOptions.runtimeDiscovery);
+  const launch = resolveRuntimeLaunch(command, transportOptions.env, transportOptions.runtimeDiscovery);
+  const env = claudeEnvironment(launch.env);
   return {
     cwd: expandHome(params.cwd),
-    pathToClaudeCodeExecutable: command,
+    pathToClaudeCodeExecutable: launch.command,
     systemPrompt: {
       type: 'preset',
       preset: 'claude_code',
@@ -871,10 +872,8 @@ function normalizedPermissionMode(value: string | null | undefined): PermissionM
 }
 
 function claudeEnvironment(
-  overrides: NodeJS.ProcessEnv | undefined,
-  runtimeDiscovery: RuntimeDiscoveryDependencies | undefined,
+  env: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
-  const env = withDiscoveredRuntimePath(overrides, runtimeDiscovery);
   // Session mutations run in this process, so query-only home overrides would
   // send reads and deletes to a different store than the running conversation.
   env.CLAUDE_CONFIG_DIR = claudeConfigDirectoryOverride();

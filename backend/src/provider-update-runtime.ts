@@ -24,7 +24,7 @@ export class ProviderUpdateRuntime {
   private readonly io: Dependencies;
   constructor(private readonly options: { command(backend: AgentBackend): string; claudeHome(): string; env?: NodeJS.ProcessEnv }, dependencies: Partial<Dependencies> = {}) {
     this.io = {
-      resolve: resolveRuntimeExecutable, realpath, read: file => readFile(file, 'utf8'),
+      resolve: command => resolveRuntimeExecutable(command, { env: { ...process.env, ...options.env } }), realpath, read: file => readFile(file, 'utf8'),
       run: async (file, args, timeout, env) => (await exec(file, args, {
         timeout, maxBuffer: 2 * 1024 * 1024, windowsHide: true,
         env: withDiscoveredRuntimePath({ ...options.env, ...env }),
@@ -68,8 +68,12 @@ export class ProviderUpdateRuntime {
       }
       if (!command) {
         const npm = this.io.resolve('npm');
-        if (npm && resolved.includes(`${path.sep}node_modules${path.sep}`)) {
-          const root = (await this.io.run(npm, ['root', '-g'], 10_000)).trim();
+        const npmNode = npm ? this.io.resolve(path.join(path.dirname(npm), 'node')) : null;
+        if (npm && npmNode && resolved.includes(`${path.sep}node_modules${path.sep}`)) {
+          // npm's default prefix is derived from process.execPath. Its shebang
+          // must not accidentally pick the desktop's private Node from PATH.
+          const npmCli = await this.io.realpath(npm);
+          const root = (await this.io.run(npmNode, [npmCli, 'root', '-g'], 10_000)).trim();
           const packageRoot = path.join(root, packages[backend]);
           const canonicalRoot = await this.io.realpath(packageRoot).catch(() => '');
           if (canonicalRoot && inside(resolved, canonicalRoot)) {
@@ -79,7 +83,7 @@ export class ProviderUpdateRuntime {
               latestVersion = backend === 'claude' && channel === 'stable'
                 ? exactVersion((await this.io.fetchText('https://downloads.claude.ai/claude-code-releases/stable')).trim())
                 : await this.registryVersion(backend);
-              if (latestVersion) command = { file: npm, args: ['install', '-g', `${packages[backend]}@${latestVersion}`] };
+              if (latestVersion) command = { file: npmNode, args: [npmCli, 'install', '-g', `${packages[backend]}@${latestVersion}`] };
             }
           }
         }
@@ -105,7 +109,7 @@ export class ProviderUpdateRuntime {
     if (!latestVersion) throw new Error('No valid provider version was returned.');
     if (backend === 'claude' && (this.options.env?.DISABLE_UPDATES || process.env.DISABLE_UPDATES)) command = undefined;
     return { executable, version, latestVersion, method, channel,
-      identity: JSON.stringify([executable, resolved, version, method, channel, command?.file]), command };
+      identity: JSON.stringify([executable, resolved, version, method, channel, command]), command };
   }
 
   async upgrade(installation: ProviderInstallation): Promise<void> {

@@ -15,7 +15,7 @@ vi.mock('node:os', async (importOriginal) => {
 });
 
 vi.mock('@workspace/core/runtime-discovery', () => ({
-  withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
+  resolveRuntimeLaunch: (command: string, env: NodeJS.ProcessEnv | undefined) => ({ command, env: { ...process.env, ...env } }),
 }));
 
 // Claude names project directories by replacing every non-alphanumeric character

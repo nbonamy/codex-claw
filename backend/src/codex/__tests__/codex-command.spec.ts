@@ -1,24 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveCodexCommand } from '../codex-command';
-import { resolveRuntimeExecutable } from '@workspace/core/runtime-discovery';
+import { resolveCodexLaunch } from '../codex-command';
+import { resolveRuntimeLaunch } from '@workspace/core/runtime-discovery';
 
 vi.mock('@workspace/core/runtime-discovery', () => ({
-  resolveRuntimeExecutable: vi.fn(() => '/user/bin/codex'),
+  resolveRuntimeLaunch: vi.fn((command: string) => ({ command: command === 'codex' ? '/user/bin/codex' : command, env: { PATH: '/user/bin' } })),
 }));
 
-describe('resolveCodexCommand', () => {
-  afterEach(() => { vi.unstubAllEnvs(); vi.mocked(resolveRuntimeExecutable).mockReset().mockReturnValue('/user/bin/codex'); });
+describe('resolveCodexLaunch', () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
   it('keeps an explicit Settings executable path authoritative', () => {
-    expect(resolveCodexCommand(' /opt/homebrew/bin/codex ')).toBe('/opt/homebrew/bin/codex');
+    expect(resolveCodexLaunch(' /opt/homebrew/bin/codex ').command).toBe('/opt/homebrew/bin/codex');
   });
 
   it('uses the user PATH executable rather than a private app bundle', () => {
     vi.stubEnv('APP_BUNDLED_CODEX_PATH', '/app/resources/codex/codex');
-    expect(resolveCodexCommand('')).toBe('/user/bin/codex');
+    expect(resolveCodexLaunch('')).toStrictEqual({ command: '/user/bin/codex', env: { PATH: '/user/bin' } });
   });
 
   it('keeps missing PATH detection explicit instead of enabling SDK bundle discovery', () => {
-    vi.mocked(resolveRuntimeExecutable).mockReturnValue(null);
-    expect(resolveCodexCommand(undefined)).toBe('codex');
+    vi.mocked(resolveRuntimeLaunch).mockReturnValueOnce({ command: 'codex', env: { PATH: '/user/bin' } });
+    expect(resolveCodexLaunch(undefined).command).toBe('codex');
   });
 });

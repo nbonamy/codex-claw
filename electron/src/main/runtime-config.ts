@@ -120,7 +120,8 @@ function packagedDaemonCommand(deps: RuntimeDaemonConfigDeps): RuntimeDaemonComm
     args: [bundlePath, '--stdio'],
     env: {
       ...runtimeEnv,
-      PATH: [path.dirname(nodeCommand), runtimeEnv.PATH].filter(Boolean).join(platform === 'win32' ? ';' : ':'),
+      // The daemon uses an absolute private Node; provider tools prefer user Node.
+      PATH: [runtimeEnv.PATH, path.dirname(nodeCommand)].filter(Boolean).join(platform === 'win32' ? ';' : ':'),
     },
   };
 }

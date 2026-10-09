@@ -4,7 +4,7 @@ import { ProviderUpdateRuntime } from '../provider-update-runtime';
 function fixture(resolved: string) {
   const run = vi.fn(async (_file: string, args: string[]) => {
     if (args[0] === '--version') return 'codex-cli 1.0.0';
-    if (args[0] === 'root') return '/tools/lib/node_modules';
+    if (args[1] === 'root') return '/tools/lib/node_modules';
     if (args[0] === '--prefix') return '/brew';
     if (args[0] === 'info') return JSON.stringify({ casks: [{ token: 'claude-code', version: '1.1.0' }, { token: 'codex', version: '1.2.0' }] });
     return '';
@@ -13,21 +13,36 @@ function fixture(resolved: string) {
   const read = vi.fn(async () => JSON.stringify({ name: '@openai/codex' }));
   const runtime = new ProviderUpdateRuntime({ command: backend => backend, claudeHome: () => '/user/.claude' }, {
     home: '/user', platform: 'darwin',
-    resolve: command => command === 'npm' ? '/tools/bin/npm' : command === 'brew' ? '/brew/bin/brew' : `/user/.local/bin/${command}`,
-    realpath: async file => file.startsWith('/tools/lib/') ? file : resolved,
+    resolve: command => command === '/tools/bin/node' ? command : command === 'npm' ? '/tools/bin/npm' : command === 'brew' ? '/brew/bin/brew' : `/user/.local/bin/${command}`,
+    realpath: async file => file === '/tools/bin/npm' ? '/tools/lib/node_modules/npm/bin/npm-cli.js' : file.startsWith('/tools/lib/') ? file : resolved,
     run, read, fetchText,
   });
   return { runtime, run, read, fetchText };
 }
 
 describe('installed provider updates', () => {
+  it('checks and upgrades npm through its owning Node instead of the packaged Node on PATH', async () => {
+    const f = fixture('/tools/lib/node_modules/@openai/codex/bin/codex.js');
+    f.run.mockImplementation(async (file, args) => {
+      if (args[0] === '--version') return 'codex-cli 1.0.0';
+      // npm derives its default global prefix from the Node that executes it.
+      if (file === '/tools/bin/npm' && args[0] === 'root') return '/app/resources/lib/node_modules';
+      if (file === '/tools/bin/node' && args[1] === 'root') return '/tools/lib/node_modules';
+      return '';
+    });
+    const installation = await f.runtime.inspect('codex');
+    expect(installation).toMatchObject({ method: 'npm', version: '1.0.0', latestVersion: '1.2.0' });
+    await f.runtime.upgrade(installation);
+    expect(f.run).toHaveBeenLastCalledWith('/tools/bin/node', ['/tools/lib/node_modules/npm/bin/npm-cli.js', 'install', '-g', '@openai/codex@1.2.0'], 300_000, expect.any(Object));
+  });
+
   it('uses the package manager owning the resolved executable and pins the checked target', async () => {
     const f = fixture('/tools/lib/node_modules/@openai/codex/bin/codex.js');
     const installation = await f.runtime.inspect('codex');
     expect(installation).toMatchObject({ method: 'npm', version: '1.0.0', latestVersion: '1.2.0' });
-    expect(f.run.mock.calls.some(([, args]) => args[0] === 'install')).toBe(false);
+    expect(f.run.mock.calls.some(([, args]) => args.includes('install'))).toBe(false);
     await f.runtime.upgrade(installation);
-    expect(f.run).toHaveBeenLastCalledWith('/tools/bin/npm', ['install', '-g', '@openai/codex@1.2.0'], 300_000, expect.any(Object));
+    expect(f.run).toHaveBeenLastCalledWith('/tools/bin/node', ['/tools/lib/node_modules/npm/bin/npm-cli.js', 'install', '-g', '@openai/codex@1.2.0'], 300_000, expect.any(Object));
   });
 
   it('keeps a different npm prefix manual rather than upgrading an unrelated global installation', async () => {

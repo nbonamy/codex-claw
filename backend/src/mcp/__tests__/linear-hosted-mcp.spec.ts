@@ -15,7 +15,7 @@ import { createQueryHarness } from '../../claude/__tests__/sdk-query-fixture';
 
 vi.mock('@workspace/core/runtime-discovery', () => ({
   resolveRuntimeExecutable: () => '/test/bin/codex',
-  withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
+  resolveRuntimeLaunch: (command: string, env: NodeJS.ProcessEnv | undefined) => ({ command, env: { ...process.env, ...env } }),
 }));
 
 const cleanups: Array<() => Promise<void>> = [];

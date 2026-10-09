@@ -14,7 +14,7 @@ vi.mock('node:child_process', () => ({
     },
   }),
 }));
-vi.mock('@workspace/core/runtime-discovery', () => ({ withDiscoveredRuntimePath: (env: unknown) => env }));
+vi.mock('@workspace/core/runtime-discovery', () => ({ resolveRuntimeLaunch: (command: string, env: unknown) => ({ command, env }) }));
 
 beforeEach(() => { cli.error = null; cli.calls.mockClear(); });
 

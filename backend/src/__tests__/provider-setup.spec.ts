@@ -13,6 +13,7 @@ const cli = vi.hoisted(() => ({ installed: new Set<string>(), fail: false, insta
 vi.mock('@workspace/core/runtime-discovery', () => ({
   resolveRuntimeExecutable: (command: string) => cli.installed.has(command) ? command : null,
   withDiscoveredRuntimePath: () => ({}),
+  resolveRuntimeLaunch: (command: string) => ({ command, env: {} }),
 }));
 vi.mock('node:child_process', async importOriginal => ({
   ...await importOriginal<typeof import('node:child_process')>(),

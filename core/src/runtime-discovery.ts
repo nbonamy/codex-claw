@@ -6,7 +6,7 @@ import path from 'node:path';
 type ExecFileSync = (
   file: string,
   args: string[],
-  options?: { encoding?: BufferEncoding; env?: NodeJS.ProcessEnv; stdio?: 'ignore' | 'pipe' },
+  options?: { encoding?: BufferEncoding; env?: NodeJS.ProcessEnv; stdio?: 'ignore' | 'pipe'; timeout?: number },
 ) => string | Buffer;
 
 export type RuntimeDiscoveryDependencies = {
@@ -29,8 +29,10 @@ export function discoveredRuntimePathEntries(dependencies: RuntimeDiscoveryDepen
   const delimiter = pathDelimiter(dependencies);
   const env = dependencies.env ?? process.env;
   const entries = [
-    ...pathEntries(env.PATH, delimiter),
+    // GUI/daemon PATH can contain an older nvm selection or private app runtime.
+    // The user's login shell is authoritative; inherited entries are fallbacks.
     ...pathEntries(loginShellPath(dependencies), delimiter),
+    ...pathEntries(env.PATH, delimiter),
     ...commonUserBinaryPaths(dependencies),
     ...nvmBinaryPaths(dependencies),
   ];
@@ -60,12 +62,34 @@ export function resolveRuntimeExecutable(
   executable: string,
   dependencies: RuntimeDiscoveryDependencies = {},
 ): string | null {
+  return executableFromPath(executable, () => discoveredRuntimePathEntries(dependencies), dependencies);
+}
+
+/** Resolve a provider and its child-process environment from one PATH snapshot. */
+export function resolveRuntimeLaunch(
+  command: string,
+  overrides?: NodeJS.ProcessEnv,
+  dependencies: RuntimeDiscoveryDependencies = {},
+): { command: string; env: NodeJS.ProcessEnv } {
+  const env = withDiscoveredRuntimePath(overrides, dependencies);
+  const executable = command.trim();
+  return {
+    command: executableFromPath(executable, () => pathEntries(env.PATH, pathDelimiter(dependencies)), { ...dependencies, env }) ?? executable,
+    env,
+  };
+}
+
+function executableFromPath(
+  executable: string,
+  entries: () => string[],
+  dependencies: RuntimeDiscoveryDependencies,
+): string | null {
   if (path.isAbsolute(executable)) {
     return executableExists(executable, dependencies) ? executable : null;
   }
 
   const candidates = executableCandidates(executable, dependencies);
-  for (const entry of discoveredRuntimePathEntries(dependencies)) {
+  for (const entry of entries()) {
     for (const candidate of candidates) {
       const filePath = path.join(entry, candidate);
       if (executableExists(filePath, dependencies)) {
@@ -84,16 +108,22 @@ function loginShellPath(dependencies: RuntimeDiscoveryDependencies): string | nu
 
   const shell = dependencies.shell ?? dependencies.env?.SHELL ?? process.env.SHELL ?? '/bin/bash';
   const execFileSync = dependencies.execFileSync ?? nodeExecFileSync;
+  const start = '__APP_RUNTIME_PATH_START__';
+  const end = '__APP_RUNTIME_PATH_END__';
   const command = shell.endsWith('/nu') || shell === 'nu'
-    ? 'print $env.PATH'
-    : 'printf "%s" "$PATH"';
+    ? `print '${start}'; print ($env.PATH | str join ':'); print '${end}'`
+    : `printf '${start}%s${end}' "$PATH"`;
 
   try {
-    return execFileSync(shell, ['-l', '-c', command], {
+    const output = execFileSync(shell, ['-l', '-c', command], {
       encoding: 'utf8',
       env: dependencies.env ?? process.env,
       stdio: 'pipe',
-    }).toString().trim();
+      timeout: 5_000,
+    }).toString();
+    const from = output.lastIndexOf(start);
+    const to = output.indexOf(end, from + start.length);
+    return from >= 0 && to >= 0 ? output.slice(from + start.length, to).trim() : null;
   } catch {
     return null;
   }
@@ -132,6 +162,7 @@ function nvmBinaryPathFromCommand(dependencies: RuntimeDiscoveryDependencies): s
       encoding: 'utf8',
       env: dependencies.env ?? process.env,
       stdio: 'pipe',
+      timeout: 5_000,
     }).toString().trim();
     return executableExists(nodePath, dependencies) ? path.dirname(nodePath) : null;
   } catch {
