@@ -141,6 +141,7 @@ const screenshotPending = ref(false);
 const selectionStart = ref<{ x: number; y: number } | null>(null);
 const selectionRect = ref<BrowserBounds | null>(null);
 let browserReady = false;
+let initializing = true;
 let guestElement: (HTMLElement & { getWebContentsId?: () => number }) | null = null;
 let guestWebContentsId: number | null = null;
 let guestPartition: string | null = null;
@@ -192,24 +193,13 @@ onMounted(async () => {
   if (viewport.value) resizeObserver.observe(viewport.value);
   if (guestFrame.value) resizeObserver.observe(guestFrame.value);
   try {
-    const initialState = await openInitialContent();
-    browserReady = true;
-    if (!props.visible) await appApi?.browserSetVisible(props.agentId, props.browserId, false);
-    if (props.openRequestId !== initialRequestId) {
-      if (props.visualization || !props.initialUrl) await runNavigation(openInitialContent);
-      else {
-        address.value = props.initialUrl;
-        await navigate();
-      }
-    } else {
-      state.value = initialState;
-      if (initialState.url) address.value = initialState.url;
-    }
+    await runNavigation(openInitialContent);
+    if (browserReady && !props.visible) await appApi?.browserSetVisible(props.agentId, props.browserId, false);
   } catch (reason) {
     error.value = messageFor(reason);
   } finally {
-    if (browserReady) await syncZoom();
-    loading.value = false;
+    initializing = false;
+    if (!disposed && props.openRequestId !== initialRequestId) await openRequestedContent();
     await nextTick();
     await syncBounds();
   }
@@ -239,15 +229,18 @@ watch(() => props.visible, async (visible) => {
 
 watch(() => props.openRequestId, async (requestId, previousRequestId) => {
   if (!requestId || requestId === previousRequestId) return;
-  if (!browserReady) return;
-  if (props.visualization) {
+  if (initializing || disposed) return;
+  await openRequestedContent();
+});
+
+async function openRequestedContent(): Promise<void> {
+  if (props.visualization || !props.initialUrl) {
     await runNavigation(openInitialContent);
     return;
   }
-  if (!props.initialUrl) return;
   address.value = props.initialUrl;
   await navigate();
-});
+}
 
 async function openInitialContent(): Promise<BrowserState> {
   const api = requireBrowserApi();
@@ -334,7 +327,9 @@ async function navigate(): Promise<void> {
     : !/\s/u.test(input) && looksLikeHost ? (explicitScheme ? `https://${input}` : input)
     : !input || explicitScheme ? input
       : `https://www.google.com/search?q=${encodeURIComponent(input)}`;
-  await runNavigation(() => requireBrowserApi().browserNavigate(props.agentId, props.browserId, target));
+  await runNavigation(async () => browserReady
+    ? requireBrowserApi().browserNavigate(props.agentId, props.browserId, target)
+    : requireBrowserApi().browserOpen(props.agentId, props.browserId, target, await ensureGuest()));
 }
 
 async function goBack(): Promise<void> {
@@ -533,6 +528,7 @@ async function runNavigation(action: () => Promise<BrowserState>): Promise<void>
   error.value = null;
   try {
     state.value = await action();
+    browserReady = true;
     address.value = state.value.url;
   } catch (reason) {
     error.value = messageFor(reason);

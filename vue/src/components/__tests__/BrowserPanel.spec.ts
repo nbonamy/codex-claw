@@ -83,6 +83,46 @@ function mountPanel(
 }
 
 describe('BrowserPanel', () => {
+  it.each([false, true])('recovers model navigation after initial failure (manual recovery: %s)', async (manualRecovery) => {
+    const { api, emitDomReady, wrapper } = mountPanel({ initialUrl: 'http://127.0.0.1:57540' }, { deferDomReady: true });
+    api.browserOpen.mockRejectedValueOnce(new Error('ERR_CONNECTION_REFUSED'));
+    emitDomReady();
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('ERR_CONNECTION_REFUSED');
+    const recovered = { url: 'https://example.com/', title: 'Example', canGoBack: false, canGoForward: false };
+    api.browserOpen.mockResolvedValue(recovered);
+    if (manualRecovery) {
+      await wrapper.get('input[aria-label="Browser address"]').setValue('https://example.com/');
+      await wrapper.get('form').trigger('submit');
+      await flushPromises();
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    }
+    api.browserNavigate.mockClear();
+    await wrapper.setProps({ initialUrl: recovered.url, openRequestId: 1 });
+    await flushPromises();
+    expect(manualRecovery ? api.browserNavigate : api.browserOpen).toHaveBeenLastCalledWith(
+      'agent-1', 'primary', recovered.url, ...(manualRecovery ? [] : [42]),
+    );
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.emitted('url-change')?.at(-1)).toStrictEqual([recovered.url]);
+  });
+
+  it('honors a new model request when the initial page fails while loading', async () => {
+    const { api, emitDomReady, wrapper } = mountPanel({}, { deferDomReady: true });
+    let failInitial: ((reason: Error) => void) | undefined;
+    api.browserOpen.mockImplementationOnce(() => new Promise((_resolve, reject) => { failInitial = reject; }));
+    emitDomReady();
+    await flushPromises();
+    const url = 'https://example.com/';
+    api.browserOpen.mockResolvedValue({ url, title: 'Example', canGoBack: false, canGoForward: false });
+    await wrapper.setProps({ initialUrl: url, openRequestId: 1 });
+    failInitial?.(new Error('ERR_CONNECTION_REFUSED'));
+    await flushPromises();
+    expect(api.browserOpen).toHaveBeenLastCalledWith('agent-1', 'primary', url, 42);
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.emitted('url-change')?.at(-1)).toStrictEqual([url]);
+  });
+
   it('applies targeted viewport requests through device controls and acknowledges layout, including reset', async () => {
     const { wrapper, api, emitCommand } = mountPanel();
     await flushPromises();
