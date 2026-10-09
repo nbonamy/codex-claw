@@ -1,10 +1,13 @@
 <template>
-  <div class="voice-textarea" :style="fieldStyle">
+  <div class="voice-textarea" :style="fieldStyle" @keydown.esc="cancelDictation">
     <CodexComposerVoiceField
       v-if="voiceVisible && busy"
       class="voice-textarea__voice-field"
-      :recorder="voiceRecorder"
       :recording="voiceRecording"
+      :starting="voiceStarting"
+      :transcript="voiceTranscript"
+      :before="voiceBefore"
+      :after="voiceAfter"
     />
     <textarea
       v-else
@@ -73,15 +76,33 @@ const voiceController = useCodexComposerVoice({
 const voiceButtonDisabled = computed(() => voiceController.buttonDisabled.value);
 const voiceButtonLabel = computed(() => voiceController.buttonLabel.value);
 const voiceButtonTitle = computed(() => voiceController.buttonTitle.value);
-const voiceRecorder = computed(() => voiceController.recorder.value);
 const voiceRecording = computed(() => voiceController.isRecording.value);
 const voiceTranscribing = computed(() => voiceController.isTranscribing.value);
-const busy = computed(() => voiceRecording.value || voiceTranscribing.value);
+const voiceStarting = computed(() => voiceController.isStarting.value);
+const voiceTranscript = computed(() => voiceController.transcript.value);
+const busy = computed(() => voiceStarting.value || voiceRecording.value || voiceTranscribing.value);
+const voiceBefore = computed(() => {
+  const text = props.modelValue.slice(0, selectionStart.value);
+  return text && !/\s$/u.test(text) ? `${text} ` : text;
+});
+const voiceAfter = computed(() => {
+  const text = props.modelValue.slice(selectionEnd.value);
+  return text && !/^\s/u.test(text) ? ` ${text}` : text;
+});
 const fieldStyle = computed(() => ({ minHeight: `${Math.max(2, props.rows) * 20 + 24}px` }));
 
 watch(busy, (value) => emit('busy-change', value));
 
 onBeforeUnmount(() => voiceController.dispose());
+
+async function cancelDictation(event: KeyboardEvent): Promise<void> {
+  if (!busy.value) return;
+  event.preventDefault();
+  event.stopPropagation();
+  await voiceController.cancel();
+  await nextTick();
+  textarea.value?.focus();
+}
 
 function updateValue(event: Event): void {
   emit('update:modelValue', (event.target as HTMLTextAreaElement).value);

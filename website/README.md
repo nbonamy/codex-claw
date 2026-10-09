@@ -70,21 +70,35 @@ remain full-square. Composite the canonical vector into thumbnails, the social
 card, and the channel banner rather than asking image generation to redraw it.
 Re-export the films after updating their shared `website/assets/app-icon.png`.
 
-The page opens with a text-led hero, followed by five self-hosted product films:
-Mission in the first workflow section, Delegation and Code Review beside their
-workflow copy, and Quick Chat and Visualize in the feature cards. Automations
-and Cockpit retain static illustrations.
+The hero leads with three visitor problems—parallel work, reliable results,
+and big ideas—each answered by a self-hosted product film: Delegation, Code
+Review, and Mission. Quick Chat and Visualize films sit in the feature cards.
+Cockpit, Automations, and Background runtime show real screenshots from
+`assets/screens/`, captured from the running app with neutral demo data (a
+sample storefront team, no private repository names or account details).
+Refresh them with the `korus-live-preview` skill when those surfaces change,
+and bump the `?v=` query on the image URLs. Computer Use and the choice of
+agents stay text-only until a faithful capture exists.
 
-Each film opens from its rendered poster frame. No MP4 is requested until the
-visitor clicks; native controls provide seeking and fullscreen, and starting a
-film pauses the others. The films use the approved Calm American narration and
-pacing. Playback starts muted with captions on; visitors can unmute using the
-native controls or use the understated Captions on/off text link below each player.
-Sound, volume, and caption choices apply to all five players until the page reloads.
-Captions sit near the bottom of the video; native controls may adjust their placement.
-Captions are separate WebVTT tracks and also available through the native player's menu. Subtitle
+The hero previews the selected film muted and without controls, then advances
+to the next tab when it ends. Only the selected film loads; the others stay off
+the network until chosen. With reduced motion, the hero shows posters and plays
+nothing until asked. **Watch with sound** restarts the current film with sound,
+captions, and native controls, and it then stays on that film. Without
+JavaScript, the link opens the MP4 directly.
+
+Feature-card films open from their rendered poster frame. No MP4 is requested
+until the visitor clicks; native controls provide seeking and fullscreen. Only one
+film plays at a time across the page. The films use the approved Calm American
+narration and pacing. Feature-card playback starts muted with captions on;
+visitors can unmute using the native controls or use the understated Captions
+on/off text link below each player. Sound, volume, and caption choices apply to
+the feature-card players until the page reloads. Captions sit near the bottom of
+the video; native controls may adjust their placement. Captions are separate
+WebVTT tracks and also available through the native player's menu. Subtitle
 files are loaded only when the visitor opens a film. Cover links also open the
-MP4 directly without JavaScript. These are animated walkthroughs, not live recordings.
+MP4 directly without JavaScript. These are animated walkthroughs, not live
+recordings.
 
 Before building or deploying from a fresh checkout, render all five films:
 
@@ -104,8 +118,9 @@ Do not commit these rebuildable outputs; deployments upload them with the rest
 of the static artifact. YouTube uploads are independent of the website.
 
 Keep visuals free of private repository names, messages, and account details.
-The page positions Korus as a workspace for agentic software engineering
-workflows; explain their value without becoming a release changelog.
+The page positions Korus as a team of coding agents it orchestrates. Lead with
+the problems visitors recognize, explain the value without becoming a release
+changelog, and promise only what the shipped product does.
 
 Run the static-site checks with:
 

@@ -6,16 +6,16 @@
     <meta name="theme-color" content="#f4f3ef" />
     <meta
       name="description"
-      content="From idea to delivery. __PRODUCT_NAME__ orchestrates software engineering workflows through agents, connecting planning, implementation, and review while you guide the decisions."
+      content="Run Codex and Claude Code agents side by side. __PRODUCT_NAME__ handles the coordination—parallel work, multi-round code review, and Missions for big ideas—so you stay on the problem and make the calls."
     />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
-      content="__PRODUCT_NAME__ — From idea to delivery."
+      content="__PRODUCT_NAME__ — A team of coding agents, orchestrated."
     />
     <meta
       property="og:description"
-      content="Software engineering, orchestrated. Connect planning, implementation, and review through agents—with you in control of key decisions."
+      content="Run Codex and Claude Code agents side by side. __PRODUCT_NAME__ handles the coordination, so you stay on the problem and make the calls."
     />
     <link rel="canonical" href="__PRODUCT_WEBSITE_URL__/" />
     <link rel="icon" type="image/png" href="assets/app-icon.png?v=mark-2" />
@@ -33,14 +33,14 @@
       name="twitter:image"
       content="__PRODUCT_WEBSITE_URL__/assets/og.png?v=mark-2"
     />
-    <title>__PRODUCT_NAME__ — From idea to delivery.</title>
+    <title>__PRODUCT_NAME__ — A team of coding agents, orchestrated.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@1&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=scheduled-prompts-1" />
+    <link rel="stylesheet" href="styles.css?v=hero-films-1" />
   </head>
   <body>
     <header class="site-header shell">
@@ -49,9 +49,8 @@
         <span><strong>__PRODUCT_NAME__</strong></span>
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
-        <a href="#sessions">Workflows</a>
-        <a href="#routing">Start work</a>
-        <a href="#workspace">Review</a>
+        <a href="#workflows">Workflows</a>
+        <a href="#features">Features</a>
         <a href="#automations">Automations</a>
       </nav>
       <div class="header-actions">
@@ -68,372 +67,154 @@
       <section class="hero shell">
         <div class="hero-copy reveal">
           <p class="eyebrow">
-            <span class="pulse"></span> Software engineering, orchestrated.
+            <span class="pulse"></span> Codex · Claude Code · one workspace
           </p>
-          <h1>From idea<br /><em>to delivery.</em></h1>
-          <p class="hero-lede">
-            __PRODUCT_NAME__ orchestrates software engineering workflows through
-            agents. Planning, implementation, review, and delivery stay
-            connected—with you in control of the decisions that matter.
-          </p>
-          <div class="hero-actions">
-            <a
-              class="button button-primary"
-              href="#download"
-              data-platform-download
-              ><span>Download<span data-platform-label></span></span>
-              <span aria-hidden="true">→</span></a
+          <h1>
+            A team of coding agents.<br /><em
+              >Orchestrated by __PRODUCT_NAME__.</em
             >
-            <a class="text-link" href="#download"
-              >All downloads <span aria-hidden="true">↓</span></a
-            >
-          </div>
-          <div class="hero-meta" aria-label="Product details">
-            <span>macOS</span><span class="dot"></span><span>Windows</span
-            ><span class="dot"></span><span>Linux</span><span class="dot"></span
-            ><span>Free to use</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="signal-strip" aria-label="__PRODUCT_NAME__ workflow">
-        <div class="shell signal-strip-inner">
-          <span>Shape the work</span><i>→</i><span>Build with agents</span
-          ><i>→</i><span>Review the results</span><i>→</i
-          ><span>Ship the change</span>
-        </div>
-      </section>
-
-      <section id="sessions" class="story shell">
-        <div class="story-heading reveal">
-          <p class="section-kicker">01 / One connected workflow</p>
-          <h2>
-            More than a conversation.<br /><span>Work that moves forward.</span>
-          </h2>
-          <p>
-            Software work doesn’t end when an agent answers. Missions connect
-            requirements, tickets, implementation, and review in one workflow.
-            Agents carry out the work; __PRODUCT_NAME__ coordinates its progress
-            and handoffs, with artifacts you can inspect along the way.
-          </p>
-        </div>
-        <div class="session-story">
-          <figure class="product-film mission-film reveal">
-            <div class="film-frame">
-              <video
-                controls
-                playsinline
-                muted
-                preload="none"
-                hidden
-                tabindex="0"
-                aria-label="Mission walkthrough"
-                id="film-mission"
-              >
-                <track
-                  kind="captions"
-                  label="English"
-                  srclang="en"
-                  data-src="__FILM_MISSION_CAPTIONS__"
-                />
-              </video>
-              <a
-                class="film-cover"
-                href="__FILM_MISSION_VIDEO__"
-                aria-label="Play Mission film"
-              >
-                <img
-                  src="__FILM_MISSION_POSTER__"
-                  width="1600"
-                  height="900"
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span class="film-play"
-                  ><span aria-hidden="true">▶</span> Watch film</span
-                >
-              </a>
-            </div>
-            <figcaption>
-              <span><strong>Mission</strong> · Idea to pull request</span>
-              <button
-                class="film-captions"
-                type="button"
-                aria-label="Mission captions"
-                aria-controls="film-mission"
-                aria-pressed="true"
-                hidden
-              >
-                CC · Captions
-              </button>
-            </figcaption>
-          </figure>
-          <div class="session-principles">
-            <article class="session-principle reveal">
-              <span>01</span>
-              <h3>Shape the work</h3>
-              <p>
-                Work through the requirements with an agent, refine the scope,
-                and approve a plan before implementation begins.
+          </h1>
+          <div class="hero-intro">
+            <div>
+              <p class="hero-lede">
+                Run Codex and Claude Code agents side by side. __PRODUCT_NAME__
+                handles the coordination, so you stay on the problem and make
+                the calls.
               </p>
-            </article>
-            <article class="session-principle reveal delay-1">
-              <span>02</span>
-              <h3>Connect the stages</h3>
-              <p>
-                Let the workflow coordinate execution and handoffs. Context,
-                progress, and artifacts stay with the work as it moves forward.
-              </p>
-            </article>
-            <article class="session-principle reveal delay-2">
-              <span>03</span>
-              <h3>Stay in control</h3>
-              <p>
-                Inspect what agents produce, guide the next step, and make the
-                decisions that need your judgment. Orchestrated doesn’t mean
-                unattended.
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="routing" class="routing-section">
-        <div class="shell routing-grid">
-          <div class="routing-copy reveal">
-            <p class="section-kicker">02 / Give work its own space</p>
-            <h2>Delegate the task.<br /><span>Keep the context.</span></h2>
-            <p>
-              Turn a feature discussion into focused work. Hand it to a
-              dedicated agent in an isolated worktree, keep iterating together,
-              and merge the changes back when they’re ready.
-            </p>
-            <div class="routing-note">
-              <span>The right space for the work</span>
-              <p>
-                Continue with existing context or create an isolated worktree.
-                Parallel work gets its own space without losing the path back.
-              </p>
-            </div>
-          </div>
-          <figure class="product-film reveal delay-1">
-            <div class="film-frame">
-              <video
-                controls
-                playsinline
-                muted
-                preload="none"
-                hidden
-                tabindex="0"
-                aria-label="Delegation walkthrough"
-                id="film-delegation"
-              >
-                <track
-                  kind="captions"
-                  label="English"
-                  srclang="en"
-                  data-src="__FILM_DELEGATION_CAPTIONS__"
-                />
-              </video>
-              <a
-                class="film-cover"
-                href="__FILM_DELEGATION_VIDEO__"
-                aria-label="Play Delegation film"
-              >
-                <img
-                  src="__FILM_DELEGATION_POSTER__"
-                  width="1600"
-                  height="900"
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span class="film-play"
-                  ><span aria-hidden="true">▶</span> Watch film</span
-                >
-              </a>
-            </div>
-            <figcaption>
-              <span
-                ><strong>Delegation</strong> · Isolate the work. Merge it
-                back.</span
-              >
-              <button
-                class="film-captions"
-                type="button"
-                aria-label="Delegation captions"
-                aria-controls="film-delegation"
-                aria-pressed="true"
-                hidden
-              >
-                CC · Captions
-              </button>
-            </figcaption>
-          </figure>
-        </div>
-      </section>
-
-      <section id="workspace" class="git-section">
-        <div class="shell git-grid">
-          <div class="git-copy reveal">
-            <p class="section-kicker section-kicker-light">
-              03 / Automatic code review
-            </p>
-            <h2>Review. Fix. Verify.<br /><em>Automatically.</em></h2>
-            <p>
-              An independent agent reviews your code. Korus fixes findings at
-              the severity levels you choose, then starts another review round
-              to verify the result. Want an adversarial perspective? Have
-              Claude review Codex’s work—or the other way around.
-            </p>
-            <ul>
-              <li>Every review round starts with fresh context.</li>
-              <li>You choose which severity levels get fixed.</li>
-              <li>The loop stops when the review is clear or your round limit is reached.</li>
-            </ul>
-          </div>
-          <figure class="product-film reveal delay-1">
-            <div class="film-frame">
-              <video
-                controls
-                playsinline
-                muted
-                preload="none"
-                hidden
-                tabindex="0"
-                aria-label="Code Review walkthrough"
-                id="film-review"
-              >
-                <track
-                  kind="captions"
-                  label="English"
-                  srclang="en"
-                  data-src="__FILM_REVIEW_CAPTIONS__"
-                />
-              </video>
-              <a
-                class="film-cover"
-                href="__FILM_REVIEW_VIDEO__"
-                aria-label="Play Code Review film"
-              >
-                <img
-                  src="__FILM_REVIEW_POSTER__"
-                  width="1600"
-                  height="900"
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span class="film-play"
-                  ><span aria-hidden="true">▶</span> Watch film</span
-                >
-              </a>
-            </div>
-            <figcaption>
-              <span
-                ><strong>Code Review</strong> · Review, fix, verify automatically</span
-              >
-              <button
-                class="film-captions"
-                type="button"
-                aria-label="Code Review captions"
-                aria-controls="film-review"
-                aria-pressed="true"
-                hidden
-              >
-                CC · Captions
-              </button>
-            </figcaption>
-          </figure>
-        </div>
-      </section>
-
-      <section id="automations" class="automations-section">
-        <div class="shell automations-grid">
-          <div
-            class="automation-console reveal"
-            role="img"
-            aria-label="Example automation: a project summary in an existing agent every weekday at 9 AM, with completed runs"
-          >
-            <header>
-              <strong>Automations</strong><span class="mono">Local</span>
-            </header>
-            <div class="automation-body">
-              <aside>
-                <small>SCHEDULED PROMPTS</small>
-                <div class="active">
-                  <span>◷</span><strong>Morning review</strong><i>On</i>
-                </div>
-                <div>
-                  <span>◷</span><strong>Dependency check</strong><i>On</i>
-                </div>
-              </aside>
-              <div class="automation-detail">
-                <div class="automation-title">
-                  <small>AUTOMATION</small><strong>Morning review</strong
-                  ><span>Enabled</span>
-                </div>
-                <div class="automation-prompt">
-                  <small>PROMPT</small>
-                  <p>
-                    Summarize recent changes to this project and flag anything
-                    that needs my attention. Do not change files.
-                  </p>
-                </div>
-                <div class="automation-settings">
-                  <div>
-                    <small>RUN IN</small><strong>Existing agent</strong
-                    ><span>Web app</span>
-                  </div>
-                  <div>
-                    <small>SCHEDULE</small><strong>Weekdays</strong
-                    ><span>9:00 AM · Chicago</span>
-                  </div>
-                </div>
-                <div class="run-history">
-                  <small>RECENT RUNS</small
-                  ><span
-                    ><i></i><strong>Today</strong> Completed
-                    <time>9:00 AM</time></span
-                  ><span
-                    ><i></i><strong>Yesterday</strong> Completed
-                    <time>9:00 AM</time></span
-                  >
-                </div>
+              <div class="hero-meta" aria-label="Product details">
+                <span>macOS</span><span class="dot"></span><span>Windows</span
+                ><span class="dot"></span><span>Linux</span
+                ><span class="dot"></span><span>Free to use</span>
               </div>
             </div>
+            <div class="hero-actions">
+              <a
+                class="button button-primary"
+                href="#download"
+                data-platform-download
+                ><span>Download<span data-platform-label></span></span>
+                <span aria-hidden="true">→</span></a
+              >
+              <a class="text-link" href="#download"
+                >All downloads <span aria-hidden="true">↓</span></a
+              >
+            </div>
           </div>
-          <div class="automations-copy reveal delay-1">
-            <p class="section-kicker">04 / Repeatable work</p>
-            <h2>Make the repeatable<br /><span>automatic.</span></h2>
-            <p>
-              Give an agent a prompt and a schedule. Run a daily project
-              summary, a weekly dependency check, or your own routine in an
-              existing conversation—or a fresh Quick Chat each time.
-            </p>
-            <small
-              >Set it up in Automations or ask in chat. Check each run’s result
-              in its conversation.</small
+        </div>
+
+        <div id="workflows" class="showcase reveal delay-1">
+          <div class="showcase-tabs" role="tablist" aria-label="Workflows">
+            <button
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="showcase-delegation"
             >
-            <a class="text-link" href="/docs/features/automations.html"
-              >Set up an automation <span aria-hidden="true">↗</span></a
+              <span class="showcase-label">Parallel work</span>
+              <strong>Start the next task while this one runs.</strong>
+              <span class="showcase-detail">
+                Hand it to a teammate. __PRODUCT_NAME__ sets up the workspace
+                and brings the changes back when they’re ready.
+              </span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="showcase-review"
+              tabindex="-1"
+            >
+              <span class="showcase-label">Reliable results</span>
+              <strong>One review pass misses things. Run several.</strong>
+              <span class="showcase-detail">
+                Each round starts fresh, fixes what it finds, and checks again.
+                Add a second model for a challenging view.
+              </span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="showcase-mission"
+              tabindex="-1"
+            >
+              <span class="showcase-label">Big ideas</span>
+              <strong>Too big for one prompt? Make it a Mission.</strong>
+              <span class="showcase-detail">
+                Agree on requirements, split the work into tickets, and approve
+                each step before code changes.
+              </span>
+            </button>
+          </div>
+          <div class="showcase-stage">
+            <video
+              id="showcase-delegation"
+              class="is-active"
+              muted
+              playsinline
+              preload="none"
+              poster="__FILM_DELEGATION_POSTER__"
+              data-src="__FILM_DELEGATION_VIDEO__"
+              aria-label="Delegation walkthrough"
+            >
+              <track
+                kind="captions"
+                label="English"
+                srclang="en"
+                data-src="__FILM_DELEGATION_CAPTIONS__"
+              />
+            </video>
+            <video
+              id="showcase-review"
+              muted
+              playsinline
+              preload="none"
+              poster="__FILM_REVIEW_POSTER__"
+              data-src="__FILM_REVIEW_VIDEO__"
+              aria-label="Code Review walkthrough"
+            >
+              <track
+                kind="captions"
+                label="English"
+                srclang="en"
+                data-src="__FILM_REVIEW_CAPTIONS__"
+              />
+            </video>
+            <video
+              id="showcase-mission"
+              muted
+              playsinline
+              preload="none"
+              poster="__FILM_MISSION_POSTER__"
+              data-src="__FILM_MISSION_VIDEO__"
+              aria-label="Mission walkthrough"
+            >
+              <track
+                kind="captions"
+                label="English"
+                srclang="en"
+                data-src="__FILM_MISSION_CAPTIONS__"
+              />
+            </video>
+            <a class="showcase-watch" href="__FILM_DELEGATION_VIDEO__"
+              ><span aria-hidden="true">▶</span> Watch with sound</a
             >
           </div>
         </div>
       </section>
 
-      <section class="more shell">
+      <section id="features" class="more shell">
         <div class="section-heading reveal">
           <div>
-            <p class="section-kicker">05 / The workspace behind the workflow</p>
+            <p class="section-kicker">The workspace behind the workflow</p>
             <h2>
               Agents, context, and tools.<br /><span>Working together.</span>
             </h2>
           </div>
           <p>
-            Choose your agents, explore a design, and follow parallel work. The
-            supporting tools are here when the workflow needs them.
+            Follow parallel work, explore a design, schedule routines, and
+            choose your agents. The supporting tools are here when the workflow
+            needs them.
           </p>
         </div>
         <div class="capability-grid">
@@ -444,11 +225,15 @@
               See progress across your teams and spot the work that needs a
               decision. Pick up the thread without checking every conversation.
             </p>
-            <div class="tool-stream" aria-hidden="true">
-              <span><i>●</i> 4 sessions working</span
-              ><span><i>✓</i> 2 ready for review</span
-              ><span class="running"><i></i> 1 needs attention</span>
-            </div>
+            <img
+              class="capability-shot"
+              src="assets/screens/cockpit.webp?v=screens-1"
+              width="2136"
+              height="960"
+              alt="The Cockpit showing a team of agents, some working and some idle"
+              loading="lazy"
+              decoding="async"
+            />
           </article>
           <article class="capability reveal">
             <span class="capability-label">QUICK CHAT</span>
@@ -574,6 +359,44 @@
               </figcaption>
             </figure>
           </article>
+          <article id="automations" class="capability reveal delay-1">
+            <span class="capability-label">AUTOMATIONS</span>
+            <h3>Make the repeatable automatic.</h3>
+            <p>
+              Give an agent a prompt and a schedule. Run a daily project summary
+              or a weekly dependency check in an existing conversation or a
+              fresh Quick Chat.
+              <a class="text-link" href="/docs/features/automations.html"
+                >Set up an automation <span aria-hidden="true">↗</span></a
+              >
+            </p>
+            <img
+              class="capability-shot"
+              src="assets/screens/automation.webp?v=screens-2"
+              width="1552"
+              height="925"
+              alt="An automation with a prompt, a team, and a weekday 9 AM schedule"
+              loading="lazy"
+              decoding="async"
+            />
+          </article>
+          <article class="capability reveal">
+            <span class="capability-label">BACKGROUND RUNTIME</span>
+            <h3>Switch sessions. The others keep their place.</h3>
+            <p>
+              The background daemon keeps turns alive, while status and unread
+              signals make it easy to know where to return.
+            </p>
+            <img
+              class="capability-shot"
+              src="assets/screens/runtime.webp?v=screens-2"
+              width="1510"
+              height="900"
+              alt="The sidebar showing agents that are working or have unread results"
+              loading="lazy"
+              decoding="async"
+            />
+          </article>
           <article class="capability reveal delay-1">
             <span class="capability-label">YOUR CHOICE OF AGENTS</span>
             <h3>Codex, Claude Code—or both.</h3>
@@ -581,20 +404,6 @@
               Choose the engine for each agent. Keep their work together in one
               workspace, across local repositories and remote teams.
             </p>
-            <div class="tab-preview" aria-hidden="true">
-              <span>Codex</span><span>Claude Code</span>
-            </div>
-          </article>
-          <article class="capability reveal delay-1">
-            <span class="capability-label">BACKGROUND RUNTIME</span>
-            <h3>Switch sessions. The others keep their place.</h3>
-            <p>
-              The background daemon keeps turns alive, while status and unread
-              signals make it easy to know where to return.
-            </p>
-            <div class="daemon-status" aria-hidden="true">
-              <i></i> daemon running <span>7 agents</span>
-            </div>
           </article>
           <article class="capability reveal">
             <span class="capability-label">GUIDED COMPUTER USE · MAC</span>
@@ -603,10 +412,6 @@
               Opt-in Computer Use lets a session inspect and operate native
               applications while every action remains visible.
             </p>
-            <div class="computer-target" aria-hidden="true">
-              <span>◉</span><strong>Inspecting Safari</strong
-              ><i>frontmost window</i>
-            </div>
           </article>
         </div>
       </section>
@@ -676,6 +481,6 @@
       <span>Software engineering, orchestrated.</span>
       <span class="mono">© <span id="year"></span> nabocorp</span>
     </footer>
-    <script src="script.js?v=platform-downloads-1"></script>
+    <script src="script.js?v=hero-films-1"></script>
   </body>
 </html>
