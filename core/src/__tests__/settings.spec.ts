@@ -3,6 +3,12 @@ import { createEmptySnapshot } from '../snapshot';
 import { defaultAppshotSettings, defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings, normalizeAppshotSettings, normalizeGeneralSettings, normalizePluginSettings, normalizeSourceFolderState, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
 
 describe('settings contracts', () => {
+  it('updates one global Git preference without replacing the other', () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.general.git = { pull: 'rebase', update: 'merge' };
+    updateSettingsInSnapshot(snapshot, { general: { git: { update: 'rebase' } } });
+    expect(snapshot.general.git).toStrictEqual({ pull: 'rebase', update: 'rebase' });
+  });
   it('defaults follow-ups to queue and retains only supported behavior choices', () => {
     expect(normalizeGeneralSettings({}).followUpBehavior).toBe('queue');
     expect(normalizeGeneralSettings({ followUpBehavior: 'steer' }).followUpBehavior).toBe('steer');
@@ -27,6 +33,7 @@ describe('settings contracts', () => {
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     })).toStrictEqual({
+      git: { pull: 'git-config', update: 'merge' },
       commitMessageInstructions: '',
       pullRequestInstructions: '',
       codexBinaryPath: '/opt/homebrew/bin/codex',
@@ -128,6 +135,7 @@ describe('settings contracts', () => {
     });
 
     expect(snapshot.general).toStrictEqual({
+      git: { pull: 'git-config', update: 'merge' },
       commitMessageInstructions: '',
       pullRequestInstructions: '',
       codexBinaryPath: '',

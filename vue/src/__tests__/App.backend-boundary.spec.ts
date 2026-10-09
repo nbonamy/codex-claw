@@ -74,7 +74,10 @@ describe('Unified backend → mounted application', () => {
     expect(api.sendPrompt).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])('opens /review and consumes only existing review readiness (flag present: %s)', async (ready) => {
+  it.each([
+    [true, '/review', ''],
+    [false, '  /review   Focus on race conditions.\nCheck backward compatibility.  ', 'Focus on race conditions.\nCheck backward compatibility.'],
+  ] as const)('opens review setup and forwards instructions (flag present: %s)', async (ready, prompt, instructions) => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
     const agent = snapshot.agents[0]!;
@@ -87,7 +90,7 @@ describe('Unified backend → mounted application', () => {
     await flushPromises();
 
     const editor = wrapper.get('[role="textbox"][contenteditable]');
-    editor.element.textContent = '/review';
+    editor.element.textContent = prompt;
     await editor.trigger('input');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
@@ -100,6 +103,16 @@ describe('Unified backend → mounted application', () => {
     expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(false);
     expect(wrapper.find('.thread-flag-affordance').exists()).toBe(true);
     expect(api.sendPrompt).not.toHaveBeenCalled();
+    const field = wrapper.get<HTMLTextAreaElement>('textarea[aria-label="Additional instructions"]');
+    expect(field.element.value).toBe(instructions);
+    api.startCodeReview.mockResolvedValue(cleared);
+    await wrapper.get('.code-review-panel__start').trigger('click');
+    await flushPromises();
+    expect(api.startCodeReview).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      automation: { enabled: false, maxPriority: 'p2', maxRounds: 3, autoCommit: false },
+      backend: 'codex', scope: { type: 'uncommitted' }, threadMode: 'independent',
+      ...(instructions ? { instructions } : {}),
+    });
   });
 
   it('handles app-owned thread flag execution, dismissal, and review routing through the client seam', async () => {

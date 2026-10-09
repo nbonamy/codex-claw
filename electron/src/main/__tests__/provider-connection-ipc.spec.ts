@@ -25,6 +25,19 @@ vi.mock('electron', () => ({
 }));
 
 describe('provider sign-out IPC', () => {
+  it('routes provider version checks and confirmed upgrades through preload to the owning host', async () => {
+    const state = { backend: 'claude', status: 'waiting', method: 'native', canUpgrade: true, busy: true };
+    const request = vi.fn().mockResolvedValue(state);
+    const controller = new AppController(createInitialSnapshot(), createBackendClient({ request }), fakeAppLifecycle());
+    controller.registerIpcHandlers();
+    await import('../../preload/index');
+    const api = bridge.exposed.get('app') as AppApi;
+    await expect(api.getProviderUpdate('claude', 'wall-e', true)).resolves.toEqual(state);
+    expect(request).toHaveBeenLastCalledWith('provider/update/get', { backend: 'claude', remoteConnectionId: 'wall-e', refresh: true });
+    const input = { action: 'upgrade' as const, confirmed: true, token: 'checked-installation' };
+    await expect(api.setProviderUpdate('claude', input, 'wall-e')).resolves.toEqual(state);
+    expect(request).toHaveBeenLastCalledWith('provider/update/set', { backend: 'claude', input, remoteConnectionId: 'wall-e' });
+  });
   it('carries sign-out from the real preload API to daemon with the selected engine and host', async () => {
     const result = { kind: 'claude', connected: false, state: { loggedIn: false } };
     const request = vi.fn().mockResolvedValue(result);

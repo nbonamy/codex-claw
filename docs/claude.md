@@ -32,9 +32,17 @@ adding steering, forks, goals, turn mutations or context controls.
   only when no live session exists, and an in-flight history read cannot replace a
   session started meanwhile.
 - A shared semantic adapter turns tool use (Bash, Read/Write/Edit/Glob/Grep, web,
-  Agent, MCP) into app-owned titles, paths and statistics for both live and
-  historical records. Read/Write/Edit/NotebookEdit also emit file activity so file
-  links and Git status stay current.
+  Skill, MCP, and tools such as todos, tasks, subagents and worktrees)
+  into app-owned titles, paths and statistics for both live and historical
+  records. Read/Write/Edit/NotebookEdit also emit file activity so file links and
+  Git status stay current.
+- Tool rows reach the renderer as the same status descriptors Codex produces, so
+  both providers read alike. Simple read-only shell commands (`cat`, `ls`, `rg`,
+  and similar) are classified into read, list and search; anything with shell
+  syntax or an unrecognized flag stays a plain run, because a wrong summary is
+  worse than the literal command. Tools with no file or command shape carry a
+  `scope` and `operation` in the descriptor, and the renderer owns the wording.
+  A tool the adapter does not know falls back to the SDK's generic title.
 - **Outcome ordering.** Explicit interruption is reported before failure, and
   failure before success. An error result or unexpected iterator end emits a failed
   outcome even after a durable task result was submitted (that result stays

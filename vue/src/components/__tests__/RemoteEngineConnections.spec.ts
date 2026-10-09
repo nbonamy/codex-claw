@@ -14,6 +14,20 @@ const connection: RemoteConnection = {
 afterEach(() => { configureAppClient(undefined); document.body.innerHTML = ''; });
 
 describe('RemoteEngineConnections', () => {
+  it('keeps Antigravity sign-in native without offering unsupported remote upgrades', async () => {
+    const { api } = createClientApiMock();
+    api.getProviderConnections.mockResolvedValue([{ backend: 'antigravity', installed: true, connected: false, checking: false }]);
+    configureAppClient({ platform: 'desktop', api });
+    const wrapper = mount(RemoteEngineConnections, { props: { connection } });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Antigravity');
+    expect(wrapper.find('[aria-label="Check for updates"]').exists()).toBe(false);
+    expect(api.getProviderUpdate).not.toHaveBeenCalled();
+    await wrapper.get('.form-row__control button').trigger('click');
+    expect(wrapper.get('[role="alert"]').text()).toContain('Sign in to Antigravity on the remote host');
+    expect(api.authenticateProvider).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('toggles an authenticated remote engine from cached status without another auth check', async () => {
     const { api } = createClientApiMock();
     const engine = { backend: 'claude' as const, installed: true, connected: true, checking: false, enabled: true,

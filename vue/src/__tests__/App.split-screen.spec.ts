@@ -22,6 +22,52 @@ async function chooseLayout(wrapper: ReturnType<typeof mount>, label: string) {
 }
 
 describe('split-screen conversations', () => {
+  it('keeps slash review instructions scoped to the sending pane and clears them when its tab closes', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'codex', installed: true, connected: true, checking: false }];
+    const { api } = installBackendFixture(snapshot);
+    api.selectAgent.mockImplementation(async id => ({
+      ...snapshot, activeAgentId: id,
+      teams: snapshot.teams.map(team => ({ ...team, activeAgentId: id })),
+    }));
+    api.startCodeReview.mockResolvedValue(snapshot);
+    const wrapper = mount(App, { attachTo: document.body, global: { components: { ElPopover } } });
+    await flushPromises();
+    await chooseLayout(wrapper, 'Vertical Split');
+    const panes = wrapper.findAll('.agent-split-grid__pane');
+    for (const [index, pane] of panes.entries()) {
+      await pane.trigger('pointerdown');
+      await flushPromises();
+      const editor = pane.get('[contenteditable="true"]');
+      editor.element.textContent = `/review Focus for pane ${index}`;
+      await editor.trigger('input');
+      await pane.get('form').trigger('submit');
+      await flushPromises();
+    }
+    const panels = wrapper.findAllComponents({ name: 'CodeReviewPanel' });
+    for (const [index, agent] of snapshot.agents.slice(0, 2).entries()) {
+      const panel = panels.find(panel => panel.props('agent').id === agent.id)!;
+      expect(panel.get<HTMLTextAreaElement>('textarea').element.value).toBe(`Focus for pane ${index}`);
+    }
+    const firstWorkspace = wrapper.findAllComponents({ name: 'RightWorkspacePanel' })
+      .find(panel => panel.props('agent').id === snapshot.agents[0]!.id)!;
+    await firstWorkspace.get('[aria-label="Close Review tab"]').trigger('click');
+    await panes[0]!.trigger('pointerdown');
+    await flushPromises();
+    const firstEditor = panes[0]!.get('[contenteditable="true"]');
+    firstEditor.element.textContent = '/review';
+    await firstEditor.trigger('input');
+    await panes[0]!.get('form').trigger('submit');
+    await flushPromises();
+    expect(firstWorkspace.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
+    const second = panels.find(panel => panel.props('agent').id === snapshot.agents[1]!.id)!;
+    await second.get('.code-review-panel__start').trigger('click');
+    await flushPromises();
+    expect(api.startCodeReview).toHaveBeenCalledWith(snapshot.agents[1]!.id, expect.objectContaining({ instructions: 'Focus for pane 1' }));
+    expect(api.sendPrompt).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it.each([
     ['Single Pane', false], ['Vertical Split', false], ['Horizontal Split', false], ['4-Pane Split', false],
     ['Single Pane', true], ['Vertical Split', true],

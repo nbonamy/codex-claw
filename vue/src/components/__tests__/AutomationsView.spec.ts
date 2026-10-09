@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { reactive } from 'vue';
-import { ElInput, ElSelect, ElOption, ElSwitch, ElButton, ElPopover, ElMessageBox } from 'element-plus';
+import { ElInput, ElSelect, ElOption, ElOptionGroup, ElSwitch, ElButton, ElPopover, ElMessageBox } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import type { Automation, RemoteConnection } from '@workspace/core/contracts';
@@ -16,7 +16,7 @@ const remote: RemoteConnection = { id: 'remote', kind: 'ssh', name: 'devbox', ho
 function view(overrides: Partial<InstanceType<typeof AutomationsView>['$props']> = {}) {
   return mount(AutomationsView, { attachTo: document.body,
     props: { agents: snapshot.agents, teams: snapshot.teams, automations: [], ...overrides },
-    global: { components: { ElInput, ElSelect, ElOption, ElSwitch, ElButton, ElPopover } } });
+    global: { components: { ElInput, ElSelect, ElOption, ElOptionGroup, ElSwitch, ElButton, ElPopover } } });
 }
 async function choose(wrapper: ReturnType<typeof view>, label: string, option: string) {
   const control = wrapper.get(`[aria-label="${label}"]`);
@@ -34,6 +34,7 @@ async function menu(wrapper: ReturnType<typeof view>, action: string) {
 afterEach(() => { vi.restoreAllMocks(); });
 describe('AutomationsView', () => {
   it('creates and edits scheduled prompts through the real editor', async () => {
+    const warnings = vi.spyOn(console, 'warn');
     const createAutomation = vi.fn().mockResolvedValue(undefined);
     const updateAutomation = vi.fn().mockResolvedValue(undefined);
     const wrapper = view({ createAutomation, updateAutomation });
@@ -56,6 +57,7 @@ describe('AutomationsView', () => {
     expect(updateAutomation).toHaveBeenCalledWith(expect.objectContaining({ id: 'auto', prompt: 'Summarize tasks' }));
     expect(wrapper.find('form').exists()).toBe(false);
     expect(getComputedStyle(wrapper.get('.automations-view__panel').element).maxWidth).toBe('920px');
+    expect(warnings).not.toHaveBeenCalled();
   });
 
   it('routes remote creation and runs only to the selected host without requiring a work provider', async () => {

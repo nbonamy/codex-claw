@@ -80,6 +80,7 @@ export class CodeReviewService {
       backend: input.backend ?? agent.backend,
       model: input.model,
       reasoningEffort: input.reasoningEffort,
+      instructions: input.instructions,
       threadMode: 'independent',
       automation: {
         enabled: true,
@@ -801,6 +802,7 @@ export class CodeReviewService {
         : { type: 'uncommitted' },
       threadMode: input.threadMode,
       status: 'reviewing',
+      ...(input.instructions?.trim() ? { instructions: input.instructions.trim() } : {}),
       activeRoundId: round.id,
       rounds: [round],
       ...(input.automation?.enabled ? { automation: { ...input.automation, state: 'running' as const, commits: [] } } : {}),
@@ -949,7 +951,7 @@ Before ending this inspection turn, you MUST call mcp__${mcpServerName}__finish_
 After accepted inspection completion, end the turn with a natural summary of one or two short sentences. If there are no actionable findings, say so plainly; otherwise state how many findings you registered. Do not list or repeat the findings in chat, imply that the review is an approval to ship, or use a generic "Review complete" response.
 </context>
 
-Review ${visibleScope}.`;
+Review ${visibleScope}.${session.instructions ? `\n\nAdditional instructions from the user:\n${session.instructions}` : ''}`;
 }
 
 function fixPrompt(session: CodeReviewSession, round: CodeReviewRound, findings: CodeReviewFinding[]): string {

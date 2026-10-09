@@ -46,6 +46,19 @@ describe('state persistence', () => {
     expect(restored.general.providerModelDefaults).toStrictEqual(snapshot.general.providerModelDefaults);
     expect(restored.general.providerApprovalDefaults).toStrictEqual(snapshot.general.providerApprovalDefaults);
   });
+
+  it('defaults Pull to Git configuration and preserves explicit choices', () => {
+    const fresh = createEmptySnapshot();
+    expect(fresh.general.git?.pull).toBe('git-config');
+    const saved = persistedStateFromSnapshot(fresh);
+    delete saved.general.git;
+    const restored = snapshotFromPersistedState(saved);
+    expect(restored.general.git).toStrictEqual({ pull: 'git-config', update: 'merge' });
+    for (const pull of ['merge', 'rebase'] as const) {
+      restored.general.git!.pull = pull;
+      expect(snapshotFromPersistedState(persistedStateFromSnapshot(restored)).general.git?.pull).toBe(pull);
+    }
+  });
   it('drops repository-based automation definitions without migrating or deleting their agents', () => {
     const snapshot = createInitialSnapshot();
     const persisted = persistedStateFromSnapshot(snapshot);
@@ -1312,7 +1325,7 @@ describe('state persistence', () => {
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
-    expect(restored.general).toStrictEqual(snapshot.general);
+    expect(restored.general).toStrictEqual({ ...snapshot.general, git: { pull: 'git-config', update: 'merge' } });
   });
 
   it('removes credentials from restored workspace origins', () => {

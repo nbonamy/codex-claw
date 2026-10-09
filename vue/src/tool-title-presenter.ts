@@ -6,6 +6,11 @@ import {
 type ToolPhase = 'completed' | 'failed' | 'running';
 type AgentNameResolver = (identifier: string) => string | undefined;
 
+const SIMULATOR_ACTIONS = new Set([
+  'list', 'status', 'attach', 'detach', 'shutdown', 'screenshot',
+  'inspect', 'tap', 'swipe', 'text', 'button', 'launch',
+]);
+
 const TOOL_KEYS: Record<string, string> = {
   simulator: 'simulator',
   'read-skill': 'readSkill',
@@ -92,14 +97,28 @@ export function presentAppToolTitle({
   const tool = appToolName(toolCall.function, toolCall.kind, toolCall.metadata, descriptor?.params?.tool);
   if (!tool) return undefined;
 
-  const key = TOOL_KEYS[tool];
+  const args = isRecord(toolCall.args) ? toolCall.args : {};
+  const simulatorAction = tool === 'simulator' && typeof args.action === 'string' && SIMULATOR_ACTIONS.has(args.action)
+    ? args.action : undefined;
+  const key = simulatorAction ? `simulator.${simulatorAction}` : TOOL_KEYS[tool];
   if (!key) return undefined;
 
-  const args = isRecord(toolCall.args) ? toolCall.args : {};
   const phase = toolPhase(descriptor?.phase, toolCall.state);
   return translate(`chat.tool.mcp.app.${key}.${phase}`, {
-    target: toolTarget(tool, args, toolCall.result, phase, resolveAgentName),
+    target: simulatorAction === 'attach'
+      ? (phase === 'completed' ? simulatorDeviceName(toolCall.result) : undefined) ?? translate('chat.tool.mcp.app.simulator.device')
+      : toolTarget(tool, args, toolCall.result, phase, resolveAgentName),
   });
+}
+
+function simulatorDeviceName(result: unknown): string | undefined {
+  for (const payload of nestedResultRecords(result)) {
+    const attachment = isRecord(payload.attachment) ? payload.attachment : undefined;
+    const device = attachment && isRecord(attachment.device) ? attachment.device : undefined;
+    const name = device && firstString(device.name);
+    if (name) return name;
+  }
+  return undefined;
 }
 
 export function appToolName(

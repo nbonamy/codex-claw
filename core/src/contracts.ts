@@ -465,6 +465,7 @@ export type SavedPromptDraft = {
 export type CockpitAgentViewMode = 'teams' | 'recent';
 
 export type AppGeneralSettings = {
+  git?: import('./git-preferences').GitSettings;
   commitMessageInstructions: string;
   pullRequestInstructions: string;
   preventSleepWhenAgentsRun: boolean;
@@ -502,7 +503,8 @@ export type AppGeneralSettings = {
   plugins?: AppPluginSettings;
 };
 
-export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugins'>> & {
+export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugins' | 'git'>> & {
+  git?: Partial<import('./git-preferences').GitSettings>;
   plugins?: Partial<AppPluginSettings>;
 };
 
@@ -700,6 +702,7 @@ export type AppCommand =
   | { type: 'debug-open-visualize' }
   | { type: 'debug-open-markdown' }
   | { type: 'debug-missing-engines'; enabled: boolean }
+  | { type: 'debug-provider-upgrades'; enabled: boolean }
   | { type: 'debug-operation-progress'; kind: 'worktreeInitialization' | 'pullRequest' | 'merge' }
   | { type: 'edit-active-agent' }
   | { type: 'new-team' }
@@ -925,6 +928,8 @@ export type AppApi = {
   getCodexAuthentication(remoteConnectionId?: string): Promise<CodexAuthentication>;
   getClaudeAuthentication(remoteConnectionId?: string): Promise<ClaudeAuthentication>;
   getProviderSetup(remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus[]>;
+  getProviderUpdate(backend: AgentBackend, remoteConnectionId?: string, refresh?: boolean): Promise<import('./contracts/provider-updates').ProviderUpdateStatus>;
+  setProviderUpdate(backend: AgentBackend, input: import('./contracts/provider-updates').ProviderUpdateInput, remoteConnectionId?: string): Promise<import('./contracts/provider-updates').ProviderUpdateStatus>;
   getProviderConnections(remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;
   getProviderUsage(backend: AgentBackend): Promise<AccountRateLimits | null>;
   setProviderEnabled(backend: AgentBackend, enabled: boolean, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;

@@ -25,10 +25,18 @@ come from published packages and `package-lock.json`, never a live sibling SDK.
    intended changes. Never republish an existing version.
 4. Verify every consumed `@codex-app-sdk/*` package is available from npm at the
    selected version, with registry provenance covering the intended SDK commit.
-   Update all Korus `@codex-app-sdk/*` declarations together to exact numeric pins
-   for the selected published version. Refresh `package-lock.json` with the CI
-   Node/npm toolchain and verify every consumed SDK package resolves to that
-   same version. Preserve the local-development opt-in; release dependencies
+   Install the selected version with normal `npm install --save-exact` commands
+   in each consuming workspace, preserving dependencies versus devDependencies.
+   For example, `npm install --save-exact @codex-app-sdk/backend@<version>
+   @codex-app-sdk/core@<version> -w backend`; use `--save-dev` for core's SDK
+   devDependency. Derive the other package/workspace pairs from the manifests.
+   Let npm update both manifests and `package-lock.json`; never manually edit,
+   delete entries from, or reconstruct the lockfile. Do not substitute manifest
+   edits followed by `--package-lock-only` for these dependency installs.
+   Use the installed npm directly. If an install fails or leaves old pins,
+   diagnose that command instead of patching the lockfile or repeatedly trying
+   equivalent installs. Verify the resulting declarations and lock entries once.
+   Preserve the local-development opt-in; release dependencies
    must resolve to npm tarballs, not sibling paths, source aliases, or local
    overrides.
 5. Record this dependency-only diff for the changelog audit. Keep it uncommitted
@@ -67,9 +75,13 @@ git diff --check
 git status --short
 ```
 
-Use the Node/npm versions declared in the release workflow. Only CHANGELOG.md,
+The lockfile-only command above refreshes app-version metadata after SDK
+installation; npm remains the sole lockfile writer. CI validates the clean
+install with the Node/npm versions declared in the release workflow. Only CHANGELOG.md,
 the six package manifests, package-lock.json, and
-vue/src/generated/release-notes.json may change.
+vue/src/generated/release-notes.json may change unless Nicolas explicitly includes
+another change in the release commit. When resuming preparation, reuse completed
+audit and verification results whose inputs have not changed.
 
 The GitHub quality job owns the clean install, Electron setup, lint/typechecks,
 full test suite, script tests, and 85% statement coverage in every workspace

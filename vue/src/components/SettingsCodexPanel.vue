@@ -4,6 +4,7 @@
     title-id="settings-codex-title"
   >
     <SettingsEngineConnectionRow backend="codex" :installed="installed" :title="$t('surface.settingsCodexPanel.codex')" :authentication="authentication" :connected="connected" :enabled="settings.providerEnabled?.codex !== false" :set-enabled="setEnabled" :busy="connectionBusy" :pending="loginPending" :error="connectionError" @refresh="emit('refresh')" @connect="emit('connect')" @disconnect="emit('disconnect')" @cancel="emit('cancel')">
+      <ProviderUpdateRow v-if="installed" backend="codex" />
       <SettingsEngineSetupRow :home="settings.providerHomes?.codex" @customize="emit('customize')" />
     </SettingsEngineConnectionRow>
     <FormSection
@@ -36,6 +37,7 @@ import FormRow from '../shared/form/FormRow.vue';
 import FormSection from '../shared/form/FormSection.vue';
 import SettingsEngineConnectionRow from './SettingsEngineConnectionRow.vue';
 import SettingsEngineSetupRow from './SettingsEngineSetupRow.vue';
+import ProviderUpdateRow from './ProviderUpdateRow.vue';
 import type { ProviderAuthentication } from '@workspace/core/contracts/provider-setup';
 
 const emit = defineEmits<{ connect: []; disconnect: []; cancel: []; customize: []; refresh: [] }>();

@@ -130,6 +130,24 @@ describe('BackendDriverRpc', () => {
     expect(next.close).toHaveBeenCalledOnce();
     expect(claude.close).toHaveBeenCalledOnce();
   });
+  it('waits for process shutdown before upgrading and restores a usable driver even when the upgrade fails', async () => {
+    let release!: () => void;
+    const previous = createDriver({ close: vi.fn(() => new Promise<void>(resolve => { release = resolve; })) });
+    const next = createDriver();
+    const other = createDriver();
+    const drivers = new Map([['codex' as const, previous], ['claude' as const, other]]);
+    const rpc = new BackendDriverRpc(drivers);
+    const upgrade = vi.fn(async () => { throw new Error('installer failed'); });
+    const pending = rpc.replaceDriver('codex', () => next, upgrade);
+    const failed = expect(pending).rejects.toThrow('installer failed');
+    expect(upgrade).not.toHaveBeenCalled();
+    release();
+    await failed;
+    expect(upgrade).toHaveBeenCalledOnce();
+    expect(other.close).not.toHaveBeenCalled();
+    expect(drivers.get('codex')).toBe(next);
+    await rpc.close();
+  });
   it(`appends agent-specific context after the default ${product.name} instructions`, async () => {
     const options = appSurfaceOptions({
       appMcpServerUrl: 'http://localhost:4321/mcp',

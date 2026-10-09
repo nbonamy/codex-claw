@@ -4,6 +4,17 @@ import { surfaceMessages } from './surface-messages';
 export const messages = {
   en: {
     antigravity: { name: 'Antigravity', connect: 'Connect Antigravity', connected: 'Antigravity connected', enable: 'Enable Antigravity', remoteLogin: 'Sign in to Antigravity on the remote host, then retry the connection.', installInstructions: 'Download ACP 1.3.0 for your platform from the linked registry. Extract agy_acp_server.par and localharness_external into the same directory on your PATH and make both executable, then check again.' },
+    gitWorkflow: {
+      title: 'Workflow', pull: 'Pull strategy', update: 'Update from base',
+      strategies: { 'git-config': 'Git configuration', merge: 'Merge', rebase: 'Rebase', 'ff-only': 'Fast-forward only' },
+    },
+    providerUpdate: {
+      version: 'Version', available: '{version} available', current: 'Up to date',
+      upgrade: 'Upgrade', upgradeWhenIdle: 'Upgrade when idle', waiting: 'Waiting for agents to finish', upgrading: 'Upgrading…',
+      check: 'Check for updates', instructions: 'Update instructions',
+      confirmation: `Upgrade this provider on this machine? This also updates the CLI used outside ${product.name}. Affected agents will reconnect when idle.`,
+      errors: { checkFailed: 'Could not check or update this provider. Try again.', installationChanged: 'The installation changed. Check for updates again.', upgradeFailed: 'Upgrade failed. Check the installation and try again.', verificationFailed: 'The expected version was not detected. Check the installation before retrying.' },
+    },
     documents: { saveTabAs: 'Save {title} as…', save: 'Save', saveAs: 'Save As…', destination: 'Save on the agent’s host:', replaceFile: 'Replace the existing file?', replace: 'Replace' },
   promptAutomation: {
     schedule: 'Schedule',
@@ -862,6 +873,144 @@ export const messages = {
           completed: 'Searched tools',
           failed: 'Could not search tools',
         },
+        claude: {
+          todos: {
+            update: {
+              running: 'Updating todo list',
+              completed: 'Updated todo list{progress}',
+              failed: 'Could not update todo list',
+            },
+          },
+          task: {
+            create: {
+              running: 'Creating task {target}',
+              completed: 'Created task {target}',
+              failed: 'Could not create task {target}',
+            },
+            update: {
+              running: 'Updating task {target}',
+              completed: 'Updated task {target}',
+              failed: 'Could not update task {target}',
+            },
+            start: {
+              running: 'Starting task {target}',
+              completed: 'Started task {target}',
+              failed: 'Could not start task {target}',
+            },
+            complete: {
+              running: 'Completing task {target}',
+              completed: 'Completed task {target}',
+              failed: 'Could not complete task {target}',
+            },
+            delete: {
+              running: 'Deleting task {target}',
+              completed: 'Deleted task {target}',
+              failed: 'Could not delete task {target}',
+            },
+            get: {
+              running: 'Reading task {target}',
+              completed: 'Read task {target}',
+              failed: 'Could not read task {target}',
+            },
+            list: {
+              running: 'Listing tasks',
+              completed: 'Listed tasks',
+              failed: 'Could not list tasks',
+            },
+          },
+          background: {
+            output: {
+              running: 'Reading background task output',
+              completed: 'Read background task output',
+              failed: 'Could not read background task output',
+            },
+            stop: {
+              running: 'Stopping background task',
+              completed: 'Stopped background task',
+              failed: 'Could not stop background task',
+            },
+            monitor: {
+              running: 'Monitoring {target}',
+              completed: 'Monitored {target}',
+              failed: 'Could not monitor {target}',
+            },
+          },
+          resources: {
+            list: {
+              running: 'Listing MCP resources {target}',
+              completed: 'Listed MCP resources {target}',
+              failed: 'Could not list MCP resources {target}',
+            },
+            read: {
+              running: 'Reading MCP resource {target}',
+              completed: 'Read MCP resource {target}',
+              failed: 'Could not read MCP resource {target}',
+            },
+            browse: {
+              running: 'Browsing MCP resources {target}',
+              completed: 'Browsed MCP resources {target}',
+              failed: 'Could not browse MCP resources {target}',
+            },
+          },
+          remote: {
+            list: {
+              running: 'Listing remote triggers',
+              completed: 'Listed remote triggers',
+              failed: 'Could not list remote triggers',
+            },
+            get: {
+              running: 'Reading remote trigger',
+              completed: 'Read remote trigger',
+              failed: 'Could not read remote trigger',
+            },
+            create: {
+              running: 'Creating remote trigger',
+              completed: 'Created remote trigger',
+              failed: 'Could not create remote trigger',
+            },
+            update: {
+              running: 'Updating remote trigger',
+              completed: 'Updated remote trigger',
+              failed: 'Could not update remote trigger',
+            },
+            run: {
+              running: 'Running remote trigger',
+              completed: 'Ran remote trigger',
+              failed: 'Could not run remote trigger',
+            },
+          },
+          worktree: {
+            enter: {
+              running: 'Entering worktree {target}',
+              completed: 'Entered worktree {target}',
+              failed: 'Could not enter worktree {target}',
+            },
+            exit: {
+              running: 'Leaving worktree',
+              completed: 'Left worktree',
+              failed: 'Could not leave worktree',
+            },
+            remove: {
+              running: 'Removing worktree',
+              completed: 'Removed worktree',
+              failed: 'Could not remove worktree',
+            },
+          },
+          notification: {
+            send: {
+              running: 'Sending notification',
+              completed: 'Sent notification',
+              failed: 'Could not send notification',
+            },
+          },
+          agent: {
+            delegate: {
+              running: 'Running subagent {target}',
+              completed: 'Ran subagent {target}',
+              failed: 'Subagent failed: {target}',
+            },
+          },
+        },
         fallback: {
           completed: 'Ran {name}',
           running: 'Running {name}',
@@ -932,7 +1081,22 @@ export const messages = {
               failed: 'Failed broadcasting message',
               running: 'Broadcasting message',
             },
-            simulator: { running: 'Using simulator', completed: 'Used simulator', failed: 'Simulator action failed' },
+            simulator: {
+              running: 'Using simulator', completed: 'Used simulator', failed: 'Simulator action failed',
+              device: 'simulator',
+              list: { running: 'Listing simulators', completed: 'Listed simulators', failed: 'Could not list simulators' },
+              status: { running: 'Checking simulator status', completed: 'Checked simulator status', failed: 'Could not check simulator status' },
+              attach: { running: 'Opening {target}', completed: 'Opened {target}', failed: 'Could not open {target}' },
+              detach: { running: 'Detaching simulator', completed: 'Detached simulator', failed: 'Could not detach simulator' },
+              shutdown: { running: 'Shutting down simulator', completed: 'Shut down simulator', failed: 'Could not shut down simulator' },
+              screenshot: { running: 'Capturing simulator screenshot', completed: 'Captured simulator screenshot', failed: 'Could not capture simulator screenshot' },
+              inspect: { running: 'Inspecting simulator screen', completed: 'Inspected simulator screen', failed: 'Could not inspect simulator screen' },
+              tap: { running: 'Tapping simulator screen', completed: 'Tapped simulator screen', failed: 'Could not tap simulator screen' },
+              swipe: { running: 'Swiping simulator screen', completed: 'Swiped simulator screen', failed: 'Could not swipe simulator screen' },
+              text: { running: 'Typing in simulator', completed: 'Typed in simulator', failed: 'Could not type in simulator' },
+              button: { running: 'Pressing simulator button', completed: 'Pressed simulator button', failed: 'Could not press simulator button' },
+              launch: { running: 'Launching simulator app', completed: 'Launched simulator app', failed: 'Could not launch simulator app' },
+            },
             browserClick: {
               completed: 'Clicked page',
               failed: 'Failed clicking page',

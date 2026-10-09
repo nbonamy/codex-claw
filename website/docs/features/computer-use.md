@@ -40,6 +40,7 @@ Computer Use controls the desktop host connected to Korus. It is not automatical
 | --- | --- |
 | Inspect a local web preview or navigate a public website | [In-app Browser](./browser). |
 | Use existing Chrome tabs, login state, or extensions | Chrome plugin setup in [Browser](./browser#external-browser-work). |
+| Try an iOS or Android app in a local virtual device | [Mobile simulators](./workspace#mobile-simulators). |
 | Exercise a native macOS app, dialog, or menu | Computer Use. |
 
 ## Troubleshoot permissions

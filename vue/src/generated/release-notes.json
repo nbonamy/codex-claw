@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.30.0",
+  "currentVersion": "0.31.0",
   "releases": [
+    {
+      "version": "0.31.0",
+      "releasedAt": "2026-10-08",
+      "sourceSha256": "31569fb601aa6ba9d70a49e59b1e40aa1d692aefbd28f74d76e685bb3d8d1fb8",
+      "markdown": "### New features\n\n- Open iOS simulators and Android emulators beside a conversation, with live\n  device screens, touch input, rotation, and hardware controls. Agents can attach\n  to a local simulator, inspect its screen, and interact with your app.\n- See words appear as you speak with live on-device dictation on supported Macs.\n  Dictation replaces the waveform with text, responds sooner, and preserves\n  your draft when you stop or cancel.\n- Agents can switch the built-in browser between device presets and custom\n  viewport dimensions to check responsive layouts.\n- Recently active Cockpit cards show the first line of the agent's latest\n  response, including Codex summaries when available, with activity time as\n  the fallback.\n\n### Improvements and fixes\n\n- Korus detects your installed Codex and Claude Code through PATH. Welcome and\n  Settings offer official installation links and a refresh control when an\n  engine is missing. Codex is no longer bundled or installed automatically.\n- Question and approval cards have a clearer, more consistent layout. Selecting\n  a suggested answer advances the question without an extra confirmation click.\n- Opening an existing folder goes straight to the workspace, and repository\n  indicators recognize its actual default branch.\n- Claude agents reliably show their working status, with simpler tool labels.\n- Review findings accept uppercase priority labels instead of rejecting them."
+    },
     {
       "version": "0.30.0",
       "releasedAt": "2026-10-07",

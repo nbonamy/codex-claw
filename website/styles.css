@@ -573,6 +573,27 @@ input {
   grid-column: span 2;
   background: linear-gradient(120deg, #f3f5fa, rgba(251, 251, 248, 0.9));
 }
+.capability-mobile {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 30px;
+  min-height: 0;
+  padding-block: 38px;
+}
+.capability-mobile h3 {
+  margin: 20px 0 0;
+  font-size: clamp(28px, 3.5vw, 40px);
+}
+.capability-mobile p {
+  margin: 20px 0 0;
+}
+.capability-mobile .capability-shot {
+  width: auto;
+  max-width: 100%;
+  max-height: 440px;
+  margin: 0 auto;
+}
 .download {
   position: relative;
   overflow: hidden;
@@ -796,7 +817,8 @@ input {
     padding: 95px 0;
   }
   .feature-row,
-  .capability-grid {
+  .capability-grid,
+  .capability-mobile {
     grid-template-columns: 1fr;
   }
   .feature {

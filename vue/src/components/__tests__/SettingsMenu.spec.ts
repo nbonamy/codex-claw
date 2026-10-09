@@ -88,6 +88,11 @@ describe('SettingsMenu', () => {
     expect(rows[1]?.text()).toContain('50%');
     expect(rows[1]?.get('.settings-menu__rate-limit-reset').text()).toBe('1d 5h');
     expect(wrapper.get('[aria-label="Usage actions divider"]').attributes('role')).toBe('separator');
+    const header = wrapper.get('.settings-menu__rate-limits-header');
+    expect(getComputedStyle(header.element).display).toBe('flex');
+    const iconStyle = getComputedStyle(header.get('svg').element);
+    expect(iconStyle.width).toBe('var(--icon-sm)');
+    expect(iconStyle.height).toBe('var(--icon-sm)');
 
     vi.advanceTimersByTime(60 * 60 * 1000);
     await nextTick();

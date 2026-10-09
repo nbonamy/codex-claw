@@ -78,6 +78,7 @@ export class AppController {
   private connectionState: BackendConnectionState = { status: 'connecting' };
   private rendererReady = false;
   private debugMissingEngines = false;
+  private debugProviderUpgrades = false;
   private readonly pendingDeepLinkCommands: AppCommand[] = [];
   private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
   private autoUpdateService: DesktopAutoUpdateService | null = null;
@@ -513,6 +514,8 @@ export class AppController {
     ipc.handle(ipcChannels.getCodexAuthentication, (_event, remoteConnectionId?: string) => this.getCodexAuthentication(remoteConnectionId));
     ipc.handle(ipcChannels.getClaudeAuthentication, (_event, remoteConnectionId?: string) => this.getClaudeAuthentication(remoteConnectionId));
     ipc.handle(ipcChannels.getProviderSetup, (_event, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerSetupGet, { remoteConnectionId }));
+    ipc.handle(ipcChannels.getProviderUpdate, (_event, backend, remoteConnectionId, refresh) => this.requireBackendClient().request(backendMethods.providerUpdateGet, { backend, remoteConnectionId, refresh }));
+    ipc.handle(ipcChannels.setProviderUpdate, (_event, backend, input, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerUpdateSet, { backend, input, remoteConnectionId }));
     ipc.handle(ipcChannels.getProviderConnections, (_event, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerConnectionsGet, { remoteConnectionId }));
     ipc.handle(ipcChannels.getProviderUsage, (_event, backend) => this.requireBackendClient().request(backendMethods.providerUsageGet, { backend }));
     ipc.handle(ipcChannels.setProviderEnabled, (_event, backend, enabled, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerEnabledSet, { backend, enabled, remoteConnectionId }));
@@ -714,8 +717,9 @@ export class AppController {
     this.rendererReady = false;
     this.mainWindow.webContents.on('did-start-loading', () => {
       this.rendererReady = false;
-      if (this.debugMissingEngines) {
+      if (this.debugMissingEngines || this.debugProviderUpgrades) {
         this.debugMissingEngines = false;
+        this.debugProviderUpgrades = false;
         this.refreshAppMenu();
       }
     });
@@ -1692,8 +1696,17 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines' | 'getDebugProviderUpgrades' | 'setDebugProviderUpgrades'> {
     return {
+      getDebugProviderUpgrades: () => this.debugProviderUpgrades,
+      setDebugProviderUpgrades: enabled => {
+        if (app.isPackaged) return;
+        this.debugProviderUpgrades = enabled;
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          sendAppCommand(this.mainWindow.webContents, { type: 'debug-provider-upgrades', enabled });
+        }
+        this.refreshAppMenu();
+      },
       getDebugMissingEngines: () => this.debugMissingEngines,
       setDebugMissingEngines: enabled => {
         if (app.isPackaged) return;

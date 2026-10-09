@@ -153,6 +153,8 @@ export function createClientApiMock(
     getCodexAuthentication: unscripted('getCodexAuthentication'),
     getClaudeAuthentication: unscripted('getClaudeAuthentication'),
     getProviderSetup: unscripted('getProviderSetup'),
+    getProviderUpdate: vi.fn<Api['getProviderUpdate']>(async backend => ({ backend, status: 'unavailable', method: 'manual', canUpgrade: false, busy: false })),
+    setProviderUpdate: unscripted('setProviderUpdate'),
     getProviderConnections: unscripted('getProviderConnections'),
     getProviderUsage: unscripted('getProviderUsage'),
     setProviderEnabled: unscripted('setProviderEnabled'),

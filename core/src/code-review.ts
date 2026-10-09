@@ -9,6 +9,7 @@ export type CodeReviewScope =
 export type CodeReviewThreadMode = 'current' | 'independent';
 
 export type CodeReviewStartInput = {
+  instructions?: string;
   backend?: 'codex' | 'claude' | 'antigravity';
   model?: string;
   reasoningEffort?: string;
@@ -101,6 +102,7 @@ export type CodeReviewRound = {
 
 export type CodeReviewSession = {
   id: string;
+  instructions?: string;
   /** Agent whose workspace and changes are being reviewed. */
   targetAgentId: string;
   /** Visible agent whose provider conversation performs the review. */
@@ -234,6 +236,7 @@ export function cloneCodeReviewSession(session: CodeReviewSession): CodeReviewSe
 
 export function isCodeReviewStartInput(value: unknown): value is CodeReviewStartInput {
   return isRecord(value) && isCodeReviewScope(value.scope) && isCodeReviewThreadMode(value.threadMode)
+    && (value.instructions === undefined || typeof value.instructions === 'string')
     && (value.backend === undefined || value.backend === 'codex' || value.backend === 'claude' || value.backend === 'antigravity')
     && optionalSelection(value.model) && optionalSelection(value.reasoningEffort)
     && (value.threadMode === 'independent' || (value.model === undefined && value.reasoningEffort === undefined))
@@ -273,6 +276,7 @@ export function isCodeReviewDiscussionInput(value: unknown): value is CodeReview
 
 export function isCodeReviewSession(value: unknown): value is CodeReviewSession {
   if (!isRecord(value) || typeof value.id !== 'string') return false;
+  if (value.instructions !== undefined && typeof value.instructions !== 'string') return false;
   if (typeof value.targetAgentId !== 'string' || typeof value.reviewerAgentId !== 'string') return false;
   if (!isCodeReviewScope(value.scope) || !isCodeReviewThreadMode(value.threadMode)) return false;
   if (!isReviewSessionStatus(value.status) || typeof value.activeRoundId !== 'string') return false;

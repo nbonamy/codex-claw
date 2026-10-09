@@ -47,6 +47,29 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it('toggles upgrade previews through the native command and restores actual versions in Settings', async () => {
+    let command: (value: AppCommand) => void = () => {};
+    const getProviderUpdate = vi.fn(async () => ({ backend: 'claude', status: 'current', installedVersion: '9.0.0', method: 'native', canUpgrade: false, busy: false }));
+    const setProviderUpdate = vi.fn();
+    window.app = { onAppCommand: vi.fn(listener => { command = listener; return () => {}; }), getProviderUpdate, setProviderUpdate } as unknown as AppApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    const wrapper = mountShell({ snapshot });
+    try {
+      await flushPromises();
+      command({ type: 'debug-provider-upgrades', enabled: true });
+      command({ type: 'open-settings' });
+      await flushPromises();
+      await wrapper.findAll('.settings-sidebar button').find(button => button.text() === 'Claude Code')!.trigger('click');
+      await flushPromises();
+      expect(wrapper.get('.engine-hero').text()).toContain('1.1.0 available');
+      command({ type: 'debug-provider-upgrades', enabled: false });
+      await flushPromises();
+      expect(wrapper.get('.provider-update__version').text()).toBe('9.0.0');
+      expect(setProviderUpdate).not.toHaveBeenCalled();
+    } finally { wrapper.unmount(); }
+  });
+
   it('previews missing local engines in Welcome and Settings without changing real connections', async () => {
     let command: (value: AppCommand) => void = () => {};
     const refreshProvider = vi.fn();

@@ -130,6 +130,8 @@ export const ipcChannels = {
   getCodexAuthentication: 'codex:authentication:get',
   getClaudeAuthentication: 'claude:authentication:get',
   getProviderSetup: 'provider:setup:get',
+  getProviderUpdate: 'provider:update:get',
+  setProviderUpdate: 'provider:update:set',
   getProviderConnections: 'provider:connections:get',
   getProviderUsage: 'provider:usage:get',
   setProviderEnabled: 'provider:enabled:set',

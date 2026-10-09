@@ -9,6 +9,10 @@ import type { AgentBackendDriver, BackendSendResult } from '@workspace/core/back
 import type { AppBackendEvent } from '@workspace/core/backend-protocol/rpc';
 import { BackendDriverRpc, createBackendDriver, createDefaultBackendDrivers, type BackendDriverRegistryOptions } from './driver-rpc';
 import { ProviderSetup } from './provider-setup';
+import { ProviderUpdates } from './provider-updates';
+import { ProviderUpdateRuntime } from './provider-update-runtime';
+import { localProviderAgents } from './provider-roster-reset';
+import { handoffInProgress } from '@workspace/core/agent-handoff';
 import { RemoteDaemonClientManager } from './connections/remote-daemon-client';
 import { SshConnectionService } from './connections/ssh-connections';
 import { AutomationRunner } from './automations/runner';
@@ -168,7 +172,31 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     ].filter(Boolean).join('\n\n') || undefined,
   };
   const backendDrivers = createDefaultBackendDrivers(driverOptions);
-  const driverRpc = new BackendDriverRpc(backendDrivers, worktreeManager, backend => server.requireConnectedEngine(backend));
+  const driverRpc: BackendDriverRpc = new BackendDriverRpc(backendDrivers, worktreeManager, backend => server.requireConnectedEngine(backend), backend => providerUpdates.isUpdating(backend));
+  const updater = new ProviderUpdateRuntime({
+    command: backend => backend === 'codex' ? snapshot.general.codexBinaryPath?.trim() || 'codex' : process.env.APP_CLAUDE_COMMAND || 'claude',
+    claudeHome: () => snapshot.general.providerHomes?.claude?.homePath ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(process.env.HOME ?? '', '.claude'),
+  });
+  const providerUpdates: ProviderUpdates = new ProviderUpdates({
+    inspect: backend => updater.inspect(backend),
+    upgrade: installation => updater.upgrade(installation),
+    busy: backend => {
+      const agents = localProviderAgents(snapshot, backend);
+      const ids = new Set(agents.map(agent => agent.id));
+      return providerSetup.isChanging() || driverRpc.isBusy(backend)
+        || agents.some(agent => agent.status.type === 'working' || agent.status.type === 'awaitingInput' || handoffInProgress(agent))
+        || (snapshot.queuedPrompts ?? []).some(prompt => ids.has(prompt.agentId));
+    },
+    withStoppedProvider: async (backend, work) => {
+      const agents = localProviderAgents(snapshot, backend).filter(agent => agent.backendSession);
+      const current = backendDrivers.get(backend)!;
+      for (const agent of agents) await current.assertHandoffReady?.(agent);
+      await driverRpc.replaceDriver(backend, () => createBackendDriver(backend, { ...driverOptions, generalSettings: snapshot.general }), work);
+      // Rehydrate the same sessions, never restart/reset the conversation identity.
+      const replacement = backendDrivers.get(backend)!;
+      for (const agent of agents) await replacement.loadConversation?.(agent);
+    },
+  });
   const automationRunner = new AutomationRunner({
     requireConnectedEngine: backend => server.requireConnectedEngine(backend),
     getSnapshot: () => snapshot,
@@ -206,6 +234,7 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     runOnStart: true,
     run: () => automationRunner.runAll(),
   });
+  scheduler.register({ id: 'provider-updates', intervalMs: 2_000, run: () => providerUpdates.tick() });
   const pullRequestMonitor = new PullRequestMonitor({
     getSnapshot: () => snapshot,
     notifySnapshotUpdated: () => server.emitEvent({
@@ -231,6 +260,7 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     documents,
     tasks,
     providerSetup,
+    providerUpdates,
     version: options.version,
     snapshot,
     agentGitService,
