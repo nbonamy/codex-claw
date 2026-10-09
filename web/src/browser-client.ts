@@ -21,14 +21,22 @@ type PendingRequest = {
 
 export function createAppBrowserClient(options: CreateAppBrowserClientOptions): AppApi {
   const transport = new AppBrowserTransport(options);
+  // Renderer catalog caches compare API functions by identity, so each operation
+  // must resolve to one stable function for the life of the client.
+  const operations = new Map<string, (...args: unknown[]) => unknown>();
+  const onEvent = (listener: (event: MainToRendererEvent) => void) => transport.onEvent(listener);
+  const noopSubscription = () => () => undefined;
   return new Proxy({}, {
     get(_target, property) {
-      if (property === 'onEvent') return (listener: (event: MainToRendererEvent) => void) => transport.onEvent(listener);
-      if (property === 'onAppCommand' || property === 'onUpdateStatusChanged') {
-        return () => () => undefined;
-      }
+      if (property === 'onEvent') return onEvent;
+      if (property === 'onAppCommand' || property === 'onUpdateStatusChanged') return noopSubscription;
       if (typeof property !== 'string') return undefined;
-      return (...args: unknown[]) => transport.invoke(property, args);
+      let operation = operations.get(property);
+      if (!operation) {
+        operation = (...args: unknown[]) => transport.invoke(property, args);
+        operations.set(property, operation);
+      }
+      return operation;
     },
   }) as AppApi;
 }

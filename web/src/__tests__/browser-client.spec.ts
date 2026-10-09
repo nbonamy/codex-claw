@@ -39,6 +39,15 @@ describe(`${product.name} browser client`, () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ seq: 3 }));
   });
 
+  it('returns the same function for every read of an operation', () => {
+    const api = createAppBrowserClient({ createSocket: () => new FakeBrowserSocket() as unknown as WebSocket });
+
+    // Renderer catalog caches key freshness on the identity of the API function.
+    expect(api.listBackendModels).toBe(api.listBackendModels);
+    expect(api.listBackendModels).not.toBe(api.createTeam);
+    expect(api.onEvent).toBe(api.onEvent);
+  });
+
   it('supports host no-op subscriptions, errors, binary responses, and unsubscription', async () => {
     const socket = new FakeBrowserSocket();
     const api = createAppBrowserClient({ createSocket: () => socket as unknown as WebSocket });
