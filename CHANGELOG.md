@@ -4,6 +4,30 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.32.0] - 2026-10-09
+
+### New features
+
+- Choose how Git pulls and updates from the base branch: merge, rebase, or
+  fast-forward only. Pull can also follow your existing Git configuration.
+- Prune a repository from the Git menu, with local branches, remote branches,
+  and linked worktrees in one place. Merged, unused local branches are selected
+  by default; remote branches are opt-in. Review unmerged work and files before
+  confirming their deletion.
+- Check installed Codex and Claude Code versions and upgrade supported
+  installations from Settings. Upgrades wait for busy agents to finish.
+- Add instructions after `/review` to focus the reviewer on what matters to you.
+
+### Improvements and fixes
+
+- Git menu actions are grouped for easier scanning.
+- Claude and simulator tool activity shows clearer, action-specific labels.
+- Delegated agents receive explicit implementation approval in their handoff,
+  avoiding redundant confirmation requests.
+- The built-in browser recovers from failed page loads and opens `about:blank`
+  without an error.
+- Dialog content stays left-aligned while footer actions remain right-aligned.
+
 ## [0.31.0] - 2026-10-08
 
 ### New features
