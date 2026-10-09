@@ -823,4 +823,19 @@ defineExpose({
   cursor: col-resize;
   user-select: none;
 }
+
+@media (max-width: 768px) {
+  .app-shell__right-workspace {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    flex-basis: auto !important;
+    width: auto;
+    background: var(--color-shell-main);
+  }
+
+  .app-shell__right-workspace-resizer {
+    display: none;
+  }
+}
 </style>

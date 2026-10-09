@@ -19,6 +19,14 @@ describe('renderer platform', () => {
     expect(root.dataset.platform).toBe('macos');
   });
 
+  it('keeps native window chrome off browser-hosted clients', () => {
+    const root = document.createElement('html');
+
+    applyRendererPlatform(root, 'MacIntel', 'Macintosh', false);
+
+    expect(root.dataset.platform).toBe('other');
+  });
+
   it('draws an inset window edge only on Windows without taking layout space', () => {
     const app = document.createElement('div');
     app.className = 'window-edge';

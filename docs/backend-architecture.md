@@ -95,6 +95,11 @@ of the same version. Backend changes rebuild and restart the process (no HMR) an
 the client re-syncs with `snapshot/get`; only durable state survives, and active
 turns, pending approvals and in-memory MCP sessions are interrupted. Protocol
 changes may require restarting both processes. Renderer changes keep Vite HMR.
+
+`npm run dev:web` is the web equivalent: it builds `daemon` once, watches the web
+server bundle (restarting server and daemon on change) and serves the client from Vite
+with HMR, proxying `/app` to the server. `CODEX_APP_SDK_SOURCE=1` links the sibling SDK
+sources for HMR, as in desktop dev. Use `APP_HOME` to keep it off your real state.
 `APP_BACKEND_MODE=in-process` exists for bisecting.
 
 Folder-changing provider actions are rejected while chats are active because they

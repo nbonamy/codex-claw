@@ -29,7 +29,7 @@
         <span>{{ t('sidebar.quickChat') }}</span>
       </button>
       <button
-        v-if="!missions?.length"
+        v-if="!phoneScope && !missions?.length"
         class="agent-sidebar__mission-action"
         type="button"
         :aria-busy="missionCreationPending"
@@ -45,7 +45,7 @@
     </div>
 
     <nav class="agent-sidebar__list" :aria-label="t('sidebar.workspaceSessions')">
-      <section v-if="missions?.length" class="agent-sidebar__workspace-group" data-group-kind="missions">
+      <section v-if="!phoneScope && missions?.length" class="agent-sidebar__workspace-group" data-group-kind="missions">
         <header class="agent-sidebar__workspace-header">
           <TargetArrowIcon class="agent-sidebar__workspace-icon" data-icon="target-arrow" aria-hidden="true" />
           <button
@@ -373,6 +373,8 @@ const props = defineProps<{
   maxWidth?: number;
   missionCreationError?: string;
   missionCreationPending?: boolean;
+  /** Phones expose conversations and the cockpit only. */
+  phoneScope?: boolean;
   quickSwitchShortcutsVisible?: boolean;
   repositoryIcons?: Record<string, string>;
   listRepositoryBranches?: (input: { agentId: string; repositoryRoot: string }) => Promise<SourceBranch[]>;
