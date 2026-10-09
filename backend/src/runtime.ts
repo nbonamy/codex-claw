@@ -161,8 +161,9 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     generalSettings: snapshot.general,
     pluginSettings,
     celebrationsEnabled: () => snapshot.general.celebrationsEnabled,
-    additionalDeveloperInstructions: (agent) => [
+    additionalDeveloperInstructions: async (agent) => [
       tasks.instructions(agent.id),
+      agent.folder && agent.workspace?.kind === 'git' ? await agentGitService.guidance(agent.folder).catch(() => undefined) : undefined,
       server?.missionDeveloperInstructions(agent.id),
       visualizeService.developerInstructions(),
     ].filter(Boolean).join('\n\n') || undefined,

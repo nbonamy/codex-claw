@@ -3,6 +3,15 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    gitWorkflow: {
+      title: 'Workflow', scope: 'Repository', appDefaults: 'App defaults', pull: 'Pull strategy', update: 'Update from base', integration: 'Integrate into base',
+      base: 'Base branch', automatic: 'Auto-detect', save: 'Save defaults', saved: 'Defaults saved', loading: 'Loading repository…', settings: 'Git settings',
+      inherit: 'Inherit ({strategy})', strategy: 'Strategy', rewrite: 'Allow rewriting published commits for this operation',
+      sourceTarget: '{source} → {target}', rebaseOnto: 'Rebase onto {branch}', mergeInto: 'Merge into {branch}', integrate: 'Integrate into {branch}',
+      integrateAction: '{strategy} into {branch}', andPush: '{action} and push', commitBeforeIntegrating: 'Commit your changes before integrating.',
+      rebaseInProgress: 'Rebase in progress: {branch}', continue: 'Continue rebase', abort: 'Abort rebase', close: 'Close',
+      strategies: { 'git-config': 'Git configuration', merge: 'Merge', mergeCommit: 'Merge commit', rebase: 'Rebase', squash: 'Squash', 'rebase-ff': 'Rebase and fast-forward', 'ff-only': 'Fast-forward only' },
+    },
     documents: { saveTabAs: 'Save {title} as…', save: 'Save', saveAs: 'Save As…', destination: 'Save on the agent’s host:', replaceFile: 'Replace the existing file?', replace: 'Replace' },
   promptAutomation: {
     schedule: 'Schedule',

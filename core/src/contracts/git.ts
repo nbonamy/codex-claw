@@ -84,8 +84,11 @@ export type AgentPullRequestTracking = AgentGitPullRequest & {
 };
 
 export type GitRebaseState = { branch: string; onto: string; conflicts: string[] };
-export type GitOperationChoice = { rewritePublished?: boolean; expectedBranch?: string; expectedTarget?: string };
+export type GitOperationChoice = { rewritePublished?: boolean; expectedBranch?: string; expectedTarget?: string; expectedHead?: string; expectedTargetHead?: string };
 export type AgentGitWorkflow = {
+  headSha?: string;
+  baseHeadSha?: string;
+  upstreamHeadSha?: string;
   preferences?: { repositoryKey: string; defaults: import('../git-preferences').GitWorkflowPreferences; overrides: import('../git-preferences').GitRepositoryPreferences; effective: import('../git-preferences').GitRepositoryPreferences & import('../git-preferences').GitWorkflowPreferences };
   rebase?: GitRebaseState;
   repository: string;

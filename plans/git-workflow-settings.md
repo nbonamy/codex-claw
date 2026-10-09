@@ -1,6 +1,6 @@
 # Git workflow settings
 
-Status: in progress. Implementation and coherent local commits authorized by delegation.
+Status: implemented and validated; local commits ready for review. No push or merge.
 No push, merge, publication, release, or automatic review authorized.
 
 This reconstructs the proposal discussed with Nicolas; it is not a recovered copy
@@ -156,7 +156,39 @@ backend typechecks pass. UI and app-boundary recovery wiring follow in phase 5.
 Phase 4 implemented: all four integration histories, explicit base overrides,
 source/target rechecks and cleanup only after success. Real repository tests
 replace overlapping command-array assertions; 62 focused tests pass.
+Phase 5 implemented: canonical strategy controls, app/repository settings, explicit
+saves, one-off choices, displayed source/target guards, and restart-visible recovery.
+Mounted interactions cover inheritance, save/reset, confirmations, and cleanup/push
+separation. Runtime inspection caught and fixed collapsed select widths and empty
+inheritance labels. Settings save/reload and one-off integration passed in headless
+Chromium against the built web shell and owning daemon.
+Phase 6 implemented: owning-backend preferences/recovery routes across desktop/web
+and remote forwarding; effective agent guidance preserves explicit instructions
+and mutation authority. Real app-server tests exercise persisted overrides and
+Git outcomes. Built web-to-daemon execution applied inherited Rebase onto a
+nonstandard `release` base; shell integration then fast-forwarded it while retaining
+the worktrees, branch, and saved defaults. Provider connection/catalog fixtures
+bypassed unauthenticated preview onboarding; Git and settings were real.
+
+Validation: full `test:ai` and lint pass, with the final web routing addition also
+passing its 35 tests and typechecks. Workspace tests total 3,648; script tests 47.
+Statement coverage: core 86.40%, backend 87.65%, Vue 88.12%, Electron 86.52%,
+web 95.89%. Build:web passes. Remote routing is contract-tested; no live SSH host,
+packaged desktop, release/signing, or automatic review was exercised. The Korus
+browser pane timed out, so runtime UI evidence uses headless Chromium. Existing
+source-mode environment wiring and SDK/lockfile pins remain unchanged.
 
 ## Completion learnings
 
-Append reusable ways-of-working and design-pattern learnings after execution.
+- Git's native rebase files provide restart recovery without a second operation
+  database. Recovery completes or aborts the rebase; integration still requires its
+  own confirmation afterward.
+- Canonical common-directory identity shares preferences across linked worktrees
+  while keeping separate clones and backend owners independent.
+- Explicit strategy flags must override unrelated Git configuration. Treat config
+  as an input only for the selected Git-configuration Pull policy.
+- Real histories expose unsafe fallbacks and shared-branch rewrites better than
+  command-array assertions. Pair those tests with mounted controls and a runtime
+  layout check: mounted tests did not catch collapsed select widths.
+- Nested settings defaults need per-snapshot copies. Defaults-only updates must
+  preserve repository overrides owned by the backend.

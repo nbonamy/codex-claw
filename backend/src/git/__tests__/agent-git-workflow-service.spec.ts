@@ -132,7 +132,7 @@ describe('AgentGitWorkflowService', () => {
     const persistAndEmitSnapshot = vi.fn().mockResolvedValue(snapshot);
     const push = vi.fn().mockResolvedValue(undefined);
     const workflow = vi.fn().mockResolvedValue({
-      branch: 'main', detached: false, remote: 'origin', upstream: 'origin/main',
+      branch: 'main', baseBranch: 'main', detached: false, remote: 'origin', upstream: 'origin/main',
       remoteUrl: 'git@github.com:owner/repo.git', repository: 'owner/repo', ahead: 0, behind: 0, files: [],
     });
     const service = new AgentGitWorkflowService({
@@ -184,7 +184,7 @@ describe('AgentGitWorkflowService', () => {
       applyEvent: vi.fn(), archiveConversation, delegatedWorkReports: {} as DelegatedWorkReportPort,
       driverRequest: vi.fn(), releaseConversation, getSnapshot: () => snapshot,
       getWorkIntegrations: () => ({ githubConnected: async () => false }) as never,
-      git: { merge, workflow } as unknown as AgentGitService,
+      git: { merge, workflow, mergeTarget: async () => '/repo' } as unknown as AgentGitService,
       persistAndEmitSnapshot, refreshGitStatus: vi.fn(), refreshWorkspaceIdentity: vi.fn(), sendPrompt: vi.fn(),
     });
 
@@ -244,7 +244,7 @@ describe('AgentGitWorkflowService', () => {
       workflow: { branch: 'feature/demo' },
     });
 
-    expect(source === 'pull' ? pull : updateFromBase).toHaveBeenCalledWith('/repo-feature', true);
+    expect(source === 'pull' ? pull : updateFromBase).toHaveBeenCalledWith('/repo-feature', true, {});
     expect(sendPrompt).toHaveBeenCalledExactlyOnceWith(agent.id, expect.stringContaining(
       `Git merged \`${source === 'pull' ? 'origin/feature/demo' : 'main'}\` into \`feature/demo\``,
     ));

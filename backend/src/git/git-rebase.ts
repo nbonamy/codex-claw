@@ -30,10 +30,17 @@ export class GitRebase {
 
   async start(folder: string, target: string, rewriteConfirmed: boolean, preserveMerges = false): Promise<string[]> {
     await this.assertIdle(folder);
+    const branch = (await this.run(folder, ['symbolic-ref', '--quiet', 'HEAD'])).stdout.trim();
+    const worktrees = (await this.run(folder, ['worktree', 'list', '--porcelain'])).stdout;
+    if (worktrees.split('\n').filter(line => line === `branch ${branch}`).length > 1) throw new Error('The working branch is checked out in multiple worktrees.');
     if ((await this.run(folder, ['status', '--porcelain=v1', '-z'])).stdout) throw new Error('Commit your changes before rebasing.');
     const ancestor = await this.run(folder, ['merge-base', '--is-ancestor', target, 'HEAD']).then(() => true, () => false);
     if (ancestor) return [];
     const commits = (await this.run(folder, ['rev-list', `${target}..HEAD`])).stdout.trim().split('\n').filter(Boolean);
+    const originalHead = (await this.run(folder, ['rev-parse', 'HEAD'])).stdout;
+    const originalTarget = (await this.run(folder, ['rev-parse', target])).stdout;
+    await this.run(folder, ['fetch', '--all']);
+    if ((await this.run(folder, ['symbolic-ref', '--quiet', 'HEAD'])).stdout.trim() !== branch || (await this.run(folder, ['rev-parse', 'HEAD'])).stdout !== originalHead || (await this.run(folder, ['rev-parse', target])).stdout !== originalTarget) throw new Error('Git state changed while checking published history. Review the operation again.');
     if (!rewriteConfirmed) {
       for (const commit of commits) {
         const published = (await this.run(folder, ['for-each-ref', `--contains=${commit}`, '--format=%(refname)', 'refs/remotes'])).stdout.trim();

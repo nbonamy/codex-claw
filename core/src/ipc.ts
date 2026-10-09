@@ -64,6 +64,8 @@ export const ipcChannels = {
   commitAgentGitChanges: 'agent:git-workflow:commit',
   pushAgentGitBranch: 'agent:git-workflow:push',
   pullAgentGitBranch: 'agent:git-workflow:pull',
+  updateAgentGitPreferences: 'agent:git-workflow:preferences',
+  recoverAgentGitRebase: 'agent:git-workflow:rebase',
   revertAgentGitChanges: 'agent:git-workflow:revert',
   createAgentGitBranch: 'agent:git-workflow:branch:create',
   createAgentGitPullRequest: 'agent:git-workflow:pull-request:create',

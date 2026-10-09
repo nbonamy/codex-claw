@@ -503,7 +503,8 @@ export type AppGeneralSettings = {
   plugins?: AppPluginSettings;
 };
 
-export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugins'>> & {
+export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugins' | 'git'>> & {
+  git?: Partial<import('./git-preferences').GitSettings>;
   plugins?: Partial<AppPluginSettings>;
 };
 
@@ -851,6 +852,8 @@ export type AppApi = {
   readAgentFileChunk(agentId: string, filePath: string, offset: number): Promise<import('./contracts/workspace').AgentFileChunk>;
   getAgentGitDiff(agentId: string, target?: AgentGitDiffTarget): Promise<import('./contracts/git').AgentGitDiff>;
   getAgentGitWorkflow(agentId: string): Promise<AgentGitWorkflow>;
+  updateAgentGitPreferences(agentId: string, input: import('./git-preferences').GitRepositoryPreferences): Promise<AgentGitWorkflow>;
+  recoverAgentGitRebase(agentId: string, input: { action: 'continue' | 'abort'; confirmed: boolean }): Promise<AgentGitWorkflow>;
   listAgentTasks(agentId: string): Promise<import('./delegated-task').DelegatedTask[]>;
   cancelAgentTask(agentId: string, taskId: string): Promise<import('./delegated-task').DelegatedTask>;
   generateAgentGitMessage(agentId: string, input: AgentGitMessageGenerationInput): Promise<AgentGitMessageGenerationResult>;

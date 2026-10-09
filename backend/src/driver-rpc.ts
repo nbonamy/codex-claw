@@ -28,7 +28,7 @@ export type BackendDriverRegistryOptions = {
   generalSettings?: AppGeneralSettings;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
-  additionalDeveloperInstructions?: (agent: Agent) => string | undefined;
+  additionalDeveloperInstructions?: (agent: Agent) => string | undefined | Promise<string | undefined>;
 };
 
 type AppLoadingStrategy = 'eager' | 'lazy';
@@ -77,7 +77,7 @@ export function appSurfaceOptions(options: BackendDriverRegistryOptions = {}): A
           options.pluginSettings?.() ?? options.generalSettings?.plugins,
           {
             celebrationsEnabled: options.celebrationsEnabled?.() ?? options.generalSettings?.celebrationsEnabled,
-            developerInstructions: options.additionalDeveloperInstructions?.(agent),
+            developerInstructions: await options.additionalDeveloperInstructions?.(agent),
           },
           reviewMcpServerUrl ? {} : options.hostedMcpServerUrls?.() ?? {},
         );

@@ -73,6 +73,7 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
     snapshot.general = normalizeGeneralSettings({
       ...snapshot.general,
       ...input.general,
+      ...(input.general.git ? { git: { ...normalizeGitSettings(snapshot.general.git), ...input.general.git } } : {}),
       ...(enabledChanges ? { providerEnabled: { ...snapshot.general.providerEnabled, ...enabledChanges } } : {}),
       plugins: {
         ...snapshot.general.plugins,
@@ -119,7 +120,7 @@ export function updateSettingsInSnapshot(snapshot: AppSnapshot, input: UpdateSet
 
 export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
   if (!isRecord(value)) {
-    return { ...defaultGeneralSettings };
+    return { ...defaultGeneralSettings, git: normalizeGitSettings(defaultGeneralSettings.git) };
   }
 
   return {

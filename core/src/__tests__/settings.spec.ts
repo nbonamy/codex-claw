@@ -3,6 +3,12 @@ import { createEmptySnapshot } from '../snapshot';
 import { defaultAppshotSettings, defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings, normalizeAppshotSettings, normalizeGeneralSettings, normalizePluginSettings, normalizeSourceFolderState, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
 
 describe('settings contracts', () => {
+  it('updates app Git defaults without replacing repository overrides', () => {
+    const snapshot = createEmptySnapshot();
+    snapshot.general.git!.repositories['/repo/.git'] = { update: 'rebase' };
+    updateSettingsInSnapshot(snapshot, { general: { git: { defaults: { pull: 'ff-only', update: 'merge', integration: 'squash' } } } });
+    expect(snapshot.general.git).toStrictEqual({ defaults: { pull: 'ff-only', update: 'merge', integration: 'squash' }, repositories: { '/repo/.git': { update: 'rebase' } } });
+  });
   it('defaults follow-ups to queue and retains only supported behavior choices', () => {
     expect(normalizeGeneralSettings({}).followUpBehavior).toBe('queue');
     expect(normalizeGeneralSettings({ followUpBehavior: 'steer' }).followUpBehavior).toBe('steer');

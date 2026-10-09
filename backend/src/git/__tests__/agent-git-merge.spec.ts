@@ -31,6 +31,16 @@ async function fixture() {
 }
 
 describe('merge cleanup with real Git', () => {
+  it('refuses rewriting a branch checked out in another worktree', async () => {
+    const { root, repo, feature } = await fixture();
+    try {
+      await git(repo, ['commit', '--allow-empty', '-m', 'base advance']);
+      await git(repo, ['worktree', 'add', '--force', join(root, 'shared'), 'feature']);
+      const before = (await git(feature, ['rev-parse', 'HEAD'])).stdout;
+      await expect(new AgentGitService(() => new Date(), git).updateFromBase(feature, false, { strategy: 'rebase' })).rejects.toThrow('multiple worktrees');
+      expect((await git(feature, ['rev-parse', 'HEAD'])).stdout).toBe(before);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
   it('rejects a dirty base before integration and supports integration from a primary feature checkout', async () => {
     const { root, repo, feature } = await fixture();
     try {
@@ -67,6 +77,7 @@ describe('merge cleanup with real Git', () => {
       const { repositoryKey } = await service.preferences(feature);
       service.setSettingsProvider(() => ({ defaults: { pull: 'git-config', update: 'merge', integration: strategy }, repositories: { [repositoryKey]: { baseBranch: 'release' } } }));
       expect((await service.workflow(feature)).baseBranch).toBe('release');
+      expect((await service.diff(feature, { type: 'branch' })).target).toStrictEqual({ type: 'branch', baseRef: 'release' });
       const remote = (await git(feature, ['rev-parse', 'origin/feature'])).stdout;
       await service.merge(feature, undefined, false, false, 'squashed');
       expect(await readFile(join(repo, 'feature.txt'), 'utf8')).toBe('merged content\n');
@@ -108,6 +119,7 @@ describe('merge cleanup with real Git', () => {
       const service = new AgentGitService(() => new Date(), git);
       await writeFile(join(repo, 'base.txt'), 'base update'); await git(repo, ['add', '.']); await git(repo, ['commit', '-m', 'base update']);
       await git(feature, ['push']);
+      await git(feature, ['config', 'merge.ff', 'only']);
       const before = (await git(feature, ['rev-parse', 'HEAD'])).stdout;
       await writeFile(join(feature, 'dirty.txt'), 'keep');
       await expect(service.updateFromBase(feature, false, { strategy })).rejects.toThrow('Commit your changes');

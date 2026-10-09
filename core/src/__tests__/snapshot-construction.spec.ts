@@ -105,6 +105,8 @@ describe('snapshot construction', () => {
     first.general.appshots.hotkey = 'shift';
     first.general.plugins!.computerUseEnabled = true;
     first.sourceFolder.recentRepoNames.push('mutated');
+    first.general.git!.defaults.pull = 'rebase';
+    first.general.git!.repositories['/repo/.git'] = { integration: 'squash' };
 
     expect(second).toStrictEqual(expectedEmptySnapshot());
   });
@@ -158,6 +160,7 @@ function expectedEmptySnapshot(): AppSnapshot {
       connections: [],
     },
     general: {
+      git: { defaults: { pull: 'git-config', update: 'merge', integration: 'merge' }, repositories: {} },
       commitMessageInstructions: '',
       pullRequestInstructions: '',
       preventSleepWhenAgentsRun: true,

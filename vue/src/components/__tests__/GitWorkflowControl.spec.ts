@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElSelect, ElOption } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import GitWorkflowControl from '../GitWorkflowControl.vue';
@@ -12,10 +12,42 @@ const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktr
 const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
 const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, baseBranch: 'main', branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
 function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
-  return mount(GitWorkflowControl, { props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides } });
+  return mount(GitWorkflowControl, { attachTo: document.body, global: { components: { ElSelect, ElOption } }, props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides } });
 }
 
 describe('GitWorkflowControl', () => {
+  it('uses repository defaults, applies a one-off strategy without saving, and restores the default on reopening', async () => {
+    const preferences = { repositoryKey: '/repo/.git', defaults: { pull: 'merge', update: 'merge', integration: 'merge' }, overrides: { pull: 'rebase' }, effective: { pull: 'rebase', update: 'merge', integration: 'ff-only' } } as const;
+    const current = { ...workflow, files: [], preferences };
+    const save = vi.fn();
+    stubElectronTestWindow({ app: { updateAgentGitPreferences: save } });
+    const pullBranch = vi.fn().mockResolvedValue({ workflow: current, upstream: workflow.upstream, branch: workflow.branch, conflicts: [] });
+    const wrapper = mountControl({ getWorkflow: async () => current, pullBranch });
+    await flushPromises(); await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Pull')!.trigger('click');
+    expect(wrapper.text()).toContain('origin/feature/demo → feature/demo');
+    expect(wrapper.text()).toContain('Rebase onto origin/feature/demo');
+    await chooseStrategy(wrapper, 'Fast-forward only');
+    await submitButton(wrapper, 'Cancel').trigger('click');
+    expect(pullBranch).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Pull')!.trigger('click');
+    expect(wrapper.text()).toContain('Rebase onto origin/feature/demo');
+    await chooseStrategy(wrapper, 'Fast-forward only'); await submitButton(wrapper, 'Pull').trigger('click'); await flushPromises();
+    expect(pullBranch).toHaveBeenCalledWith(agent.id, { strategy: 'ff-only', confirmed: true, expectedBranch: 'feature/demo', expectedTarget: 'origin/feature/demo' });
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it.each(['Continue rebase', 'Abort rebase'])('offers restart-visible recovery through %s', async label => {
+    const recoverAgentGitRebase = vi.fn().mockResolvedValue(workflow);
+    stubElectronTestWindow({ app: { recoverAgentGitRebase } });
+    const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, rebase: { branch: 'feature/demo', onto: 'sha', conflicts: ['a.ts'] }, detached: true }) });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Rebase in progress: feature/demo');
+    await wrapper.findAll('button').find(button => button.text() === label)!.trigger('click'); await flushPromises();
+    expect(recoverAgentGitRebase).toHaveBeenCalledExactlyOnceWith(agent.id, { action: label === 'Continue rebase' ? 'continue' : 'abort', confirmed: true });
+    expect(wrapper.text()).not.toContain('Rebase in progress');
+  });
   it.each([true, false])('requires confirmation before reverting, with unversioned files=%s', async (includeUntracked) => {
     const revertChanges = vi.fn(async () => ({ ...workflow, files: [] }));
     const wrapper = mountControl({ revertChanges });
@@ -78,7 +110,7 @@ describe('GitWorkflowControl', () => {
     await actions[0]!.trigger('click');
     await flushPromises();
     expect(merge.find('[role="dialog"]').exists()).toBe(true);
-    expect(merge.find('[role="radiogroup"]').exists()).toBe(true);
+    expect(merge.find('[aria-label="Strategy"]').exists()).toBe(true);
 
     const pullRequest = mountControl({ presentation: 'delivery' });
     await flushPromises();
@@ -282,6 +314,7 @@ describe('GitWorkflowControl', () => {
       'Push',
       'Merge',
       'Create PR',
+      'Git settings',
     ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
   });
@@ -293,7 +326,10 @@ describe('GitWorkflowControl', () => {
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Pull')!.trigger('click');
     await flushPromises();
-    expect(pullBranch).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true });
+    expect(pullBranch).not.toHaveBeenCalled();
+    await submitButton(wrapper, 'Pull').trigger('click');
+    await flushPromises();
+    expect(pullBranch).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true, strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'origin/feature/demo' });
     expect(wrapper.text()).toContain('Agent resolving conflicts');
     expect(wrapper.text()).toContain('origin/feature/demo');
   });
@@ -313,7 +349,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.text()).toContain('Commit your changes first');
     await submitButton(wrapper, 'Update anyway').trigger('click');
     await flushPromises();
-    expect(pullBranch).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true, allowDirty: true });
+    expect(pullBranch).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true, allowDirty: true, strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'origin/feature/demo' });
   });
 
   it('offers updating a linked worktree from its base branch and recommends committing dirty work first', async () => {
@@ -348,12 +384,12 @@ describe('GitWorkflowControl', () => {
     await submitButton(wrapper, 'Update anyway').trigger('click');
     await flushPromises();
 
-    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true, allowDirty: true });
+    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true, allowDirty: true, strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'main' });
     expect(wrapper.text()).toContain('Agent resolving conflicts');
     expect(wrapper.text()).toContain('The agent has been asked to resolve 1 conflict from main.');
   });
 
-  it('runs a clean update immediately in the Git progress dialog', async () => {
+  it('confirms a clean update before showing Git progress', async () => {
     const cleanWorkflow = { ...workflow, files: [], stagedFiles: [], unstagedFiles: [] };
     const pendingUpdate = deferred<{ workflow: AgentGitWorkflow; baseBranch: string; branch: string; conflicts: string[] }>();
     const updateFromBase = vi.fn(() => pendingUpdate.promise);
@@ -363,7 +399,9 @@ describe('GitWorkflowControl', () => {
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
 
-    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true });
+    expect(updateFromBase).not.toHaveBeenCalled();
+    await submitButton(wrapper, 'Update from main').trigger('click');
+    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true, strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'main' });
     expect(wrapper.text()).toContain('Updating from main');
 
     vi.useFakeTimers();
@@ -407,13 +445,13 @@ describe('GitWorkflowControl', () => {
 
     await submitButton(wrapper, 'Update from main').trigger('click');
     await flushPromises();
-    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true });
+    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true, strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'main' });
     expect(wrapper.text()).toContain('Branch updated');
 
     getWorkflow.mockResolvedValue(currentWorkflow);
     await vi.advanceTimersByTimeAsync(1500);
     expect(wrapper.text()).toContain('Merge branch');
-    expect(wrapper.text()).toContain('Preserve every commit in a merge commit.');
+    expect(wrapper.find('[aria-label="Strategy"]').exists()).toBe(true);
     expect(mergeBranch).not.toHaveBeenCalled();
   });
 
@@ -426,13 +464,13 @@ describe('GitWorkflowControl', () => {
     await flushPromises();
     await wrapper.findAll('button').find(button => button.text() === 'Merge')!.trigger('click');
     await flushPromises();
-    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Strategy"]').exists()).toBe(true);
 
     getWorkflow.mockResolvedValue({ ...currentWorkflow, baseUpdateRequired: true });
     await submitButton(wrapper, 'Merge').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('Update required');
-    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Strategy"]').exists()).toBe(true);
     expect(mergeBranch).not.toHaveBeenCalled();
     expect(updateFromBase).not.toHaveBeenCalled();
   });
@@ -451,7 +489,7 @@ describe('GitWorkflowControl', () => {
 
     expect(wrapper.text()).toContain('Commit changes in main first');
     expect(wrapper.text()).toContain('The main worktree has uncommitted changes. Commit them before merging feature/demo.');
-    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Strategy"]').exists()).toBe(false);
     expect(mergeBranch).not.toHaveBeenCalled();
   });
 
@@ -517,38 +555,31 @@ describe('GitWorkflowControl', () => {
     expect(merge?.attributes('disabled')).toBeDefined();
   });
 
-  it('uses distinct icon-led strategy choices and secondary switch controls in the merge dialog', async () => {
+  it('chooses squash explicitly and retains separate cleanup controls', async () => {
     const mergeBranch = vi.fn(async () => workflow);
-    const wrapper = mountControl({ mergeBranch });
+    const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch });
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await flushPromises();
 
-    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(true);
-    const choices = wrapper.findAll('.git-workflow-control__merge-strategy label');
-    expect(choices).toHaveLength(2);
-    expect(choices[0]?.text()).toContain('Preserve every commit in a merge commit.');
-    expect(choices[1]?.text()).toContain('Combine all changes into a single commit.');
-    expect(wrapper.findAll('.git-workflow-control__merge-icon')).toHaveLength(2);
-    expect(choices[0]?.classes()).toContain('git-workflow-control__merge-option--selected');
+    expect(wrapper.find('[aria-label="Strategy"]').exists()).toBe(true);
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })).toHaveLength(2);
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1]?.props('disabled')).toBe(true);
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1]?.props('disabled')).toBe(false);
-    await choices[1]?.find('input').setValue(true);
-    expect(choices[1]?.classes()).toContain('git-workflow-control__merge-option--selected');
+    await chooseStrategy(wrapper, 'Squash');
     const message = wrapper.get<HTMLTextAreaElement>('.git-workflow-control__merge-message');
     expect(message.element.value).toBe('');
     expect(message.attributes('placeholder')).toBe('Squash commit message…');
-    expect(submitButton(wrapper, 'Merge').attributes('disabled')).toBeDefined();
-    expect(submitButton(wrapper, 'Merge and push').attributes('disabled')).toBeDefined();
+    expect(submitButton(wrapper, 'Squash into main').attributes('disabled')).toBeDefined();
+    expect(submitButton(wrapper, 'Squash into main and push').attributes('disabled')).toBeDefined();
     await message.setValue('feat: combine demo work');
-    await submitButton(wrapper, 'Merge').trigger('click');
+    await submitButton(wrapper, 'Squash into main').trigger('click');
     await flushPromises();
     expect(mergeBranch).toHaveBeenCalledWith('agent-1', {
-      strategy: 'squash',
+      strategy: 'squash', expectedBranch: 'feature/demo', expectedTarget: 'main',
       commitMessage: 'feat: combine demo work',
       deleteBranch: false,
       deleteWorktree: true,
@@ -576,7 +607,7 @@ describe('GitWorkflowControl', () => {
   it('shows merge progress and passive success before closing automatically', async () => {
     const pendingMerge = deferred<AgentGitWorkflow>();
     const mergeBranch = vi.fn(() => pendingMerge.promise);
-    const wrapper = mountControl({ mergeBranch });
+    const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch });
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
@@ -612,7 +643,7 @@ describe('GitWorkflowControl', () => {
       isLinkedWorktree: false,
       warning,
     }));
-    const wrapper = mountControl({ mergeBranch });
+    const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch });
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
@@ -634,7 +665,7 @@ describe('GitWorkflowControl', () => {
     const pendingPush = deferred<AgentGitWorkflow>();
     const mergeBranch = vi.fn(async () => baseWorkflow);
     const pushBranch = vi.fn(() => pendingPush.promise);
-    const wrapper = mountControl({ mergeBranch, pushBranch });
+    const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch, pushBranch });
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
@@ -646,7 +677,7 @@ describe('GitWorkflowControl', () => {
     await flushPromises();
 
     expect(mergeBranch).toHaveBeenCalledWith('agent-1', {
-      strategy: 'merge', deleteBranch: true, deleteWorktree: true, pushAfter: true, confirmed: true,
+      strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'main', deleteBranch: true, deleteWorktree: true, pushAfter: true, confirmed: true,
     });
     expect(pushBranch).toHaveBeenCalledWith('agent-1', {
       confirmed: true, target: 'mergeTarget', closeAgentAfterPush: true,
@@ -669,7 +700,7 @@ describe('GitWorkflowControl', () => {
     const pushBranch = vi.fn()
       .mockRejectedValueOnce(new Error('Remote rejected the base branch.'))
       .mockResolvedValueOnce({ ...baseWorkflow, ahead: 0 });
-    const wrapper = mountControl({ mergeBranch, pushBranch });
+    const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch, pushBranch });
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
@@ -700,7 +731,7 @@ describe('GitWorkflowControl', () => {
 
   it('keeps a failed merge open with its error and a retry action', async () => {
     const mergeBranch = vi.fn().mockRejectedValue(new Error('The linked worktree could not be removed.'));
-    const wrapper = mountControl({ mergeBranch });
+    const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch });
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
@@ -747,7 +778,7 @@ describe('GitWorkflowControl', () => {
     expect(writingSurface.get('textarea').attributes('placeholder')).toBe('Describe the change (optional)');
   });
 
-  it('warns when pull request or merge actions would leave uncommitted changes behind', async () => {
+  it('warns about uncommitted PR changes and requires a clean integration', async () => {
     const pullRequest = mountControl();
     await flushPromises();
     expect(pullRequest.get('.git-workflow-control__primary').attributes('disabled')).toBeUndefined();
@@ -764,8 +795,9 @@ describe('GitWorkflowControl', () => {
     await merge.findAll('[role="menuitem"]').find((item) => item.text().includes('Merge'))?.trigger('click');
     await flushPromises();
     expect(merge.get('.git-workflow-control__uncommitted-warning').text()).toBe(
-      'Uncommitted changes will not be included in this merge.',
+      'Commit your changes before integrating.',
     );
+    expect(submitButton(merge, 'Merge').attributes('disabled')).toBeDefined();
 
     const cleanPullRequest = mountControl({
       getWorkflow: async () => ({ ...workflow, files: [], stagedFiles: [], unstagedFiles: [] }),
@@ -798,7 +830,7 @@ describe('GitWorkflowControl', () => {
     expect(pullRequest.emitted('delivery-complete')).toStrictEqual([[{ kind: 'pullRequest', number: 42, url: createdPullRequest.url }]]);
 
     const mergeBranch = vi.fn(async () => workflow);
-    const merge = mountControl({ mergeBranch, reportBackAgentName: 'main' });
+    const merge = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch, reportBackAgentName: 'main' });
     await flushPromises();
     expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
@@ -811,7 +843,7 @@ describe('GitWorkflowControl', () => {
     await submitButton(merge, 'Merge').trigger('click');
     await flushPromises();
     expect(mergeBranch).toHaveBeenCalledWith('agent-1', {
-      strategy: 'merge', deleteBranch: false, deleteWorktree: false, reportBack: true, confirmed: true,
+      strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'main', deleteBranch: false, deleteWorktree: false, reportBack: true, confirmed: true,
     });
     expect(merge.emitted('delivery-complete')).toStrictEqual([[{ kind: 'merge' }]]);
   });
@@ -842,7 +874,7 @@ describe('GitWorkflowControl', () => {
     expect(pullRequest.get('.git-workflow-control__trigger').attributes('disabled')).toBeUndefined();
 
     const pendingMerge = deferred<AgentGitWorkflow>();
-    const merge = mountControl({ mergeBranch: () => pendingMerge.promise, reportBackAgentName: 'main' });
+    const merge = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch: () => pendingMerge.promise, reportBackAgentName: 'main' });
     await flushPromises();
     expect(merge.get('.git-workflow-control__trigger')).toBeTruthy();
     await merge.get('.git-workflow-control__trigger').trigger('click');
@@ -898,6 +930,7 @@ describe('GitWorkflowControl', () => {
 
     const pendingMerge = deferred<AgentGitWorkflow>();
     const merge = mountControl({
+      getWorkflow: async () => ({ ...workflow, files: [] }),
       mergeBranch: () => pendingMerge.promise,
       reportBackAgentName: 'main',
     });
@@ -1156,4 +1189,15 @@ function deferred<T>() {
     reject = rejectPromise;
   });
   return { promise, reject, resolve };
+}
+
+async function chooseStrategy(wrapper: ReturnType<typeof mountControl>, label: string): Promise<void> {
+  await wrapper.get('[aria-label="Strategy"]').trigger('click');
+  await flushPromises();
+  const control = wrapper.get('[aria-label="Strategy"]');
+  const list = document.getElementById(control.attributes('aria-controls')!);
+  const option = [...list!.querySelectorAll('.el-select-dropdown__item')].find(item => item.textContent === label);
+  if (!option) throw new Error(`Missing strategy ${label}`);
+  (option as HTMLElement).click();
+  await flushPromises();
 }
