@@ -19,6 +19,7 @@ import {
   IconSitemap as SitemapIcon,
   IconUsers as UsersIcon,
 } from '@tabler/icons-vue';
+import { presentClaudeToolTitle } from './claude-tool-titles';
 import { appMcpToolName, appToolName, presentAppToolTitle } from './tool-title-presenter';
 
 type Translate = CodexToolTitlePresenterContext['translate'];
@@ -102,6 +103,9 @@ export function presentAppTool(
       title: translate(`chat.tool.searchTools.${phase}`),
     };
   }
+
+  const claudeTitle = presentClaudeToolTitle(context, translate);
+  if (claudeTitle) return { title: claudeTitle };
 
   if (context.kind === 'mcp' && context.metadata?.server === 'cua_repl' && context.metadata.tool === 'js') {
     const phase = context.descriptor?.phase === 'failed' || context.toolCall.state === 'error'
