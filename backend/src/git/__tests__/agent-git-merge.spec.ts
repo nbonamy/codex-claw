@@ -31,6 +31,18 @@ async function fixture() {
 }
 
 describe('merge cleanup with real Git', () => {
+  it('shares overrides between linked worktrees and isolates separate clones and owning services', async () => {
+    const { root, repo, feature } = await fixture();
+    try {
+      const service = new AgentGitService(() => new Date(), git);
+      const { repositoryKey } = await service.preferences(repo);
+      service.setSettingsProvider(() => ({ defaults: { pull: 'merge', update: 'merge', integration: 'merge' }, repositories: { [repositoryKey]: { pull: 'rebase' } } }));
+      expect(await service.preferences(feature)).toStrictEqual(await service.preferences(repo));
+      await git(root, ['clone', repo, 'clone']);
+      expect((await service.preferences(join(root, 'clone'))).effective.pull).toBe('merge');
+      expect((await new AgentGitService(() => new Date(), git).preferences(repo)).effective.pull).toBe('git-config');
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
   it.each(['merge', 'squash'] as const)('cleans up a %s when the tracked remote branch is behind', async (strategy) => {
     const { root, repo, feature } = await fixture();
     try {

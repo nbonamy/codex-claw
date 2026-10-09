@@ -2,6 +2,8 @@ import { product } from '@workspace/core/product';
 import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { realpath } from 'node:fs/promises';
+import { normalizeGitSettings, resolveGitPreferences, type GitSettings } from '@workspace/core/git-preferences';
 import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@workspace/core/contracts';
 import { AppError } from '@workspace/core/app-error';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
@@ -25,6 +27,17 @@ export type AgentGitGenerationContext = {
 };
 
 export class AgentGitService {
+  private settings: () => GitSettings = () => normalizeGitSettings(undefined);
+
+  setSettingsProvider(provider: () => GitSettings): void { this.settings = provider; }
+
+  async preferences(folder: string) {
+    const common = (await this.runGit(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).stdout.trim();
+    const repositoryKey = await realpath(common);
+    const settings = this.settings();
+    return { repositoryKey, defaults: settings.defaults, overrides: settings.repositories[repositoryKey] ?? {}, effective: resolveGitPreferences(settings, repositoryKey) };
+  }
+
   constructor(
     private readonly now: AgentGitServiceClock = () => new Date(),
     private readonly runGit: AgentGitRunner = git,

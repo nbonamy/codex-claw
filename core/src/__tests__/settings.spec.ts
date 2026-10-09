@@ -27,6 +27,7 @@ describe('settings contracts', () => {
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     })).toStrictEqual({
+      git: { defaults: { pull: 'git-config', update: 'merge', integration: 'merge' }, repositories: {} },
       commitMessageInstructions: '',
       pullRequestInstructions: '',
       codexBinaryPath: '/opt/homebrew/bin/codex',
@@ -128,6 +129,7 @@ describe('settings contracts', () => {
     });
 
     expect(snapshot.general).toStrictEqual({
+      git: { defaults: { pull: 'git-config', update: 'merge', integration: 'merge' }, repositories: {} },
       commitMessageInstructions: '',
       pullRequestInstructions: '',
       codexBinaryPath: '',

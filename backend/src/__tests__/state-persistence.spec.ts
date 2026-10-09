@@ -24,6 +24,16 @@ afterEach(async () => {
 });
 
 describe('state persistence', () => {
+  it('preserves merge for existing installations while new installations follow Git configuration', () => {
+    const fresh = createEmptySnapshot();
+    expect(fresh.general.git?.defaults.pull).toBe('git-config');
+    const saved = persistedStateFromSnapshot(fresh);
+    delete saved.general.git;
+    const restored = snapshotFromPersistedState(saved);
+    expect(restored.general.git?.defaults).toStrictEqual({ pull: 'merge', update: 'merge', integration: 'merge' });
+    restored.general.git!.defaults.pull = 'rebase';
+    expect(snapshotFromPersistedState(persistedStateFromSnapshot(restored)).general.git?.defaults.pull).toBe('rebase');
+  });
   it('drops repository-based automation definitions without migrating or deleting their agents', () => {
     const snapshot = createInitialSnapshot();
     const persisted = persistedStateFromSnapshot(snapshot);
@@ -1290,7 +1300,7 @@ describe('state persistence', () => {
 
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
 
-    expect(restored.general).toStrictEqual(snapshot.general);
+    expect(restored.general).toStrictEqual({ ...snapshot.general, git: { defaults: { pull: 'merge', update: 'merge', integration: 'merge' }, repositories: {} } });
   });
 
   it('removes credentials from restored workspace origins', () => {

@@ -3,6 +3,7 @@ import { isAgentHandoff } from '@workspace/core/agent-handoff';
 import { isMission } from '@workspace/core/missions';
 import { isThreadFlags } from '@workspace/core/thread-flags';
 import { backendCodexHomeDir } from './state';
+import { legacyGitPreferences } from '@workspace/core/git-preferences';
 import { isPlanReview } from '@workspace/core/plan-review';
 import { sanitizeClientPreferences } from '@workspace/core/client-preferences';
 import { isAutomationTarget } from '@workspace/core/automation-manager';
@@ -77,6 +78,7 @@ export type PersistedAgent = Pick<Agent, 'id' | 'name' | 'folder' | 'createdAt' 
 
 function migrateGeneralSettings(value: unknown): AppGeneralSettings {
   const settings = normalizeGeneralSettings(value);
+  if (!isRecord(value) || !value.git) settings.git = { defaults: { ...legacyGitPreferences }, repositories: {} };
   if (isRecord(value) && typeof value.shareCodexSkillsAndPlugins === 'boolean' && !settings.providerHomes?.codex) {
     settings.providerHomes = { ...settings.providerHomes, codex: {
       isolated: true, shareSkills: value.shareCodexSkillsAndPlugins, homePath: backendCodexHomeDir(),

@@ -4,6 +4,7 @@ import { repositoryIconKeyForRemote } from './git-remote';
 import { isApprovalPreset } from './approval-presets';
 import { claudeBackendCapabilities } from './backend-capabilities';
 import { isCodeReviewPreferences } from './code-review';
+import { normalizeGitSettings } from './git-preferences';
 
 export const defaultPluginSettings: AppPluginSettings = {
   computerUseEnabled: false,
@@ -17,6 +18,7 @@ export const defaultAppshotSettings: AppshotSettings = {
 };
 
 export const defaultGeneralSettings: AppGeneralSettings = {
+  git: normalizeGitSettings(undefined),
   commitMessageInstructions: '',
   pullRequestInstructions: '',
   preventSleepWhenAgentsRun: true,
@@ -122,6 +124,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
 
   return {
     preventSleepWhenAgentsRun: value.preventSleepWhenAgentsRun !== false,
+    git: normalizeGitSettings(value.git),
     commitMessageInstructions: normalizeString(value.commitMessageInstructions) ?? '',
     pullRequestInstructions: normalizeString(value.pullRequestInstructions) ?? '',
     preventSleepWhenRemoteAccessEnabled: value.preventSleepWhenRemoteAccessEnabled !== false,

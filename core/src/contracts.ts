@@ -465,6 +465,7 @@ export type SavedPromptDraft = {
 export type CockpitAgentViewMode = 'teams' | 'recent';
 
 export type AppGeneralSettings = {
+  git?: import('./git-preferences').GitSettings;
   commitMessageInstructions: string;
   pullRequestInstructions: string;
   preventSleepWhenAgentsRun: boolean;
