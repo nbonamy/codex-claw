@@ -462,9 +462,6 @@ describe('AppShell missions', () => {
     );
     await board.findAll('button').find(button => button.text() === 'Update from main')!.trigger('click');
     await flushPromises();
-    expect(updateAgentGitBranchFromBase).not.toHaveBeenCalled();
-    await wrapper.get('.app-dialog').findAll('button').find(button => button.text() === 'Update from main')!.trigger('click');
-    await flushPromises();
-    expect(updateAgentGitBranchFromBase).toHaveBeenCalledExactlyOnceWith(snapshot.agents[0]!.id, { confirmed: true, strategy: 'merge', expectedBranch: workflow.branch, expectedTarget: 'main' });
+    expect(updateAgentGitBranchFromBase).toHaveBeenCalledExactlyOnceWith(snapshot.agents[0]!.id, { confirmed: true, expectedBranch: workflow.branch, expectedTarget: 'main' });
   });
 });

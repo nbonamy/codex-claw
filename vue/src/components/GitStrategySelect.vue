@@ -6,10 +6,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { pullStrategies, updateStrategies, integrationStrategies } from '@workspace/core/git-preferences';
-const props = defineProps<{ modelValue: string; kind: 'pull' | 'update' | 'integration'; label: string }>();
+import { pullStrategies, updateStrategies } from '@workspace/core/git-preferences';
+const props = defineProps<{ modelValue: string; kind: 'pull' | 'update'; label: string }>();
 defineEmits<{ 'update:modelValue': [value: string] }>();
 const { t } = useI18n();
-const choices = computed(() => props.kind === 'pull' ? pullStrategies : props.kind === 'update' ? updateStrategies : integrationStrategies);
-function strategyLabel(value: string): string { return t(`gitWorkflow.strategies.${value === 'merge' && props.kind === 'integration' ? 'mergeCommit' : value}`); }
+const choices = computed(() => props.kind === 'pull' ? pullStrategies : updateStrategies);
+function strategyLabel(value: string): string { return t(`gitWorkflow.strategies.${value}`); }
 </script>

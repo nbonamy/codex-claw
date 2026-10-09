@@ -18,8 +18,8 @@ Two global settings, saved immediately when changed like other settings:
 | Update from base | Merge · Rebase | Merge |
 
 There is no repository selector or repository override layer. Integration strategy
-belongs only in the merge dialog: Merge commit, Squash, Rebase and fast-forward,
-or Fast-forward only. The dialog initially selects Merge commit.
+belongs only in the original merge dialog: Merge commit or Squash. The dialog
+initially selects Merge commit.
 
 Pull updates the current branch from its upstream. Update from base brings the
 base into the working branch. Integration brings completed work into the base.
@@ -36,15 +36,13 @@ earlier development shapes or preserve superseded development defaults.
 
 ## Applying the preferences
 
-One-off choices override global settings without changing them. Action dialogs
-show actual source and target branches before mutation. Base selection remains
-auto-detected, including nonstandard base names; no repository-level override.
+Clean Pull and Update from base run immediately using the global settings,
+without a strategy dialog. Retain the original dirty-worktree and required-update
+guards. Base selection remains auto-detected, including nonstandard base names;
+no repository-level override.
 
-Every Git operation strategy picker uses the original Merge/Squash icon-card
-design, including its existing icons, copy and styling for those choices. New
-strategies extend that same template. Dropdowns are reserved for Settings.
-
-Use precise labels such as “Rebase onto main.” Keep Commit and Commit & Push
+The merge dialog retains the original Merge/Squash choices, icons, copy, and
+styling. Dropdowns are reserved for Settings. Keep Commit and Commit & Push
 distinct. A strategy choice never adds pushing or cleanup.
 
 Korus-managed agent instructions receive global preferences as guidance. Explicit
@@ -82,8 +80,8 @@ Keep each behavior change and its tests together in local commits.
    published-history confirmation, dirty/shared checks, and abort restoration.
 4. **Integration:** four resulting histories, safe target rechecks, no push or
    cleanup after failure.
-5. **UI:** two autosaved global settings; integration in merge dialog only;
-   one-off choices, concise source/target labels, and recovery controls.
+5. **UI:** two autosaved global settings applied directly by Pull/Update;
+   original Merge/Squash dialog and recovery controls.
 6. **Guidance and routing:** app-owned local/remote operations and preference
    guidance without expanding authority. Representative app-boundary workflows.
 
@@ -94,7 +92,8 @@ Keep each behavior change and its tests together in local commits.
   dirty/shared/published refusal, and absence of fallback or unintended mutations.
 - Settings tests prove defaults, independent partial updates, persistence and
   one-off precedence. No tests for compatibility with discarded development data.
-- Mounted UI tests exercise autosaving, errors, operation choices and confirmation.
+- Mounted UI tests exercise autosaving, immediate Pull/Update, original merge
+  choices, errors and recovery.
 - Verify local and remote app-owned routing. Shared Git directory identity is for
   mutation serialization across linked worktrees, not preferences.
 - Focused tests/typechecks during iteration; proportional full gates and korus-dod
@@ -118,20 +117,24 @@ Headless Chromium verified two global controls, no Save button, automatic saves
 through the owning daemon, reload persistence, usable widths, and no page errors.
 Coverage figures above precede this simplification; coverage was not rerun.
 
-Dialog icon choices restored using the original Merge/Squash card CSS and copy.
-The Vue suite passed (1,553 tests); the final exact-style restoration passed its
-63 focused tests, Vue lint/typechecks, and web build. Headless Chromium exercised
-Merge, Pull, Update from base and required-update dialogs, keyboard selection,
-narrow layout, and Settings dropdowns. This UI check used synthetic Git workflow
-and provider states and performed no Git mutations.
+Pull and Update use saved settings immediately for clean worktrees, without
+strategy prompts. The merge dialog has only the original Merge/Squash choices.
+Its complete template and the component stylesheet match main byte-for-byte;
+original dirty-worktree and required-update guards are preserved. The Vue suite
+passed (1,548 tests), alongside the backend settings workflow test, Vue
+lint/typechecks, and web build. Headless Chromium exercised the original merge
+choices, immediate Pull/Update, required-update followed by Merge/Squash, and
+Settings dropdowns. This UI check used synthetic Git workflow and provider
+states and performed no Git mutations. Backend contracts retain the additional
+integration strategies; the restored merge UI exposes only Merge/Squash.
 
 Remote routing is contract-tested; no live SSH host, packaged desktop, signing,
 release, or automatic review. Source-mode SDK wiring and lockfile pins unchanged.
 
 ## Completion learnings
 
-- Follow existing settings autosave behavior. Keep operation choices in operation
-  dialogs; avoid building persistence layers beyond the agreed product scope.
+- Follow existing settings autosave behavior. Use saved preferences directly;
+  preserve existing operation dialogs instead of adding redundant choices.
 - Unreleased development schema changes do not require data migrations.
 - Native rebase files supply restart recovery without another operation database.
   Recovery completes/aborts rebase; integration requires its own confirmation.

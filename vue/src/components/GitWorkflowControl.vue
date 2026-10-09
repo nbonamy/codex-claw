@@ -299,9 +299,24 @@
   >
     <template #header><div class="app-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !mergeTargetDirtyWarning }"><h2 class="app-dialog__title">{{ mergeDialogTitle }}</h2><span v-if="mergeTargetDirtyWarning" class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.targetWorktreeHasChanges', { branch: baseBranch, sourceBranch: workflow?.branch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
     <div v-if="!mergeTargetDirtyWarning && mergeOperation.status === 'confirming'" class="git-workflow-control__dialog-form">
-      <p>{{ $t('gitWorkflow.sourceTarget', { source: workflow?.branch, target: baseBranch }) }}</p>
-      <GitStrategyChoices :model-value="mergeStrategy" kind="integration" :label="$t('gitWorkflow.strategy')" @update:model-value="mergeStrategy = $event as GitIntegrationStrategy" />
-      <el-checkbox v-if="mergeStrategy === 'rebase-ff'" v-model="rewritePublished">{{ $t('gitWorkflow.rewrite') }}</el-checkbox>
+      <div class="git-workflow-control__merge-strategy" role="radiogroup" :aria-label="$t('surface.gitWorkflowControl.mergeStrategy')">
+        <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'merge' }">
+          <input v-model="mergeStrategy" type="radio" value="merge" />
+          <GitMergeIcon class="git-workflow-control__merge-icon" aria-hidden="true" />
+          <span class="git-workflow-control__merge-copy">
+            <strong>{{ $t('surface.gitWorkflowControl.mergeCommit') }}</strong>
+            <span>{{ $t('surface.gitWorkflowControl.preserveEveryCommitInAMergeCommit') }}</span>
+          </span>
+        </label>
+        <label :class="{ 'git-workflow-control__merge-option--selected': mergeStrategy === 'squash' }">
+          <input v-model="mergeStrategy" type="radio" value="squash" />
+          <ArrowsMinimizeIcon class="git-workflow-control__merge-icon" aria-hidden="true" />
+          <span class="git-workflow-control__merge-copy">
+            <strong>{{ $t('surface.gitWorkflowControl.squashAndMerge') }}</strong>
+            <span>{{ $t('surface.gitWorkflowControl.combineAllChangesIntoASingleCommit') }}</span>
+          </span>
+        </label>
+      </div>
       <textarea
         v-if="mergeStrategy === 'squash'"
         ref="squashCommitMessageInput"
@@ -313,7 +328,7 @@
       />
       <p v-if="workflow?.files.length" class="git-workflow-control__uncommitted-warning">
         <AlertTriangleIcon aria-hidden="true" />
-        <span>{{ $t('gitWorkflow.commitBeforeIntegrating') }}</span>
+        <span>{{ $t('surface.gitWorkflowControl.uncommittedChangesWillNotBeIncludedInThisMerge') }}</span>
       </p>
       <label v-if="reportBackAgentName" class="git-workflow-control__check git-workflow-control__report-back">
         <el-switch v-model="reportBack" size="small" />
@@ -339,7 +354,7 @@
     </GitOperationFeedback>
     <template #footer>
       <div v-if="mergeTargetDirtyWarning" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
-      <div v-else-if="mergeOperation.status === 'confirming'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ integrationActionLabel }}</button><button class="app-button app-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ integrationPushLabel }}</button></div>
+      <div v-else-if="mergeOperation.status === 'confirming'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--secondary" type="button" :disabled="busy || !canMerge" @click="merge(false)">{{ $t('surface.gitWorkflowControl.merge') }}</button><button class="app-button app-button--primary" type="button" :disabled="busy || !canMerge || !pushCapable" @click="merge(true)">{{ $t('surface.gitWorkflowControl.mergeAndPush') }}</button></div>
       <div v-else-if="mergeOperationRunning" class="app-dialog__footer"><button class="app-button app-button--secondary" type="button" @click="runMergeInBackground">{{ $t('surface.gitWorkflowControl.runInBackground') }}</button></div>
       <div v-else-if="mergeOperation.status === 'warning'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
       <div v-else-if="mergeOperation.status === 'error'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="mergeDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="mergeOperation.mergeCreated ? retryMergePush() : merge(mergeOperation.pushAfter)">{{ mergeOperation.mergeCreated ? $t('surface.gitWorkflowControl.retryPush') : $t('surface.gitWorkflowControl.retry') }}</button></div>
@@ -359,11 +374,6 @@
     destroy-on-close
   >
     <template #header><div class="app-form-dialog__header" :class="{ 'git-workflow-control__dialog-header': !updateOperationConfirming }"><h2 class="app-dialog__title">{{ updateDialogTitle }}</h2><template v-if="updateOperation.status === 'confirmingDirty'"><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.commitYourChangesFirst') }}</span><span class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.updatingWithUncommittedChangesCanCauseConflicts', { branch: updateBranch }) }}</span></template><span v-else-if="updateOperation.status === 'confirmingRequired'" class="app-dialog__subtitle">{{ $t('surface.gitWorkflowControl.branchMustIncludeLatestChanges', { branch: baseBranch }) }}</span><span v-else class="git-workflow-control__branch">{{ workflow?.repository }} · {{ workflow?.branch }}</span></div></template>
-    <div v-if="updateOperationConfirming" class="git-workflow-control__dialog-form">
-      <p>{{ $t('gitWorkflow.sourceTarget', { source: updateBranch, target: workflow?.branch }) }}</p>
-      <GitStrategyChoices :model-value="updateStrategy" :kind="updateSource === 'upstream' ? 'pull' : 'update'" :label="$t('gitWorkflow.strategy')" @update:model-value="updateStrategy = $event as GitPullStrategy" />
-      <el-checkbox v-if="updateStrategy === 'rebase' || updateStrategy === 'git-config'" v-model="rewritePublished">{{ $t('gitWorkflow.rewrite') }}</el-checkbox>
-    </div>
     <GitOperationFeedback
       v-if="!updateOperationConfirming"
       :status="updateFeedbackStatus"
@@ -374,7 +384,7 @@
     </GitOperationFeedback>
     <template #footer>
       <div v-if="updateOperation.status === 'confirmingDirty'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--secondary" type="button" @click="updateFromBase(true)">{{ $t('surface.gitWorkflowControl.updateAnyway') }}</button><button class="app-button app-button--primary" type="button" @click="commitBeforeUpdate">{{ $t('surface.gitWorkflowControl.commitFirst') }}</button></div>
-      <div v-else-if="updateOperation.status === 'confirmingRequired'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--primary" type="button" @click="updateFromBase(false)">{{ updateActionLabel }}</button></div>
+      <div v-else-if="updateOperation.status === 'confirmingRequired'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--primary" type="button" @click="updateFromBase(false)">{{ $t('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch }) }}</button></div>
       <div v-else-if="updateOperation.status === 'conflicts'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button></div>
       <div v-else-if="updateOperation.status === 'error'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="updateFromBase(Boolean(workflow?.files.length))">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
@@ -386,15 +396,13 @@ import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { Agent, AgentGitCommitInput, AgentGitMergeInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitOperationProgress, AgentGitPullRequestInput, AgentGitPushInput, AgentGitStatus, AgentGitUpdateFromBaseInput, AgentGitUpdateFromBaseResult, AgentGitWorkflow, MainToRendererEvent } from '@workspace/core/contracts';
-import { AlertTriangleIcon, ArrowBackUpIcon, ArrowRightIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, RefreshIcon, SparklesIcon } from '../shared/icons/app-icons';
+import { AlertTriangleIcon, ArrowBackUpIcon, ArrowRightIcon, ArrowsMinimizeIcon, ChevronDown, CloudUploadIcon, GitCommitIcon, GitForkIcon, GitHubIcon, GitMergeIcon, RefreshIcon, SparklesIcon } from '../shared/icons/app-icons';
+import { appApi } from '../platform-api';
 import { localizedErrorMessage } from '../i18n/errors';
 import AppMenu from '../shared/menu/AppMenu.vue';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
-import GitStrategyChoices from './GitStrategyChoices.vue';
-import type { GitIntegrationStrategy, GitPullStrategy } from '@workspace/core/git-preferences';
-import { appApi } from '../platform-api';
 
 const props = withDefaults(defineProps<{
   agent: Agent;
@@ -437,9 +445,7 @@ const includeUnstaged = ref(true);
 const includeUntracked = ref(false);
 const pullRequestTitle = ref('');
 const pullRequestBody = ref('');
-const mergeStrategy = ref<GitIntegrationStrategy>('merge');
-const updateStrategy = ref<GitPullStrategy>('merge');
-const rewritePublished = ref(false);
+const mergeStrategy = ref<'merge' | 'squash'>('merge');
 const squashCommitMessage = ref('');
 const deleteBranch = ref(false);
 const deleteWorktree = ref(false);
@@ -589,7 +595,6 @@ const mergeDialogTitle = computed(() => mergeTargetDirtyWarning.value
 const updateDialogTitle = computed(() => updateSource.value === 'upstream' ? translate('surface.gitWorkflowControl.pull') : resumeMergeAfterUpdate.value
   ? translate('surface.gitWorkflowControl.updateFromBranchRequired', { branch: baseBranch.value })
   : translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }));
-const updateActionLabel = computed(() => updateStrategy.value === 'rebase' ? translate('gitWorkflow.rebaseOnto', { branch: updateBranch.value }) : updateSource.value === 'upstream' ? translate('surface.gitWorkflowControl.pull') : translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }));
 const updateOperationRunning = computed(() => updateOperation.value.status === 'updating');
 const updateFeedbackStatus = computed<'running' | 'success' | 'warning' | 'error'>(() => updateOperation.value.status === 'success'
   ? 'success'
@@ -626,9 +631,7 @@ const pushCapable = computed(() => Boolean(workflow.value?.branch && workflow.va
 const currentBranchAvailable = computed(() => Boolean(workflow.value?.branch && !workflow.value?.detached && !workflow.value?.rebase));
 const integrationBranch = computed(() => ['main', 'master', 'develop', 'development', 'trunk'].includes(workflow.value?.branch ?? ''));
 const mergeEnabled = computed(() => currentBranchAvailable.value && (workflow.value?.baseBranch ? workflow.value.baseBranch !== workflow.value.branch : !integrationBranch.value));
-const integrationActionLabel = computed(() => mergeStrategy.value === 'merge' ? translate('surface.gitWorkflowControl.merge') : translate('gitWorkflow.integrateAction', { strategy: translate(`gitWorkflow.strategies.${mergeStrategy.value}`), branch: baseBranch.value }));
-const integrationPushLabel = computed(() => mergeStrategy.value === 'merge' ? translate('surface.gitWorkflowControl.mergeAndPush') : translate('gitWorkflow.andPush', { action: integrationActionLabel.value }));
-const canMerge = computed(() => !workflow.value?.files.length && (mergeStrategy.value !== 'squash' || Boolean(squashCommitMessage.value.trim())));
+const canMerge = computed(() => mergeStrategy.value === 'merge' || Boolean(squashCommitMessage.value.trim()));
 const prEnabled = computed(() => currentBranchAvailable.value && !integrationBranch.value);
 const updateEnabled = computed(() => Boolean(props.updateFromBase && workflow.value?.baseBranch && workflow.value.baseBranch !== workflow.value.branch && currentBranchAvailable.value));
 const pullEnabled = computed(() => Boolean(props.pullBranch && workflow.value?.upstream && currentBranchAvailable.value));
@@ -798,11 +801,7 @@ async function selectAction(action: string): Promise<void> {
   else if (action === 'merge' && mergeEnabled.value && !mergeUnavailable.value) {
     busy.value = true;
     try {
-      if (await refreshMergeWorkflow()) {
-        mergeStrategy.value = 'merge';
-        rewritePublished.value = false;
-        prepareMerge();
-      }
+      if (await refreshMergeWorkflow()) prepareMerge();
     } finally {
       busy.value = false;
     }
@@ -811,9 +810,7 @@ async function selectAction(action: string): Promise<void> {
     resetUpdateOperation();
     updateSource.value = action === 'pull' ? 'upstream' : 'base';
     updateDialogOpen.value = true;
-    updateStrategy.value = (updateSource.value === 'upstream' ? workflow.value?.preferences?.pull : workflow.value?.preferences?.update) ?? 'merge';
-    rewritePublished.value = false;
-    updateOperation.value = { status: workflow.value?.files.length ? 'confirmingDirty' : 'confirmingRequired' };
+    if (!workflow.value?.files.length) void updateFromBase(false);
   }
 }
 async function refreshMergeWorkflow(): Promise<boolean> {
@@ -832,7 +829,7 @@ function prepareMerge(): boolean {
     mergeDialogOpen.value = true;
     return false;
   }
-  if (workflow.value?.baseUpdateRequired && updateEnabled.value && (mergeStrategy.value === 'merge' || mergeStrategy.value === 'squash')) {
+  if (workflow.value?.baseUpdateRequired && updateEnabled.value) {
     mergeDialogOpen.value = false;
     resetUpdateOperation();
     resumeMergeAfterUpdate.value = true;
@@ -1029,7 +1026,6 @@ async function merge(pushAfter: boolean): Promise<void> {
       strategy: mergeStrategy.value,
       expectedBranch: branch, expectedTarget,
       ...(expectedHead ? { expectedHead } : {}), ...(expectedTargetHead ? { expectedTargetHead } : {}),
-      ...(rewritePublished.value ? { rewritePublished: true } : {}),
       ...(mergeStrategy.value === 'squash' ? { commitMessage: squashCommitMessage.value.trim() } : {}),
       deleteBranch: deleteBranch.value,
       deleteWorktree: deleteWorktree.value,
@@ -1081,11 +1077,9 @@ async function updateFromBase(allowDirty: boolean): Promise<void> {
   updateOperation.value = { status: 'updating' };
   try {
     const result = await update(props.agent.id, {
-      strategy: updateStrategy.value as 'merge' | 'rebase',
       expectedBranch: workflow.value?.branch, expectedTarget: updateBranch.value,
       ...(workflow.value?.headSha ? { expectedHead: workflow.value.headSha } : {}),
       ...((updateSource.value === 'upstream' ? workflow.value?.upstreamHeadSha : workflow.value?.baseHeadSha) ? { expectedTargetHead: updateSource.value === 'upstream' ? workflow.value?.upstreamHeadSha : workflow.value?.baseHeadSha } : {}),
-      ...(rewritePublished.value ? { rewritePublished: true } : {}),
       confirmed: true,
       ...(allowDirty ? { allowDirty: true } : {}),
     });
@@ -1242,8 +1236,6 @@ function clearMergeSuccessTimer(): void {
 }
 function resetUpdateOperation(): void {
   updateSource.value = 'base';
-  updateStrategy.value = workflow.value?.preferences?.update ?? 'merge';
-  rewritePublished.value = false;
   clearUpdateSuccessTimer();
   resumeMergeAfterUpdate.value = false;
   updateOperation.value = { status: 'confirmingDirty' };
@@ -1609,6 +1601,77 @@ function handleMainEvent(event: MainToRendererEvent): void {
   flex: 0 0 32px;
 }
 
+.git-workflow-control__merge-strategy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-6) 0 var(--space-8);
+}
+
+.git-workflow-control__merge-strategy label {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-4);
+  min-height: 124px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-8);
+  color: var(--color-text-muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.git-workflow-control__merge-strategy label:hover,
+.git-workflow-control__merge-option--selected {
+  color: var(--color-text) !important;
+  border-color: var(--color-primary) !important;
+  background: color-mix(
+    in srgb,
+    var(--color-primary) 6%,
+    transparent
+  ) !important;
+}
+
+.git-workflow-control__merge-strategy input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.git-workflow-control__merge-strategy label:focus-within {
+  border-color: var(--color-primary);
+}
+
+.git-workflow-control__merge-icon {
+  width: 30px;
+  height: 30px;
+  color: var(--color-primary);
+  stroke-width: 1.7;
+}
+
+.git-workflow-control__merge-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.git-workflow-control__merge-copy strong {
+  color: var(--color-text);
+  font-size: var(--font-size-15);
+  font-weight: var(--font-weight-semibold);
+}
+
+.git-workflow-control__merge-copy span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  line-height: var(--line-height-18);
+}
 
 .git-workflow-control__merge-cleanup {
   min-height: var(--space-24);

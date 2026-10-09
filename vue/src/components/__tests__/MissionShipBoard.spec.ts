@@ -103,10 +103,7 @@ describe('MissionShipBoard', () => {
     expect(wrapper.find('.git-workflow-control__trigger').exists()).toBe(false);
     await wrapper.findAll('button').find(button => button.text() === 'Update from main')!.trigger('click');
     await flushPromises();
-    expect(updateFromBase).not.toHaveBeenCalled();
-    await wrapper.get('[role="dialog"]').findAll('button').find(button => button.text() === 'Update from main')!.trigger('click');
-    await flushPromises();
-    expect(updateFromBase).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true, strategy: 'merge', expectedBranch: workflow.branch, expectedTarget: 'main' });
+    expect(updateFromBase).toHaveBeenCalledExactlyOnceWith(agent.id, { confirmed: true, expectedBranch: workflow.branch, expectedTarget: 'main' });
     expect(wrapper.text()).toContain('Agent resolving conflicts');
     expect(wrapper.text()).toContain('Review the resolved changes before merging.');
     expect(mergeBranch).not.toHaveBeenCalled();
