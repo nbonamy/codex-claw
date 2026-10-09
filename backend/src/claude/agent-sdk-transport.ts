@@ -319,7 +319,8 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
 
   async close(): Promise<void> {
     this.closing = true;
-    for (const queryRuntime of this.inspectionQueries) {
+    const inspections = [...this.inspectionQueries];
+    for (const queryRuntime of inspections) {
       queryRuntime.close();
     }
     this.inspectionQueries.clear();
@@ -328,6 +329,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     for (const session of sessions) {
       this.closeSessionRecord(session, 'Claude session closed.');
     }
+    await Promise.all([...inspections, ...sessions.map(session => session.query)].map(query => query.return?.()));
   }
 
   private createSession(

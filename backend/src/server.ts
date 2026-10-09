@@ -87,6 +87,7 @@ export type AppBackendServerOptions = {
   documents?: DocumentWorkspaceService;
   tasks?: DurableTaskService;
   providerSetup?: import('./provider-setup').ProviderSetup;
+  providerUpdates?: import('./provider-updates').ProviderUpdates;
   version: string;
   pid?: number;
   snapshot?: AppSnapshot;
@@ -198,7 +199,7 @@ export class AppBackendServer {
   private readonly providerSetup?: import('./provider-setup').ProviderSetup;
   private readonly providerConnections?: ProviderConnections;
 
-  constructor(options: AppBackendServerOptions) {
+  constructor(private readonly options: AppBackendServerOptions) {
     this.tasks = options.tasks;
     this.providerSetup = options.providerSetup;
     this.version = options.version;
@@ -281,7 +282,7 @@ export class AppBackendServer {
       refreshWorkspaceIdentity: async (agentId) => { await this.agentWorkspaces.refreshIdentity(agentId); },
     });
     this.agentPrompts = new AgentPromptManager({
-      isEngineConnected: agent => this.snapshot.providerConnections?.some(connection => connection.backend === agent.backend && connection.connected && connection.installed && connection.enabled !== false) === true,
+      isEngineConnected: agent => !this.options.providerUpdates?.isUpdating(agent.backend) && this.snapshot.providerConnections?.some(connection => connection.backend === agent.backend && connection.connected && connection.installed && connection.enabled !== false) === true,
       getSnapshot: () => this.snapshot,
       driverForAgent: (agent) => this.backendDriverForAgent(agent),
       applyEvent: (event) => this.applyAndEmitBackendEvent(event),
@@ -601,8 +602,10 @@ export class AppBackendServer {
   }
 
   async requireConnectedEngine(backend?: Agent['backend']): Promise<Agent['backend']> {
+    if (this.options.providerUpdates?.isUpdating(backend)) throw new Error('Provider upgrade is in progress. Try again when it finishes.');
     if (this.providerSetup?.isChanging(backend)) throw new Error('Engine setup is changing. Try again when it finishes.');
     await this.providerConnections?.refreshDisconnected(backend);
+    if (this.options.providerUpdates?.isUpdating(backend)) throw new Error('Provider upgrade is in progress. Try again when it finishes.');
     return resolveAgentBackend(this.snapshot, backend);
   }
 
@@ -2123,6 +2126,26 @@ export class AppBackendServer {
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         return createAppRpcResult(message.id, this.providerSetup.list());
       }
+      case backendMethods.providerUpdateGet:
+      case backendMethods.providerUpdateSet: {
+        const params = requireRecord(message.params);
+        const backend = requireAgentBackend(params.backend);
+        const connectionId = requireOptionalConnectionId(params);
+        if (connectionId) return createAppRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method, {
+          backend, ...(params.input === undefined ? {} : { input: params.input }), ...(params.refresh === undefined ? {} : { refresh: params.refresh }),
+        }));
+        const updates = this.options.providerUpdates;
+        if (!updates) throw new Error('Provider updates are unavailable.');
+        if (message.method === backendMethods.providerUpdateGet) {
+          if (params.refresh !== undefined && typeof params.refresh !== 'boolean') throw new Error('Invalid refresh option.');
+          return createAppRpcResult(message.id, await updates.get(backend, params.refresh === true));
+        }
+        const input = requireRecord(params.input);
+        if (input.action !== 'cancel' && input.action !== 'upgrade') throw new Error('Invalid provider update action.');
+        return createAppRpcResult(message.id, updates.request(backend, input.action === 'cancel' ? { action: 'cancel' } : {
+          action: 'upgrade', confirmed: input.confirmed === true, token: typeof input.token === 'string' ? input.token : undefined,
+        }));
+      }
       case backendMethods.providerDisconnect: {
         const backend = requireAgentBackend(requireRecord(message.params).backend);
         return this.respondInLocation(message.id,
@@ -2183,6 +2206,7 @@ export class AppBackendServer {
           return createAppRpcResult(message.id, await this.remoteTeams.request(connectionId, message.method, { backend: input.backend }));
         }
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
+        if (this.options.providerUpdates?.isUpdating()) throw new Error('Wait for the provider upgrade to finish.');
         const input = requireRecord(message.params);
         if (input.backend !== 'codex' && input.backend !== 'claude') throw new Error('Unknown provider.');
         let result;
@@ -2584,6 +2608,7 @@ export class AppBackendServer {
   }
 
   async close(): Promise<void> {
+    await this.options.providerUpdates?.close();
     this.providerConnections?.close();
     this.agentWorkspaces.close();
     this.delegatedWorkReports.close();

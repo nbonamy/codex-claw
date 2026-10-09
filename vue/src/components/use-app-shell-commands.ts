@@ -47,6 +47,7 @@ type AppShellCommandOptions = {
     disconnectTeam: (teamId: string) => void;
     debugMarkUnread: () => void;
     setDebugMissingEngines: (enabled: boolean) => void;
+    setDebugProviderUpgrades: (enabled: boolean) => void;
     duplicateAgent: (agentId: string) => void;
     editAgent: (agentId: string) => void;
     forkAgent: (agentId: string) => void;
@@ -256,6 +257,10 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
     if (command.type === 'debug-missing-engines') {
       options.actions.setDebugMissingEngines(command.enabled);
+      return;
+    }
+    if (command.type === 'debug-provider-upgrades') {
+      options.actions.setDebugProviderUpgrades(command.enabled);
       return;
     }
 

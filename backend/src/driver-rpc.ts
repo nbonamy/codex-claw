@@ -33,6 +33,8 @@ export type BackendDriverRegistryOptions = {
 
 type AppLoadingStrategy = 'eager' | 'lazy';
 
+function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
+
 type AppSurfaceOptions = Parameters<typeof createCodexSurface>[0] & {
   loadingStrategy?: AppLoadingStrategy;
 };
@@ -107,6 +109,7 @@ function reviewExtensionMcpUrl(value: unknown): string | null {
 }
 
 export class BackendDriverRpc {
+  private readonly inFlight = new Map<AgentBackend, number>();
   private readonly listeners = new Set<(event: BackendEvent) => void>();
   private readonly unsubscribeDriverEvents = new Map<AgentBackend, () => void>();
 
@@ -114,17 +117,23 @@ export class BackendDriverRpc {
     private readonly drivers: Map<AgentBackend, AgentBackendDriver>,
     private readonly worktreeManager = new WorktreeManager(),
     private readonly ensureConnected?: (backend: AgentBackend) => Promise<unknown>,
+    private readonly blocked: (backend: AgentBackend) => boolean = () => false,
   ) {
     for (const [backend, driver] of drivers) this.unsubscribeDriverEvents.set(backend, driver.onEvent((event) => this.emit(event)));
   }
 
-  async replaceDriver(backend: AgentBackend, create: () => AgentBackendDriver): Promise<void> {
+  async replaceDriver(backend: AgentBackend, create: () => AgentBackendDriver, maintenance?: () => Promise<void>): Promise<void> {
     this.unsubscribeDriverEvents.get(backend)?.();
     await this.drivers.get(backend)?.close();
-    const driver = create();
-    this.drivers.set(backend, driver);
-    this.unsubscribeDriverEvents.set(backend, driver.onEvent(event => this.emit(event)));
+    try { await maintenance?.(); }
+    finally {
+      const driver = create();
+      this.drivers.set(backend, driver);
+      this.unsubscribeDriverEvents.set(backend, driver.onEvent(event => this.emit(event)));
+    }
   }
+
+  isBusy(backend: AgentBackend): boolean { return (this.inFlight.get(backend) ?? 0) > 0; }
 
   async refreshConversationContext(agent: Agent): Promise<void> {
     const driver = this.requireDriver(agent.backend);
@@ -134,6 +143,18 @@ export class BackendDriverRpc {
   }
 
   async handle(method: string, params: unknown): Promise<unknown> {
+    const record = isRecord(params) ? params : {};
+    const candidate = record.backend ?? (isRecord(record.agent) ? record.agent.backend : undefined);
+    const backend = candidate === 'codex' || candidate === 'claude' ? candidate : undefined;
+    if (backend) {
+      if (this.blocked(backend)) throw new Error('Provider upgrade is in progress. Try again when it finishes.');
+      this.inFlight.set(backend, (this.inFlight.get(backend) ?? 0) + 1);
+    }
+    try { return await this.dispatch(method, params); }
+    finally { if (backend) this.inFlight.set(backend, (this.inFlight.get(backend) ?? 1) - 1); }
+  }
+
+  private async dispatch(method: string, params: unknown): Promise<unknown> {
     switch (method) {
       case backendMethods.driverProviderAuthentication: {
         const record = requireRecord(params);
@@ -584,6 +605,7 @@ export class BackendDriverRpc {
   }
 
   private requireDriver(backend: AgentBackend): AgentBackendDriver {
+    if (this.blocked(backend)) throw new Error('Provider upgrade is in progress. Try again when it finishes.');
     const driver = this.drivers.get(backend);
     if (!driver) {
       throw new Error(`Backend driver is not configured: ${backend}`);

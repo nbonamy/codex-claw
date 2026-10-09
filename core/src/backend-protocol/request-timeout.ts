@@ -25,6 +25,8 @@ const requestTimeoutByMethod = {
   [backendMethods.agentTaskCancel]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentHandoff]: EXTENDED_REQUEST_TIMEOUT_MS,
   [backendMethods.driverHandoffCheck]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerUpdateGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerUpdateSet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.providerUsageGet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.driverAccountRateLimitsGet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.providerConnectionsGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,

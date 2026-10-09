@@ -3,6 +3,13 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    providerUpdate: {
+      version: 'Version', available: '{version} available', current: 'Up to date',
+      upgrade: 'Upgrade', upgradeWhenIdle: 'Upgrade when idle', waiting: 'Waiting for agents to finish', upgrading: 'Upgrading…',
+      check: 'Check for updates', instructions: 'Update instructions',
+      confirmation: `Upgrade this provider on this machine? This also updates the CLI used outside ${product.name}. Affected agents will reconnect when idle.`,
+      errors: { checkFailed: 'Could not check or update this provider. Try again.', installationChanged: 'The installation changed. Check for updates again.', upgradeFailed: 'Upgrade failed. Check the installation and try again.', verificationFailed: 'The expected version was not detected. Check the installation before retrying.' },
+    },
     documents: { saveTabAs: 'Save {title} as…', save: 'Save', saveAs: 'Save As…', destination: 'Save on the agent’s host:', replaceFile: 'Replace the existing file?', replace: 'Replace' },
   promptAutomation: {
     schedule: 'Schedule',

@@ -96,7 +96,20 @@ describe('app menu', () => {
     const cb = callbacks();
     cb.getDebugMissingEngines = () => enabled;
     cb.setDebugMissingEngines = value => { enabled = value; };
-    const item = () => nestedMenuItem(buildAppMenuTemplate(cb, { debugMode: true }), 'Debug', 'UI Previews', 'Simulate Missing Local Engines')!;
+    const item = () => nestedMenuItem(buildAppMenuTemplate(cb, { debugMode: true }), 'Debug', 'Backends', 'Simulate Missing Local Engines')!;
+    expect(item()).toMatchObject({ type: 'checkbox', checked: false, enabled: true });
+    item().click!({ checked: true } as never, undefined, {} as never);
+    expect(item().checked).toBe(true);
+    item().click!({ checked: false } as never, undefined, {} as never);
+    expect(item().checked).toBe(false);
+  });
+
+  it('shows upgrade simulation as a checked toggle in Backends', () => {
+    let enabled = false;
+    const cb = callbacks();
+    cb.getDebugProviderUpgrades = () => enabled;
+    cb.setDebugProviderUpgrades = value => { enabled = value; };
+    const item = () => nestedMenuItem(buildAppMenuTemplate(cb, { debugMode: true }), 'Debug', 'Backends', 'Simulate Available Upgrades')!;
     expect(item()).toMatchObject({ type: 'checkbox', checked: false, enabled: true });
     item().click!({ checked: true } as never, undefined, {} as never);
     expect(item().checked).toBe(true);
@@ -385,6 +398,7 @@ describe('app menu', () => {
       'Visualize Fixtures',
       'Review',
       'Thread Flags',
+      'Backends',
       'UI Previews',
       'Effects',
       'separator',
@@ -429,8 +443,11 @@ describe('app menu', () => {
       'Delegate to Worktree',
       'Ready for Review',
     ]);
-    expect(submenuLabels(debugMenu, 'Debug', 'UI Previews')).toStrictEqual([
+    expect(submenuLabels(debugMenu, 'Debug', 'Backends')).toStrictEqual([
       'Simulate Missing Local Engines',
+      'Simulate Available Upgrades',
+    ]);
+    expect(submenuLabels(debugMenu, 'Debug', 'UI Previews')).toStrictEqual([
       'Markdown',
       'Image Annotation',
       'Worktree Initialization',
@@ -453,7 +470,6 @@ describe('app menu', () => {
       'Plan Review',
     ]);
     expect(nestedSubmenu(debugMenu, 'Debug', 'UI Previews').map(menuEntryLabel)).toStrictEqual([
-      'Simulate Missing Local Engines',
       'Markdown',
       'Image Annotation',
       'separator',
