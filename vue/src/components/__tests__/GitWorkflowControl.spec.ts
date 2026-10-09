@@ -270,16 +270,21 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.text()).toContain('No untracked files');
   });
 
-  it('shows icon-only action menu entries without descriptions', async () => {
-    const wrapper = mountControl();
+  it.each([true, false])('groups local, sync, and integration actions with dividers (update available: %s)', async (updateAvailable) => {
+    const wrapper = mountControl(updateAvailable ? { updateFromBase: vi.fn() } : {});
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    expect(wrapper.findAll('.app-menu__label').map((item) => item.text())).toStrictEqual([
+    expect(wrapper.findAll('[role="menuitem"], [role="separator"]').map((item) =>
+      item.attributes('role') === 'separator' ? '---' : item.text(),
+    )).toStrictEqual([
       'Revert',
-      'Pull',
       'Commit',
+      '---',
+      'Pull',
       'Push',
+      ...(updateAvailable ? ['Update from main'] : []),
+      '---',
       'Merge',
       'Create PR',
     ]);
