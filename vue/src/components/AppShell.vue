@@ -1643,7 +1643,8 @@ const splitActions = computed<AgentConversationActions | undefined>(() => props.
     if (visualize && !options?.attachments?.length) {
       return startVisualizeForAgent(agentId, visualize[1]?.trim() ? { prompt: visualize[1].trim() } : undefined);
     }
-    if (prompt.trim() === '/review' && !options?.attachments?.length) return openCodeReviewForAgent(agentId);
+    const review = prompt.trim().match(/^\/review(?:\s+([\s\S]*))?$/u);
+    if (review && !options?.attachments?.length) return openCodeReviewForAgent(agentId, review[1]?.trim());
     const clarification = pendingReviewClarification.value;
     if (clarification?.agentId === agentId && !options?.attachments?.length) {
       await props.discussCodeReviewFinding(agentId, { sessionId: clarification.sessionId, roundId: clarification.roundId, findingId: clarification.findingId, question: prompt });
@@ -1675,13 +1676,17 @@ function openRightWorkspaceTab(tab: RightWorkspaceTab, agentId?: string): void {
   openRightWorkspaceTabLocal(tab, agentId);
 }
 
-async function openCodeReviewForAgent(agentId: string): Promise<void> {
+async function openCodeReviewForAgent(agentId: string, instructions?: string): Promise<void> {
   const agent = props.snapshot.agents.find(candidate => candidate.id === agentId);
+  if (instructions && agent?.codeReview) {
+    throw new Error(t('surface.codeReviewPanel.instructionsRequireNewReview'));
+  }
   if (agent?.threadFlags?.ready_for_review) {
     const response: ThreadFlagResponse = { id: 'ready_for_review', action: 'execute' };
     if (props.agentConversationActions) await props.agentConversationActions.threadFlag(agentId, response);
     else if (currentAgent.value?.id === agentId) await props.respondToThreadFlagAction?.(response);
   }
+  if (instructions) rightWorkspaceFor(agentId).codeReviewInstructions = instructions;
   openRightWorkspaceTab('codeReview', agentId);
 }
 
@@ -2882,8 +2887,9 @@ function forwardPrompt(prompt: string, options?: RendererSendPromptOptions): voi
     const direction = visualizeCommand[1]?.trim();
     return startVisualizeForAgent(currentAgent.value.id, direction ? { prompt: direction } : undefined);
   }
-  if (prompt.trim() === '/review' && !options?.attachments?.length && currentAgent.value) {
-    return openCodeReviewForAgent(currentAgent.value.id);
+  const reviewCommand = prompt.trim().match(/^\/review(?:\s+([\s\S]*))?$/u);
+  if (reviewCommand && !options?.attachments?.length && currentAgent.value) {
+    return openCodeReviewForAgent(currentAgent.value.id, reviewCommand[1]?.trim());
   }
   const clarification = pendingReviewClarification.value;
   if (
