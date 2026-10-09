@@ -65,6 +65,7 @@
     <p v-if="error" class="mobile-simulator__error" role="alert">
       {{ error }} <button type="button" @click="retry">{{ $t('surface.mobileSimulator.retry') }}</button>
     </p>
+    <p v-if="typingError && !error" class="mobile-simulator__error" role="alert">{{ typingError }}</p>
     <div v-if="!attachment" class="mobile-simulator__empty">
       <div class="mobile-simulator__empty-icon" aria-hidden="true">
         <IconDeviceMobile />
@@ -236,6 +237,8 @@ const pickerOpen = ref(false);
 const pickerTrigger = ref<HTMLElement>();
 const pickerMenu = ref<HTMLElement>();
 const error = ref('');
+/** A rejected keystroke is reported without ending the live view. */
+const typingError = ref('');
 const busy = ref(false);
 const TYPING_BATCH_MS = 30;
 let generation = 0;
@@ -380,9 +383,14 @@ function sendKey(input: MobileAction) {
   const current = attachment.value;
   if (!current) return;
   typing = typing.then(() =>
-    execute({ ...input, attachmentId: current.id }).catch((cause) => {
-      error.value = errorMessage(cause);
-    }),
+    execute({ ...input, attachmentId: current.id }).then(
+      () => {
+        typingError.value = '';
+      },
+      (cause) => {
+        typingError.value = errorMessage(cause);
+      },
+    ),
   );
 }
 function flushTyped() {
@@ -398,7 +406,7 @@ function keyDown(event: KeyboardEvent) {
     event.preventDefault();
     flushTyped();
     sendKey({ action: 'button', button: event.key === 'Enter' ? 'enter' : 'backspace' });
-  } else if (event.key.length === 1) {
+  } else if (/^[\x20-\x7e]$/.test(event.key)) {
     event.preventDefault();
     typed += event.key;
     clearTimeout(typedTimer);
@@ -434,6 +442,7 @@ watch(
     const identity = ++generation;
     clearTimeout(timer);
     typed = '';
+    typingError.value = '';
     clearTimeout(typedTimer);
     platform.value = '';
     pending.value = '';

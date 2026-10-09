@@ -86,7 +86,7 @@ export class StdioRpcPeer {
         reject(new Error(`stdio request timed out: ${method}`));
       // Native helper requests have a 30s inner deadline; the outer callback
       // must leave room for that response (including a helper timeout error).
-      // A simulator attach may cold-boot a device (up to 90s) before its bridge answers.
+      // A simulator attach may cold-boot a device before its bridge answers (iOS up to 90s, Android up to 180s).
       }, this.options.requestTimeoutMs ?? defaultRequestTimeoutMs(method));
 
       this.pending.set(id, {
@@ -297,6 +297,6 @@ function lineLooksLikeJson(line: string): boolean {
 
 function defaultRequestTimeoutMs(method: string): number {
   if (method.startsWith('client/computerUse/')) return 35_000;
-  if (method === 'client/mobileSimulator/execute') return 120_000;
+  if (method === 'client/mobileSimulator/execute') return 240_000;
   return 5_000;
 }

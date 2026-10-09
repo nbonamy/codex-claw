@@ -6,7 +6,7 @@ describe('stdio JSON-RPC transport', () => {
   it.each([
     ['client/external/open', undefined, 5000],
     ['client/computerUse/execute', undefined, 35000],
-    ['client/mobileSimulator/execute', undefined, 120000],
+    ['client/mobileSimulator/execute', undefined, 240000],
     ['client/computerUse/execute', 100, 100],
   ] as const)('keeps a bounded deadline for %s (%s)', async (method, requestTimeoutMs, deadline) => {
     vi.useFakeTimers();

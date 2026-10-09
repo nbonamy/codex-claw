@@ -165,6 +165,27 @@ describe('MobileSimulatorPanel', () => {
     wrapper.unmount();
   });
 
+  it('ignores keys the device cannot type and keeps the live screen when typing is rejected', async () => {
+    const { wrapper, mobileSimulator } = setup();
+    await flushPromises();
+    const image = wrapper.get('img');
+    mobileSimulator.mockClear();
+    await image.trigger('keydown', { key: 'é' });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(mobileSimulator.mock.calls.some(([, input]) => input.action === 'text')).toBe(false);
+    mobileSimulator.mockRejectedValueOnce(new Error('ADB cannot type a literal %s sequence.'));
+    await image.trigger('keydown', { key: 'x' });
+    await vi.advanceTimersByTimeAsync(100);
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('literal %s');
+    expect(wrapper.find('img').exists()).toBe(true);
+    await image.trigger('keydown', { key: 'y' });
+    await vi.advanceTimersByTimeAsync(100);
+    await flushPromises();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('shows recoverable errors and removes stale screen content after native failure', async () => {
     const { wrapper, mobileSimulator } = setup();
     await flushPromises();
