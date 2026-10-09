@@ -40,7 +40,7 @@ it('debounces both fields and flushes edits on exit', async () => {
   vi.useFakeTimers();
   const updateSettings = vi.fn().mockResolvedValue(undefined);
   const wrapper = mount(SettingsInstructionsPanel, { props: { settings: defaultGeneralSettings, updateSettings } });
-  expect(wrapper.find('button').exists()).toBe(false);
+  expect(wrapper.find('.settings-instructions__fields button').exists()).toBe(false);
   expect(wrapper.get('textarea').attributes('rows')).toBe('6');
   expect(wrapper.text()).toContain('Extra guidance for generated commit messages');
   expect(wrapper.text()).toContain('Extra guidance for generated pull request titles and descriptions');

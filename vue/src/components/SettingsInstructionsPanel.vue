@@ -3,6 +3,7 @@
     <template #banner>
       <SettingsIntro kind="git" :title="$t('surface.instructionSettings.gitIntroTitle')" :description="$t('surface.instructionSettings.gitIntroDescription')" />
     </template>
+    <SettingsGitWorkflowSection :settings="settings" :update-settings="updateSettings" />
     <FormSection
       class="settings-instructions__worktree-section"
       :title="$t('surface.instructionSettings.worktrees')"
@@ -46,6 +47,7 @@ import { reactive, watch } from 'vue';
 import { useDebouncedSave } from '../shared/use-debounced-save';
 import type { AppGeneralSettings, UpdateSettingsInput, WorktreeInitializationMode } from '@workspace/core/contracts';
 import SettingsPanelFrame from './SettingsPanelFrame.vue';
+import SettingsGitWorkflowSection from './SettingsGitWorkflowSection.vue';
 import SettingsIntro from './SettingsIntro.vue';
 import FormRow from '../shared/form/FormRow.vue';
 import FormSection from '../shared/form/FormSection.vue';

@@ -1,4 +1,5 @@
 import { product } from './product';
+import { normalizeGitSettings } from './git-preferences';
 import type { Agent, AppSnapshot } from './contracts';
 import { defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings } from './settings';
 import { seedTeamId } from './seed-ids';
@@ -41,6 +42,7 @@ export function createEmptySnapshot(): AppSnapshot {
     remoteConnections: createDefaultRemoteConnectionsState(),
     general: {
       ...defaultGeneralSettings,
+      git: normalizeGitSettings(defaultGeneralSettings.git),
       collapsedRepositoryKeys: [...defaultGeneralSettings.collapsedRepositoryKeys],
       repositoryIcons: { ...defaultGeneralSettings.repositoryIcons },
       appshots: { ...defaultGeneralSettings.appshots },
@@ -86,6 +88,7 @@ export function createInitialSnapshot(): AppSnapshot {
     remoteConnections: createDefaultRemoteConnectionsState(),
     general: {
       ...defaultGeneralSettings,
+      git: normalizeGitSettings(defaultGeneralSettings.git),
       collapsedRepositoryKeys: [...defaultGeneralSettings.collapsedRepositoryKeys],
       repositoryIcons: { ...defaultGeneralSettings.repositoryIcons },
       appshots: { ...defaultGeneralSettings.appshots },

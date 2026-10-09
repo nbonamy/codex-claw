@@ -774,7 +774,7 @@ describe('agent git service parsers', () => {
       branch: 'feature/demo',
       conflicts: [],
     });
-    expect(runGit).toHaveBeenCalledWith('/repo-feature', ['merge', '--no-edit', 'main']);
+    expect(runGit).toHaveBeenCalledWith('/repo-feature', ['merge', '--ff', '--no-edit', '--no-autostash', 'main']);
   });
 
   it('blocks a dirty update unless explicitly allowed and preserves conflicts for the agent', async () => {

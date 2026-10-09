@@ -5,6 +5,7 @@ import { backendHomeDir } from './state';
 import type { DocumentWorkspaceChange, DocumentSaveInput } from '@workspace/core/document-workspace';
 import { isWorkProviderKind } from '@workspace/core/work-providers';
 import { product } from '@workspace/core/product';
+import { normalizeGitSettings } from '@workspace/core/git-preferences';
 import { readWorktreeHead } from './git-worktrees';
 import type { DurableTaskService } from './agents/durable-task-service';
 import { ProviderConnections } from './provider-connections';
@@ -260,6 +261,7 @@ export class AppBackendServer {
       ? () => options.providerSetup!.getResourceSharingStatus('codex') : getCodexResourceSharingStatus);
     this.inspectPluginStatus = options.inspectPluginStatus ?? loadPluginStatus;
     this.agentGitService = options.agentGitService ?? new AgentGitService();
+    this.agentGitService.setSettingsProvider?.(() => normalizeGitSettings(this.snapshot.general.git));
     this.agentWorkspaces = new AgentWorkspaceService({
       applyGitStatus: (agentId, status) => this.applyAndEmitBackendEvent({
         agentId,
