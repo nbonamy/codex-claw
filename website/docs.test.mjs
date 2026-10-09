@@ -47,16 +47,27 @@ test("the built website has reachable documentation pages, anchors, and assets",
       await readFile(new URL("narration.json", narrated), "utf8"),
     );
     for (const film of manifest.films) {
-      for (const [selector, attribute, filename] of [
-        [".film-cover", "href", film.video],
-        ["video track", "data-src", film.subtitles],
+      // Feature-card covers link their film; hero films load from data-src.
+      for (const [sources, filename] of [
+        [
+          [
+            [".film-cover", "href"],
+            [".showcase video", "data-src"],
+          ],
+          film.video,
+        ],
+        [[["video track", "data-src"]], film.subtitles],
       ]) {
-        const element = [...landing.querySelectorAll(selector)].find((node) =>
-          node.getAttribute(attribute)?.endsWith(`-${filename}`),
-        );
-        assert.ok(element, `${filename} is exposed by the built player`);
+        const published = sources
+          .flatMap(([selector, attribute]) =>
+            [...landing.querySelectorAll(selector)].map((node) =>
+              node.getAttribute(attribute),
+            ),
+          )
+          .find((value) => value?.endsWith(`-${filename}`));
+        assert.ok(published, `${filename} is exposed by the built player`);
         assert.deepEqual(
-          await readFile(new URL(element.getAttribute(attribute), artifact)),
+          await readFile(new URL(published, artifact)),
           await readFile(new URL(filename, narrated)),
           `${filename} is published without changing the approved media`,
         );

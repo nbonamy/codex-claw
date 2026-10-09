@@ -48,44 +48,58 @@
     },
     {
       "id": "review-film",
-      "title": "Code Review",
-      "duration": 50,
+      "title": "Automatic code review",
+      "duration": 56,
       "cues": [
-        { "start": 0.5, "end": 3, "text": "Let's review my changes in Korus." },
+        {
+          "start": 0.5,
+          "end": 3,
+          "text": "I just finished working on a new feature. Let's review it."
+        },
         {
           "start": 3.5,
           "end": 8.3,
-          "text": "I can use the slash review command, right here in my conversation."
+          "text": "I use the slash review command in my conversation."
         },
         {
           "start": 8.8,
-          "end": 14.8,
-          "text": "I choose the branch I want to review, and an independent agent to take a look."
+          "end": 12.2,
+          "text": "I can keep the same model or choose another. Here, Claude reviews code written by Codex."
         },
         {
-          "start": 15.3,
-          "end": 20.8,
-          "text": "The reviewer checks the changes and records its findings, while I stay in my workspace."
+          "start": 12.5,
+          "end": 20.5,
+          "text": "I enable automatic remediation for critical, high, and medium findings, and allow up to three review rounds."
         },
         {
-          "start": 21.3,
-          "end": 28.8,
-          "text": "Here are the findings. I can inspect the details, select the issues worth fixing, and leave the others out."
+          "start": 20.7,
+          "end": 26.8,
+          "text": "Korus opens a new conversation with an independent reviewer. It checks the branch with fresh context."
         },
         {
-          "start": 29.3,
-          "end": 36.8,
-          "text": "Now I ask the agent to fix my selection. I can follow each issue as it moves from pending to fixed."
+          "start": 27.3,
+          "end": 30.8,
+          "text": "These findings meet my priority threshold, so the fixes start automatically."
         },
         {
-          "start": 37.3,
-          "end": 43.8,
-          "text": "I run another round to check the fixes. No more findings, so I can finish the review."
+          "start": 31.3,
+          "end": 38.8,
+          "text": "The agent fixes the issues one by one, and verifies each change."
         },
         {
-          "start": 44.5,
-          "end": 49.3,
-          "text": "I've chosen the fixes and checked the result. All in Korus."
+          "start": 39.3,
+          "end": 45,
+          "text": "A second review round starts automatically. This one comes back clear, so the loop stops."
+        },
+        {
+          "start": 46.5,
+          "end": 49.8,
+          "text": "The reviewer closes and returns its report to my original conversation. Changes stay uncommitted."
+        },
+        {
+          "start": 50.5,
+          "end": 55.5,
+          "text": "Review, fix, and verify automatically. From idea to delivery, in Korus."
         }
       ]
     },

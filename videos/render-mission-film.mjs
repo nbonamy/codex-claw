@@ -37,7 +37,7 @@ const duration =
         : filmName === "delegation-film"
           ? 46
           : filmName === "review-film"
-            ? 50
+            ? 56
             : 48;
 const posterSecond =
   filmName === "visualize-film"
@@ -49,7 +49,7 @@ const posterSecond =
         : filmName === "delegation-film"
           ? 29
           : filmName === "review-film"
-            ? 23
+            ? 28
             : 12;
 const allowedFiles = new Map([
   ["/product.mjs", ["product.mjs", "text/javascript; charset=utf-8"]],

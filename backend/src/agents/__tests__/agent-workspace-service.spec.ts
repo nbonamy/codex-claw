@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgentWorkspaceService } from '../agent-workspace-service';
+import type { AgentWorkspaceIdentity } from '@workspace/core/contracts';
+import { createInitialSnapshot } from '@workspace/core/snapshot';
 import { createTestSnapshot } from '../../__tests__/server-test-fixtures';
 
 afterEach(() => vi.useRealTimers());
@@ -91,5 +93,35 @@ describe('scheduled Git refresh', () => {
     await first;
     await vi.advanceTimersByTimeAsync(0);
     expect(getGitStatus).toHaveBeenCalledOnce();
+  });
+});
+
+describe('workspace default branch reconciliation', () => {
+  it('backfills legacy identities and persists a changed default branch', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.folder = '/repo';
+    const workspace: AgentWorkspaceIdentity = {
+      kind: 'git', folder: '/repo', repositoryName: 'repo', repositoryRoot: '/repo',
+      branch: 'main', isLinkedWorktree: false, primaryWorktreeRoot: '/repo', updatedAt: '',
+    };
+    agent.workspace = workspace;
+    const resolveIdentity = vi.fn().mockResolvedValue({ ...workspace, defaultBranch: 'trunk' });
+    const persistSnapshot = vi.fn(async () => undefined);
+    const service = new AgentWorkspaceService({
+      getSnapshot: () => snapshot, getGitStatus: async () => null, applyGitStatus: vi.fn(),
+      persistSnapshot, resolveIdentity,
+    });
+
+    await service.reconcile([agent.id]);
+    expect(snapshot.agents[0]!.workspace).toStrictEqual({ ...workspace, defaultBranch: 'trunk' });
+    expect(persistSnapshot).toHaveBeenCalledOnce();
+    resolveIdentity.mockResolvedValue({ ...workspace, defaultBranch: 'release' });
+    await service.reconcile([agent.id], true);
+    expect(snapshot.agents[0]!.workspace).toStrictEqual({ ...workspace, defaultBranch: 'release' });
+    expect(persistSnapshot).toHaveBeenCalledTimes(2);
+    await service.reconcile([agent.id]);
+    expect(resolveIdentity).toHaveBeenCalledTimes(2);
+    service.close();
   });
 });

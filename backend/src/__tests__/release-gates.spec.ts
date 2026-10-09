@@ -14,16 +14,16 @@ describe('shipped provider release gates', () => {
     snapshot.general.providerHomes = { antigravity: { homePath: '/saved/acp', isolated: true, shareSkills: false } };
     snapshot.agents = [{ ...createRemoteAgent(), backend: 'antigravity', teamId: 'team-test', backendSession: { kind: 'antigravity', sessionId: 'saved-session' } }];
     const before = structuredClone(snapshot);
-    const lifecycle = { home: vi.fn(), installed: vi.fn(() => true), prepareHome: vi.fn(), applyHome: vi.fn(), install: vi.fn() };
+    const lifecycle = { home: vi.fn(), installed: vi.fn(() => true), prepareHome: vi.fn(), applyHome: vi.fn() };
     const setup = new ProviderSetup(snapshot, vi.fn(), vi.fn(), new Map([['antigravity', lifecycle]]));
     await setup.initialize();
     expect(setup.list()).toEqual([]);
     expect(lifecycle.prepareHome).not.toHaveBeenCalled();
     expect(lifecycle.applyHome).toHaveBeenCalledWith(snapshot.general.providerHomes.antigravity);
     expect(lifecycle.installed).not.toHaveBeenCalled();
-    await expect(setup.install('antigravity')).rejects.toThrow(/not available in this build/);
+    await expect(setup.refresh('antigravity')).rejects.toThrow(/not available in this build/);
     await expect(setup.configure('antigravity', { isolated: false, shareSkills: false })).rejects.toThrow(/not available in this build/);
-    expect(lifecycle.install).not.toHaveBeenCalled();
+    expect(lifecycle.prepareHome).not.toHaveBeenCalled();
     expect(snapshot).toEqual(before);
   });
 

@@ -8,7 +8,7 @@ Korus can run **Codex**, **Claude Code**, or both. Each engine has its own insta
 
 | Engine | Installation and sign-in |
 | --- | --- |
-| [Codex](./codex) | Bundled with the desktop app; browser sign-in from Korus |
+| [Codex](./codex) | Install the CLI separately; browser sign-in from Korus |
 | [Claude Code](./claude-code) | Requires the Claude Code CLI; sign-in through a command copied from Korus |
 
 ## Choose where each engine keeps its setup

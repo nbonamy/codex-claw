@@ -1,14 +1,9 @@
 <template>
   <div class="remote-engine-connections">
     <template v-for="engine in engines" :key="engine.backend">
-      <button v-if="!engine.installed" class="app-button app-button--secondary" type="button" :disabled="busy" @click="install(engine.backend)">
-        {{ $t('auth.installProvider') }} {{ backendDisplayName(engine.backend) }}
-      </button>
-      <template v-else>
-        <SettingsEngineConnectionRow compact :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @connect="connect(engine)" @disconnect="disconnect(engine.backend)" />
-        <RemoteCodexAuthentication v-if="signingIn === engine.backend && engine.backend === 'codex'" :connection="connection" @connected="finishConnection" />
-        <RemoteClaudeAuthentication v-if="signingIn === engine.backend && engine.backend === 'claude'" :connection="connection" @connected="finishConnection" />
-      </template>
+      <SettingsEngineConnectionRow compact :backend="engine.backend" :installed="engine.installed" :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @refresh="refreshProvider(engine.backend)" @connect="connect(engine)" @disconnect="disconnect(engine.backend)" />
+      <RemoteCodexAuthentication v-if="signingIn === engine.backend && engine.backend === 'codex'" :connection="connection" @connected="finishConnection" />
+      <RemoteClaudeAuthentication v-if="signingIn === engine.backend && engine.backend === 'claude'" :connection="connection" @connected="finishConnection" />
     </template>
     <p v-if="error" role="alert">{{ error }}</p>
     <button v-if="error" class="app-button app-button--tertiary" type="button" :disabled="busy" @click="refresh">{{ $t('surface.remoteClaudeAuth.retry') }}</button>
@@ -45,13 +40,13 @@ async function refresh() {
     if (expected === revision) error.value = cause instanceof Error ? cause.message : String(cause);
   } finally { if (expected === revision) busy.value = false; }
 }
-async function install(backend: AgentBackend) {
+async function refreshProvider(backend: AgentBackend) {
   busy.value = true;
   error.value = '';
   const expected = revision;
   try {
     if (!appApi) throw new Error('Backend connection is unavailable.');
-    await appApi.installProvider(backend, props.connection.id);
+    await appApi.refreshProvider(backend, props.connection.id);
     if (expected === revision) await refresh();
   } catch (cause) {
     if (expected === revision) error.value = cause instanceof Error ? cause.message : String(cause);

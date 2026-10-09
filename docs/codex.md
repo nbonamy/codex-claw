@@ -37,15 +37,14 @@ routing envelope (agent, thread, revision) and recovery.
 
 ## Process And Home
 
-- Executable precedence: the explicit Settings path (always wins; changing it
-  relaunches Korus), then the pinned executable bundled with local desktop builds
-  (`APP_BUNDLED_CODEX_PATH`), then SDK discovery on the host (remote hosts, which
-  receive only `daemon.mjs` from SSH sync).
-- `scripts/prepare-codex-app-server.mjs` runs for every dev/build/package path and
-  installs the version in `codex-app-server-release.json` into
-  `electron/resources/codex/` using the official installer. Korus verifies version
-  and Developer ID signature, and signing preserves OpenAI's signature and
-  entitlements on that nested executable.
+- Executable selection uses the host's discovered PATH, including login-shell and common
+  user bin directories for GUI launches, unless an explicit backend
+  `codexBinaryPath` override is saved. Korus supplies an explicit command to
+  the SDK rather than enabling app-bundle fallback. Welcome and Settings link to
+  official installation documentation; the backend rechecks external installs
+  and refreshes a newly available driver without installing or updating a CLI.
+- Codex is an external prerequisite; development, packaging and release checks
+  do not download or pin the CLI. The app packages its own Node runtime and daemon.
 - `CODEX_HOME` is always `$APP_HOME/codex-home`, ignoring any inherited home. Skills
   and plugins sharing, isolation and the roster-reset rules are in
   [architecture.md](architecture.md#provider-homes). Folder-changing actions restart

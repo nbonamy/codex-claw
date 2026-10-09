@@ -5,6 +5,7 @@ export type AgentWorkspaceIdentity =
       repositoryName: string;
       repositoryRoot: string;
       branch: string | null;
+      defaultBranch?: string | null;
       isLinkedWorktree: boolean;
       primaryWorktreeRoot: string;
       originUrl?: string;

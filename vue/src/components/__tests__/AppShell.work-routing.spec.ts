@@ -299,6 +299,30 @@ describe('AppShell work routing', () => {
     expect(createProject).toHaveBeenCalledWith({ name: 'fresh-project', teamId: 'team-remote', backend: 'codex' });
   });
 
+  it.each([
+    ['a Git checkout', '/src/project', [{ name: 'trunk', isDefault: true }, { name: 'feature', isDefault: false }]],
+    ['a linked worktree', '/src/project-feature', [{ name: 'feature', isDefault: false, worktreePath: '/src/project-feature' }]],
+    ['a plain folder', '/src/notes', []],
+    ['a canceled selection', null, []],
+  ])('opens %s directly without a branch picker', async (_label, folder, branches) => {
+    const createAgent = vi.fn().mockResolvedValue(undefined);
+    const listSourceBranches = vi.fn().mockResolvedValue(branches);
+    const wrapper = mountShell({
+      chooseAgentFolder: vi.fn().mockResolvedValue(folder), createAgent, listSourceBranches,
+    });
+
+    wrapper.getComponent({ name: 'AgentSidebar' }).vm.$emit('start-work', 'local');
+    await flushPromises();
+
+    if (folder) {
+      expect(createAgent).toHaveBeenCalledExactlyOnceWith({ name: null, folder, backend: 'codex', teamId: 'team-app' });
+    } else {
+      expect(createAgent).not.toHaveBeenCalled();
+    }
+    expect(listSourceBranches).not.toHaveBeenCalled();
+    expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('visible')).toBe(false);
+  });
+
   it('browses and opens existing folders on the active remote team devbox', async () => {
     const snapshot = remoteEmptyTeamSnapshot();
     const chooseAgentFolder = vi.fn();
@@ -307,7 +331,7 @@ describe('AppShell work routing', () => {
       parentPath: '/home',
       entries: [{ name: 'src', path: '/home/nicolas/src' }],
     });
-    const listSourceBranches = vi.fn().mockResolvedValue([]);
+    const listSourceBranches = vi.fn().mockResolvedValue([{ name: 'trunk', isDefault: true }]);
     const createAgent = vi.fn().mockResolvedValue(undefined);
     const wrapper = mountRealShell({
       snapshot,
@@ -329,10 +353,8 @@ describe('AppShell work routing', () => {
     folderPicker.vm.$emit('select', '/home/nicolas/src/existing-project');
     await flushPromises();
 
-    expect(listSourceBranches).toHaveBeenCalledWith(
-      '/home/nicolas/src/existing-project',
-      'connection-devbox',
-    );
+    expect(listSourceBranches).not.toHaveBeenCalled();
+    expect(wrapper.getComponent({ name: 'RepositorySessionSourceDialog' }).props('visible')).toBe(false);
     expect(createAgent).toHaveBeenCalledWith({
       name: null,
       folder: '/home/nicolas/src/existing-project',

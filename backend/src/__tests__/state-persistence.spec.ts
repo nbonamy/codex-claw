@@ -428,6 +428,7 @@ describe('state persistence', () => {
       repositoryName: 'agent-workspace',
       repositoryRoot: '/Users/nbonamy/src/agent-workspace-feature',
       branch: 'feat/work-routing',
+      defaultBranch: 'trunk',
       isLinkedWorktree: true,
       primaryWorktreeRoot: '/Users/nbonamy/src/agent-workspace',
       originUrl: 'github.com:nbonamy/agent-workspace.git',

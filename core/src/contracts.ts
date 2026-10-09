@@ -673,6 +673,7 @@ export type AgentCreationProgress = {
 };
 
 export type AppCommand =
+  | ({ type: 'set-browser-viewport' } & import('./browser-viewport').BrowserViewportRequest)
   | {
     type: 'attach-appshot';
     accessibilityText?: string;
@@ -698,11 +699,14 @@ export type AppCommand =
   | { type: 'debug-open-code-review' }
   | { type: 'debug-open-visualize' }
   | { type: 'debug-open-markdown' }
+  | { type: 'debug-missing-engines'; enabled: boolean }
   | { type: 'debug-operation-progress'; kind: 'worktreeInitialization' | 'pullRequest' | 'merge' }
   | { type: 'edit-active-agent' }
   | { type: 'new-team' }
   | { type: 'open-agent-composer'; agentId?: string; prompt?: string; submit?: boolean }
   | { type: 'open-agent-palette' }
+  | { type: 'open-simulator'; agentId: string }
+  | { type: 'close-simulator'; agentId: string }
   | { type: 'open-browser'; agentId?: string; browserId?: string; url?: string }
   | { type: 'open-review' }
   | { type: 'open-saved-prompt-drafts' }
@@ -861,7 +865,6 @@ export type AppApi = {
   getOpenInApplications(): Promise<OpenInApplicationCatalog>;
   openAgentPath(agentId: string, application: OpenInApplication, filePath?: string): Promise<AppSnapshot>;
   chooseAgentFolder(): Promise<string | null>;
-  chooseCodexBinary(): Promise<string | null>;
   chooseSourceFolder(): Promise<string | null>;
   listSourceFolders(input?: SourceFolderListInput): Promise<SourceFolderListing>;
   listSourceRepositories(remoteConnectionId?: string): Promise<SourceRepository[]>;
@@ -928,7 +931,7 @@ export type AppApi = {
   disconnectProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderAuthentication>;
   authenticateProvider(backend: AgentBackend, action: 'login' | 'cancel'): Promise<import('./contracts/provider-setup').ProviderAuthentication>;
   configureProviderSetup(backend: AgentBackend, choice: import('./contracts/provider-setup').ProviderSetupChange): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
-  installProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
+  refreshProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
   cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication>;
   startCodexChatGptDeviceCodeLogin(remoteConnectionId: string): Promise<CodexChatGptDeviceCodeLogin>;
   startCodexChatGptLogin(): Promise<CodexChatGptLogin>;
@@ -960,6 +963,8 @@ export type AppApi = {
   editTurn(agentId: string, turnId: string, content: string): Promise<AppSnapshot>;
   retryTurn(agentId: string, turnId: string): Promise<AppSnapshot>;
   continueInterruptedTurn(agentId: string): Promise<AppSnapshot>;
+  mobileSimulator?(agentId: string, input: import('./mobile-simulator').MobileRequest): Promise<import('./mobile-simulator').MobileResult>;
+  mobileSimulatorView?(agentId: string, input: import('./mobile-simulator').MobileViewRequest): Promise<import('./mobile-simulator').MobileViewResult>;
   browserOpen(agentId: string, browserId: string, url: string, guestWebContentsId: number): Promise<BrowserState>;
   browserOpenVisualization(agentId: string, browserId: string, path: string, title: string, guestWebContentsId: number): Promise<BrowserState>;
   browserNavigate(agentId: string, browserId: string, url: string): Promise<BrowserState>;
@@ -970,6 +975,7 @@ export type AppApi = {
   browserSetZoom(agentId: string, browserId: string, percent: number): Promise<number>;
   browserCopyScreenshot(agentId: string, browserId: string, rect?: BrowserBounds): Promise<void>;
   browserSetBounds(agentId: string, browserId: string, bounds: BrowserViewportBounds): Promise<void>;
+  browserViewportApplied(agentId: string, browserId: string, requestId: string, error?: string): Promise<void>;
   browserSetVisible(agentId: string, browserId: string, visible: boolean): Promise<void>;
   browserSetAnnotationMode(agentId: string, browserId: string, enabled: boolean): Promise<void>;
   browserResolveAnnotation(token: string, comment: string | null): Promise<void>;

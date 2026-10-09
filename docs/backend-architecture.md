@@ -18,7 +18,7 @@ log and socket paths, npm scripts and launchd labels stay brand-neutral.
   session implementation owns JSON-RPC framing, pending requests, timeouts and
   server callbacks; never copy lifecycle logic into a second transport.
 - Provider setup follows the same split: `ProviderLifecycle` adapters own
-  executable detection, install, home preparation and resource sharing;
+  executable detection, home preparation and resource sharing;
   `ProviderSetup` owns locking, serialization, persistence and driver replacement.
   Authentication enters through the optional `AgentBackendDriver.authenticate`
   capability; the server caches the app-owned result and never interprets
@@ -41,11 +41,14 @@ auth probes, rejects new work, and preserves preferences, queues, saved-home
 routing and hosts for history, interruption and cleanup. Rebuild and restart to
 change gates; remove a temporary gate when its feature graduates.
 
-`backend/src/antigravity` owns the paired, checksum-verified native ACP
-runtime/harness, OAuth observations and provider replica; the agy CLI is not the
+`backend/src/antigravity` detects the externally installed ACP runtime/harness and
+owns OAuth observations and the provider replica; the agy CLI is not the
 execution path. OAuth renewal stays native, background checks suppress login UI,
 and child environments sanitize Google credentials/projects with isolated
 `GEMINI_HOME` and temporary storage. Home routing is not a filesystem sandbox.
+Korus provides installation instructions and rechecks availability; it never
+downloads the runtime. Discovery accepts the paired executables on PATH, explicit
+runtime/harness environment paths, or an existing versioned runtime directory.
 
 Each agent owns a process/session with serialized prompts and bounded cancellation.
 Cold replay validates session identity and rebuilds atomically: replay tool IDs
@@ -102,12 +105,10 @@ agents or automation runs prompt for a restart.
 
 ### Remote Hosts (SSH)
 
-Connection records live in `daemon`. Sync uploads the self-contained `daemon.mjs`
-and the pinned Codex release (`~/.korus/codex/<version>/bin`), ensures Claude Code
-through Anthropic's per-user installer when enabled (a Claude failure never
-disables Codex), mirrors `provider-tokens.json` and asks the remote to reload
-connections. It never copies state files, shell profiles or conversation data.
-Remote hosts discover Codex themselves when no bundle is supplied. Version
+Connection records live in `daemon`. Sync uploads the self-contained `daemon.mjs`,
+mirrors `provider-tokens.json` and asks the remote to reload connections. It never
+installs provider CLIs or copies state files, shell profiles or conversation data.
+Provider detection and authentication run on the owning host. Version
 discovery still accepts the previous `daemon` CLI name for hosts not yet upgraded.
 
 ## Development
@@ -151,15 +152,18 @@ conversation or sequence cursor outlives the backend instance.
 - The bundle imports no `electron`, leaves Node built-ins external, ships
   sourcemaps, and avoids native dependencies unless their packaging and signing
   are designed.
-- `codex-app-server-release.json` pins official Codex archive SHA-256s; preparation
-  verifies hash, architecture and executable version on the native build host.
-  macOS keeps upstream Codex signatures. Windows preparation verifies the whole
-  package, keeps its `bin/`, `codex-path/` and `codex-resources/` layout intact
-  (sandbox helpers and DLLs), checks the version from the final location because
-  running staged binaries locks the directory, and rolls back on failed validation.
-  The `extract-zip` dependency pins an overridden `yauzl`; keep its completion
-  regression test.
-- Computer Use, Screenshots and Apple speech helpers are macOS-only; packaging
+- Provider CLIs are external prerequisites discovered on the owning host's PATH.
+  Development and packaging do not download, pin or bundle Codex. Release smoke
+  checks reject a bundled Codex resource directory and probe the packaged daemon's
+  health and provider detection without requiring a provider installation or login.
+- The iOS simulator companion is a pinned native resource, prepared from an
+  upstream archive with SHA-256 verification, including cached downloads. Its
+  protocol and native dependency notices travel with the resource directory.
+  Electron uses direct gRPC on owned Unix sockets; there is no Python runtime or
+  system idb dependency. Forge signs the companion and its nested native resources;
+  GitHub Actions probes the packaged executable with a minimal PATH. Xcode and
+  simulator runtimes remain external prerequisites.
+- Computer Use, Screenshots, the iOS companion and Apple speech helpers are macOS-only; packaging
   another OS does not enable them.
 - Release builds sign and notarize; use `APP_SKIP_SIGNING=1` for local
   verification. Every build must still start the packaged backend and answer
@@ -172,8 +176,7 @@ Computer Use helper is ARM64-only; Windows ARM64 is experimental. Passing builds
 not prove GUI installation, login or a full agent turn on a clean machine: do that
 acceptance check before promoting the first release for an OS. Windows installers
 are **unsigned** (SmartScreen warnings are expected; no certificate prerequisite).
-Codex is bundled; Claude Code stays a separately installed prerequisite, as do
-Git/GitHub tools.
+Codex and Claude Code are separately installed prerequisites, as are Git/GitHub tools.
 
 ## GitHub desktop releases
 

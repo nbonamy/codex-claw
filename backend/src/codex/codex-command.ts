@@ -1,29 +1,13 @@
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-import { bundledCodexVersion } from '@workspace/core/codex-release';
-import { backendHomeDir } from '../state';
-
-export type CodexCommandDependencies = {
-  bundledPath?: string;
-  existsSync?: (filePath: string) => boolean;
-};
+import { resolveRuntimeExecutable } from '@workspace/core/runtime-discovery';
 
 export function resolveCodexCommand(
   configuredPath: string | undefined,
-  dependencies: CodexCommandDependencies = {},
-): string | undefined {
+): string {
   const explicit = configuredPath?.trim();
   if (explicit) {
     return explicit;
   }
 
-  const bundled = (dependencies.bundledPath ?? process.env.APP_BUNDLED_CODEX_PATH)?.trim();
-  if (bundled) {
-    return bundled;
-  }
-
-  const exists = dependencies.existsSync ?? existsSync;
-  const managed = path.join(backendHomeDir(), 'codex', bundledCodexVersion, 'bin', 'codex');
-  if (exists(managed)) return managed;
-  return undefined;
+  // Always pass a command: undefined lets SDK discovery select an app-private CLI.
+  return resolveRuntimeExecutable('codex') ?? 'codex';
 }

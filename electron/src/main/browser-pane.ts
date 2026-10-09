@@ -6,10 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { BrowserAnnotation, BrowserBounds, BrowserState, BrowserViewportBounds } from '@workspace/core/contracts';
 import { browserGuestPartition } from '@workspace/core/browser-guest';
+import { parseBrowserViewport, type BrowserViewportRequest } from '@workspace/core/browser-viewport';
 export { safePartitionName } from '@workspace/core/browser-guest';
 
 type BrowserPaneOptions = {
   onAnnotation(annotation: BrowserAnnotation): void;
+  onViewportRequest?(request: BrowserViewportRequest): void;
 };
 
 type HostedBrowserPane = {
@@ -40,6 +42,12 @@ const maximumVisualizationBytes = 1_048_576;
  */
 export class BrowserPane {
   private readonly panes = new Map<string, HostedBrowserPane>();
+  private readonly viewportRequests = new Map<string, {
+    request: BrowserViewportRequest;
+    resolve: (value: unknown) => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
 
   constructor(private readonly options: BrowserPaneOptions) {}
 
@@ -220,6 +228,7 @@ export class BrowserPane {
   setVisible(agentId: string, browserId: string, visible: boolean): void {
     const pane = this.requirePane(agentId, browserId);
     pane.visible = visible;
+    if (!visible) this.rejectViewportRequest(agentId, browserId, 'Browser pane was hidden.');
     if (pane.annotationOverlay && !pane.annotationOverlay.isDestroyed()) {
       if (visible) pane.annotationOverlay.show();
       else pane.annotationOverlay.hide();
@@ -280,6 +289,7 @@ export class BrowserPane {
   }
 
   async close(agentId: string, browserId: string): Promise<void> {
+    this.rejectViewportRequest(agentId, browserId, 'Browser pane was closed.');
     const key = browserPaneKey(agentId, browserId);
     const pane = this.panes.get(key);
     if (!pane) return;
@@ -297,6 +307,23 @@ export class BrowserPane {
   async execute(agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>): Promise<unknown> {
     const pane = this.requirePane(agentId, browserId);
     const webContents = pane.webContents;
+    if (command === 'viewport') {
+      const viewport = parseBrowserViewport(arguments_);
+      if (!pane.navigationEnabled || !pane.visible) throw new Error('Open this agent’s Browser pane before changing its viewport.');
+      const notify = this.options.onViewportRequest;
+      if (!notify) throw new Error('Browser viewport controls are unavailable.');
+      // Dimensions are CSS pixels, independent of a previous manual page zoom.
+      pane.webContents.setZoomFactor(1);
+      this.rejectViewportRequest(agentId, browserId, 'Browser viewport request was superseded.');
+      return new Promise((resolve, reject) => {
+        const request = { agentId, browserId, requestId: crypto.randomUUID(), viewport };
+        const timer = setTimeout(() => this.rejectViewportRequest(agentId, browserId, 'Timed out resizing the browser viewport.'), 10_000);
+        this.viewportRequests.set(browserPaneKey(agentId, browserId), { request, resolve, reject, timer });
+        try { notify(request); } catch (error) {
+          this.rejectViewportRequest(agentId, browserId, error instanceof Error ? error.message : String(error));
+        }
+      });
+    }
     if (command === 'screenshot') {
       const image = await webContents.capturePage();
       return { mimeType: 'image/png', data: image.toPNG().toString('base64') };
@@ -314,6 +341,36 @@ export class BrowserPane {
       if (input.command === 'scroll') { (input.selector ? root : window).scrollBy({ top: input.deltaY, behavior: 'instant' }); return { scrolled: input.deltaY, selector: input.selector || 'window' }; }
       throw new Error('Unsupported browser command.');
     })()`, true);
+  }
+
+  async viewportApplied(agentId: string, browserId: string, requestId: string, error?: string): Promise<void> {
+    const key = browserPaneKey(agentId, browserId);
+    const pending = this.viewportRequests.get(key);
+    if (!pending || pending.request.requestId !== requestId) return;
+    if (error) { this.rejectViewportRequest(agentId, browserId, error); return; }
+    try {
+      const metrics = await this.requirePane(agentId, browserId).webContents.executeJavaScript(
+        '({ width: window.innerWidth, height: window.innerHeight, devicePixelRatio: window.devicePixelRatio })',
+      );
+      if (this.viewportRequests.get(key) !== pending) return;
+      if (!metrics || !Number.isFinite(metrics.width) || metrics.width <= 0 || !Number.isFinite(metrics.height) || metrics.height <= 0) {
+        throw new Error('Could not measure the browser viewport.');
+      }
+      clearTimeout(pending.timer);
+      this.viewportRequests.delete(key);
+      pending.resolve({ preset: pending.request.viewport.preset, width: metrics.width, height: metrics.height, devicePixelRatio: metrics.devicePixelRatio });
+    } catch (error) {
+      if (this.viewportRequests.get(key) === pending) this.rejectViewportRequest(agentId, browserId, error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  private rejectViewportRequest(agentId: string, browserId: string, message: string): void {
+    const key = browserPaneKey(agentId, browserId);
+    const pending = this.viewportRequests.get(key);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.viewportRequests.delete(key);
+    pending.reject(new Error(message));
   }
 
   private async cancelAnnotationMode(pane: HostedBrowserPane): Promise<void> {

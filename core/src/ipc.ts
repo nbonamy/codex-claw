@@ -1,6 +1,8 @@
 import type { AppCommand, AppApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
+  mobileSimulator: 'mobile:execute',
+  mobileSimulatorView: 'mobile:view',
   getDocumentWorkspaces: "document:getDocumentWorkspaces",
   updateDocumentWorkspace: "document:updateDocumentWorkspace",
   readWorkspaceDocument: "document:readWorkspaceDocument",
@@ -70,7 +72,6 @@ export const ipcChannels = {
   getOpenInApplications: 'open-in:applications:get',
   openAgentPath: 'agent:path:open-in',
   chooseAgentFolder: 'agent:choose-folder',
-  chooseCodexBinary: 'codex:binary:choose',
   chooseSourceFolder: 'source-folder:choose',
   listSourceFolders: 'source-folder:folders:list',
   listSourceRepositories: 'source-folder:repositories:list',
@@ -135,7 +136,7 @@ export const ipcChannels = {
   disconnectProvider: 'provider:disconnect',
   authenticateProvider: 'provider:authenticate',
   configureProviderSetup: 'provider:setup:configure',
-  installProvider: 'provider:install',
+  refreshProvider: 'provider:refresh',
   cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',
   startCodexChatGptLogin: 'codex:authentication:chatgpt:start',
   startCodexChatGptDeviceCodeLogin: 'codex:authentication:deviceCode:start',
@@ -177,6 +178,7 @@ export const ipcChannels = {
   browserSetZoom: 'browser:zoom:set',
   browserCopyScreenshot: 'browser:screenshot:copy',
   browserSetBounds: 'browser:bounds:set',
+  browserViewportApplied: 'browser:viewport:applied',
   browserSetVisible: 'browser:visible:set',
   browserSetAnnotationMode: 'browser:annotation-mode:set',
   browserResolveAnnotation: 'browser:annotation:resolve',
@@ -197,7 +199,7 @@ type IpcRequestFor<Method> = Method extends (...args: infer Arguments) => infer 
 export type AppIpcRequests = {
   [Name in keyof AppIpcRequestApi as Name extends keyof typeof ipcChannels
     ? (typeof ipcChannels)[Name]
-    : never]: IpcRequestFor<AppIpcRequestApi[Name]>;
+    : never]: IpcRequestFor<NonNullable<AppIpcRequestApi[Name]>>;
 };
 
 export type AppIpcEvents = {

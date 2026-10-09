@@ -244,6 +244,31 @@ describe('AgentSidebar sessions', () => {
     expect(document.body.textContent).toContain('Could not load branches: offline');
   });
 
+  it('preserves default, branch, and worktree icon colors using detected workspace metadata', async () => {
+    const source = agents[0]!;
+    if (source.workspace?.kind !== 'git') throw new Error('Expected Git fixture');
+    const workspace = { ...source.workspace, branch: 'trunk', defaultBranch: 'trunk' };
+    const wrapper = mount(AgentSidebar, {
+      attachTo: document.body,
+      props: { agents: [{ ...source, workspace }], activeAgentId: source.id, teamName: 'Team' },
+    });
+    const icon = () => wrapper.get('.agent-sidebar__session-icon');
+    expect(wrapper.get('.agent-sidebar__agent').attributes('data-session-kind')).toBe('main');
+    expect(icon().classes()).toContain('tabler-icon-git-branch');
+    expect(getComputedStyle(icon().element).color).toBe('var(--color-primary)');
+
+    await wrapper.setProps({ agents: [{ ...source, workspace: { ...workspace, branch: 'main' } }] });
+    expect(wrapper.get('.agent-sidebar__agent').attributes('data-session-kind')).toBe('branch');
+    expect(icon().classes()).toContain('tabler-icon-git-branch');
+    expect(getComputedStyle(icon().element).color).toBe('var(--color-success)');
+
+    await wrapper.setProps({ agents: [{ ...source, workspace: { ...workspace, isLinkedWorktree: true } }] });
+    expect(wrapper.get('.agent-sidebar__agent').attributes('data-session-kind')).toBe('worktree');
+    expect(icon().classes()).toContain('tabler-icon-git-fork');
+    expect(getComputedStyle(icon().element).color).toBe('var(--color-warning)');
+    wrapper.unmount();
+  });
+
   it('renders compact workspace rows with repository headers, branches, and status icons', () => {
     const wrapper = mount(AgentSidebar, {
       props: {

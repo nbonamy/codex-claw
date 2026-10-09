@@ -15,6 +15,7 @@ electron/.icons/
 electron/.runtime-cache/
 # Temporary Codex installer staging and recovery directories
 /electron/resources/.codex-*/
+/electron/resources/codex/
 native/**/.build/
 
 # Rebuild promo video renders from videos/*.html and videos/render-mission-film.mjs.
@@ -25,3 +26,7 @@ native/**/.build/
 
 # Generated Linux development startup identity
 electron/.development-shell/
+
+# Verified native simulator build resources
+electron/.mobile-simulator/
+electron/.mobile-simulator-artifacts/

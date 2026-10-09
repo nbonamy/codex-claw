@@ -70,21 +70,35 @@ remain full-square. Composite the canonical vector into thumbnails, the social
 card, and the channel banner rather than asking image generation to redraw it.
 Re-export the films after updating their shared `website/assets/app-icon.png`.
 
-The page opens with a text-led hero, followed by five self-hosted product films:
-Mission in the first workflow section, Delegation and Code Review beside their
-workflow copy, and Quick Chat and Visualize in the feature cards. Automations
-and Cockpit retain static illustrations.
+The hero leads with three visitor problems—parallel work, reliable results,
+and big ideas—each answered by a self-hosted product film: Delegation, Code
+Review, and Mission. Quick Chat and Visualize films sit in the feature cards.
+Cockpit, Automations, and Background runtime show real screenshots from
+`assets/screens/`, captured from the running app with neutral demo data (a
+sample storefront team, no private repository names or account details).
+Refresh them with the `korus-live-preview` skill when those surfaces change,
+and bump the `?v=` query on the image URLs. Computer Use and the choice of
+agents stay text-only until a faithful capture exists.
 
-Each film opens from its rendered poster frame. No MP4 is requested until the
-visitor clicks; native controls provide seeking and fullscreen, and starting a
-film pauses the others. The films use the approved Calm American narration and
-pacing. Playback starts muted with captions on; visitors can unmute using the
-native controls or use the understated Captions on/off text link below each player.
-Sound, volume, and caption choices apply to all five players until the page reloads.
-Captions sit near the bottom of the video; native controls may adjust their placement.
-Captions are separate WebVTT tracks and also available through the native player's menu. Subtitle
+The hero previews the selected film muted and without controls, then advances
+to the next tab when it ends. Only the selected film loads; the others stay off
+the network until chosen. With reduced motion, the hero shows posters and plays
+nothing until asked. **Watch with sound** restarts the current film with sound,
+captions, and native controls, and it then stays on that film. Without
+JavaScript, the link opens the MP4 directly.
+
+Feature-card films open from their rendered poster frame. No MP4 is requested
+until the visitor clicks; native controls provide seeking and fullscreen. Only one
+film plays at a time across the page. The films use the approved Calm American
+narration and pacing. Feature-card playback starts muted with captions on;
+visitors can unmute using the native controls or use the understated Captions
+on/off text link below each player. Sound, volume, and caption choices apply to
+the feature-card players until the page reloads. Captions sit near the bottom of
+the video; native controls may adjust their placement. Captions are separate
+WebVTT tracks and also available through the native player's menu. Subtitle
 files are loaded only when the visitor opens a film. Cover links also open the
-MP4 directly without JavaScript. These are animated walkthroughs, not live recordings.
+MP4 directly without JavaScript. These are animated walkthroughs, not live
+recordings.
 
 Before building or deploying from a fresh checkout, render all five films:
 
@@ -104,8 +118,9 @@ Do not commit these rebuildable outputs; deployments upload them with the rest
 of the static artifact. YouTube uploads are independent of the website.
 
 Keep visuals free of private repository names, messages, and account details.
-The page positions Korus as a workspace for agentic software engineering
-workflows; explain their value without becoming a release changelog.
+The page positions Korus as a team of coding agents it orchestrates. Lead with
+the problems visitors recognize, explain the value without becoming a release
+changelog, and promise only what the shipped product does.
 
 Run the static-site checks with:
 
@@ -243,13 +258,48 @@ deliverables. Paths are relative to `videos/local/`. Preserve the approved WAVs,
 their provenance/alignment JSON, and the reference WAVs when clearing rebuildable
 MP4s: re-rendering preserves the approved voice; synthesizing it again may not.
 
-## Code Review product film
+## Automatic code review product film
 
-`videos/review-film.html` is a separate, illustrative 50-second walkthrough of Korus's standalone `/review` command: open Review, choose branch scope and an independent reviewer, inspect structured findings, remediate the selected issues, run a second round, and finish. It is not the Mission Review stage or a captured live review. Preview it at <http://127.0.0.1:4174/videos/review-film.html> and export its MP4 and poster with:
+`videos/review-film.html` is an illustrative 56-second walkthrough of automatic
+code review: find issues, fix qualifying findings, and verify the changes in a
+fresh round. Switching models is optional; this example uses Claude to review
+Codex's work for an adversarial perspective. The user enables automatic
+remediation for critical, high, and medium findings and allows up to three
+rounds. A cleared conversation marks each independent reviewer thread. Findings,
+severity, fix progress, and verification results appear in the Review pane;
+the conversation contains brief agent updates, not duplicate finding cards.
+A fresh reviewer verifies the result, returns the report to the original
+conversation, and closes. The example finishes after two rounds with
+local commits disabled. It is a scripted promotion, not a captured live review
+or the Mission Review stage. Preview it at
+<http://127.0.0.1:4174/videos/review-film.html> and export its ignored MP4 and poster:
 
 ```bash
 node videos/render-mission-film.mjs review-film
 ```
+
+For a standalone narrated export, generate and validate one Calm American take,
+then apply the same speech and pause settings as the other films:
+
+```bash
+.app-dev/video-tts/bin/python videos/generate-local-narration.py review-film --voice american-male --output videos/local/review-automatic/review-film
+.app-dev/video-tts/bin/python videos/check-local-narration.py --voice american-male --output videos/local/review-automatic/review-film
+node videos/render-review-film.mjs
+npx vite videos/local/review-automatic --host 127.0.0.1 --port 4190 --strictPort
+```
+
+The narrated MP4, optional VTT captions, and review page stay ignored under
+`videos/local/review-automatic/`. Narration may extend the silent film's timing.
+Use that review page for the visible **CC · Captions** control; the editable
+`videos/review-film.html` animation viewer is silent and has no subtitle track.
+To include an approved standalone take in the website, copy its `narration.wav`,
+`narration.json`, and `narration-aligned.json` from
+`videos/local/review-automatic/review-film/american-male/` into
+`videos/local/narrated/review-film/american-male/`, then run
+`node videos/render-voice-comparison.mjs --all`. This regenerates the website's
+five-film manifest and exports without synthesizing new speech. Deploy through
+the website workflow below. The tracked thumbnail is
+`videos/assets/review-film-thumbnail.png`.
 
 ## Worktree delegation product film
 

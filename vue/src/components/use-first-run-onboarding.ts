@@ -88,7 +88,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
   }
 
   async function startChatGptLogin(): Promise<void> {
-    if (!isInstalled('codex')) { customizeProvider('codex'); return; }
+    if (!isInstalled('codex')) return;
     if (codexConnected.value) { await enableConnectedEngine('codex'); return; }
     authenticationLoading.value = true;
     authenticationError.value = null;
@@ -123,7 +123,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
   }
 
   async function connectClaude(): Promise<void> {
-    if (!isInstalled('claude')) { customizeProvider('claude'); return; }
+    if (!isInstalled('claude')) return;
     if (claudeConnected.value) { await enableConnectedEngine('claude'); return; }
     claudeDialogVisible.value = true;
     await refreshClaude();
@@ -164,7 +164,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
   }
 
   async function connectAntigravity(): Promise<void> {
-    if (!isInstalled('antigravity')) { await customizeProvider('antigravity'); return; }
+    if (!isInstalled('antigravity')) return;
     if (antigravityConnected.value) { await enableConnectedEngine('antigravity'); return; }
     antigravityPending.value = true; antigravityError.value = null;
     try { await requireApi().authenticateProvider('antigravity', 'login'); }
@@ -186,6 +186,19 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     customizingProvider.value = backend;
   }
 
+  async function refreshProvider(backend: AgentBackend): Promise<void> {
+    if (setupBusy.value) return;
+    updatingProvider.value = backend;
+    setupError.value = null;
+    try {
+      const next = await requireApi().refreshProvider(backend);
+      if (disposed) return;
+      providerSetup.value = [...providerSetup.value.filter(setup => setup.backend !== backend), next];
+    } catch (error) {
+      if (!disposed) setupError.value = errorMessage(error);
+    } finally { if (!disposed) updatingProvider.value = null; }
+  }
+
   async function saveProviderSetup(choice: ProviderSetupChange): Promise<void> {
     const backend = customizingProvider.value;
     if (!backend || setupBusy.value) return;
@@ -199,15 +212,12 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
       const current = providerSetup.value.find(setup => setup.backend === backend);
       const unchangedLockedSetup = current?.locked && !choice.removeAgentIds
         && current.isolated === choice.isolated && current.shareSkills === choice.shareSkills;
-      let next = unchangedLockedSetup ? current : await requireApi().configureProviderSetup(backend, choice);
+      const next = unchangedLockedSetup ? current : await requireApi().configureProviderSetup(backend, choice);
       if (backend === 'codex') authentication.value = null;
       else if (backend === 'claude') claudeAuthentication.value = null;
       providerSetup.value = providerSetup.value.map(setup => setup.backend === backend ? next : setup);
-      if (!next.installed) {
-        next = await requireApi().installProvider(backend);
-        providerSetup.value = providerSetup.value.map(setup => setup.backend === backend ? next : setup);
-      }
       customizingProvider.value = null;
+      if (!next.installed) return;
       if (backend === 'codex') await refreshCodex();
       else if (backend === 'claude') await refreshClaude();
       else await refreshConnections();
@@ -319,7 +329,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
     codexConnected, claudeConnected, canContinue, continuing,
     completeVisible, gated, githubVisible, initialAuthenticationLoading, showLogin,
     cancelChatGptLogin, completeGitHub, finish, load, startChatGptLogin,
-    connectClaude, disconnectProvider, refreshClaude, refreshConnections, continueWithProviders,
+    connectClaude, disconnectProvider, refreshClaude, refreshConnections, refreshProvider, continueWithProviders,
     providerSetup, customizingProvider, customizedSetup, setupBusy, updatingProvider, setupError, customizeProvider, saveProviderSetup,
   };
 }

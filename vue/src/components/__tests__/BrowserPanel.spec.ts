@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ElMessage } from 'element-plus';
 import BrowserPanel from '../BrowserPanel.vue';
 import { setElectronTestClient } from '../../test/client';
-import type { MainToRendererEvent } from '@workspace/core/contracts';
+import type { AppCommand, MainToRendererEvent } from '@workspace/core/contracts';
 import { createInitialSnapshot } from '@workspace/core/snapshot';
 import GitDiffControl from '../GitDiffControl.vue';
 
@@ -32,6 +32,7 @@ function mountPanel(
   options: { deferDomReady?: boolean; attachTo?: Element } = {},
 ) {
   let listener: ((event: MainToRendererEvent) => void) | null = null;
+  let commandListener: ((command: AppCommand) => void) | null = null;
   const browserOpen = vi.fn().mockResolvedValue({
     url: '',
     title: '',
@@ -59,6 +60,7 @@ function mountPanel(
     browserSetZoom: vi.fn(async (_agentId: string, _browserId: string, percent: number) => percent),
     browserCopyScreenshot: vi.fn().mockResolvedValue(undefined),
     browserSetBounds: vi.fn().mockResolvedValue(undefined),
+    browserViewportApplied: vi.fn().mockResolvedValue(undefined),
     browserSetVisible: vi.fn().mockResolvedValue(undefined),
     browserSetAnnotationMode: vi.fn().mockResolvedValue(undefined),
     browserClearAnnotations: vi.fn().mockResolvedValue(undefined),
@@ -67,16 +69,56 @@ function mountPanel(
       listener = nextListener;
       return vi.fn();
     }),
+    onAppCommand: vi.fn((nextListener) => {
+      commandListener = nextListener;
+      return () => { commandListener = null; };
+    }),
   };
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   setElectronTestClient(api);
   const wrapper = mount(BrowserPanel, { attachTo: options.attachTo, props: { agentId: 'agent-1', visible: true, ...props } });
   const emitDomReady = () => wrapper.get('webview').element.dispatchEvent(new Event('dom-ready'));
   if (!options.deferDomReady) queueMicrotask(emitDomReady);
-  return { api, browserOpen, emitDomReady, emitEvent: (event: MainToRendererEvent) => listener?.(event), wrapper };
+  return { api, browserOpen, emitDomReady, emitEvent: (event: MainToRendererEvent) => listener?.(event), emitCommand: (command: AppCommand) => commandListener?.(command), wrapper };
 }
 
 describe('BrowserPanel', () => {
+  it('applies targeted viewport requests through device controls and acknowledges layout, including reset', async () => {
+    const { wrapper, api, emitCommand } = mountPanel();
+    await flushPromises();
+    const request = { type: 'set-browser-viewport' as const, agentId: 'agent-1', browserId: 'primary', requestId: 'phone', viewport: { preset: 'phone' as const, width: 390, height: 844 } };
+    emitCommand({ ...request, agentId: 'someone-else' });
+    emitCommand({ ...request, browserId: 'other-tab' });
+    expect(api.browserViewportApplied).not.toHaveBeenCalled();
+    expect(wrapper.find('.browser-panel__device-toolbar').exists()).toBe(false);
+
+    emitCommand(request);
+    await vi.waitFor(() => expect(api.browserViewportApplied).toHaveBeenCalledWith('agent-1', 'primary', 'phone', undefined));
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Device mode"]').element.value).toBe('phone');
+    expect(wrapper.get<HTMLElement>('.browser-panel__guest-frame').element.style.width).toBe('390px');
+    expect(wrapper.get<HTMLElement>('.browser-panel__guest-frame').element.style.height).toBe('844px');
+
+    emitCommand({ ...request, requestId: 'custom', viewport: { preset: 'custom', width: 900, height: 700 } });
+    await vi.waitFor(() => expect(api.browserViewportApplied).toHaveBeenCalledWith('agent-1', 'primary', 'custom', undefined));
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Viewport width"]').element.value).toBe('900');
+    expect(wrapper.get<HTMLInputElement>('[aria-label="Viewport height"]').element.value).toBe('700');
+    emitCommand({ ...request, requestId: 'fit', viewport: { preset: 'fit' } });
+    await vi.waitFor(() => expect(api.browserViewportApplied).toHaveBeenCalledWith('agent-1', 'primary', 'fit', undefined));
+    expect(wrapper.find('.browser-panel__device-toolbar').exists()).toBe(false);
+    expect(wrapper.get<HTMLElement>('.browser-panel__guest-frame').element.style.width).toBe('');
+    wrapper.unmount();
+  });
+
+  it('rejects viewport requests when the panel is hidden', async () => {
+    const { wrapper, api, emitCommand } = mountPanel();
+    await flushPromises();
+    await wrapper.setProps({ visible: false });
+    emitCommand({ type: 'set-browser-viewport', agentId: 'agent-1', browserId: 'primary', requestId: 'hidden', viewport: { preset: 'phone', width: 390, height: 844 } });
+    await flushPromises();
+    expect(api.browserViewportApplied).toHaveBeenCalledWith('agent-1', 'primary', 'hidden', expect.stringContaining('Open'));
+    expect(wrapper.find('.browser-panel__device-toolbar').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it.each([
     ['app', 'https://www.google.com/search?q=app'],
     ['  how do worktrees work?  ', 'https://www.google.com/search?q=how%20do%20worktrees%20work%3F'],
@@ -443,7 +485,9 @@ describe('BrowserPanel', () => {
     await wrapper.get<HTMLInputElement>('[aria-label="Viewport width"]').setValue('520');
     expect(mode.element.value).toBe('custom');
     expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 520px');
-    await wrapper.get('[aria-label="Rotate viewport"]').trigger('click');
+    const rotateButton = wrapper.get('[aria-label="Rotate viewport"]');
+    expect(rotateButton.find('svg.tabler-icon-rotate-rectangle').exists()).toBe(true);
+    await rotateButton.trigger('click');
     expect(wrapper.get('.browser-panel__guest-frame').attributes('style')).toContain('width: 844px');
     await wrapper.get('[aria-label="Hide device toolbar"]').trigger('click');
     expect(wrapper.find('.browser-panel__device-toolbar').exists()).toBe(false);

@@ -18,12 +18,12 @@ import { presentAppTool } from '../tool-presentation';
 
 describe(`${product.name} tool presentation`, () => {
   it.each([
-    ['running', 'browser screenshot', 'Searching tools: browser screenshot'],
-    ['completed', 'select:mcp__korus__list_agents', 'Searched tools: select:mcp__korus__list_agents'],
-    ['failed', 'browser screenshot', 'Could not search tools: browser screenshot'],
+    ['running', 'browser screenshot', 'Searching tools'],
+    ['completed', 'select:mcp__korus__list_agents', 'Searched tools'],
+    ['failed', 'browser screenshot', 'Could not search tools'],
     ['running', undefined, 'Searching tools'],
     ['completed', undefined, 'Searched tools'],
-  ])('shows tool search context when %s', (phase, target, title) => {
+  ])('shows a concise tool search label when %s', (phase, target, title) => {
     const call = context('ToolSearch', {});
     call.kind = 'generic';
     call.metadata = undefined;
@@ -41,6 +41,7 @@ describe(`${product.name} tool presentation`, () => {
     ['add-visualization', SitemapIcon, 'Created diagram'],
     ['delete-visualization', SitemapIcon, 'Deleted diagram'],
     ['browser-screenshot', BrowserIcon, 'Captured page screenshot'],
+    ['browser-set-viewport', BrowserIcon, 'Resized browser viewport'],
     ['computer-use-get-app-state', DeviceDesktopIcon, `Inspected ${product.name}`],
     ['computer-use-guide', DeviceDesktopIcon, 'Loaded Computer Use guide'],
     ['computer-use-list-windows', DeviceDesktopIcon, 'Listed Safari windows'],

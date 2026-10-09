@@ -848,10 +848,6 @@ export function useAppState() {
     return await appApi?.chooseAgentFolder?.() ?? null;
   }
 
-  async function chooseCodexBinary(): Promise<string | null> {
-    return await appApi?.chooseCodexBinary?.() ?? null;
-  }
-
   async function chooseSourceFolder(): Promise<string | null> {
     return await appApi?.chooseSourceFolder?.() ?? null;
   }
@@ -1706,7 +1702,6 @@ export function useAppState() {
     loadDaemonStatus,
     loadSnapshot,
     chooseAgentFolder,
-    chooseCodexBinary,
     chooseSourceFolder,
     listSourceFolders,
     listSourceRepositories,

@@ -14,6 +14,7 @@ import { ClaudeAgentSdkTransport } from '../../claude/agent-sdk-transport';
 import { createQueryHarness } from '../../claude/__tests__/sdk-query-fixture';
 
 vi.mock('@workspace/core/runtime-discovery', () => ({
+  resolveRuntimeExecutable: () => '/test/bin/codex',
   withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
 }));
 

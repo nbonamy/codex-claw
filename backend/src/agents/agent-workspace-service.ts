@@ -25,7 +25,8 @@ export class AgentWorkspaceService {
     const targetIds = agentIds ? new Set(agentIds) : null;
     const targets = snapshot.agents.filter((agent) => (
       (!targetIds || targetIds.has(agent.id)) &&
-      (refreshExisting || !agent.workspace || agent.workspace.folder !== agent.folder)
+      (refreshExisting || !agent.workspace || agent.workspace.folder !== agent.folder
+        || (agent.workspace.kind === 'git' && agent.workspace.defaultBranch === undefined))
     ));
     if (targets.length === 0) return;
 
@@ -133,6 +134,7 @@ function sameWorkspaceIdentity(current: AgentWorkspaceIdentity | undefined, next
     return current.repositoryName === next.repositoryName &&
       current.repositoryRoot === next.repositoryRoot &&
       current.branch === next.branch &&
+      current.defaultBranch === next.defaultBranch &&
       current.isLinkedWorktree === next.isLinkedWorktree &&
       current.primaryWorktreeRoot === next.primaryWorktreeRoot &&
       current.originUrl === next.originUrl;

@@ -4,11 +4,11 @@ description: Set up Codex with separate Korus chats or your existing environment
 
 # Codex
 
-Codex is bundled with the Korus desktop app. You can use it without installing a separate Codex CLI, but you still need to connect an account with Codex access.
+Install the Codex CLI using the [official installation instructions](https://learn.chatgpt.com/docs/codex/cli#getting-started). Korus detects it on PATH. Welcome and Settings offer **Install** and a refresh icon when Codex is not detected. You also need an account with Codex access.
 
 ## Choose a separate or existing setup
 
-On the first connection screen, select **Customize** beneath Codex. If you are already in the workspace, open **Settings → Codex → Location → Customize**.
+Once Codex is detected, select **Customize** beneath it on the first connection screen. If you are already in the workspace, open **Settings → Codex → Location → Customize**.
 
 For a separate environment:
 
@@ -74,12 +74,6 @@ The current **Launch ChatGPT** action targets Korus's separate Codex home. If yo
 
 To edit personal instructions, open **Settings → Personalization**, choose **Codex**, and check the displayed instruction-file path. These edits follow the selected Codex home; with **Use existing setup**, they also affect your setup outside Korus.
 
-## Use a custom Codex executable
-
-The bundled runtime is the default. For development or a specific troubleshooting need, open **Settings → Codex → Runtime** and set **Codex executable**, using **Choose** to select the file. Changing this setting restarts Korus.
-
-Clear the setting to return to bundled Codex. Selecting a different executable does not select a different conversation home; **Location** controls that separately.
-
 ## Connection problems
 
 | Symptom | What to check |
@@ -88,7 +82,7 @@ Clear the setting to return to bundled Codex. Selecting a different executable d
 | The first screen says **Detected**, but work cannot start | Detection confirms the runtime, not authentication. Complete **Connect Codex**. |
 | Browser sign-in remains pending | Finish the flow in the browser or select **Cancel sign-in** and retry. |
 | A skill, plugin, or MCP server is missing | Check the selected home and whether resource reuse is enabled. Skills/plugin sharing does not copy all provider configuration. |
-| A custom runtime fails | Check **Codex executable**; clear it to retry with bundled Codex. |
+| Codex is not detected | Install the CLI, make it available on PATH, then select the refresh icon. |
 | The engine is connected but unavailable for new work | Turn on **Enable engine**. **Disconnect** signs out of the selected Codex setup; connect again if you used it. |
 
 When reporting a problem, include the Korus version, displayed location, runtime choice, and the error message. See [Troubleshooting](../troubleshooting/) for the wider diagnostic checklist.

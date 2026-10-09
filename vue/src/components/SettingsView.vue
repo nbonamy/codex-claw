@@ -39,30 +39,32 @@
         <SettingsCodexPanel
           v-else-if="activeTab === 'codex'"
           :connected="codexConnected"
+          :installed="providerConnections?.find(engine => engine.backend === 'codex')?.installed ?? false"
+          @refresh="refreshProvider?.('codex')"
           :authentication="providerConnections?.find(engine => engine.backend === 'codex')?.authentication"
           @customize="customizeProvider?.('codex')"
           :set-enabled="enabled => setProviderEnabled?.('codex', enabled)"
-          :connection-busy="codexConnectionBusy"
+          :connection-busy="codexConnectionBusy || updatingProvider === 'codex'"
           :login-pending="codexLoginPending"
-          :connection-error="codexConnectionError"
+          :connection-error="codexConnectionError || providerSetupError"
           @connect="connectCodex"
           @disconnect="disconnectProvider?.('codex')"
           @cancel="cancelCodexLogin"
-          :choose-codex-binary="chooseCodexBinary"
           :launch-chat-gpt-app="launchChatGptApp"
           :settings="generalSettings"
-          :update-settings="updateSettings"
         />
         <SettingsAntigravityPanel
           v-else-if="activeTab === 'antigravity'"
+          :installed="providerConnections?.find(engine => engine.backend === 'antigravity')?.installed ?? false"
+          @refresh="refreshProvider?.('antigravity')"
           :connected="providerConnections?.some(engine => engine.backend === 'antigravity' && engine.connected)"
           :authentication="providerConnections?.find(engine => engine.backend === 'antigravity')?.authentication"
           :home="generalSettings.providerHomes?.antigravity"
           :enabled="generalSettings.providerEnabled?.antigravity !== false"
           :set-enabled="enabled => setProviderEnabled?.('antigravity', enabled)"
-          :busy="antigravityConnectionBusy"
+          :busy="antigravityConnectionBusy || updatingProvider === 'antigravity'"
           :pending="antigravityLoginPending"
-          :error="antigravityConnectionError"
+          :error="antigravityConnectionError || providerSetupError"
           @customize="customizeProvider?.('antigravity')"
           @connect="connectAntigravity"
           @disconnect="disconnectProvider?.('antigravity')"
@@ -71,13 +73,15 @@
         <SettingsClaudeCodePanel
           v-else-if="activeTab === 'claude-code'"
           :connected="claudeConnected"
+          :installed="providerConnections?.find(engine => engine.backend === 'claude')?.installed ?? false"
+          @refresh="refreshProvider?.('claude')"
           :authentication="providerConnections?.find(engine => engine.backend === 'claude')?.authentication"
           :home="generalSettings.providerHomes?.claude"
           @customize="customizeProvider?.('claude')"
           :enabled="generalSettings.providerEnabled?.claude !== false"
           :set-enabled="enabled => setProviderEnabled?.('claude', enabled)"
-          :busy="claudeConnectionBusy"
-          :error="claudeConnectionError"
+          :busy="claudeConnectionBusy || updatingProvider === 'claude'"
+          :error="claudeConnectionError || providerSetupError"
           @connect="connectClaude"
           @disconnect="disconnectProvider?.('claude')"
         />
@@ -155,6 +159,7 @@ import SettingsSidebar from './SettingsSidebar.vue';
 import SettingsVoicePanel from './SettingsVoicePanel.vue';
 import type { SettingsTab } from './settings-tabs';
 import type { ProviderConnection } from '@workspace/core/contracts/provider-setup';
+import type { AgentBackend } from '@workspace/core/contracts';
 import { appHostCapabilities } from '../platform-api';
 import appPackage from '../../package.json';
 
@@ -163,9 +168,12 @@ const appVersion = appPackage.version;
 const props = withDefaults(defineProps<{
   codexConnected?: boolean;
   providerConnections?: ProviderConnection[];
-  customizeProvider?: (backend: import('@workspace/core/contracts').AgentBackend) => unknown;
-  setProviderEnabled?: (backend: import('@workspace/core/contracts').AgentBackend, enabled: boolean) => unknown;
-  disconnectProvider?: (backend: import('@workspace/core/contracts').AgentBackend) => Promise<void>;
+  refreshProvider?: (backend: AgentBackend) => Promise<void>;
+  updatingProvider?: AgentBackend | null;
+  providerSetupError?: string | null;
+  customizeProvider?: (backend: AgentBackend) => unknown;
+  setProviderEnabled?: (backend: AgentBackend, enabled: boolean) => unknown;
+  disconnectProvider?: (backend: AgentBackend) => Promise<void>;
   claudeConnected?: boolean;
   codexConnectionBusy?: boolean;
   claudeConnectionBusy?: boolean;
@@ -186,7 +194,6 @@ const props = withDefaults(defineProps<{
   sourceFolder?: SourceFolderState;
   daemonStatus?: DaemonStatus | null;
   daemonStatusError?: string | null;
-  chooseCodexBinary?: () => Promise<string | null>;
   chooseSourceFolder?: () => Promise<string | null>;
   launchChatGptApp?: () => Promise<void>;
   workBacklogConnections?: WorkIntegrationConnection[];
@@ -243,7 +250,6 @@ const props = withDefaults(defineProps<{
   sourceFolder: () => ({ ...defaultSourceFolderState }),
   daemonStatus: null,
   daemonStatusError: null,
-  chooseCodexBinary: async () => null,
   chooseSourceFolder: async () => null,
   pollWorkProviderAuthorization: async () => undefined,
   connectWorkProvider: async () => undefined,

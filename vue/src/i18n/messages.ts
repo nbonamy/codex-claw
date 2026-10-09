@@ -3,7 +3,7 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
-    antigravity: { name: 'Antigravity', connect: 'Connect Antigravity', connected: 'Antigravity connected', enable: 'Enable Antigravity', remoteLogin: 'Sign in to Antigravity on the remote host, then retry the connection.' },
+    antigravity: { name: 'Antigravity', connect: 'Connect Antigravity', connected: 'Antigravity connected', enable: 'Enable Antigravity', remoteLogin: 'Sign in to Antigravity on the remote host, then retry the connection.', installInstructions: 'Download ACP 1.3.0 for your platform from the linked registry. Extract agy_acp_server.par and localharness_external into the same directory on your PATH and make both executable, then check again.' },
     documents: { saveTabAs: 'Save {title} as…', save: 'Save', saveAs: 'Save As…', destination: 'Save on the agent’s host:', replaceFile: 'Replace the existing file?', replace: 'Replace' },
   promptAutomation: {
     schedule: 'Schedule',
@@ -686,7 +686,8 @@ export const messages = {
       existingSetup: 'Use existing setup',
       shareSkills: 'Reuse my existing skills',
       setupLocked: 'This provider already has chats. Its setup cannot be changed here.',
-      installExplanation: 'This CLI was not detected. Install it to connect; your conversations will use the setup selected below.',
+      notDetected: 'Not detected',
+      checkAgain: 'Check again',
       installProvider: 'Install',
       saveSetup: 'Save',
       settingUp: 'Setting up…',
@@ -857,16 +858,9 @@ export const messages = {
       },
       tool: {
         searchTools: {
-          target: {
-            running: 'Searching tools: {target}',
-            completed: 'Searched tools: {target}',
-            failed: 'Could not search tools: {target}',
-          },
-          empty: {
-            running: 'Searching tools',
-            completed: 'Searched tools',
-            failed: 'Could not search tools',
-          },
+          running: 'Searching tools',
+          completed: 'Searched tools',
+          failed: 'Could not search tools',
         },
         fallback: {
           completed: 'Ran {name}',
@@ -938,6 +932,7 @@ export const messages = {
               failed: 'Failed broadcasting message',
               running: 'Broadcasting message',
             },
+            simulator: { running: 'Using simulator', completed: 'Used simulator', failed: 'Simulator action failed' },
             browserClick: {
               completed: 'Clicked page',
               failed: 'Failed clicking page',
@@ -957,6 +952,11 @@ export const messages = {
               completed: 'Opened {target}',
               failed: 'Failed opening {target}',
               running: 'Opening {target}',
+            },
+            browserSetViewport: {
+              running: 'Resizing browser viewport',
+              completed: 'Resized browser viewport',
+              failed: 'Failed resizing browser viewport',
             },
             browserScreenshot: {
               completed: 'Captured page screenshot',

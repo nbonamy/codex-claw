@@ -10,17 +10,6 @@ type SignDarwinBinariesDeps = {
   logger?: Pick<typeof console, 'log' | 'warn'>;
 };
 
-const bundledCodexPathSuffixes = [
-  path.join('Contents', 'Resources', 'codex', 'codex'),
-  path.join('Contents', 'Resources', 'codex', 'codex-code-mode-host'),
-];
-
-export function shouldPreserveUpstreamCodexSignature(filePath: string): boolean {
-  const normalizedPath = path.normalize(filePath);
-  return bundledCodexPathSuffixes.some((suffix) => normalizedPath === suffix
-    || normalizedPath.endsWith(`${path.sep}${suffix}`));
-}
-
 export function signDarwinBinaries(
   buildPath: string,
   _arch: string,
@@ -101,9 +90,17 @@ function resolveDarwinBinaryPaths(
     path: path.join(resourcePath, 'runtime', 'node'),
   }));
 
+  const mobileCompanionPaths = resourcePaths.map(resourcePath => ({
+    label: 'iOS simulator companion',
+    path: path.join(resourcePath, 'mobile-simulator', 'idb_companion'),
+  }));
+
   const appleSpeechHelper = binaryPaths.find((binary) => existsSync(binary.path)) ?? binaryPaths[0];
   const computerUseHelper = computerUseAppPaths.find((binary) => existsSync(binary.path)) ?? computerUseAppPaths[0];
   const ttsHelper = ttsHelperPaths.find((binary) => existsSync(binary.path)) ?? ttsHelperPaths[0];
   const nodeRuntime = nodeRuntimePaths.find((binary) => existsSync(binary.path)) ?? nodeRuntimePaths[0];
-  return [appleSpeechHelper, computerUseHelper, ttsHelper, nodeRuntime];
+  // The companion is optional (absent on hosts without a pinned build). Electron's outer osxSign
+  // pass also walks and signs its nested Mach-O resources.
+  const mobileCompanion = mobileCompanionPaths.find(binary => existsSync(binary.path));
+  return [appleSpeechHelper, computerUseHelper, ttsHelper, nodeRuntime, ...(mobileCompanion ? [mobileCompanion] : [])];
 }

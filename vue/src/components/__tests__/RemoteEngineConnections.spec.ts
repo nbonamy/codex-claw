@@ -64,21 +64,25 @@ describe('RemoteEngineConnections', () => {
     wrapper.unmount();
   });
 
-  it('installs only the selected remote engine and signs in to its configured home', async () => {
+  it('rechecks the owning remote host after external installation and signs in separately', async () => {
     const { api } = createClientApiMock();
     const missing = (['codex', 'claude'] as const).map(backend => ({ backend, installed: false, connected: false, checking: false }));
     api.getProviderConnections.mockResolvedValueOnce(missing).mockResolvedValue([
       missing[0]!, { ...missing[1]!, installed: true },
     ]);
-    api.installProvider.mockResolvedValue({ backend: 'claude', installed: true, locked: false, isolated: true, shareSkills: true, homePath: '/remote/app/claude-home' });
+    api.refreshProvider.mockResolvedValue({ backend: 'claude', installed: true, locked: false, isolated: true, shareSkills: true, homePath: '/remote/app/claude-home' });
     api.getClaudeAuthentication.mockResolvedValue({ loggedIn: false, configDirectory: '/remote/app/claude-home' });
     configureAppClient({ platform: 'desktop', api });
     const wrapper = mount(RemoteEngineConnections, { props: { connection } });
     await flushPromises();
 
-    await wrapper.findAll('button').find(button => button.text() === 'Install Claude Code')!.trigger('click');
+    expect(wrapper.findAll('a').map(link => link.attributes('href'))).toEqual([
+      'https://learn.chatgpt.com/docs/codex/cli#getting-started',
+      'https://code.claude.com/docs/en/quickstart#step-1-install-claude-code',
+    ]);
+    await wrapper.findAll('button').filter(button => button.attributes('aria-label') === 'Check again')[1]!.trigger('click');
     await flushPromises();
-    expect(api.installProvider).toHaveBeenCalledExactlyOnceWith('claude', 'wall-e');
+    expect(api.refreshProvider).toHaveBeenCalledExactlyOnceWith('claude', 'wall-e');
     expect(api.getProviderConnections).toHaveBeenLastCalledWith('wall-e');
     expect(api.getClaudeAuthentication).not.toHaveBeenCalled();
     expect(api.getCodexAuthentication).not.toHaveBeenCalled();

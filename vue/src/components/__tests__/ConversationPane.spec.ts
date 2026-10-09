@@ -686,24 +686,26 @@ describe('ConversationPane', () => {
   });
 
   it.each([
-    ['running', 'Searching tools: browser screenshot'],
-    ['completed', 'Searched tools: browser screenshot'],
-    ['failed', 'Could not search tools: browser screenshot'],
-  ] as const)('renders tool search details while %s', (status, label) => {
+    ['running', 'Searching tools'],
+    ['completed', 'Searched tools'],
+    ['failed', 'Could not search tools'],
+  ] as const)('renders tool search without tool names while %s', (status, label) => {
     const wrapper = mountPane({ agent, controller: controllerFor([{
       id: 'tool-search-message', agentId: agent.id, role: 'assistant',
       status: status === 'running' ? 'streaming' : 'complete', createdAt: '',
       parts: [{
         type: 'tool', id: 'tool-search', kind: 'generic', title: 'ToolSearch', status,
-        input: { query: 'browser screenshot' },
+        input: { query: 'select:mcp__korus__set_status,mcp__korus__report_finding' },
         statusText: JSON.stringify({
           source: 'claude', action: 'search', phase: status,
-          params: { scope: 'tools', target: 'browser screenshot' },
+          params: { scope: 'tools', target: 'select:mcp__korus__set_status,mcp__korus__report_finding' },
         }),
       }],
     }]) });
     expect(wrapper.get('.chat-tool-call').text()).toContain(label);
-    expect(wrapper.get('.chat-tool-call').text()).not.toContain('Ran ToolSearch');
+    expect(wrapper.get('.chat-tool-call').text()).not.toContain('ToolSearch');
+    expect(wrapper.get('.chat-tool-call').text()).not.toContain('select:');
+    expect(wrapper.get('.chat-tool-call').text()).not.toContain('mcp__korus__');
     expect(wrapper.find('.tabler-icon-search').exists()).toBe(true);
   });
 

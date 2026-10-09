@@ -458,7 +458,7 @@ Validation so far: all five workspace tests plus script tests passed after refre
 the installed SDK build; affected contract/persistence tests and typechecks passed.
 This is foundation work, not shipped Antigravity support.
 
-Lifecycle foundation added: version-pinned paired-runtime discovery/installation,
+Lifecycle foundation: externally installed paired-runtime discovery,
 private home and native skills links, sanitized process environment, and provider-owned
 OAuth checks. Native fresh-profile probing confirmed background authentication
 detects a missing login without opening a browser. Credentials remain exclusively
@@ -472,7 +472,7 @@ Settings retry now have regression coverage without changing enablement.
 - [x] Extend backend/session/default/auth unions and all owning runtime decoders.
 - [x] Extend generic settings normalization, connected choices, and remembered
   selections without silently falling back from an explicitly selected provider.
-- [x] Register discovery, installation, configured home, and connection observation.
+- [x] Register discovery, external installation instructions, configured home, and connection observation. Korus never downloads ACP binaries; setup and refresh only observe the installed pair.
 - [x] Add contract tests for roundtrip persistence, unavailable-provider rejection,
   disconnected retry, and cross-provider default isolation in this same milestone.
 

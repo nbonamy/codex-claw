@@ -1,7 +1,6 @@
 import { canonicalGitRemoteIdentity } from '@workspace/core/git-remote';
 import type {
   CloneSourceRepositoryInput,
-  SourceBranch,
   SourceRepository,
   Team,
   WorkIntegrationConnection,
@@ -22,7 +21,6 @@ export type RepositoryAcquisitionOptions = {
   connectGitHub: () => Promise<void>;
   errorMessage: (error: unknown) => string;
   githubConnection: () => WorkIntegrationConnection;
-  listSourceBranches: (repoPath: string, remoteConnectionId?: string) => Promise<SourceBranch[]>;
   listSourceRepositories: (remoteConnectionId?: string) => Promise<SourceRepository[]>;
   loadGitHubRepositories: () => Promise<WorkSource[] | void>;
   openFolder: (folder: string, teamId?: string) => Promise<void>;
@@ -149,21 +147,6 @@ export function useRepositoryAcquisition(options: RepositoryAcquisitionOptions) 
 
   async function openExistingFolderPath(folder: string): Promise<void> {
     const team = options.activeTeam();
-    const remoteConnectionId = team?.remoteConnectionId?.trim() || undefined;
-    const repository: SourceRepository = {
-      name: folder.split(/[\\/]/u).filter(Boolean).at(-1) ?? 'workspace',
-      path: folder,
-      worktrees: [],
-    };
-    try {
-      const branches = await options.listSourceBranches(folder, remoteConnectionId);
-      if (branches.length > 0) {
-        await options.openRepository(repository, team?.id ?? options.activeTeamId());
-        return;
-      }
-    } catch {
-      // A plain folder remains a valid session workspace.
-    }
     await options.openFolder(folder, team?.id ?? options.activeTeamId());
   }
 

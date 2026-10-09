@@ -12,15 +12,20 @@ describe('SettingsView', () => {
   it('uses daemon availability for gated settings and falls back from a saved unavailable tab', async () => {
     setElectronTestClient({});
     const connectAntigravity = vi.fn();
+    const refreshProvider = vi.fn().mockResolvedValue(undefined);
     const wrapper = mount(SettingsView, { props: {
       activeTab: 'antigravity', settings: defaultThemeSettings,
       generalSettings: { ...defaultGeneralSettings, providerEnabled: { antigravity: true } },
-      providerConnections: [], connectAntigravity,
+      providerConnections: [], connectAntigravity, refreshProvider,
     } });
     expect(wrapper.text()).not.toContain('Antigravity');
     expect(wrapper.text()).toContain('Accessibility');
     await wrapper.setProps({ providerConnections: [{ backend: 'antigravity', installed: false, connected: false, checking: false }] });
     expect(wrapper.get('.engine-hero__copy strong').text()).toBe('Antigravity');
+    await wrapper.get('button[aria-label="Check again"]').trigger('click');
+    expect(refreshProvider).toHaveBeenCalledWith('antigravity');
+    expect(connectAntigravity).not.toHaveBeenCalled();
+    await wrapper.setProps({ providerConnections: [{ backend: 'antigravity', installed: true, connected: false, checking: false }] });
     await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
     expect(connectAntigravity).toHaveBeenCalledOnce();
     const agentGroup = wrapper.findAll('.el-menu-item-group').find(group => group.get('.el-menu-item-group__title').text() === 'Agents')!;
@@ -95,12 +100,13 @@ describe('SettingsView', () => {
         settings: defaultThemeSettings,
         generalSettings: defaultGeneralSettings,
         connectCodex, connectClaude, setProviderEnabled, disconnectProvider,
+        providerConnections: (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: false, checking: false })),
       },
     });
 
     expect(wrapper.text()).toContain('Launch ChatGPT');
     expect(wrapper.text()).not.toContain('Share skills and plugins with ChatGPT');
-    expect(wrapper.text()).toContain('Codex executable');
+    expect(wrapper.text()).not.toContain('Codex executable');
     expect(wrapper.text()).not.toContain('Enable Claude Code');
     await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
     expect(connectCodex).toHaveBeenCalledOnce();
@@ -120,6 +126,32 @@ describe('SettingsView', () => {
     await wrapper.findAll('button').find(button => button.text() === 'Disconnect')!.trigger('click');
     expect(disconnectProvider).toHaveBeenLastCalledWith('codex');
     expect(setProviderEnabled).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['codex', 'codex', 'https://learn.chatgpt.com/docs/codex/cli#getting-started'],
+    ['claude-code', 'claude', 'https://code.claude.com/docs/en/quickstart#step-1-install-claude-code'],
+  ] as const)('offers installation documentation and detection in %s settings', async (activeTab, backend, url) => {
+    const refreshProvider = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(SettingsView, { props: {
+      activeTab, settings: defaultThemeSettings, generalSettings: defaultGeneralSettings, refreshProvider,
+      providerConnections: [{ backend, installed: false, connected: false, checking: false }],
+    } });
+    expect(wrapper.get('.engine-hero').text()).toContain('Not detected');
+    expect(wrapper.get('.engine-hero a').attributes('href')).toBe(url);
+    expect(wrapper.get('.engine-hero a').text()).toBe('Install');
+    expect(getComputedStyle(wrapper.get('.engine-hero a').element).textDecoration).toBe('none');
+    const refresh = wrapper.get('.engine-hero button[aria-label="Check again"]');
+    expect(refresh.text()).toBe('');
+    expect(refresh.find('svg').exists()).toBe(true);
+    expect(getComputedStyle(refresh.element).color).toBe(getComputedStyle(wrapper.get('.engine-hero a').element).color);
+    expect(wrapper.findAll('button').some(button => button.text() === 'Connect')).toBe(false);
+    await wrapper.findAll('button').find(button => button.attributes('aria-label') === 'Check again')!.trigger('click');
+    expect(refreshProvider).toHaveBeenCalledExactlyOnceWith(backend);
+    await wrapper.setProps({ providerConnections: [{ backend, installed: true, connected: false, checking: false }] });
+    expect(wrapper.find('.engine-hero a').exists()).toBe(false);
+    expect(wrapper.findAll('button').some(button => button.text() === 'Connect')).toBe(true);
+    wrapper.unmount();
   });
 
   it('renders controlled appearance settings and emits appearance updates', async () => {

@@ -78,7 +78,6 @@
     :codex-resource-sharing-migration-required="codexResourceSharingStatus.migrationRequired"
     :source-repositories="sourceRepositories"
     :choose-agent-folder="chooseAgentFolder"
-    :choose-codex-binary="chooseCodexBinary"
     :choose-source-folder="chooseSourceFolder"
     :list-source-folders="listSourceFolders"
     :list-source-repositories="listSourceRepositories"
@@ -327,7 +326,6 @@ const {
   loadSnapshot,
   loadOlderAgentHistory,
   chooseAgentFolder,
-  chooseCodexBinary,
   chooseSourceFolder,
   listSourceFolders,
   listSourceRepositories,

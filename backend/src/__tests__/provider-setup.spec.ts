@@ -219,7 +219,7 @@ describe('provider onboarding setup', () => {
     expect(snapshot.missions?.map(item => item.outcome)).toEqual(['Prepare work', 'New background work']);
     expect(snapshot.general.providerHomes!.claude).toEqual(previous);
   });
-  it('uses the registered lifecycle policy for detection, installation, and home configuration', async () => {
+  it('redetects an externally installed CLI without replacing an already available driver', async () => {
     const snapshot = createTestSnapshot();
     let installed = false;
     const prepareHome = vi.fn();
@@ -228,14 +228,16 @@ describe('provider onboarding setup', () => {
       home: (_snapshot, choice = { isolated: true, shareSkills: false }) => ({ ...choice, homePath: '/engine-owned/home' }),
       installed: () => installed,
       prepareHome, applyHome,
-      install: async () => { installed = true; },
     };
     const reconnect = vi.fn();
     const setup = new ProviderSetup(snapshot, vi.fn(), reconnect, new Map([['claude', lifecycle]]));
     await setup.initialize();
     expect(setup.list()).toEqual([{ backend: 'claude', installed: false, locked: false, affectedAgentIds: [], homePath: '/engine-owned/home', isolated: true, shareSkills: false }]);
-    expect(await setup.install('claude')).toMatchObject({ installed: true });
-    expect(await setup.install('claude')).toMatchObject({ installed: true });
+    expect(await setup.refresh('claude')).toMatchObject({ installed: false });
+    expect(reconnect).not.toHaveBeenCalled();
+    installed = true;
+    expect(await setup.refresh('claude')).toMatchObject({ installed: true });
+    expect(await setup.refresh('claude')).toMatchObject({ installed: true });
     expect(reconnect).toHaveBeenCalledOnce();
     const result = await setup.configure('claude', { isolated: false, shareSkills: true });
     expect(result).toMatchObject({ homePath: '/engine-owned/home', isolated: false, shareSkills: true });
@@ -372,7 +374,7 @@ describe('provider onboarding setup', () => {
     expect(await server.handleMessage({ jsonrpc: '2.0', id: 1, method: 'provider/setup/get' })).toHaveProperty('result');
     expect(await server.handleMessage({ jsonrpc: '2.0', id: 2, method: 'settings/update', params: { input: { general: { theme: 'dark' } } } })).toMatchObject({ error: { message: 'Engine setup is changing. Try again when it finishes.' } });
     await expect(setup.configure('codex', { isolated: false, shareSkills: true })).rejects.toThrow('already in progress');
-    await expect(setup.install('claude')).rejects.toThrow('already in progress');
+    await expect(setup.refresh('claude')).rejects.toThrow('already in progress');
     release();
     await changing;
     await server.close();
@@ -381,7 +383,7 @@ describe('provider onboarding setup', () => {
     expect((await loadBackendSnapshot()).general.providerHomes?.claude).toStrictEqual({ isolated: false, shareSkills: true, homePath: path.join(root, 'claude') });
   });
 
-  it('detects without installing; explicit RPC installation updates status and redacts failures', async () => {
+  it('refreshes PATH detection over RPC after external installation and does not expose an installer', async () => {
     const snapshot = createTestSnapshot();
     cli.installed.add('codex');
     const setup = new ProviderSetup(snapshot, vi.fn(), vi.fn());
@@ -390,15 +392,12 @@ describe('provider onboarding setup', () => {
     const request = (method: string, params?: unknown) => server.handleMessage({ jsonrpc: '2.0', id: 1, method, params });
     expect(await request('provider/setup/get')).toMatchObject({ result: [expect.objectContaining({ backend: 'codex', installed: true }), expect.objectContaining({ backend: 'claude', installed: false })] });
     expect(cli.installs).toBe(0);
-    cli.fail = true;
-    await expect(request('provider/install', { backend: 'claude' })).rejects.toThrow('Could not install Claude Code.');
-    cli.fail = false;
-    if (process.platform === 'win32') {
-      await expect(request('provider/install', { backend: 'claude' })).rejects.toThrow('Could not install Claude Code.');
-      expect(cli.installs).toBe(0);
-    } else {
-      expect(await request('provider/install', { backend: 'claude' })).toMatchObject({ result: { backend: 'claude', installed: true } });
-    }
+    expect(await request('provider/refresh', { backend: 'claude' })).toMatchObject({ result: { backend: 'claude', installed: false } });
+    cli.installed.add('claude');
+    expect(await request('provider/refresh', { backend: 'claude' })).toMatchObject({ result: { backend: 'claude', installed: true } });
+    expect(await request('provider/connections/get')).toMatchObject({ result: expect.arrayContaining([expect.objectContaining({ backend: 'claude', installed: true })]) });
+    expect(await request('provider/install', { backend: 'claude' })).toHaveProperty('error');
+    expect(cli.installs).toBe(0);
     await expect(request('provider/setup/configure', { backend: 'claude', choice: { isolated: 'yes' } })).rejects.toThrow('Invalid provider setup');
     await expect(request('settings/update', { input: { general: { providerHomes: { claude: { homePath: '/arbitrary' } } } } })).rejects.toThrow('provider setup');
   });

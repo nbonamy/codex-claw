@@ -17,6 +17,7 @@ export type AppBackendClientPort = {
 };
 
 export function createRuntimeAppBackendClient(options: {
+  mobileSimulator?: (agentId: string, input: import('@workspace/core/mobile-simulator').MobileRequest) => Promise<import('@workspace/core/mobile-simulator').MobileResult>;
   browserOpen?: (agentId: string, browserId: string, url: string) => Promise<unknown>;
   browserExecute?: (agentId: string, browserId: string, command: string, arguments_: Record<string, unknown>) => Promise<unknown>;
   spokenAnnouncements?: Pick<SpokenAnnouncementQueue, 'queue'>;
@@ -24,6 +25,7 @@ export function createRuntimeAppBackendClient(options: {
 } = {}): AppBackendClientPort | null {
   const mode = runtimeDaemonBackendMode();
   const requestHandlers = createRuntimeClientRequestHandlers({
+    mobileSimulator: options.mobileSimulator,
     browserExecute: options.browserExecute,
     browserOpen: options.browserOpen,
     spokenAnnouncements: options.spokenAnnouncements,

@@ -1,6 +1,5 @@
 import type { AgentBackend, AppSnapshot, SetCodexResourceSharingInput } from '@workspace/core/contracts';
 import type { ProviderHomeSettings, ProviderSetupChange, ProviderSetupStatus } from '@workspace/core/contracts/provider-setup';
-import { backendDisplayName } from '@workspace/core/backend-driver';
 import { createProviderLifecycles, type ProviderLifecycle } from './provider-lifecycle';
 import { localProviderAgents, resetProviderRoster, validateProviderReset } from './provider-roster-reset';
 import { isProviderReleased, requireReleasedProvider } from './provider-release';
@@ -89,18 +88,17 @@ export class ProviderSetup {
     } finally { this.busy = false; this.changingBackend = null; }
   }
 
-  async install(backend: AgentBackend): Promise<ProviderSetupStatus> {
+  async refresh(backend: AgentBackend): Promise<ProviderSetupStatus> {
     if (this.busy) throw new Error('Provider setup is already in progress.');
-    if (this.status(backend).installed) return this.status(backend);
+    const wasInstalled = this.status(backend).installed;
     this.busy = true;
     try {
-      await this.lifecycle(backend).install();
       this.invalidateInstallation(backend);
-      if (!this.status(backend).installed) throw new Error('Provider was not detected after installation.');
-      await this.reconnect(backend);
+      if (this.status(backend).installed && !wasInstalled) await this.reconnect(backend);
       return this.status(backend);
-    } catch {
-      throw new Error(`Could not install ${backendDisplayName(backend)}. Install its CLI manually, then retry.`);
+    } catch (error) {
+      this.installations.set(backend, wasInstalled);
+      throw error;
     } finally { this.busy = false; }
   }
 

@@ -1,3 +1,7 @@
+import { mobileRuntimePaths } from './mobile/runtime';
+import { MobileSimulatorService } from './mobile/service';
+import { NativeMobileAdapter } from './mobile/adapter';
+import type { MobileRequest, MobileResult } from '@workspace/core/mobile-simulator';
 import { product } from '@workspace/core/product';
 import { registerMissionIpcHandlers } from './mission-ipc';
 import type { MissionReviewDebugState, MissionStage } from '@workspace/core/missions';
@@ -73,6 +77,7 @@ export class AppController {
   private shuttingDown = false;
   private connectionState: BackendConnectionState = { status: 'connecting' };
   private rendererReady = false;
+  private debugMissingEngines = false;
   private readonly pendingDeepLinkCommands: AppCommand[] = [];
   private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
   private autoUpdateService: DesktopAutoUpdateService | null = null;
@@ -81,8 +86,18 @@ export class AppController {
   private selectedMissionId: string | null = null;
   private appshotCapturePending = false;
 
+  private readonly mobileSimulator = new MobileSimulatorService(new NativeMobileAdapter(mobileRuntimePaths({
+    isPackaged: Boolean(app?.isPackaged),
+    appPath: app?.getAppPath?.() ?? process.cwd(),
+    resourcesPath: process.resourcesPath,
+  })));
+
   private readonly browserPane = new BrowserPane({
     onAnnotation: (annotation) => this.emitBrowserAnnotation(annotation),
+    onViewportRequest: (request) => {
+      if (!this.mainWindow || this.mainWindow.isDestroyed()) throw new Error('Browser window is not available.');
+      sendAppCommand(this.mainWindow.webContents, { type: 'set-browser-viewport', ...request });
+    },
   });
 
   private readonly powerSaveBlocker = new AgentActivityPowerSaveBlocker();
@@ -124,6 +139,7 @@ export class AppController {
       }),
     );
     this.backendClient = backendClient ?? createRuntimeAppBackendClient({
+      mobileSimulator: (agentId, input) => this.executeMobileSimulator(agentId, input),
       browserOpen: (agentId, browserId, url) => this.requestBrowserOpen(agentId, browserId, url),
       browserExecute: (agentId, browserId, command, arguments_) => this.browserPane.execute(agentId, browserId, command, arguments_),
       spokenAnnouncements: this.policyAwareSpokenAnnouncements,
@@ -284,10 +300,6 @@ export class AppController {
 
     ipc.handle(ipcChannels.chooseAgentFolder, async () => {
       return this.chooseAgentFolder();
-    });
-
-    ipc.handle(ipcChannels.chooseCodexBinary, async () => {
-      return this.chooseCodexBinary();
     });
 
     ipc.handle(ipcChannels.chooseSourceFolder, async () => {
@@ -507,7 +519,7 @@ export class AppController {
     ipc.handle(ipcChannels.disconnectProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerDisconnect, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.authenticateProvider, (_event, backend, action) => this.requireBackendClient().request(backendMethods.providerAuthenticate, { backend, action }));
     ipc.handle(ipcChannels.configureProviderSetup, (_event, backend, choice) => this.requireBackendClient().request(backendMethods.providerSetupConfigure, { backend, choice }));
-    ipc.handle(ipcChannels.installProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerInstall, { backend, remoteConnectionId }));
+    ipc.handle(ipcChannels.refreshProvider, (_event, backend, remoteConnectionId) => this.requireBackendClient().request(backendMethods.providerRefresh, { backend, remoteConnectionId }));
     ipc.handle(ipcChannels.cancelCodexChatGptLogin, (_event, remoteConnectionId?: string, loginId?: string) => this.cancelCodexChatGptLogin(remoteConnectionId, loginId));
     ipc.handle(ipcChannels.startCodexChatGptDeviceCodeLogin, (_event, remoteConnectionId: string) => {
       return this.startCodexChatGptDeviceCodeLogin(remoteConnectionId);
@@ -644,6 +656,11 @@ export class AppController {
       return this.continueInterruptedTurn(agentId);
     });
 
+    ipc.handle(ipcChannels.mobileSimulator, (_event, agentId, input) => this.executeMobileSimulator(agentId, input, true));
+    ipc.handle(ipcChannels.mobileSimulatorView, async (_event, agentId, input) => {
+      this.requireMobileAgent(agentId);
+      return this.mobileSimulator.view(agentId, input);
+    });
     ipc.handle(ipcChannels.browserOpen, (_event, agentId: string, browserId: string, url: string, guestWebContentsId: number) => this.browserOpen(agentId, browserId, url, guestWebContentsId));
     ipc.handle(ipcChannels.browserOpenVisualization, (_event, agentId: string, browserId: string, filePath: string, title: string, guestWebContentsId: number) => this.browserOpenVisualization(agentId, browserId, filePath, title, guestWebContentsId));
     ipc.handle(ipcChannels.browserNavigate, (_event, agentId: string, browserId: string, url: string) => this.browserNavigate(agentId, browserId, url));
@@ -654,6 +671,7 @@ export class AppController {
     ipc.handle(ipcChannels.browserSetZoom, (_event, agentId: string, browserId: string, percent: number) => this.browserPane.setZoom(agentId, browserId, percent));
     ipc.handle(ipcChannels.browserCopyScreenshot, (_event, agentId: string, browserId: string, rect?: BrowserBounds) => this.browserPane.copyScreenshot(agentId, browserId, rect));
     ipc.handle(ipcChannels.browserSetBounds, (_event, agentId: string, browserId: string, bounds: BrowserViewportBounds) => this.browserPane.setBounds(agentId, browserId, bounds));
+    ipc.handle(ipcChannels.browserViewportApplied, (_event, agentId: string, browserId: string, requestId: string, error?: string) => this.browserPane.viewportApplied(agentId, browserId, requestId, error));
     ipc.handle(ipcChannels.browserSetVisible, (_event, agentId: string, browserId: string, visible: boolean) => this.browserPane.setVisible(agentId, browserId, visible));
     ipc.handle(ipcChannels.browserSetAnnotationMode, (_event, agentId: string, browserId: string, enabled: boolean) => this.browserPane.setAnnotationMode(agentId, browserId, enabled));
     ipc.handle(ipcChannels.browserResolveAnnotation, (_event, token: string, comment: string | null) => this.browserPane.resolveAnnotation(token, comment));
@@ -696,6 +714,10 @@ export class AppController {
     this.rendererReady = false;
     this.mainWindow.webContents.on('did-start-loading', () => {
       this.rendererReady = false;
+      if (this.debugMissingEngines) {
+        this.debugMissingEngines = false;
+        this.refreshAppMenu();
+      }
     });
     this.mainWindow.webContents.on('did-finish-load', () => {
       this.rendererReady = true;
@@ -732,6 +754,7 @@ export class AppController {
     }
     this.autoUpdateService?.stop();
     this.appshotsKeyMonitor?.stop();
+    this.mobileSimulator.clear();
     this.spokenAnnouncements.dispose();
     this.nativeIpcUnregister?.();
     this.nativeIpcUnregister = null;
@@ -1161,8 +1184,9 @@ export class AppController {
   }
 
   private async adoptBackendSnapshot(snapshot: AppSnapshot): Promise<AppSnapshot> {
-    const previousDebugThreadFlags = this.debugThreadFlagState();
+    const previousDebugMenuState = this.debugMenuState();
     this.snapshot = snapshot;
+    this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
     this.policyAwareSpokenAnnouncements.refresh();
     this.transientSnapshots.add(snapshot);
     try {
@@ -1170,17 +1194,18 @@ export class AppController {
       return withRendererMediaUrls(snapshot, this.localMediaRegistry);
     } finally {
       this.transientSnapshots.delete(snapshot);
-      this.refreshDebugThreadFlagMenuIfChanged(previousDebugThreadFlags);
+      this.refreshDebugMenuIfChanged(previousDebugMenuState);
     }
   }
 
   private async adoptBackendMutationSnapshot(nextSnapshot: AppSnapshot): Promise<AppSnapshot> {
     if (!this.snapshot) throw new Error('daemon snapshot is not available.');
-    const previousDebugThreadFlags = this.debugThreadFlagState();
+    const previousDebugMenuState = this.debugMenuState();
     replaceAppSnapshot(this.snapshot, nextSnapshot);
+    this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
     this.policyAwareSpokenAnnouncements.refresh();
     this.syncPowerSaveBlocker();
-    this.refreshDebugThreadFlagMenuIfChanged(previousDebugThreadFlags);
+    this.refreshDebugMenuIfChanged(previousDebugMenuState);
     return nextSnapshot;
   }
 
@@ -1211,6 +1236,26 @@ export class AppController {
       prompt,
       options: backendOptions,
     }));
+  }
+
+  private requireMobileAgent(agentId: string): void {
+    const agent = this.snapshot?.agents.find(agent => agent.id === agentId);
+    if (!agent) throw new Error('Agent not found.');
+    const team = this.snapshot?.teams.find(team => team.id === agent.teamId);
+    if (team?.remoteConnectionId) throw new Error('Mobile simulators are available to local agents only.');
+    this.mobileSimulator.retainAgents(this.snapshot!.agents.map(agent => agent.id));
+  }
+
+  private async executeMobileSimulator(agentId: string, input: MobileRequest, userInitiated = false): Promise<MobileResult> {
+    this.requireMobileAgent(agentId);
+    const result = await this.mobileSimulator.execute(agentId, input, userInitiated);
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      // The pane follows an agent's lifecycle; a user detaching or powering off in the pane keeps it open.
+      if (input.action === 'attach') sendAppCommand(this.mainWindow.webContents, { type: 'open-simulator', agentId });
+      else if (!userInitiated && (input.action === 'detach' || input.action === 'shutdown'))
+        sendAppCommand(this.mainWindow.webContents, { type: 'close-simulator', agentId });
+    }
+    return result;
   }
 
   private async browserOpen(agentId: string, browserId: string, url: string, guestWebContentsId: number): Promise<BrowserState> {
@@ -1450,15 +1495,6 @@ export class AppController {
     return result.canceled ? null : result.filePaths[0] ?? null;
   }
 
-  private async chooseCodexBinary(): Promise<string | null> {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      title: mainT('dialog.codexExecutable'),
-    });
-
-    return result.canceled ? null : result.filePaths[0] ?? null;
-  }
-
   private async chooseSourceFolder(): Promise<string | null> {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -1558,6 +1594,7 @@ export class AppController {
 
       let synchronizedSnapshot = backendState.snapshot;
       this.snapshot = synchronizedSnapshot;
+      this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
       this.policyAwareSpokenAnnouncements.refresh();
       this.clientState = backendState.clientState;
       this.lastBackendEventSeq = backendState.lastEventSeq;
@@ -1655,10 +1692,20 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines'> {
     return {
+      getDebugMissingEngines: () => this.debugMissingEngines,
+      setDebugMissingEngines: enabled => {
+        if (app.isPackaged) return;
+        this.debugMissingEngines = enabled;
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          sendAppCommand(this.mainWindow.webContents, { type: 'debug-missing-engines', enabled });
+        }
+        this.refreshAppMenu();
+      },
       sendDebugAgentMessage: () => this.sendDebugAgentMessage(),
       toggleDebugExecutionPlan: () => this.toggleDebugExecutionPlan(),
+      hasDebugExecutionPlan: () => this.hasDebugExecutionPlan(),
       injectDebugPlanReview: () => this.injectDebugPlanReview(),
       populateDebugVisualize: (scenario) => this.populateDebugVisualize(scenario),
       getDebugMissionStage: () => this.debugMission()?.stage,
@@ -1710,12 +1757,16 @@ export class AppController {
     return activeAgent?.threadFlags?.[id] === true;
   }
 
-  private debugThreadFlagState(snapshot = this.snapshot): string {
-    return `${this.isDebugThreadFlagSet('delegate_to_worktree', snapshot)}:${this.isDebugThreadFlagSet('ready_for_review', snapshot)}`;
+  private debugMenuState(snapshot = this.snapshot): string {
+    return `${this.isDebugThreadFlagSet('delegate_to_worktree', snapshot)}:${this.isDebugThreadFlagSet('ready_for_review', snapshot)}:${this.hasDebugExecutionPlan(snapshot)}`;
   }
 
-  private refreshDebugThreadFlagMenuIfChanged(previousValue: string): void {
-    if (!app?.isPackaged && previousValue !== this.debugThreadFlagState()) this.refreshAppMenu();
+  private refreshDebugMenuIfChanged(previousValue: string): void {
+    if (!app?.isPackaged && previousValue !== this.debugMenuState()) this.refreshAppMenu();
+  }
+
+  private hasDebugExecutionPlan(snapshot = this.snapshot): boolean {
+    return Boolean(snapshot?.agents.find(agent => agent.id === snapshot.activeAgentId)?.plan);
   }
 
   private toggleDebugExecutionPlan(): void {
@@ -1726,6 +1777,7 @@ export class AppController {
 
     void this.backendClient.request<AppSnapshot>(backendMethods.debugExecutionPlanToggle, { agentId })
       .then((snapshot) => this.adoptBackendSnapshot(snapshot))
+      .finally(() => this.refreshAppMenu())
       .catch((error) => warnMain('debug', 'failed to toggle execution plan', {
         agentId,
         detail: error instanceof Error ? error.message : String(error),
@@ -1833,7 +1885,7 @@ export class AppController {
   }
 
   private applyBackendEvent(event: AppBackendEvent, notifyRenderer: boolean): void {
-    const previousDebugThreadFlags = this.debugThreadFlagState();
+    const previousDebugMenuState = this.debugMenuState();
     const rendererEvent = eventForRenderer(event);
     const decodedSnapshot = decodeSnapshotFromBackendEvent(event);
     for (const snapshot of this.transientSnapshots) {
@@ -1845,6 +1897,7 @@ export class AppController {
     } else if (this.snapshot) {
       if (event.type !== 'snapshot.updated') applyMainEventToSnapshot(this.snapshot, rendererEvent);
     }
+    this.mobileSimulator.retainAgents(this.snapshot?.agents.map(agent => agent.id) ?? []);
     this.policyAwareSpokenAnnouncements.refresh();
     if (isClientState(event.clientState)) {
       this.clientState = event.clientState;
@@ -1852,13 +1905,14 @@ export class AppController {
 
     this.lastBackendEventSeq = event.seq;
     this.syncPowerSaveBlocker();
-    this.refreshDebugThreadFlagMenuIfChanged(previousDebugThreadFlags);
+    this.refreshDebugMenuIfChanged(previousDebugMenuState);
     if (notifyRenderer && this.mainWindow && !this.mainWindow.isDestroyed()) {
       sendRendererEvent(this.mainWindow.webContents, withRendererMediaUrls(rendererEvent, this.localMediaRegistry));
     }
   }
 
   private handleBackendDisconnect(error?: Error): void {
+    this.mobileSimulator.clear();
     if (this.shuttingDown) return;
     warnMain('daemon', 'backend connection lost', {
       detail: error?.message ?? 'unknown error',

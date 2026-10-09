@@ -2,7 +2,8 @@
   <div v-if="compact" class="settings-engine-connection--compact">
     <FormRow :title="title ?? $t('engineConnection.title')" :error="error">
       <template #control>
-        <button v-if="pending" class="app-button app-button--tertiary" type="button" aria-busy="true" :disabled="busy" @click="emit('cancel')">{{ $t('auth.cancel') }}</button>
+        <ProviderInstallActions v-if="installed === false && backend" :backend="backend" :busy="busy" @refresh="emit('refresh')" />
+        <button v-else-if="pending" class="app-button app-button--tertiary" type="button" aria-busy="true" :disabled="busy" @click="emit('cancel')">{{ $t('auth.cancel') }}</button>
         <el-button v-else-if="connected" size="small" :disabled="busy || saving" @click="emit('disconnect')">{{ $t('engineConnection.disconnect') }}</el-button>
         <el-button v-else size="small" :disabled="busy || saving" @click="emit('connect')">
           {{ $t('engineConnection.connect') }}
@@ -12,7 +13,7 @@
       <template #copy>
         <span v-if="accountLabel" :title="accountLabel">{{ accountLabel }}</span>
         <span v-if="busy && !pending" role="status">{{ $t('auth.checking') }}</span>
-        <span v-else-if="!pending && !accountLabel">{{ $t(connected ? 'engineConnection.connected' : 'engineConnection.disconnected') }}</span>
+        <span v-else-if="!pending && !accountLabel">{{ statusLabel }}</span>
       </template>
     </FormRow>
     <slot />
@@ -27,7 +28,8 @@
         <span v-if="error" class="engine-hero__error" role="alert">{{ error }}</span>
       </div>
       <div class="engine-hero__action">
-        <button v-if="pending" class="app-button app-button--tertiary" type="button" aria-busy="true" :disabled="busy" @click="emit('cancel')">{{ $t('auth.cancel') }}</button>
+        <ProviderInstallActions v-if="installed === false && backend" :backend="backend" :busy="busy" @refresh="emit('refresh')" />
+        <button v-else-if="pending" class="app-button app-button--tertiary" type="button" aria-busy="true" :disabled="busy" @click="emit('cancel')">{{ $t('auth.cancel') }}</button>
         <el-button v-else-if="connected" :disabled="busy || saving" @click="emit('disconnect')">{{ $t('engineConnection.disconnect') }}</el-button>
         <el-button v-else type="primary" :disabled="busy || saving" @click="emit('connect')">{{ $t('engineConnection.connect') }}</el-button>
       </div>
@@ -51,9 +53,10 @@ import { ElMessageBox } from 'element-plus';
 import { useI18n } from 'vue-i18n';
 import FormRow from '../shared/form/FormRow.vue';
 import BackendIcon from './BackendIcon.vue';
+import ProviderInstallActions from './ProviderInstallActions.vue';
 import StatusPill from '../shared/form/StatusPill.vue';
-const props = withDefaults(defineProps<{ backend?: AgentBackend; compact?: boolean; title?: string; connected?: boolean; enabled?: boolean; busy?: boolean; pending?: boolean; error?: string | null; authentication?: ProviderAuthentication; setEnabled?: (enabled: boolean) => unknown }>(), { enabled: true });
-const emit = defineEmits<{ connect: []; disconnect: []; cancel: [] }>();
+const props = withDefaults(defineProps<{ backend?: AgentBackend; installed?: boolean; compact?: boolean; title?: string; connected?: boolean; enabled?: boolean; busy?: boolean; pending?: boolean; error?: string | null; authentication?: ProviderAuthentication; setEnabled?: (enabled: boolean) => unknown }>(), { enabled: true, installed: true });
+const emit = defineEmits<{ connect: []; disconnect: []; cancel: []; refresh: [] }>();
 const { t } = useI18n();
 const saving = ref(false);
 const accountLabel = computed(() => {
@@ -75,6 +78,7 @@ const tone = computed(() => state.value === 'active' ? 'success' : state.value =
 const statusLabel = computed(() => {
   if (props.pending) return t('engineConnection.waiting');
   if (props.busy) return t('auth.checking');
+  if (!props.installed) return t('auth.notDetected');
   if (!props.connected) return t('engineConnection.disconnected');
   return props.enabled !== false ? t('engineConnection.connected') : t('engineConnection.connectedDisabled');
 });

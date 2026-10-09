@@ -1,33 +1,7 @@
 import { product } from '@workspace/core/product';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  shouldPreserveUpstreamCodexSignature,
-  signDarwinBinaries,
-} from '../sign-binaries';
-
-describe('shouldPreserveUpstreamCodexSignature', () => {
-  it('excludes only the bundled upstream Codex executables from Electron re-signing', () => {
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/Resources/codex/codex`,
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      'Contents/Resources/codex/codex',
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/Resources/codex/codex-code-mode-host`,
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      'Contents/Resources/codex/codex-code-mode-host',
-    )).toBe(true);
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/Resources/codex/codex-helper`,
-    )).toBe(false);
-    expect(shouldPreserveUpstreamCodexSignature(
-      `/build/${product.name}.app/Contents/MacOS/codex`,
-    )).toBe(false);
-  });
-});
+import { signDarwinBinaries } from '../sign-binaries';
 
 describe('signDarwinBinaries', () => {
   it('skips signing when the signing identity is not configured', () => {
@@ -60,6 +34,7 @@ describe('signDarwinBinaries', () => {
         `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
         `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
         `/build/${product.name}.app/Contents/Resources/runtime/node`,
+        `/build/${product.name}.app/Contents/Resources/mobile-simulator/idb_companion`,
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -106,7 +81,12 @@ describe('signDarwinBinaries', () => {
       path.resolve(__dirname, '../Entitlements.darwin.plist'),
       `/build/${product.name}.app/Contents/Resources/runtime/node`,
     ], { stdio: 'inherit' });
-    expect(execFileSync).toHaveBeenCalledTimes(4);
+    expect(execFileSync).toHaveBeenNthCalledWith(5, 'codesign', [
+      '--force', '--verbose', '--options', 'runtime', '--sign',
+      `Developer ID Application: ${product.name}`,
+      `/build/${product.name}.app/Contents/Resources/mobile-simulator/idb_companion`,
+    ], { stdio: 'inherit' });
+    expect(execFileSync).toHaveBeenCalledTimes(5);
   });
 
   it('supports the afterCopy app directory path used by older signing hooks', () => {
@@ -122,6 +102,7 @@ describe('signDarwinBinaries', () => {
         `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
         `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
         `/build/${product.name}.app/Contents/Resources/runtime/node`,
+        `/build/${product.name}.app/Contents/Resources/mobile-simulator/idb_companion`,
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -140,7 +121,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(4);
+    expect(execFileSync).toHaveBeenCalledTimes(5);
   });
 
   it('supports the afterCopyExtraResources staging root before the app is renamed', () => {
@@ -156,6 +137,7 @@ describe('signDarwinBinaries', () => {
         `/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/${product.name} Computer Use.app`,
         '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/app-tts-helper',
         '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/runtime/node',
+        '/var/folders/electron-packager/tmp-123/Electron.app/Contents/Resources/mobile-simulator/idb_companion',
       ].includes(filePath),
       logger: {
         log: vi.fn(),
@@ -174,7 +156,7 @@ describe('signDarwinBinaries', () => {
     ], {
       stdio: 'inherit',
     });
-    expect(execFileSync).toHaveBeenCalledTimes(4);
+    expect(execFileSync).toHaveBeenCalledTimes(5);
   });
 
   it('fails when a required helper has not been copied yet', () => {
@@ -195,5 +177,25 @@ describe('signDarwinBinaries', () => {
 
     expect(execFileSync).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('signs the required helpers when the optional iOS companion was not staged', () => {
+    const execFileSync = vi.fn();
+
+    signDarwinBinaries(`/build/${product.name}.app/Contents/Resources/app`, 'x64', {
+      env: {
+        IDENTITY_DARWIN_CODE: `Developer ID Application: ${product.name}`,
+      },
+      execFileSync,
+      existsSync: (filePath) => [
+        `/build/${product.name}.app/Contents/Resources/apple-speechanalyzer-cli`,
+        `/build/${product.name}.app/Contents/Resources/${product.name} Computer Use.app`,
+        `/build/${product.name}.app/Contents/Resources/app-tts-helper`,
+        `/build/${product.name}.app/Contents/Resources/runtime/node`,
+      ].includes(filePath),
+      logger: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(execFileSync).toHaveBeenCalledTimes(4);
   });
 });

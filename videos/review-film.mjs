@@ -1,6 +1,6 @@
 import "./product.mjs";
 
-const DURATION = 50;
+const DURATION = 56;
 const SCENES = [
   { name: "opening", start: 0, end: 3.2 },
   {
@@ -14,74 +14,63 @@ const SCENES = [
   {
     name: "setup",
     start: 8.5,
-    end: 15,
+    end: 22,
     chapter: "02 / 06",
-    title: "Choose the work to inspect.",
-    detail: "Review this branch with an independent reviewer.",
+    title: "Your review. Your rules.",
+    detail: "Choose the reviewer, priorities, and automatic round limit.",
   },
   {
     name: "reviewing",
-    start: 15,
-    end: 21,
+    start: 22,
+    end: 27,
     chapter: "03 / 06",
-    title: "A second set of eyes.",
-    detail: "The reviewer examines the branch and records structured findings.",
+    title: "A fresh conversation. An independent reviewer.",
+    detail:
+      "The review starts in a new thread, separate from the feature work.",
   },
   {
     name: "findings",
-    start: 21,
-    end: 29,
+    start: 27,
+    end: 31,
     chapter: "04 / 06",
-    title: "Decide what matters.",
-    detail:
-      "Inspect findings, keep the relevant ones, and start targeted fixes.",
+    title: "Fix what matters.",
+    detail: "Critical, high, and medium findings are selected automatically.",
   },
   {
     name: "fixing",
-    start: 29,
-    end: 37,
+    start: 31,
+    end: 39,
     chapter: "05 / 06",
-    title: "Fix with evidence.",
-    detail: "Remediation progresses through the selected findings.",
+    title: "Work through the findings.",
+    detail:
+      "Qualifying findings are fixed one by one, with verification evidence.",
   },
   {
     name: "second",
-    start: 37,
-    end: 44,
+    start: 39,
+    end: 50,
     chapter: "06 / 06",
-    title: "Review it again.",
-    detail: "A fresh round verifies the fixes before you finish.",
+    title: "Check the fixes. Close the loop.",
+    detail:
+      "A fresh reviewer checks the fixes. The loop stops when clear or at your round limit.",
   },
-  { name: "ending", start: 44, end: DURATION },
+  { name: "ending", start: 50, end: DURATION },
 ];
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const ease = (value) => 1 - (1 - clamp(value, 0, 1)) ** 3;
 const mix = (start, end, progress) => start + (end - start) * progress;
 
-function message(body, tool = "") {
-  return `<div class="review-message"><strong><i>✦</i> Codex</strong><p>${body}</p>${tool ? `<span class="review-message__tool"><i>✓</i>${tool}</span>` : ""}</div>`;
+function message(body, tool = "", backend = "Claude") {
+  return `<div class="review-message"><strong><i>${backend === "Claude" ? "✻" : "✦"}</i> ${backend}</strong><p>${body}</p>${tool ? `<span class="review-message__tool"><i>✓</i>${tool}</span>` : ""}</div>`;
 }
 
-function diff(mode = "source") {
-  const rows =
-    mode === "fixed"
-      ? [
-          ["41", "const session = await remote.connect(runId);", ""],
-          [
-            "42",
-            "if (sessions.has(runId)) return sessions.get(runId);",
-            "is-added",
-          ],
-          ["43", "sessions.set(runId, session);", "is-added"],
-          ["44", "return session;", ""],
-        ]
-      : [
-          ["41", "const session = await remote.connect(runId);", ""],
-          ["42", "sessions.set(randomId(), session);", "is-removed is-focus"],
-          ["43", "return session;", ""],
-        ];
-  return `<div class="review-diff"><header>src/cloud-session.ts <span>${mode === "fixed" ? "reviewed fix" : "feature/cloud-agents"}</span></header>${rows.map(([number, code, className]) => `<div class="review-diff__line ${className}"><b>${number}</b><span>${code}</span></div>`).join("")}</div>`;
+function activity(items) {
+  return `<div class="review-activity">${items.map(([label, state]) => `<div class="review-activity__row is-${state}"><i>${state === "done" ? "✓" : state === "working" ? "◌" : "·"}</i><span>${label}</span><small>${state === "done" ? "Done" : state === "working" ? "Working" : "Queued"}</small></div>`).join("")}</div>`;
+}
+
+function newThread(round) {
+  return `<div class="review-thread-divider"><span>New independent conversation · Round ${round}</span></div>`;
 }
 
 function finding(priority, title, file, description, state, expanded = false) {
@@ -97,21 +86,64 @@ function finding(priority, title, file, description, state, expanded = false) {
 }
 
 function reviewFrame(status, round, body, footer = "") {
-  return `<div class="review-session"><header class="review-session__header"><div><small>CODE REVIEW</small><strong>feature/cloud-agents</strong></div><span>${status}</span></header><div class="review-rounds"><span class="${round === 1 ? "is-active" : ""}">Round 1</span>${round > 1 ? `<span class="is-active">Round 2</span>` : ""}</div><div class="review-session__body">${body}</div>${footer ? `<footer class="review-session__footer">${footer}</footer>` : ""}</div>`;
+  return `<div class="review-session"><header class="review-session__header"><div><small>CODE REVIEW · CLAUDE</small><strong>feature/cloud-agents</strong></div><span>${status}</span></header><div class="review-auto-status"><span>${status === "Finished" ? "Automatic review complete" : `Automatic · round ${round} of 3`}</span>${status === "Finished" ? "" : "<span>Stop automatic review</span>"}</div><div class="review-rounds"><span class="${round === 1 ? "is-active" : ""}">Round 1</span>${round > 1 ? `<span class="is-active">Round 2</span>` : ""}</div><div class="review-session__body">${body}</div>${footer ? `<footer class="review-session__footer">${footer}</footer>` : ""}</div>`;
+}
+
+function setupPanel(variant) {
+  const variants = [
+    "choose",
+    "providers",
+    "claude",
+    "automatic",
+    "settings",
+    "priorities",
+    "priorityChosen",
+    "roundsChosen",
+    "configured",
+  ];
+  const stage = variants.indexOf(variant);
+  const settings = stage >= 4 && stage < 8;
+  return `<div class="review-setup"><div class="review-setup__intro"><h3>Review this branch</h3><p>Inspect Codex's implementation with an independent reviewer.</p></div><h4>Scope</h4><div class="review-setup__options"><div class="review-setup__option"><b>▤</b><strong>Uncommitted changes</strong><small>Working tree</small></div><div class="review-setup__option is-selected"><b>⑂</b><strong>Current branch</strong><small>against origin/main</small></div></div><h4>Reviewer thread</h4><div class="review-setup__options"><div class="review-setup__option is-selected"><b>✦</b><strong>Independent reviewer</strong><small>Separate conversation</small></div><div class="review-setup__option ${stage >= 3 ? "is-disabled" : ""}"><b>◌</b><strong>Current thread</strong><small>${stage >= 3 ? "Unavailable in automatic mode" : "Stay in this conversation"}</small></div></div><h4>Review model</h4><div class="review-model-row"><span id="review-provider">${stage >= 2 ? "✻ Claude" : "✦ Codex"} ▾</span><span>Default model ▾</span><span>Default effort ▾</span>${variant === "providers" ? `<div class="review-provider-menu"><span>✦ Codex</span><span id="choose-claude">✻ Claude</span></div>` : ""}</div><div class="review-automatic-row"><strong>Automatic remediation</strong>${stage >= 3 ? `<span id="configure-auto">Configure</span>` : ""}<span id="automatic-toggle" class="review-toggle ${stage >= 3 ? "is-on" : ""}"></span></div>${stage >= 8 ? `<p class="review-config-summary">Critical through medium · Up to 3 rounds · No local commits</p>` : ""}<span class="review-action" id="start-automatic-review">Start review →</span></div>
+    ${settings ? `<div class="review-settings-overlay"><div class="review-settings-dialog"><h3>Automatic remediation</h3><label>Fix priorities</label><div class="review-settings-select" id="priority-select">${stage >= 6 ? "Critical, high and medium" : "Critical and high"}<span>▾</span></div>${variant === "priorities" ? `<div class="review-priority-menu"><span>Only critical findings</span><span>Critical and high</span><span id="choose-priority">Critical, high and medium</span><span>All findings</span></div>` : ""}<label>Maximum review rounds</label><div class="review-round-input"><span>−</span><b>${stage >= 7 ? "3" : "2"}</b><span id="round-increase">+</span></div><div class="review-commit-row"><label>Commit after each fix round</label><span class="review-toggle"></span></div><p>Leave changes uncommitted for you to inspect and commit.</p><p>Automatic mode uses an independent reviewer for each round.<br>Never pushes or merges.</p><footer><span class="review-action" id="settings-done">Done</span></footer></div></div>` : ""}`;
 }
 
 function sceneVariant(scene, local) {
   if (scene.name === "command") return local >= 4.95 ? "sent" : "typing";
-  if (scene.name === "setup") return local >= 6.1 ? "started" : "choose";
-  if (scene.name === "reviewing") return local >= 4.7 ? "found" : "scanning";
-  if (scene.name === "findings") return local >= 2.4 ? "expanded" : "list";
+  if (scene.name === "setup")
+    return local >= 10.76
+      ? "configured"
+      : local >= 8.1
+        ? "roundsChosen"
+        : local >= 6.96
+          ? "priorityChosen"
+          : local >= 5.1
+            ? "priorities"
+            : local >= 3.9
+              ? "settings"
+              : local >= 2.8
+                ? "automatic"
+                : local >= 1.86
+                  ? "claude"
+                  : local >= 0.8
+                    ? "providers"
+                    : "choose";
+  if (scene.name === "reviewing")
+    return local < 1 ? "starting" : local >= 4.2 ? "found" : "scanning";
+  if (scene.name === "findings") return "expanded";
   if (scene.name === "fixing")
     return local >= 6.8
       ? "fixedBoth"
       : local >= 3.4
         ? "fixedFirst"
         : "fixFirst";
-  if (scene.name === "second") return local >= 3.7 ? "clear" : "scanning";
+  if (scene.name === "second")
+    return local < 0.8
+      ? "starting"
+      : local >= 7.5
+        ? "handoff"
+        : local >= 3.7
+          ? "clear"
+          : "scanning";
   return "";
 }
 
@@ -119,39 +151,59 @@ function sceneContent(scene, variant) {
   switch (scene.name) {
     case "command":
       return {
-        center: `${message("The branch is ready. The implementation and focused checks are complete.", "3 files changed · branch ready")}${diff()}`,
+        center: `${message("Cloud-agent support is implemented. The branch and focused checks are ready for independent review.", "Built by Codex · 3 files changed", "Codex")}${activity(
+          [
+            ["Connect cloud-based agents", "done"],
+            ["Track connection and recovery status", "done"],
+            ["Run focused feature checks", "done"],
+          ],
+        )}`,
         panel: `<div class="review-pane--dormant"><span>☑</span><strong>Code Review</strong><p>Inspect a branch or uncommitted work with an agent reviewer.</p></div>`,
         role: "Codex · feature/cloud-agents",
         label: "REVIEW / COMMAND",
       };
     case "setup":
       return {
-        center: `${message("The branch is ready. The implementation and focused checks are complete.", "3 files changed · branch ready")}${diff()}`,
-        panel: `<div class="review-setup"><div class="review-setup__intro"><span>☑</span><h3>Review this branch</h3><p>Choose the changes and reviewer conversation.</p></div><h4>Scope</h4><div class="review-setup__options"><div class="review-setup__option"><b>▤</b><strong>Uncommitted changes</strong><small>Working tree</small></div><div class="review-setup__option is-selected"><b>⑂</b><strong>Current branch</strong><small>against origin/main</small></div></div><h4>Reviewer thread</h4><div class="review-setup__options"><div class="review-setup__option is-selected"><b>✦</b><strong>Independent reviewer</strong><small>Separate conversation</small></div><div class="review-setup__option"><b>◌</b><strong>Current thread</strong><small>Stay in this conversation</small></div></div><span class="review-action">Start review →</span></div>`,
+        center: `${message("Cloud-agent support is implemented. The branch and focused checks are ready for independent review.", "Built by Codex · 3 files changed", "Codex")}${activity(
+          [
+            ["Connect cloud-based agents", "done"],
+            ["Track connection and recovery status", "done"],
+            ["Run focused feature checks", "done"],
+          ],
+        )}`,
+        panel: setupPanel(variant),
         role: "Codex · feature/cloud-agents",
         label: "REVIEW / SETUP",
       };
     case "reviewing":
       return {
-        center: `${message("I’m inspecting feature/cloud-agents against origin/main. I’ll report findings with file locations and evidence.", "Reading branch diff")}${diff()}`,
+        center: `${newThread(1)}${
+          variant === "starting"
+            ? ""
+            : message(
+                "I’ll review the feature branch independently, looking for failure cases and regressions.",
+              )
+        }`,
         panel: reviewFrame(
           "Reviewing",
           1,
           `<div class="review-working"><span class="review-working__spinner"></span><strong>Review in progress</strong><p>Inspecting feature/cloud-agents against origin/main</p>${variant === "found" ? `<span class="review-working__count">2 findings found</span>` : ""}</div>`,
         ),
-        role: "Independent reviewer · Round 1",
+        role: "Claude · independent reviewer · Round 1",
         label: "REVIEW / INSPECT",
       };
     case "findings":
       return {
-        center: `${message("I found two issues worth resolving before this branch is ready. The first can duplicate a remote session after reconnect; the second leaves an offline agent looking active.", "2 findings recorded")}${diff()}`,
-        panel: reviewFrame(
-          "Ready",
-          1,
-          `<div class="review-totals"><span><b>2</b> findings</span><span><b>2</b> selected</span><span><b>0</b> fixed</span></div><div class="review-findings">${finding("P1", "Reconnect duplicates a session", "src/cloud-session.ts:42", "Reuse the remote run identity after a dropped connection.", "selected", variant === "expanded")}${finding("P2", "Offline agent appears active", "src/agent-status.ts:86", "Show a recoverable offline state when the endpoint drops.", "selected")}</div>`,
-          `<span>2 findings selected</span><span class="review-action">Remediate selected →</span>`,
+        center: message(
+          "The findings are in the Review pane. I’ll apply the fixes selected by your priority settings.",
         ),
-        role: "Independent reviewer · Round 1",
+        panel: reviewFrame(
+          "Automatic",
+          1,
+          `<div class="review-totals"><span><b>2</b> findings</span><span><b>2</b> auto-selected</span><span><b>0</b> fixed</span></div><div class="review-findings">${finding("High", "Reconnect duplicates a session", "src/cloud-session.ts:42", "Reuse the remote run identity after a dropped connection.", "selected", variant === "expanded")}${finding("Medium", "Offline agent appears active", "src/agent-status.ts:86", "Show a recoverable offline state when the endpoint drops.", "selected")}</div>`,
+          `<span>High and medium findings qualify</span><span>Starting fixes automatically…</span>`,
+        ),
+        role: "Claude · independent reviewer · Round 1",
         label: "REVIEW / FINDINGS",
       };
     case "fixing": {
@@ -164,35 +216,49 @@ function sceneContent(scene, variant) {
             : "pending";
       const fixedCount = Number(first === "fixed") + Number(second === "fixed");
       return {
-        center: `${message(variant === "fixedBoth" ? "Both selected findings are fixed. I verified the reconnect identity and offline-state behavior with focused checks." : variant === "fixedFirst" ? "The reconnect fix is in. I’m now correcting the offline status path." : "I’m applying the selected fixes in the branch and recording evidence for each finding.", variant === "fixedBoth" ? "Focused checks passed" : "Remediation in progress")}${diff(variant === "fixFirst" ? "source" : "fixed")}`,
+        center: message(
+          variant === "fixedBoth"
+            ? "The selected fixes and their checks are complete. A fresh review will verify the result."
+            : "I’m applying the selected fixes and running checks. Progress is tracked in the Review pane.",
+        ),
         panel: reviewFrame(
           "Fixing",
           1,
-          `<div class="review-fix-progress"><div><strong>Remediation progress</strong><span>${fixedCount} of 2 fixed</span></div><div class="review-fix-progress__track"><i id="review-fix-fill"></i></div></div><div class="review-findings">${finding("P1", "Reconnect duplicates a session", "src/cloud-session.ts:42", "Use the remote run identity as the session key.", first)}${finding("P2", "Offline agent appears active", "src/agent-status.ts:86", "Keep the offline state visible until recovery.", second)}</div>`,
+          `<div class="review-fix-progress"><div><strong>Remediation progress</strong><span>${fixedCount} of 2 fixed</span></div><div class="review-fix-progress__track"><i id="review-fix-fill"></i></div></div><div class="review-findings">${finding("High", "Reconnect duplicates a session", "src/cloud-session.ts:42", "Use the remote run identity as the session key.", first)}${finding("Medium", "Offline agent appears active", "src/agent-status.ts:86", "Keep the offline state visible until recovery.", second)}</div>`,
           variant === "fixedBoth"
-            ? `<span>Both fixes verified</span><span class="review-action">Review again →</span>`
+            ? `<span>Both fixes verified</span><span>Starting a fresh review round…</span>`
             : `<span>Fixing selected findings</span><span>● In progress</span>`,
         ),
-        role: "Independent reviewer · remediation",
+        role: "Claude · independent reviewer · remediation",
         label: "REVIEW / FIX",
       };
     }
-    case "second":
+    case "second": {
+      const complete = variant === "clear" || variant === "handoff";
       return {
-        center: `${message(variant === "clear" ? "The second review found no open findings. The selected fixes are verified and this review is ready to finish." : "I’m checking the updated branch in a fresh round, including the earlier findings.", variant === "clear" ? "Round 2 complete · 0 findings" : "Round 2 in progress")}${diff("fixed")}`,
+        center: `${newThread(2)}${
+          variant === "starting"
+            ? ""
+            : message(
+                complete
+                  ? "This fresh review found no open findings. Automatic review is complete after two of the three allowed rounds."
+                  : "I’m reviewing the updated branch independently, including the fixes from the earlier round.",
+              )
+        }`,
         panel: reviewFrame(
-          variant === "clear" ? "Ready to finish" : "Reviewing",
+          complete ? "Finished" : "Reviewing",
           2,
-          variant === "clear"
+          complete
             ? `<div class="review-totals"><span><b>2</b> fixed</span><span><b>0</b> open</span><span><b>2</b> rounds</span></div><div class="review-clear"><span>✓</span><strong>No open findings</strong><p>The follow-up review is clear.</p></div>`
             : `<div class="review-working"><span class="review-working__spinner"></span><strong>Review in progress</strong><p>Checking the updated branch and prior findings</p></div>`,
-          variant === "clear"
-            ? `<span>Round 2 is clear</span><span class="review-action">Finish review →</span>`
+          complete
+            ? `<span>Report saved · 2 rounds used</span><span>Changes left uncommitted</span>`
             : "",
         ),
-        role: "Independent reviewer · Round 2",
+        role: "Claude · independent reviewer · Round 2",
         label: "REVIEW / VERIFY",
       };
+    }
     default:
       return null;
   }
@@ -227,13 +293,17 @@ export function createFilm(document, browserWindow = document.defaultView) {
   function updatePointer(scene, local) {
     const schedules = {
       command: [[3.5, 4.95, "#composer-send"]],
-      setup: [[4.9, 6.1, ".review-setup > .review-action"]],
-      findings: [
-        [0.9, 2.4, ".review-finding:first-child .review-finding__heading"],
-        [6.2, 7.6, ".review-session__footer .review-action"],
+      setup: [
+        [0.2, 0.8, "#review-provider"],
+        [0.95, 1.6, "#choose-claude"],
+        [2.1, 2.8, "#automatic-toggle"],
+        [3.2, 3.9, "#configure-auto"],
+        [4.4, 5.1, "#priority-select"],
+        [6, 6.7, "#choose-priority"],
+        [7.4, 8.1, "#round-increase"],
+        [9.8, 10.5, "#settings-done"],
+        [11.9, 12.8, "#start-automatic-review"],
       ],
-      fixing: [[6.85, 7.7, ".review-session__footer .review-action"]],
-      second: [[5.4, 6.6, ".review-session__footer .review-action"]],
     };
     const pointer = $("#film-pointer");
     const ring = $("#pointer-ring");
@@ -337,36 +407,44 @@ export function createFilm(document, browserWindow = document.defaultView) {
   function paintScene(scene, variant) {
     const content = sceneContent(scene, variant);
     if (!content) return;
+    const owner =
+      scene.name === "command" ||
+      scene.name === "setup" ||
+      variant === "handoff";
+    if (variant === "handoff") {
+      content.center = `${message("Claude's automatic review is complete: two findings fixed, no open findings after two rounds. The report and verification evidence are saved.", "Review report · 2 fixed · 0 open", "Korus")}${message("The reviewed changes are ready for you to inspect. No commits, pushes, or merges were made.", "Back in the implementation conversation", "Codex")}`;
+      content.role = "Codex · feature/cloud-agents";
+    }
     $("#chapter-index").textContent = scene.chapter;
     $("#chapter-title").textContent = scene.title;
     $("#chapter-detail").textContent = scene.detail;
     $("#conversation-body").innerHTML = content.center;
     $("#review-pane-body").innerHTML = content.panel;
-    $("#conversation-name").textContent =
-      scene.name === "command" || scene.name === "setup"
-        ? "Cloud agent work"
-        : "Code reviewer";
+    $("#conversation-name").textContent = owner
+      ? "Cloud agent work"
+      : "Code reviewer";
     $("#conversation-role").textContent = content.role;
-    $("#workspace-title").textContent =
-      scene.name === "command" || scene.name === "setup"
-        ? "Cloud agent work"
-        : "Code reviewer";
+    $("#workspace-title").textContent = owner
+      ? "Cloud agent work"
+      : "Code reviewer";
     $("#workspace-status").textContent =
-      scene.name === "second" && variant === "clear"
+      scene.name === "second" && (variant === "clear" || variant === "handoff")
         ? "Review clear"
         : scene.name === "command" || scene.name === "setup"
           ? "Branch ready"
           : "Review in progress";
-    const hasReviewer = scene.name !== "command" && scene.name !== "setup";
+    const hasReviewer =
+      scene.name !== "command" &&
+      scene.name !== "setup" &&
+      variant !== "handoff";
+    $(".review-avatar").textContent = owner ? "✦" : "✻";
+    $(".review-avatar").classList.toggle("is-claude", !owner);
     $("#reviewer-session").classList.toggle("is-visible", hasReviewer);
     $("#reviewer-session").classList.toggle(
       "sidebar-session--active",
-      hasReviewer,
+      hasReviewer && !owner,
     );
-    $("#target-session").classList.toggle(
-      "sidebar-session--active",
-      !hasReviewer,
-    );
+    $("#target-session").classList.toggle("sidebar-session--active", owner);
     $("#film-footer-stage").textContent = content.label;
   }
 
@@ -392,7 +470,7 @@ export function createFilm(document, browserWindow = document.defaultView) {
     updateMotion(scene, local);
     scrubber.value = String(time);
     $("#timecode").textContent =
-      `00:${String(Math.floor(time)).padStart(2, "0")} / 00:50`;
+      `00:${String(Math.floor(time)).padStart(2, "0")} / 00:56`;
     return { scene: scene.name, variant, time };
   }
 

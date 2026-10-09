@@ -274,7 +274,6 @@ describe('AppShell authentication and conversation', () => {
     expect(wrapper.find('.codex-composer').exists()).toBe(false);
     expect(wrapper.find('.codex-conversation-pane__messages .chat-tool-user-input').exists()).toBe(false);
     await wrapper.get('.codex-conversation-pane__footer button[aria-label="Vue"]').trigger('click');
-    await wrapper.get('.codex-conversation-pane__footer .chat-tool-user-input__button--primary').trigger('click');
 
     expect(wrapper.emitted('client-response')).toStrictEqual([[
       { id: question.id, payload: { answers: { framework: { answers: ['Vue'] } } } },
@@ -683,17 +682,17 @@ describe('AppShell authentication and conversation', () => {
     reloaded.unmount();
   });
 
-  it.each([false, true])('installs an undetected provider and preserves a locked home (%s)', async (locked) => {
+  it.each([false, true])('redetects an externally installed provider without configuring its home (%s)', async (locked) => {
     const snapshot = createInitialSnapshot();
     snapshot.agents = [];
     const setup = { backend: 'claude' as const, installed: false, isolated: true, shareSkills: true, locked, homePath: '/app/claude-home' };
     const configureProviderSetup = vi.fn().mockResolvedValue(setup);
-    const installProvider = vi.fn().mockResolvedValue({ ...setup, installed: true });
+    const refreshProvider = vi.fn().mockResolvedValue({ ...setup, installed: true });
     const getClaudeAuthentication = vi.fn().mockResolvedValue({ loggedIn: true, configDirectory: setup.homePath });
     const getCodexAuthentication = vi.fn();
     window.app = {
       getProviderSetup: vi.fn().mockResolvedValue([setup, { ...setup, backend: 'codex', homePath: '/app/codex-home' }]),
-      configureProviderSetup, installProvider, getClaudeAuthentication, getCodexAuthentication,
+      configureProviderSetup, refreshProvider, getClaudeAuthentication, getCodexAuthentication,
     } as Partial<AppApi> as AppApi;
     const wrapper = mountShell({ snapshot });
     await flushPromises();
@@ -701,17 +700,38 @@ describe('AppShell authentication and conversation', () => {
     await wrapper.findAll('.codex-login__providers .el-button')[1]!.trigger('click');
     await flushPromises();
     expect(getClaudeAuthentication).not.toHaveBeenCalled();
-    expect(installProvider).not.toHaveBeenCalled();
-    const install = wrapper.findAll('button').find(button => button.text() === 'Install');
-    expect(install).toBeDefined();
-    await install!.trigger('click');
+    expect(refreshProvider).not.toHaveBeenCalled();
+    expect(wrapper.find('.provider-setup__choices').exists()).toBe(false);
+    const recheck = wrapper.findAll('.codex-login__provider')[1]!.findAll('button').find(button => button.attributes('aria-label') === 'Check again');
+    await recheck!.trigger('click');
     await flushPromises();
-    if (locked) expect(configureProviderSetup).not.toHaveBeenCalled();
-    else expect(configureProviderSetup).toHaveBeenCalledWith('claude', { isolated: true, shareSkills: true });
-    expect(installProvider).toHaveBeenCalledWith('claude');
+    expect(configureProviderSetup).not.toHaveBeenCalled();
+    expect(refreshProvider).toHaveBeenCalledWith('claude');
+    expect(getClaudeAuthentication).not.toHaveBeenCalled();
+    expect(wrapper.findAll('.codex-login__providers .el-button')[1]!.attributes('disabled')).toBeUndefined();
     await wrapper.setProps({ snapshot: { ...snapshot, providerConnections: [{ backend: 'claude', installed: true, connected: true, checking: false }] } });
     expect(wrapper.get('.codex-login').text()).toContain('Claude Code connected');
     expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeUndefined();
+  });
+
+  it('keeps setup customization unavailable in Welcome until the provider is detected', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.agents = [];
+    const setup = { backend: 'claude' as const, installed: false, isolated: true, shareSkills: true, locked: false, homePath: '/app/claude-home' };
+    const configureProviderSetup = vi.fn().mockResolvedValue(setup);
+    const refreshProvider = vi.fn();
+    const getClaudeAuthentication = vi.fn();
+    window.app = {
+      getProviderSetup: vi.fn().mockResolvedValue([setup]), configureProviderSetup, refreshProvider, getClaudeAuthentication,
+    } as Partial<AppApi> as AppApi;
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    expect(wrapper.findAll('.codex-login__provider')[1]!.text()).not.toContain('Customize');
+    expect(configureProviderSetup).not.toHaveBeenCalled();
+    expect(refreshProvider).not.toHaveBeenCalled();
+    expect(getClaudeAuthentication).not.toHaveBeenCalled();
+    expect(wrapper.get('.provider-install-actions a').text()).toBe('Install');
+    wrapper.unmount();
   });
 
   it.each(['codex', 'claude'] as const)('recognizes existing %s authentication after separation is disabled', async backend => {

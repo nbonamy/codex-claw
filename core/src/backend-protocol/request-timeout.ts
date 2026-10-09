@@ -15,6 +15,7 @@ const EXTENDED_REQUEST_TIMEOUT_MS = 10 * 60_000;
  * and EXTENDED only for operations designed to run for several minutes.
  */
 const requestTimeoutByMethod = {
+  [backendMethods.clientMobileSimulatorExecute]: EXTENDED_REQUEST_TIMEOUT_MS,
   [backendMethods.clientWorkspaceGet]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.clientWorkspaceApply]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.clientDocumentRead]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
@@ -32,7 +33,7 @@ const requestTimeoutByMethod = {
   [backendMethods.providerAuthenticate]: EXTENDED_REQUEST_TIMEOUT_MS,
   [backendMethods.providerSetupGet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.providerSetupConfigure]: IO_REQUEST_TIMEOUT_MS,
-  [backendMethods.providerInstall]: EXTENDED_REQUEST_TIMEOUT_MS,
+  [backendMethods.providerRefresh]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.engineInstructionsRead]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.engineInstructionsSave]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.agentApprovalPresetUpdate]: QUICK_REQUEST_TIMEOUT_MS,

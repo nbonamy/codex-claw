@@ -2,7 +2,7 @@ import { chmod, mkdtemp, readdir, readFile, readlink, mkdir, rm, writeFile } fro
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { acpEnvironment, installAcpRuntime, resolveAcpRuntime } from '../runtime';
+import { acpEnvironment, resolveAcpRuntime } from '../runtime';
 import { AcpRuntime, NativeLoginRequired } from '../acp-runtime';
 import { createAntigravityLifecycle } from '../provider-lifecycle';
 import { AntigravityHost } from '../antigravity-host';
@@ -104,11 +104,23 @@ describe('Antigravity native lifecycle', () => {
     } finally { await host.close(); }
   });
 
-  it('rejects a modified download before extraction and leaves no partial installation', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('untrusted archive')));
-    await expect(installAcpRuntime()).rejects.toThrow('checksum mismatch');
-    expect(await readdir(path.join(root, 'app/antigravity'))).toEqual([]);
+  it('observes an externally installed pair on PATH after setup leaves the runtime absent', async () => {
+    vi.stubEnv('APP_ANTIGRAVITY_COMMAND', '');
+    vi.stubEnv('ANTIGRAVITY_HARNESS_PATH', '');
+    vi.stubEnv('PATH', root);
+    vi.stubEnv('SHELL', '/bin/sh');
+    const lifecycle = createAntigravityLifecycle();
+    const home = lifecycle.home(createTestSnapshot());
+    await lifecycle.prepareHome(home, false);
+    await lifecycle.prepareHome(home, true);
     expect(resolveAcpRuntime()).toBeNull();
+    await writeFile(path.join(root, 'agy_acp_server.par'), '', { mode: 0o700 });
+    expect(lifecycle.installed(createTestSnapshot())).toBe(false);
+    await writeFile(path.join(root, 'localharness_external'), '', { mode: 0o700 });
+    expect(lifecycle.installed(createTestSnapshot())).toBe(true);
+    expect(resolveAcpRuntime()).toMatchObject({ command: path.join(root, 'agy_acp_server.par'), harness: path.join(root, 'localharness_external') });
+    await rm(path.join(root, 'localharness_external'));
+    expect(lifecycle.installed(createTestSnapshot())).toBe(false);
   });
 
   it('shares only native skill directories, preserves private skills, and never copies authentication', async () => {

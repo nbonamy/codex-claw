@@ -80,6 +80,30 @@ const callbacks = (): AppMenuCallbacks => ({
 });
 
 describe('app menu', () => {
+  it('shows Execution Plan as a checkbox reflecting the selected agent plan', () => {
+    const cb = callbacks();
+    cb.hasDebugExecutionPlan = () => true;
+    const item = () => nestedMenuItem(buildAppMenuTemplate(cb, { debugMode: true }), 'Debug', 'Agent Fixtures', 'Execution Plan')!;
+    expect(item()).toMatchObject({ type: 'checkbox', checked: true });
+    item().click!({ checked: false } as never, undefined, {} as never);
+    expect(cb.toggleDebugExecutionPlan).toHaveBeenCalledOnce();
+    cb.hasDebugExecutionPlan = () => false;
+    expect(item().checked).toBe(false);
+  });
+
+  it('shows missing-engine simulation as a checked toggle backed by the current preview state', () => {
+    let enabled = false;
+    const cb = callbacks();
+    cb.getDebugMissingEngines = () => enabled;
+    cb.setDebugMissingEngines = value => { enabled = value; };
+    const item = () => nestedMenuItem(buildAppMenuTemplate(cb, { debugMode: true }), 'Debug', 'UI Previews', 'Simulate Missing Local Engines')!;
+    expect(item()).toMatchObject({ type: 'checkbox', checked: false, enabled: true });
+    item().click!({ checked: true } as never, undefined, {} as never);
+    expect(item().checked).toBe(true);
+    item().click!({ checked: false } as never, undefined, {} as never);
+    expect(item().checked).toBe(false);
+  });
+
   it('builds app-owned file, view, and agent menus with the native Edit menu', () => {
     const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
@@ -406,6 +430,7 @@ describe('app menu', () => {
       'Ready for Review',
     ]);
     expect(submenuLabels(debugMenu, 'Debug', 'UI Previews')).toStrictEqual([
+      'Simulate Missing Local Engines',
       'Markdown',
       'Image Annotation',
       'Worktree Initialization',
@@ -428,6 +453,7 @@ describe('app menu', () => {
       'Plan Review',
     ]);
     expect(nestedSubmenu(debugMenu, 'Debug', 'UI Previews').map(menuEntryLabel)).toStrictEqual([
+      'Simulate Missing Local Engines',
       'Markdown',
       'Image Annotation',
       'separator',

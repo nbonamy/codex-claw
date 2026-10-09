@@ -47,6 +47,60 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it('previews missing local engines in Welcome and Settings without changing real connections', async () => {
+    let command: (value: AppCommand) => void = () => {};
+    const refreshProvider = vi.fn();
+    const configureProviderSetup = vi.fn();
+    const disconnectProvider = vi.fn();
+    const backends = ['codex', 'claude', 'antigravity'] as const;
+    window.app = {
+      onAppCommand: vi.fn(listener => { command = listener; return () => {}; }),
+      getProviderSetup: vi.fn().mockResolvedValue(backends.map(backend => ({
+        backend, installed: true, isolated: true, shareSkills: true, homePath: '/home', locked: false,
+      }))),
+      refreshProvider, configureProviderSetup, disconnectProvider,
+    } as unknown as AppApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = backends.map(backend => ({
+      backend, installed: true, connected: true, checking: false,
+    }));
+    const wrapper = mountShell({ snapshot });
+    await flushPromises();
+    expect(wrapper.find('.codex-login').exists()).toBe(false);
+
+    command({ type: 'debug-missing-engines', enabled: true });
+    await flushPromises();
+    expect(wrapper.findAll('.codex-login .provider-install-actions a')).toHaveLength(3);
+    expect(wrapper.findAll('.codex-login__provider').slice(0, 2).some(provider => provider.text().includes('Customize'))).toBe(false);
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+    expect(wrapper.findAll('.codex-login__provider')[2]!.text()).toContain('Connect Antigravity');
+    await wrapper.get('.codex-login .provider-install-actions button').trigger('click');
+    expect(refreshProvider).not.toHaveBeenCalled();
+
+    command({ type: 'open-settings' });
+    await flushPromises();
+    expect(wrapper.find('.codex-login').exists()).toBe(false);
+    for (const label of ['Codex', 'Claude Code']) {
+      const tab = wrapper.findAll('.settings-sidebar button').find(button => button.text() === label);
+      expect(tab).toBeDefined();
+      await tab!.trigger('click');
+      await flushPromises();
+      expect(wrapper.get('.engine-hero').text()).toContain('Not detected');
+      expect(wrapper.find('.engine-hero .provider-install-actions a').exists()).toBe(true);
+      expect(wrapper.get('.engine-hero [role="switch"]').attributes('disabled')).toBeDefined();
+      await wrapper.get('.engine-hero .provider-install-actions button').trigger('click');
+    }
+    expect(refreshProvider).not.toHaveBeenCalled();
+    command({ type: 'debug-missing-engines', enabled: false });
+    await flushPromises();
+    expect(wrapper.find('.engine-hero .provider-install-actions').exists()).toBe(false);
+    expect(wrapper.get('.engine-hero').text()).toContain('Disconnect');
+    expect(snapshot.providerConnections.every(engine => engine.installed && engine.connected)).toBe(true);
+    expect(configureProviderSetup).not.toHaveBeenCalled();
+    expect(disconnectProvider).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it.each([
     { backend: 'codex' as const, command: 'delegate' },
     { backend: 'claude' as const, command: 'worktree' },
@@ -622,11 +676,13 @@ describe('AppShell dialogs and commands', () => {
       observe() {}
       disconnect() {}
     });
-    let listener: (command: AppCommand) => void = () => undefined;
-    const unsubscribe = vi.fn();
+    const listeners = new Set<(command: AppCommand) => void>();
+    const listener = (command: AppCommand) => {
+      for (const nextListener of listeners) nextListener(command);
+    };
     const onAppCommand = vi.fn((nextListener: (command: AppCommand) => void) => {
-      listener = nextListener;
-      return unsubscribe;
+      listeners.add(nextListener);
+      return () => listeners.delete(nextListener);
     });
     window.app = {
       onAppCommand,
@@ -704,7 +760,7 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.text()).toContain('Edit agent');
 
     wrapper.unmount();
-    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(listeners.size).toBe(0);
   });
 
   it('persists repository icons selected from the session sidebar', async () => {
@@ -1098,6 +1154,31 @@ describe('AppShell dialogs and commands', () => {
     ]]);
     expect(wrapper.emitted('sendPrompt')).toBeUndefined();
     expect(wrapper.emitted('send-agent-prompt')).toBeUndefined();
+  });
+
+  it('opens the requesting agent simulator pane without switching the selected conversation', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    const mobileSimulator = vi.fn().mockResolvedValue({ attachment: null, catalog: { devices: [], setup: [] } });
+    window.app = {
+      onAppCommand: vi.fn(next => { listener = next; return () => undefined; }),
+      mobileSimulator,
+    } as Partial<AppApi> as AppApi;
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountRealShell({ snapshot });
+    listener({ type: 'open-simulator', agentId: 'agent-jesse' });
+    await flushPromises();
+    expect(mobileSimulator.mock.calls.every(([agentId]) => agentId === 'agent-jesse')).toBe(true);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    listener({ type: 'open-simulator', agentId: 'agent-dina' });
+    await flushPromises();
+    expect(wrapper.get('[aria-label="Mobile simulator"]').text()).toContain('Choose a simulator');
+    expect(mobileSimulator).toHaveBeenCalledWith('agent-dina', { action: 'list' });
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    expect(wrapper.findAll('[aria-label="Mobile simulator"]')).toHaveLength(2);
+    listener({ type: 'close-simulator', agentId: 'agent-dina' });
+    await flushPromises();
+    expect(wrapper.findAll('[aria-label="Mobile simulator"]')).toHaveLength(1);
+    wrapper.unmount();
   });
 
   it('opens a model-requested URL in the active agent browser workspace', async () => {

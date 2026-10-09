@@ -48,6 +48,88 @@ if ("IntersectionObserver" in window) {
   reveals.forEach((element) => element.classList.add("is-visible"));
 }
 
+// The hero plays its films muted, one after another, so visitors see the
+// product on arrival. Only the selected film loads; reduced motion keeps posters.
+const showcase = document.querySelector(".showcase");
+const showcaseTabs = [...showcase.querySelectorAll('[role="tab"]')];
+const showcaseVideos = [...showcase.querySelectorAll("video")];
+const watch = showcase.querySelector(".showcase-watch");
+const autoplay = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+let showcaseIndex = 0;
+const pauseShowcase = () => showcaseVideos[showcaseIndex].pause();
+const loadShowcase = (video) => {
+  if (!video.hasAttribute("src")) video.src = video.dataset.src;
+};
+const pauseFilms = () => {
+  for (const video of document.querySelectorAll(".product-film video"))
+    video.pause();
+};
+const selectShowcase = (index) => {
+  pauseShowcase();
+  pauseFilms();
+  showcaseIndex = index;
+  showcaseTabs.forEach((tab, position) => {
+    const selected = position === index;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    tab.style.removeProperty("--progress");
+  });
+  showcaseVideos.forEach((video, position) =>
+    video.classList.toggle("is-active", position === index),
+  );
+  const video = showcaseVideos[index];
+  watch.href = video.dataset.src;
+  watch.hidden = false;
+  video.muted = true;
+  video.controls = false;
+  if (video.readyState) video.currentTime = 0;
+  if (!autoplay) return;
+  loadShowcase(video);
+  video.play().catch(() => {});
+};
+showcaseVideos.forEach((video, index) => {
+  video.addEventListener("timeupdate", () => {
+    if (index === showcaseIndex && video.duration)
+      showcaseTabs[index].style.setProperty(
+        "--progress",
+        String(video.currentTime / video.duration),
+      );
+  });
+  // Advance only while previewing; a film watched with sound stays put.
+  video.addEventListener("ended", () => {
+    if (index === showcaseIndex && video.muted && autoplay)
+      selectShowcase((index + 1) % showcaseVideos.length);
+  });
+});
+showcaseTabs.forEach((tab, index) => {
+  tab.addEventListener("click", () => selectShowcase(index));
+  tab.addEventListener("keydown", (event) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = (index + step + showcaseTabs.length) % showcaseTabs.length;
+    selectShowcase(next);
+    showcaseTabs[next].focus();
+  });
+});
+watch.addEventListener("click", (event) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  const video = showcaseVideos[showcaseIndex];
+  const track = video.querySelector("track");
+  pauseFilms();
+  loadShowcase(video);
+  if (!track.hasAttribute("src")) track.src = track.dataset.src;
+  track.track.mode = "showing";
+  video.muted = false;
+  video.controls = true;
+  video.currentTime = 0;
+  watch.hidden = true;
+  video.focus({ preventScroll: true });
+  video.play().catch(() => {});
+});
+selectShowcase(0);
+
 // Keep MP4s off the network until a visitor chooses a film. The cover is a
 // direct media link so the walkthroughs remain available without JavaScript.
 const films = [...document.querySelectorAll(".product-film")];
@@ -117,6 +199,7 @@ for (const film of films) {
   };
   video.addEventListener("error", showError);
   video.addEventListener("play", () => {
+    pauseShowcase();
     for (const other of films) {
       if (other !== film) other.querySelector("video").pause();
     }

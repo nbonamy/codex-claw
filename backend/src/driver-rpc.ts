@@ -66,9 +66,7 @@ export function appSurfaceOptions(options: BackendDriverRegistryOptions = {}): A
     codexHome: options.generalSettings?.providerHomes?.codex?.homePath ?? backendCodexHomeDir(),
     loadingStrategy: 'lazy',
     transport: {
-      command: resolveCodexCommand(options.generalSettings?.codexBinaryPath, {
-        bundledPath: process.env.APP_BUNDLED_CODEX_PATH,
-      }),
+      command: resolveCodexCommand(options.generalSettings?.codexBinaryPath),
       configOverrides: buildAppMcpConfigOverrides(
         options.pluginSettings?.() ?? options.generalSettings?.plugins,
       ),

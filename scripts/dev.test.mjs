@@ -35,6 +35,7 @@ for (const scenario of [
       writeFileSync(npmCli, `
         const fs = require('node:fs');
         const path = require('node:path');
+        if (process.argv.includes('build:codex') || process.env.APP_BUNDLED_CODEX_PATH) process.exit(99);
         if (process.argv.includes('dev:backend')) setInterval(() => {}, 1000);
         if (process.argv.includes('start:electron')) {
           const assets = process.env.CODEX_APP_SDK_ASSETS_PATH;
@@ -46,6 +47,7 @@ for (const scenario of [
       const env = { ...process.env, npm_execpath: npmCli, APP_DEV_TRACE: trace };
       delete env.CODEX_APP_SDK_SOURCE;
       delete env.CODEX_APP_SDK_ASSETS_PATH;
+      delete env.APP_BUNDLED_CODEX_PATH;
       if (scenario.shell) env.CODEX_APP_SDK_SOURCE = scenario.shell;
       const result = spawnSync(process.execPath, [path.join(root, 'scripts/dev.mjs')], {
         cwd: temp, env, encoding: 'utf8', timeout: 10_000,

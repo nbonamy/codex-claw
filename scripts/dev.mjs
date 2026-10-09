@@ -22,9 +22,9 @@ if (process.argv.includes('--help')) {
 dotenv.config({ path: path.join(rootDir, '.env'), quiet: true });
 const sdkAssets = sdkAssetsPath();
 
-await run('npm', ['run', 'build:codex']);
 await run('npm', ['run', 'build:computer-use']);
 await run('npm', ['run', 'build:tts']);
+await run('npm', ['run', 'prepare:mobile-simulator', '--', '--optional']);
 await run('npm', ['run', 'build', '-w', '@workspace/backend']);
 
 const backendWatch = start('npm', ['run', 'dev:backend'], {
@@ -43,8 +43,6 @@ const electronDev = start('npm', ['run', 'start:electron'], {
     APP_BACKEND_ARGS: `${backendBundle},--stdio`,
     APP_BACKEND_WATCH_FILE: '',
     APP_ASSETS_PATH: path.join(rootDir, 'electron', 'assets'),
-    APP_BUNDLED_CODEX_PATH: path.join(rootDir, 'electron', 'resources', 'codex',
-      ...(process.platform === 'win32' ? ['bin', 'codex.exe'] : ['codex'])),
     CODEX_APP_SDK_ASSETS_PATH: sdkAssets,
   },
 });

@@ -3,6 +3,8 @@ import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
+import type { BrowserViewportRequest } from '@workspace/core/browser-viewport';
 
 const electronMocks = vi.hoisted(() => {
   const guests = new Map<number, WebContentsMock>();
@@ -114,6 +116,50 @@ beforeEach(() => {
 });
 
 describe('browser pane helpers', () => {
+  it('waits for the matching viewport layout acknowledgement and returns guest measurements', async () => {
+    const owner = { webContents: {} };
+    const guest = electronMocks.createGuest(owner, 60);
+    const onViewportRequest = vi.fn<(request: BrowserViewportRequest) => void>();
+    const pane = new BrowserPane({ onAnnotation: vi.fn(), onViewportRequest });
+    await pane.open(owner as never, 'agent-one', 'primary', '', '', 60);
+    guest.executeJavaScript.mockImplementation(async script => runInNewContext(script, { window: { innerWidth: 390, innerHeight: 844, devicePixelRatio: 2 } }));
+    const settled = vi.fn();
+    const result = pane.execute('agent-one', 'primary', 'viewport', { preset: 'phone' }).then(settled);
+    const request = onViewportRequest.mock.calls[0]![0];
+    expect(request).toEqual({ agentId: 'agent-one', browserId: 'primary', requestId: expect.any(String), viewport: { preset: 'phone', width: 390, height: 844 } });
+    await pane.viewportApplied('agent-two', 'primary', request.requestId);
+    await pane.viewportApplied('agent-one', 'primary', 'stale');
+    expect(settled).not.toHaveBeenCalled();
+    await pane.viewportApplied('agent-one', 'primary', request.requestId);
+    await result;
+    expect(settled).toHaveBeenCalledWith({ preset: 'phone', width: 390, height: 844, devicePixelRatio: 2 });
+    await pane.closeAll();
+  });
+
+  it('bounds viewport input and rejects superseded, closed and timed-out requests', async () => {
+    const owner = { webContents: {} };
+    electronMocks.createGuest(owner, 60);
+    const onViewportRequest = vi.fn<(request: BrowserViewportRequest) => void>();
+    const pane = new BrowserPane({ onAnnotation: vi.fn(), onViewportRequest });
+    await pane.open(owner as never, 'agent-one', 'primary', '', '', 60);
+    for (const input of [{}, { width: 900 }, { width: 239, height: 400 }, { width: 500, height: 2001 }, { preset: 'phone', width: 400 }, { preset: 'invalid' }]) {
+      await expect(pane.execute('agent-one', 'primary', 'viewport', input)).rejects.toThrow();
+    }
+    expect(onViewportRequest).not.toHaveBeenCalled();
+    const first = expect(pane.execute('agent-one', 'primary', 'viewport', { width: 800, height: 600 })).rejects.toThrow('superseded');
+    const second = expect(pane.execute('agent-one', 'primary', 'viewport', { preset: 'responsive' })).rejects.toThrow('closed');
+    await first;
+    await pane.closeAll();
+    await second;
+    electronMocks.createGuest(owner, 61);
+    await pane.open(owner as never, 'agent-one', 'primary', '', '', 61);
+    vi.useFakeTimers();
+    try {
+      const timeout = expect(pane.execute('agent-one', 'primary', 'viewport', { preset: 'fit' })).rejects.toThrow('Timed out');
+      await vi.advanceTimersByTimeAsync(10_000);
+      await timeout;
+    } finally { vi.useRealTimers(); await pane.closeAll(); }
+  });
   it('waits for a replacement page when a client redirect aborts loadURL', async () => {
     const owner = { webContents: {} };
     const guest = electronMocks.createGuest(owner, 60);

@@ -6,6 +6,7 @@ import {
   type CodexToolTitlePresenterContext,
 } from '@codex-app-sdk/vue';
 import {
+  IconDeviceMobile as MobileIcon,
   IconBrowser as BrowserIcon,
   IconDeviceDesktop as DeviceDesktopIcon,
   IconGitBranch as GitBranchIcon,
@@ -29,6 +30,7 @@ type AgentNameResolver = (identifier: string) => string | undefined;
 // host boundary instead of leaking it through the resolver.
 const icons = {
   agents: UsersIcon as unknown as ToolIcon,
+  simulator: MobileIcon as unknown as ToolIcon,
   browser: BrowserIcon as unknown as ToolIcon,
   computerUse: DeviceDesktopIcon as unknown as ToolIcon,
   markdown: MarkdownIcon as unknown as ToolIcon,
@@ -46,6 +48,7 @@ const BROWSER_TOOLS = new Set([
   'browser-console-logs',
   'browser-get-dom',
   'browser-open',
+  'browser-set-viewport',
   'browser-screenshot',
   'browser-scroll',
   'browser-type',
@@ -94,10 +97,9 @@ export function presentAppTool(
     const phase = context.descriptor.phase === 'failed' || context.toolCall.state === 'error'
       ? 'failed'
       : context.descriptor.phase === 'completed' ? 'completed' : 'running';
-    const target = typeof context.descriptor.params.target === 'string' ? context.descriptor.params.target.trim() : '';
     return {
       icon: icons.search,
-      title: translate(`chat.tool.searchTools.${target ? 'target' : 'empty'}.${phase}`, { target }),
+      title: translate(`chat.tool.searchTools.${phase}`),
     };
   }
 
@@ -130,6 +132,7 @@ export function provideAppToolPresentation(translate: Translate, resolveAgentNam
 }
 
 function appToolIcon(tool: string): ToolIcon | undefined {
+  if (tool === 'simulator') return icons.simulator;
   if (BROWSER_TOOLS.has(tool)) return icons.browser;
   if (COMPUTER_USE_TOOLS.has(tool)) return icons.computerUse;
   if (MESSAGE_TOOLS.has(tool)) return icons.messages;

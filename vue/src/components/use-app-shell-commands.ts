@@ -46,6 +46,7 @@ type AppShellCommandOptions = {
     closeTeam: (teamId: string) => void;
     disconnectTeam: (teamId: string) => void;
     debugMarkUnread: () => void;
+    setDebugMissingEngines: (enabled: boolean) => void;
     duplicateAgent: (agentId: string) => void;
     editAgent: (agentId: string) => void;
     forkAgent: (agentId: string) => void;
@@ -63,7 +64,8 @@ type AppShellCommandOptions = {
     openFileQuick: () => void;
     openGitReview: () => void | Promise<void>;
     openMarkdown: (request: SidePanelMarkdownRequest) => void;
-    openRightWorkspaceTab: (tab: RightWorkspaceTab) => void;
+    openRightWorkspaceTab: (tab: RightWorkspaceTab, agentId?: string) => void;
+    closeRightWorkspaceTab: (tab: RightWorkspaceTab, agentId: string) => void;
     openSettings: () => void;
     openWhatsNew: () => void;
     quit: () => void | Promise<void>;
@@ -252,6 +254,11 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
     // the transient Command-number reveal so the sidebar cannot stay latched.
     resetQuickAgentShortcuts();
 
+    if (command.type === 'debug-missing-engines') {
+      options.actions.setDebugMissingEngines(command.enabled);
+      return;
+    }
+
     if (command.type === 'appshot-failed') {
       if (!appHostCapabilities.appshots) return;
       ElMessage.error(command.message);
@@ -292,6 +299,16 @@ export function useAppShellCommands(options: AppShellCommandOptions) {
 
     if (command.type === 'toggle-spoken-announcements-muted') {
       options.actions.toggleSpokenAnnouncementsMuted();
+      return;
+    }
+
+    if (command.type === 'open-simulator') {
+      options.actions.openRightWorkspaceTab('simulator', command.agentId);
+      return;
+    }
+
+    if (command.type === 'close-simulator') {
+      options.actions.closeRightWorkspaceTab('simulator', command.agentId);
       return;
     }
 

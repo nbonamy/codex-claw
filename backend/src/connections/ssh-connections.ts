@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import type { AddSshConnectionInput, ClaudeAuthentication, RemoteConnection, SshHostCandidate } from '@workspace/core/contracts';
 import { createEntityId } from '@workspace/core/ids';
 import { backendProviderTokensFilePath } from '../state';
-import { remoteCodexVersionCommand } from './remote-codex-install';
+import { remoteCodexVersionCommand } from './remote-codex-command';
 import { remoteClaudeAuthenticationCommand, remoteClaudeInstallCommand, remoteClaudeVersionCommand } from './remote-claude-install';
 
 type ExecResult = {
@@ -67,7 +67,7 @@ export class SshConnectionService {
       await this.installRemoteDaemon(next.host);
       await this.syncRemoteProviderTokens(next.host);
       const daemonVersion = await this.remoteDaemonVersion(next.host);
-      const codexVersion = await this.remoteCodexVersion(next.host, connection.codexVersion).catch(() => undefined);
+      const codexVersion = await this.remoteCodexVersion(next.host).catch(() => undefined);
       const claudeVersion = await this.remoteClaudeVersion(next.host).catch(() => undefined);
       const runtimeVersions = [`${product.daemonName} ${daemonVersion}`, ...(codexVersion ? [`Codex ${codexVersion}`] : []), ...(claudeVersion ? [`Claude ${claudeVersion}`] : [])];
       next = {
@@ -98,7 +98,7 @@ export class SshConnectionService {
   async inspectVersions(connection: RemoteConnection): Promise<RemoteConnection> {
     const [daemonVersion, codexVersion] = await Promise.all([
       this.remoteDaemonVersion(connection.host),
-      this.remoteCodexVersion(connection.host, connection.codexVersion).catch(() => undefined),
+      this.remoteCodexVersion(connection.host).catch(() => undefined),
     ]);
     const runtimeVersions = [`${product.daemonName} ${daemonVersion}`, `Codex ${codexVersion || 'unknown'}`];
     let claudeWarning = '';
@@ -145,8 +145,8 @@ export class SshConnectionService {
     return parseRemoteClaudeVersion(result.stdout);
   }
 
-  private async remoteCodexVersion(host: string, managedVersion?: string): Promise<string> {
-    const result = await this.run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, remoteCodexVersionCommand(managedVersion)]);
+  private async remoteCodexVersion(host: string): Promise<string> {
+    const result = await this.run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, remoteCodexVersionCommand()]);
     return /^codex-cli\s+(\S+)/u.exec(result.stdout.trim())?.[1] ?? '';
   }
 
@@ -293,16 +293,13 @@ export function parseSshConfig(content: string, configPath?: string): SshHostCan
   return hosts.sort((a, b) => a.host.localeCompare(b.host));
 }
 
-export function sshStdioTransport(host: string, codexVersion?: string): RemoteConnection['transport'] {
-  if (codexVersion && !/^\d+\.\d+\.\d+$/u.test(codexVersion)) throw new Error('Invalid remote Codex version.');
+export function sshStdioTransport(host: string): RemoteConnection['transport'] {
   return {
     type: 'ssh-stdio',
     command: 'ssh',
     args: [
       host,
-      codexVersion
-        ? `APP_BUNDLED_CODEX_PATH="$HOME/${product.homeDirectory}/codex/${codexVersion}/bin/codex" exec node ${remoteDaemonPath} --stdio`
-        : `node ${remoteDaemonPath} connect || exec node ${remoteDaemonPath} --stdio`,
+      `node ${remoteDaemonPath} connect || exec node ${remoteDaemonPath} --stdio`,
     ],
   };
 }

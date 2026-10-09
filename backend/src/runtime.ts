@@ -1,3 +1,4 @@
+import { createMobileSimulatorToolModuleProvider } from './mcp/mobile-simulator-tools';
 import { DocumentWorkspaceService } from './document-workspace-service';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
 import path from 'node:path';
@@ -43,6 +44,7 @@ export type DaemonRuntimeOptions = {
   features?: {
     computerUse?: boolean;
     embeddedBrowser?: boolean;
+    mobileSimulator?: boolean;
   };
   requestClient: DaemonClientRequest;
   version: string;
@@ -144,7 +146,13 @@ export async function createDaemonRuntime(options: DaemonRuntimeOptions): Promis
     agentCreation,
     createProject: (agentId, name, prompt, backend) => server.createProjectFromQuickChat(agentId, name, prompt, backend),
     startAutomaticReview: (agentId, input) => server.startAutomaticReview(agentId, input),
-    toolModuleProviders: [createVisualizeToolModuleProvider(visualizeService), createTaskToolModuleProvider(tasks)],
+    toolModuleProviders: [
+      createMobileSimulatorToolModuleProvider(options.features?.mobileSimulator !== false
+        ? (agentId, input) => options.requestClient(backendMethods.clientMobileSimulatorExecute, { agentId, input })
+        : undefined),
+      createVisualizeToolModuleProvider(visualizeService),
+      createTaskToolModuleProvider(tasks),
+    ],
   });
   const mcpServerUrl = await mcpService.start();
   const driverOptions: BackendDriverRegistryOptions = {

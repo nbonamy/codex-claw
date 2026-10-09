@@ -1,6 +1,13 @@
 import * as z from 'zod/v4';
 
-export const findingPrioritySchema = z.enum(['p0', 'p1', 'p2', 'p3']).describe(
+const findingPriorities = ['p0', 'p1', 'p2', 'p3'] as const;
+type FindingPriority = (typeof findingPriorities)[number];
+
+/** Accepts either case ("P2" as written in review instructions, or "p2") and normalizes to lowercase. */
+export const findingPrioritySchema = z
+  .enum([...findingPriorities, ...findingPriorities.map((priority) => priority.toUpperCase() as Uppercase<FindingPriority>)])
+  .transform((priority) => priority.toLowerCase() as FindingPriority)
+  .describe(
   'P0: drop everything; universally blocks release, operations, or major usage. P1: urgent; fix in the next cycle. P2: normal; fix eventually. P3: low; nice to have.',
 );
 export const findingTitleSchema = z.string().trim().min(1).max(80).describe('Imperative finding title, at most 80 characters.');

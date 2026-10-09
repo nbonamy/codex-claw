@@ -44,7 +44,6 @@ const messages = {
     'menu.whatsNew': 'What’s New',
     'menu.window': 'Window',
     'dialog.agentFolder': 'Select agent folder',
-    'dialog.codexExecutable': 'Select Codex executable',
     'dialog.sourceFolder': 'Select source folder',
     'dialog.sourceFolderMessage': 'Select your source folder containing git repositories',
     'dialog.worktreeFolder': 'Choose worktree folder',

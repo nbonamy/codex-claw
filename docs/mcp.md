@@ -195,6 +195,63 @@ Registered per authenticated request by independent modules
   selection and waits for load; other `browser-*` tools operate the sandboxed page
   through `client/browser/open|execute`. The renderer never exposes DOM, cookies or
   screenshots to page scripts.
+  Viewport changes reuse the renderer's device controls; the desktop waits for
+  the targeted pane to acknowledge layout before reading the guest's actual CSS
+  dimensions. Hidden/closed panes cannot report a successful resize. Device presets
+  change viewport size only, not user agent, touch input or pixel density.
+
+## Mobile Simulators
+
+The provider-independent simulator tool routes authenticated caller identity through
+`client/mobileSimulator/execute` to Electron's local device service. The pane uses
+the same service through typed preload IPC. It is unavailable on web hosts and to
+remote agents. Attaching, from the pane or through the tool, needs no prompt: the simulators are local
+to the user's own machine. Either grants one agent an exclusive attachment;
+input and observations require its opaque attachment ID. Detach, shutdown, agent removal,
+backend disconnect and desktop shutdown revoke that authority. `shutdown` powers the
+attached device off and is available to its owner; rotation is pane-only. An agent's
+attach opens the pane and its detach or shutdown closes it, while the user's own
+detach or power-off in the pane leaves it open. Otherwise devices remain running and
+their data is never erased as cleanup.
+
+The visible pane uses a native video stream and continuous touch input through
+an attachment-scoped view lease. Electron keeps only the latest frame; the renderer
+has one outstanding read and coalesces pointer movement without dropping release.
+Idle Android screens keep their lease through empty replies. Closing the pane,
+changing agents or revoking the attachment cancels capture and releases held input.
+Video stays outside provider transcripts and product snapshots.
+
+Agent screenshots remain explicit PNG observations. Input uses observed framebuffer
+pixels; the iOS adapter converts pixels to device points. Live Android frames carry
+an orientation epoch, so stale coordinates are rejected before input reaches the
+physical display. Rotation during a held gesture releases input and requires
+reconnecting. iOS accessibility frames remain in UI-oriented points, which can
+differ from the raw framebuffer after rotation; locate input in the screenshot. iOS keeps a portrait framebuffer when the
+device rotates and draws the turned UI inside it, so live frames carry a clockwise
+quarter-turn hint, the pane rotates image and bezel, and live touches use the
+upright (displayed) coordinate space.
+Android accessibility bounds are pixels. Missing accessibility is reported
+explicitly as screenshot fallback. Screen content is untrusted observation.
+
+Xcode and an iOS runtime remain user-installed prerequisites. Korus bundles a
+pinned Meta idb companion and speaks its protobuf/gRPC protocol directly over a
+private Unix socket; Python, Homebrew and a separate idb installation are not
+required. One companion belongs to each iOS attachment. Detach closes the channel,
+cancels outstanding calls, and stops only that child. The global idb registry is
+never consulted. Native framework compatibility depends on the bundled
+companion/Xcode pair; a helper update ships with an app update.
+
+The macOS ARM64 build prepares the checksum-pinned native distribution, runtime
+resources, protocol and third-party notices before Forge copies them into app
+resources. GitHub Actions owns packaging, signing/notarization and the packaged
+helper smoke check. Development uses the same prepared assets;
+`APP_MOBILE_COMPANION_PATH` can select an isolated native installation in development
+only. Packaged apps always select their own helper. Android uses user-installed
+SDK Platform Tools and Emulator. ADB handles device management and agent actions;
+the pane uses the emulator's native gRPC video/touch service and installed protocol.
+Discovery must match the selected serial, a live local process and the expected
+AVD identity, and requires a bearer token on loopback. Physical devices and remote
+endpoints are excluded. Korus does not install Xcode, runtimes or Android SDK tooling.
 
 ## Computer Use
 

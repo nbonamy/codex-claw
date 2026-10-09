@@ -739,7 +739,6 @@ describe('useAppState', () => {
     const before = state.snapshot.value;
 
     await expect(state.chooseAgentFolder()).resolves.toBeNull();
-    await expect(state.chooseCodexBinary()).resolves.toBeNull();
     await expect(state.chooseSourceFolder()).resolves.toBeNull();
     await expect(state.listSourceFolders()).resolves.toStrictEqual({ path: '', parentPath: null, entries: [] });
     await expect(state.listSourceRepositories()).resolves.toStrictEqual([]);

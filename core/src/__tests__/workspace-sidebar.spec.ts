@@ -53,6 +53,20 @@ describe('workspace sidebar projection', () => {
     }]);
   });
 
+  it.each([
+    ['trunk', 'trunk', false, 'main'],
+    ['main', 'trunk', false, 'branch'],
+    ['master', 'trunk', false, 'branch'],
+    ['trunk', 'trunk', true, 'worktree'],
+    ['feature', 'trunk', true, 'worktree'],
+    ['main', null, false, 'branch'],
+  ] as const)('classifies %s with default %s and linked=%s as %s', (branch, defaultBranch, linked, kind) => {
+    const agent = gitAgent('agent', null, '/src/project', branch, linked);
+    if (agent.workspace?.kind !== 'git') throw new Error('Expected Git fixture');
+    agent.workspace = { ...agent.workspace, defaultBranch };
+    expect(projectSidebar({ agents: [agent], activeAgentId: null })[0]?.sessions[0]?.kind).toBe(kind);
+  });
+
   it('classifies ordinary branches, detached heads, and folder sessions for presentation', () => {
     const branch = gitAgent('agent-branch', 'Branch', '/src/repo', 'feat/sidebar', false);
     const detached = gitAgent('agent-detached', 'Detached', '/src/repo-detached', 'main', false);

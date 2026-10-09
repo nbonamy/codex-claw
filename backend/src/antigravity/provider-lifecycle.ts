@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { ProviderLifecycle } from '../provider-lifecycle';
 import { backendHomeDir } from '../state';
-import { installAcpRuntime, resolveAcpRuntime } from './runtime';
+import { resolveAcpRuntime } from './runtime';
 
 export function createAntigravityLifecycle(): ProviderLifecycle {
   const isolated = path.join(backendHomeDir(), 'antigravity-home');
@@ -33,6 +33,5 @@ export function createAntigravityLifecycle(): ProviderLifecycle {
       }
     },
     applyHome: home => { process.env.GEMINI_HOME = home.homePath; },
-    install: installAcpRuntime,
   };
 }

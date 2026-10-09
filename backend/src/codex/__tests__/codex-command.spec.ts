@@ -1,44 +1,24 @@
-import { product } from '@workspace/core/product';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { bundledCodexVersion } from '@workspace/core/codex-release';
 import { resolveCodexCommand } from '../codex-command';
+import { resolveRuntimeExecutable } from '@workspace/core/runtime-discovery';
+
+vi.mock('@workspace/core/runtime-discovery', () => ({
+  resolveRuntimeExecutable: vi.fn(() => '/user/bin/codex'),
+}));
 
 describe('resolveCodexCommand', () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => { vi.unstubAllEnvs(); vi.mocked(resolveRuntimeExecutable).mockReset().mockReturnValue('/user/bin/codex'); });
   it('keeps an explicit Settings executable path authoritative', () => {
-    expect(resolveCodexCommand(' /opt/homebrew/bin/codex ', {
-      bundledPath: '/app/resources/codex/codex',
-      existsSync: () => true,
-    })).toBe('/opt/homebrew/bin/codex');
+    expect(resolveCodexCommand(' /opt/homebrew/bin/codex ')).toBe('/opt/homebrew/bin/codex');
   });
 
-  it('uses the Codex executable bundled with the local app', () => {
-    expect(resolveCodexCommand('', {
-      bundledPath: ' /app/resources/codex/codex ',
-      existsSync: () => true,
-    })).toBe('/app/resources/codex/codex');
+  it('uses the user PATH executable rather than a private app bundle', () => {
+    vi.stubEnv('APP_BUNDLED_CODEX_PATH', '/app/resources/codex/codex');
+    expect(resolveCodexCommand('')).toBe('/user/bin/codex');
   });
 
-  it('launches the managed remote Codex installation when it is present', () => {
-    vi.stubEnv('APP_HOME', `/home/mnmt/${product.homeDirectory}`);
-    const managedCodex = `/home/mnmt/${product.homeDirectory}/codex/${bundledCodexVersion}/bin/codex`;
-    expect(resolveCodexCommand('', {
-      bundledPath: '',
-      existsSync: (candidate) => candidate === managedCodex,
-    })).toBe(managedCodex);
-  });
-
-  it(`defers app bundle discovery to the SDK when ${product.name} has no managed executable`, () => {
-    expect(resolveCodexCommand('', {
-      bundledPath: ' ',
-      existsSync: (candidate) => candidate === '/Applications/ChatGPT.app/Contents/Resources/codex',
-    })).toBeUndefined();
-  });
-
-  it('leaves normal executable discovery enabled when no local bundle is provided', () => {
-    expect(resolveCodexCommand(undefined, {
-      bundledPath: ' ',
-      existsSync: () => false,
-    })).toBeUndefined();
+  it('keeps missing PATH detection explicit instead of enabling SDK bundle discovery', () => {
+    vi.mocked(resolveRuntimeExecutable).mockReturnValue(null);
+    expect(resolveCodexCommand(undefined)).toBe('codex');
   });
 });
