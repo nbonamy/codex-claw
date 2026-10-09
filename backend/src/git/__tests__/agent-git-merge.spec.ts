@@ -31,6 +31,40 @@ async function fixture() {
 }
 
 describe('merge cleanup with real Git', () => {
+  it.each(['merge', 'rebase'] as const)('updates from base with %s, refuses dirty rebases, and confirms published rewrites', async strategy => {
+    const { root, repo, feature } = await fixture();
+    try {
+      const service = new AgentGitService(() => new Date(), git);
+      await writeFile(join(repo, 'base.txt'), 'base update'); await git(repo, ['add', '.']); await git(repo, ['commit', '-m', 'base update']);
+      await git(feature, ['push']);
+      const before = (await git(feature, ['rev-parse', 'HEAD'])).stdout;
+      await writeFile(join(feature, 'dirty.txt'), 'keep');
+      await expect(service.updateFromBase(feature, false, { strategy })).rejects.toThrow('Commit your changes');
+      if (strategy === 'rebase') await expect(service.updateFromBase(feature, true, { strategy })).rejects.toThrow('Commit your changes');
+      await rm(join(feature, 'dirty.txt'));
+      if (strategy === 'rebase') {
+        await expect(service.updateFromBase(feature, false, { strategy })).rejects.toThrow('Confirm rewriting');
+        expect((await git(feature, ['rev-parse', 'HEAD'])).stdout).toBe(before);
+      }
+      expect((await service.updateFromBase(feature, false, { strategy, rewritePublished: true })).conflicts).toStrictEqual([]);
+      expect(await readFile(join(feature, 'base.txt'), 'utf8')).toBe('base update');
+      const parents = (await git(feature, ['rev-list', '--parents', '-n', '1', 'HEAD'])).stdout.trim().split(' ');
+      expect(parents).toHaveLength(strategy === 'merge' ? 3 : 2);
+      expect((await git(feature, ['rev-parse', 'origin/feature'])).stdout).toBe(before);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it('retains merge conflicts when an explicitly allowed dirty update encounters a conflict', async () => {
+    const { root, repo, feature } = await fixture();
+    try {
+      await writeFile(join(repo, 'feature.txt'), 'base version'); await git(repo, ['add', '.']); await git(repo, ['commit', '-m', 'base version']);
+      await writeFile(join(feature, 'notes.txt'), 'keep notes');
+      const service = new AgentGitService(() => new Date(), git);
+      expect((await service.updateFromBase(feature, true)).conflicts).toStrictEqual(['feature.txt']);
+      expect(await readFile(join(feature, 'notes.txt'), 'utf8')).toBe('keep notes');
+      expect((await git(feature, ['stash', 'list'])).stdout).toBe('');
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
   it('shares overrides between linked worktrees and isolates separate clones and owning services', async () => {
     const { root, repo, feature } = await fixture();
     try {

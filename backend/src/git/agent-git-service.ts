@@ -2,8 +2,10 @@ import { product } from '@workspace/core/product';
 import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { GitRebase } from './git-rebase';
+import type { GitOperationChoice } from '@workspace/core/contracts/git';
 import { realpath } from 'node:fs/promises';
-import { normalizeGitSettings, resolveGitPreferences, type GitSettings } from '@workspace/core/git-preferences';
+import { normalizeGitSettings, resolveGitPreferences, type GitSettings, type GitPullStrategy, type GitUpdateStrategy } from '@workspace/core/git-preferences';
 import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@workspace/core/contracts';
 import { AppError } from '@workspace/core/app-error';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
@@ -33,9 +35,13 @@ export class AgentGitService {
 
   async preferences(folder: string) {
     const common = (await this.runGit(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).stdout.trim();
-    const repositoryKey = await realpath(common);
+    const repositoryKey = await realpath(resolve(folder, common));
     const settings = this.settings();
     return { repositoryKey, defaults: settings.defaults, overrides: settings.repositories[repositoryKey] ?? {}, effective: resolveGitPreferences(settings, repositoryKey) };
+  }
+
+  private async effectivePreferences(folder: string) {
+    return Object.keys(this.settings().repositories).length ? (await this.preferences(folder)).effective : { ...this.settings().defaults, baseBranch: undefined as string | undefined };
   }
 
   constructor(
@@ -374,7 +380,9 @@ export class AgentGitService {
         : undefined,
     ]);
     const repository = githubRepositoryFromRemote(remoteUrl) ?? fileName(repositoryFolder);
+    const rebase = await new GitRebase(this.runGit).state(folder);
     return {
+      ...(rebase ? { rebase } : {}),
       repository,
       folder: repositoryFolder,
       isLinkedWorktree: currentWorktreeIndex > 0,
@@ -534,7 +542,7 @@ export class AgentGitService {
     return target.path;
   }
 
-  async updateFromBase(folder: string, allowDirty = false): Promise<{ baseBranch: string; branch: string; conflicts: string[] }> {
+  async updateFromBase(folder: string, allowDirty = false, choice: GitOperationChoice & { strategy?: GitUpdateStrategy } = {}): Promise<{ baseBranch: string; branch: string; conflicts: string[] }> {
     const current = await this.workflow(folder);
     if (!current.isLinkedWorktree) throw new Error('The current folder is not a linked worktree.');
     if (!current.branch || current.detached) throw new Error('Create or check out a branch before updating it.');
@@ -543,32 +551,68 @@ export class AgentGitService {
     }
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
     const base = selectMergeTarget(worktrees, current.folder);
-    if (!base?.branch) throw new Error('Check out the base branch before updating this worktree.');
+    const baseBranch = (await this.effectivePreferences(folder)).baseBranch ?? base?.branch;
+    if (!baseBranch) throw new Error('Check out the base branch before updating this worktree.');
+    await this.assertCommitRef(folder, baseBranch);
+    this.assertExpected(current, baseBranch, choice);
+    await new GitRebase(this.runGit).assertIdle(folder);
+    if ((choice.strategy ?? (await this.effectivePreferences(folder)).update) === 'rebase') {
+      const conflicts = await new GitRebase(this.runGit).start(folder, baseBranch, choice.rewritePublished === true);
+      return { baseBranch, branch: current.branch, conflicts };
+    }
     try {
-      await this.runGit(folder, ['merge', '--no-edit', base.branch]);
-      return { baseBranch: base.branch, branch: current.branch, conflicts: [] };
+      await this.runGit(folder, ['-c', 'merge.autoStash=false', 'merge', '--no-edit', '--no-autostash', baseBranch]);
+      return { baseBranch, branch: current.branch, conflicts: [] };
     } catch (error) {
       const conflicts = (await this.runGit(folder, ['diff', '--name-only', '--diff-filter=U', '-z'])
         .catch(() => ({ stdout: '' }))).stdout.split('\0').filter(Boolean);
       if (conflicts.length === 0) throw error;
-      return { baseBranch: base.branch, branch: current.branch, conflicts };
+      return { baseBranch, branch: current.branch, conflicts };
     }
   }
 
-  async pull(folder: string, allowDirty = false): Promise<{ upstream: string; branch: string; conflicts: string[] }> {
+  async recoverRebase(folder: string, action: 'continue' | 'abort'): Promise<void> {
+    await new GitRebase(this.runGit).recover(folder, action);
+  }
+
+  private assertExpected(current: { branch?: string }, target: string, choice: GitOperationChoice): void {
+    if ((choice.expectedBranch && choice.expectedBranch !== current.branch) || (choice.expectedTarget && choice.expectedTarget !== target)) {
+      throw new Error('The source or target branch changed. Review the operation again.');
+    }
+  }
+
+  async pull(folder: string, allowDirty = false, choice: GitOperationChoice & { strategy?: GitPullStrategy } = {}): Promise<{ upstream: string; branch: string; conflicts: string[] }> {
     const current = await this.workflow(folder);
     if (!current.branch || current.detached) throw new Error('Check out a branch before pulling.');
     if (!current.upstream) throw new Error('Set an upstream branch before pulling.');
-    const readConflicts = async () => (await this.runGit(folder, ['diff', '--name-only', '--diff-filter=U', '-z'])).stdout.split('\0').filter(Boolean);
-    if ((await readConflicts()).length > 0) throw new Error('Resolve the existing conflicts before pulling.');
+    const rebase = new GitRebase(this.runGit);
+    await rebase.assertIdle(folder);
+    this.assertExpected(current, current.upstream, choice);
     if (current.files.length > 0 && !allowDirty) throw new Error('Commit your changes before pulling.');
+    let strategy = choice.strategy ?? (await this.effectivePreferences(folder)).pull;
+    let noFF = false;
+    let preserveMerges = false;
+    if (strategy === 'git-config') {
+      const config = async (key: string) => (await this.runGit(folder, ['config', '--get', key]).catch(() => ({ stdout: '' }))).stdout.trim();
+      const configuredRebase = await config(`branch.${current.branch}.rebase`) || await config('pull.rebase');
+      const ff = await config('pull.ff');
+      if (configuredRebase && !['true', 'false', 'merges', 'm', 'interactive', 'i'].includes(configuredRebase)) throw new Error('Unsupported Git pull.rebase configuration. Choose a Pull strategy.');
+      if (['interactive', 'i'].includes(configuredRebase)) throw new Error('Interactive rebase requires an explicit Pull strategy.');
+      strategy = ff === 'only' ? 'ff-only' : ['true', 'merges', 'm'].includes(configuredRebase) ? 'rebase' : configuredRebase === 'false' || ff === 'false' || ff === 'true' ? 'merge' : 'ff-only';
+      noFF = ff === 'false';
+      preserveMerges = ['merges', 'm'].includes(configuredRebase);
+    }
+    const before = (await this.runGit(folder, ['rev-parse', 'HEAD'])).stdout;
+    await this.runGit(folder, ['fetch', '--all']);
+    const refreshed = await this.workflow(folder);
+    if (refreshed.branch !== current.branch || refreshed.upstream !== current.upstream || (await this.runGit(folder, ['rev-parse', 'HEAD'])).stdout !== before) throw new Error('The branch changed while fetching. Review the operation again.');
     const result = { upstream: current.upstream, branch: current.branch, conflicts: [] as string[] };
+    if (strategy === 'rebase') return { ...result, conflicts: await rebase.start(folder, current.upstream, choice.rewritePublished === true, preserveMerges) };
     try {
-      // Merge the configured upstream, regardless of global rebase/ff-only/autostash preferences.
-      await this.runGit(folder, ['pull', '--no-rebase', '--ff', '--no-edit', '--no-autostash']);
+      await this.runGit(folder, ['-c', 'merge.autoStash=false', 'merge', strategy === 'ff-only' ? '--ff-only' : noFF ? '--no-ff' : '--ff', '--no-edit', '--no-autostash', current.upstream]);
       return result;
     } catch (error) {
-      const conflicts = await readConflicts();
+      const conflicts = await rebase.conflicts(folder);
       if (conflicts.length === 0) throw error;
       return { ...result, conflicts };
     }

@@ -149,6 +149,10 @@ complete. Existing Git, settings, and workflow UI baseline: 95 tests passing.
 The parent confirmed implementation authorization after the fix-skill invocation.
 Phase 1 implemented: settings normalization, existing-user migration, precedence,
 and owning-backend repository identity shared by linked worktrees.
+Phases 2–3 backend execution implemented: explicit/configured Pull strategies,
+merge/rebase updates, published-history confirmation, native restart-visible rebase
+state and Continue/Abort. Real-repository and service tests: 60 passing; core and
+backend typechecks pass. UI and app-boundary recovery wiring follow in phase 5.
 
 ## Completion learnings
 

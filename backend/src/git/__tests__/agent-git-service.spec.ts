@@ -77,6 +77,7 @@ describe('agent git service parsers', () => {
       if (command === 'rev-parse --verify --quiet abcdef12^{commit}') return { stdout: 'abcdef12\n' };
       if (command === 'show --format= --no-ext-diff abcdef12 --') return { stdout: 'commit diff\n' };
       if (command === 'show --format= --numstat abcdef12 --') return { stdout: '7\t3\tb.ts\n' };
+      if (command.startsWith('rev-parse --path-format=absolute --git-path rebase-')) return { stdout: '/nonexistent-rebase' };
       throw new Error(`Unexpected git command: ${command}`);
     });
     const service = new AgentGitService(() => new Date(), runGit);
@@ -753,55 +754,6 @@ describe('agent git service parsers', () => {
       baseBranch: 'main',
       baseWorktreeDirty: true,
     });
-  });
-
-  it('merges the checked-out base branch into a clean linked worktree', async () => {
-    const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'worktree') {
-        return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature/demo\n' };
-      }
-      return { stdout: '' };
-    });
-    const service = new AgentGitService(() => new Date(), runGit);
-    vi.spyOn(service, 'workflow').mockResolvedValue({
-      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
-      baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
-      files: [], stagedFiles: [], unstagedFiles: [],
-    });
-
-    await expect(service.updateFromBase('/repo-feature')).resolves.toStrictEqual({
-      baseBranch: 'main',
-      branch: 'feature/demo',
-      conflicts: [],
-    });
-    expect(runGit).toHaveBeenCalledWith('/repo-feature', ['merge', '--no-edit', 'main']);
-  });
-
-  it('blocks a dirty update unless explicitly allowed and preserves conflicts for the agent', async () => {
-    const runGit = vi.fn(async (_folder: string, args: string[]) => {
-      if (args[0] === 'worktree') {
-        return { stdout: 'worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo-feature\nHEAD def\nbranch refs/heads/feature/demo\n' };
-      }
-      if (args[0] === 'merge') throw new Error('CONFLICT (content): Merge conflict in src/app.ts');
-      if (args[0] === 'diff') return { stdout: 'src/app.ts\0src/state.ts\0' };
-      return { stdout: '' };
-    });
-    const service = new AgentGitService(() => new Date(), runGit);
-    vi.spyOn(service, 'workflow').mockResolvedValue({
-      repository: 'owner/repo', folder: '/repo-feature', isLinkedWorktree: true,
-      baseBranch: 'main', branch: 'feature/demo', detached: false, ahead: 0, behind: 0,
-      files: [{ path: 'notes.md', indexStatus: ' ', worktreeStatus: 'M' }], stagedFiles: [], unstagedFiles: ['notes.md'],
-    });
-
-    await expect(service.updateFromBase('/repo-feature')).rejects.toThrow('Commit your changes before updating');
-    expect(runGit).not.toHaveBeenCalled();
-
-    await expect(service.updateFromBase('/repo-feature', true)).resolves.toStrictEqual({
-      baseBranch: 'main',
-      branch: 'feature/demo',
-      conflicts: ['src/app.ts', 'src/state.ts'],
-    });
-    expect(runGit).toHaveBeenCalledWith('/repo-feature', ['diff', '--name-only', '--diff-filter=U', '-z']);
   });
 
   it('rejects staging paths that escape the repository', async () => {
