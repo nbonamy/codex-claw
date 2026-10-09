@@ -632,10 +632,12 @@ const pullEnabled = computed(() => Boolean(props.pullBranch && workflow.value?.u
 const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
   { id: 'revert', type: 'action', label: translate('surface.gitWorkflowControl.revert'), icon: ArrowBackUpIcon, disabled: !props.revertChanges || !commitEnabled.value },
-  { id: 'pull', type: 'action', label: translate('surface.gitWorkflowControl.pull'), icon: RefreshIcon, disabled: !pullEnabled.value },
   { id: 'commit', type: 'action', label: translate('surface.gitWorkflowControl.commit'), icon: GitCommitIcon, disabled: !commitEnabled.value },
+  { id: 'separator-sync', type: 'separator' },
+  { id: 'pull', type: 'action', label: translate('surface.gitWorkflowControl.pull'), icon: RefreshIcon, disabled: !pullEnabled.value },
   { id: 'push', type: 'action', label: translate('surface.gitWorkflowControl.push'), icon: CloudUploadIcon, disabled: !pushEnabled.value },
   ...(updateEnabled.value ? [{ id: 'update-from-base', type: 'action' as const, label: translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }), icon: RefreshIcon }] : []),
+  { id: 'separator-integration', type: 'separator' },
   { id: 'merge', type: 'action', label: translate('surface.gitWorkflowControl.merge'), icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
   { id: 'create-pr', type: 'action', label: translate('surface.gitWorkflowControl.createPR'), icon: GitForkIcon, disabled: !prEnabled.value },
 ]);
