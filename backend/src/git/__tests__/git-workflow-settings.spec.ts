@@ -10,7 +10,7 @@ import { AgentGitService } from '../agent-git-service';
 import { AppBackendServer } from '../../server';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../../state-persistence';
 
-it('persists repository choices through the app boundary, applies them, and retains failed integration work', async () => {
+it('persists global preferences through the app boundary, applies them, and retains failed integration work', async () => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'git-preferences-boundary-')));
   const exec = promisify(execFile);
   const git = (cwd: string, args: string[]) => exec('git', args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
@@ -29,16 +29,17 @@ it('persists repository choices through the app boundary, applies them, and reta
     const service = new AgentGitService(undefined, git);
     server = new AppBackendServer({ version: 'test', snapshot, agentGitService: service, saveSnapshot, workIntegrations: { githubConnected: async () => false } as never });
     const request = (method: string, input?: unknown) => server!.handleMessage({ jsonrpc: '2.0', id: method, method, params: { agentId: agent.id, ...(input === undefined ? {} : { input }) } });
-    expect(await request(backendMethods.agentGitPreferencesUpdate, { pull: 'rebase', update: 'rebase', integration: 'ff-only', baseBranch: 'release' })).toMatchObject({ result: { baseBranch: 'release', preferences: { effective: { pull: 'rebase', update: 'rebase', integration: 'ff-only' } } } });
+    await server.handleMessage({ jsonrpc: '2.0', id: 'settings', method: backendMethods.settingsUpdate, params: { input: { general: { git: { pull: 'rebase', update: 'rebase' } } } } });
+    expect(await request(backendMethods.agentGitWorkflowGet)).toMatchObject({ result: { baseBranch: 'release', preferences: { pull: 'rebase', update: 'rebase' } } });
     expect(saveSnapshot).toHaveBeenCalled();
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(snapshot));
     expect(restored.general.git).toStrictEqual(snapshot.general.git);
-    expect(await service.guidance(feature)).toContain('Pull: rebase; Update from base: rebase; Integrate into base: ff-only; Base: release');
-    expect(await service.guidance(feature)).toContain('grant no authority');
+    expect(await service.guidance()).toContain('Pull: rebase; Update from base: rebase.');
+    expect(await service.guidance()).toContain('grant no authority');
     await writeFile(join(repo, 'base.txt'), 'base'); await git(repo, ['add', 'base.txt']); await git(repo, ['commit', '-m', 'base']);
     await writeFile(join(feature, 'work.txt'), 'work'); await git(feature, ['add', '.']); await git(feature, ['commit', '-m', 'work']);
     const head = (await git(repo, ['rev-parse', 'HEAD'])).stdout;
-    await expect(request(backendMethods.agentGitMerge, { confirmed: true, deleteWorktree: true, deleteBranch: true, pushAfter: true })).rejects.toThrow('not up to date');
+    await expect(request(backendMethods.agentGitMerge, { strategy: 'ff-only', confirmed: true, deleteWorktree: true, deleteBranch: true, pushAfter: true })).rejects.toThrow('not up to date');
     expect((await git(repo, ['rev-parse', 'HEAD'])).stdout).toBe(head);
     expect((await git(repo, ['worktree', 'list', '--porcelain'])).stdout).toContain(feature);
     expect(await request(backendMethods.agentGitUpdateFromBase, { confirmed: true, expectedBranch: 'work', expectedTarget: 'release' })).toMatchObject({ result: { conflicts: [], workflow: { branch: 'work' } } });
@@ -47,7 +48,6 @@ it('persists repository choices through the app boundary, applies them, and reta
     snapshot.agents.push(other);
     await expect(request(backendMethods.agentGitMerge, { confirmed: true, deleteWorktree: false, deleteBranch: false })).rejects.toThrow('Another agent');
     snapshot.agents.pop();
-    expect(await request(backendMethods.agentGitPreferencesUpdate, {})).toMatchObject({ result: { preferences: { overrides: {}, effective: { pull: 'git-config', update: 'merge', integration: 'merge' } } } });
     await expect(request(backendMethods.agentGitPull, { confirmed: true, strategy: 'unknown' })).rejects.toThrow('supported Git strategy');
     await expect(request(backendMethods.agentGitRebaseRecover, { confirmed: false, action: 'abort' })).rejects.toThrow('confirmation');
   } finally { await server?.close(); await rm(root, { recursive: true, force: true }); }

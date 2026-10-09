@@ -89,7 +89,7 @@ export type AgentGitWorkflow = {
   headSha?: string;
   baseHeadSha?: string;
   upstreamHeadSha?: string;
-  preferences?: { repositoryKey: string; defaults: import('../git-preferences').GitWorkflowPreferences; overrides: import('../git-preferences').GitRepositoryPreferences; effective: import('../git-preferences').GitRepositoryPreferences & import('../git-preferences').GitWorkflowPreferences };
+  preferences?: import('../git-preferences').GitWorkflowPreferences;
   rebase?: GitRebaseState;
   repository: string;
   folder: string;

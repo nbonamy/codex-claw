@@ -16,11 +16,11 @@ function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('GitWorkflowControl', () => {
-  it('uses repository defaults, applies a one-off strategy without saving, and restores the default on reopening', async () => {
-    const preferences = { repositoryKey: '/repo/.git', defaults: { pull: 'merge', update: 'merge', integration: 'merge' }, overrides: { pull: 'rebase' }, effective: { pull: 'rebase', update: 'merge', integration: 'ff-only' } } as const;
+  it('uses global defaults, applies a one-off strategy without saving, and restores the default on reopening', async () => {
+    const preferences = { pull: 'rebase', update: 'merge' } as const;
     const current = { ...workflow, files: [], preferences };
     const save = vi.fn();
-    stubElectronTestWindow({ app: { updateAgentGitPreferences: save } });
+    stubElectronTestWindow({ app: { updateSettings: save } });
     const pullBranch = vi.fn().mockResolvedValue({ workflow: current, upstream: workflow.upstream, branch: workflow.branch, conflicts: [] });
     const wrapper = mountControl({ getWorkflow: async () => current, pullBranch });
     await flushPromises(); await wrapper.get('.git-workflow-control__trigger').trigger('click');
@@ -314,7 +314,6 @@ describe('GitWorkflowControl', () => {
       'Push',
       'Merge',
       'Create PR',
-      'Git settings',
     ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
   });

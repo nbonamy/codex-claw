@@ -1,194 +1,131 @@
 # Git workflow settings
 
-Status: implemented and validated; local commits ready for review. No push or merge.
-No push, merge, publication, release, or automatic review authorized.
-
-This reconstructs the proposal discussed with Nicolas; it is not a recovered copy
-of the earlier document.
+Status: implemented and validated; local commits ready for review.
+Local commits authorized. No push, merge, publication, release, or automatic review.
 
 ## Goal
 
-Let people use their own Git workflow without fighting Korus. Settings select
-defaults; they do not grant permission to commit, push, rewrite history, or delete
-work.
+Let people use their own Git workflow without fighting Korus. Preferences do not
+grant permission to commit, push, rewrite history, or delete work.
 
 ## Settings → Git
 
-Start with three independent choices:
+Two global settings, saved immediately when changed like other settings:
 
-| Setting | Choices | Proposed default for new installations |
+| Setting | Choices | Default |
 | --- | --- | --- |
 | Pull strategy | Git configuration · Merge · Rebase · Fast-forward only | Git configuration |
 | Update from base | Merge · Rebase | Merge |
-| Integrate into base | Merge commit · Squash · Rebase and fast-forward · Fast-forward only | Merge commit |
+
+There is no repository selector or repository override layer. Integration strategy
+belongs only in the merge dialog: Merge commit, Squash, Rebase and fast-forward,
+or Fast-forward only. The dialog initially selects Merge commit.
 
 Pull updates the current branch from its upstream. Update from base brings the
-selected base into the working branch. Integration brings completed work back into
-the selected base. One global “merge vs rebase” toggle cannot express all three.
+base into the working branch. Integration brings completed work into the base.
 
-For Pull, “Git configuration” resolves the repository's effective pull strategy on
-the machine owning the checkout. If no strategy is configured, use fast-forward
-only; divergent histories require an explicit choice. This setting is not
-permission to inherit unrelated destructive behavior or enable hidden autostashing.
+Git configuration is the default where Git defines the policy: Pull resolves
+effective branch/pull settings on the machine owning the checkout. With no policy,
+use fast-forward only and require an explicit choice for divergent histories.
+Git has no equivalent single setting selecting merge versus rebase for updating
+from a base. Do not silently inherit autostashing or destructive behavior.
 
-“Rebase and fast-forward” explicitly rebases the working branch onto the base,
-then advances the base only if safe. “Fast-forward only” never rewrites commits and
-never silently falls back to merge or squash.
-
-For existing users, seed Merge / Merge / Merge commit to preserve behavior. New
-installations default Pull to Git configuration. Both can change the settings
-explicitly.
-
-## Scope and precedence
-
-Provide app defaults plus optional repository overrides. Worktrees of one clone
-share its override; separate clones and remote locations remain distinct. Keep
-preferences in Korus data without editing Git configuration or committing a new
-repository file.
-
-Resolve each preference as:
-
-1. One-off operation choice.
-2. Repository override.
-3. App default.
-
-Git configuration is consulted only when that option is selected.
-
-Show repository overrides in Settings → Git through a repository selector;
-inherit app defaults until overridden. The Git menu can open the settings for its
-current repository.
-
-The base branch remains auto-detected, with an explicit repository-level override.
-Show the actual target branch before applying an operation; do not assume every
-repository uses main.
+Keep preferences in Korus data without editing Git configuration or creating
+repository files. Accept the current settings format directly; do not migrate
+earlier development shapes or preserve superseded development defaults.
 
 ## Applying the preferences
 
-Existing Git actions use the effective defaults. Their dialogs expose a compact
-strategy choice and the actual source/target branches. Changing a choice affects
-that operation only; saving a default is explicit.
+One-off choices override global settings without changing them. Action dialogs
+show actual source and target branches before mutation. Base selection remains
+auto-detected, including nonstandard base names; no repository-level override.
 
-Use precise action text, such as “Rebase onto main,” without explanatory Git
-lessons. Keep Commit and Commit & Push distinct. Choosing a preferred strategy
-never silently adds a push or cleanup step.
+Use precise labels such as “Rebase onto main.” Keep Commit and Commit & Push
+distinct. A strategy choice never adds pushing or cleanup.
 
-Korus-managed agent instructions receive the effective repository preferences as
-guidance. Explicit user directions and applicable repository instructions still
-matter. The backend enforces Korus-owned operations; preferences are not a
-guarantee about arbitrary Git commands an agent executes independently.
+Korus-managed agent instructions receive global preferences as guidance. Explicit
+user directions and applicable repository instructions still matter. Backend
+enforcement covers Korus-owned operations, not arbitrary agent Git commands.
 
-All policy, repository resolution, and Git execution belong in the Korus backend,
-including remote checkouts. No SDK changes are needed for this feature.
+All policy, repository resolution, and Git execution belong in the owning backend,
+including remote checkouts. No SDK changes.
 
 ## Failure handling and safeguards
 
-Rebase support includes conflicts, Continue and Abort, and visible in-progress
-operation state after restart. An integration operation must not proceed to push
-or cleanup until the requested integration has actually succeeded.
+Rebase includes conflicts, Continue/Abort, and restart-visible native operation
+state. Rebase and fast-forward rebases the working branch, then advances the base
+only if safe. Fast-forward only never rewrites or falls back to another strategy.
 
-Dirty or shared worktrees require appropriate checks. No silent stashing, force
-push, deletion, or strategy fallback. A published branch that would be rewritten
-requires explicit confirmation; an eventual force-with-lease push remains a
-separate action.
+Validate dirty/shared worktrees, actual source and target, and recheck before
+mutation. Published-history rewriting requires explicit operation confirmation;
+force-with-lease pushing remains a separate action. No silent stashing, force push,
+deletion, cleanup, or strategy fallback. Failed integration cannot trigger cleanup
+or push. Existing explicit commit scope and cleanup controls remain intact.
 
-## First-version scope
-
-Include the three strategies, repository overrides, base-branch selection,
-one-off choices, and proper conflict handling.
-
-Leave commit-message conventions, signing, branch naming, automatic cleanup,
-automatic pushing, and new hosted-PR merge workflows out of this change. Existing
-commit scope and cleanup controls remain intact. Local integration settings must
-not be confused with a forge's PR merge policy.
+Commit conventions, signing, branch naming, automatic cleanup/pushing, and hosted
+PR merge workflows are out of scope. Local integration is separate from forge
+merge policy.
 
 ## Implementation strategy and commit checkpoints
 
-These are the authorized implementation milestones.
-Keep each behavior change with its tests. Update this plan after each phase.
+Keep each behavior change and its tests together in local commits.
 
-1. **Preferences and resolution:** add app-owned settings/contracts, migration
-   preserving existing behavior, repository/worktree identity, inheritance and
-   remote-owner resolution. Test normalization, precedence, migration and
-   isolation between repositories and locations.
-2. **Pull strategies:** apply explicit or configured strategies in the backend.
-   Test actual branch histories in temporary Git repositories, including unset
-   configuration, divergence and refusal without fallback.
-3. **Rebase lifecycle and base updates:** add merge/rebase updates with operation
-   state, conflict reporting, Continue/Abort and restart recovery. Test dirty,
-   shared and published branches and restoration after abort.
-4. **Integration strategies:** implement merge commit, squash, rebase-and-fast-
-   forward and fast-forward-only behavior. Test resulting history, target safety,
-   and prevention of push/cleanup on failure.
-5. **Settings and workflow UI:** expose defaults, repository overrides, base
-   selection and per-operation choices; use precise action labels and render
-   conflict controls. Test mounted user interactions, inherited values and the
-   distinction between one-off choices and saved defaults.
-6. **Agent guidance and end-to-end wiring:** expose effective preferences to
-   agents without expanding authority; verify local and remote routing and run
-   representative workflows through the app-owned boundary.
+1. **Preferences:** app-owned global settings/contracts, current-format validation,
+   default Git-configuration Pull, one-off precedence, and owning-backend resolution.
+2. **Pull:** explicit/configured strategies, real branch histories, unset policy,
+   divergence, and refusal without fallback.
+3. **Rebase lifecycle:** merge/rebase updates, conflicts, Continue/Abort, restart,
+   published-history confirmation, dirty/shared checks, and abort restoration.
+4. **Integration:** four resulting histories, safe target rechecks, no push or
+   cleanup after failure.
+5. **UI:** two autosaved global settings; integration in merge dialog only;
+   one-off choices, concise source/target labels, and recovery controls.
+6. **Guidance and routing:** app-owned local/remote operations and preference
+   guidance without expanding authority. Representative app-boundary workflows.
 
 ## Test strategy
 
-- Follow the Test Value Gate in docs/testing.md. Prefer observable outcomes over
-  assertions about implementation text or command arrays alone.
-- Use real temporary Git repositories for strategy and recovery behavior;
-  exercise fast-forwardable and divergent histories and inspect resulting commits
-  and worktree contents.
-- Test preference resolution at its owner, including existing-user migration,
-  reset-to-inherit, linked worktrees and remote locations.
-- Mount settings and operation dialogs to exercise choices and confirmations.
-- Verify no implicit push, force push, cleanup, autostash or strategy fallback;
-  failed or conflicted operations must retain recoverable state.
-- Use focused tests and affected-workspace typechecks while iterating; apply
-  korus-dod before each handoff. Do not run release packaging for this feature.
+- Follow docs/testing.md and its Test Value Gate. No production-source assertions.
+- Real temporary Git repositories prove histories, contents, conflicts, recovery,
+  dirty/shared/published refusal, and absence of fallback or unintended mutations.
+- Settings tests prove defaults, independent partial updates, persistence and
+  one-off precedence. No tests for compatibility with discarded development data.
+- Mounted UI tests exercise autosaving, errors, operation choices and confirmation.
+- Verify local and remote app-owned routing. Shared Git directory identity is for
+  mutation serialization across linked worktrees, not preferences.
+- Focused tests/typechecks during iteration; proportional full gates and korus-dod
+  before handoff. Runtime UI check for layout and save/reload behavior. No packaging.
 
 ## Progress
 
-Scope and defaults confirmed by delegation. Worktree setup and ownership inspection
-complete. Existing Git, settings, and workflow UI baseline: 95 tests passing.
-The parent confirmed implementation authorization after the fix-skill invocation.
-Phase 1 implemented: settings normalization, existing-user migration, precedence,
-and owning-backend repository identity shared by linked worktrees.
-Phases 2–3 backend execution implemented: explicit/configured Pull strategies,
-merge/rebase updates, published-history confirmation, native restart-visible rebase
-state and Continue/Abort. Real-repository and service tests: 60 passing; core and
-backend typechecks pass. UI and app-boundary recovery wiring follow in phase 5.
-Phase 4 implemented: all four integration histories, explicit base overrides,
-source/target rechecks and cleanup only after success. Real repository tests
-replace overlapping command-array assertions; 62 focused tests pass.
-Phase 5 implemented: canonical strategy controls, app/repository settings, explicit
-saves, one-off choices, displayed source/target guards, and restart-visible recovery.
-Mounted interactions cover inheritance, save/reset, confirmations, and cleanup/push
-separation. Runtime inspection caught and fixed collapsed select widths and empty
-inheritance labels. Settings save/reload and one-off integration passed in headless
-Chromium against the built web shell and owning daemon.
-Phase 6 implemented: owning-backend preferences/recovery routes across desktop/web
-and remote forwarding; effective agent guidance preserves explicit instructions
-and mutation authority. Real app-server tests exercise persisted overrides and
-Git outcomes. Built web-to-daemon execution applied inherited Rebase onto a
-nonstandard `release` base; shell integration then fast-forwarded it while retaining
-the worktrees, branch, and saved defaults. Provider connection/catalog fixtures
-bypassed unauthenticated preview onboarding; Git and settings were real.
+All six implementation phases completed. Original full validation passed:
+3,648 workspace tests and 47 script tests; lint/typechecks; statement coverage
+core 86.40%, backend 87.65%, Vue 88.12%, Electron 86.52%, web 95.89%.
+Real app-server and built web-to-daemon workflows exercised Rebase onto `release`
+and fast-forward integration without push or cleanup. Headless Chromium provided
+runtime evidence after the Korus browser pane timed out. Provider connection and
+catalog fixtures bypassed unauthenticated onboarding; Git/settings used the daemon.
 
-Validation: full `test:ai` and lint pass, with the final web routing addition also
-passing its 35 tests and typechecks. Workspace tests total 3,648; script tests 47.
-Statement coverage: core 86.40%, backend 87.65%, Vue 88.12%, Electron 86.52%,
-web 95.89%. Build:web passes. Remote routing is contract-tested; no live SSH host,
-packaged desktop, release/signing, or automatic review was exercised. The Korus
-browser pane timed out, so runtime UI evidence uses headless Chromium. Existing
-source-mode environment wiring and SDK/lockfile pins remain unchanged.
+Scope refinement implemented: two global settings, immediate autosave, integration
+only in the merge dialog, no repository preference types/storage/routes/UI or
+development-state migrations. Refinement validation passed: full `test:ai`
+(3,645 workspace tests and 47 script tests), lint/typechecks, and `build:web`.
+Headless Chromium verified two global controls, no Save button, automatic saves
+through the owning daemon, reload persistence, usable widths, and no page errors.
+Coverage figures above precede this simplification; coverage was not rerun.
+
+Remote routing is contract-tested; no live SSH host, packaged desktop, signing,
+release, or automatic review. Source-mode SDK wiring and lockfile pins unchanged.
 
 ## Completion learnings
 
-- Git's native rebase files provide restart recovery without a second operation
-  database. Recovery completes or aborts the rebase; integration still requires its
-  own confirmation afterward.
-- Canonical common-directory identity shares preferences across linked worktrees
-  while keeping separate clones and backend owners independent.
-- Explicit strategy flags must override unrelated Git configuration. Treat config
-  as an input only for the selected Git-configuration Pull policy.
-- Real histories expose unsafe fallbacks and shared-branch rewrites better than
-  command-array assertions. Pair those tests with mounted controls and a runtime
-  layout check: mounted tests did not catch collapsed select widths.
-- Nested settings defaults need per-snapshot copies. Defaults-only updates must
-  preserve repository overrides owned by the backend.
+- Follow existing settings autosave behavior. Keep operation choices in operation
+  dialogs; avoid building persistence layers beyond the agreed product scope.
+- Unreleased development schema changes do not require data migrations.
+- Native rebase files supply restart recovery without another operation database.
+  Recovery completes/aborts rebase; integration requires its own confirmation.
+- Canonical common-directory identity serializes linked-worktree Git mutations.
+- Explicit strategy flags override unrelated Git config. Consult configuration
+  for strategy policy only when Git-configuration Pull is selected.
+- Real histories catch unsafe fallbacks and shared-branch rewrites. Pair mounted
+  interaction tests with runtime layout checks and independent snapshot copies.

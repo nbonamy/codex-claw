@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { GitRebase } from './git-rebase';
 import type { GitOperationChoice } from '@workspace/core/contracts/git';
 import { realpath } from 'node:fs/promises';
-import { normalizeGitSettings, resolveGitPreferences, type GitSettings, type GitPullStrategy, type GitUpdateStrategy, type GitIntegrationStrategy } from '@workspace/core/git-preferences';
+import { normalizeGitSettings, type GitSettings, type GitPullStrategy, type GitUpdateStrategy, type GitIntegrationStrategy } from '@workspace/core/git-preferences';
 import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@workspace/core/contracts';
 import { AppError } from '@workspace/core/app-error';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
@@ -33,29 +33,20 @@ export class AgentGitService {
 
   setSettingsProvider(provider: () => GitSettings): void { this.settings = provider; }
 
-  async preferences(folder: string) {
+  preferences(): GitSettings { return { ...this.settings() }; }
+
+  async repositoryKey(folder: string): Promise<string> {
     const common = (await this.runGit(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).stdout.trim();
-    const repositoryKey = await realpath(resolve(folder, common));
-    const settings = this.settings();
-    return { repositoryKey, defaults: settings.defaults, overrides: settings.repositories[repositoryKey] ?? {}, effective: resolveGitPreferences(settings, repositoryKey) };
+    return realpath(resolve(folder, common));
   }
 
-  async validateBaseBranch(folder: string, branch: string): Promise<void> {
-    await this.runGit(folder, ['check-ref-format', '--branch', branch]);
-    await this.runGit(folder, ['show-ref', '--verify', `refs/heads/${branch}`]);
-  }
-
-  async guidance(folder: string): Promise<string> {
-    const { effective } = await this.preferences(folder);
+  guidance(): string {
+    const preferences = this.preferences();
     return [
-      `Git workflow preferences for this repository: Pull: ${effective.pull}; Update from base: ${effective.update}; Integrate into base: ${effective.integration}; Base: ${effective.baseBranch ?? 'auto-detect'}.`,
+      `Git workflow preferences: Pull: ${preferences.pull}; Update from base: ${preferences.update}. Integration strategy is chosen in the merge dialog.`,
       'Treat these as defaults. Explicit user directions and applicable repository instructions take precedence. Git configuration is consulted on the owning machine only when Pull is set to git-config; absent a configured strategy, use fast-forward only.',
       'Preferences grant no authority to commit, push, rewrite published history, stash, delete, or clean up. Confirm published-history rewrites separately; a force-with-lease push remains a separate explicitly authorized operation. Korus enforces its own Git actions, not arbitrary agent CLI commands.',
     ].join('\n');
-  }
-
-  private async effectivePreferences(folder: string) {
-    return Object.keys(this.settings().repositories).length ? (await this.preferences(folder)).effective : { ...this.settings().defaults, baseBranch: undefined as string | undefined };
   }
 
   constructor(
@@ -561,12 +552,6 @@ export class AgentGitService {
   }
 
   private async baseBranch(folder: string, branch: string, worktrees: Array<{ path: string; branch?: string }>, currentFolder: string, remote?: string): Promise<string | undefined> {
-    const override = (await this.effectivePreferences(folder)).baseBranch;
-    if (override) {
-      await this.runGit(folder, ['check-ref-format', '--branch', override]);
-      await this.runGit(folder, ['show-ref', '--verify', `refs/heads/${override}`]);
-      return override;
-    }
     if (remote) {
       const head = (await this.runGit(folder, ['symbolic-ref', '--quiet', '--short', `refs/remotes/${remote}/HEAD`]).catch(() => ({ stdout: '' }))).stdout.trim();
       const local = head.startsWith(`${remote}/`) ? head.slice(remote.length + 1) : '';
@@ -590,7 +575,7 @@ export class AgentGitService {
     await this.assertCommitRef(folder, baseBranch);
     this.assertExpected(current, baseBranch, choice);
     await new GitRebase(this.runGit).assertIdle(folder);
-    if ((choice.strategy ?? (await this.effectivePreferences(folder)).update) === 'rebase') {
+    if ((choice.strategy ?? this.settings().update) === 'rebase') {
       const conflicts = await new GitRebase(this.runGit).start(folder, baseBranch, choice.rewritePublished === true);
       return { baseBranch, branch: current.branch, conflicts };
     }
@@ -625,7 +610,7 @@ export class AgentGitService {
     await rebase.assertIdle(folder);
     this.assertExpected(current, current.upstream, choice);
     if (current.files.length > 0 && !allowDirty) throw new Error('Commit your changes before pulling.');
-    let strategy = choice.strategy ?? (await this.effectivePreferences(folder)).pull;
+    let strategy = choice.strategy ?? this.settings().pull;
     let noFF = false;
     let preserveMerges = false;
     if (strategy === 'git-config') {
@@ -655,7 +640,7 @@ export class AgentGitService {
   }
 
   async merge(folder: string, strategy: GitIntegrationStrategy | undefined, deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string, choice: GitOperationChoice = {}): Promise<AgentGitMergeResult> {
-    strategy ??= (await this.effectivePreferences(folder)).integration;
+    strategy ??= 'merge';
     const normalizedCommitMessage = commitMessage?.trim();
     if (strategy === 'squash' && !normalizedCommitMessage) throw new Error('Enter a squash commit message.');
     const current = await this.workflow(folder);
@@ -727,11 +712,6 @@ export class AgentGitService {
   }
 
   private async resolveBaseRef(folder: string, branch: string, remote?: string): Promise<string> {
-    const override = (await this.effectivePreferences(folder)).baseBranch;
-    if (override && override !== branch) {
-      await this.validateBaseBranch(folder, override);
-      return override;
-    }
     if (remote) {
       const remoteHead = (await this.runGit(folder, ['symbolic-ref', '--quiet', '--short', `refs/remotes/${remote}/HEAD`])
         .catch(() => ({ stdout: '' }))).stdout.trim();

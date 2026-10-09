@@ -16,7 +16,7 @@ import type {
 } from '@workspace/core/contracts';
 import type { DelegatedWorkReportPort } from '../agents/delegated-work-report-service';
 import type { AgentGitService } from './agent-git-service';
-import { normalizeGitRepositoryPreferences, normalizeGitSettings, pullStrategies, updateStrategies, integrationStrategies } from '@workspace/core/git-preferences';
+import { pullStrategies, updateStrategies, integrationStrategies } from '@workspace/core/git-preferences';
 import { resolve } from 'node:path';
 
 export type AgentGitRequest = {
@@ -53,11 +53,10 @@ export class AgentGitWorkflowService {
 
   async execute(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult | AgentGitPullResult> {
     const reads: AgentGitBackendMethod[] = [backendMethods.agentGitWorkflowGet, backendMethods.agentGitDiffGet, backendMethods.agentGitMessageGenerate];
-    if (reads.includes(request.method) || request.method === backendMethods.agentGitPreferencesUpdate) return this.executeRequest(request, agent);
+    if (reads.includes(request.method)) return this.executeRequest(request, agent);
     const folder = requireAgentFolder(agent);
     if (this.options.getSnapshot().agents.some(other => other.id !== agent.id && other.folder && resolve(other.folder) === resolve(folder) && (other.status.type === 'working' || other.status.type === 'awaitingInput'))) throw new Error('Another agent is using this worktree. Wait for it to finish before changing Git state.');
-    const preferences = await this.options.git.preferences?.(folder);
-    const key = preferences?.repositoryKey ?? folder;
+    const key = await this.options.git.repositoryKey?.(folder) ?? folder;
     if (this.busyRepositories.has(key)) throw new Error('Another Git operation is running in this repository.');
     this.busyRepositories.add(key);
     try { return await this.executeRequest(request, agent); }
@@ -67,18 +66,6 @@ export class AgentGitWorkflowService {
   private async executeRequest(request: AgentGitRequest, agent: Agent): Promise<AgentGitDiff | AgentGitMessageGenerationResult | AgentGitWorkflow | AgentGitUpdateFromBaseResult | AgentGitPullResult> {
     const { method, agentId, params } = request;
     switch (method) {
-      case backendMethods.agentGitPreferencesUpdate: {
-        const preferences = await this.options.git.preferences(requireAgentFolder(agent));
-        const input = requireRecord(params.input);
-        const normalized = normalizeGitRepositoryPreferences(input);
-        if (Object.keys(input).some(key => input[key] !== normalized[key as keyof typeof normalized])) throw new Error('Invalid Git preferences.');
-        if (normalized.baseBranch) await this.options.git.validateBaseBranch(requireAgentFolder(agent), normalized.baseBranch);
-        const settings = normalizeGitSettings(this.options.getSnapshot().general.git);
-        settings.repositories[preferences.repositoryKey] = normalized;
-        this.options.getSnapshot().general.git = settings;
-        await this.options.persistAndEmitSnapshot();
-        return this.workflow(agent);
-      }
       case backendMethods.agentGitRebaseRecover: {
         const input = requireConfirmed(params.input, 'Recovering a rebase');
         if (input.action !== 'continue' && input.action !== 'abort') throw new Error('Choose Continue or Abort.');
@@ -210,7 +197,7 @@ export class AgentGitWorkflowService {
     }
     return {
       ...workflow,
-      ...(this.options.git.preferences ? { preferences: await this.options.git.preferences(requireAgentFolder(agent)) } : {}),
+      ...(this.options.git.preferences ? { preferences: this.options.git.preferences() } : {}),
       githubConnected,
       ...(existingPullRequest ? { existingPullRequest } : {}),
       ...(githubError ? { githubError } : {}),
@@ -308,7 +295,7 @@ export class AgentGitWorkflowService {
     const folder = requireAgentFolder(agent);
     const input = requireConfirmed(params.input, 'Merging a branch');
     const choice = operationChoice(input, integrationStrategies);
-    const strategy = choice.strategy ?? (await this.options.git.preferences?.(folder))?.effective.integration ?? 'merge';
+    const strategy = choice.strategy ?? 'merge';
     const commitMessage = strategy === 'squash' ? requireString(input.commitMessage, 'commitMessage') : undefined;
     const deleteWorktree = input.deleteWorktree === true;
     const sourceWorkflow = input.reportBack === true ? await this.workflow(agent) : null;

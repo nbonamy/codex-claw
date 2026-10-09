@@ -70,7 +70,6 @@ const requestTimeoutByMethod = {
   [backendMethods.workspaceFolderValidate]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitDiffGet]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitWorkflowGet]: IO_REQUEST_TIMEOUT_MS,
-  [backendMethods.agentGitPreferencesUpdate]: IO_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitRebaseRecover]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitMessageGenerate]: LONG_RUNNING_REQUEST_TIMEOUT_MS,
   [backendMethods.agentGitStage]: IO_REQUEST_TIMEOUT_MS,

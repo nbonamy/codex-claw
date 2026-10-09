@@ -30,7 +30,6 @@ describe('agent Git IPC', () => {
   });
 
   it.each([
-    [ipcChannels.updateAgentGitPreferences, backendMethods.agentGitPreferencesUpdate, [{ pull: 'rebase' }], { preferences: { effective: { pull: 'rebase' } } }],
     [ipcChannels.recoverAgentGitRebase, backendMethods.agentGitRebaseRecover, [{ action: 'abort', confirmed: true }], { branch: 'feature' }],
     [ipcChannels.getAgentGitWorkflow, backendMethods.agentGitWorkflowGet, [], { repository: 'repo' }],
     [ipcChannels.generateAgentGitMessage, backendMethods.agentGitMessageGenerate, [{ kind: 'commit' }], { kind: 'commit', message: 'Subject' }],

@@ -14,7 +14,6 @@ import {
 
 describe('AppBackendServer', () => {
   it.each([
-    ['agent/git/preferences/update', { pull: 'rebase', baseBranch: 'release' }],
     ['agent/git/rebase/recover', { action: 'abort', confirmed: true }],
   ])('routes %s to the owning daemon without local repository access', async (method, input) => {
     const snapshot = createTestSnapshot();
@@ -22,7 +21,7 @@ describe('AppBackendServer', () => {
     snapshot.remoteConnections.connections = [connection];
     snapshot.teams = [{ id: 'team-pointer', name: 'Remote', remoteConnectionId: connection.id, remoteTeamId: 'team-remote', agentIds: [] }];
     const remoteSnapshot = createRemoteTeamSnapshot([createRemoteAgent()]);
-    const result = { repository: 'remote/repo', branch: 'work', preferences: { effective: { pull: 'rebase' } } };
+    const result = { repository: 'remote/repo', branch: 'work', preferences: { pull: 'rebase', update: 'merge' } };
     const remoteClients = { request: vi.fn().mockResolvedValueOnce({ snapshot: remoteSnapshot, lastEventSeq: 0, clientState: { sourceFolderPath: '', shouldPreventDisplaySleep: false } }).mockResolvedValue(result), close: vi.fn() };
     const localPreferences = vi.fn();
     const server = new AppBackendServer({ version: 'test', snapshot, remoteClients: remoteClients as never, agentGitService: { preferences: localPreferences } as never });

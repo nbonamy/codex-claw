@@ -3,7 +3,7 @@
     <template #banner>
       <SettingsIntro kind="git" :title="$t('surface.instructionSettings.gitIntroTitle')" :description="$t('surface.instructionSettings.gitIntroDescription')" />
     </template>
-    <SettingsGitWorkflowSection :settings="settings" :agents="agents" :update-settings="updateSettings" />
+    <SettingsGitWorkflowSection :settings="settings" :update-settings="updateSettings" />
     <FormSection
       class="settings-instructions__worktree-section"
       :title="$t('surface.instructionSettings.worktrees')"
@@ -55,7 +55,6 @@ import SettingsTextareaField from './SettingsTextareaField.vue';
 
 const props = defineProps<{
   settings: AppGeneralSettings;
-  agents?: import('@workspace/core/contracts').Agent[];
   updateSettings?: (input: UpdateSettingsInput) => Promise<void>;
 }>();
 type Field = 'commitMessageInstructions' | 'pullRequestInstructions';

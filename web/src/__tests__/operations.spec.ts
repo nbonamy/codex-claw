@@ -15,7 +15,6 @@ it('routes document saves and layout changes through client-scoped operations', 
 describe(`${product.name} web operations`, () => {
   it.each([
     ['updateAgentGitBranchFromBase', backendMethods.agentGitUpdateFromBase, { strategy: 'rebase', expectedTarget: 'release', confirmed: true, rewritePublished: true }],
-    ['updateAgentGitPreferences', backendMethods.agentGitPreferencesUpdate, { pull: 'ff-only', baseBranch: 'release' }],
     ['recoverAgentGitRebase', backendMethods.agentGitRebaseRecover, { action: 'abort', confirmed: true }],
   ])('routes %s with repository identity and operation consent intact', async (operation, method, input) => {
     const request = vi.fn().mockResolvedValue({ branch: 'work' });

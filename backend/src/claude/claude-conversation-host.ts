@@ -108,7 +108,7 @@ type ClaudeBackendDriverOptions = {
   homeDir?: string;
   pluginSettings?: () => AppPluginSettings;
   celebrationsEnabled?: () => boolean;
-  additionalDeveloperInstructions?: (agent: Agent) => string | undefined | Promise<string | undefined>;
+  additionalDeveloperInstructions?: (agent: Agent) => string | undefined;
 };
 
 type ClaudeReviewTurnConfiguration = {
@@ -331,8 +331,6 @@ export class ClaudeConversationHost implements AgentBackendDriver {
       this.liveSessionIdsByAgentId.delete(agent.id);
     }
     let activeTurn: ActiveClaudeTurn | null = null;
-    const instructions = this.driverOptions.additionalDeveloperInstructions?.(agent);
-    const developerInstructions = instructions instanceof Promise ? await instructions : instructions;
     const started = new Promise<BackendSendResult>((resolve, reject) => {
       const defaults = claudeTurnParams(
         agent,
@@ -344,7 +342,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
         this.driverOptions.pluginSettings?.(),
         {
           celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
-          developerInstructions,
+          developerInstructions: this.driverOptions.additionalDeveloperInstructions?.(agent),
         },
       );
       const turnParams: ClaudeTurnParams = review
@@ -872,7 +870,7 @@ export class ClaudeConversationHost implements AgentBackendDriver {
           this.driverOptions.pluginSettings?.(),
           {
             celebrationsEnabled: this.driverOptions.celebrationsEnabled?.(),
-            developerInstructions: await this.driverOptions.additionalDeveloperInstructions?.(agent),
+            developerInstructions: this.driverOptions.additionalDeveloperInstructions?.(agent),
           },
         );
         const { prompt: _prompt, attachments: _attachments, ...params } = turnParams;

@@ -72,10 +72,6 @@
     </template>
   </div>
 
-  <FormDialog v-if="gitSettingsOpen" v-model="gitSettingsOpen" :title="$t('gitWorkflow.settings')" :subtitle="workflow?.repository">
-    <SettingsGitWorkflowSection :agent-id="agent.id" />
-    <template #footer><button class="app-button app-button--tertiary" type="button" @click="gitSettingsOpen = false; loadWorkflow()">{{ $t('gitWorkflow.close') }}</button></template>
-  </FormDialog>
   <FormDialog
     v-if="revertDialogOpen"
     v-model="revertDialogOpen"
@@ -397,7 +393,6 @@ import FormDialog from '../shared/dialog/FormDialog.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
 import GitStrategySelect from './GitStrategySelect.vue';
-import SettingsGitWorkflowSection from './SettingsGitWorkflowSection.vue';
 import type { GitIntegrationStrategy, GitPullStrategy } from '@workspace/core/git-preferences';
 import { appApi } from '../platform-api';
 
@@ -445,7 +440,6 @@ const pullRequestBody = ref('');
 const mergeStrategy = ref<GitIntegrationStrategy>('merge');
 const updateStrategy = ref<GitPullStrategy>('merge');
 const rewritePublished = ref(false);
-const gitSettingsOpen = ref(false);
 const squashCommitMessage = ref('');
 const deleteBranch = ref(false);
 const deleteWorktree = ref(false);
@@ -647,7 +641,6 @@ const menuItems = computed<AppMenuItem[]>(() => [
   ...(updateEnabled.value ? [{ id: 'update-from-base', type: 'action' as const, label: translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }), icon: RefreshIcon }] : []),
   { id: 'merge', type: 'action', label: translate('surface.gitWorkflowControl.merge'), icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
   { id: 'create-pr', type: 'action', label: translate('surface.gitWorkflowControl.createPR'), icon: GitForkIcon, disabled: !prEnabled.value },
-  { id: 'git-settings', type: 'action', label: translate('gitWorkflow.settings') },
 ]);
 
 watch(commitDialogOpen, (open) => {
@@ -716,7 +709,6 @@ onBeforeUnmount(() => {
 });
 watch([() => props.agent.id, () => props.agent.folder], () => {
   revertDialogOpen.value = false;
-  gitSettingsOpen.value = false;
   void loadWorkflow({ reset: true });
 });
 watch(() => props.gitStatus?.updatedAt, () => {
@@ -784,7 +776,6 @@ function runFirstEnabled(): void { if (firstEnabledAction.value) selectAction(fi
 async function selectAction(action: string): Promise<void> {
   if (busy.value) return;
   menuOpen.value = false;
-  if (action === 'git-settings') { gitSettingsOpen.value = true; return; }
   if (action === 'revert' && props.revertChanges && commitEnabled.value) {
     revertIncludeUntracked.value = false;
     revertError.value = null;
@@ -808,7 +799,7 @@ async function selectAction(action: string): Promise<void> {
     busy.value = true;
     try {
       if (await refreshMergeWorkflow()) {
-        mergeStrategy.value = workflow.value?.preferences?.effective.integration ?? 'merge';
+        mergeStrategy.value = 'merge';
         rewritePublished.value = false;
         prepareMerge();
       }
@@ -820,7 +811,7 @@ async function selectAction(action: string): Promise<void> {
     resetUpdateOperation();
     updateSource.value = action === 'pull' ? 'upstream' : 'base';
     updateDialogOpen.value = true;
-    updateStrategy.value = (updateSource.value === 'upstream' ? workflow.value?.preferences?.effective.pull : workflow.value?.preferences?.effective.update) ?? 'merge';
+    updateStrategy.value = (updateSource.value === 'upstream' ? workflow.value?.preferences?.pull : workflow.value?.preferences?.update) ?? 'merge';
     rewritePublished.value = false;
     updateOperation.value = { status: workflow.value?.files.length ? 'confirmingDirty' : 'confirmingRequired' };
   }
@@ -1251,7 +1242,7 @@ function clearMergeSuccessTimer(): void {
 }
 function resetUpdateOperation(): void {
   updateSource.value = 'base';
-  updateStrategy.value = workflow.value?.preferences?.effective.update ?? 'merge';
+  updateStrategy.value = workflow.value?.preferences?.update ?? 'merge';
   rewritePublished.value = false;
   clearUpdateSuccessTimer();
   resumeMergeAfterUpdate.value = false;

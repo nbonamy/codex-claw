@@ -69,17 +69,14 @@ describe('merge cleanup with real Git', () => {
       expect((await git(repo, ['branch', '--list', 'feature'])).stdout).toBe('');
     } finally { await rm(root, { recursive: true, force: true }); }
   });
-  it.each(['merge', 'squash', 'rebase-ff', 'ff-only'] as const)('integrates with %s into an explicit nonstandard base without pushing or cleanup', async strategy => {
+  it.each(['merge', 'squash', 'rebase-ff', 'ff-only'] as const)('integrates with %s into an auto-detected nonstandard base without pushing or cleanup', async strategy => {
     const { root, repo, feature } = await fixture();
     try {
       await git(repo, ['branch', '-m', 'release']);
       const service = new AgentGitService(() => new Date(), git);
-      const { repositoryKey } = await service.preferences(feature);
-      service.setSettingsProvider(() => ({ defaults: { pull: 'git-config', update: 'merge', integration: strategy }, repositories: { [repositoryKey]: { baseBranch: 'release' } } }));
       expect((await service.workflow(feature)).baseBranch).toBe('release');
-      expect((await service.diff(feature, { type: 'branch' })).target).toStrictEqual({ type: 'branch', baseRef: 'release' });
       const remote = (await git(feature, ['rev-parse', 'origin/feature'])).stdout;
-      await service.merge(feature, undefined, false, false, 'squashed');
+      await service.merge(feature, strategy, false, false, 'squashed');
       expect(await readFile(join(repo, 'feature.txt'), 'utf8')).toBe('merged content\n');
       expect((await git(repo, ['rev-list', '--parents', '-n', '1', 'HEAD'])).stdout.trim().split(' ')).toHaveLength(strategy === 'merge' ? 3 : 2);
       expect((await git(feature, ['rev-parse', 'origin/feature'])).stdout).toBe(remote);
@@ -148,18 +145,19 @@ describe('merge cleanup with real Git', () => {
       expect((await git(feature, ['stash', 'list'])).stdout).toBe('');
     } finally { await rm(root, { recursive: true, force: true }); }
   });
-  it('shares overrides between linked worktrees and isolates separate clones and owning services', async () => {
+  it('uses the same global preferences for every repository on its owning backend', async () => {
     const { root, repo, feature } = await fixture();
     try {
       const service = new AgentGitService(() => new Date(), git);
-      const { repositoryKey } = await service.preferences(repo);
-      service.setSettingsProvider(() => ({ defaults: { pull: 'merge', update: 'merge', integration: 'merge' }, repositories: { [repositoryKey]: { pull: 'rebase' } } }));
-      expect(await service.preferences(feature)).toStrictEqual(await service.preferences(repo));
-      await git(root, ['clone', repo, 'clone']);
-      expect((await service.preferences(join(root, 'clone'))).effective.pull).toBe('merge');
-      expect((await new AgentGitService(() => new Date(), git).preferences(repo)).effective.pull).toBe('git-config');
+      service.setSettingsProvider(() => ({ pull: 'rebase', update: 'merge' }));
+      expect(service.preferences()).toStrictEqual({ pull: 'rebase', update: 'merge' });
+      expect(await service.repositoryKey(feature)).toBe(await service.repositoryKey(repo));
+      await git(root, ['clone', repo, join(root, 'clone')]);
+      expect(await service.repositoryKey(join(root, 'clone'))).not.toBe(await service.repositoryKey(repo));
+      expect(new AgentGitService(() => new Date(), git).preferences().pull).toBe('git-config');
     } finally { await rm(root, { recursive: true, force: true }); }
   });
+
   it.each(['merge', 'squash'] as const)('cleans up a %s when the tracked remote branch is behind', async (strategy) => {
     const { root, repo, feature } = await fixture();
     try {

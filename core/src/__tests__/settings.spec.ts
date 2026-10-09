@@ -3,11 +3,11 @@ import { createEmptySnapshot } from '../snapshot';
 import { defaultAppshotSettings, defaultGeneralSettings, defaultPluginSettings, defaultSourceFolderState, defaultThemeSettings, normalizeAppshotSettings, normalizeGeneralSettings, normalizePluginSettings, normalizeSourceFolderState, normalizeThemeSettings, updateSettingsInSnapshot } from '../settings';
 
 describe('settings contracts', () => {
-  it('updates app Git defaults without replacing repository overrides', () => {
+  it('updates one global Git preference without replacing the other', () => {
     const snapshot = createEmptySnapshot();
-    snapshot.general.git!.repositories['/repo/.git'] = { update: 'rebase' };
-    updateSettingsInSnapshot(snapshot, { general: { git: { defaults: { pull: 'ff-only', update: 'merge', integration: 'squash' } } } });
-    expect(snapshot.general.git).toStrictEqual({ defaults: { pull: 'ff-only', update: 'merge', integration: 'squash' }, repositories: { '/repo/.git': { update: 'rebase' } } });
+    snapshot.general.git = { pull: 'rebase', update: 'merge' };
+    updateSettingsInSnapshot(snapshot, { general: { git: { update: 'rebase' } } });
+    expect(snapshot.general.git).toStrictEqual({ pull: 'rebase', update: 'rebase' });
   });
   it('defaults follow-ups to queue and retains only supported behavior choices', () => {
     expect(normalizeGeneralSettings({}).followUpBehavior).toBe('queue');
@@ -33,7 +33,7 @@ describe('settings contracts', () => {
       appshots: defaultAppshotSettings,
       plugins: defaultPluginSettings,
     })).toStrictEqual({
-      git: { defaults: { pull: 'git-config', update: 'merge', integration: 'merge' }, repositories: {} },
+      git: { pull: 'git-config', update: 'merge' },
       commitMessageInstructions: '',
       pullRequestInstructions: '',
       codexBinaryPath: '/opt/homebrew/bin/codex',
@@ -135,7 +135,7 @@ describe('settings contracts', () => {
     });
 
     expect(snapshot.general).toStrictEqual({
-      git: { defaults: { pull: 'git-config', update: 'merge', integration: 'merge' }, repositories: {} },
+      git: { pull: 'git-config', update: 'merge' },
       commitMessageInstructions: '',
       pullRequestInstructions: '',
       codexBinaryPath: '',

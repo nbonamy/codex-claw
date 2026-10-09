@@ -31,7 +31,6 @@
         />
         <SettingsInstructionsPanel
           v-else-if="activeTab === 'git'"
-          :agents="agents"
           :settings="generalSettings"
           :update-settings="updateSettings"
         />
@@ -165,7 +164,6 @@ withDefaults(defineProps<{
   connectClaude?: () => Promise<void>;
   cancelCodexLogin?: () => Promise<void>;
   activeTab?: SettingsTab;
-  agents?: import('@workspace/core/contracts').Agent[];
   settings: AppThemeSettings;
   generalSettings?: AppGeneralSettings;
   sourceFolder?: SourceFolderState;

@@ -115,7 +115,6 @@
       <BackendConnectionBanner :connection-state="connectionState" />
       <SettingsView
         v-if="settingsVisible"
-        :agents="snapshot.agents"
         :codex-connected="!debugMissingEngines && codexConnected"
         :provider-connections="displayProviderConnections"
         :refresh-provider="refreshProvider"
