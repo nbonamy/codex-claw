@@ -1150,6 +1150,31 @@ describe('AppShell dialogs and commands', () => {
     expect(wrapper.emitted('send-agent-prompt')).toBeUndefined();
   });
 
+  it('opens the requesting agent simulator pane without switching the selected conversation', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    const mobileSimulator = vi.fn().mockResolvedValue({ attachment: null, catalog: { devices: [], setup: [] } });
+    window.app = {
+      onAppCommand: vi.fn(next => { listener = next; return () => undefined; }),
+      mobileSimulator,
+    } as Partial<AppApi> as AppApi;
+    const snapshot = createInitialSnapshot();
+    const wrapper = mountRealShell({ snapshot });
+    listener({ type: 'open-simulator', agentId: 'agent-jesse' });
+    await flushPromises();
+    expect(mobileSimulator.mock.calls.every(([agentId]) => agentId === 'agent-jesse')).toBe(true);
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    listener({ type: 'open-simulator', agentId: 'agent-dina' });
+    await flushPromises();
+    expect(wrapper.get('[aria-label="Mobile simulator"]').text()).toContain('Choose a simulator');
+    expect(mobileSimulator).toHaveBeenCalledWith('agent-dina', { action: 'list' });
+    expect(wrapper.emitted('select-agent')).toBeUndefined();
+    expect(wrapper.findAll('[aria-label="Mobile simulator"]')).toHaveLength(2);
+    listener({ type: 'close-simulator', agentId: 'agent-dina' });
+    await flushPromises();
+    expect(wrapper.findAll('[aria-label="Mobile simulator"]')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   it('opens a model-requested URL in the active agent browser workspace', async () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

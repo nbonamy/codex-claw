@@ -927,6 +927,7 @@ export const messages = {
               failed: 'Failed broadcasting message',
               running: 'Broadcasting message',
             },
+            simulator: { running: 'Using simulator', completed: 'Used simulator', failed: 'Simulator action failed' },
             browserClick: {
               completed: 'Clicked page',
               failed: 'Failed clicking page',

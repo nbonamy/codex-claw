@@ -1,3 +1,5 @@
+import mobileRelease from '../mobile-simulator-release.json' with { type: 'json' };
+import { checkPackagedMobileSimulator } from './mobile-simulator-check.mjs';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,6 +24,7 @@ try {
   if (!daemonVersion.includes(version)) throw new Error('Incorrect bundled daemon version.');
   if (fs.existsSync(path.join(resources, 'codex'))) throw new Error('Desktop package must not contain a bundled Codex runtime.');
   await checkPackagedDaemon(node, path.join(resources, 'daemon', product.daemonName), env, version);
+  if (process.platform === 'darwin' && process.arch === mobileRelease.arch) checkPackagedMobileSimulator(resources, mobileRelease, env);
   if (process.platform === 'darwin' && process.env.APP_SKIP_SIGNING !== '1') {
     const bundle = path.join(app, `${product.name}.app`);
     execFileSync('codesign', ['--verify', '--deep', '--strict', bundle], { stdio: 'inherit' });

@@ -7,6 +7,7 @@ type ToolPhase = 'completed' | 'failed' | 'running';
 type AgentNameResolver = (identifier: string) => string | undefined;
 
 const TOOL_KEYS: Record<string, string> = {
+  simulator: 'simulator',
   'read-skill': 'readSkill',
   'wait-tasks': 'waitTasks',
   'complete-task': 'completeTask',

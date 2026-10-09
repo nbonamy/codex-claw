@@ -99,7 +99,7 @@ jobs:
       - name: Unsigned Windows or Linux build
         if: runner.os != 'macOS'
         run: npm run make:electron
-      - name: Exercise packaged native runtimes
+      - name: Exercise packaged native runtimes and bundled iOS companion
         run: node scripts/smoke-desktop.mjs
       - name: Collect installers
         run: node scripts/release-artifacts.mjs ${{ matrix.target }}

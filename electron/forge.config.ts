@@ -9,6 +9,7 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import fs from 'node:fs';
 import path from 'node:path';
 import desktopPackage from './package.json';
 import { signDarwinBinaries } from './build/sign-binaries';
@@ -38,6 +39,10 @@ const extraResource = [
   'resources/daemon',
   ...(process.platform === 'darwin' ? [`.computer-use/${product.name} Computer Use.app`] : []),
   ...(process.platform === 'darwin' ? ['.tts/app-tts-helper'] : []),
+  // Staged only on hosts with a pinned companion (see scripts/prepare-mobile-simulator.mjs).
+  ...(process.platform === 'darwin' && fs.existsSync(path.resolve(__dirname, '.mobile-simulator/mobile-simulator'))
+    ? ['.mobile-simulator/mobile-simulator']
+    : []),
 ];
 
 // osx special configuration

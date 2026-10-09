@@ -42,6 +42,7 @@
                   <IconChecklist v-if="tab === 'codeReview'" aria-hidden="true" />
                   <IconSitemap v-else-if="tab === 'visualize'" aria-hidden="true" />
                   <FileDiffIcon v-else-if="tab === 'review'" aria-hidden="true" />
+                  <IconDeviceMobile v-else-if="tab === 'simulator'" aria-hidden="true" />
                   <IconWorld v-else-if="tab === 'browser' || isRightWorkspaceBrowserTab(tab)" aria-hidden="true" />
                   <FoldersIcon v-else-if="tab === 'files'" aria-hidden="true" />
                   <FileTextIcon v-else-if="tab === 'plan'" aria-hidden="true" />
@@ -158,6 +159,7 @@
         <span>{{ $t('surface.rightWorkspacePanel.changes') }}</span>
         <kbd>{{ workspaceShortcuts.changes }}</kbd>
       </button>
+      <button v-if="simulatorAvailable" type="button" @click="emit('openTab', 'simulator')"><IconDeviceMobile aria-hidden="true" /><span>{{ $t('surface.mobileSimulator.tab') }}</span></button>
       <button v-if="browserAvailable" type="button" @click="emit('openTab', 'browser')">
         <IconWorld aria-hidden="true" />
         <span>{{ $t('surface.rightWorkspacePanel.browser') }}</span>
@@ -222,6 +224,7 @@
       :visible="visible && activeTab === 'backlog'"
     />
 
+    <MobileSimulatorPanel v-if="simulatorAvailable && tabs.includes('simulator')" v-show="activeTab === 'simulator'" :agent-id="agent.id" :visible="activeTab === 'simulator' && visible" />
     <BrowserPanel
       v-if="browserAvailable && tabs.includes('browser')"
       :key="browserVisualization ? 'visualization' : 'browser'"
@@ -368,7 +371,7 @@ async function saveCanvas(agentId: string, input: SaveCanvasInput) {
 import { translate } from '../i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
+import { IconDeviceMobile, IconChecklist, IconChevronLeft, IconChevronRight, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconLego, IconSitemap, IconWorld } from '@tabler/icons-vue';
 import type { Agent, AgentFileSearchItem, AgentGitStatus, AgentSubagentTree, AppSnapshot, OpenInApplication, OpenInApplicationCatalog, RendererMessage, WorkBacklogAssignment, WorkItem } from '@workspace/core/contracts';
 import type { CodexConversationLink, CodexConversationVisualization } from '@codex-app-sdk/vue';
 import { ArrowUpRightIcon, BacklogIcon, CircleXIcon, CodeIcon, CopyIcon, DownloadIcon, FileDiffIcon, FileTextIcon, FoldersIcon, PhotoIcon, PlusIcon, X } from '../shared/icons/app-icons';
@@ -378,6 +381,8 @@ import type { AppMenuItem } from '../shared/menu/app-menu';
 import OpenInControl from '../shared/OpenInControl.vue';
 import { effectiveOpenInApplication } from '../shared/open-in';
 import BrowserPanel from './BrowserPanel.vue';
+import MobileSimulatorPanel from './MobileSimulatorPanel.vue';
+
 import WorkspaceLinkDropTarget from './WorkspaceLinkDropTarget.vue';
 import { externalBrowserUrl, openInExternalBrowser } from './browser-external';
 import CodeReviewPanel from './CodeReviewPanel.vue';
@@ -548,10 +553,12 @@ const activeProjectFilePath = computed(() => {
   if (!filePath || isAbsoluteFilePath(filePath)) return null;
   return filePath;
 });
+const simulatorAvailable = Boolean(appApi?.mobileSimulator);
 const addMenuItems = computed<AppMenuItem[]>(() => [
   { id: 'codeReview', type: 'action', label: translate('surface.rightWorkspacePanel.review'), icon: IconChecklist },
   { id: 'visualize', type: 'action', label: translate('surface.rightWorkspacePanel.visualize'), icon: IconSitemap },
   { id: 'review', type: 'action', label: translate('surface.rightWorkspacePanel.changes'), icon: FileDiffIcon },
+  ...(simulatorAvailable ? [{ id: 'simulator', type: 'action', label: translate('surface.mobileSimulator.tab'), icon: IconDeviceMobile } satisfies AppMenuItem] : []),
   ...(props.browserAvailable ? [{ id: 'browser', type: 'action', label: translate('surface.rightWorkspacePanel.browser'), icon: IconWorld } satisfies AppMenuItem] : []),
   { id: 'files', type: 'action', label: translate('surface.rightWorkspacePanel.files'), icon: FoldersIcon },
 ]);
@@ -658,6 +665,7 @@ function stopFilesPaneResize(): void {
 }
 
 function tabLabel(tab: RightWorkspaceTab): string {
+  if (tab === 'simulator') return translate('surface.mobileSimulator.tab');
   if (tab === 'backlog') return translate('surface.rightWorkspacePanel.backlog');
   if (tab === 'codeReview') return translate('surface.rightWorkspacePanel.review');
   if (tab === 'visualize') return translate('surface.rightWorkspacePanel.visualize');
@@ -808,7 +816,7 @@ function sourceFilePanel(tab: RightWorkspaceFileTab): SidePanelSourceState | nul
 
 function openTabFromMenu(tab: string): void {
   addMenuOpen.value = false;
-  if (tab === 'backlog' || tab === 'codeReview' || tab === 'visualize' || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
+  if ((tab === 'simulator' && simulatorAvailable) || tab === 'backlog' || tab === 'codeReview' || tab === 'visualize' || tab === 'review' || tab === 'files' || (tab === 'browser' && props.browserAvailable)) {
     emit('openTab', tab);
   }
 }

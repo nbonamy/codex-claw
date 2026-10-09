@@ -96,6 +96,14 @@ describe('createClientRequestHandlers', () => {
     expect(openExternal).toHaveBeenCalledWith('https://example.com');
   });
 
+  it('routes simulator actions to the authenticated agent desktop port and rejects malformed envelopes', async () => {
+    const mobileSimulator = vi.fn().mockResolvedValue({ attachment: null });
+    const handlers = createClientRequestHandlers({ openExternal: vi.fn(), getSystemPermissionsStatus: vi.fn(), openAccessibilitySettings: vi.fn(), computerUseOptions, mobileSimulator });
+    await expect(handlers['client/mobileSimulator/execute']?.({ agentId: 'agent-dina', input: { action: 'status' } })).resolves.toStrictEqual({ attachment: null });
+    expect(mobileSimulator).toHaveBeenCalledWith('agent-dina', { action: 'status' });
+    expect(() => handlers['client/mobileSimulator/execute']?.({ input: { action: 'status' } })).toThrow('agentId');
+  });
+
   it('opens the agent-scoped in-app browser through the desktop port', async () => {
     const browserState = {
       url: 'https://example.com/',

@@ -1,6 +1,8 @@
 import type { AppCommand, AppApi, MainToRendererEvent } from './contracts';
 
 export const ipcChannels = {
+  mobileSimulator: 'mobile:execute',
+  mobileSimulatorView: 'mobile:view',
   getDocumentWorkspaces: "document:getDocumentWorkspaces",
   updateDocumentWorkspace: "document:updateDocumentWorkspace",
   readWorkspaceDocument: "document:readWorkspaceDocument",
@@ -196,7 +198,7 @@ type IpcRequestFor<Method> = Method extends (...args: infer Arguments) => infer 
 export type AppIpcRequests = {
   [Name in keyof AppIpcRequestApi as Name extends keyof typeof ipcChannels
     ? (typeof ipcChannels)[Name]
-    : never]: IpcRequestFor<AppIpcRequestApi[Name]>;
+    : never]: IpcRequestFor<NonNullable<AppIpcRequestApi[Name]>>;
 };
 
 export type AppIpcEvents = {
