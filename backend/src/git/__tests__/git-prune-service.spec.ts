@@ -182,6 +182,25 @@ describe('repository pruning with real Git', () => {
     });
   });
 
+  it('counts a collapsed ignored directory once instead of listing every file', async () => {
+    await fixture(async ({ repo, worktree, service }) => {
+      await writeFile(join(repo, '.git', 'info', 'exclude'), 'deps/\n');
+      await mkdir(join(worktree, 'deps'));
+      for (const name of ['a', 'b', 'c']) await writeFile(join(worktree, 'deps', name), name);
+      const local = (await service.inventory(repo, [])).groups.find(group => group.branch === 'feat/done')!.local!;
+      expect(local).toMatchObject({ blocked: 'changes', changedFiles: 1 });
+    });
+  });
+
+  it('protects only the default branch of each remote', async () => {
+    await fixture(async ({ repo, service }) => {
+      await git(repo, ['push', 'origin', 'main:develop']);
+      const names = targets(await service.inventory(repo, [])).filter(item => item.kind === 'remote').map(item => item.name);
+      expect(names).toContain('origin/develop');
+      expect(names).not.toContain('origin/main');
+    });
+  });
+
   it('revalidates branch heads and live remote heads rather than trusting stale tracking refs', async () => {
     await fixture(async ({ repo, remote, service }) => {
       const inventory = await service.inventory(repo, []);

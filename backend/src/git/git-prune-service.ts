@@ -8,6 +8,9 @@ type Owner = { folder: string; name: string };
 type Worktree = { path: string; branch?: string; locked: boolean; prunable: boolean };
 type Candidate = GitPruneTarget & { remoteUrl?: string };
 
+// Ignored directories stay collapsed (`!! node_modules/`); expanding them overflows the Git output buffer.
+const WORKTREE_STATUS_ARGS = ['status', '--porcelain=v1', '-z', '--ignored'];
+
 /** Inventory and deletion share one safety policy; the client never supplies a path or Git command. */
 export class GitPruneService {
   private readonly running = new Set<string>();
@@ -69,7 +72,7 @@ export class GitPruneService {
               if (target.worktreeMissing) {
                 if (!await missingPath(target.worktree)) throw new Error('Worktree was restored.');
               } else {
-                const status = await this.git(path, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored']);
+                const status = await this.git(path, WORKTREE_STATUS_ARGS);
                 if (status.stdout && input.force !== true) throw new Error('Worktree has files.');
               }
               await this.git(folder, ['worktree', 'remove', ...(input.force === true ? ['--force', '--force'] : []), '--', target.worktree]);
@@ -105,7 +108,7 @@ export class GitPruneService {
     const path = await canonical(tree.path);
     const usedBy = (await Promise.all(owners.map(async owner => ({ ...owner, folder: await canonical(owner.folder) }))))
       .filter(owner => contains(path, owner.folder)).map(owner => `${owner.folder}:${owner.name}`).sort();
-    const files = missing ? '' : status ?? (await this.git(tree.path, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored'])).stdout;
+    const files = missing ? '' : status ?? (await this.git(tree.path, WORKTREE_STATUS_ARGS)).stdout;
     return revision([String(tree.locked), files, ...usedBy]);
   }
 
@@ -125,7 +128,7 @@ export class GitPruneService {
     const baseBranch = [defaultBranch, 'main', 'master'].find(name => name && localRefs.some(ref => ref.branch === name));
     if (!baseBranch) throw new Error('No local default branch is available to check merged branches.');
     const baseSha = localRefs.find(ref => ref.branch === baseBranch)!.sha;
-    const hidden = new Set(['main', baseBranch, defaultBranch]);
+    const hidden = new Set([baseBranch, defaultBranch]);
     const worktrees = parseWorktrees(trees.stdout);
     const rootPath = await canonical(root.stdout.trim());
     if (worktrees[0]?.branch) hidden.add(worktrees[0].branch);
@@ -154,7 +157,7 @@ export class GitPruneService {
         try {
           // Include ignored files in the explicit discard warning.
           if (!worktreeMissing) {
-            const status = await this.git(tree.path, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored']);
+            const status = await this.git(tree.path, WORKTREE_STATUS_ARGS);
             statusText = status.stdout;
             changedFiles = status.stdout.split('\0').filter(Boolean).length;
             if (changedFiles) blocked = 'changes';

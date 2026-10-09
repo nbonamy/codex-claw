@@ -232,7 +232,7 @@ clears or changes it, Korus never re-detects.
   still points at the recorded PR head (a closed PR keeps its remote branch).
 - Repository pruning belongs to `daemon`. A local selection bundles its branch
   and linked worktree; remote refs are independent opt-ins. The inventory excludes
-  integration branches and the primary checkout. The agent menu is an entry point,
+  the default branch (per remote, as reported by that remote) and the primary checkout. The agent menu is an entry point,
   not a scope restriction: inventory and deletion run from the primary checkout,
   even when the invoking agent uses a selected worktree. Agent ownership, locks,
   local files (including ignored files), and unmerged commits require explicit
