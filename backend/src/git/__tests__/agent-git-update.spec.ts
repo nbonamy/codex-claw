@@ -84,9 +84,21 @@ describe('update strategies with real Git', () => {
       await git(base, ['commit', '--allow-empty', '-m', 'advance']);
       await writeFile(join(work, 'file.txt'), 'keep this');
       await git(work, ['config', 'rebase.autoStash', 'true']);
-      await expect(service.updateFromBase(work, true)).rejects.toThrow();
+      await expect(service.updateFromBase(work, true)).rejects.toThrow('before updating with rebase');
       expect(await readFile(join(work, 'file.txt'), 'utf8')).toBe('keep this');
       expect((await git(work, ['stash', 'list'])).stdout).toBe('');
+    });
+  });
+
+  it('rebases over untracked files when dirty updates are allowed', async () => {
+    await fixture(async (base, work, service) => {
+      service.setSettingsProvider(() => ({ pull: 'git-config', update: 'rebase' }));
+      await writeFile(join(base, 'base.txt'), 'base update'); await git(base, ['add', '.']); await git(base, ['commit', '-m', 'base update']);
+      await writeFile(join(work, 'work.txt'), 'work'); await git(work, ['add', '.']); await git(work, ['commit', '-m', 'work']);
+      await writeFile(join(work, 'scratch.txt'), 'scratch');
+      expect((await service.updateFromBase(work, true)).conflicts).toStrictEqual([]);
+      expect(await readFile(join(work, 'scratch.txt'), 'utf8')).toBe('scratch');
+      expect(await readFile(join(work, 'base.txt'), 'utf8')).toBe('base update');
     });
   });
 });

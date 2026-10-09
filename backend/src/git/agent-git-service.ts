@@ -536,8 +536,9 @@ export class AgentGitService {
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
     const base = selectMergeTarget(worktrees, current.folder);
     if (!base?.branch) throw new Error('Check out the base branch before updating this worktree.');
+    const strategy = this.settings().update;
+    if (strategy === 'rebase') assertRebaseCanProceed(current.files, 'updating');
     try {
-      const strategy = this.settings().update;
       await this.runGit(folder, strategy === 'rebase'
         ? ['-c', 'rebase.updateRefs=false', 'rebase', '--no-autostash', base.branch]
         : ['merge', strategy === 'ff-only' ? '--ff-only' : '--ff', '--no-edit', '--no-autostash', base.branch]);
@@ -558,8 +559,10 @@ export class AgentGitService {
     if ((await readConflicts()).length > 0) throw new Error('Resolve the existing conflicts before pulling.');
     if (current.files.length > 0 && !allowDirty) throw new Error('Commit your changes before pulling.');
     const result = { upstream: current.upstream, branch: current.branch, conflicts: [] as string[] };
+    const strategyFlags = await this.pullStrategyFlags(folder, current.branch);
+    if (strategyFlags.some((flag) => flag === '--rebase' || flag.startsWith('--rebase='))) assertRebaseCanProceed(current.files, 'pulling');
     try {
-      await this.runGit(folder, ['-c', 'rebase.updateRefs=false', 'pull', ...await this.pullStrategyFlags(folder, current.branch), '--no-edit', '--no-autostash']);
+      await this.runGit(folder, ['-c', 'rebase.updateRefs=false', 'pull', ...strategyFlags, '--no-edit', '--no-autostash']);
       return result;
     } catch (error) {
       const conflicts = await readConflicts();
@@ -690,6 +693,13 @@ function selectMergeTarget(worktrees: Array<{ path: string; branch?: string }>, 
 function parseWorktrees(output: string): Array<{ path: string; branch?: string }> {
   const records = output.split(/\n\n+/).map((record) => record.split(/\r?\n/)).filter((lines) => lines[0]?.startsWith('worktree '));
   return records.map((lines) => ({ path: lines[0]!.slice('worktree '.length), branch: lines.find((line) => line.startsWith('branch '))?.slice('branch refs/heads/'.length) }));
+}
+
+// Git cannot rebase over tracked changes without an autostash; untracked files are fine.
+function assertRebaseCanProceed(files: AgentGitFile[], action: 'pulling' | 'updating'): void {
+  if (files.some((file) => file.indexStatus !== '?' && file.indexStatus !== '!')) {
+    throw new Error(`Commit or discard your tracked changes before ${action} with rebase, or choose another strategy in Settings.`);
+  }
 }
 
 export function parsePorcelainFiles(output: string): AgentGitFile[] {

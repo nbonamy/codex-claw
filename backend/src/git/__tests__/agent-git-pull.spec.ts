@@ -104,6 +104,23 @@ describe('pull with real Git', () => {
     });
   });
 
+  it.each([['saved rebase', 'rebase'], ['configured rebase', 'git-config']] as const)('refuses a %s pull over tracked changes without stashing, but allows untracked files', async (_label, strategy) => {
+    await fixture(async (local, remote, service) => {
+      service.setSettingsProvider(() => ({ pull: strategy, update: 'merge' }));
+      await git(local, ['config', 'pull.rebase', 'true']);
+      await writeFile(join(remote, 'remote.txt'), 'remote'); await git(remote, ['add', '.']); await git(remote, ['commit', '-m', 'remote']);
+      await writeFile(join(local, 'file.txt'), 'keep this\n');
+      await expect(service.pull(local, true)).rejects.toThrow('before pulling with rebase');
+      expect(await readFile(join(local, 'file.txt'), 'utf8')).toBe('keep this\n');
+      expect((await git(local, ['stash', 'list'])).stdout).toBe('');
+      await git(local, ['checkout', '--', 'file.txt']);
+      await writeFile(join(local, 'scratch.txt'), 'scratch');
+      expect((await service.pull(local, true)).conflicts).toStrictEqual([]);
+      expect(await readFile(join(local, 'scratch.txt'), 'utf8')).toBe('scratch');
+      expect(await readFile(join(local, 'remote.txt'), 'utf8')).toBe('remote');
+    });
+  });
+
   it('leaves a divergent merge conflict for resolution, overriding rebase and ff-only preferences', async () => {
     await fixture(async (local, remote, service) => {
       for (const [folder, text] of [[local, 'local'], [remote, 'remote']]) {
