@@ -19,6 +19,7 @@ import {
 
 export type AgentRightWorkspaceState = {
   activeTab: RightWorkspaceTab | null;
+  codeReviewInstructions?: string;
   browserId: string;
   browserInitialUrl: string;
   browserOpenRequestId: number;
@@ -121,6 +122,7 @@ export function useRightWorkspaceState(options: {
     const nextTabs = workspace.tabs.filter((candidate) => candidate !== tab);
     workspace.tabs = nextTabs;
     if (tab === 'review') workspace.gitReviewPanel = null;
+    if (tab === 'codeReview') delete workspace.codeReviewInstructions;
     if (tab === 'plan') workspace.planPanel = null;
     if (tab === 'files') workspace.filesPaneOpen = false;
     if (isRightWorkspaceBrowserTab(tab)) {

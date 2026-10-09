@@ -3,6 +3,10 @@ import { surfaceMessages } from './surface-messages';
 
 export const messages = {
   en: {
+    gitWorkflow: {
+      title: 'Workflow', pull: 'Pull strategy', update: 'Update from base',
+      strategies: { 'git-config': 'Git configuration', merge: 'Merge', rebase: 'Rebase', 'ff-only': 'Fast-forward only' },
+    },
     providerUpdate: {
       version: 'Version', available: '{version} available', current: 'Up to date',
       upgrade: 'Upgrade', upgradeWhenIdle: 'Upgrade when idle', waiting: 'Waiting for agents to finish', upgrading: 'Upgrading…',

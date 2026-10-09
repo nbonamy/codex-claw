@@ -287,6 +287,9 @@ export const surfaceMessages = {
   "codeReviewPanel": {
     "codeReview": "Code review",
     "reviewThisBranch": "Start a review",
+    "additionalInstructions": "Additional instructions",
+    "instructionsPlaceholder": "Anything the reviewer should focus on (optional)",
+    "instructionsRequireNewReview": "Finish or discard the current review before adding new review instructions.",
     "nothingToReview": "Nothing to review",
     "nothingToReviewDescription": "No uncommitted or branch changes.",
     "scope": "Scope",

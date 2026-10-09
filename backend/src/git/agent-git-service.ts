@@ -2,6 +2,7 @@ import { product } from '@workspace/core/product';
 import { execFile } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { normalizeGitSettings, type GitSettings } from '@workspace/core/git-preferences';
 import type { AgentGitCommitSummary, AgentGitDiff, AgentGitDiffCatalog, AgentGitDiffSection, AgentGitDiffSummary, AgentGitDiffTarget, AgentGitFile, AgentGitWorkflow, AgentWorkspaceIdentity } from '@workspace/core/contracts';
 import { AppError } from '@workspace/core/app-error';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
@@ -25,6 +26,10 @@ export type AgentGitGenerationContext = {
 };
 
 export class AgentGitService {
+  private settings: () => GitSettings = () => normalizeGitSettings(undefined);
+
+  setSettingsProvider(provider: () => GitSettings): void { this.settings = provider; }
+
   constructor(
     private readonly now: AgentGitServiceClock = () => new Date(),
     private readonly runGit: AgentGitRunner = git,
@@ -531,8 +536,12 @@ export class AgentGitService {
     const worktrees = parseWorktrees((await this.runGit(folder, ['worktree', 'list', '--porcelain'])).stdout);
     const base = selectMergeTarget(worktrees, current.folder);
     if (!base?.branch) throw new Error('Check out the base branch before updating this worktree.');
+    const strategy = this.settings().update;
+    if (strategy === 'rebase') assertRebaseCanProceed(current.files, 'updating');
     try {
-      await this.runGit(folder, ['merge', '--no-edit', base.branch]);
+      await this.runGit(folder, strategy === 'rebase'
+        ? ['-c', 'rebase.updateRefs=false', 'rebase', '--no-autostash', base.branch]
+        : ['merge', strategy === 'ff-only' ? '--ff-only' : '--ff', '--no-edit', '--no-autostash', base.branch]);
       return { baseBranch: base.branch, branch: current.branch, conflicts: [] };
     } catch (error) {
       const conflicts = (await this.runGit(folder, ['diff', '--name-only', '--diff-filter=U', '-z'])
@@ -550,15 +559,31 @@ export class AgentGitService {
     if ((await readConflicts()).length > 0) throw new Error('Resolve the existing conflicts before pulling.');
     if (current.files.length > 0 && !allowDirty) throw new Error('Commit your changes before pulling.');
     const result = { upstream: current.upstream, branch: current.branch, conflicts: [] as string[] };
+    const strategyFlags = await this.pullStrategyFlags(folder, current.branch);
+    if (strategyFlags.some((flag) => flag === '--rebase' || flag.startsWith('--rebase='))) assertRebaseCanProceed(current.files, 'pulling');
     try {
-      // Merge the configured upstream, regardless of global rebase/ff-only/autostash preferences.
-      await this.runGit(folder, ['pull', '--no-rebase', '--ff', '--no-edit', '--no-autostash']);
+      await this.runGit(folder, ['-c', 'rebase.updateRefs=false', 'pull', ...strategyFlags, '--no-edit', '--no-autostash']);
       return result;
     } catch (error) {
       const conflicts = await readConflicts();
       if (conflicts.length === 0) throw error;
       return { ...result, conflicts };
     }
+  }
+
+  private async pullStrategyFlags(folder: string, branch: string): Promise<string[]> {
+    const strategy = this.settings().pull;
+    if (strategy === 'merge') return ['--no-rebase', '--ff'];
+    if (strategy === 'rebase') return ['--rebase', '--ff'];
+    if (strategy === 'ff-only') return ['--no-rebase', '--ff-only'];
+
+    const config = async (key: string) => (await this.runGit(folder, ['config', '--get', key]).catch(() => ({ stdout: '' }))).stdout.trim();
+    const rebase = await config(`branch.${branch}.rebase`) || await config('pull.rebase');
+    const ff = await config('pull.ff');
+    if (rebase && !['true', 'false', 'merges', 'm'].includes(rebase)) throw new Error('Unsupported Git rebase configuration. Choose a Pull strategy in Settings.');
+    if (ff && !['true', 'false', 'only'].includes(ff)) throw new Error('Unsupported Git fast-forward configuration. Choose a Pull strategy in Settings.');
+    if (ff === 'only' || (!rebase && !ff)) return ['--no-rebase', '--ff-only'];
+    return [rebase === 'true' ? '--rebase' : rebase === 'merges' || rebase === 'm' ? '--rebase=merges' : '--no-rebase', ff === 'false' ? '--no-ff' : '--ff'];
   }
 
   async merge(folder: string, strategy: 'merge' | 'squash', deleteBranch: boolean, deleteWorktree: boolean, commitMessage?: string): Promise<AgentGitMergeResult> {
@@ -668,6 +693,13 @@ function selectMergeTarget(worktrees: Array<{ path: string; branch?: string }>, 
 function parseWorktrees(output: string): Array<{ path: string; branch?: string }> {
   const records = output.split(/\n\n+/).map((record) => record.split(/\r?\n/)).filter((lines) => lines[0]?.startsWith('worktree '));
   return records.map((lines) => ({ path: lines[0]!.slice('worktree '.length), branch: lines.find((line) => line.startsWith('branch '))?.slice('branch refs/heads/'.length) }));
+}
+
+// Git cannot rebase over tracked changes without an autostash; untracked files are fine.
+function assertRebaseCanProceed(files: AgentGitFile[], action: 'pulling' | 'updating'): void {
+  if (files.some((file) => file.indexStatus !== '?' && file.indexStatus !== '!')) {
+    throw new Error(`Commit or discard your tracked changes before ${action} with rebase, or choose another strategy in Settings.`);
+  }
 }
 
 export function parsePorcelainFiles(output: string): AgentGitFile[] {

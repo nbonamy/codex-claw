@@ -239,7 +239,7 @@ describe('AppBackendServer code review workflow', () => {
 
     const started = await request(server, backendMethods.agentCodeReviewStart, {
       agentId: owner.id,
-      input: { scope: { type: 'uncommitted' }, threadMode: 'independent', backend, model: 'review-model', reasoningEffort: 'low' },
+      input: { scope: { type: 'uncommitted' }, threadMode: 'independent', backend, model: 'review-model', reasoningEffort: 'low', instructions: 'Focus on permission boundaries.' },
     });
     const reviewer = snapshot.agents.find((candidate) => candidate.id !== owner.id)!;
     await vi.waitFor(() => expect(reviewer.codeReview?.status).toBe('ready'));
@@ -258,6 +258,7 @@ describe('AppBackendServer code review workflow', () => {
     const round = session.rounds[0]!;
     expect(runCodeReview).toHaveBeenNthCalledWith(1, reviewer, expect.objectContaining({
       reviewMcpServerUrl: expect.stringContaining('reviewContextId=1'),
+      prompt: expect.stringContaining('Focus on permission boundaries.'),
     }));
 
     await request(server, backendMethods.agentCodeReviewFindingDecide, {

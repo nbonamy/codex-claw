@@ -81,6 +81,28 @@ function reviewer(test: ReturnType<typeof harness>, session: { reviewerAgentId: 
 }
 
 describe('CodeReviewService', () => {
+  it.each(['current', 'independent'] as const)('keeps user instructions across %s review rounds and restoration without saving them as defaults', async threadMode => {
+    const test = harness([async () => ({ text: 'Clean.', findingCount: 0 })]);
+    test.owner.backendSession = { kind: 'codex', threadId: 'owner-thread' };
+    const instructions = 'Focus on race conditions.\nCheck backward compatibility.';
+    const session = test.service.start(test.owner, {
+      scope: { type: 'uncommitted' }, threadMode, instructions: `  ${instructions}  `,
+    });
+    await vi.waitFor(() => expect(session.status).toBe('ready'));
+    expect(test.turns[0]!.prompt).toContain(instructions);
+    expect(session.instructions).toBe(instructions);
+    expect(test.snapshot.general.codeReviewDefaults ?? {}).not.toHaveProperty('instructions');
+
+    const restored = harness([async () => ({ text: 'Still clean.', findingCount: 0 })]);
+    const savedReviewer = JSON.parse(JSON.stringify(reviewer(test, session))) as Agent;
+    if (threadMode === 'current') restored.snapshot.agents = [savedReviewer];
+    else restored.snapshot.agents.push(savedReviewer);
+    restored.service.submit(savedReviewer, session.id);
+    await restored.service.reviewAgain(savedReviewer, session.id);
+    await vi.waitFor(() => expect(savedReviewer.codeReview?.status).toBe('ready'));
+    expect(restored.turns[0]!.prompt).toContain(instructions);
+  });
+
   it('pauses an automatic review when the provider ends without explicitly finishing the inspection', async () => {
     const test = harness([async () => ({ text: 'I reported three findings using a different tool.' })]);
     const session = test.service.start(test.owner, {

@@ -103,6 +103,15 @@
             </div>
           </fieldset>
           <p v-if="modelsError" role="status">{{ t('automaticReview.modelError') }} <button type="button" class="app-button app-button--tertiary" @click="modelReload++">{{ t('automaticReview.retry') }}</button></p>
+          <FormField :label="t('surface.codeReviewPanel.additionalInstructions')">
+            <VoiceTextarea
+              v-model="instructions"
+              :label="t('surface.codeReviewPanel.additionalInstructions')"
+              :placeholder="t('surface.codeReviewPanel.instructionsPlaceholder')"
+              :rows="3"
+              :disabled="busy"
+            />
+          </FormField>
           <div class="code-review-panel__automatic">
             <div class="code-review-panel__toggle">
               <span>{{ t('automaticReview.title') }}</span>
@@ -328,6 +337,7 @@ import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingLi
 import BackendSelector from './BackendSelector.vue';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormField from '../shared/form/FormField.vue';
+import VoiceTextarea from '../shared/VoiceTextarea.vue';
 import { useBackendChoices } from './backend-selection';
 import { useCodeReviewSettings } from './code-review-settings';
 import type { BackendModelOption } from '@workspace/core/contracts';
@@ -358,6 +368,7 @@ const emit = defineEmits<{
   }];
   openFile: [path: string];
 }>();
+const instructions = defineModel<string>('instructions', { default: '' });
 const busy = ref(false);
 const error = ref<string | null>(null);
 const scope = ref<CodeReviewStartInput["scope"]["type"]>("uncommitted");
@@ -610,6 +621,7 @@ function startSelectedReview(): void {
     : { type: "uncommitted" };
   void run(() => props.startReview(props.agent.id, {
     scope: reviewScope, threadMode: threadMode.value,
+    ...(instructions.value.trim() ? { instructions: instructions.value.trim() } : {}),
     ...(threadMode.value === 'independent' ? { backend: reviewBackend.value } : {}),
     ...(threadMode.value === 'independent' && reviewModel.value ? { model: reviewModel.value } : {}),
     ...(threadMode.value === 'independent' && reviewEffort.value ? { reasoningEffort: reviewEffort.value } : {}),
@@ -628,6 +640,7 @@ function retryReview(): void {
   void run(() => props.startReview(props.agent.id, {
     scope: automation?.baseRef ? { type: 'branch', baseRef: automation.baseRef } : reviewScope,
     threadMode: review.threadMode,
+    ...(review.instructions ? { instructions: review.instructions } : {}),
     ...(automation ? { automation: { enabled: true, maxPriority: automation.maxPriority, maxRounds: automation.maxRounds, autoCommit: automation.autoCommit ?? false } } : {}),
   }));
 }

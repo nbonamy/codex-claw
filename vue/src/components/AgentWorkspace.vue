@@ -79,6 +79,7 @@
       :start-repository-work="(input) => startRepositoryWork(agent.id, input)"
       :show-repository-work-agent="selectAgentFromShell"
       :start-code-review="startCodeReview"
+      v-model:code-review-instructions="rightWorkspaceFor(agent.id).codeReviewInstructions"
       :decide-code-review-finding="decideCodeReviewFinding"
       :submit-code-review-round="submitCodeReviewRound"
       :finish-code-review="finishCodeReview"

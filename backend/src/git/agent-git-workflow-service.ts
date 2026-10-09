@@ -337,12 +337,12 @@ export class AgentGitWorkflowService {
 
 function conflictResolutionPrompt(result: { baseBranch: string; branch: string; conflicts: string[] }): string {
   return [
-    `Git merged \`${result.baseBranch}\` into \`${result.branch}\`, but conflicts need to be resolved.`,
+    `Git encountered conflicts while updating \`${result.branch}\` from \`${result.baseBranch}\`.`,
     '',
     'Conflicted files:',
     ...result.conflicts.map((path) => `- ${path}`),
     '',
-    'Resolve the merge conflicts, preserve the intended changes from both branches, run the relevant tests, and commit the merge when ready.',
+    'Resolve the conflicts and preserve the intended changes from both branches. Check git status: if a rebase is in progress, stage the resolved files and run git rebase --continue, repeating for further conflicts; otherwise commit the merge when ready. Run the relevant tests. If asked to abandon the update, abort the active rebase or merge. Do not push.',
   ].join('\n');
 }
 

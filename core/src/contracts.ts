@@ -465,6 +465,7 @@ export type SavedPromptDraft = {
 export type CockpitAgentViewMode = 'teams' | 'recent';
 
 export type AppGeneralSettings = {
+  git?: import('./git-preferences').GitSettings;
   commitMessageInstructions: string;
   pullRequestInstructions: string;
   preventSleepWhenAgentsRun: boolean;
@@ -502,7 +503,8 @@ export type AppGeneralSettings = {
   plugins?: AppPluginSettings;
 };
 
-export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugins'>> & {
+export type UpdateGeneralSettingsInput = Partial<Omit<AppGeneralSettings, 'plugins' | 'git'>> & {
+  git?: Partial<import('./git-preferences').GitSettings>;
   plugins?: Partial<AppPluginSettings>;
 };
 
