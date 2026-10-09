@@ -10,6 +10,13 @@ export const messages = {
       integrateAction: '{strategy} into {branch}', andPush: '{action} and push', commitBeforeIntegrating: 'Commit your changes before integrating.',
       rebaseInProgress: 'Rebase in progress: {branch}', continue: 'Continue rebase', abort: 'Abort rebase', close: 'Close',
       strategies: { 'git-config': 'Git configuration', merge: 'Merge', mergeCommit: 'Merge commit', rebase: 'Rebase', squash: 'Squash', 'rebase-ff': 'Rebase and fast-forward', 'ff-only': 'Fast-forward only' },
+      descriptions: {
+        'git-config': 'Use this repository’s Git configuration.',
+        merge: 'Bring in changes with a merge.',
+        rebase: 'Replay this branch’s commits on the target.',
+        'rebase-ff': 'Rebase this branch, then advance the base.',
+        'ff-only': 'Advance without merging or rewriting commits.',
+      },
     },
     providerUpdate: {
       version: 'Version', available: '{version} available', current: 'Up to date',

@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { ElMessage, ElSelect, ElOption } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import GitWorkflowControl from '../GitWorkflowControl.vue';
@@ -12,7 +12,7 @@ const agent = { id: 'agent-1', name: 'Dina', avatar: 'DI', folder: '/repo/worktr
 const status: AgentGitStatus = { folder: agent.folder!, branch: 'feature/demo', ahead: 2, behind: 0, changedFiles: 2, addedLines: 4, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '' };
 const workflow: AgentGitWorkflow = { repository: 'owner/repo', folder: agent.folder!, isLinkedWorktree: true, baseBranch: 'main', branch: 'feature/demo', detached: false, remote: 'origin', remoteUrl: 'git@github.com:owner/repo.git', upstream: 'origin/feature/demo', ahead: 2, behind: 0, stagedAddedLines: 4, stagedRemovedLines: 1, unstagedAddedLines: 2, unstagedRemovedLines: 0, untrackedAddedLines: 3, untrackedRemovedLines: 0, files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'new.ts', indexStatus: '?', worktreeStatus: '?' }], stagedFiles: [], unstagedFiles: ['a.ts', 'new.ts'], githubConnected: true };
 function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
-  return mount(GitWorkflowControl, { attachTo: document.body, global: { components: { ElSelect, ElOption } }, props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides } });
+  return mount(GitWorkflowControl, { attachTo: document.body, props: { agent, gitStatus: status, getWorkflow: async () => workflow, ...overrides } });
 }
 
 describe('GitWorkflowControl', () => {
@@ -388,7 +388,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.text()).toContain('The agent has been asked to resolve 1 conflict from main.');
   });
 
-  it('confirms a clean update before showing Git progress', async () => {
+  it.each(['merge', 'rebase'])('confirms a clean %s update before showing Git progress', async strategy => {
     const cleanWorkflow = { ...workflow, files: [], stagedFiles: [], unstagedFiles: [] };
     const pendingUpdate = deferred<{ workflow: AgentGitWorkflow; baseBranch: string; branch: string; conflicts: string[] }>();
     const updateFromBase = vi.fn(() => pendingUpdate.promise);
@@ -399,8 +399,9 @@ describe('GitWorkflowControl', () => {
     await wrapper.findAll('[role="menuitem"]').find((item) => item.text().includes('Update from main'))?.trigger('click');
 
     expect(updateFromBase).not.toHaveBeenCalled();
-    await submitButton(wrapper, 'Update from main').trigger('click');
-    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true, strategy: 'merge', expectedBranch: 'feature/demo', expectedTarget: 'main' });
+    await chooseStrategy(wrapper, strategy === 'rebase' ? 'Rebase' : 'Merge');
+    await submitButton(wrapper, strategy === 'rebase' ? 'Rebase onto main' : 'Update from main').trigger('click');
+    expect(updateFromBase).toHaveBeenCalledWith('agent-1', { confirmed: true, strategy, expectedBranch: 'feature/demo', expectedTarget: 'main' });
     expect(wrapper.text()).toContain('Updating from main');
 
     vi.useFakeTimers();
@@ -554,6 +555,30 @@ describe('GitWorkflowControl', () => {
     expect(merge?.attributes('disabled')).toBeDefined();
   });
 
+  it.each([
+    ['rebase-ff', 'Rebase and fast-forward', true],
+    ['ff-only', 'Fast-forward only', false],
+  ] as const)('submits the %s icon choice with separate rewrite consent', async (strategy, label, rewritePublished) => {
+    const current = { ...workflow, files: [] };
+    const mergeBranch = vi.fn().mockResolvedValue(current);
+    const wrapper = mountControl({ getWorkflow: async () => current, mergeBranch });
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').find(item => item.text() === 'Merge')!.trigger('click');
+    await flushPromises();
+    await chooseStrategy(wrapper, label);
+    expect(mergeBranch).not.toHaveBeenCalled();
+    if (rewritePublished) await wrapper.get('input[type="checkbox"]').setValue(true);
+    await submitButton(wrapper, `${label} into main`).trigger('click');
+    await flushPromises();
+    expect(mergeBranch).toHaveBeenCalledExactlyOnceWith(agent.id, {
+      strategy, confirmed: true, expectedBranch: 'feature/demo', expectedTarget: 'main',
+      deleteWorktree: false, deleteBranch: false,
+      ...(rewritePublished ? { rewritePublished: true } : {}),
+    });
+    wrapper.unmount();
+  });
+
   it('chooses squash explicitly and retains separate cleanup controls', async () => {
     const mergeBranch = vi.fn(async () => workflow);
     const wrapper = mountControl({ getWorkflow: async () => ({ ...workflow, files: [] }), mergeBranch });
@@ -568,7 +593,7 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1]?.props('disabled')).toBe(true);
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1]?.props('disabled')).toBe(false);
-    await chooseStrategy(wrapper, 'Squash');
+    await chooseStrategy(wrapper, 'Squash and merge');
     const message = wrapper.get<HTMLTextAreaElement>('.git-workflow-control__merge-message');
     expect(message.element.value).toBe('');
     expect(message.attributes('placeholder')).toBe('Squash commit message…');
@@ -1191,12 +1216,6 @@ function deferred<T>() {
 }
 
 async function chooseStrategy(wrapper: ReturnType<typeof mountControl>, label: string): Promise<void> {
-  await wrapper.get('[aria-label="Strategy"]').trigger('click');
-  await flushPromises();
-  const control = wrapper.get('[aria-label="Strategy"]');
-  const list = document.getElementById(control.attributes('aria-controls')!);
-  const option = [...list!.querySelectorAll('.el-select-dropdown__item')].find(item => item.textContent === label);
-  if (!option) throw new Error(`Missing strategy ${label}`);
-  (option as HTMLElement).click();
+  await wrapper.get(`[role="radiogroup"] input[aria-label="${label}"]`).setValue(true);
   await flushPromises();
 }

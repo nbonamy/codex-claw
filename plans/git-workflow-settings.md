@@ -40,6 +40,10 @@ One-off choices override global settings without changing them. Action dialogs
 show actual source and target branches before mutation. Base selection remains
 auto-detected, including nonstandard base names; no repository-level override.
 
+Every Git operation strategy picker uses the original Merge/Squash icon-card
+design, including its existing icons, copy and styling for those choices. New
+strategies extend that same template. Dropdowns are reserved for Settings.
+
 Use precise labels such as “Rebase onto main.” Keep Commit and Commit & Push
 distinct. A strategy choice never adds pushing or cleanup.
 
@@ -113,6 +117,13 @@ development-state migrations. Refinement validation passed: full `test:ai`
 Headless Chromium verified two global controls, no Save button, automatic saves
 through the owning daemon, reload persistence, usable widths, and no page errors.
 Coverage figures above precede this simplification; coverage was not rerun.
+
+Dialog icon choices restored using the original Merge/Squash card CSS and copy.
+The Vue suite passed (1,553 tests); the final exact-style restoration passed its
+63 focused tests, Vue lint/typechecks, and web build. Headless Chromium exercised
+Merge, Pull, Update from base and required-update dialogs, keyboard selection,
+narrow layout, and Settings dropdowns. This UI check used synthetic Git workflow
+and provider states and performed no Git mutations.
 
 Remote routing is contract-tested; no live SSH host, packaged desktop, signing,
 release, or automatic review. Source-mode SDK wiring and lockfile pins unchanged.

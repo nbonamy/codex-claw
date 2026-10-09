@@ -121,6 +121,7 @@ Search by behavior first.
 | Settings structure | `SettingsPanelFrame`, `SettingsTextareaField` (compose `FormSection`/`FormRow`) | `vue/src/components/` |
 | Dense structured data | `AppDataList` | `vue/src/components/` |
 | Operation feedback | `GitOperationFeedback` | `vue/src/components/` |
+| Git strategy choices | `GitStrategyChoices` icon cards in every operation dialog; `GitStrategySelect` dropdowns in Settings only | `vue/src/components/` |
 | Worktree provisioning progress | `WorkspaceProvisioningProgressDialog` | `vue/src/components/` |
 
 ## Interaction
