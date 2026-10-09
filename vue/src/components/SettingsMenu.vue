@@ -241,10 +241,11 @@ function selectMenuItem(itemId: string): void {
   text-transform: uppercase;
   color: var(--color-text-muted);
   font-weight: var(--font-weight-medium);
-  svg {
-    width: var(--icon-sm);
-    height: var(--icon-sm);
-  }
+}
+
+.settings-menu__rate-limits-header svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .settings-menu__rate-limit {
