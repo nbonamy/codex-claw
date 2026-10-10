@@ -51,6 +51,7 @@ export default defineConfig({
           { text: "Provider guides", link: "/providers/" },
           { text: "Codex", link: "/providers/codex" },
           { text: "Claude Code", link: "/providers/claude-code" },
+          { text: "Antigravity", link: "/providers/#antigravity" },
         ],
       },
       {

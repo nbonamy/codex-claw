@@ -33,7 +33,7 @@ Let the current conversation shape a task first, then submit `/delegate` to hand
 /delegate Implement the agreed CSV export flow and its tests. Keep commits local and report back for review.
 ```
 
-Both Codex and Claude Code support these commands. The composer's **+** menu also offers **Delegate**. The current agent uses the conversation to prepare a self-contained handoff and creates a separate Korus teammate in a dedicated worktree. If the task or repository is unclear, it asks for clarification first. The original agent and conversation remain open.
+These commands work across supported coding engines. The composer's **+** menu also offers **Delegate**. The current agent uses the conversation to prepare a self-contained handoff and creates a separate Korus teammate in a dedicated worktree. If the task or repository is unclear, it asks for clarification first. The original agent and conversation remain open.
 
 You can also request delegation in plain language:
 

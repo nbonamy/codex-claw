@@ -4,7 +4,7 @@ description: Understand how agents share status and coordinate through Korus's b
 
 # Agent collaboration
 
-Korus supplies built-in collaboration and workspace tools to each agent. They are available to both Codex and Claude Code through MCP, without manually adding a server URL or passing an agent ID.
+Korus supplies built-in collaboration and workspace tools to each agent through MCP, without manually adding a server URL or passing an agent ID.
 
 ## Coordinate work
 

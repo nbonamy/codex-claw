@@ -16,11 +16,11 @@ empty result, and check the rendered interaction. Leave the change
 uncommitted so I can review it.
 ```
 
-Use the composer's file mentions, skills, and attachment controls to supply relevant context. Both Codex and Claude Code conversations support attachments. Each agent keeps its own conversation and draft as you switch agents.
+Use the composer's available context controls to supply file mentions, skills, and attachments. Desktop Antigravity conversations support images, WAV audio, PDFs, and UTF-8 text; its remote-team and browser-hosted conversations do not support attachments. Each agent keeps its own conversation and draft as you switch agents.
 
 Choose a model in the composer before sending when you need a particular provider model. Reasoning effort and service tier controls are Codex-specific; the choices shown depend on the provider's available catalog.
 
-The composer's **+** menu includes **Review**, **Delegate**, and **Visualize** for both engines. These open [Code Review](../workflows/code-review), request [worktree delegation](../workflows/worktrees#delegate-implementation), and open [Visualize](./visualize), respectively. The corresponding slash commands remain available.
+The composer's **+** menu includes **Review**, **Delegate**, and **Visualize** across supported engines. These open [Code Review](../workflows/code-review), request [worktree delegation](../workflows/worktrees#delegate-implementation), and open [Visualize](./visualize), respectively. The corresponding slash commands remain available.
 
 After a response, the empty composer may suggest a follow-up. It is a hint, not a draft or a sent message; it does not replace anything you have typed. Enter the request you want to send.
 
@@ -39,7 +39,7 @@ Screen Recording permission is required for capture; check **Settings → Genera
 
 ## Discuss before implementation
 
-Use `/plan` to enter Plan mode, then explain what you want to decide before editing. Korus uses Codex's native Plan mode; for Claude Code, it supplies planning instructions to the conversation.
+Use `/plan` to enter Plan mode, then explain what you want to decide before editing. Korus uses native Plan mode for Codex and Antigravity; for Claude Code, it supplies planning instructions to the conversation. Antigravity plan proposals open for review, and accepting one starts a separate implementation turn.
 
 ```text
 First discuss the tradeoffs between extending this module and adding
@@ -60,11 +60,13 @@ Open a document or diff in the workspace when you need to examine it while conti
 | --- | --- |
 | **Steer** | Correct or add a constraint to a running turn. |
 | **Queue** | Save a follow-up for after the current turn. Inspect the pending prompt list if you need to edit or remove a queued instruction. |
-| **Interrupt** | Stop the current turn before assigning a different direction. Both providers support interruption. |
+| **Interrupt** | Stop the current turn before assigning a different direction. All supported engines offer interruption. |
 
 For example, steer “Keep the current API; change only the implementation” into an active Codex task. Queue “Now update the guide for the final behavior” when documentation should follow the implementation.
 
 Available actions depend on the conversation's provider and state. Check the control shown in the composer before sending a correction.
+
+Antigravity does not support steering a running turn. Queue the follow-up or interrupt before changing direction.
 
 Claude steering delivers input at a tool boundary or in a following turn; it does not immediately cancel a running tool. Use **Interrupt** when you need the active work to stop, then inspect any files or other side effects already produced.
 
@@ -82,7 +84,7 @@ Codex turn actions can edit, retry, delete, or fork from a turn. Use the action 
 
 Claude Code supports native conversation forks while idle, including from a completed turn when that boundary is available. The fork has independent conversation history but uses the same folder. It does not create a worktree or restore earlier file contents. If a turn cannot be used as a fork point, reload the conversation and choose an available completed boundary.
 
-Use `/compact` or **Agent → Compact Session** when the conversation is long and you want a context summary. The agent must be idle for the shell's compact action. Codex also supports **Replace conversation with summary** from the agent context menu.
+In Codex or Claude Code, use `/compact` or **Agent → Compact Session** when the conversation is long and you want a context summary. The agent must be idle for the shell's compact action. Codex also supports **Replace conversation with summary** from the agent context menu.
 
 Right-click an agent for session actions:
 
@@ -90,11 +92,13 @@ Right-click an agent for session actions:
 - **Restart Agent** starts a fresh conversation for the same agent and folder. It is not the way to reload the current history.
 - **Fork**, when available, creates another conversation from existing context.
 
-For provider setup and capability differences, see [Codex](../providers/codex) and [Claude Code](../providers/claude-code).
+Antigravity supports saved history and **Resume Session**, but not conversation forks or edit, retry, delete, and compact actions.
+
+For provider setup and capability differences, see the [provider guides](../providers/).
 
 ## Hand work to another engine
 
-Use **Hand off…** to continue a workspace task with a new agent, including switching between Codex and Claude Code. You can also choose the same engine with a different model.
+Use **Hand off…** to continue a workspace task with a new agent, including switching coding engines. You can also choose the same engine with a different model.
 
 1. Wait until the agent is idle, then right-click it in the sidebar or Cockpit and choose **Hand off…**. The native **Agent** menu offers the same action.
 2. Choose the destination **Coding agent** and **Model**, or keep **Provider default**.
@@ -109,7 +113,7 @@ For parallel work that keeps the original agent open and creates an isolated che
 
 ## Set a goal
 
-Use `/goal` to define an outcome the agent should keep working toward. Keep the condition concrete and inspect the resulting evidence before accepting it as done.
+In Codex and Claude Code conversations, use `/goal` to define an outcome the agent should keep working toward. Keep the condition concrete and inspect the resulting evidence before accepting it as done. Antigravity does not offer goals.
 
 Claude goals use Claude Code's native goal behavior and require native goal hooks to be enabled. Claude goals do not support a token budget or live iteration counters. An interrupted goal can appear paused; a failed run or unverifiable goal state can appear blocked. Clearing a goal removes it rather than claiming it succeeded.
 

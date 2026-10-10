@@ -1,46 +1,48 @@
 ---
-description: Connect Codex and Claude Code for agent work, and GitHub or Linear for backlog work.
+description: Connect coding engines for agent work, and GitHub or Linear for backlog work.
 ---
 
 # Provider guides
 
-Korus can run **Codex**, **Claude Code**, or both. Each engine has its own installation, account, conversation location, and customization. Connecting Codex does not connect Claude Code.
+Korus can run different coding engines in the same team. Each engine has its own installation, account, conversation location, and customization. Connecting one does not authenticate the others.
 
 | Engine | Installation and sign-in |
 | --- | --- |
 | [Codex](./codex) | Install the CLI separately; browser sign-in from Korus |
 | [Claude Code](./claude-code) | Requires the Claude Code CLI; sign-in through a command copied from Korus |
+| [Antigravity](#antigravity) | Requires the Antigravity ACP runtime and its companion executable; native Google sign-in from Korus |
 
 ## Choose where each engine keeps its setup
 
-On the first connection screen, select **Customize** beneath the engine before signing in. Later, open **Settings → Codex** or **Settings → Claude Code** and select **Customize** beside **Location**.
+Install the engine first: **Install** opens external instructions, and the refresh icon rechecks detection. Korus does not install provider runtimes automatically. Once detected, select **Customize** beneath the engine before signing in. Later, open its Settings page and select **Customize** beside **Location**.
 
 There are two choices under **Conversations**:
 
 | Choice | Conversations and sign-in | Skills and configuration |
 | --- | --- | --- |
-| **Separate Korus chats** | Korus uses its own provider home. Sign in for that setup, even if the engine already works in your terminal. | **Reuse my existing skills** is selected by default. Other provider configuration remains separate. |
+| **Separate Korus chats** | Korus uses its own provider home. Sign in for that setup, even if the engine already works in your terminal. | **Reuse my existing skills** can share skills with that home. Other provider configuration remains separate. |
 | **Use existing setup** | Korus uses the provider home you already use outside Korus, including its sign-in and conversation storage. | Skills and configuration belong to that existing setup; changes can affect sessions outside Korus too. |
 
-For a new setup, the default is **Separate Korus chats** with **Reuse my existing skills** enabled. You can choose differently for each engine: for example, keep Codex separate while using your existing Claude Code setup. On an upgrade, check **Location** to see the setup retained for your engine.
+For a new setup, the default is **Separate Korus chats**. Check **Reuse my existing skills** to choose whether skills are shared. You can choose differently for each engine. Check **Location** to see the setup retained for your engine.
 
 A provider home is the folder where that engine keeps its account state, conversations, and user configuration. With the standard Korus installation, separate homes are:
 
 - Codex: `~/.korus/codex-home`
 - Claude Code: `~/.korus/claude-home`
+- Antigravity: `~/.korus/antigravity-home`
 
-Existing setups normally use `~/.codex` and `~/.claude`. Custom launch environments can use different paths, so the path displayed under **Location** is the one to check when troubleshooting.
+Existing setups normally use `~/.codex`, `~/.claude`, or `~/.gemini` for Antigravity. Custom launch environments can use different paths, so the path displayed under **Location** is the one to check when troubleshooting.
 
 ::: tip Separate chats can still share skills
-**Reuse my existing skills** links to your existing provider skills rather than taking a one-time copy. Updates are shared in both directions. For Codex, this choice also shares the provider's plugins; for Claude Code, it shares skills only. It does not copy your sign-in or move your old conversations.
+**Reuse my existing skills** links to your existing provider skills rather than taking a one-time copy. Updates are shared in both directions. For Codex, this choice also shares the provider's plugins; other engines share skills only. It does not copy your sign-in or move your old conversations.
 :::
 
 Uncheck **Reuse my existing skills** if you want to manage those resources separately too. Repository instructions and project configuration still apply to the working folder you open.
 
 ## Connect and verify
 
-1. Choose the conversation setup for the engine, then **Save**. If the CLI is missing, the dialog offers **Install** instead.
-2. Follow the [Codex](./codex#connect-codex) or [Claude Code](./claude-code#connect-claude-code) sign-in steps. **Detected** means the executable is available; **Connected** means Korus recognizes the selected setup's authentication.
+1. Install the engine if needed, choose its conversation setup, then **Save**.
+2. Follow the [Codex](./codex#connect-codex), [Claude Code](./claude-code#connect-claude-code), or [Antigravity](#antigravity) sign-in steps. **Detected** means the runtime is available; **Connected** means Korus recognizes the selected setup's authentication.
 3. Connect at least one engine, then select **Continue** on the first connection screen.
 4. In the engine's Settings page, check that **Account** shows **Connected** and **Enable engine** is on.
 5. Start a small conversation and check that the engine can respond before assigning a larger task.
@@ -49,9 +51,25 @@ Uncheck **Reuse my existing skills** if you want to manage those resources separ
 
 Authentication, model availability, and usage limits belong to the selected provider. Connecting an account to Korus does not create a new model subscription or transfer one provider's access to another. Claude subscription sign-in and Anthropic Console API billing are separate choices in its connection dialog.
 
+## Antigravity
+
+Antigravity uses Google's ACP runtime, not the editor or the `agy` CLI. Install the runtime separately using **Install** in Welcome or **Settings → Antigravity**. The linked [ACP registry entry](https://github.com/agentclientprotocol/registry/blob/dc55a34900fdd60e5e97c1cbd7825c5a1df673fc/antigravity-acp/agent.json) lists the platform downloads for the supported runtime.
+
+On macOS and Linux, extract `agy_acp_server.par` and `localharness_external` together into a directory on PATH and make both executable. Korus needs both files to detect the engine. Select the refresh icon after installation. Installing the editor alone does not establish that this runtime is available.
+
+Once detected:
+
+1. Select **Customize** to choose separate Korus chats or your existing setup. Antigravity's existing setup uses `GEMINI_HOME` when configured, otherwise `~/.gemini`.
+2. Select **Connect Antigravity** in Welcome, or **Connect** in its Settings page, and complete the native Google sign-in flow. Credentials stay with Antigravity; do not paste them into chat.
+3. Wait for **Connected**, enable the engine, and select it when creating an agent. Verify with a small read-only repository task.
+
+Antigravity supports streaming conversations, history, approvals, interruption, native Plan mode, and Korus workflows including reviews, Missions, delegation, and automations. Review its proposed plan before accepting implementation. Model choices come from the ACP runtime and may differ from the editor's catalog; available effort variants appear in the model choices.
+
+Desktop conversations accept images, WAV audio, PDFs, and UTF-8 text attachments. Antigravity attachments are unavailable for remote teams and browser-hosted sessions. Steering a running turn, goals, conversation forks, and edit/retry/delete turn actions are not available; queue a follow-up or interrupt instead. See [Conversations](../features/conversations) for shared controls.
+
 ## Connect GitHub or Linear
 
-Coding engines and backlog integrations are separate choices. Codex or Claude Code runs the agent; GitHub or Linear supplies the work items.
+Coding engines and backlog integrations are separate choices. The selected engine runs the agent; GitHub or Linear supplies the work items.
 
 Open **Settings → Integrations** and connect the service you want to use:
 

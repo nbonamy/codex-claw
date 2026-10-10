@@ -11,7 +11,7 @@ description: Download and install the Korus desktop app.
 1. Open [Downloads](__PRODUCT_DOWNLOAD_URL__) and choose the macOS DMG for Apple silicon.
 2. Open the DMG and double-click Korus. It installs in Applications and launches. If an installed copy needs replacing, confirm **Replace**; your chats and settings are kept.
 3. If Korus asks you to use Finder, choose **Open Applications**, drag Korus there from the DMG, and approve the installation in Finder. Then open Korus from Applications.
-4. The first-run screen checks your coding engines and offers **Connect Codex**, **Connect Claude Code**, and **Customize** for each one.
+4. The first-run screen checks your coding engines. **Install** opens instructions for missing runtimes; the refresh icon rechecks detection. Detected engines offer **Connect** and **Customize**.
 5. Choose how each engine should store its setup before connecting it. Follow the steps below, then open a repository.
 
 ## Install on Windows
@@ -35,7 +35,7 @@ Korus can keep its provider setup separate from your existing command-line tools
 | **Separate Korus chats** | You want Korus's chats and provider sign-in kept in a separate setup environment. |
 | **Use existing setup** | You want Korus to use the provider environment already configured on this computer. |
 
-This choice is independent for Codex and Claude Code. Selecting an existing Codex setup does not select an existing Claude setup, and signing in to one engine does not authenticate the other.
+This choice is independent for each engine. Selecting an existing setup or signing in to one engine does not configure or authenticate the others.
 
 Follow the [provider setup overview](../providers/) before changing an existing setup. It explains skills and plugin sharing, the selected provider location, and what happens to Korus conversations when you switch locations later.
 
@@ -43,11 +43,11 @@ Follow the [provider setup overview](../providers/) before changing an existing 
 
 Korus does not include a separate model subscription. Connect a provider account with access to the engine you want to use.
 
-1. Use **Connect Codex** for the OpenAI sign-in flow, or **Connect Claude Code** for its provider-specific authentication steps.
-2. Confirm the engine is connected and enabled. The first-run **Continue** action becomes available when at least one installed engine is connected and enabled; connecting both is optional.
+1. Select **Connect** for your chosen engine and complete its provider-specific authentication steps.
+2. Confirm the engine is connected and enabled. The first-run **Continue** action becomes available when at least one installed engine is connected and enabled; additional engines are optional.
 3. Select **Continue**.
 
-Use the complete [Codex](../providers/codex) or [Claude Code](../providers/claude-code) guide for the engine you choose. A detected installation alone does not establish that its selected setup environment is signed in.
+Use the [provider guides](../providers/), including [Antigravity setup](../providers/#antigravity), for the engine you choose. A detected installation alone does not establish that its selected setup environment is signed in.
 
 ## Connect GitHub, or skip it
 

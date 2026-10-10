@@ -12,11 +12,11 @@ Start with one repository, one agent, and a small change you can review.
 
 ## Choose your provider's setup
 
-On the first-run screen, select **Customize** beneath Codex or Claude Code. Choose **Separate Korus chats** for its own setup environment, or **Use existing setup** to reuse the provider environment already on your computer. Configure each engine separately.
+On the first-run screen, install your chosen engine if it is not detected, then select **Customize** beneath it. Choose **Separate Korus chats** for its own setup environment, or **Use existing setup** to reuse the provider environment already on your computer. Configure each engine separately.
 
-Use **Connect Codex** or **Connect Claude Code** and complete that engine's authentication steps. Once at least one engine is connected and enabled, select **Continue**. You can manage these choices later in **Settings → Codex** or **Settings → Claude Code**.
+Select **Connect** for the engine and complete its authentication steps. Once at least one engine is connected and enabled, select **Continue**. You can manage these choices later in the engine's Settings page.
 
-The [Codex guide](../providers/codex) and [Claude Code guide](../providers/claude-code) explain the separate setup and sign-in flows. Model access and usage limits come from the provider account you connect.
+The [provider guides](../providers/) explain setup and sign-in, including [Antigravity's external runtime](../providers/#antigravity). Model access and usage limits come from the provider account you connect.
 
 At the GitHub step, connect your account if you want GitHub workflows, or select **Skip for now** for a local repository task.
 

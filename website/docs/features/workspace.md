@@ -42,7 +42,7 @@ Use the full repository diff before delivery so earlier or unrelated edits are a
 
 ## Mobile simulators
 
-Run an iOS simulator or Android emulator beside your conversation. Interact with the live screen yourself, or ask your Codex or Claude agent to inspect the app, tap, swipe, type, and capture screenshots while you work on the code.
+Run an iOS simulator or Android emulator beside your conversation. Interact with the live screen yourself, or ask your agent to inspect the app, tap, swipe, type, and capture screenshots while you work on the code.
 
 ### Set up a device
 

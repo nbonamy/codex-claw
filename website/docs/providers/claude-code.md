@@ -4,16 +4,16 @@ description: Install Claude Code, choose its conversation home, sign in to the c
 
 # Claude Code
 
-Claude Code runs alongside Codex as an independent engine. It requires a Claude Code CLI installation and its own authentication. A Codex connection or ChatGPT subscription does not connect Claude Code.
+Claude Code runs as an independent engine. It requires a Claude Code CLI installation and its own authentication. A connection to another provider does not connect Claude Code.
 
 ## Install and choose a setup
 
-1. Select **Customize** beneath Claude Code on the first connection screen, or open **Settings → Claude Code → Location → Customize**.
+1. Install the CLI using **Install** on the first connection screen or in **Settings → Claude Code**, then select the refresh icon. Once detected, select **Customize**, or use **Location → Customize** in Settings.
 2. Select **Separate Korus chats** or **Use existing setup**.
 3. For separate chats, leave **Reuse my existing skills** checked if you want to share existing Claude Code skills; uncheck it to keep skills separate too.
-4. If Claude Code is detected, select **Save**. If the CLI is missing, select **Install** and wait for setup to finish.
+4. Select **Save**.
 
-Korus's install action uses Claude Code's native installer. If installation fails, follow the [official Claude Code installation guide](https://code.claude.com/docs/en/setup#install-claude-code), restart Korus, and retry the connection. Installing the executable and signing in are separate steps.
+**Install** opens the [official Claude Code installation instructions](https://code.claude.com/docs/en/quickstart#step-1-install-claude-code); it does not install the CLI for you. Korus detects Claude Code on PATH. Installing the executable and signing in are separate steps.
 
 ### Separate Korus chats
 
@@ -71,7 +71,7 @@ Claude agents can use Korus's collaboration tools without installing Codex or co
 
 | Symptom | What to do |
 | --- | --- |
-| The CLI is not detected | Open **Customize** and use **Install**. If it fails, install Claude Code manually, restart Korus, and try again. |
+| The CLI is not detected | Use **Install** to open the instructions, install Claude Code on PATH, then select the refresh icon. |
 | Your terminal is signed in, but Korus is not | Check **Location** and use the full login command copied from Korus, including its home prefix. |
 | You finished terminal login, but the dialog is still open | Select **Refresh status**; terminal sign-in is not an automatic completion signal for this dialog. |
 | Korus reports an authentication-check error | Verify that the CLI is installed and that the login ran against the selected home, then retry **Connect** and **Refresh status**. |

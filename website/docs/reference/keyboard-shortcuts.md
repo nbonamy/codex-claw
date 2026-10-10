@@ -51,17 +51,17 @@ Press both Command keys simultaneously while the window you want to capture is i
 
 ## Composer commands
 
-Type `/` in the composer to discover commands. These commands are available for both Codex and Claude Code:
+Type `/` in the composer to discover commands. Availability depends on the engine:
 
 | Command | Action |
 | --- | --- |
 | `/plan` | Enter Plan mode. |
-| `/compact` | Compact conversation context. |
+| `/compact` | Compact conversation context in Codex or Claude Code. |
 | `/review` | Open Korus's [Code Review](../workflows/code-review) workflow. |
 | `/visualize` | Open [Visualize](../features/visualize). |
 | `/delegate [task]` | Ask the current agent to hand off work to a new Korus teammate in a worktree. |
 | `/worktree [task]` | Alias for `/delegate`. |
 
-The composer's **+** menu includes **Review**, **Delegate**, and **Visualize**. See [Worktree delegation](../workflows/worktrees#delegate-implementation) for handoff and local-commit behavior.
+Apart from `/compact`, the commands above are shared across supported engines, including Antigravity. The composer's **+** menu includes **Review**, **Delegate**, and **Visualize**. See [Worktree delegation](../workflows/worktrees#delegate-implementation) for handoff and local-commit behavior.
 
 Both Codex and Claude Code offer `/goal`. Claude goals have no token-budget support. Other composer controls and turn actions depend on the selected provider; see [Conversations](../features/conversations).

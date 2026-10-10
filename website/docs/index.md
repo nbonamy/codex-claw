@@ -11,7 +11,7 @@ Korus is a desktop workspace for agentic software engineering. Keep conversation
 
 <div class="docs-grid">
   <a class="docs-card" href="./getting-started/quickstart.html"><strong>Quickstart →</strong><span>Install Korus and take your first task through to a reviewed diff.</span></a>
-  <a class="docs-card" href="./providers/"><strong>Provider guides →</strong><span>Connect Codex or Claude Code and choose an engine for your agents.</span></a>
+  <a class="docs-card" href="./providers/"><strong>Provider guides →</strong><span>Connect your coding engines and choose one for each agent.</span></a>
   <a class="docs-card" href="./workflows/parallel-agents.html"><strong>Work with agents →</strong><span>Coordinate parallel work, isolate changes, and review the outcome.</span></a>
   <a class="docs-card" href="./troubleshooting/"><strong>Troubleshooting →</strong><span>Find the next step when setup, a conversation, or a workflow gets stuck.</span></a>
 </div>

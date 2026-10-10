@@ -18,13 +18,13 @@ Agents using the same folder share its files. Use separate [worktrees](../workfl
 
 ## Does “Separate Korus chats” mean a separate model subscription?
 
-It selects a separate provider setup environment for Korus's chats, sign-in, and configuration. You still use a provider account with the model access you need. Codex and Claude Code make this setup choice independently.
+It selects a separate provider setup environment for Korus's chats, sign-in, and configuration. You still use a provider account with the model access you need. Each engine makes this setup choice independently.
 
 See [Provider guides](../providers/) for the exact account, skills, and plugin boundaries.
 
 ## Why do I need to sign in when my CLI is already connected?
 
-Check the engine's selected setup location. A separate Korus environment has its own authentication; **Use existing setup** selects the provider environment already configured on this computer. Signing in to Codex also does not authenticate Claude Code.
+Check the engine's selected setup location. A separate Korus environment has its own authentication; **Use existing setup** selects the provider environment already configured on this computer. Signing in to one engine does not authenticate the others.
 
 ## Do I need GitHub to use Korus?
 

@@ -8,7 +8,7 @@ Visualize brings diagrams and interactive explanations into the workspace next t
 
 ## Start a visualization
 
-Enter `/visualize` in a Codex or Claude Code conversation, or open **Visualize** from the workspace's **+** menu. The pane uses your conversation as context and can offer suggested diagrams. Select a suggestion when the agent is idle, or ask for a specific result in the composer.
+Enter `/visualize` in your conversation, or open **Visualize** from the workspace's **+** menu. The pane uses your conversation as context and can offer suggested diagrams. Select a suggestion when the agent is idle, or ask for a specific result in the composer.
 
 ```text
 Show how a request moves from the frontend through the backend

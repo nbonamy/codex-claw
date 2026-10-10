@@ -14,12 +14,12 @@ Development builds have additional runtime and SDK requirements described in the
 
 ## A provider will not connect
 
-1. Open **Settings → Codex** or **Settings → Claude Code** for the failing engine.
+1. Open the failing engine's Settings page.
 2. Check the selected setup location. A successful login in your normal command-line environment does not authenticate a separate Korus setup.
 3. Complete the authentication flow for that selected location. A detected engine and a connected account are separate states.
 4. Confirm the engine is enabled. The initial **Continue** button needs at least one installed, connected, enabled engine.
 
-See the [Codex](../providers/codex) or [Claude Code](../providers/claude-code) guide. Include the selected provider and any custom runtime or provider home when reporting the error.
+See the [provider guides](../providers/) for the engine's setup and sign-in steps. If Antigravity is not detected, check that its runtime and matching harness are both installed, then select the refresh icon. Include the selected provider and any custom runtime or provider home when reporting the error.
 
 ## My previous conversations are missing after changing setup
 
