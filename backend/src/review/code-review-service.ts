@@ -259,6 +259,7 @@ export class CodeReviewService {
     const round = activeCodeReviewRound(session);
     this.requireIdleRound(round);
     const revision = session.updatedAt;
+    const automatic = session.automation?.state === 'completed';
     const finishedAt = this.timestamp();
     this.activeRoundTurns.add(round.id);
     try {
@@ -266,7 +267,8 @@ export class CodeReviewService {
         ...session, status: 'finished', finishedAt, updatedAt: finishedAt,
       }));
       this.requireOpenReviewSession(session);
-      if (session.status !== 'readyToFinish' || session.updatedAt !== revision) {
+      if (session.status !== 'readyToFinish' || session.updatedAt !== revision
+        || (automatic && session.automation?.state !== 'completed')) {
         throw new Error('The review changed while saving its report. Inspect it before finishing.');
       }
       if (session.threadMode === 'independent') {

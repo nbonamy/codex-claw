@@ -20,7 +20,7 @@ function agent(id: string): Agent {
 
 type ReviewScript = (handlers: ReviewToolHandlers) => Promise<{ text: string; findingCount?: number }>;
 
-function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent): Promise<void> => undefined, snapshot: AppSnapshot = createEmptySnapshot()) {
+function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent): Promise<void> => undefined, snapshot: AppSnapshot = createEmptySnapshot(), now?: () => Date) {
   snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
   const owner = snapshot.agents.find(candidate => candidate.id === 'owner') ?? agent('owner');
   if (!snapshot.agents.includes(owner)) snapshot.agents.push(owner);
@@ -56,7 +56,7 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
     git,
     createAgent: (input, options) => agentCreation.create(input, options),
     tools,
-    now: () => new Date(`2026-09-19T10:${String(tick++).padStart(2, '0')}:00.000Z`),
+    now: now ?? (() => new Date(`2026-09-19T10:${String(tick++).padStart(2, '0')}:00.000Z`)),
     runReview: async (_agent, prompt, _url, reviewerSession) => {
       turns.push({ prompt, ...(reviewerSession ? { reviewerSession } : {}) });
       const script = scripts.shift();
@@ -85,6 +85,23 @@ function reviewer(test: ReturnType<typeof harness>, session: { reviewerAgentId: 
 }
 
 describe('CodeReviewService', () => {
+  it('preserves the reviewer when switching while automatic finish saves its report in the same millisecond', async () => {
+    let release!: (path: string) => void;
+    const test = harness([async () => ({ text: 'Clean.', findingCount: 0 })], undefined, undefined, () => new Date('2026-09-19T10:00:00.000Z'));
+    test.saveReport.mockImplementation(() => new Promise(resolve => { release = resolve; }));
+    const session = test.service.startAutomatic(test.owner, { scope: { type: 'uncommitted' } });
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    const visible = reviewer(test, session);
+    await test.service.switchToManual(visible, session.id);
+    release('/reports/review.md');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(test.deleted).toEqual([]);
+    expect(session.status).toBe('readyToFinish');
+    expect(session.automation).toMatchObject({ enabled: false, state: 'manual' });
+    expect(session.automation?.reason).toBeUndefined();
+    expect(visible.codeReview).toBe(session);
+  });
+
   it('keeps a clean review available when switching during automatic completion scheduling', async () => {
     const test = harness([async () => ({ text: 'Clean.', findingCount: 0 })]);
     let release!: () => void;
