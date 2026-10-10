@@ -10,14 +10,16 @@ This folder contains editable, scripted Korus product films. Follow the reposito
 
 ## Source and motion
 
-- Keep editable HTML, CSS, and JavaScript in `videos/`. The shared renderer is `render-mission-film.mjs`; add each new film to its allowlist, duration, and poster timing.
-- Drive every visual state from a deterministic `window.seekFilm(seconds)`. Scrubbing, playback, and exported frames must tell the same story at the same timestamp.
+- Keep editable HTML, CSS, and choreography in `videos/`; Remotion in `remotion/` owns Studio playback, audio, frame rendering, and encoding. Register films in `film-catalog.mjs` and the composition controller registry. Use the shared Remotion exporter for every film.
+- Keep controllers importable without starting browser playback. Drive visual state from `createFilm(root).seek(seconds)`; the standalone browser adapter exposes `window.seekFilm` for previews. Remotion supplies the frame clock. Random-access scrubbing and parallel exported frames must tell the same story at the same timestamp.
+- Preserve each film's authored CSS cascade. Load only the active composition's styles so another film cannot override them. Wait for artwork and fonts before rendering.
+- Use `film-timing.mjs` to map frames to the approved narration. Preserve continuous takes, their provenance, and measured captions; a re-export must not invoke speech synthesis. Optional captions stay separate WebVTT tracks.
 - Carry the viewer through the workflow with movement inside the app—typed prompts, progressing work, panels, diagrams, and objects moving into their next state. Use scene transitions sparingly; avoid a sequence of fade-outs/fade-ins or decorative wave/shift effects.
 - Keep progress causal and legible. A task or defect should advance through its stages rather than jump to completion or reset visually.
 
 ### Cursor and clicks
 
-Match the earlier films' cursor treatment (see `review-film.mjs` and `delegation-film.mjs`):
+Match the earlier films' cursor treatment (see `review-film-controller.mjs` and `delegation-film-controller.mjs`):
 
 - Schedule only meaningful clicks as `[start, click, selector]` against the actual rendered target. Derive its center from `getBoundingClientRect()` relative to the scaled film, rather than hard-coding screen coordinates.
 - Ease the cursor in from nearby, briefly scale it down on press, and show one short ripple (about 0.28 seconds) at the target. Hide cursor and ripple outside that click's interval.

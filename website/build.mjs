@@ -73,7 +73,7 @@ for (const film of [
         : new URL(name, location),
     ).catch(() => {
       throw new Error(
-        `Missing ${name}. Run: ${kind === "POSTER" ? `node videos/render-mission-film.mjs ${film}-film` : "node videos/render-voice-comparison.mjs --all"}`,
+        `Missing ${name}. Run: npm run render --prefix videos/remotion -- ${film}-film`,
       );
     });
     const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 12);

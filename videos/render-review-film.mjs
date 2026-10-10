@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import {
   readApprovedNarration,
   paceNarration,
-  retimeForNarration,
 } from "./render-voice-comparison.mjs";
-import { renderNarration } from "./render-narration.mjs";
+import { alignFilmToNarration } from "./film-timing.mjs";
+import { renderFilms } from "./remotion/render.mjs";
 
 // Film-specific export recipe; reuse the approved voice, pacing and caption pipeline.
 const root = dirname(fileURLToPath(import.meta.url));
@@ -26,21 +26,24 @@ const paced = await paceNarration({
   inputPath: approved.narrationPath,
   outputPath: narrationPath,
 });
-const inputPath = join(output, "review-film-paced-silent.mp4");
-const timed = await retimeForNarration({
+const timed = alignFilmToNarration({
   film,
   narration: paced,
   narrationOffset: 0,
   outro: 0,
-  inputPath: join(root, "assets/review-film.mp4"),
-  outputPath: inputPath,
 });
-const rendered = await renderNarration({
-  film: timed,
-  inputPath,
-  outputPath: join(output, "review-film-paced.mp4"),
-  voice: voice.title,
-  narrationPath,
+const [rendered] = await renderFilms({
+  jobs: [
+    {
+      film,
+      timed,
+      id: film.id,
+      title: film.title,
+      voice: voice.title,
+      narrationPath,
+    },
+  ],
+  outputDirectory: output,
 });
 await writeFile(
   join(output, "narration.json"),

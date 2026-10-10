@@ -13,8 +13,8 @@ import { renderNarration } from "./render-narration.mjs";
 import {
   paceNarration,
   readApprovedNarration,
-  retimeForNarration,
 } from "./render-voice-comparison.mjs";
+import { alignFilmToNarration } from "./film-timing.mjs";
 
 const run = promisify(execFile);
 
@@ -168,11 +168,10 @@ test("paced narration slows speech without lowering pitch and keeps pauses align
   }
 });
 
-test("continuous narration stays intact while visuals follow its timing", async () => {
+test("continuous narration stays intact through caption boundaries", async () => {
   const folder = await mkdtemp(join(tmpdir(), "local-narration-test-"));
   try {
     const original = join(folder, "original.mp4");
-    const retimed = join(folder, "retimed.mp4");
     const speech = join(folder, "speech.wav");
     const outputPath = join(folder, "narrated.mp4");
     await run("ffmpeg", [
@@ -182,7 +181,7 @@ test("continuous narration stays intact while visuals follow its timing", async 
       "-f",
       "lavfi",
       "-i",
-      "testsrc2=size=160x90:rate=24:duration=4",
+      "testsrc2=size=160x90:rate=24:duration=6",
       "-c:v",
       "libx264",
       "-pix_fmt",
@@ -208,7 +207,7 @@ test("continuous narration stays intact while visuals follow its timing", async 
       ],
     };
     const originalBytes = await readFile(original);
-    const shared = await retimeForNarration({
+    const shared = alignFilmToNarration({
       film,
       narration: {
         duration: 5,
@@ -217,15 +216,13 @@ test("continuous narration stays intact while visuals follow its timing", async 
           { start: 2.8, spokenEnd: 4.7, text: "Second cue" },
         ],
       },
-      inputPath: original,
-      outputPath: retimed,
     });
     assert.equal(shared.cues[0].start, 0.6);
     assert.equal(shared.cues[1].start, 3.3);
     assert.equal(shared.duration, 6);
     const report = await renderNarration({
       film: shared,
-      inputPath: retimed,
+      inputPath: original,
       outputPath,
       narrationPath: speech,
       narrationOffset: 0.5,
@@ -280,7 +277,7 @@ test("continuous narration stays intact while visuals follow its timing", async 
         0.05,
     );
     await run("ffmpeg", ["-v", "error", "-i", outputPath, "-f", "null", "-"]);
-    // Actual last frames must still represent the source ending after retiming.
+    // Audio muxing must preserve the visual ending.
     async function ending(path) {
       return (
         await run(
@@ -319,21 +316,12 @@ test("continuous narration stays intact while visuals follow its timing", async 
     await assert.rejects(
       renderNarration({
         film: shared,
-        inputPath: retimed,
+        inputPath: original,
         outputPath,
         narrationPath: speech,
         narrationOffset: 3,
       }),
       /cut off/,
-    );
-    await assert.rejects(
-      retimeForNarration({
-        film,
-        narration: { duration: 5, cues: [] },
-        inputPath: original,
-        outputPath: retimed,
-      }),
-      /aligned cue/,
     );
   } finally {
     await rm(folder, { recursive: true, force: true });

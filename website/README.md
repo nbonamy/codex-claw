@@ -107,12 +107,12 @@ recordings.
 Before building or deploying from a fresh checkout, render all five films:
 
 ```bash
-for film in mission review delegation project visualize; do
-  node videos/render-mission-film.mjs "$film-film"
-done
+npm ci --prefix videos/remotion
+npm run render --prefix videos/remotion -- --all
 ```
 
-Then follow the **Calm American five-film exports** instructions below. The build
+The exporter uses existing approved takes without synthesizing speech; see
+**Calm American five-film exports** below when preparing new narration. The build
 uses the approved narrated MP4s, VTTs, and timing manifest from
 `videos/local/narrated/` (override with `APP_NARRATED_FILMS`) plus the
 ignored poster outputs in `videos/assets/`. Missing assets stop the build with
@@ -140,17 +140,64 @@ npx playwright install chromium
 npm run test:website:browser
 ```
 
+## Remotion films
+
+`videos/remotion/` is the rendering project for the five widescreen films and
+Quick Chat Shorts. Each film has a source composition; the five widescreen
+films also have narrated compositions using approved Calm American takes.
+
+```bash
+npm ci --prefix videos/remotion
+npm run studio --prefix videos/remotion
+npm run render --prefix videos/remotion -- --all
+```
+
+Studio reports its local preview URL. It uses the same HTML, CSS, and shared
+controllers as the editable browser viewers, with Remotion supplying the
+frame clock and audio. Frames are mapped directly to measured narration
+timing, including the approved pauses; no intermediate video is stretched.
+
+The batch writes narrated MP4s, optional WebVTT captions, and the review player
+to `videos/local/narrated/`, posters to `videos/assets/`, and the silent
+Shorts MP4 to `videos/assets/project-shorts.mp4`. These paths are the website’s
+existing media contract. Open the review player with:
+
+```bash
+npx vite videos/local/narrated --host 127.0.0.1 --port 4190 --strictPort
+```
+
+Export just one narrated film, or silent source films for draft voice work:
+
+```bash
+npm run render --prefix videos/remotion -- review-film
+npm run render --prefix videos/remotion -- --all --silent
+```
+
+FFmpeg is required for audio preparation; Remotion manages its headless
+browser. Source compositions work without narration. Narrated exports require
+approved WAVs and matching provenance/alignment files; stale copy or missing
+takes stop the export rather than substituting a voice. Studio loads cached
+narrated compositions when those approved takes are present.
+
+Prepared markup, styles, normalized audio, manifests, and temporary bundles
+stay ignored under `videos/local/remotion/`. Editing film source does not
+require copying it into the rendering project. Do not commit generated media.
+
 ## Mission product film
 
 `videos/mission-film.html` is an editable 48-second HTML/CSS/JavaScript illustration of a Mission moving from prompt through Requirements, Tickets, Implementation, Review, and Ship. After the PR action, it cuts to a clear promotional handoff showing the pull request ready for review, then returns to the closing title. The Mission scenes follow the desktop app's three-pane layout and current light-theme tokens. The cloud-agent feature and PR shown are an illustrative scenario, not a claim that cloud-agent support has shipped or a recording of a live run.
 
-Preview the films from the repository root with `python3 -m http.server 4174 --directory .`, then open <http://127.0.0.1:4174/videos/mission-film.html>. The pages have play, pause, restart, and scrub controls. To export a silent, caption-led 1600×900 MP4 and poster image, install Chrome and FFmpeg, then run:
+Preview the films from the repository root with `python3 -m http.server 4174 --directory .`, then open <http://127.0.0.1:4174/videos/mission-film.html>. The pages have play, pause, restart, and scrub controls. To export a silent, caption-led 1600×900 MP4 and poster image with Remotion, run:
 
 ```bash
-node videos/render-mission-film.mjs
+npm run render --prefix videos/remotion -- mission-film --silent
 ```
 
-The render writes `videos/assets/mission-film.mp4` and `videos/assets/mission-film-poster.png`. These rebuildable outputs are ignored by Git; run the renderer for each film when you need an MP4 or poster. The thumbnails remain as source artwork, and the viewers reuse the website's Korus icon. Set `APP_FILM_CHROME` if Chrome is not at the default macOS path. The deterministic `window.seekFilm(seconds)` renderer drives both the preview and frame export, so the encoded video matches the editable source.
+The render writes `videos/assets/mission-film.mp4` and
+`videos/assets/mission-film-poster.png`. These rebuildable outputs are ignored
+by Git. Thumbnails remain tracked source artwork, and the films reuse the
+website’s Korus icon. The shared choreography drives both the browser preview
+and Remotion composition.
 
 ## Draft voice-over review
 
@@ -242,7 +289,7 @@ for film in mission-film review-film delegation-film project-film visualize-film
   .app-dev/video-tts/bin/python videos/generate-local-narration.py "$film" --voice american-male --output "videos/local/narrated/$film" || break
   .app-dev/video-tts/bin/python videos/check-local-narration.py --voice american-male --output "videos/local/narrated/$film" || break
 done
-node videos/render-voice-comparison.mjs --all
+npm run render --prefix videos/remotion -- --all
 npx vite videos/local/narrated --host 127.0.0.1 --port 4190 --strictPort
 ```
 
@@ -279,7 +326,7 @@ or the Mission Review stage. Preview it at
 <http://127.0.0.1:4174/videos/review-film.html> and export its ignored MP4 and poster:
 
 ```bash
-node videos/render-mission-film.mjs review-film
+npm run render --prefix videos/remotion -- review-film --silent
 ```
 
 For a standalone narrated export, generate and validate one Calm American take,
@@ -300,7 +347,7 @@ To include an approved standalone take in the website, copy its `narration.wav`,
 `narration.json`, and `narration-aligned.json` from
 `videos/local/review-automatic/review-film/american-male/` into
 `videos/local/narrated/review-film/american-male/`, then run
-`node videos/render-voice-comparison.mjs --all`. This regenerates the website's
+`npm run render --prefix videos/remotion -- --all`. This regenerates the website's
 five-film manifest and exports without synthesizing new speech. Deploy through
 the website workflow below. The tracked thumbnail is
 `videos/assets/review-film-thumbnail.png`.
@@ -310,7 +357,7 @@ the website workflow below. The tracked thumbnail is
 `videos/delegation-film.html` is a separate, illustrative 46-second film: a feature conversation leads to typing and submitting `/delegate` in the current agent's composer, handoff preparation, visible worktree provisioning, follow-up work with the delegated agent, and a merge with worktree cleanup that closes the delegated agent. The original agent and conversation remain available. Preview it at <http://127.0.0.1:4174/videos/delegation-film.html> and export its ignored MP4 and poster with:
 
 ```bash
-node videos/render-mission-film.mjs delegation-film
+npm run render --prefix videos/remotion -- delegation-film --silent
 ```
 
 ## Quick Chat to project product film
@@ -318,7 +365,7 @@ node videos/render-mission-film.mjs delegation-film
 `videos/project-film.html` is a separate, illustrative 43-second film: discuss an app idea in Quick Chat, explicitly ask Korus to create a project, see the folder/agent/handoff setup, then open the new project agent while the original Quick Chat remains. The project folder is not shown as a Git repository or worktree. Preview it at <http://127.0.0.1:4174/videos/project-film.html> and export its ignored MP4 and poster with:
 
 ```bash
-node videos/render-mission-film.mjs project-film
+npm run render --prefix videos/remotion -- project-film --silent
 ```
 
 The source thumbnail is `videos/assets/project-film-thumbnail.png`.
@@ -326,7 +373,7 @@ The source thumbnail is `videos/assets/project-film-thumbnail.png`.
 `videos/project-shorts.html` reframes the same story as an editable 40-second 9:16 vertical cut for TikTok and YouTube Shorts. It uses larger mobile-readable captions and a focused app close-up; the explicit create request and retained Quick Chat remain visible. Preview it at <http://127.0.0.1:4174/videos/project-shorts.html> and export the ignored 1080×1920 MP4 and poster with:
 
 ```bash
-node videos/render-mission-film.mjs project-shorts
+npm run render --prefix videos/remotion -- project-shorts --silent
 ```
 
 ## Visualize and annotations product film
@@ -334,7 +381,7 @@ node videos/render-mission-film.mjs project-shorts
 `videos/visualize-film.html` is an editable 31-second, 16:9 illustration of the shipped Visualize flow: enter `/visualize`, choose a suggested diagram, watch it populate and zoom on the Excalidraw canvas, annotate one shape, submit the annotation without extra composer text, and see just that part of the diagram refined. It is a scripted promotion, not a recording of a live run. Preview it at <http://127.0.0.1:4174/videos/visualize-film.html> and export the ignored 1600×900 MP4 and poster with:
 
 ```bash
-node videos/render-mission-film.mjs visualize-film
+npm run render --prefix videos/remotion -- visualize-film --silent
 ```
 
 The source thumbnail is `videos/assets/visualize-film-thumbnail.png`.

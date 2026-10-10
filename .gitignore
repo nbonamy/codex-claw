@@ -18,7 +18,7 @@ electron/.runtime-cache/
 /electron/resources/codex/
 native/**/.build/
 
-# Rebuild promo video renders from videos/*.html and videos/render-mission-film.mjs.
+# Rebuild promo video renders with the Remotion project in videos/remotion/.
 /videos/assets/*.mp4
 /videos/assets/*-poster.png
 # Local voice references, approved takes, captions, drafts, and narrated exports.

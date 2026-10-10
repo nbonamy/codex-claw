@@ -4,7 +4,7 @@ import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { renderNarration } from "./render-narration.mjs";
+import { alignFilmToNarration } from "./film-timing.mjs";
 
 const run = promisify(execFile);
 const root = dirname(fileURLToPath(import.meta.url));
@@ -135,118 +135,6 @@ export async function paceNarration({
   };
 }
 
-// Fit visual intervals to the edited take, preserving the original choreography.
-export async function retimeForNarration({
-  film,
-  narration,
-  inputPath,
-  outputPath,
-  narrationOffset = 0.5,
-  outro = 0.5,
-}) {
-  if (resolve(inputPath) === resolve(outputPath))
-    throw new Error("Keep the silent original separate from the comparison.");
-  const source = await probe(inputPath);
-  if (
-    Math.abs(Number(source.format.duration) - film.duration) > 0.1 ||
-    source.streams.find((stream) => stream.codec_type === "video")
-      ?.r_frame_rate !== "24/1"
-  )
-    throw new Error(
-      "Re-export the silent film at its scripted duration and 24 fps.",
-    );
-  if (
-    !narration ||
-    narration.cues?.length !== film.cues.length ||
-    !Number.isFinite(narration.duration) ||
-    narration.duration <= 0
-  )
-    throw new Error("Each line needs an aligned cue from the continuous take.");
-  const offset = narrationOffset;
-  const duration = Math.ceil((narration.duration + offset + outro) * fps) / fps;
-  const cues = narration.cues.map((cue, index) => {
-    if (
-      cue.text !== film.cues[index].text ||
-      !Number.isFinite(cue.start) ||
-      !Number.isFinite(cue.spokenEnd) ||
-      cue.start < 0 ||
-      cue.spokenEnd <= cue.start ||
-      cue.spokenEnd > narration.duration ||
-      (index > 0 && cue.start < narration.cues[index - 1].spokenEnd)
-    )
-      throw new Error(
-        "Invalid or stale aligned cue; recheck the continuous take.",
-      );
-    return {
-      text: cue.text,
-      start: cue.start + offset,
-      spokenEnd: cue.spokenEnd + offset,
-      end:
-        index + 1 < narration.cues.length
-          ? narration.cues[index + 1].start + offset
-          : duration,
-    };
-  });
-  const boundaries = [
-    0,
-    ...film.cues.map((cue) => Math.round(cue.start * fps)),
-    Math.round(film.duration * fps),
-  ];
-  const target = [
-    0,
-    ...cues.map((cue) => Math.round(cue.start * fps)),
-    Math.round(duration * fps),
-  ];
-  const segments = boundaries.slice(0, -1).map((start, index) => {
-    const original = boundaries[index + 1] - start;
-    if (original <= 0)
-      throw new Error(
-        "Cue starts must be increasing and after the opening frame.",
-      );
-    const frames = target[index + 1] - target[index];
-    if (
-      frames <= 0 ||
-      (index > 0 && (frames > original * 2.5 || frames < original * 0.35))
-    )
-      throw new Error(
-        `Cue ${index} has unexpected timing; inspect the take before retiming.`,
-      );
-    return { start, original, frames };
-  });
-  const filters = [
-    `[0:v]split=${segments.length}${segments.map((_, index) => `[in${index}]`).join("")}`,
-    ...segments.map(
-      ({ start, original, frames }, index) =>
-        `[in${index}]trim=start_frame=${start}:end_frame=${start + original},setpts=(PTS-STARTPTS)*${frames / original},fps=${fps},tpad=stop_mode=clone:stop_duration=1,trim=end_frame=${frames},setpts=N/(${fps}*TB)[v${index}]`,
-    ),
-    `${segments.map((_, index) => `[v${index}]`).join("")}concat=n=${segments.length}:v=1:a=0[out]`,
-  ];
-  await run("ffmpeg", [
-    "-y",
-    "-v",
-    "error",
-    "-i",
-    inputPath,
-    "-filter_complex",
-    filters.join(";"),
-    "-map",
-    "[out]",
-    "-an",
-    "-c:v",
-    "libx264",
-    "-crf",
-    "18",
-    "-preset",
-    "fast",
-    "-pix_fmt",
-    "yuv420p",
-    "-movflags",
-    "+faststart",
-    outputPath,
-  ]);
-  return { ...film, duration, cues };
-}
-
 export async function readApprovedNarration({ folder, film, voice, settings }) {
   const stem = join(folder, "narration");
   const provenance = JSON.parse(await readFile(`${stem}.json`, "utf8"));
@@ -273,12 +161,12 @@ export async function readApprovedNarration({ folder, film, voice, settings }) {
   return { narrationPath: `${stem}.wav`, narration };
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+export async function exportNarrated(args = process.argv.slice(2)) {
   const all = args.includes("--all");
+  const requested = args.find((arg) => arg.startsWith("--film="))?.slice(7);
   const output = resolve(
-    args.find((arg) => arg !== "--all") ??
-      join(root, "local", all ? "narrated" : "voice-comparison"),
+    args.find((arg) => !arg.startsWith("--")) ??
+      join(root, "local", all || requested ? "narrated" : "voice-comparison"),
   );
   const script = JSON.parse(
     await readFile(join(root, "narration.json"), "utf8"),
@@ -288,17 +176,25 @@ async function main() {
   );
   const selectedFilms = all
     ? script.films
-    : script.films.filter((film) => film.id === "delegation-film");
-  const selectedVoices = all
-    ? settings.voices.filter((voice) => voice.id === "american-male")
-    : settings.voices;
+    : script.films.filter(
+        (film) => film.id === (requested ?? "delegation-film"),
+      );
+  if (!selectedFilms.length)
+    throw new Error(`Unknown narrated film: ${requested}`);
+  const selectedVoices =
+    all || requested
+      ? settings.voices.filter((voice) => voice.id === "american-male")
+      : settings.voices;
   const jobs = selectedFilms.flatMap((film) =>
     selectedVoices.map((voice) => ({
       film,
       voice,
-      folder: all ? join(output, film.id, voice.id) : join(output, voice.id),
-      id: all ? film.id : `delegation-${voice.id}`,
-      title: all ? film.title : voice.title,
+      folder:
+        all || requested
+          ? join(output, film.id, voice.id)
+          : join(output, voice.id),
+      id: all || requested ? film.id : `delegation-${voice.id}`,
+      title: all || requested ? film.title : voice.title,
     })),
   );
   // Validate every cached clip before replacing any exported film.
@@ -309,7 +205,7 @@ async function main() {
       await readApprovedNarration({ film, voice, folder, settings }),
     );
   }
-  const films = [];
+  const renderJobs = [];
   for (const job of jobs) {
     const { film, voice, folder, id, title } = job;
     const narrationPath = join(folder, "narration-paced.wav");
@@ -319,38 +215,59 @@ async function main() {
       inputPath: job.narrationPath,
       outputPath: narrationPath,
     });
-    const inputPath = join(output, `${id}-paced-silent.mp4`);
-    const timed = await retimeForNarration({
+    const timed = alignFilmToNarration({
       film,
       narration: paced,
       narrationOffset: 0,
       outro: 0,
-      inputPath: join(root, "assets", `${film.id}.mp4`),
-      outputPath: inputPath,
     });
-    const rendered = await renderNarration({
-      film: { ...timed, id, title },
-      inputPath,
-      outputPath: join(output, `${id}-paced.mp4`),
+    renderJobs.push({
+      film,
+      timed,
+      id,
+      title,
       voice: voice.title,
       narrationPath,
     });
-    films.push(rendered);
-    console.log(
-      `${title}: ${rendered.duration.toFixed(2)}s · ${join(output, rendered.video)}`,
-    );
   }
+  const { renderFilms } = await import("./remotion/render.mjs");
+  const films = await renderFilms({
+    jobs: renderJobs,
+    sourceIds: all ? ["project-shorts"] : [],
+    outputDirectory: output,
+  });
+  let existing = [];
+  if (requested) {
+    try {
+      existing = JSON.parse(
+        await readFile(join(output, "narration.json"), "utf8"),
+      ).films;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  const merged = requested
+    ? script.films
+        .map(
+          (film) =>
+            films.find((item) => item.id === film.id) ??
+            existing.find((item) => item.id === film.id),
+        )
+        .filter(Boolean)
+    : films;
   await writeFile(
     join(output, "narration.json"),
     JSON.stringify(
       {
-        title: all
-          ? "Korus · Five workflows, one voice"
-          : "Korus · Two voices, one workflow",
-        description: all
-          ? "Five films narrated by Calm American, with the approved pauses and speech speed. Optional captions; click a line to replay it."
-          : "The same approved voices, with breathing room between lines and calmer scene pacing. Optional captions; click a line to replay it.",
-        films,
+        title:
+          all || requested
+            ? "Korus · Five workflows, one voice"
+            : "Korus · Two voices, one workflow",
+        description:
+          all || requested
+            ? "Five films narrated by Calm American, with the approved pauses and speech speed. Optional captions; click a line to replay it."
+            : "The same approved voices, with breathing room between lines and calmer scene pacing. Optional captions; click a line to replay it.",
+        films: merged,
       },
       null,
       2,
@@ -369,7 +286,7 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  main().catch((error) => {
+  exportNarrated().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
   });
