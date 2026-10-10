@@ -22,7 +22,7 @@
         >
       </div>
       <div v-else class="repository-session-source-dialog__assignment-header">
-        <button type="button" :aria-label="t('common.back')" :disabled="preparationVisible" @click="selectedWorkItem = null">
+        <button type="button" :aria-label="t('common.back')" @click="selectedWorkItem = null">
           <ArrowLeftIcon aria-hidden="true" />
         </button>
         <strong>{{ t('repositoryBacklog.startWork', { identifier: workItemDisplayIdentifier(selectedWorkItem) }) }}</strong>
@@ -53,24 +53,13 @@
       <p v-if="purpose === 'missionIssue' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
       <template v-if="selectedWorkItem">
         <p v-if="!workProviderDefinition(selectedWorkItem.provider).repositoryBacked">{{ t('backlogSource.codeRepository') }}: {{ repositoryName }}</p>
-        <StagedOperationProgress
-          v-if="preparationVisible && assignmentState !== 'error'"
-          :state="assignmentState === 'success' ? 'success' : 'running'"
-          :eyebrow="t('repositoryBacklog.launchingFrom', { identifier: workItemDisplayIdentifier(selectedWorkItem) })"
-          :title="preparationTitle"
-          :complete-title="t('repositoryBacklog.workReady', { identifier: workItemDisplayIdentifier(selectedWorkItem) })"
-          :steps="preparationSteps"
-          @complete="emit('preparation-complete')"
-        />
         <WorkItemAssignmentPicker
-          v-else
           v-model:backend="backend"
           :item="selectedWorkItem"
           :branch-name="assignmentBranchName"
           :existing-worktree-path="assignmentExistingWorktreePath"
           :model-agent-id="modelAgentId"
           :sessions="sessions"
-          :error="assignmentError"
           @custom="customWorkItem"
           @submit="startWorkItem"
         >
@@ -117,7 +106,7 @@
       </template>
     </section>
     <template v-if="backendChoices.length !== 1 && purpose === 'session' && !selectedWorkItem" #footer>
-      <BackendSelector v-model="backend" size="small" :disabled="preparationVisible" />
+      <BackendSelector v-model="backend" size="small" />
     </template>
   </el-dialog>
 </template>
@@ -144,7 +133,6 @@ import { useBackendChoices, useNewAgentBackend } from './backend-selection';
 const backendChoices = useBackendChoices();
 const backend = defineModel<import('@workspace/core/contracts').AgentBackend>('backend');
 useNewAgentBackend(backend, backendChoices);
-import StagedOperationProgress from './StagedOperationProgress.vue';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
 
 type SourceTab = 'branches' | 'pullRequests' | 'issues';
@@ -153,8 +141,6 @@ const props = withDefaults(defineProps<{
   location?: import('@workspace/core/contracts').AutomationLocation;
   modelAgentId?: string;
   branches?: SourceBranch[];
-  assignmentError?: string | null;
-  assignmentState?: 'idle' | 'running' | 'success' | 'error';
   error?: string | null;
   loading?: boolean;
   repositoryName: string;
@@ -167,9 +153,7 @@ const props = withDefaults(defineProps<{
   workItems?: WorkItem[];
 }>(), {
   branches: () => [],
-  assignmentError: null,
   modelAgentId: '',
-  assignmentState: 'idle',
   error: null,
   loading: false,
   sessions: () => [],
@@ -182,7 +166,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   close: [];
   'custom-work-item': [selection: Omit<WorkItemAssignmentSelection, 'action'>];
-  'preparation-complete': [];
   'select-branch': [branch: SourceBranch];
   'select-repository': [repositoryId: string];
   'select-work-item': [item: WorkItem];
@@ -202,7 +185,6 @@ const effectiveLoading = computed(() => tab.value === 'issues' ? backlog.status.
 function selectSource(id: string | null): void {
   selectedWorkItem.value = null;
   query.value = '';
-  resetPreparation();
   void backlog.selectSource(id);
 }
 
@@ -211,12 +193,9 @@ const query = ref('');
 const selectedWorkItem = ref<WorkItem | null>(null);
 let selectionRevision = 0;
 watch([selectedWorkItem, () => props.visible, () => JSON.stringify(props.location)], () => { ++selectionRevision; }, { flush: 'sync' });
-const preparationSelection = ref<WorkItemAssignmentSelection | null>(null);
-const preparationVisible = ref(false);
 watch([backlog.provider, () => backlog.providers.value.length > 0], () => {
   selectedWorkItem.value = null;
   query.value = '';
-  resetPreparation();
 });
 const tab = ref<SourceTab>(props.purpose === 'missionIssue' ? 'issues' : 'branches');
 const tabs = computed<ReadonlyArray<{ id: SourceTab; label: string }>>(() => [
@@ -244,55 +223,18 @@ const assignmentBranchName = computed(() => {
 const assignmentExistingWorktreePath = computed(() => (
   props.branches.find((branch) => branch.name === assignmentBranchName.value)?.worktreePath ?? ''
 ));
-const preparationSteps = computed(() => {
-  if (preparationSelection.value?.destination === 'existing') {
-    const session = props.sessions.find((candidate) => candidate.agentId === preparationSelection.value?.agentId);
-    return [
-      { title: t('repositoryBacklog.switchExistingSession'), detail: session?.label ?? t('repositoryBacklog.existingSession') },
-      { title: t('repositoryBacklog.handOverWorkContext'), detail: props.repositoryName },
-    ];
-  }
-  return [
-    { title: t('repositoryBacklog.createIsolatedWorktree'), detail: assignmentBranchName.value },
-    { title: t('agentCreationProgress.initializeWorktree'), detail: t('agentCreationProgress.checkProjectSetup') },
-    { title: t('repositoryBacklog.startAgentSession'), detail: t('repositoryBacklog.newCodexSession') },
-    { title: t('repositoryBacklog.handOverWorkContext'), detail: props.repositoryName },
-  ];
-});
-const preparationTitle = computed(() => {
-  const identifier = selectedWorkItem.value ? workItemDisplayIdentifier(selectedWorkItem.value) : '';
-  return t(
-    preparationSelection.value?.destination === 'existing'
-      ? 'repositoryBacklog.prepareExistingSession'
-      : 'repositoryBacklog.buildIsolatedHome',
-    { identifier },
-  );
-});
-
 watch(() => props.visible, async (visible) => {
   if (!visible) return;
   query.value = '';
   tab.value = props.purpose === 'missionIssue' ? 'issues' : 'branches';
   selectedWorkItem.value = null;
-  resetPreparation();
   await nextTick();
   searchInput.value?.focus();
-});
-
-watch(() => props.assignmentState, (state) => {
-  if (state === 'running' && preparationSelection.value && !preparationVisible.value) {
-    preparationVisible.value = true;
-    return;
-  }
-  if (state === 'error') {
-    resetPreparation(false);
-  }
 });
 
 watch(() => `${JSON.stringify(props.location)}:${props.selectedRepositoryId}:${props.repositoryName}`, () => {
   selectedWorkItem.value = null;
   query.value = '';
-  resetPreparation();
 });
 
 function onVisibilityChanged(visible: boolean): void {
@@ -307,8 +249,6 @@ function selectWorkItem(item: WorkItem): void {
 
 function startWorkItem(selection: WorkItemAssignmentSelection): void {
   if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
-  preparationSelection.value = selection;
-  preparationVisible.value = true;
   emit('start-work-item', { ...selection, isCurrent: selectionGuard(selection.item) });
 }
 
@@ -322,11 +262,6 @@ function selectionGuard(item: WorkItem): () => boolean {
 function customWorkItem(selection: Omit<WorkItemAssignmentSelection, 'action'>): void {
   if (selection.item.id !== selectedWorkItem.value?.id || !props.visible) return;
   emit('custom-work-item', { ...selection, isCurrent: selectionGuard(selection.item) });
-}
-
-function resetPreparation(clearSelection = true): void {
-  preparationVisible.value = false;
-  if (clearSelection) preparationSelection.value = null;
 }
 </script>
 

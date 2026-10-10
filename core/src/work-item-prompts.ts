@@ -16,7 +16,7 @@ export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPrompt
   const assignmentInstructions = options.assignment?.trim();
   const workItemId = workItemAssignmentKey(item);
   const completionPolicy = options.completionPolicy ?? 'review';
-  return [
+  const context = [
     workItemActionInstruction(item, options.action),
     '',
     `Work item ID: ${workItemId}`,
@@ -33,6 +33,18 @@ export function workItemAssignmentPrompt(item: WorkItem, options: WorkItemPrompt
     assignmentInstructions ? ['Assignment instructions:', assignmentInstructions].join('\n') : null,
     body ? ['Body:', body].join('\n') : null,
   ].filter((line): line is string => line !== null).join('\n');
+  // The conversation view hides <context>; the user only sees the short request below it.
+  return `<context>\n${context.replace(/<\/context>/giu, '&lt;/context&gt;')}\n</context>\n\n${workItemVisibleRequest(item, options.action)}`;
+}
+
+function workItemVisibleRequest(item: WorkItem, action?: WorkItemAssignmentAction): string {
+  const kind = item.kind === 'pullRequest' ? 'pull request' : 'issue';
+  const subject = `${workProviderLabel(item.provider)} ${kind} ${workItemDisplayIdentifier(item)} — ${item.title}`;
+  if (action === 'investigate') return `Investigate ${subject}`;
+  if (action === 'fix') return `Fix ${subject}`;
+  if (action === 'review') return `Review ${subject}`;
+  if (action === 'addressFeedback') return `Address review feedback on ${subject}`;
+  return `Work on ${subject}`;
 }
 
 export function workItemComposerPrompt(item: WorkItem): string {

@@ -47,7 +47,7 @@ describe('Linear issue to repository session', () => {
         });
         return { session };
       },
-      template: `<RepositorySessionSourceDialog :visible="session.visible.value" repository-name="code" :branches="session.branches.value" :assignment-state="session.assignmentState.value" :assignment-error="session.assignmentError.value" :location="{ kind: 'remote', remoteConnectionId: 'remote-code' }" @start-work-item="session.startWork" @close="session.close" />`,
+      template: `<RepositorySessionSourceDialog :visible="session.visible.value" repository-name="code" :branches="session.branches.value" :location="{ kind: 'remote', remoteConnectionId: 'remote-code' }" @start-work-item="session.startWork" @close="session.close" />`,
     });
     const wrapper = mount(Host, { global: { provide: { [backendChoicesKey as symbol]: computed(() => ['codex']) } } });
     await session.open({ repositoryRoot: '/remote/code', repositoryName: 'code', teamId: team.id });
@@ -63,6 +63,7 @@ describe('Linear issue to repository session', () => {
     expect(createAgent).toHaveBeenCalledWith({ name: null, folder: '/remote/code-eng-12', backend: 'codex', sourceRepositoryName: 'code', teamId: team.id });
     expect(assign).toHaveBeenCalledWith({ agentId: createdAgent.id, item: issue, prompt: expect.stringContaining('Issue: ENG-12') });
     expect(assign.mock.calls[0]![0].prompt).toContain(issue.body);
-    expect(session.assignmentState.value).toBe('success');
+    expect(session.visible.value).toBe(false);
+    expect(session.creationProgress.value).toMatchObject({ state: 'success', createWorktree: true, branchName: 'fix/eng-12', backend: 'codex', agentId: createdAgent.id });
   });
 });

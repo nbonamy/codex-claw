@@ -417,12 +417,9 @@
       :error="repositorySessionSourceError"
       :model-agent-id="repositorySessionSource?.agentId"
       :sessions="repositorySessionAssignmentSessions"
-      :assignment-state="repositorySessionAssignmentState"
-      :assignment-error="repositorySessionAssignmentError"
       @close="closeRepositorySessionSource"
       @select-branch="openNewAgentForSourceBranch"
       @custom-work-item="customizeRepositorySessionWork"
-      @preparation-complete="completePreparedRepositorySession"
       @start-work-item="startRepositorySessionWork"
     />
     <RepositorySessionSourceDialog
@@ -556,8 +553,8 @@
       @save="saveImageAnnotation"
     />
     <WorkspaceProvisioningProgressDialog
-      :operation="debugAgentCreationProgress ? { mode: 'single', progress: debugAgentCreationProgress } : null"
-      @close="closeDebugAgentCreationProgress"
+      :operation="provisioningProgress ? { mode: 'single', progress: provisioningProgress } : null"
+      @close="closeProvisioningProgress"
     />
     <MissionDeleteDialog
       :visible="missionDeleteTarget !== null"
@@ -1472,13 +1469,12 @@ const repositorySession = useRepositorySession({
   suggestSourceWorktreePath: (input) => props.suggestSourceWorktreePath(input),
 });
 const {
-  assignmentError: repositorySessionAssignmentError,
   assignmentSessions: repositorySessionAssignmentSessions,
-  assignmentState: repositorySessionAssignmentState,
   branches: repositorySessionSourceBranches,
   close: closeRepositorySessionSource,
   closeWorktree: closeRepositorySessionWorktree,
-  complete: completePreparedRepositorySession,
+  closeCreationProgress: closeRepositorySessionCreationProgress,
+  creationProgress: repositorySessionCreationProgress,
   createForSourceBranch: openNewAgentForSourceBranch,
   createFromWorktree: createRepositorySessionFromWorktree,
   createOnBranch: createRepositorySessionOnBranch,
@@ -2585,6 +2581,13 @@ function scheduleDebugAgentCreationUpdate(
     if (debugAgentCreationProgress.value?.id !== id) return;
     debugAgentCreationProgress.value = { ...debugAgentCreationProgress.value, ...update };
   }, delay));
+}
+
+const provisioningProgress = computed(() => debugAgentCreationProgress.value ?? repositorySessionCreationProgress.value);
+
+function closeProvisioningProgress(id: string): void {
+  closeDebugAgentCreationProgress(id);
+  closeRepositorySessionCreationProgress(id);
 }
 
 function closeDebugAgentCreationProgress(id: string): void {

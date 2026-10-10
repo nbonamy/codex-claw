@@ -3,7 +3,7 @@ import { agentDisplayName } from '@workspace/core/agent-display';
 import type {
   Agent,
   AgentGitBranchInput,
-  BackendDefaults,
+  ReasoningEffort,
   AppSnapshot,
   CreateAgentInput,
   CreateSourceWorktreeInput,
@@ -184,7 +184,7 @@ export function useWorkItemRouting(options: {
   async function createIsolatedAgent(
     listedItem: WorkItem,
     teamId: string,
-    creationOptions: { reuseExisting?: boolean; backend?: Agent['backend']; model?: string; reasoningEffort?: string; repository?: SourceRepository; isCurrent?: () => boolean } = {},
+    creationOptions: { reuseExisting?: boolean; backend?: Agent['backend']; model?: string; reasoningEffort?: string; repository?: SourceRepository; isCurrent?: () => boolean; onPhase?: (phase: 'creatingAgent') => void } = {},
   ): Promise<{ agent: Agent; item: WorkItem }> {
     const team = options.model.snapshot().teams.find((candidate) => candidate.id === teamId);
     if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
@@ -205,15 +205,15 @@ export function useWorkItemRouting(options: {
       ...remoteConnection(team),
     });
     ensureCurrent(creationOptions.isCurrent);
+    creationOptions.onPhase?.('creatingAgent');
     const agent = await options.actions.createAgent({
       name: null,
       folder: worktree.path,
       ...(creationOptions.backend ? { backend: creationOptions.backend } : {}),
-      ...(creationOptions.backend && (creationOptions.model || creationOptions.reasoningEffort) ? { backendDefaults: {
-        kind: creationOptions.backend,
-        ...(creationOptions.model ? { model: creationOptions.model, userSelectedModel: true } : {}),
-        ...(creationOptions.reasoningEffort ? { reasoningEffort: creationOptions.reasoningEffort } : {}),
-      } as BackendDefaults } : {}),
+      ...(creationOptions.model ? { modelSelection: {
+        model: creationOptions.model,
+        ...(creationOptions.reasoningEffort ? { reasoningEffort: creationOptions.reasoningEffort as ReasoningEffort } : {}),
+      } } : {}),
       sourceRepositoryName: repository.name,
       teamId: team.id,
     });

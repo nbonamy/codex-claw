@@ -372,6 +372,10 @@ wiring, never branches in assignment, Mission, Settings or automation code.
 - Assignments are provider-neutral records keyed by provider and item ID. Agents
   update status through `update-work-item`; the record survives deletion of its
   agent, and Korus status never changes the tracker's own workflow state.
+- An assignment prompt is a short user-visible request plus a hidden `<context>`
+  block holding the action instructions, the `update-work-item` protocol and the
+  item's content. Item text is untrusted, so a closing tag inside it is escaped
+  rather than allowed to end the hidden block early.
 - Automations schedule prompts on their owning daemon, independently of backlog
   sources and repositories. Existing agents and Quick Chats retain their provider
   settings; fresh Quick Chats use the automation's provider settings without

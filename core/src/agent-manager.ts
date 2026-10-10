@@ -50,6 +50,7 @@ export function createAgentInSnapshot(
 ): AppSnapshot {
   const agent = createAgentFromInput(input, createdAt, targetTeamId(snapshot, input.teamId), id);
   if (!input.backendDefaults) applyProviderDefaults(snapshot, agent);
+  if (input.modelSelection) agent.backendDefaults = backendDefaultsWithModel(agent, input.modelSelection);
   const source = options.afterAgentId
     ? snapshot.agents.find((candidate) => candidate.id === options.afterAgentId)
     : undefined;
@@ -91,17 +92,7 @@ export function updateAgentFromInput(snapshot: AppSnapshot, input: UpdateAgentIn
     agent.updatedAt = updatedAt;
   }
   if (input.modelSelection) {
-    const defaults = agent.backendDefaults?.kind === agent.backend
-      ? agent.backendDefaults
-      : defaultBackendDefaults(agent.backend);
-    const { reasoningEffort: _previousEffort, ...rest } = { reasoningEffort: undefined, ...defaults };
-    agent.backendDefaults = {
-      ...rest,
-      model: input.modelSelection.model,
-      userSelectedModel: true,
-      ...(agent.backend !== 'antigravity' && input.modelSelection.reasoningEffort ? { reasoningEffort: input.modelSelection.reasoningEffort } : {}),
-      ...(agent.backend === 'codex' ? { serviceTier: input.modelSelection.serviceTier } : {}),
-    } as BackendDefaults;
+    agent.backendDefaults = backendDefaultsWithModel(agent, input.modelSelection);
     snapshot.general.providerModelDefaults = {
       ...snapshot.general.providerModelDefaults,
       [agent.backend]: { ...input.modelSelection, ...(agent.backend === 'antigravity' ? { reasoningEffort: null, serviceTier: null } : {}) },
@@ -240,6 +231,20 @@ function applyProviderDefaults(snapshot: AppSnapshot, agent: Agent): void {
   } else if (agent.backend === 'antigravity' && approvals?.antigravity) {
     agent.backendDefaults = { ...agent.backendDefaults, kind: 'antigravity', permissionMode: approvals.antigravity };
   }
+}
+
+function backendDefaultsWithModel(agent: Agent, selection: NonNullable<CreateAgentInput['modelSelection']>): BackendDefaults {
+  const defaults = agent.backendDefaults?.kind === agent.backend
+    ? agent.backendDefaults
+    : defaultBackendDefaults(agent.backend);
+  const { reasoningEffort: _previousEffort, ...rest } = { reasoningEffort: undefined, ...defaults };
+  return {
+    ...rest,
+    model: selection.model,
+    userSelectedModel: true,
+    ...(agent.backend !== 'antigravity' && selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+    ...(agent.backend === 'codex' && selection.serviceTier !== undefined ? { serviceTier: selection.serviceTier } : {}),
+  } as BackendDefaults;
 }
 
 function defaultBackendDefaults(backend: AgentBackend): Agent['backendDefaults'] {

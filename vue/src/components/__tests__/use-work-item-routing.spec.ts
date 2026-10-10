@@ -92,14 +92,14 @@ describe('useWorkItemRouting', () => {
     });
   });
 
-  it('creates the isolated agent with the chosen model and reasoning effort', async () => {
+  it('creates the isolated agent with the chosen model layered over provider defaults', async () => {
     const harness = createHarness();
 
     await harness.routing.createIsolatedAgent(harness.item, harness.teamId, { backend: 'codex', model: 'gpt-fast', reasoningEffort: 'high' });
 
     expect(harness.createAgent).toHaveBeenCalledWith(expect.objectContaining({
       backend: 'codex',
-      backendDefaults: { kind: 'codex', model: 'gpt-fast', userSelectedModel: true, reasoningEffort: 'high' },
+      modelSelection: { model: 'gpt-fast', reasoningEffort: 'high' },
     }));
   });
 

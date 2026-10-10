@@ -3,6 +3,7 @@ import { preferredBackendChoices } from './backend-selection';
 import type {
   Agent,
   AgentBackend,
+  AgentCreationProgress,
   AppSnapshot,
   AutomationLocation,
   CreateAgentInput,
@@ -13,7 +14,7 @@ import type {
   WorkItem,
   WorkSource,
 } from '@workspace/core/contracts';
-import { workItemAssignmentPrompt } from '@workspace/core/work-item-prompts';
+import { workItemAssignmentPrompt, workItemBranchName } from '@workspace/core/work-item-prompts';
 import { computed, ref } from 'vue';
 import { translate } from '../i18n';
 import type { WorkItemAssignmentSelection, WorkItemAssignmentSession } from './WorkItemAssignmentPicker.vue';
@@ -26,7 +27,7 @@ export function useRepositorySession(options: {
   createIsolatedWorkItemAgent: (
     item: WorkItem,
     teamId: string,
-    options?: { reuseExisting?: boolean; backend?: AgentBackend; model?: string; reasoningEffort?: string; repository?: SourceRepository; isCurrent?: () => boolean },
+    options?: { reuseExisting?: boolean; backend?: AgentBackend; model?: string; reasoningEffort?: string; repository?: SourceRepository; isCurrent?: () => boolean; onPhase?: (phase: 'creatingAgent') => void },
   ) => Promise<{ agent: Agent; item: WorkItem }>;
   createSourceWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   getSnapshot: () => AppSnapshot;
@@ -52,8 +53,7 @@ export function useRepositorySession(options: {
   const workSourceId = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const assignmentState = ref<'idle' | 'running' | 'success' | 'error'>('idle');
-  const assignmentError = ref<string | null>(null);
+  const creationProgress = ref<AgentCreationProgress | null>(null);
   const worktreeSource = ref<RepositorySessionSource | null>(null);
   const worktreeBranches = ref<SourceBranch[]>([]);
   const worktreeBranchesLoading = ref(false);
@@ -90,8 +90,6 @@ export function useRepositorySession(options: {
     workItems.value = [];
     workSourceId.value = null;
     error.value = null;
-    assignmentState.value = 'idle';
-    assignmentError.value = null;
     loading.value = true;
     const { remoteConnectionId, location } = context(nextSource);
     try {
@@ -130,8 +128,6 @@ export function useRepositorySession(options: {
     workSourceId.value = null;
     loading.value = false;
     error.value = null;
-    assignmentState.value = 'idle';
-    assignmentError.value = null;
   }
 
   async function listBranches(input: { agentId: string; repositoryRoot: string }): Promise<SourceBranch[]> {
@@ -207,73 +203,91 @@ export function useRepositorySession(options: {
   }
 
   async function startWork(selection: WorkItemAssignmentSelection): Promise<void> {
-    const current = source.value;
-    if (!current) return;
-    const requestId = sourceRequestId;
-    const isCurrent = () => requestId === sourceRequestId && (!selection.isCurrent || selection.isCurrent());
-    if (!isCurrent()) return;
-    const { teamId } = context(current);
-    assignmentState.value = 'running';
-    assignmentError.value = null;
-    try {
-      if (selection.destination === 'existing') {
-        if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-        await options.startWorkItemInExistingSession(selection.agentId, selection.item, selection.action, isCurrent);
-      } else {
-        if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
-        const { agent, item } = await options.createIsolatedWorkItemAgent(
-          selection.item,
-          teamId,
-          { backend: selection.backend ?? backend.value, ...(selection.model ? { model: selection.model } : {}),
-            ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}), ...(selection.reuseExisting ? { reuseExisting: true } : {}),
-            repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
-        );
-        if (!isCurrent()) return;
-        await options.assignWorkItem({
-          agentId: agent.id,
-          item,
-          prompt: workItemAssignmentPrompt(item, { action: selection.action }),
-        });
-      }
-      if (isCurrent()) assignmentState.value = 'success';
-    } catch (caught) {
-      if (!isCurrent()) return;
-      assignmentState.value = 'error';
-      assignmentError.value = caught instanceof Error ? caught.message : String(caught);
-    }
+    await runWork(selection, selection.action, async (agent, item) => {
+      await options.assignWorkItem({
+        agentId: agent.id,
+        item,
+        prompt: workItemAssignmentPrompt(item, { action: selection.action }),
+      });
+    }, () => options.startWorkItemInExistingSession(selection.agentId!, selection.item, selection.action));
   }
 
   async function customizeWork(selection: Omit<WorkItemAssignmentSelection, 'action'>): Promise<void> {
+    await runWork(selection, 'custom', (agent, item) => options.prefillWorkItemForAgent(agent.id, item),
+      () => options.prefillWorkItemForAgent(selection.agentId!, selection.item));
+  }
+
+  // The picker closes as soon as the user confirms; from then on the work runs to completion on its own.
+  async function runWork(
+    selection: Omit<WorkItemAssignmentSelection, 'action'>,
+    action: WorkItemAssignmentSelection['action'] | 'custom',
+    handOverToNewAgent: (agent: Agent, item: WorkItem) => void | Promise<void>,
+    handOverToExistingAgent: () => void | Promise<void>,
+  ): Promise<void> {
     const current = source.value;
     if (!current) return;
-    const requestId = sourceRequestId;
-    const isCurrent = () => requestId === sourceRequestId && (!selection.isCurrent || selection.isCurrent());
-    if (!isCurrent()) return;
+    if (selection.isCurrent && !selection.isCurrent()) return;
     const { teamId } = context(current);
-    assignmentState.value = 'running';
-    assignmentError.value = null;
-    try {
-      if (selection.destination === 'existing') {
+    close();
+    if (selection.destination === 'existing') {
+      try {
         if (!selection.agentId) throw new Error(translate('surface.appShell.theSelectedAgentIsUnavailable'));
-        options.prefillWorkItemForAgent(selection.agentId, selection.item);
-      } else {
-        if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
-        const { agent, item } = await options.createIsolatedWorkItemAgent(
-          selection.item,
-          teamId,
-          { backend: selection.backend ?? backend.value, ...(selection.model ? { model: selection.model } : {}),
-            ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}), ...(selection.reuseExisting ? { reuseExisting: true } : {}),
-            repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
-        );
-        if (!isCurrent()) return;
-        options.prefillWorkItemForAgent(agent.id, item);
+        await handOverToExistingAgent();
+      } catch (caught) {
+        reportWorkError(caught);
       }
-      close();
-    } catch (caught) {
-      if (!isCurrent()) return;
-      assignmentState.value = 'error';
-      assignmentError.value = caught instanceof Error ? caught.message : String(caught);
+      return;
     }
+
+    const id = `work-item-${Date.now()}`;
+    const branchName = workItemBranchName(selection.item);
+    const resolvedBackend = selection.backend ?? backend.value ?? 'codex';
+    creationProgress.value = {
+      id,
+      state: 'running',
+      backend: resolvedBackend,
+      repositoryName: current.repositoryName,
+      createWorktree: true,
+      branchName,
+      hasPrompt: action !== 'custom',
+      phase: 'creatingWorktree',
+    };
+    const update = (change: Partial<AgentCreationProgress>) => {
+      if (creationProgress.value?.id === id) creationProgress.value = { ...creationProgress.value, ...change };
+    };
+    try {
+      if (!teamId) throw new Error(translate('surface.appShell.createOrSelectATeamBeforeStartingRepositoryWork'));
+      const { agent, item } = await options.createIsolatedWorkItemAgent(selection.item, teamId, {
+        backend: resolvedBackend,
+        ...(selection.model ? { model: selection.model } : {}),
+        ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+        ...(selection.reuseExisting ? { reuseExisting: true } : {}),
+        repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] },
+        onPhase: (phase) => update({ phase }),
+      });
+      update({ phase: 'startingPrompt', agentId: agent.id, agentName: agentDisplayName(agent) });
+      await handOverToNewAgent(agent, item);
+      update({ state: 'success' });
+    } catch (caught) {
+      if (isAssignmentCancelled(caught)) {
+        if (creationProgress.value?.id === id) creationProgress.value = null;
+        return;
+      }
+      update({ state: 'error', error: caught instanceof Error ? caught.message : String(caught) });
+    }
+  }
+
+  function reportWorkError(caught: unknown): void {
+    if (isAssignmentCancelled(caught)) return;
+    options.notifyError(caught instanceof Error ? caught.message : String(caught));
+  }
+
+  function isAssignmentCancelled(caught: unknown): boolean {
+    return caught instanceof Error && caught.message === translate('surface.appShell.assignmentCancelled');
+  }
+
+  function closeCreationProgress(id: string): void {
+    if (creationProgress.value?.id === id) creationProgress.value = null;
   }
 
   async function createSession(nextSource: RepositorySessionSource, branch: SourceBranch, teamId?: string): Promise<void> {
@@ -305,13 +319,12 @@ export function useRepositorySession(options: {
 
   return {
     backend,
-    assignmentError,
     assignmentSessions,
-    assignmentState,
     branches,
     close,
     closeWorktree,
-    complete: close,
+    closeCreationProgress,
+    creationProgress,
     createForSourceBranch,
     createFromWorktree,
     createOnBranch,

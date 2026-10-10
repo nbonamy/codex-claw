@@ -729,6 +729,8 @@ export type CreateAgentInput = {
   avatar?: string;
   backend?: AgentBackend;
   backendDefaults?: BackendDefaults;
+  /** A model chosen at creation, layered over the provider defaults (unlike `backendDefaults`, which replaces them). */
+  modelSelection?: Pick<AgentModelSelection, 'model'> & Partial<AgentModelSelection>;
   delegatedByAgentId?: string;
   sourceRepositoryName?: string;
   teamId?: string;

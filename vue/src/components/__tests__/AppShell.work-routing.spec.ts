@@ -189,9 +189,14 @@ describe('AppShell work routing', () => {
       agentId: 'agent-dina',
       item: issue,
     }));
-    expect(sourceDialog.props('assignmentState')).toBe('success');
-    expect(sourceDialog.props('visible')).toBe(true);
+    expect(sourceDialog.props('visible')).toBe(false);
 
+    sidebar.vm.$emit('create-agent-from-repository', {
+      agentId: 'agent-dina',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
+    });
+    await flushPromises();
     sourceDialog.vm.$emit('start-work-item', {
       action: 'fix',
       destination: 'new',
@@ -206,9 +211,18 @@ describe('AppShell work routing', () => {
       agentId: preparedAgent.id,
       item: issue,
     }));
-    expect(sourceDialog.props('assignmentState')).toBe('success');
-    expect(sourceDialog.props('visible')).toBe(true);
+    expect(sourceDialog.props('visible')).toBe(false);
+    expect(wrapper.findAllComponents({ name: 'WorkspaceProvisioningProgressDialog' }).map(dialog => dialog.props('operation'))).toContainEqual(expect.objectContaining({
+      mode: 'single',
+      progress: expect.objectContaining({ state: 'success', createWorktree: true, branchName: 'fix/gh-24', agentId: preparedAgent.id }),
+    }));
 
+    sidebar.vm.$emit('create-agent-from-repository', {
+      agentId: 'agent-dina',
+      repositoryName: 'agent-workspace',
+      repositoryRoot: '/Users/nbonamy/src/agent-workspace',
+    });
+    await flushPromises();
     sourceDialog.vm.$emit('select-branch', { name: 'feat/work-routing', isDefault: false });
     await flushPromises();
     expect(createSourceWorktree).toHaveBeenCalledWith({

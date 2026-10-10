@@ -246,7 +246,7 @@ describe('RepositorySessionSourceDialog', () => {
     ]]);
   });
 
-  it('paces isolated-session preparation before completing', async () => {
+  it('leaves progress to the standard provisioning dialog once work is confirmed', async () => {
     const wrapper = mount(RepositorySessionSourceDialog, {
       global: { provide: { [backlogConnectionsKey as symbol]: () => [{ provider: 'github', status: 'connected' }] } },
       props: {
@@ -261,37 +261,9 @@ describe('RepositorySessionSourceDialog', () => {
     await wrapper.findAll('[role="tab"]')[2]!.trigger('click');
     await flushPromises();
     await wrapper.get('.repository-session-source-dialog__result').trigger('click');
-
-    vi.useFakeTimers();
     await wrapper.get('.app-button--primary').trigger('click');
-    await wrapper.setProps({ assignmentState: 'running' });
 
-    expect(wrapper.get('.staged-operation-progress__heading').text())
-      .toContain('Building an isolated home for #24');
-    const firstStep = wrapper.get('.staged-operation-progress li.is-active').text();
-    expect(firstStep).toContain('Creating isolated worktree');
-    expect(firstStep).toContain('fix/gh-24');
-
-    vi.advanceTimersByTime(1_200);
-    await nextTick();
-    expect(wrapper.get('.staged-operation-progress li.is-active').text())
-      .toContain('Initializing worktree');
-
-    vi.advanceTimersByTime(1_700);
-    await nextTick();
-    expect(wrapper.get('.staged-operation-progress li.is-active').text())
-      .toContain('Starting agent session');
-
-    await wrapper.setProps({ assignmentState: 'success' });
-    vi.advanceTimersByTime(1_700);
-    await nextTick();
-    expect(wrapper.get('.staged-operation-progress li.is-active').text())
-      .toContain('Handing over work context');
-
-    vi.advanceTimersByTime(1_500);
-    await nextTick();
-    expect(wrapper.get('.staged-operation-progress__heading').text())
-      .toContain('Work on #24 is ready');
-    expect(wrapper.emitted('preparation-complete')).toHaveLength(1);
+    expect(wrapper.emitted('start-work-item')).toHaveLength(1);
+    expect(wrapper.find('.staged-operation-progress').exists()).toBe(false);
   });
 });
