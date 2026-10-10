@@ -1176,6 +1176,21 @@ describe('AppShell authentication and conversation', () => {
     }
   });
 
+  it('clears earlier review instructions when plain /review reopens the same pane', async () => {
+    const wrapper = mountRealShell({ realConversationPane: true });
+    const editor = wrapper.get('[role="textbox"][contenteditable]');
+    for (const prompt of ['/review Focus on retries.', '/review']) {
+      editor.element.textContent = prompt;
+      await editor.trigger('input');
+      await nextTick();
+      await wrapper.get('form').trigger('submit');
+      await flushPromises();
+      const panel = wrapper.get('[aria-label="Code review"]');
+      if (prompt === '/review') expect(panel.text()).not.toContain('Additional instructions');
+      else expect(wrapper.getComponent({ name: 'CodeReviewPanel' }).props('instructions')).toBe('Focus on retries.');
+    }
+  });
+
   it('moves the Review pane from the source thread to an independent reviewer', async () => {
     const snapshot = createInitialSnapshot();
     const source = snapshot.agents[0]!;
