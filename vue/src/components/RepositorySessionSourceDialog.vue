@@ -4,6 +4,7 @@
     :class="{ 'repository-session-source-dialog--assignment': selectedWorkItem, 'repository-session-source-dialog--issue-picker': purpose === 'missionIssue' }"
     :model-value="visible"
     :teleported="false"
+    :align-center="Boolean(selectedWorkItem)"
     :style="{ width: '720px' }"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
@@ -489,7 +490,8 @@ function resetPreparation(clearSelection = true): void {
 .repository-session-source-dialog--assignment
   .repository-session-source-dialog__results {
   min-height: 0;
-  max-height: min(84vh, 880px);
+  /* Header plus content stay inside the window so the overlay never scrolls the dialog. */
+  max-height: min(calc(100vh - 160px), 880px);
   padding: var(--space-3) var(--space-8) var(--space-8);
 }
 

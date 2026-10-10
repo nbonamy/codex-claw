@@ -10,12 +10,13 @@
         <span v-for="label in item.labels" :key="label.name" class="work-item-detail__label">{{ label.name }}</span>
       </div>
     </header>
-    <p class="work-item-detail__body">{{ item.body }}</p>
+    <MarkdownPanel v-if="item.body?.trim()" class="work-item-detail__body" :content="item.body" />
   </section>
 </template>
 <script setup lang="ts">
 import { workItemDisplayIdentifier } from '@workspace/core/work-item-prompts';
 import type { WorkItem } from '@workspace/core/contracts';
+import MarkdownPanel from './MarkdownPanel.vue';
 defineProps<{ item: WorkItem }>();
 </script>
 <style scoped>
@@ -33,8 +34,9 @@ defineProps<{ item: WorkItem }>();
 
 .work-item-detail__header a {
   color: var(--color-primary);
-  font-size: var(--font-size-14);
+  font-size: var(--font-size-16);
   font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-22);
   text-decoration: none;
 }
 
@@ -44,7 +46,7 @@ defineProps<{ item: WorkItem }>();
 
 .work-item-detail__title {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
 }
@@ -71,11 +73,22 @@ defineProps<{ item: WorkItem }>();
   background: var(--color-surface-base);
 }
 
-.work-item-detail__body {
-  margin: 0;
+.work-item-detail .work-item-detail__body {
+  flex: none;
+  padding: 0;
   font-size: var(--font-size-13);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+}
+
+/* The ticket title outranks any heading written inside the issue body. */
+.work-item-detail__body :deep(h1),
+.work-item-detail__body :deep(h2) {
+  font-size: var(--font-size-15);
+  line-height: var(--line-height-22);
+}
+
+.work-item-detail__body :deep(h3),
+.work-item-detail__body :deep(h4) {
+  font-size: var(--font-size-14);
+  line-height: var(--line-height-20);
 }
 </style>

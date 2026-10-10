@@ -77,9 +77,11 @@ Choose **GitHub** or **Linear** when both are connected, then a repository or Li
 
 In a repository backlog, search by issue identifier or title and use the state, assignee, and label filters to narrow the list. Open an item to read its details before assigning work. For an issue:
 
-1. Choose **New agent** for a new agent and worktree, or **Existing agent** when offered. Check the displayed branch; an existing agent uses its current folder without creating a worktree.
-2. Choose the coding engine for a new agent.
+1. Choose **New agent** for a new agent and worktree, or **Existing agent** when offered. An existing agent keeps working on its current branch; Korus never creates or switches a branch or worktree for it.
+2. For a new agent, choose the coding engine, model, and reasoning effort, and check the branch it will be created on.
 3. Select **Investigate**, **Fix**, or **Custom** to prepare your own prompt.
+
+For a pull request, **Existing agent** is offered only for agents already on the pull request's branch, so reviews and feedback always run against the right code.
 
 From the global Backlog, select items and start work, choose the destination **Team** and coding engine, and choose a **Code repository** for Linear. Each selected item starts a separate agent in a worktree. Korus does not infer a local clone from the Linear team or project name.
 
