@@ -35,6 +35,97 @@ function snapshotWithCalendar(): AppSnapshot {
 }
 
 describe('AppStateStore', () => {
+  it.each([1, 2])('loads supported agents and preserves unknown providers across schema-%i saves and restarts', async (schemaVersion) => {
+    const snapshot = createInitialSnapshot();
+    await new AppStateStore(home).save(snapshot);
+    const roster = await readJson('roster.json');
+    roster.schemaVersion = schemaVersion;
+    const unknown = { id: 'future-agent', name: null, folder: '/future', createdAt: '2026-10-09',
+      engine: { kind: 'antigravity', session: { opaque: ['future-session'] },
+        settings: { model: 'gemini-3.6-flash-low', permissionMode: 'auto_edit' }, extra: true },
+      futureField: { untouched: true } };
+    (roster.data.agents as unknown[]).splice(1, 0, unknown);
+    const teams = roster.data.teams as Array<{ id: string; agentIds: string[]; activeAgentId?: string }>;
+    teams[0]!.agentIds.splice(1, 0, unknown.id);
+    teams[0]!.activeAgentId = unknown.id;
+    const membership = [...teams[0]!.agentIds];
+    const subagents = { rootConversationId: 'future-root', nodes: { child: { opaque: true } } };
+    (roster.data.subagents as Record<string, unknown>)[unknown.id] = subagents;
+    const assignment = { agentId: unknown.id, opaque: 'future-assignment' };
+    (roster.data.workAssignments as Record<string, unknown>).future = assignment;
+    await writeFile(file('roster.json'), JSON.stringify(roster));
+    const original = await readFile(file('roster.json'), 'utf8');
+    const logs: string[] = [];
+    const store = new AppStateStore(home, { log: message => logs.push(message) });
+
+    const restored = await store.load();
+    expect(restored.agents.map(agent => agent.id)).toStrictEqual(snapshot.agents.map(agent => agent.id));
+    expect(restored.teams[0]!.agentIds).toStrictEqual(snapshot.teams[0]!.agentIds);
+    expect(restored.activeAgentId).toBe(snapshot.agents[0]!.id);
+    expect(restored.subagentTrees[unknown.id]).toBeUndefined();
+    expect(restored.workBacklog.assignments.future).toBeUndefined();
+    expect(logs.join('\n')).toContain(unknown.id);
+    if (schemaVersion === 2) expect(await readFile(file('roster.json'), 'utf8')).toBe(original);
+    restored.agents[0]!.name = 'Changed while future provider is unavailable';
+    await store.save(restored);
+
+    const saved = await readJson('roster.json');
+    expect((saved.data.agents as unknown[])[1]).toStrictEqual(unknown);
+    expect((saved.data.teams as typeof teams)[0]!.agentIds).toStrictEqual(membership);
+    expect((saved.data.subagents as Record<string, unknown>)[unknown.id]).toStrictEqual(subagents);
+    expect((saved.data.workAssignments as Record<string, unknown>).future).toStrictEqual(assignment);
+    const restarted = new AppStateStore(home);
+    const reloaded = await restarted.load();
+    expect(reloaded.agents[0]!.name).toBe('Changed while future provider is unavailable');
+    await restarted.save(reloaded);
+    expect((await readJson('roster.json')).data).toStrictEqual(saved.data);
+  });
+
+  it('preserves unknown agents when supported teammates or their teams are removed', async () => {
+    const snapshot = createInitialSnapshot();
+    await new AppStateStore(home).save(snapshot);
+    const roster = await readJson('roster.json');
+    const agents = roster.data.agents as Array<{ id: string; engine: unknown }>;
+    const unknownA = { ...agents[0]!, id: 'unknown-a', engine: { kind: 'antigravity' } };
+    const unknownB = { ...unknownA, id: 'unknown-b', engine: { kind: 'future-provider' } };
+    agents.push(unknownA, unknownB);
+    const teams = roster.data.teams as Array<{ id: string; agentIds: string[] }>;
+    teams[0]!.agentIds.push(unknownA.id);
+    teams.push({ ...teams[0]!, id: 'future-team', agentIds: [unknownB.id] });
+    await writeFile(file('roster.json'), JSON.stringify(roster));
+
+    const store = new AppStateStore(home);
+    const restored = await store.load();
+    const removed = snapshot.agents[0]!.id;
+    restored.agents = restored.agents.filter(agent => agent.id !== removed);
+    restored.teams = restored.teams.filter(team => team.id !== 'future-team');
+    restored.teams[0]!.agentIds = restored.teams[0]!.agentIds.filter(id => id !== removed);
+    await store.save(restored);
+
+    const saved = await readJson('roster.json');
+    const savedAgents = saved.data.agents as typeof agents;
+    expect(savedAgents.find(agent => agent.id === unknownA.id)).toStrictEqual(unknownA);
+    expect(savedAgents.find(agent => agent.id === unknownB.id)).toStrictEqual(unknownB);
+    expect(savedAgents.some(agent => agent.id === removed)).toBe(false);
+    expect((saved.data.teams as typeof teams).map(team => [team.id, team.agentIds]))
+      .toStrictEqual([[snapshot.teams[0]!.id, [snapshot.agents[1]!.id, unknownA.id]], ['future-team', [unknownB.id]]]);
+    expect((await new AppStateStore(home).load()).agents.map(agent => agent.id)).toStrictEqual([snapshot.agents[1]!.id]);
+  });
+
+  it.each([
+    { kind: 'codex', session: { threadId: 123 } },
+    { kind: 'claude', session: { sessionId: 'session', transport: 'invalid' } },
+    {},
+  ])('still refuses corrupt engine data: %j', async engine => {
+    await new AppStateStore(home).save(createInitialSnapshot());
+    const roster = await readJson('roster.json');
+    (roster.data.agents as Array<{ engine: unknown }>)[0]!.engine = engine;
+    const original = JSON.stringify(roster);
+    await writeFile(file('roster.json'), original);
+    await expect(new AppStateStore(home).load()).rejects.toThrowError(StoreFormatError);
+    expect(await readFile(file('roster.json'), 'utf8')).toBe(original);
+  });
+
   it('protects calendar automations from schema-1 readers and retains them across restart', async () => {
     const snapshot = snapshotWithCalendar();
     await new AppStateStore(home).save(snapshot);

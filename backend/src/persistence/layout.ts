@@ -16,10 +16,17 @@ type Engine =
 
 export type RosterAgent = Omit<PersistedAgent, 'teamId' | 'backend' | 'backendSession' | 'backendDefaults'> & { engine: Engine };
 
+/** Provider data this build must retain without interpreting or running it. */
+export type StoredRosterAgent = RosterAgent | { id: string; engine: { kind: string; [key: string]: unknown }; [key: string]: unknown };
+
+export function isSupportedRosterAgent(agent: StoredRosterAgent): agent is RosterAgent {
+  return agent.engine.kind === 'codex' || agent.engine.kind === 'claude';
+}
+
 export type RosterData = {
   activeTeamId: string | null;
   teams: Team[];
-  agents: RosterAgent[];
+  agents: StoredRosterAgent[];
   automations: Automation[];
   missions?: Mission[];
   workAssignments: WorkBacklogState['assignments'];
@@ -85,6 +92,7 @@ export function splitPersistedState(state: FullPersistedState): StoreFiles {
 /** Rebuilds the legacy-shaped state that the existing sanitizers and repairs consume. */
 export function joinPersistedState(files: StoreFiles): PersistedState {
   const { roster, settings } = files;
+  const unsupportedIds = new Set(roster.agents.filter(agent => !isSupportedRosterAgent(agent)).map(agent => agent.id));
   const teamOfAgent = new Map(roster.teams.flatMap((team) => team.agentIds.map((agentId) => [agentId, team.id] as const)));
   const activeTeam = roster.teams.find((team) => team.id === roster.activeTeamId);
   const libraries: Record<string, Visualization[]> = {};
@@ -95,22 +103,52 @@ export function joinPersistedState(files: StoreFiles): PersistedState {
     ...(roster.missions ? { missions: roster.missions } : {}),
     ...(Object.keys(libraries).length ? { repositoryVisualizations: libraries } : {}),
     teams: roster.teams,
-    agents: roster.agents.map((agent) => persistedAgentFrom(agent, teamOfAgent.get(agent.id))),
+    agents: roster.agents.filter(isSupportedRosterAgent).map((agent) => persistedAgentFrom(agent, teamOfAgent.get(agent.id))),
     automations: roster.automations,
     activeTeamId: roster.activeTeamId,
     activeAgentId: activeTeam?.activeAgentId ?? null,
     ...(roster.accountRateLimits ? { accountRateLimits: roster.accountRateLimits } : {}),
-    subagentTrees: Object.fromEntries(Object.entries(roster.subagents).map(([agentId, tree]) => [agentId, {
-      rootConversationId: tree.rootConversationId,
-      nodes: tree.nodes,
-      operations: {},
-      activities: {},
-    } satisfies AgentSubagentTree])),
+    subagentTrees: Object.fromEntries(Object.entries(roster.subagents)
+      .filter(([agentId]) => !unsupportedIds.has(agentId))
+      .map(([agentId, tree]) => [agentId, {
+        rootConversationId: tree.rootConversationId,
+        nodes: tree.nodes,
+        operations: {},
+        activities: {},
+      } satisfies AgentSubagentTree])),
     workBacklog: { ...settings.workIntegrations, assignments: roster.workAssignments },
     remoteConnections: { connections: settings.remoteConnections },
     general: settings.settings,
     sourceFolder: settings.sourceFolder,
     theme: settings.theme,
+  };
+}
+
+/** Ordinary snapshot saves cannot delete records absent only because their provider is unknown. */
+export function preserveUnsupportedAgents(roster: RosterData, original: RosterData): RosterData {
+  const unknown = original.agents.filter(agent => !isSupportedRosterAgent(agent));
+  const ids = new Set(unknown.map(agent => agent.id));
+  const agents = [...roster.agents];
+  for (const agent of unknown) agents.splice(Math.min(original.agents.indexOf(agent), agents.length), 0, agent);
+  const teams = roster.teams.map(team => ({ ...team, agentIds: [...team.agentIds] }));
+  for (const originalTeam of original.teams) {
+    const members = originalTeam.agentIds.filter(id => ids.has(id));
+    if (!members.length) continue;
+    const team = teams.find(candidate => candidate.id === originalTeam.id);
+    if (!team) {
+      teams.push({ ...originalTeam, agentIds: members,
+        activeAgentId: members.includes(originalTeam.activeAgentId ?? '') ? originalTeam.activeAgentId : undefined });
+      continue;
+    }
+    for (const id of members) {
+      if (!team.agentIds.includes(id)) team.agentIds.splice(Math.min(originalTeam.agentIds.indexOf(id), team.agentIds.length), 0, id);
+    }
+  }
+  return {
+    ...roster, agents, teams,
+    subagents: { ...roster.subagents, ...Object.fromEntries(Object.entries(original.subagents).filter(([id]) => ids.has(id))) },
+    workAssignments: { ...roster.workAssignments,
+      ...Object.fromEntries(Object.entries(original.workAssignments).filter(([, assignment]) => ids.has(assignment.agentId))) },
   };
 }
 

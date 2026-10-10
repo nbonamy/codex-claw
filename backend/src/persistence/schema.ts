@@ -3,11 +3,11 @@ import type { AccountRateLimits, AppGeneralSettings, AppThemeSettings, Automatio
 import type { Mission } from '@workspace/core/missions';
 import { isVisualization } from '@workspace/core/visualize';
 import { StoreFormatError } from './store-format';
-import type { RosterAgent, RosterData, SettingsData, VisualizationData } from './layout';
+import type { StoredRosterAgent, RosterData, SettingsData, VisualizationData } from './layout';
 
 /*
- * Roster schema 2; settings and visualization schema 1. The file structure and the engine block are
- * strict. Entities that keep their long-standing shape (agents' inner fields, missions,
+ * Roster schema 2; settings and visualization schema 1. The file structure and supported engine
+ * blocks are strict; unknown engines stay opaque. Entities that keep their long-standing shape (agents' inner fields, missions,
  * automations, settings...) are checked as objects here and repaired by the existing
  * entity sanitizers when the state is joined back together.
  */
@@ -28,8 +28,13 @@ const engineSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-const agentSchema = z.custom<RosterAgent>(
-  (value) => isRecord(value) && typeof value.id === 'string' && engineSchema.safeParse(value.engine).success,
+const agentSchema = z.custom<StoredRosterAgent>(
+  (value) => {
+    if (!isRecord(value) || typeof value.id !== 'string' || !isRecord(value.engine)
+      || typeof value.engine.kind !== 'string' || !value.engine.kind.trim()) return false;
+    return value.engine.kind !== 'codex' && value.engine.kind !== 'claude'
+      || engineSchema.safeParse(value.engine).success;
+  },
   'agent must have an id and a valid engine block',
 );
 
