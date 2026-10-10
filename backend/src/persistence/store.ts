@@ -8,7 +8,7 @@ import { projectClientSnapshot } from '@workspace/core/client-preferences';
 import { createEmptySnapshot } from '@workspace/core/snapshot-construction';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { backupFile } from './backup';
-import { joinPersistedState, splitPersistedState, type StoreFiles, type VisualizationData } from './layout';
+import { isSupportedRosterAgent, joinPersistedState, preserveUnsupportedAgents, splitPersistedState, type RosterData, type StoreFiles, type VisualizationData } from './layout';
 import { migrateData, rosterMigrations, type Migration } from './migrations';
 import { parseData, rosterSchema, settingsSchema, visualizationSchema } from './schema';
 import { StoreFormatError, parseStoreFile, serializeStoreFile, storeSchemaVersion, rosterSchemaVersion } from './store-format';
@@ -54,6 +54,7 @@ export class AppStateStore {
   private writeInFlight = false;
   /** Relative path to the content last known to be on disk. */
   private written = new Map<string, string>();
+  private unsupportedRoster: RosterData | null = null;
 
   constructor(private readonly home: string, private readonly options: AppStateStoreOptions = {}) {}
 
@@ -129,6 +130,11 @@ export class AppStateStore {
       settings: parseData(settingsFile, settingsSchema, migrateData(settingsFile, settingsEnvelope.data, settingsEnvelope.schemaVersion, storeSchemaVersion, fileMigrations.settings)),
       visualizations: [],
     };
+    const unsupported = files.roster.agents.filter(agent => !isSupportedRosterAgent(agent));
+    this.unsupportedRoster = unsupported.length ? files.roster : null;
+    for (const agent of unsupported) {
+      this.options.log?.(`Skipping agent ${agent.id}: unsupported provider ${agent.engine.kind}; its stored data will be preserved.`);
+    }
     // Establish downgrade protection on load, before any ordinary snapshot save.
     // Keep the original bytes in a verified backup before changing the envelope.
     if (rosterEnvelope.schemaVersion < rosterSchemaVersion) {
@@ -173,7 +179,7 @@ export class AppStateStore {
     const files = new Map<string, string>();
     for (const visualization of visualizations) files.set(visualizationPath(visualization), serializeStoreFile(visualization));
     files.set(settingsFile, serializeStoreFile(settings));
-    files.set(rosterFile, serializeStoreFile(roster, rosterSchemaVersion));
+    files.set(rosterFile, serializeStoreFile(this.unsupportedRoster ? preserveUnsupportedAgents(roster, this.unsupportedRoster) : roster, rosterSchemaVersion));
     return files;
   }
 
