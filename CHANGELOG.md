@@ -4,6 +4,30 @@ All notable Korus changes are recorded here.
 
 ## Unreleased
 
+## [0.33.0] - 2026-10-09
+
+### New features
+
+- Use Antigravity alongside Codex and Claude Code, with provider setup,
+  streaming conversations, history, approvals, planning, and code reviews.
+- Commit changes from completed reviews before finishing the review or starting
+  another round.
+- Choose a backend, model, and reasoning effort when starting backlog work,
+  with branch-safe reuse of existing agents.
+
+### Improvements and fixes
+
+- Codex and Claude Code detection, execution, and upgrades use the same runtime
+  selection, avoiding mismatches between nvm installations.
+- Merge cleanup deletes both the local branch and its matching origin branch.
+  Newer remote work is preserved, and cleanup failures remain visible without
+  treating a successful merge as failed.
+- Review setup uses consistent headings and shows additional instructions only
+  when supplied, as a compact read-only preview.
+- Issue descriptions render as Markdown. Start work dialogs stay within the
+  window, use standard provisioning progress, and preserve permission defaults.
+- Preserve saved agent records for providers unsupported by the current build.
+
 ## [0.32.0] - 2026-10-09
 
 ### New features

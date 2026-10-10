@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.32.0",
+  "currentVersion": "0.33.0",
   "releases": [
+    {
+      "version": "0.33.0",
+      "releasedAt": "2026-10-09",
+      "sourceSha256": "8995cd37e0cf98f0b08e03371b878fcdadd9029d77e35f034cb316d698dbefef",
+      "markdown": "### New features\n\n- Use Antigravity alongside Codex and Claude Code, with provider setup,\n  streaming conversations, history, approvals, planning, and code reviews.\n- Commit changes from completed reviews before finishing the review or starting\n  another round.\n- Choose a backend, model, and reasoning effort when starting backlog work,\n  with branch-safe reuse of existing agents.\n\n### Improvements and fixes\n\n- Codex and Claude Code detection, execution, and upgrades use the same runtime\n  selection, avoiding mismatches between nvm installations.\n- Merge cleanup deletes both the local branch and its matching origin branch.\n  Newer remote work is preserved, and cleanup failures remain visible without\n  treating a successful merge as failed.\n- Review setup uses consistent headings and shows additional instructions only\n  when supplied, as a compact read-only preview.\n- Issue descriptions render as Markdown. Start work dialogs stay within the\n  window, use standard provisioning progress, and preserve permission defaults.\n- Preserve saved agent records for providers unsupported by the current build."
+    },
     {
       "version": "0.32.0",
       "releasedAt": "2026-10-09",
