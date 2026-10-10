@@ -234,6 +234,10 @@ clears or changes it, Korus never re-detects.
   polls only those PRs. A merged or closed PR raises an explicit cleanup alert;
   cleanup is accepted only for an idle agent whose unshared, clean linked worktree
   still points at the recorded PR head (a closed PR keeps its remote branch).
+- Merge branch cleanup removes the local branch and its same-named origin branch
+  after integration succeeds. Origin cleanup uses its push destination and an
+  inspected-head lease; default branches and remote commits outside the merged
+  source remain intact. Cleanup failure is a warning, not a failed merge.
 - Repository pruning belongs to `daemon`. A local selection bundles its branch
   and linked worktree; remote refs are independent opt-ins. The inventory excludes
   the default branch (per remote, as reported by that remote) and the primary checkout. The agent menu is an entry point,

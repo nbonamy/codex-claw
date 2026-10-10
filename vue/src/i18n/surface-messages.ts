@@ -529,7 +529,7 @@ export const surfaceMessages = {
     "squashCommitMessage": "Squash commit message",
     "squashCommitMessage2": "Squash commit message…",
     "deleteWorktreeAfterMerging": "Delete worktree after merging",
-    "deleteBranchAfterRemovingWorktree": "Delete branch after removing worktree",
+    "deleteBranchAfterRemovingWorktree": "Delete local and origin branches",
     "reportBackTo": "Report to {name} agent",
     "runInBackground": "Run in background",
     "buildingHandoffReport": "Building handoff report",

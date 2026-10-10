@@ -554,9 +554,11 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.findAll('.git-workflow-control__merge-icon')).toHaveLength(2);
     expect(choices[0]?.classes()).toContain('git-workflow-control__merge-option--selected');
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })).toHaveLength(2);
+    expect(wrapper.findAll('.git-workflow-control__merge-cleanup')[1]?.text()).toBe('Delete local and origin branches');
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1]?.props('disabled')).toBe(true);
     await wrapper.findAllComponents({ name: 'ElSwitch' })[0]!.setValue(true);
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })[1]?.props('disabled')).toBe(false);
+    await wrapper.findAllComponents({ name: 'ElSwitch' })[1]!.setValue(true);
     await choices[1]?.find('input').setValue(true);
     expect(choices[1]?.classes()).toContain('git-workflow-control__merge-option--selected');
     const message = wrapper.get<HTMLTextAreaElement>('.git-workflow-control__merge-message');
@@ -570,7 +572,7 @@ describe('GitWorkflowControl', () => {
     expect(mergeBranch).toHaveBeenCalledWith('agent-1', {
       strategy: 'squash',
       commitMessage: 'feat: combine demo work',
-      deleteBranch: false,
+      deleteBranch: true,
       deleteWorktree: true,
       confirmed: true,
     });
@@ -589,7 +591,7 @@ describe('GitWorkflowControl', () => {
     await flushPromises();
 
     expect(wrapper.text()).not.toContain('Delete worktree after merging');
-    expect(wrapper.text()).not.toContain('Delete branch after removing worktree');
+    expect(wrapper.text()).not.toContain('Delete local and origin branches');
     expect(wrapper.findAllComponents({ name: 'ElSwitch' })).toHaveLength(0);
   });
 

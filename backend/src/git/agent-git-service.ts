@@ -631,17 +631,46 @@ export class AgentGitService {
       ? await this.removeMergedWorktree(targetFolder, current.folder)
       : undefined;
     if (deleteBranch) {
+      let sourceSha: string;
       try {
         // Git's -d checks the upstream, which may lag behind the successful local merge.
         if (strategy === 'merge') {
           await this.runGit(targetFolder, ['merge-base', '--is-ancestor', current.branch, 'HEAD']);
         }
+        sourceSha = (await this.runGit(targetFolder, ['rev-parse', `refs/heads/${current.branch}`])).stdout.trim();
         await this.runGit(targetFolder, ['branch', '-D', current.branch]);
       } catch {
         warning = { type: 'branchRetained', branch: current.branch, ...(warning ? { folder: warning.folder } : {}) };
+        return { targetFolder, warning };
+      }
+      try {
+        await this.deleteMergedOriginBranch(targetFolder, current.branch, sourceSha);
+      } catch {
+        warning = { type: 'branchRetained', branch: `origin/${current.branch}`, ...(warning ? { folder: warning.folder } : {}) };
       }
     }
     return { targetFolder, ...(warning ? { warning } : {}) };
+  }
+
+  private async deleteMergedOriginBranch(folder: string, branch: string, sourceSha: string): Promise<void> {
+    const remotes = (await this.runGit(folder, ['remote'])).stdout.trim().split(/\r?\n/u);
+    if (!remotes.includes('origin')) return;
+    // Inspect the push destination, not a potentially different fetch URL.
+    const urls = (await this.runGit(folder, ['remote', 'get-url', '--push', '--all', 'origin'])).stdout.trim().split(/\r?\n/u);
+    if (urls.length !== 1 || !urls[0]) throw new Error('Ambiguous origin push destination.');
+    const url = urls[0];
+    const ref = `refs/heads/${branch}`;
+    const lines = (await this.runGit(folder, ['ls-remote', '--symref', '--', url, 'HEAD', ref])).stdout.split(/\r?\n/u);
+    if (lines.includes(`ref: ${ref}\tHEAD`)) throw new Error('Retain the origin default branch.');
+    const sha = lines.find((line) => line.endsWith(`\t${ref}`))?.split('\t')[0];
+    if (sha) {
+      if (!/^[a-f0-9]{40,64}$/u.test(sha)) throw new Error('Invalid origin branch head.');
+      // Preserve commits that were not part of this merge, including squash merges.
+      await this.runGit(folder, ['merge-base', '--is-ancestor', sha, sourceSha]);
+      await this.runGit(folder, ['push', `--force-with-lease=${ref}:${sha}`, '--', url, `:${ref}`]);
+    }
+    // Also clear stale tracking refs when origin already removed the branch.
+    await this.runGit(folder, ['update-ref', '-d', `refs/remotes/origin/${branch}`]);
   }
 
   private async removeMergedWorktree(targetFolder: string, worktreeFolder: string): Promise<NonNullable<AgentGitWorkflow['warning']> | undefined> {
@@ -811,6 +840,10 @@ async function git(cwd: string, args: string[]): Promise<{ stdout: string }> {
       cwd,
       encoding: 'utf8',
       maxBuffer: 10 * 1024 * 1024,
+      ...(args[0] === 'ls-remote' || (args[0] === 'push' && args[1]?.startsWith('--force-with-lease=')) ? {
+        timeout: 30_000,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      } : {}),
     });
     return { stdout: result.stdout };
   } catch (error) {
