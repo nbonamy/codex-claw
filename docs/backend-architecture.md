@@ -190,7 +190,9 @@ Computer Use helper is ARM64-only; Windows ARM64 is experimental. Passing builds
 not prove GUI installation, login or a full agent turn on a clean machine: do that
 acceptance check before promoting the first release for an OS. Windows installers
 are **unsigned** (SmartScreen warnings are expected; no certificate prerequisite).
-Codex and Claude Code are separately installed prerequisites, as are Git/GitHub tools.
+The selected provider runtimes are separately installed prerequisites, as are
+Git/GitHub tools. Antigravity requires the paired ACP runtime/harness described
+above, not an editor or CLI installation alone.
 
 ## GitHub desktop releases
 

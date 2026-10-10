@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Build with agents. From idea to delivery.</strong><br />
-  Build with Codex, Claude Code, or both—across repositories and machines.
+  Build with a team of coding agents—across repositories and machines.
 </p>
 
 <p align="center">
@@ -21,22 +21,19 @@
   <img src="website/assets/app-screenshot.png" alt="Korus with repository-grouped agents, a conversation, and input-needed status, shown with demo data" width="960" />
 </p>
 
-Korus brings Codex and Claude Code into one workspace. Use either engine
+Korus brings your coding agents into one workspace. Use one engine
 on its own or run a mixed team: give agents their own conversations and
 workspaces, see what everyone is doing, and step in when your input is needed.
 
 Korus is free to use. Connect your provider accounts; provider subscriptions
 and API usage are billed separately.
 
-This README describes the current `main` branch, including features awaiting
-the next desktop release.
-
 ## One cockpit for the whole team
 
 - **Run a real team** — Organize agents into teams, give each one a repository,
   identity, conversation, and durable workspace, then switch between them
   without interrupting their work.
-- **Choose your engines** — Connect Codex, Claude Code, or both. Use different
+- **Choose your engines** — Connect the coding providers you use. Use different
   engines for different agents; available controls reflect each engine's
   supported capabilities.
 - **Work across machines** — Connect teams on other machines over SSH and
@@ -116,15 +113,17 @@ To run from source, see [Development](#development).
    - **Windows:** Run the installer, or extract the portable ZIP and launch Korus.
    - **Linux:** Install the DEB or RPM for your architecture, or extract the ZIP
      and launch Korus.
-3. Connect Codex, Claude Code, or both, then choose Continue. Only one connected
-   engine is required. Claude Code supports subscription or API-key setup.
-4. Create a team, add an agent from a repository, and start coding. When both
+3. Install and connect a coding engine, then choose Continue. Only one connected
+   engine is required. See the [provider guides](website/docs/providers/index.md)
+   for installation and sign-in, including Antigravity's ACP runtime.
+4. Create a team, add an agent from a repository, and start coding. When multiple
    engines are enabled, choose which one the agent uses.
 
 By default, Korus keeps its conversations separate from your existing agent
-chats and reuses your skills. Choose Customize for either engine during setup
+chats. Choose Customize for an installed engine during setup
 to use your existing setup instead. A separate setup requires its own sign-in.
-Settings shows each engine's account, conversation location, and enabled state.
+You can also share existing provider skills with a separate setup. Settings shows
+each engine's account, conversation location, and enabled state.
 
 ## Development
 
@@ -132,7 +131,7 @@ Requirements:
 
 - macOS arm64, Windows x64, or Linux x64/arm64;
 - Node 22.23.3 and npm 10.9.4 (the CI toolchain);
-- network access to download the pinned Codex app-server on the first build;
+- a separately installed runtime for each coding engine you want to use.
 
 ```bash
 npm ci
@@ -148,9 +147,9 @@ download can otherwise race across workers on a clean checkout.
 
 On Windows, run development from PowerShell with Node and npm installed. The
 launcher invokes npm through Node, so it does not require a Unix shell or direct
-execution of `npm.cmd`. Preparing Codex requires `tar.exe` on `PATH` (included
-with current Windows versions). It downloads and verifies the full Windows
-Codex package, including its supporting executables and resources.
+execution of `npm.cmd`. Korus detects provider runtimes on PATH; **Install** in
+Welcome and Settings opens external installation instructions. Provider runtimes
+are not bundled with Korus or automatically installed by its build.
 
 Focused project gates:
 
@@ -191,7 +190,8 @@ Korus separates the desktop shell from the long-running agent backend:
 ```text
 Vue renderer → typed preload IPC → Electron main → daemon → backend driver
                                                           ├─ Codex app-server
-                                                          └─ Claude Agent SDK
+                                                          ├─ Claude Agent SDK
+                                                          └─ Antigravity ACP
 ```
 
 Electron owns native desktop integration. `daemon` owns agent runtime state,
@@ -208,6 +208,7 @@ types.
 - [Backend protocol](docs/protocol.md)
 - [Codex integration](docs/codex.md)
 - [Claude Code integration](docs/claude.md)
+- [Antigravity integration](docs/backend-architecture.md#antigravity)
 - [Agent collaboration and MCP](docs/mcp.md)
 - [Frontend conventions](docs/frontend.md)
 - [Testing](docs/testing.md)

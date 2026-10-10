@@ -86,7 +86,7 @@ operations, and adds coordination metadata.
   reproduce an SDK reducer transition, the seam is wrong. Fix the SDK or host and
   make Korus thinner. Product policy belongs in the driver; generic conversation
   behavior belongs in the SDK.
-- Parity between Codex and Claude is expressed through capabilities and product
+- Provider parity is expressed through capabilities and product
   actions, never through a lowest-common-denominator transcript.
 
 ## Backend Seam
@@ -169,12 +169,14 @@ Rules:
 
 ### Provider Homes
 
-Local Codex and Claude run in Korus-owned homes (`~/.korus/codex-home`,
-`~/.korus/claude-home`) so Korus never pollutes the user's CLI data and ignores an
-inherited home. Personal `skills` (and Codex `plugins`) are linked from the
-existing home by default (`providerHomes.<backend>.shareSkills`); private
-resources are never overwritten. Credentials are never copied; an isolated home
-authenticates on its own.
+Local providers use their selected isolated or existing home. Isolated homes
+are `~/.korus/codex-home`, `~/.korus/claude-home`, and
+`~/.korus/antigravity-home`; existing homes follow provider-specific launch
+configuration. Antigravity uses `GEMINI_HOME`, otherwise `~/.gemini`, for its
+existing setup. Personal skills (and Codex plugins) can be linked from the
+existing home (`providerHomes.<backend>.shareSkills`); private resources are
+never overwritten. Credentials are never copied; an isolated home authenticates
+on its own. Existing-home changes affect the user's external provider setup too.
 
 Switching between an isolated and an existing home is an explicit roster reset:
 the client confirms the exact local agent IDs (quick chats included);
