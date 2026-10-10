@@ -334,6 +334,8 @@ export const surfaceMessages = {
     "completeRound": "Complete review round",
     "finishReview": "Finish review",
     "reviewAgain": "Review again",
+    "commitAndFinish": "Commit and finish",
+    "uncommittedChangesNote": "{count} uncommitted files stay local until you commit them. Nothing is pushed.",
     "reviewFinished": "Review finished.",
     "startNewReview": "Start new review",
     "reviewStopped": "The review stopped before it could complete.",

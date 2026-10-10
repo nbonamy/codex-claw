@@ -337,6 +337,11 @@ target and reviewer agents) plus an opaque reviewer session reference.
 - User-supplied review instructions belong to the review session, survive retries
   and fresh rounds, and never become saved reviewer defaults. Unsubmitted drafts
   stay local to the agent's review tab and are discarded when that tab closes.
+- Completion can commit through the existing Git commit dialog (`Commit and finish`),
+  never a parallel commit path. It is a local commit of the user-confirmed scope, never
+  pushes, is offered only while the source folder still has changes (automatic reviews
+  that already committed leave nothing to offer), and finishes only after the commit
+  succeeds; cancel or failure leaves the review untouched.
 - Finishing saves a report first, then removes the ledger and the review-owned
   agent. Discarding removes the ledger from any state. Reopening starts from zero.
 - Findings and the `finish_review_round` acknowledgment are model tools

@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { ElInputNumber, ElSwitch } from 'element-plus';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, AgentGitStatus, AppSnapshot } from '@workspace/core/contracts';
+import type { Agent, AgentGitStatus, AgentGitWorkflow, AppSnapshot } from '@workspace/core/contracts';
 import type { CodeReviewFinding, CodeReviewSession } from '@workspace/core/code-review';
 import CodeReviewPanel from '../CodeReviewPanel.vue';
 import { codeReviewSettingsKey } from '../code-review-settings';
@@ -49,6 +49,7 @@ function mountPanel(
   gitStatus?: AgentGitStatus,
   currentThreadAvailable = true,
   preferences?: CodeReviewPreferences,
+  extraProps: Record<string, unknown> = {},
 ) {
   const actions = {
     startReview: vi.fn().mockResolvedValue({} as AppSnapshot),
@@ -72,7 +73,7 @@ function mountPanel(
   return {
     actions,
     wrapper: mount(CodeReviewPanel, {
-      props: { agent: owner, gitStatus, ...actions },
+      props: { agent: owner, gitStatus, ...actions, ...extraProps },
       global: { components: { ElInputNumber, ElSwitch }, provide: {
         [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']),
         [codeReviewSettingsKey as symbol]: { preferences: () => preferences, listModels: actions.listModels, stop: actions.stop },
@@ -545,6 +546,119 @@ describe('CodeReviewPanel', () => {
     await buttons[1]!.trigger('click');
     expect(actions.finishReview).toHaveBeenCalledWith('owner', 'review-1');
     expect(actions.reviewAgain).toHaveBeenCalledWith('owner', 'review-1');
+  });
+
+  describe('commit and finish', () => {
+    const dirtyStatus: AgentGitStatus = {
+      folder: '/repo', repository: 'app', branch: 'feature/demo', ahead: 0, behind: 0, changedFiles: 2,
+      addedLines: 6, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
+    };
+    const workflow: AgentGitWorkflow = {
+      repository: 'owner/repo', folder: '/repo', isLinkedWorktree: false, branch: 'feature/demo', detached: false,
+      remote: 'origin', upstream: 'origin/feature/demo', ahead: 0, behind: 0,
+      stagedAddedLines: 0, stagedRemovedLines: 0, unstagedAddedLines: 6, unstagedRemovedLines: 1,
+      untrackedAddedLines: 0, untrackedRemovedLines: 0,
+      files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'b.ts', indexStatus: ' ', worktreeStatus: 'M' }],
+      stagedFiles: [], unstagedFiles: ['a.ts', 'b.ts'], githubConnected: true,
+    };
+    function mountReady(status: AgentGitStatus | undefined, commitChanges: ReturnType<typeof vi.fn>) {
+      return mountPanel(session([], 'readyToFinish'), status, true, undefined, {
+        getGitWorkflow: async () => workflow,
+        commitChanges,
+      });
+    }
+    const footerButton = (wrapper: ReturnType<typeof mountPanel>['wrapper'], label: string) =>
+      wrapper.findAll('.app-dialog__footer .app-button').find((button) => button.text() === label)!;
+    async function openCommitDialog(wrapper: ReturnType<typeof mountPanel>['wrapper']) {
+      await flushPromises();
+      await wrapper.findAll('.code-review-panel__footer button').find((button) => button.text() === 'Commit and finish')!.trigger('click');
+      await flushPromises();
+    }
+
+    it('commits the shown scope locally, then finishes the review without pushing', async () => {
+      const commitChanges = vi.fn(async () => ({ ...workflow, files: [] }));
+      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
+      expect(wrapper.findAll('.code-review-panel__footer button').map((button) => button.text()))
+        .toEqual(['Finish review', 'Review again', 'Commit and finish']);
+
+      await openCommitDialog(wrapper);
+      expect(wrapper.get('[role="dialog"]').text()).toContain('owner/repo · feature/demo');
+      expect(wrapper.findAll('.app-dialog__footer .app-button').map((button) => button.text())).toEqual(['Cancel', 'Commit and finish']);
+      await wrapper.get('textarea').setValue('fix: address review findings');
+      expect(actions.finishReview).not.toHaveBeenCalled();
+      await footerButton(wrapper, 'Commit and finish').trigger('click');
+      await flushPromises();
+
+      expect(commitChanges).toHaveBeenCalledExactlyOnceWith('owner', {
+        message: 'fix: address review findings', includeUnstaged: true, includeUntracked: false, confirmed: true,
+      });
+      expect(actions.finishReview).toHaveBeenCalledExactlyOnceWith('owner', 'review-1');
+      wrapper.unmount();
+    });
+
+    it('keeps the review open when the commit is canceled or fails', async () => {
+      const commitChanges = vi.fn().mockRejectedValue(new Error('pre-commit hook failed'));
+      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
+
+      await openCommitDialog(wrapper);
+      await footerButton(wrapper, 'Cancel').trigger('click');
+      await flushPromises();
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+
+      await openCommitDialog(wrapper);
+      await wrapper.get('textarea').setValue('fix: address review findings');
+      await footerButton(wrapper, 'Commit and finish').trigger('click');
+      await flushPromises();
+
+      expect(wrapper.get('[role="dialog"]').text()).toContain('pre-commit hook failed');
+      expect(actions.finishReview).not.toHaveBeenCalled();
+      expect(wrapper.findAll('.code-review-panel__footer button').every((button) => button.attributes('disabled') === undefined)).toBe(true);
+      wrapper.unmount();
+    });
+
+    it('ignores repeated clicks while the commit is running', async () => {
+      let resolveCommit!: (value: AgentGitWorkflow) => void;
+      const commitChanges = vi.fn(() => new Promise<AgentGitWorkflow>((resolve) => { resolveCommit = resolve; }));
+      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
+
+      await openCommitDialog(wrapper);
+      await wrapper.get('textarea').setValue('fix: address review findings');
+      await footerButton(wrapper, 'Commit and finish').trigger('click');
+      expect(wrapper.find('.app-dialog__footer').exists()).toBe(false);
+      await wrapper.findAll('.code-review-panel__footer button').find((button) => button.text() === 'Commit and finish')!.trigger('click');
+      expect(commitChanges).toHaveBeenCalledTimes(1);
+
+      resolveCommit({ ...workflow, files: [] });
+      await flushPromises();
+      expect(actions.finishReview).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+
+    it('reports a finish failure after the commit so the review can be finished again', async () => {
+      const commitChanges = vi.fn(async () => ({ ...workflow, files: [] }));
+      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
+      actions.finishReview.mockRejectedValueOnce(new Error('Could not save the review report.'));
+
+      await openCommitDialog(wrapper);
+      await wrapper.get('textarea').setValue('fix: address review findings');
+      await footerButton(wrapper, 'Commit and finish').trigger('click');
+      await flushPromises();
+
+      expect(wrapper.get('[role="alert"]').text()).toBe('Could not save the review report.');
+      await wrapper.setProps({ gitStatus: { ...dirtyStatus, changedFiles: 0, state: 'clean' } });
+      expect(wrapper.findAll('.code-review-panel__footer button').map((button) => button.text())).toEqual(['Finish review', 'Review again']);
+      await wrapper.findAll('.code-review-panel__footer button')[0]!.trigger('click');
+      expect(actions.finishReview).toHaveBeenCalledTimes(2);
+      wrapper.unmount();
+    });
+
+    it('does not offer a duplicate commit once nothing is left to commit', async () => {
+      const commitChanges = vi.fn();
+      const { wrapper } = mountReady({ ...dirtyStatus, changedFiles: 0, state: 'clean' }, commitChanges);
+      await flushPromises();
+      expect(wrapper.findAll('.code-review-panel__footer button').map((button) => button.text())).toEqual(['Finish review', 'Review again']);
+      wrapper.unmount();
+    });
   });
 
   it('submits selected findings through one remediation action without assignment', async () => {

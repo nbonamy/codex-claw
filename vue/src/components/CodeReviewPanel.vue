@@ -238,6 +238,7 @@
           </button>
         </template>
         <template v-else-if="session.status === 'readyToFinish'">
+          <span v-if="commitAvailable">{{ $t('surface.codeReviewPanel.uncommittedChangesNote', { count: gitStatus!.changedFiles }) }}</span>
           <button
             class="app-button app-button--secondary"
             type="button"
@@ -247,12 +248,22 @@
             {{ $t('surface.codeReviewPanel.finishReview') }}
           </button>
           <button
-            class="app-button app-button--primary"
+            class="app-button"
+            :class="commitAvailable ? 'app-button--secondary' : 'app-button--primary'"
             type="button"
             :disabled="busy"
             @click="run(() => reviewAgain(agent.id, session!.id))"
           >
             {{ $t('surface.codeReviewPanel.reviewAgain') }}
+          </button>
+          <button
+            v-if="commitAvailable"
+            class="app-button app-button--primary"
+            type="button"
+            :disabled="busy"
+            @click="openCommitDialog"
+          >
+            {{ $t('surface.codeReviewPanel.commitAndFinish') }}
           </button>
         </template>
         <template v-else-if="session.status === 'finished'">
@@ -301,6 +312,19 @@
         <button type="button" class="app-button app-button--primary" @click="automaticSettingsOpen = false">{{ t('automaticReview.done') }}</button>
       </template>
     </FormDialog>
+    <GitWorkflowControl
+      v-if="commitChanges && getGitWorkflow"
+      ref="commitControl"
+      presentation="headless"
+      commit-only
+      :commit-label="t('surface.codeReviewPanel.commitAndFinish')"
+      :agent="agent"
+      :git-status="gitStatus"
+      :get-workflow="getGitWorkflow"
+      :generate-message="generateGitMessage"
+      :commit-changes="commitChanges"
+      @committed="finishAfterCommit"
+    />
     <p v-if="error" class="code-review-panel__error" role="alert">
       {{ error }}
     </p>
@@ -327,9 +351,10 @@ import {
   type CodeReviewStartInput,
   type CodeReviewThreadMode,
 } from "@workspace/core/code-review";
-import type { Agent, AgentGitStatus, AppSnapshot } from "@workspace/core/contracts";
+import type { Agent, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AppSnapshot } from "@workspace/core/contracts";
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 import BackendSelector from './BackendSelector.vue';
+import GitWorkflowControl from './GitWorkflowControl.vue';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormField from '../shared/form/FormField.vue';
 import { useBackendChoices } from './backend-selection';
@@ -351,6 +376,9 @@ const props = defineProps<{
   ) => Promise<AppSnapshot>;
   finishReview: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewAgain: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  getGitWorkflow?: (agentId: string) => Promise<AgentGitWorkflow>;
+  generateGitMessage?: (agentId: string, input: AgentGitMessageGenerationInput) => Promise<AgentGitMessageGenerationResult>;
+  commitChanges?: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
 }>();
 
 const { t } = useI18n();
@@ -560,6 +588,22 @@ watch(
   },
   { immediate: true },
 );
+
+const commitControl = ref<{ openCommitDialog: () => Promise<void> } | null>(null);
+// Automatic reviews may already have committed everything; only offer a commit while changes remain.
+const commitAvailable = computed(() => Boolean(props.commitChanges && props.getGitWorkflow && (props.gitStatus?.changedFiles ?? 0) > 0));
+
+async function openCommitDialog(): Promise<void> {
+  error.value = null;
+  await commitControl.value?.openCommitDialog();
+}
+
+// The review stays open when the commit is canceled or fails; finishing is only reached after success.
+function finishAfterCommit(): void {
+  if (!session.value) return;
+  const sessionId = session.value.id;
+  void run(() => props.finishReview(props.agent.id, sessionId));
+}
 
 async function run(action: () => Promise<unknown>): Promise<void> {
   busy.value = true;

@@ -192,6 +192,9 @@
       :submit-review-round="submitCodeReviewRound"
       :finish-review="finishCodeReview"
       :review-again="reviewCodeAgain"
+      :get-git-workflow="getGitWorkflow"
+      :generate-git-message="generateGitMessage"
+      :commit-changes="commitGitChanges"
       @clarify-finding="emit('clarifyFinding', $event)"
       @open-file="emit('previewFile', $event)"
     />
@@ -461,6 +464,9 @@ const props = withDefaults(defineProps<{
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  getGitWorkflow?: (agentId: string) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
+  generateGitMessage?: (agentId: string, input: import('@workspace/core/contracts').AgentGitMessageGenerationInput) => Promise<import('@workspace/core/contracts').AgentGitMessageGenerationResult>;
+  commitGitChanges?: (agentId: string, input: import('@workspace/core/contracts').AgentGitCommitInput) => Promise<import('@workspace/core/contracts').AgentGitWorkflow>;
   generateVisualizationSuggestion?: (agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
   selectVisualization?: (agentId: string, input: import('@workspace/core/visualize').SelectVisualizationInput) => Promise<AppSnapshot>;
   deleteVisualization?: (agentId: string, input: import('@workspace/core/visualize').DeleteVisualizationInput) => Promise<AppSnapshot>;
