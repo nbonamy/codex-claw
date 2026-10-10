@@ -6,10 +6,12 @@ export function rendererPlatform(navigatorPlatform: string, userAgent = ''): Ren
   return 'other';
 }
 
+/** Native window chrome (glass sidebars, window edges) only applies to desktop hosts, never to a browser tab. */
 export function applyRendererPlatform(
   root: HTMLElement,
   navigatorPlatform: string,
   userAgent = '',
+  nativeWindow = true,
 ): void {
-  root.dataset.platform = rendererPlatform(navigatorPlatform, userAgent);
+  root.dataset.platform = nativeWindow ? rendererPlatform(navigatorPlatform, userAgent) : 'other';
 }

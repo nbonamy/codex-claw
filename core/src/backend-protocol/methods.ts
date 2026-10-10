@@ -52,6 +52,8 @@ export const backendMethods = {
   agentGitPush: 'agent/git/push',
   agentGitPull: 'agent/git/pull',
   agentGitRevert: 'agent/git/revert',
+  agentGitPruneGet: 'agent/git/prune/get',
+  agentGitPrune: 'agent/git/prune',
   agentGitBranchCreate: 'agent/git/branch/create',
   agentGitPullRequestCreate: 'agent/git/pullRequest/create',
   agentGitMerge: 'agent/git/merge',
@@ -239,6 +241,8 @@ export const agentGitBackendMethods = [
   backendMethods.agentGitUpdateFromBase,
   backendMethods.agentGitPull,
   backendMethods.agentGitRevert,
+  backendMethods.agentGitPruneGet,
+  backendMethods.agentGitPrune,
 ] as const;
 
 export type AgentGitBackendMethod = typeof agentGitBackendMethods[number];

@@ -6,6 +6,7 @@ describe('stdio JSON-RPC transport', () => {
   it.each([
     ['client/external/open', undefined, 5000],
     ['client/computerUse/execute', undefined, 35000],
+    ['client/browser/open', undefined, 35000],
     ['client/mobileSimulator/execute', undefined, 240000],
     ['client/computerUse/execute', 100, 100],
   ] as const)('keeps a bounded deadline for %s (%s)', async (method, requestTimeoutMs, deadline) => {
@@ -20,7 +21,7 @@ describe('stdio JSON-RPC transport', () => {
     } finally { peer.stop(); vi.useRealTimers(); }
   });
 
-  it('allows native computer-use observations to finish beyond five seconds', async () => {
+  it.each(['client/computerUse/execute', 'client/browser/open'])('allows %s to finish beyond five seconds', async (method) => {
     vi.useFakeTimers();
     const input = new PassThrough();
     const output = new PassThrough();
@@ -30,7 +31,7 @@ describe('stdio JSON-RPC transport', () => {
     peer.start();
     try {
       const settled = vi.fn();
-      const result = peer.request('client/computerUse/execute', { command: 'get_app_state', arguments: { timeoutMs: 15000 } });
+      const result = peer.request(method);
       void result.then(settled, settled);
       await vi.advanceTimersByTimeAsync(16000);
       expect(settled).not.toHaveBeenCalled();

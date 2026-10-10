@@ -18,7 +18,7 @@ import { ClaudeBackendDriver } from '../../claude/claude-driver';
 import { ClaudeAgentSdkTransport } from '../../claude/agent-sdk-transport';
 import { createQueryHarness } from '../../claude/__tests__/sdk-query-fixture';
 
-vi.mock('@workspace/core/runtime-discovery', () => ({ withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }) }));
+vi.mock('@workspace/core/runtime-discovery', () => ({ resolveRuntimeLaunch: (command: string, env: NodeJS.ProcessEnv | undefined) => ({ command, env: { ...process.env, ...env } }) }));
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });

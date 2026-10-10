@@ -383,6 +383,7 @@
       <div v-else-if="updateOperation.status === 'error'" class="app-dialog__footer"><button class="app-button app-button--tertiary" type="button" @click="updateDialogOpen = false">{{ $t('surface.gitWorkflowControl.close') }}</button><button class="app-button app-button--primary" type="button" @click="updateFromBase(Boolean(workflow?.files.length))">{{ $t('surface.gitWorkflowControl.retry') }}</button></div>
     </template>
   </el-dialog>
+  <GitPruneDialog v-if="pruneDialogOpen && appApi" :key="agent.id" v-model="pruneDialogOpen" :agent-id="agent.id" :load="appApi.getAgentGitPrune" :prune="appApi.pruneAgentGit" @pruned="loadWorkflow({ closeMenu: false })" />
 </template>
 
 <script setup lang="ts">
@@ -397,6 +398,8 @@ import AppMenu from '../shared/menu/AppMenu.vue';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import type { AppMenuItem } from '../shared/menu/app-menu';
 import GitOperationFeedback from './GitOperationFeedback.vue';
+import GitPruneDialog from './GitPruneDialog.vue';
+import { Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   agent: Agent;
@@ -425,6 +428,7 @@ const menuOpen = ref(false);
 const busy = ref(false);
 const commitDialogOpen = ref(false);
 const revertDialogOpen = ref(false);
+const pruneDialogOpen = ref(false);
 const revertIncludeUntracked = ref(false);
 const revertError = ref<string | null>(null);
 const pushDialogOpen = ref(false);
@@ -632,12 +636,16 @@ const pullEnabled = computed(() => Boolean(props.pullBranch && workflow.value?.u
 const firstEnabledAction = computed(() => (commitEnabled.value ? 'commit' : pushEnabled.value ? 'push' : mergeEnabled.value && !mergeUnavailable.value ? 'merge' : prEnabled.value ? 'create-pr' : null));
 const menuItems = computed<AppMenuItem[]>(() => [
   { id: 'revert', type: 'action', label: translate('surface.gitWorkflowControl.revert'), icon: ArrowBackUpIcon, disabled: !props.revertChanges || !commitEnabled.value },
-  { id: 'pull', type: 'action', label: translate('surface.gitWorkflowControl.pull'), icon: RefreshIcon, disabled: !pullEnabled.value },
   { id: 'commit', type: 'action', label: translate('surface.gitWorkflowControl.commit'), icon: GitCommitIcon, disabled: !commitEnabled.value },
+  { id: 'separator-sync', type: 'separator' },
+  { id: 'pull', type: 'action', label: translate('surface.gitWorkflowControl.pull'), icon: RefreshIcon, disabled: !pullEnabled.value },
   { id: 'push', type: 'action', label: translate('surface.gitWorkflowControl.push'), icon: CloudUploadIcon, disabled: !pushEnabled.value },
   ...(updateEnabled.value ? [{ id: 'update-from-base', type: 'action' as const, label: translate('surface.gitWorkflowControl.updateFromBranch', { branch: baseBranch.value }), icon: RefreshIcon }] : []),
+  { id: 'separator-integration', type: 'separator' },
   { id: 'merge', type: 'action', label: translate('surface.gitWorkflowControl.merge'), icon: GitMergeIcon, disabled: !mergeEnabled.value || mergeUnavailable.value },
   { id: 'create-pr', type: 'action', label: translate('surface.gitWorkflowControl.createPR'), icon: GitForkIcon, disabled: !prEnabled.value },
+  { id: 'separator-cleanup', type: 'separator' },
+  { id: 'prune', type: 'action', label: translate('gitPrune.menu'), icon: Trash2Icon, disabled: !workflow.value || !appApi },
 ]);
 
 watch(commitDialogOpen, (open) => {
@@ -706,6 +714,7 @@ onBeforeUnmount(() => {
 });
 watch([() => props.agent.id, () => props.agent.folder], () => {
   revertDialogOpen.value = false;
+  pruneDialogOpen.value = false;
   void loadWorkflow({ reset: true });
 });
 watch(() => props.gitStatus?.updatedAt, () => {
@@ -777,6 +786,9 @@ async function selectAction(action: string): Promise<void> {
     revertIncludeUntracked.value = false;
     revertError.value = null;
     revertDialogOpen.value = true;
+  }
+  else if (action === 'prune' && workflow.value && appApi) {
+    pruneDialogOpen.value = true;
   }
   else if (action === 'commit' && commitEnabled.value) {
     resetCommitOperation();
@@ -1500,7 +1512,6 @@ function handleMainEvent(event: MainToRendererEvent): void {
   color: var(--color-warning);
   font-size: var(--font-size-13);
   line-height: 1.4;
-  text-align: left;
 }
 
 .git-workflow-control__uncommitted-warning svg {
@@ -1518,7 +1529,6 @@ function handleMainEvent(event: MainToRendererEvent): void {
   gap: var(--space-4);
   justify-items: start;
   padding: var(--space-10) 0 var(--space-8);
-  text-align: left;
 }
 
 .git-workflow-control__push-count {
@@ -1530,7 +1540,6 @@ function handleMainEvent(event: MainToRendererEvent): void {
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-semibold);
   line-height: 1.2;
-  text-align: left;
 }
 
 .git-workflow-control__push-destination {

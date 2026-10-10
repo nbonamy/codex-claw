@@ -1,6 +1,6 @@
 {
   "name": "agent-workspace",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "private": true,
   "packageManager": "npm@10.9.4",
   "overrides": {
@@ -50,7 +50,7 @@
     "dev:backend:run": "npm run dev:run -w @workspace/backend",
     "dev:backend:serve": "npm run serve -w @workspace/backend",
     "dev:electron": "node scripts/dev.mjs",
-    "dev:web": "npm run build:sdk && npm run build -w @workspace/backend && npm run dev -w @workspace/web",
+    "dev:web": "node scripts/dev-web.mjs",
     "docs:dev": "vitepress dev website/docs --host 127.0.0.1",
     "docs:build": "vitepress build website/docs",
     "docs:preview": "vitepress preview website/docs --host 127.0.0.1",

@@ -16,6 +16,19 @@ function mountControl(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('GitWorkflowControl', () => {
+  it('opens repository pruning from the final menu section without deleting anything', async () => {
+    const getAgentGitPrune = vi.fn(async () => ({ repository: 'repo', baseBranch: 'main', groups: [], unavailableRemotes: [] }));
+    const pruneAgentGit = vi.fn();
+    stubElectronTestWindow({ app: { getAgentGitPrune, pruneAgentGit } });
+    const wrapper = mountControl();
+    await flushPromises();
+    await wrapper.get('.git-workflow-control__trigger').trigger('click');
+    await wrapper.findAll('[role="menuitem"]').at(-1)!.trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="dialog"]').text()).toContain('No branches to prune');
+    expect(getAgentGitPrune).toHaveBeenCalledExactlyOnceWith(agent.id);
+    expect(pruneAgentGit).not.toHaveBeenCalled();
+  });
   it.each([true, false])('requires confirmation before reverting, with unversioned files=%s', async (includeUntracked) => {
     const revertChanges = vi.fn(async () => ({ ...workflow, files: [] }));
     const wrapper = mountControl({ revertChanges });
@@ -270,18 +283,25 @@ describe('GitWorkflowControl', () => {
     expect(wrapper.text()).toContain('No untracked files');
   });
 
-  it('shows icon-only action menu entries without descriptions', async () => {
-    const wrapper = mountControl();
+  it.each([true, false])('groups local, sync, and integration actions with dividers (update available: %s)', async (updateAvailable) => {
+    const wrapper = mountControl(updateAvailable ? { updateFromBase: vi.fn() } : {});
     await flushPromises();
     expect(wrapper.get('.git-workflow-control__trigger')).toBeTruthy();
     await wrapper.get('.git-workflow-control__trigger').trigger('click');
-    expect(wrapper.findAll('.app-menu__label').map((item) => item.text())).toStrictEqual([
+    expect(wrapper.findAll('[role="menuitem"], [role="separator"]').map((item) =>
+      item.attributes('role') === 'separator' ? '---' : item.text(),
+    )).toStrictEqual([
       'Revert',
-      'Pull',
       'Commit',
+      '---',
+      'Pull',
       'Push',
+      ...(updateAvailable ? ['Update from main'] : []),
+      '---',
       'Merge',
       'Create PR',
+      '---',
+      'Prune…',
     ]);
     expect(wrapper.find('.app-menu__description').exists()).toBe(false);
   });

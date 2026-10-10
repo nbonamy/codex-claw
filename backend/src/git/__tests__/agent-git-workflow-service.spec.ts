@@ -7,6 +7,34 @@ import type { AgentGitService } from '../agent-git-service';
 import { AgentGitWorkflowService, parseAgentGitRequest } from '../agent-git-workflow-service';
 
 describe('AgentGitWorkflowService', () => {
+  it('guards prune consent and supplies fresh local agent ownership, without treating PR badges as merge proof', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.folder = '/repo';
+    snapshot.agents = [agent];
+    const target = { id: 'refs/remotes/origin/feature', revision: 'checked', name: 'origin/feature', branch: 'feature', kind: 'remote', sha: 'head', merged: false, blocked: 'notMerged', usedBy: [], changedFiles: 0 };
+    const inventory = vi.fn(async () => ({ repository: 'repo', baseBranch: 'main', groups: [{ branch: 'feature', remotes: [target] }], unavailableRemotes: [] }));
+    const prune = vi.fn(async (_folder, _input, owners) => {
+      expect(owners()).toStrictEqual([{ folder: '/repo', name: agent.name }]);
+      agent.folder = '/repo/new';
+      expect(owners()).toStrictEqual([{ folder: '/repo/new', name: agent.name }]);
+      return { deleted: [], failed: [] };
+    });
+    const pr = { number: 1, title: 'feature', url: 'https://github.com/owner/repo/pull/1', state: 'merged', headSha: 'head', draft: false };
+    const service = new AgentGitWorkflowService({
+      applyEvent: vi.fn(), archiveConversation: vi.fn(), delegatedWorkReports: {} as DelegatedWorkReportPort,
+      driverRequest: vi.fn(), releaseConversation: vi.fn(), getSnapshot: () => snapshot,
+      getWorkIntegrations: () => ({ githubConnected: async () => true, findPullRequest: async () => pr }) as never,
+      git: { pruning: { inventory, prune }, workflow: async () => ({ repository: 'owner/repo', remote: 'origin' }) } as unknown as AgentGitService,
+      persistAndEmitSnapshot: vi.fn(), refreshGitStatus: vi.fn(), refreshWorkspaceIdentity: vi.fn(), sendPrompt: vi.fn(),
+    });
+    const result = await service.execute({ method: backendMethods.agentGitPruneGet, agentId: agent.id, params: {} }, agent);
+    expect(result).toStrictEqual({ repository: 'repo', baseBranch: 'main', unavailableRemotes: [], groups: [{ branch: 'feature', remotes: [{ ...target, pullRequest: pr }] }] });
+    await expect(service.execute({ method: backendMethods.agentGitPrune, agentId: agent.id, params: { input: { confirmed: false } } }, agent)).rejects.toThrow('requires explicit confirmation');
+    expect(prune).not.toHaveBeenCalled();
+    await service.execute({ method: backendMethods.agentGitPrune, agentId: agent.id, params: { input: { confirmed: true, targets: [{ id: target.id, revision: target.revision }] } } }, agent);
+    expect(prune).toHaveBeenCalledTimes(1);
+  });
   it('requires explicit revert consent and an unversioned-file choice before refreshing the affected agent', async () => {
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0] as Agent;

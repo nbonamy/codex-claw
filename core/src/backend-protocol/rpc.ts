@@ -189,6 +189,14 @@ export type AppBackendRequestMap = {
     params: { agentId: string; input: AgentGitRevertInput };
     result: AgentGitWorkflow;
   };
+  [backendMethods.agentGitPruneGet]: {
+    params: { agentId: string };
+    result: import('../contracts').GitPruneInventory;
+  };
+  [backendMethods.agentGitPrune]: {
+    params: { agentId: string; input: import('../contracts').GitPruneInput };
+    result: import('../contracts').GitPruneResult;
+  };
 };
 
 export type AppBackendRequestMethod = keyof AppBackendRequestMap;

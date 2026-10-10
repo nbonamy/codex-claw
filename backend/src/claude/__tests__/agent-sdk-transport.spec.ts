@@ -16,9 +16,9 @@ import { createQueryHarness } from './sdk-query-fixture';
 
 vi.mock('@workspace/core/runtime-discovery', () => ({
   // Runtime discovery owns its shell integration tests; this suite tests the transport boundary.
-  withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({
-    ...process.env,
-    ...env,
+  resolveRuntimeLaunch: (command: string, env: NodeJS.ProcessEnv | undefined) => ({
+    command: command === 'claude' ? '/resolved/bin/claude' : command,
+    env: { ...env, PATH: env?.PATH ?? '/resolved/bin' },
   }),
 }));
 
@@ -193,7 +193,10 @@ describe('ClaudeAgentSdkTransport', () => {
       value: 'claude-opus-4-6',
       displayName: 'Opus 4.6',
     })]);
-    expect(harness.options[0]).toMatchObject({ cwd: '/tmp/project', persistSession: false });
+    expect(harness.options[0]).toMatchObject({
+      cwd: '/tmp/project', persistSession: false,
+      pathToClaudeCodeExecutable: '/resolved/bin/claude', env: { PATH: '/resolved/bin' },
+    });
     expect(harness.runtimes[0]?.close).toHaveBeenCalledOnce();
   });
 

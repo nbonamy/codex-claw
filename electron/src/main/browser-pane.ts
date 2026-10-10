@@ -608,6 +608,7 @@ export function browserPaneKey(agentId: string, browserId: string): string {
 export function normalizeBrowserUrl(value: string, fileRoot?: string): string {
   const trimmed = value.trim();
   if (!trimmed) throw new Error('Enter a URL to open.');
+  if (trimmed === 'about:blank') return trimmed;
   const candidate = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
   const parsed = new URL(candidate);
   if (parsed.protocol === 'file:') {

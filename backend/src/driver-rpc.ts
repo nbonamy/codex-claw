@@ -13,7 +13,7 @@ import { ClaudeBackendDriver } from './claude/claude-driver';
 import { AntigravityHost } from './antigravity/antigravity-host';
 import { CodexBackendDriver } from './codex/codex-driver';
 import { CodexSurfaceAgentAdapter } from './codex/codex-surface-adapter';
-import { resolveCodexCommand } from './codex/codex-command';
+import { resolveCodexLaunch } from './codex/codex-command';
 import { createCodexSurface } from '@codex-app-sdk/backend';
 import { listSourceBranches, listSourceWorktrees, suggestedSourceWorktreePath } from './git-worktrees';
 import { WorktreeManager } from './worktrees/worktree-manager';
@@ -67,7 +67,7 @@ export function appSurfaceOptions(options: BackendDriverRegistryOptions = {}): A
     codexHome: options.generalSettings?.providerHomes?.codex?.homePath ?? backendCodexHomeDir(),
     loadingStrategy: 'lazy',
     transport: {
-      command: resolveCodexCommand(options.generalSettings?.codexBinaryPath),
+      ...resolveCodexLaunch(options.generalSettings?.codexBinaryPath),
       configOverrides: buildAppMcpConfigOverrides(
         options.pluginSettings?.() ?? options.generalSettings?.plugins,
       ),

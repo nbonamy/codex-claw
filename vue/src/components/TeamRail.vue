@@ -9,6 +9,7 @@
 
     <div class="team-rail__body">
       <button
+        v-if="!phoneScope"
         class="team-rail__backlog"
         :class="{ 'team-rail__backlog--active': backlogActive }"
         type="button"
@@ -102,6 +103,7 @@
         </button>
 
         <button
+          v-if="!phoneScope"
           class="team-rail__automations"
           :class="{ 'team-rail__automations--active': automationsActive }"
           type="button"
@@ -116,6 +118,7 @@
         </button>
 
         <SettingsMenu
+          v-if="!phoneScope"
           :active="settingsActive"
           :account="account"
           :rate-limits="rateLimits"
@@ -168,6 +171,8 @@ const props = defineProps<{
   backendRateLimits?: AppSnapshot['backendAccountRateLimits'];
   account?: CodexAccount | null;
   settingsActive?: boolean;
+  /** Phones expose conversations and the cockpit only. */
+  phoneScope?: boolean;
   spokenAnnouncementsEnabled?: boolean;
   spokenAnnouncementsMuted?: boolean;
   agentSidebarExpanded?: boolean;

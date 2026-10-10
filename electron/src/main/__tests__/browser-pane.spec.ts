@@ -208,7 +208,24 @@ describe('browser pane helpers', () => {
   it('rejects unsafe protocols and empty addresses', () => {
     expect(() => normalizeBrowserUrl('')).toThrow('Enter a URL');
     expect(() => normalizeBrowserUrl('javascript:alert(1)')).toThrow('Only http, https, and workspace file URLs');
+    for (const url of ['about:config', 'about:blank?x=1', 'data:text/html,hello']) {
+      expect(() => normalizeBrowserUrl(url)).toThrow('Only http, https, and workspace file URLs');
+    }
     expect(() => normalizeBrowserUrl('file:///Users/nicolas/.ssh/id_rsa')).toThrow('require an agent workspace');
+  });
+
+  it('opens and returns to about:blank without blocking blank-page navigation', async () => {
+    const owner = { webContents: {} };
+    const guest = electronMocks.createGuest(owner, 62);
+    const pane = new BrowserPane({ onAnnotation: vi.fn() });
+    try {
+      await expect(pane.open(owner as never, 'agent-one', 'primary', 'about:blank', '', 62)).resolves.toMatchObject({ url: 'about:blank' });
+      await pane.navigate('agent-one', 'primary', 'https://example.com');
+      await expect(pane.navigate('agent-one', 'primary', ' about:blank ')).resolves.toMatchObject({ url: 'about:blank' });
+      expect(guest.loadURL).toHaveBeenLastCalledWith('about:blank');
+      expect(guest.emitNavigation('will-navigate', 'about:blank').preventDefault).not.toHaveBeenCalled();
+      expect(guest.emitNavigation('will-navigate', 'about:config').preventDefault).toHaveBeenCalledOnce();
+    } finally { await pane.closeAll(); }
   });
 
   it('opens existing workspace files while rejecting escapes and symlinks outside the workspace', async () => {

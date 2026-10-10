@@ -8,6 +8,7 @@ import { AppError } from '@workspace/core/app-error';
 import { sanitizeGitRemoteUrl } from '@workspace/core/git-remote';
 import type { AgentGitStatus } from '@workspace/core/contracts';
 import { listSourceBranches, type GitWorktreeCreateInput } from '../git-worktrees';
+import { GitPruneService } from './git-prune-service';
 
 const execFileAsync = promisify(execFile);
 
@@ -26,6 +27,7 @@ export type AgentGitGenerationContext = {
 };
 
 export class AgentGitService {
+  readonly pruning: GitPruneService;
   private settings: () => GitSettings = () => normalizeGitSettings(undefined);
 
   setSettingsProvider(provider: () => GitSettings): void { this.settings = provider; }
@@ -34,7 +36,7 @@ export class AgentGitService {
     private readonly now: AgentGitServiceClock = () => new Date(),
     private readonly runGit: AgentGitRunner = git,
     private readonly createWorktree?: AgentGitWorktreeCreator,
-  ) {}
+  ) { this.pruning = new GitPruneService(runGit); }
 
   async identity(folder: string): Promise<AgentWorkspaceIdentity> {
     const updatedAt = this.now().toISOString();

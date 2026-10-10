@@ -4,6 +4,8 @@ import type {
   ApprovalPreset,
   ReasoningEffort,
 } from './contracts/shared';
+import type { GitPruneInput, GitPruneInventory, GitPruneResult } from './contracts/git-prune';
+export type { GitPruneInput, GitPruneInventory, GitPruneResult, GitPruneTarget } from './contracts/git-prune';
 import type {
   AgentCloseInput,
   AgentGitBranchInput,
@@ -861,6 +863,8 @@ export type AppApi = {
   pushAgentGitBranch(agentId: string, input: AgentGitPushInput): Promise<AgentGitWorkflow>;
   pullAgentGitBranch(agentId: string, input: AgentGitPullInput): Promise<AgentGitPullResult>;
   revertAgentGitChanges(agentId: string, input: AgentGitRevertInput): Promise<AgentGitWorkflow>;
+  getAgentGitPrune(agentId: string): Promise<GitPruneInventory>;
+  pruneAgentGit(agentId: string, input: GitPruneInput): Promise<GitPruneResult>;
   createAgentGitBranch(agentId: string, input: AgentGitBranchInput): Promise<AgentGitWorkflow>;
   createAgentGitPullRequest(agentId: string, input: AgentGitPullRequestInput): Promise<AgentGitWorkflow>;
   mergeAgentGitBranch(agentId: string, input: AgentGitMergeInput): Promise<AgentGitWorkflow>;

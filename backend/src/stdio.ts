@@ -296,6 +296,8 @@ function lineLooksLikeJson(line: string): boolean {
 }
 
 function defaultRequestTimeoutMs(method: string): number {
+  // Let Electron's 30-second browser-open deadline report the navigation failure.
+  if (method === 'client/browser/open') return 35_000;
   if (method.startsWith('client/computerUse/')) return 35_000;
   if (method === 'client/mobileSimulator/execute') return 240_000;
   return 5_000;

@@ -22,8 +22,9 @@ adding steering, forks, goals, turn mutations or context controls.
   Korus MCP server and its allow rule ([mcp.md](mcp.md)), and partial streaming
   events. Prompt and developer text travels over the SDK input stream and is kept
   out of process logs. The executable is launched directly, not through a shell;
-  common user bin folders are prepended to `PATH` because GUI-launched Electron does
-  not inherit the shell's. `APP_CLAUDE_COMMAND` overrides resolution.
+  the shared runtime resolver supplies the login-shell executable and child PATH
+  because GUI-launched Electron can inherit a different environment.
+  `APP_CLAUDE_COMMAND` overrides resolution.
 - The Claude conversation host is the sole owner of the normalized transcript. It
   maps SDK stream messages to immutable `ClaudeConversationEvent`s, keeps one
   snapshot per agent and publishes a bounded reset plus revisioned deltas

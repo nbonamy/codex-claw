@@ -11,7 +11,7 @@ import { BackendDriverRpc } from '../../driver-rpc';
 import { createTestSnapshot } from '../../__tests__/server-test-fixtures';
 
 vi.mock('@workspace/core/runtime-discovery', () => ({
-  withDiscoveredRuntimePath: (env: NodeJS.ProcessEnv | undefined) => ({ ...process.env, ...env }),
+  resolveRuntimeLaunch: (command: string, env: NodeJS.ProcessEnv | undefined) => ({ command, env: { ...process.env, ...env } }),
 }));
 vi.mock('../authentication', () => ({ getLocalClaudeAuthentication: vi.fn() }));
 

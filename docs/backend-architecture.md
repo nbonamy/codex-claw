@@ -32,6 +32,14 @@ log and socket paths, npm scripts and launchd labels stay brand-neutral.
   unsupported installations use official instructions. No provider is installed
   automatically and no app restart is scheduled. Preferences and queued upgrades
   must not be mistaken for permission to interrupt running work.
+- Provider detection and launches share `core/runtime-discovery`: the owning
+  host's login-shell PATH precedes inherited and fallback directories. Shell PATH
+  output is framed so startup messages cannot corrupt executable selection;
+  unavailable shells fall back to inherited PATH. Launches resolve the executable
+  and child environment together, preserving explicit executable overrides.
+  The desktop's private Node is only a child-PATH fallback. npm ownership checks
+  and upgrades run the selected npm CLI with its adjacent Node, never whichever
+  Node an app-private PATH happens to select.
 - Domain modules never self-register global timers. A runtime scheduler runs
   registered tasks (automation scans, PR monitoring) without overlap.
 - Queued prompt delivery removes an item only after backend acceptance; transport
@@ -120,6 +128,11 @@ of the same version. Backend changes rebuild and restart the process (no HMR) an
 the client re-syncs with `snapshot/get`; only durable state survives, and active
 turns, pending approvals and in-memory MCP sessions are interrupted. Protocol
 changes may require restarting both processes. Renderer changes keep Vite HMR.
+
+`npm run dev:web` is the web equivalent: it builds `daemon` once, watches the web
+server bundle (restarting server and daemon on change) and serves the client from Vite
+with HMR, proxying `/app` to the server. `CODEX_APP_SDK_SOURCE=1` links the sibling SDK
+sources for HMR, as in desktop dev. Use `APP_HOME` to keep it off your real state.
 `APP_BACKEND_MODE=in-process` exists for bisecting.
 
 Folder-changing provider actions are rejected while chats are active because they

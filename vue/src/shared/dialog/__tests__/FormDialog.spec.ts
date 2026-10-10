@@ -3,8 +3,27 @@ import { ElDialog } from 'element-plus';
 import { describe, expect, it } from 'vitest';
 import FormDialog from '../FormDialog.vue';
 import FormField from '../../form/FormField.vue';
+import '../../../styles/base.css';
 
 describe('FormDialog', () => {
+  it('isolates dialog content from right-aligned parents while keeping footer actions right-aligned', async () => {
+    const shell = document.createElement('div');
+    shell.style.textAlign = 'right';
+    document.body.append(shell);
+    const wrapper = mount(FormDialog, {
+      attachTo: shell,
+      props: { modelValue: true, title: 'Prune repository', subtitle: 'korus' },
+      slots: { default: '<p>Choose branches</p>', footer: '<button>Cancel</button><button>Prune</button>' },
+      global: { components: { ElDialog }, stubs: { ElDialog: false, teleport: false } },
+    });
+    try {
+      await flushPromises();
+      expect(getComputedStyle(wrapper.get('.el-dialog').element).textAlign).toBe('left');
+      expect(getComputedStyle(wrapper.get('.el-dialog__footer').element).textAlign).toBe('right');
+      expect(getComputedStyle(wrapper.get('.app-form-dialog__footer-actions').element).marginLeft).toBe('auto');
+    } finally { wrapper.unmount(); shell.remove(); }
+  });
+
   it('teleports outside a hidden shell when requested', async () => {
     const shell = document.createElement('main');
     shell.style.visibility = 'hidden';

@@ -1,7 +1,13 @@
 {
   "schemaVersion": 2,
-  "currentVersion": "0.31.0",
+  "currentVersion": "0.32.0",
   "releases": [
+    {
+      "version": "0.32.0",
+      "releasedAt": "2026-10-09",
+      "sourceSha256": "976d02295d5372da480fa6d392e751bd6cf0fa837e1820e441dbe0d4e641b390",
+      "markdown": "### New features\n\n- Choose how Git pulls and updates from the base branch: merge, rebase, or\n  fast-forward only. Pull can also follow your existing Git configuration.\n- Prune a repository from the Git menu, with local branches, remote branches,\n  and linked worktrees in one place. Merged, unused local branches are selected\n  by default; remote branches are opt-in. Review unmerged work and files before\n  confirming their deletion.\n- Check installed Codex and Claude Code versions and upgrade supported\n  installations from Settings. Upgrades wait for busy agents to finish.\n- Add instructions after `/review` to focus the reviewer on what matters to you.\n\n### Improvements and fixes\n\n- Git menu actions are grouped for easier scanning.\n- Claude and simulator tool activity shows clearer, action-specific labels.\n- Delegated agents receive explicit implementation approval in their handoff,\n  avoiding redundant confirmation requests.\n- The built-in browser recovers from failed page loads and opens `about:blank`\n  without an error.\n- Dialog content stays left-aligned while footer actions remain right-aligned."
+    },
     {
       "version": "0.31.0",
       "releasedAt": "2026-10-08",

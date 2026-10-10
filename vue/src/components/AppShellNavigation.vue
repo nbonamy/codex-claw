@@ -17,6 +17,7 @@
     :enabled-backends="enabledAgentBackends(snapshot)"
     :backend-rate-limits="snapshot.backendAccountRateLimits"
     :account="authentication?.account ?? null"
+    :phone-scope="phoneScope"
     class="app-shell__team-rail"
     @close-team="$emit('close-team', $event)"
     @disconnect-team="$emit('disconnect-team', $event)"
@@ -43,6 +44,7 @@
       :active-mission-id="activeMissionId"
       :mission-creation-error="missionCreationError"
       :mission-creation-pending="missionCreationPending"
+      :phone-scope="phoneScope"
       @create-mission="$emit('create-mission')"
       @delete-mission="$emit('delete-mission', $event)"
       @select-mission="$emit('select-mission', $event)"
@@ -116,6 +118,7 @@ const props = defineProps<{
   activeMissionId?: string | null;
   missionCreationError?: string;
   missionCreationPending?: boolean;
+  phoneScope?: boolean;
   activeTeam: Team | null;
   activeTeamAgents: Agent[];
   activeTeamName: string;
