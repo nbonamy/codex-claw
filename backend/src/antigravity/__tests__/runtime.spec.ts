@@ -58,6 +58,29 @@ describe('Antigravity native lifecycle', () => {
       expect(await host.authenticate({ action: 'check' })).toMatchObject({ connected: true });
     } finally { await host.close(); }
   });
+  it('lets an explicit sign-in supersede a background check that is still in flight', async () => {
+    const marker = path.join(root, 'first-authenticate');
+    // The first authenticate (the background check) never answers; later ones succeed.
+    await fakeRuntime(`const fs=require('node:fs'); if(!fs.existsSync(${JSON.stringify(marker)})) fs.writeFileSync(${JSON.stringify(marker)},''); else reply({});`);
+    const host = new AntigravityHost();
+    try {
+      const check = host.authenticate({ action: 'check' }).catch(error => error);
+      await vi.waitFor(async () => { await readFile(marker); }, { timeout: 10_000 });
+      await expect(host.authenticate({ action: 'login' })).resolves.toMatchObject({ connected: true });
+      expect(await check).toBeInstanceOf(Error);
+      await expect(host.authenticate({ action: 'check' })).resolves.toMatchObject({ connected: true });
+    } finally { await host.close(); }
+  });
+  it('still rejects overlapping explicit authentication actions', async () => {
+    await fakeRuntime('/* never answers */');
+    const host = new AntigravityHost();
+    try {
+      const login = host.authenticate({ action: 'login' }).catch(error => error);
+      await expect(host.authenticate({ action: 'login' })).rejects.toThrow('already in progress');
+      await host.authenticate({ action: 'cancel' });
+      await login;
+    } finally { await host.close(); }
+  });
   it('requires the paired runtime and excludes ambient API billing credentials from child processes', async () => {
     await writeFile(path.join(root, 'runtime'), '', { mode: 0o700 });
     expect(resolveAcpRuntime()).toBeNull();

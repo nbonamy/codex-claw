@@ -31,8 +31,7 @@ export class AntigravityHost implements AgentBackendDriver {
   private readonly auxiliary = new Set<AcpSession>();
   private readonly listeners = new Set<(event: BackendEvent) => void>();
   private authentication?: AcpRuntime;
-  private authAbort?: AbortController;
-  private authBusy = false;
+  private auth?: { action: ProviderAuthenticationAction['action']; abort: AbortController; done: Promise<ProviderAuthentication> };
   private closed = false;
   constructor(private readonly options: BackendDriverRegistryOptions = {}) {}
 
@@ -44,15 +43,27 @@ export class AntigravityHost implements AgentBackendDriver {
 
   async authenticate(request: ProviderAuthenticationAction): Promise<ProviderAuthentication> {
     if (request.action === 'cancel') {
-      this.authAbort?.abort();
+      this.auth?.abort.abort();
       await this.authentication?.close();
       return this.authState(false);
     }
     if (this.closed) throw new Error('Antigravity host is closed.');
-    if (this.authBusy) throw new Error('Antigravity authentication is already in progress.');
-    this.authBusy = true;
-    const abort = this.authAbort = new AbortController();
+    const previous = this.auth;
+    // A background check must never make the user's explicit sign-in fail; the login supersedes it.
+    if (previous && !(previous.action === 'check' && request.action === 'login')) throw new Error('Antigravity authentication is already in progress.');
+    const abort = new AbortController();
+    const entry: NonNullable<typeof this.auth> = { action: request.action, abort, done: Promise.resolve(null as never) };
+    entry.done = (async () => {
+      if (previous) { previous.abort.abort(); await this.authentication?.close(); await previous.done.catch(() => {}); }
+      return this.runAuthentication(request, abort, entry);
+    })();
+    this.auth = entry;
+    return entry.done;
+  }
+
+  private async runAuthentication(request: ProviderAuthenticationAction, abort: AbortController, entry: NonNullable<typeof this.auth>): Promise<ProviderAuthentication> {
     try {
+      if (abort.signal.aborted || this.closed) throw new Error('Antigravity authentication cancelled.');
       const home = antigravityHome();
       await mkdir(home, { recursive: true, mode: 0o700 });
       this.authentication = await AcpRuntime.open({ cwd: home, home, interactive: request.action === 'login', signal: abort.signal,
@@ -70,7 +81,10 @@ export class AntigravityHost implements AgentBackendDriver {
         return this.authState(true);
       }
       catch (error) { if (error instanceof NativeLoginRequired) return this.authState(false); throw error; }
-    } finally { await this.authentication?.close(); this.authentication = undefined; this.authAbort = undefined; this.authBusy = false; }
+    } finally {
+      await this.authentication?.close(); this.authentication = undefined;
+      if (this.auth === entry) this.auth = undefined;
+    }
   }
 
   async sendPrompt(agent: Agent, prompt: string, options?: SendPromptOptions) {
@@ -250,7 +264,7 @@ export class AntigravityHost implements AgentBackendDriver {
   }
   async close(): Promise<void> {
     this.closed = true;
-    this.authAbort?.abort();
+    this.auth?.abort.abort();
     await this.authentication?.close();
     await Promise.all([...this.auxiliary].map(session => session.close()));
     await Promise.all([...this.sessions.keys()].map(id => this.releaseConversation(id)));

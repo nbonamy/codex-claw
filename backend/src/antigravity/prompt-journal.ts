@@ -30,11 +30,10 @@ export class AcpPromptJournal {
     const entries: Entry[] = [];
     const size = await stat(file).then(value => value.size).catch(error => { if (error.code === 'ENOENT') return 0; throw error; });
     if (size > 20 * 1024 * 1024) throw new Error('Antigravity prompt metadata exceeds the supported history limit.');
+    // A crash mid-append can leave a torn line; drop it so history still opens with native text.
     if (size) for (const line of (await readFile(file, 'utf8')).split('\n').filter(Boolean)) {
-      const entry = JSON.parse(line) as Entry;
-      if (typeof entry.wireText !== 'string' || typeof entry.text !== 'string' || !Array.isArray(entry.parts)
-        || entry.parts.some(part => part.type !== 'attachment')) throw new Error('Invalid Antigravity prompt metadata.');
-      entries.push(entry);
+      const entry = parseEntry(line);
+      if (entry) entries.push(entry);
     }
     return new AcpPromptJournal(file, entries);
   }
@@ -56,4 +55,12 @@ export class AcpPromptJournal {
     if (entry) this.replayIndex = index + 1;
     return entry ? structuredClone({ text: entry.text, parts: entry.parts }) : { text: nativeText, parts: [] };
   }
+}
+
+function parseEntry(line: string): Entry | null {
+  try {
+    const entry = JSON.parse(line) as Entry;
+    return typeof entry.wireText === 'string' && typeof entry.text === 'string' && Array.isArray(entry.parts)
+      && entry.parts.every(part => part.type === 'attachment') ? entry : null;
+  } catch { return null; }
 }

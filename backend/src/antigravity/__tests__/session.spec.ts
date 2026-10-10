@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -351,6 +351,23 @@ describe('Antigravity native session', () => {
       const replay = await host.readConversationMessages(ref, agent.id);
       expect(replay.map(message => message.parts)).toEqual(live.map(message => message.parts));
       expect(replay[0]?.parts).toEqual([{ type: 'text', text: 'Read my notes' }, { type: 'attachment', attachment: { kind: 'file', name: 'notes.txt', path: file, mimeType: 'text/plain' } }]);
+    } finally { await host.close(); }
+  });
+
+  it('opens a conversation whose prompt journal ends in a torn line, keeping the intact entries', async () => {
+    const host = new AntigravityHost();
+    const agent: Agent = { id: 'torn', name: 'Torn', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const events: BackendEvent[] = [];
+    host.onEvent(event => events.push(event));
+    try {
+      const result = await host.sendPrompt(agent, 'Keep this prompt');
+      agent.backendSession = result.backendSession;
+      await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
+      const sessionId = result.backendSession.kind === 'antigravity' ? result.backendSession.sessionId : '';
+      await host.releaseConversation(agent.id);
+      await appendFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(sessionId), 'prompts.jsonl'), '{"wireText":"half');
+      const replay = await host.readConversationMessages({ backend: 'antigravity', sessionId, folder: root }, agent.id);
+      expect(replay[0]?.parts).toEqual([{ type: 'text', text: 'Keep this prompt' }]);
     } finally { await host.close(); }
   });
 
