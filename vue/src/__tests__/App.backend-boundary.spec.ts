@@ -103,8 +103,8 @@ describe('Unified backend → mounted application', () => {
     expect(wrapper.find('[aria-label="Open code review"]').exists()).toBe(false);
     expect(wrapper.find('.thread-flag-affordance').exists()).toBe(true);
     expect(api.sendPrompt).not.toHaveBeenCalled();
-    const field = wrapper.get<HTMLTextAreaElement>('textarea[aria-label="Additional instructions"]');
-    expect(field.element.value).toBe(instructions);
+    if (instructions) expect(wrapper.get('.code-review-panel__instructions').attributes('title')).toBe(instructions);
+    else expect(wrapper.find('.code-review-panel__instructions').exists()).toBe(false);
     api.startCodeReview.mockResolvedValue(cleared);
     await wrapper.get('.code-review-panel__start').trigger('click');
     await flushPromises();
