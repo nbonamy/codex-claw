@@ -329,6 +329,13 @@ export function useAppState() {
     return next;
   }
 
+  async function commitCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
+    if (!appApi) throw new Error(`${product.name} API is unavailable.`);
+    const next = await appApi.commitCodeReview(agentId, sessionId);
+    adoptBackgroundSnapshot(next);
+    return next;
+  }
+
   async function discardCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot> {
     if (!appApi) throw new Error(`${product.name} API is unavailable.`);
     const next = await appApi.discardCodeReview(agentId, sessionId);
@@ -1731,6 +1738,7 @@ export function useAppState() {
     discussCodeReviewFinding,
     submitCodeReviewRound,
     finishCodeReview,
+    commitCodeReview,
     discardCodeReview,
     reviewCodeAgain,
     getAgentGitWorkflow,

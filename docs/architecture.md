@@ -337,6 +337,14 @@ target and reviewer agents) plus an opaque reviewer session reference.
 - User-supplied review instructions belong to the review session, survive retries
   and fresh rounds, and never become saved reviewer defaults. Unsubmitted drafts
   stay local to the agent's review tab and are discarded when that tab closes.
+- Completion can commit first: with the review's commit option ticked, the review
+  agent is asked to commit the reviewed work locally before Finish or Review again
+  runs. Korus only verifies that HEAD advanced; it never pushes. The option is
+  offered only while the folder has changes (automatic reviews that already committed
+  leave nothing to offer). A failed or ineffective commit leaves the review untouched
+  and skips the chosen action. Committing an uncommitted manual review changes its
+  scope to the branch against the pre-commit HEAD, preserving the reviewed work
+  through subsequent rounds and reloads.
 - Finishing saves a report first, then removes the ledger and the review-owned
   agent. Discarding removes the ledger from any state. Reopening starts from zero.
 - Findings and the `finish_review_round` acknowledgment are model tools

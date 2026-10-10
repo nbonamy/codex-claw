@@ -334,6 +334,8 @@ export const surfaceMessages = {
     "completeRound": "Complete review round",
     "finishReview": "Finish review",
     "reviewAgain": "Review again",
+    "commitChanges": "Commit changes",
+    "committingChanges": "Committing changes…",
     "reviewFinished": "Review finished.",
     "startNewReview": "Start new review",
     "reviewStopped": "The review stopped before it could complete.",

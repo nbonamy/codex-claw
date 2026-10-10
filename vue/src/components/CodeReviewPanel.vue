@@ -238,11 +238,16 @@
           </button>
         </template>
         <template v-else-if="session.status === 'readyToFinish'">
+          <span v-if="committing">{{ $t('surface.codeReviewPanel.committingChanges') }}</span>
+          <label v-else-if="commitAvailable" class="code-review-panel__commit-option">
+            <el-switch v-model="commitFirst" size="small" :disabled="busy" :aria-label="$t('surface.codeReviewPanel.commitChanges')" />
+            <span>{{ $t('surface.codeReviewPanel.commitChanges') }}</span>
+          </label>
           <button
             class="app-button app-button--secondary"
             type="button"
             :disabled="busy"
-            @click="run(() => finishReview(agent.id, session!.id))"
+            @click="complete(() => finishReview(agent.id, session!.id))"
           >
             {{ $t('surface.codeReviewPanel.finishReview') }}
           </button>
@@ -250,7 +255,7 @@
             class="app-button app-button--primary"
             type="button"
             :disabled="busy"
-            @click="run(() => reviewAgain(agent.id, session!.id))"
+            @click="complete(() => reviewAgain(agent.id, session!.id))"
           >
             {{ $t('surface.codeReviewPanel.reviewAgain') }}
           </button>
@@ -308,7 +313,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   IconChecklist,
@@ -330,6 +335,7 @@ import {
 import type { Agent, AgentGitStatus, AppSnapshot } from "@workspace/core/contracts";
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 import BackendSelector from './BackendSelector.vue';
+import { codeReviewUncommittedPreviewKey } from './code-review-preview';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormField from '../shared/form/FormField.vue';
 import { useBackendChoices } from './backend-selection';
@@ -351,6 +357,7 @@ const props = defineProps<{
   ) => Promise<AppSnapshot>;
   finishReview: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewAgain: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  commitReview: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>();
 
 const { t } = useI18n();
@@ -560,6 +567,25 @@ watch(
   },
   { immediate: true },
 );
+
+const simulateUncommitted = inject(codeReviewUncommittedPreviewKey, ref(false));
+// Automatic reviews may already have committed everything; only offer a commit while changes remain.
+const commitAvailable = computed(() => simulateUncommitted.value || (props.gitStatus?.changedFiles ?? 0) > 0);
+const commitFirst = ref(false);
+const committing = ref(false);
+
+// The review agent commits first; if that fails the chosen action never runs and the review stays as it was.
+function complete(action: () => Promise<unknown>): void {
+  const sessionId = session.value!.id;
+  void run(async () => {
+    if (commitFirst.value && commitAvailable.value) {
+      committing.value = true;
+      try { await props.commitReview(props.agent.id, sessionId); }
+      finally { committing.value = false; }
+    }
+    await action();
+  });
+}
 
 async function run(action: () => Promise<unknown>): Promise<void> {
   busy.value = true;
@@ -1073,6 +1099,16 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   margin-right: auto;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
+}
+
+.code-review-panel__commit-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-right: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-weight: normal;
 }
 
 .code-review-panel__error {

@@ -282,6 +282,41 @@ export class CodeReviewService {
     }
   }
 
+  /** The review agent commits its own reviewed work locally; Korus only verifies that HEAD advanced. */
+  async commit(agent: Agent, sessionId: string): Promise<void> {
+    const session = this.findSession(agent, sessionId);
+    if (session.status !== 'readyToFinish') throw new Error('The review is not ready to commit.');
+    const round = activeCodeReviewRound(session);
+    this.requireIdleRound(round);
+    const folder = agent.folder;
+    if (!folder) throw new Error('The review agent has no folder to commit.');
+    this.activeRoundTurns.add(round.id);
+    try {
+      const before = await this.git.inspect(folder);
+      const hasChanges = await this.git.hasChanges(folder);
+      this.requireOpenReviewSession(session);
+      if (session.status !== 'readyToFinish' || session.activeRoundId !== round.id) {
+        throw new Error('The review changed before committing. Inspect it before continuing.');
+      }
+      if (!hasChanges) return;
+      const context = this.reviewToolContext(agent, session);
+      const result = await this.options.runReview(agent, commitPrompt(), context.url, requiredReviewerSession(round));
+      if (agent.codeReview !== session) return;
+      agent.backendSession = result.reviewerSession;
+      round.reviewerSession = result.reviewerSession;
+      const after = await this.git.inspect(folder);
+      if (after.head === before.head) throw new Error('The review agent did not create a commit. The review is unchanged.');
+      // Persist the pre-commit baseline through the existing branch scope so fresh
+      // rounds still inspect the reviewed work after it leaves the working tree.
+      if (session.scope.type === 'uncommitted' && !session.automation?.baseRef) {
+        session.scope = { type: 'branch', baseRef: before.head };
+      }
+    } finally {
+      this.activeRoundTurns.delete(round.id);
+    }
+    await this.options.changed();
+  }
+
   async discard(agent: Agent, sessionId: string): Promise<void> {
     const session = this.findSession(agent, sessionId);
     if (session.automation?.state === 'running') {
@@ -973,6 +1008,14 @@ ${findingContext}
 
 Keep the changes focused and add or update behavior-level tests when appropriate. Immediately after each individual finding is fixed and verified, call update_finding with its id and status "fixed" before moving to the next finding. Do not wait until all findings are fixed to update their statuses. Include concise verification evidence when useful.
 ${session.automation ? `Automatic remediation: run the relevant tests and checks. Every fixed finding MUST include evidence naming the commands and results (or a specific reason a check does not apply). If validation fails or a fix needs a product decision, leave the finding unresolved and explain the blocker. Do not commit, stage, push, merge, change branches, or discard changes. ${session.automation.autoCommit === true ? 'Auto-commit is enabled: the review workflow owns the local commit after validation.' : 'Auto-commit is disabled. Leave all fixes uncommitted; the review workflow will not stage or commit them.'} Preserve unrelated files; no background work may remain when this turn ends.` : ''}
+</context>`;
+}
+
+function commitPrompt(): string {
+  return `Commit the changes from this review to the current branch.
+
+<context>
+Run git status and git diff first. Stage and commit only the files that belong to the reviewed changes and their fixes; leave unrelated files untouched. Use a concise single-line message that follows the repository's commit conventions. Do not push, merge, rebase, change branches, amend existing commits, or bypass hooks. If a hook rejects the commit, fix the cause and retry; if you cannot, stop and explain. Do not call any review tools. End with one short sentence naming the commit.
 </context>`;
 }
 

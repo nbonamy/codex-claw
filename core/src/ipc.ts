@@ -23,6 +23,7 @@ export const ipcChannels = {
   discussCodeReviewFinding: 'agent:code-review:finding:discuss',
   submitCodeReviewRound: 'agent:code-review:round:submit',
   finishCodeReview: 'agent:code-review:finish',
+  commitCodeReview: 'agent:code-review:commit',
   discardCodeReview: 'agent:code-review:discard',
   reviewCodeAgain: 'agent:code-review:again',
   respondToThreadFlag: 'agent:thread-flag:respond',

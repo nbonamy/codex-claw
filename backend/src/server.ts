@@ -1486,6 +1486,14 @@ export class AppBackendServer {
           return this.persistAndEmitSnapshot();
         });
       }
+      case backendMethods.agentCodeReviewCommit: {
+        const agentId = requireStringParam(message.params, 'agentId');
+        const sessionId = requireStringParam(message.params, 'sessionId');
+        return this.routeAgentSnapshotRequest(message.id, agentId, message.method, { agentId, sessionId }, async (agent) => {
+          await this.requireCodeReviews().commit(agent, sessionId);
+          return this.persistAndEmitSnapshot();
+        });
+      }
       case backendMethods.agentCodeReviewDiscard: {
         const agentId = requireStringParam(message.params, 'agentId');
         const sessionId = requireStringParam(message.params, 'sessionId');

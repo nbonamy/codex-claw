@@ -117,6 +117,19 @@ describe('app menu', () => {
     expect(item().checked).toBe(false);
   });
 
+  it('shows the uncommitted-changes simulation as a checked toggle in Code review fixtures', () => {
+    let enabled = false;
+    const cb = callbacks();
+    cb.getDebugReviewUncommitted = () => enabled;
+    cb.setDebugReviewUncommitted = value => { enabled = value; };
+    const item = () => nestedMenuItem(buildAppMenuTemplate(cb, { debugMode: true }), 'Debug', 'Review', 'Simulate Uncommitted Changes')!;
+    expect(item()).toMatchObject({ type: 'checkbox', checked: false, enabled: true });
+    item().click!({ checked: true } as never, undefined, {} as never);
+    expect(item().checked).toBe(true);
+    item().click!({ checked: false } as never, undefined, {} as never);
+    expect(item().checked).toBe(false);
+  });
+
   it('builds app-owned file, view, and agent menus with the native Edit menu', () => {
     const menu = buildAppMenuTemplate(callbacks(), { debugMode: false }, 'darwin');
 
@@ -438,6 +451,7 @@ describe('app menu', () => {
       'Findings Ready for Selection',
       'Remediation Mix',
       'Completed Without Findings',
+      'Simulate Uncommitted Changes',
     ]);
     expect(submenuLabels(debugMenu, 'Debug', 'Thread Flags')).toStrictEqual([
       'Delegate to Worktree',

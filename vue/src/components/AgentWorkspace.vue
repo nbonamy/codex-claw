@@ -83,6 +83,7 @@
       :decide-code-review-finding="decideCodeReviewFinding"
       :submit-code-review-round="submitCodeReviewRound"
       :finish-code-review="finishCodeReview"
+      :commit-code-review="commitCodeReview"
       :review-code-again="reviewCodeAgain"
       :generate-visualization-suggestion="generateVisualizationSuggestion"
       :select-visualization="selectVisualization"
@@ -270,6 +271,7 @@ const props = defineProps<{
   decideCodeReviewFinding?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewDecisionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  commitCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   generateVisualizationSuggestion: (agentId: string, input: import('@workspace/core/visualize').GenerateVisualizationSuggestionInput) => Promise<AppSnapshot>;
@@ -326,6 +328,7 @@ const {
   decideCodeReviewFinding,
   submitCodeReviewRound,
   finishCodeReview,
+  commitCodeReview,
   discardCodeReview,
   reviewCodeAgain,
   generateVisualizationSuggestion,

@@ -79,6 +79,7 @@ export class AppController {
   private rendererReady = false;
   private debugMissingEngines = false;
   private debugProviderUpgrades = false;
+  private debugReviewUncommitted = false;
   private readonly pendingDeepLinkCommands: AppCommand[] = [];
   private readonly pendingBrowserOpens = new Map<string, PendingBrowserOpen>();
   private autoUpdateService: DesktopAutoUpdateService | null = null;
@@ -610,6 +611,9 @@ export class AppController {
     ipc.handle(ipcChannels.finishCodeReview, async (_event, agentId: string, sessionId: string) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewFinish, { agentId, sessionId }))
     ));
+    ipc.handle(ipcChannels.commitCodeReview, async (_event, agentId: string, sessionId: string) => (
+      this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewCommit, { agentId, sessionId }))
+    ));
     ipc.handle(ipcChannels.discardCodeReview, async (_event, agentId: string, sessionId: string) => (
       this.adoptBackendSnapshot(await this.requireBackendClient().request<AppSnapshot>(backendMethods.agentCodeReviewDiscard, { agentId, sessionId }))
     ));
@@ -717,9 +721,10 @@ export class AppController {
     this.rendererReady = false;
     this.mainWindow.webContents.on('did-start-loading', () => {
       this.rendererReady = false;
-      if (this.debugMissingEngines || this.debugProviderUpgrades) {
+      if (this.debugMissingEngines || this.debugProviderUpgrades || this.debugReviewUncommitted) {
         this.debugMissingEngines = false;
         this.debugProviderUpgrades = false;
+        this.debugReviewUncommitted = false;
         this.refreshAppMenu();
       }
     });
@@ -1696,7 +1701,7 @@ export class AppController {
     });
   }
 
-  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines' | 'getDebugProviderUpgrades' | 'setDebugProviderUpgrades'> {
+  private debugMenuOptions(): Pick<AppMenuCallbacks, 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines' | 'getDebugProviderUpgrades' | 'setDebugProviderUpgrades' | 'getDebugReviewUncommitted' | 'setDebugReviewUncommitted'> {
     return {
       getDebugProviderUpgrades: () => this.debugProviderUpgrades,
       setDebugProviderUpgrades: enabled => {
@@ -1704,6 +1709,15 @@ export class AppController {
         this.debugProviderUpgrades = enabled;
         if (this.mainWindow && !this.mainWindow.isDestroyed()) {
           sendAppCommand(this.mainWindow.webContents, { type: 'debug-provider-upgrades', enabled });
+        }
+        this.refreshAppMenu();
+      },
+      getDebugReviewUncommitted: () => this.debugReviewUncommitted,
+      setDebugReviewUncommitted: enabled => {
+        if (app.isPackaged) return;
+        this.debugReviewUncommitted = enabled;
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          sendAppCommand(this.mainWindow.webContents, { type: 'debug-review-uncommitted', enabled });
         }
         this.refreshAppMenu();
       },

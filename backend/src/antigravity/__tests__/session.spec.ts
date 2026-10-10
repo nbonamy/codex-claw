@@ -283,7 +283,7 @@ describe('Antigravity native session', () => {
       runReview: (agent, prompt, reviewMcpServerUrl, reviewerSession) => host.runCodeReview(agent, { prompt, cwd: root, reviewMcpServerUrl, reviewerSession }),
       resetReviewer: async agent => { await host.releaseConversation(agent.id); delete agent.backendSession; },
       deleteReviewer: dispose, saveReport: async () => path.join(root, 'report.md'), changed: () => {},
-      git: { prepare: async () => ({ ...checkpoint, baseRef: 'a'.repeat(40) }), inspect: async () => checkpoint, commit },
+      git: { prepare: async () => ({ ...checkpoint, baseRef: 'a'.repeat(40) }), inspect: async () => checkpoint, hasChanges: async () => false, commit },
     });
     try {
       const result = review.startAutomatic(owner, { scope: { type: 'uncommitted' }, maxRounds: 3, autoCommit: false });

@@ -361,6 +361,7 @@
         :decide-code-review-finding="props.decideCodeReviewFinding"
         :submit-code-review-round="props.submitCodeReviewRound"
         :finish-code-review="props.finishCodeReview"
+        :commit-code-review="props.commitCodeReview"
         :discard-code-review="props.discardCodeReview"
         :review-code-again="props.reviewCodeAgain"
         :start-visualize="startVisualizeForAgent"
@@ -600,6 +601,7 @@ import { workProviderLabel, workItemDisplayIdentifier } from '@workspace/core/wo
 import { workItemAssignmentKey } from '@workspace/core/work-assignments';
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { providerUpdatePreviewKey } from './provider-update-preview';
+import { codeReviewUncommittedPreviewKey } from './code-review-preview';
 import { useI18n } from 'vue-i18n';
 import SidebarExpandButton from '../shared/SidebarExpandButton.vue';
 import { useCompactViewport } from '../shared/use-compact-viewport';
@@ -848,6 +850,7 @@ const props = withDefaults(defineProps<{
   discussCodeReviewFinding?: (agentId: string, input: import('@workspace/core/code-review').CodeReviewDiscussionInput) => Promise<AppSnapshot>;
   submitCodeReviewRound?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   finishCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
+  commitCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   discardCodeReview?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewCodeAgain?: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   startVisualize?: (agentId: string, input?: import('@workspace/core/visualize').StartVisualizeInput) => Promise<AppSnapshot>;
@@ -894,6 +897,7 @@ const props = withDefaults(defineProps<{
   discussCodeReviewFinding: async () => { throw new Error('Code review is not available.'); },
   submitCodeReviewRound: async () => { throw new Error('Code review is not available.'); },
   finishCodeReview: async () => { throw new Error('Code review is not available.'); },
+  commitCodeReview: async () => { throw new Error('Code review is not available.'); },
   discardCodeReview: async () => { throw new Error('Code review is not available.'); },
   reviewCodeAgain: async () => { throw new Error('Code review is not available.'); },
   startVisualize: async () => { throw new Error('Visualize is not available.'); },
@@ -1329,6 +1333,8 @@ const {
 const debugMissingEngines = ref(false);
 const debugProviderUpgrades = ref(false);
 provide(providerUpdatePreviewKey, debugProviderUpgrades);
+const debugReviewUncommitted = ref(false);
+provide(codeReviewUncommittedPreviewKey, debugReviewUncommitted);
 const showOnboardingGate = computed(() => debugMissingEngines.value ? !settingsVisible.value : realOnboardingGate.value);
 const showLoginLanding = computed(() => debugMissingEngines.value ? !settingsVisible.value : realLoginLanding.value);
 const displayProviderSetup = computed(() => debugMissingEngines.value
@@ -2428,6 +2434,7 @@ const { quickAgentShortcutsVisible } = useAppShellCommands({
     openDebugOperationProgress,
     setDebugMissingEngines: enabled => { debugMissingEngines.value = enabled; },
     setDebugProviderUpgrades: enabled => { debugProviderUpgrades.value = enabled; },
+    setDebugReviewUncommitted: enabled => { debugReviewUncommitted.value = enabled; },
     openFileQuick: () => { fileQuickOpenVisible.value = true; },
     openGitReview: openAgentGitDiffPreview,
     openMarkdown: openMarkdownRequest,
