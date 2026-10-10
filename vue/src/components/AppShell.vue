@@ -1747,7 +1747,7 @@ async function openCodeReviewForAgent(agentId: string, instructions?: string): P
     if (props.agentConversationActions) await props.agentConversationActions.threadFlag(agentId, response);
     else if (currentAgent.value?.id === agentId) await props.respondToThreadFlagAction?.(response);
   }
-  if (instructions) rightWorkspaceFor(agentId).codeReviewInstructions = instructions;
+  rightWorkspaceFor(agentId).codeReviewInstructions = instructions?.trim() || undefined;
   openRightWorkspaceTab('codeReview', agentId);
 }
 

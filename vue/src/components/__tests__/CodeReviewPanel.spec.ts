@@ -8,6 +8,7 @@ import type { CodeReviewFinding, CodeReviewSession } from '@workspace/core/code-
 import CodeReviewPanel from '../CodeReviewPanel.vue';
 import { codeReviewSettingsKey } from '../code-review-settings';
 import type { CodeReviewPreferences } from '@workspace/core/code-review';
+import '../../styles/base.css';
 
 function finding(overrides: Partial<CodeReviewFinding> = {}): CodeReviewFinding {
   return {
@@ -81,18 +82,44 @@ function mountPanel(
 }
 
 describe('CodeReviewPanel', () => {
-  it.each(['Focus on retries.\nCheck error handling.', '   '])('uses edited instructions and omits blank text: %j', async instructions => {
+  it.each(['', '   '])('hides absent instructions and omits them when starting: %j', async instructions => {
     const { wrapper, actions } = mountPanel();
-    await wrapper.setProps({ instructions: 'Original focus' });
+    await wrapper.setProps({ instructions });
     await flushPromises();
-    const field = wrapper.get<HTMLTextAreaElement>('textarea[aria-label="Additional instructions"]');
-    expect(field.element.value).toBe('Original focus');
-    await field.setValue(instructions);
+    expect(wrapper.text()).not.toContain('Additional instructions');
+    expect(wrapper.find('textarea').exists()).toBe(false);
     await wrapper.get('.code-review-panel__start').trigger('click');
     await flushPromises();
     const input = actions.startReview.mock.calls[0]![1] as Record<string, unknown>;
-    if (instructions.trim()) expect(input.instructions).toBe(instructions);
-    else expect(input).not.toHaveProperty('instructions');
+    expect(input).not.toHaveProperty('instructions');
+    wrapper.unmount();
+  });
+
+  it('shows supplied instructions read-only on one line and forwards the full text', async () => {
+    const instructions = 'Focus on retries.\nCheck error handling and cancellation.';
+    const { wrapper, actions } = mountPanel();
+    await wrapper.setProps({ instructions });
+    await flushPromises();
+    const preview = wrapper.get('.code-review-panel__instructions');
+    expect(preview.attributes('title')).toBe(instructions);
+    expect(preview.text()).toBe('Focus on retries. Check error handling and cancellation.');
+    expect(wrapper.find('textarea, [contenteditable="true"]').exists()).toBe(false);
+    const style = getComputedStyle(preview.element);
+    expect([style.whiteSpace, style.overflow, style.textOverflow]).toStrictEqual(['nowrap', 'hidden', 'ellipsis']);
+    const headings = wrapper.findAll('.code-review-panel__setup legend, .app-form-dialog__label');
+    const titleStyles = headings.map(heading => {
+      const computed = getComputedStyle(heading.element);
+      return [computed.fontSize, computed.fontWeight, computed.color, computed.textTransform];
+    });
+    expect(titleStyles.length).toBeGreaterThan(3);
+    expect(titleStyles.every(style => JSON.stringify(style) === JSON.stringify(titleStyles[0]))).toBe(true);
+    expect(headings.every(heading => getComputedStyle(heading.element).textTransform === 'uppercase')).toBe(true);
+    expect(headings.every(heading => getComputedStyle(heading.element).color === 'var(--color-text-muted)')).toBe(true);
+    expect(headings.every(heading => getComputedStyle(heading.element).fontWeight === 'var(--font-weight-bold)')).toBe(true);
+    expect(headings.every(heading => getComputedStyle(heading.element).fontSize === 'var(--font-size-12)')).toBe(true);
+    await wrapper.get('.code-review-panel__start').trigger('click');
+    await flushPromises();
+    expect(actions.startReview.mock.calls[0]![1]).toMatchObject({ instructions });
     wrapper.unmount();
   });
 
