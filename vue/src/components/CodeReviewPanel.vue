@@ -238,32 +238,26 @@
           </button>
         </template>
         <template v-else-if="session.status === 'readyToFinish'">
-          <span v-if="commitAvailable">{{ $t('surface.codeReviewPanel.uncommittedChangesNote', { count: gitStatus!.changedFiles }) }}</span>
+          <span v-if="committing">{{ $t('surface.codeReviewPanel.committingChanges') }}</span>
+          <label v-else-if="commitAvailable" class="code-review-panel__commit-option">
+            <el-switch v-model="commitFirst" size="small" :disabled="busy" :aria-label="$t('surface.codeReviewPanel.commitChanges')" />
+            <span>{{ $t('surface.codeReviewPanel.commitChanges') }}</span>
+          </label>
           <button
             class="app-button app-button--secondary"
             type="button"
             :disabled="busy"
-            @click="run(() => finishReview(agent.id, session!.id))"
+            @click="complete(() => finishReview(agent.id, session!.id))"
           >
             {{ $t('surface.codeReviewPanel.finishReview') }}
           </button>
           <button
-            class="app-button"
-            :class="commitAvailable ? 'app-button--secondary' : 'app-button--primary'"
-            type="button"
-            :disabled="busy"
-            @click="run(() => reviewAgain(agent.id, session!.id))"
-          >
-            {{ $t('surface.codeReviewPanel.reviewAgain') }}
-          </button>
-          <button
-            v-if="commitAvailable"
             class="app-button app-button--primary"
             type="button"
             :disabled="busy"
-            @click="openCommitDialog"
+            @click="complete(() => reviewAgain(agent.id, session!.id))"
           >
-            {{ $t('surface.codeReviewPanel.commitAndFinish') }}
+            {{ $t('surface.codeReviewPanel.reviewAgain') }}
           </button>
         </template>
         <template v-else-if="session.status === 'finished'">
@@ -312,19 +306,6 @@
         <button type="button" class="app-button app-button--primary" @click="automaticSettingsOpen = false">{{ t('automaticReview.done') }}</button>
       </template>
     </FormDialog>
-    <GitWorkflowControl
-      v-if="commitChanges && getGitWorkflow"
-      ref="commitControl"
-      presentation="headless"
-      commit-only
-      :commit-label="t('surface.codeReviewPanel.commitAndFinish')"
-      :agent="agent"
-      :git-status="gitStatus"
-      :get-workflow="getGitWorkflow"
-      :generate-message="generateGitMessage"
-      :commit-changes="commitChanges"
-      @committed="finishAfterCommit"
-    />
     <p v-if="error" class="code-review-panel__error" role="alert">
       {{ error }}
     </p>
@@ -332,7 +313,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   IconChecklist,
@@ -351,10 +332,10 @@ import {
   type CodeReviewStartInput,
   type CodeReviewThreadMode,
 } from "@workspace/core/code-review";
-import type { Agent, AgentGitCommitInput, AgentGitMessageGenerationInput, AgentGitMessageGenerationResult, AgentGitStatus, AgentGitWorkflow, AppSnapshot } from "@workspace/core/contracts";
+import type { Agent, AgentGitStatus, AppSnapshot } from "@workspace/core/contracts";
 import ReviewFindingList, { type ReviewFindingListItem } from './ReviewFindingList.vue';
 import BackendSelector from './BackendSelector.vue';
-import GitWorkflowControl from './GitWorkflowControl.vue';
+import { codeReviewUncommittedPreviewKey } from './code-review-preview';
 import FormDialog from '../shared/dialog/FormDialog.vue';
 import FormField from '../shared/form/FormField.vue';
 import { useBackendChoices } from './backend-selection';
@@ -376,9 +357,7 @@ const props = defineProps<{
   ) => Promise<AppSnapshot>;
   finishReview: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
   reviewAgain: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
-  getGitWorkflow?: (agentId: string) => Promise<AgentGitWorkflow>;
-  generateGitMessage?: (agentId: string, input: AgentGitMessageGenerationInput) => Promise<AgentGitMessageGenerationResult>;
-  commitChanges?: (agentId: string, input: AgentGitCommitInput) => Promise<AgentGitWorkflow>;
+  commitReview: (agentId: string, sessionId: string) => Promise<AppSnapshot>;
 }>();
 
 const { t } = useI18n();
@@ -589,20 +568,23 @@ watch(
   { immediate: true },
 );
 
-const commitControl = ref<{ openCommitDialog: () => Promise<void> } | null>(null);
+const simulateUncommitted = inject(codeReviewUncommittedPreviewKey, ref(false));
 // Automatic reviews may already have committed everything; only offer a commit while changes remain.
-const commitAvailable = computed(() => Boolean(props.commitChanges && props.getGitWorkflow && (props.gitStatus?.changedFiles ?? 0) > 0));
+const commitAvailable = computed(() => simulateUncommitted.value || (props.gitStatus?.changedFiles ?? 0) > 0);
+const commitFirst = ref(false);
+const committing = ref(false);
 
-async function openCommitDialog(): Promise<void> {
-  error.value = null;
-  await commitControl.value?.openCommitDialog();
-}
-
-// The review stays open when the commit is canceled or fails; finishing is only reached after success.
-function finishAfterCommit(): void {
-  if (!session.value) return;
-  const sessionId = session.value.id;
-  void run(() => props.finishReview(props.agent.id, sessionId));
+// The review agent commits first; if that fails the chosen action never runs and the review stays as it was.
+function complete(action: () => Promise<unknown>): void {
+  const sessionId = session.value!.id;
+  void run(async () => {
+    if (commitFirst.value && commitAvailable.value) {
+      committing.value = true;
+      try { await props.commitReview(props.agent.id, sessionId); }
+      finally { committing.value = false; }
+    }
+    await action();
+  });
 }
 
 async function run(action: () => Promise<unknown>): Promise<void> {
@@ -1117,6 +1099,16 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
   margin-right: auto;
   color: var(--color-text-muted);
   font-size: var(--font-size-13);
+}
+
+.code-review-panel__commit-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-right: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-weight: normal;
 }
 
 .code-review-panel__error {

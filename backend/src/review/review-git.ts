@@ -12,6 +12,7 @@ export type ReviewGitSnapshot = { head: string; fingerprint: string; branch: str
 export type ReviewGitPort = {
   prepare(folder: string, scope: CodeReviewScope): Promise<ReviewGitSnapshot & { baseRef: string }>;
   inspect(folder: string): Promise<ReviewGitSnapshot>;
+  hasChanges(folder: string): Promise<boolean>;
   commit(folder: string, expected: ReviewGitSnapshot, round: number): Promise<ReviewGitSnapshot & { commit?: string }>;
 };
 
@@ -54,6 +55,10 @@ export class ReviewGit implements ReviewGitPort {
       else for await (const chunk of createReadStream(file)) hash.update(chunk);
     }
     return { head, branch, fingerprint: hash.digest('hex') };
+  }
+
+  async hasChanges(folder: string): Promise<boolean> {
+    return (await git(folder, ['status', '--porcelain=v1', '--untracked-files=all'])).trim().length > 0;
   }
 
   async commit(folder: string, expected: ReviewGitSnapshot, round: number): Promise<ReviewGitSnapshot & { commit?: string }> {

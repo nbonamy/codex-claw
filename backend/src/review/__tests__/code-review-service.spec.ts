@@ -32,6 +32,7 @@ function harness(scripts: ReviewScript[], deleteReviewer = async (_agent: Agent)
   const git = {
     prepare: vi.fn().mockResolvedValue({ baseRef: 'a'.repeat(40), head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' }),
     inspect: vi.fn().mockResolvedValue({ head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' }),
+    hasChanges: vi.fn().mockResolvedValue(true),
     commit: vi.fn().mockResolvedValue({ head: 'c'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'committed', commit: 'c'.repeat(40) }),
   };
   const agentCreation = new AgentCreationService(snapshot);
@@ -484,6 +485,73 @@ describe('CodeReviewService', () => {
     expect(visibleReviewer.codeReview).toBe(session);
     expect(session.status).toBe('readyToFinish');
     expect(test.handoffs).toStrictEqual([]);
+  });
+
+  describe('committing before completion', () => {
+    const advancedHead = { head: 'd'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'committed' };
+    async function readyToFinish(scripts: ReviewScript[] = []) {
+      const test = harness([async () => ({ text: '', findingCount: 0 }), ...scripts]);
+      const session = test.service.start(test.owner, { scope: { type: 'uncommitted' }, threadMode: 'independent' });
+      await vi.waitFor(() => expect(session.status).toBe('ready'));
+      const visibleReviewer = reviewer(test, session);
+      test.service.submit(visibleReviewer, session.id);
+      return { test, session, visibleReviewer };
+    }
+
+    it('asks the review agent to commit locally, keeps the review open, and then lets it finish', async () => {
+      const { test, session, visibleReviewer } = await readyToFinish([async () => ({ text: 'Committed.' })]);
+      test.git.inspect.mockResolvedValueOnce({ head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' }).mockResolvedValueOnce(advancedHead);
+
+      await test.service.commit(visibleReviewer, session.id);
+
+      expect(test.turns).toHaveLength(2);
+      expect(test.turns[1]!.prompt).toContain('Commit the changes from this review');
+      expect(test.turns[1]!.prompt).toContain('Do not push');
+      expect(test.turns[1]!.reviewerSession).toStrictEqual(session.rounds[0]!.reviewerSession);
+      expect(test.git.commit).not.toHaveBeenCalled();
+      expect(session.status).toBe('readyToFinish');
+      expect(test.deleted).toStrictEqual([]);
+
+      await test.service.finish(visibleReviewer, session.id);
+      expect(test.deleted).toStrictEqual([visibleReviewer.id]);
+    });
+
+    it('does not start a turn when the workspace has nothing to commit', async () => {
+      const { test, session, visibleReviewer } = await readyToFinish();
+      test.git.hasChanges.mockResolvedValue(false);
+
+      await test.service.commit(visibleReviewer, session.id);
+
+      expect(test.turns).toHaveLength(1);
+      expect(session.status).toBe('readyToFinish');
+    });
+
+    it('fails and leaves the review untouched when the agent does not create a commit', async () => {
+      const { test, session, visibleReviewer } = await readyToFinish([async () => ({ text: 'I could not commit.' })]);
+
+      await expect(test.service.commit(visibleReviewer, session.id)).rejects.toThrow('did not create a commit');
+
+      expect(session.status).toBe('readyToFinish');
+      expect(session.rounds[0]!.status).toBe('completed');
+      await test.service.finish(visibleReviewer, session.id);
+      expect(test.deleted).toStrictEqual([visibleReviewer.id]);
+    });
+
+    it('rejects a second commit while the first is running and any commit before the review is ready', async () => {
+      let release!: () => void;
+      const { test, session, visibleReviewer } = await readyToFinish([() => new Promise(resolve => { release = () => resolve({ text: 'Committed.' }); })]);
+      test.git.inspect.mockResolvedValueOnce({ head: 'b'.repeat(40), branch: 'refs/heads/feature', fingerprint: 'initial' }).mockResolvedValueOnce(advancedHead);
+
+      const first = test.service.commit(visibleReviewer, session.id);
+      await vi.waitFor(() => expect(test.turns).toHaveLength(2));
+      await expect(test.service.commit(visibleReviewer, session.id)).rejects.toThrow('already responding');
+      release();
+      await first;
+      expect(test.turns).toHaveLength(2);
+
+      session.status = 'ready';
+      await expect(test.service.commit(visibleReviewer, session.id)).rejects.toThrow('not ready to commit');
+    });
   });
 
   it('notifies the original thread when an independent review finishes without fixes', async () => {

@@ -39,6 +39,7 @@ export function createClientApiMock(
     discussCodeReviewFinding: unscripted('discussCodeReviewFinding'),
     submitCodeReviewRound: unscripted('submitCodeReviewRound'),
     finishCodeReview: unscripted('finishCodeReview'),
+    commitCodeReview: unscripted('commitCodeReview'),
     discardCodeReview: unscripted('discardCodeReview'),
     reviewCodeAgain: unscripted('reviewCodeAgain'),
     respondToThreadFlag: unscripted('respondToThreadFlag'),

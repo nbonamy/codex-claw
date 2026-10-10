@@ -1,12 +1,13 @@
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { ElInputNumber, ElSwitch } from 'element-plus';
 import { backendChoicesKey } from '../backend-selection';
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent, AgentGitStatus, AgentGitWorkflow, AppSnapshot } from '@workspace/core/contracts';
+import type { Agent, AgentGitStatus, AppSnapshot } from '@workspace/core/contracts';
 import type { CodeReviewFinding, CodeReviewSession } from '@workspace/core/code-review';
 import CodeReviewPanel from '../CodeReviewPanel.vue';
 import { codeReviewSettingsKey } from '../code-review-settings';
+import { codeReviewUncommittedPreviewKey } from '../code-review-preview';
 import type { CodeReviewPreferences } from '@workspace/core/code-review';
 import '../../styles/base.css';
 
@@ -50,12 +51,14 @@ function mountPanel(
   currentThreadAvailable = true,
   preferences?: CodeReviewPreferences,
   extraProps: Record<string, unknown> = {},
+  extraProvide: Record<symbol, unknown> = {},
 ) {
   const actions = {
     startReview: vi.fn().mockResolvedValue({} as AppSnapshot),
     decideFinding: vi.fn().mockResolvedValue({} as AppSnapshot),
     submitReviewRound: vi.fn().mockResolvedValue({} as AppSnapshot),
     finishReview: vi.fn().mockResolvedValue({} as AppSnapshot),
+    commitReview: vi.fn().mockResolvedValue({} as AppSnapshot),
     reviewAgain: vi.fn().mockResolvedValue({} as AppSnapshot),
     stop: vi.fn().mockResolvedValue({}),
     listModels: vi.fn(async (_agentId: string, backend: string) => backend === 'codex'
@@ -75,6 +78,7 @@ function mountPanel(
     wrapper: mount(CodeReviewPanel, {
       props: { agent: owner, gitStatus, ...actions, ...extraProps },
       global: { components: { ElInputNumber, ElSwitch }, provide: {
+        ...extraProvide,
         [backendChoicesKey as symbol]: computed(() => ['codex', 'claude']),
         [codeReviewSettingsKey as symbol]: { preferences: () => preferences, listModels: actions.listModels, stop: actions.stop },
       } },
@@ -548,115 +552,97 @@ describe('CodeReviewPanel', () => {
     expect(actions.reviewAgain).toHaveBeenCalledWith('owner', 'review-1');
   });
 
-  describe('commit and finish', () => {
+  describe('committing before completion', () => {
     const dirtyStatus: AgentGitStatus = {
       folder: '/repo', repository: 'app', branch: 'feature/demo', ahead: 0, behind: 0, changedFiles: 2,
       addedLines: 6, removedLines: 1, hasUntracked: false, state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
     };
-    const workflow: AgentGitWorkflow = {
-      repository: 'owner/repo', folder: '/repo', isLinkedWorktree: false, branch: 'feature/demo', detached: false,
-      remote: 'origin', upstream: 'origin/feature/demo', ahead: 0, behind: 0,
-      stagedAddedLines: 0, stagedRemovedLines: 0, unstagedAddedLines: 6, unstagedRemovedLines: 1,
-      untrackedAddedLines: 0, untrackedRemovedLines: 0,
-      files: [{ path: 'a.ts', indexStatus: ' ', worktreeStatus: 'M' }, { path: 'b.ts', indexStatus: ' ', worktreeStatus: 'M' }],
-      stagedFiles: [], unstagedFiles: ['a.ts', 'b.ts'], githubConnected: true,
-    };
-    function mountReady(status: AgentGitStatus | undefined, commitChanges: ReturnType<typeof vi.fn>) {
-      return mountPanel(session([], 'readyToFinish'), status, true, undefined, {
-        getGitWorkflow: async () => workflow,
-        commitChanges,
-      });
-    }
-    const footerButton = (wrapper: ReturnType<typeof mountPanel>['wrapper'], label: string) =>
-      wrapper.findAll('.app-dialog__footer .app-button').find((button) => button.text() === label)!;
-    async function openCommitDialog(wrapper: ReturnType<typeof mountPanel>['wrapper']) {
-      await flushPromises();
-      await wrapper.findAll('.code-review-panel__footer button').find((button) => button.text() === 'Commit and finish')!.trigger('click');
-      await flushPromises();
-    }
+    const cleanStatus: AgentGitStatus = { ...dirtyStatus, changedFiles: 0, addedLines: 0, removedLines: 0, state: 'clean' };
+    const footerButtons = (wrapper: ReturnType<typeof mountPanel>['wrapper']) => wrapper.findAll('.code-review-panel__footer button');
+    const checkbox = (wrapper: ReturnType<typeof mountPanel>['wrapper']) => wrapper.find('.code-review-panel__footer input[type="checkbox"]');
 
-    it('commits the shown scope locally, then finishes the review without pushing', async () => {
-      const commitChanges = vi.fn(async () => ({ ...workflow, files: [] }));
-      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
-      expect(wrapper.findAll('.code-review-panel__footer button').map((button) => button.text()))
-        .toEqual(['Finish review', 'Review again', 'Commit and finish']);
+    it('keeps Finish review secondary and Review again primary, with a commit option only while changes remain', async () => {
+      const dirty = mountPanel(session([], 'readyToFinish'), dirtyStatus);
+      expect(footerButtons(dirty.wrapper).map((button) => [button.text(), button.classes().find((name) => name.startsWith('app-button--'))]))
+        .toEqual([['Finish review', 'app-button--secondary'], ['Review again', 'app-button--primary']]);
+      expect(dirty.wrapper.get('.code-review-panel__footer').text()).toContain('Commit changes');
+      expect(checkbox(dirty.wrapper).element).toHaveProperty('checked', false);
+      dirty.wrapper.unmount();
 
-      await openCommitDialog(wrapper);
-      expect(wrapper.get('[role="dialog"]').text()).toContain('owner/repo · feature/demo');
-      expect(wrapper.findAll('.app-dialog__footer .app-button').map((button) => button.text())).toEqual(['Cancel', 'Commit and finish']);
-      await wrapper.get('textarea').setValue('fix: address review findings');
-      expect(actions.finishReview).not.toHaveBeenCalled();
-      await footerButton(wrapper, 'Commit and finish').trigger('click');
+      const clean = mountPanel(session([], 'readyToFinish'), cleanStatus);
+      expect(footerButtons(clean.wrapper).map((button) => button.text())).toEqual(['Finish review', 'Review again']);
+      expect(checkbox(clean.wrapper).exists()).toBe(false);
+      clean.wrapper.unmount();
+    });
+
+    it('does not commit unless the option is ticked', async () => {
+      const { wrapper, actions } = mountPanel(session([], 'readyToFinish'), dirtyStatus);
+      await footerButtons(wrapper)[0]!.trigger('click');
       await flushPromises();
-
-      expect(commitChanges).toHaveBeenCalledExactlyOnceWith('owner', {
-        message: 'fix: address review findings', includeUnstaged: true, includeUntracked: false, confirmed: true,
-      });
+      expect(actions.commitReview).not.toHaveBeenCalled();
       expect(actions.finishReview).toHaveBeenCalledExactlyOnceWith('owner', 'review-1');
       wrapper.unmount();
     });
 
-    it('keeps the review open when the commit is canceled or fails', async () => {
-      const commitChanges = vi.fn().mockRejectedValue(new Error('pre-commit hook failed'));
-      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
+    it.each([['finishReview', 0], ['reviewAgain', 1]] as const)('commits through the review agent before %s runs', async (action, index) => {
+      const { wrapper, actions } = mountPanel(session([], 'readyToFinish'), dirtyStatus);
+      const order: string[] = [];
+      actions.commitReview.mockImplementation(async () => { order.push('commit'); return {} as AppSnapshot; });
+      actions[action].mockImplementation(async () => { order.push(action); return {} as AppSnapshot; });
 
-      await openCommitDialog(wrapper);
-      await footerButton(wrapper, 'Cancel').trigger('click');
-      await flushPromises();
-      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
-
-      await openCommitDialog(wrapper);
-      await wrapper.get('textarea').setValue('fix: address review findings');
-      await footerButton(wrapper, 'Commit and finish').trigger('click');
+      await checkbox(wrapper).setValue(true);
+      await footerButtons(wrapper)[index]!.trigger('click');
       await flushPromises();
 
-      expect(wrapper.get('[role="dialog"]').text()).toContain('pre-commit hook failed');
-      expect(actions.finishReview).not.toHaveBeenCalled();
-      expect(wrapper.findAll('.code-review-panel__footer button').every((button) => button.attributes('disabled') === undefined)).toBe(true);
+      expect(order).toEqual(['commit', action]);
+      expect(actions.commitReview).toHaveBeenCalledExactlyOnceWith('owner', 'review-1');
       wrapper.unmount();
     });
 
-    it('ignores repeated clicks while the commit is running', async () => {
-      let resolveCommit!: (value: AgentGitWorkflow) => void;
-      const commitChanges = vi.fn(() => new Promise<AgentGitWorkflow>((resolve) => { resolveCommit = resolve; }));
-      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
+    it('keeps the review available and skips the action when the commit fails', async () => {
+      const { wrapper, actions } = mountPanel(session([], 'readyToFinish'), dirtyStatus);
+      actions.commitReview.mockRejectedValue(new Error('The review agent did not create a commit.'));
 
-      await openCommitDialog(wrapper);
-      await wrapper.get('textarea').setValue('fix: address review findings');
-      await footerButton(wrapper, 'Commit and finish').trigger('click');
-      expect(wrapper.find('.app-dialog__footer').exists()).toBe(false);
-      await wrapper.findAll('.code-review-panel__footer button').find((button) => button.text() === 'Commit and finish')!.trigger('click');
-      expect(commitChanges).toHaveBeenCalledTimes(1);
+      await checkbox(wrapper).setValue(true);
+      await footerButtons(wrapper)[0]!.trigger('click');
+      await flushPromises();
+      await footerButtons(wrapper)[1]!.trigger('click');
+      await flushPromises();
 
-      resolveCommit({ ...workflow, files: [] });
+      expect(wrapper.get('[role="alert"]').text()).toBe('The review agent did not create a commit.');
+      expect(actions.finishReview).not.toHaveBeenCalled();
+      expect(actions.reviewAgain).not.toHaveBeenCalled();
+      expect(footerButtons(wrapper).every((button) => button.attributes('disabled') === undefined)).toBe(true);
+      expect(checkbox(wrapper).element).toHaveProperty('checked', true);
+      wrapper.unmount();
+    });
+
+    it('shows progress and ignores repeated clicks while the agent is committing', async () => {
+      let resolveCommit!: (value: AppSnapshot) => void;
+      const { wrapper, actions } = mountPanel(session([], 'readyToFinish'), dirtyStatus);
+      actions.commitReview.mockImplementation(() => new Promise<AppSnapshot>((resolve) => { resolveCommit = resolve; }));
+
+      await checkbox(wrapper).setValue(true);
+      await footerButtons(wrapper)[0]!.trigger('click');
+      expect(wrapper.get('.code-review-panel__footer').text()).toContain('Committing changes');
+      expect(footerButtons(wrapper).every((button) => button.attributes('disabled') !== undefined)).toBe(true);
+      await footerButtons(wrapper)[0]!.trigger('click');
+      expect(actions.commitReview).toHaveBeenCalledTimes(1);
+
+      resolveCommit({} as AppSnapshot);
       await flushPromises();
       expect(actions.finishReview).toHaveBeenCalledTimes(1);
+      expect(wrapper.get('.code-review-panel__footer').text()).not.toContain('Committing changes');
       wrapper.unmount();
     });
 
-    it('reports a finish failure after the commit so the review can be finished again', async () => {
-      const commitChanges = vi.fn(async () => ({ ...workflow, files: [] }));
-      const { wrapper, actions } = mountReady(dirtyStatus, commitChanges);
-      actions.finishReview.mockRejectedValueOnce(new Error('Could not save the review report.'));
-
-      await openCommitDialog(wrapper);
-      await wrapper.get('textarea').setValue('fix: address review findings');
-      await footerButton(wrapper, 'Commit and finish').trigger('click');
+    it('lets the debug simulation reveal the commit option on a clean folder', async () => {
+      const simulate = ref(false);
+      const { wrapper } = mountPanel(session([], 'readyToFinish'), cleanStatus, true, undefined, {}, { [codeReviewUncommittedPreviewKey as symbol]: simulate });
+      expect(checkbox(wrapper).exists()).toBe(false);
+      simulate.value = true;
       await flushPromises();
-
-      expect(wrapper.get('[role="alert"]').text()).toBe('Could not save the review report.');
-      await wrapper.setProps({ gitStatus: { ...dirtyStatus, changedFiles: 0, state: 'clean' } });
-      expect(wrapper.findAll('.code-review-panel__footer button').map((button) => button.text())).toEqual(['Finish review', 'Review again']);
-      await wrapper.findAll('.code-review-panel__footer button')[0]!.trigger('click');
-      expect(actions.finishReview).toHaveBeenCalledTimes(2);
-      wrapper.unmount();
-    });
-
-    it('does not offer a duplicate commit once nothing is left to commit', async () => {
-      const commitChanges = vi.fn();
-      const { wrapper } = mountReady({ ...dirtyStatus, changedFiles: 0, state: 'clean' }, commitChanges);
-      await flushPromises();
-      expect(wrapper.findAll('.code-review-panel__footer button').map((button) => button.text())).toEqual(['Finish review', 'Review again']);
+      expect(checkbox(wrapper).exists()).toBe(true);
       wrapper.unmount();
     });
   });

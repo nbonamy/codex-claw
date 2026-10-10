@@ -34,12 +34,14 @@ export type AppMenuCallbacks = {
   setDebugMissingEngines?: (enabled: boolean) => void;
   getDebugProviderUpgrades?: () => boolean;
   setDebugProviderUpgrades?: (enabled: boolean) => void;
+  getDebugReviewUncommitted?: () => boolean;
+  setDebugReviewUncommitted?: (enabled: boolean) => void;
   reload(): void;
   sendAppCommand(command: AppCommand): void;
   toggleDeveloperTools(): void;
 };
 
-type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines' | 'getDebugProviderUpgrades' | 'setDebugProviderUpgrades'>>;
+type AppMenuInstallOptions = AppMenuOptions & Partial<Pick<AppMenuCallbacks, 'checkForUpdates' | 'installUpdate' | 'sendDebugAgentMessage' | 'toggleDebugExecutionPlan' | 'hasDebugExecutionPlan' | 'injectDebugPlanReview' | 'populateDebugVisualize' | 'getDebugMissionStage' | 'getDebugMissionReviewState' | 'setDebugMissionStage' | 'injectDebugCodeReview' | 'isDebugThreadFlagSet' | 'setDebugThreadFlag' | 'getDebugMissingEngines' | 'setDebugMissingEngines' | 'getDebugProviderUpgrades' | 'setDebugProviderUpgrades' | 'getDebugReviewUncommitted' | 'setDebugReviewUncommitted'>>;
 const editMenuId = 'app-edit-menu';
 
 export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOptions): void {
@@ -65,6 +67,8 @@ export function installAppMenu(window: BrowserWindow, options: AppMenuInstallOpt
     setDebugMissingEngines: options.setDebugMissingEngines,
     getDebugProviderUpgrades: options.getDebugProviderUpgrades,
     setDebugProviderUpgrades: options.setDebugProviderUpgrades,
+    getDebugReviewUncommitted: options.getDebugReviewUncommitted,
+    setDebugReviewUncommitted: options.setDebugReviewUncommitted,
   };
   const menu = Menu.buildFromTemplate(buildAppMenuTemplate(callbacks, menuOptions));
   appendDraftActionsToEditMenu(menu, callbacks);
@@ -220,6 +224,14 @@ function buildDebugCodeReviewFixtures(callbacks: AppMenuCallbacks): MenuItemCons
       label: 'Completed Without Findings',
       enabled: Boolean(callbacks.injectDebugCodeReview),
       click: () => callbacks.injectDebugCodeReview?.('readyToFinish'),
+    },
+    { type: 'separator' },
+    {
+      label: 'Simulate Uncommitted Changes',
+      type: 'checkbox',
+      checked: callbacks.getDebugReviewUncommitted?.() ?? false,
+      enabled: Boolean(callbacks.setDebugReviewUncommitted),
+      click: item => callbacks.setDebugReviewUncommitted?.(item.checked),
     },
   ];
 }

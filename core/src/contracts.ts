@@ -705,6 +705,7 @@ export type AppCommand =
   | { type: 'debug-open-markdown' }
   | { type: 'debug-missing-engines'; enabled: boolean }
   | { type: 'debug-provider-upgrades'; enabled: boolean }
+  | { type: 'debug-review-uncommitted'; enabled: boolean }
   | { type: 'debug-operation-progress'; kind: 'worktreeInitialization' | 'pullRequest' | 'merge' }
   | { type: 'edit-active-agent' }
   | { type: 'new-team' }
@@ -818,6 +819,7 @@ export type AppApi = {
   discussCodeReviewFinding(agentId: string, input: import('./code-review').CodeReviewDiscussionInput): Promise<AppSnapshot>;
   submitCodeReviewRound(agentId: string, sessionId: string): Promise<AppSnapshot>;
   finishCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
+  commitCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
   discardCodeReview(agentId: string, sessionId: string): Promise<AppSnapshot>;
   reviewCodeAgain(agentId: string, sessionId: string): Promise<AppSnapshot>;
   respondToThreadFlag(agentId: string, response: import('./thread-flags').ThreadFlagResponse): Promise<AppSnapshot>;

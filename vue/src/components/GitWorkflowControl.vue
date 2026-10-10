@@ -1,6 +1,5 @@
 <template>
   <div
-    v-if="presentation !== 'headless'"
     ref="root"
     class="git-workflow-control agent-header__git-actions"
     :class="{ 'git-workflow-control--delivery': presentation === 'delivery' }"
@@ -156,7 +155,7 @@
       <div
         v-if="commitOperation.status === 'editing'"
         class="app-dialog__footer"
-      ><button class="app-button app-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button" :class="commitOnly ? 'app-button--primary' : 'app-button--secondary'" type="button" :disabled="busy || !canCommit" @click="commit(false)">{{ commitLabel ?? $t('surface.gitWorkflowControl.commit') }}</button><button v-if="!commitOnly" class="app-button app-button--primary" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">{{ $t('surface.gitWorkflowControl.commitAndPush') }}</button></div>
+      ><button class="app-button app-button--tertiary" type="button" @click="commitDialogOpen = false">{{ $t('surface.gitWorkflowControl.cancel') }}</button><button class="app-button app-button--secondary" type="button" :disabled="busy || !canCommit" @click="commit(false)">{{ $t('surface.gitWorkflowControl.commit') }}</button><button class="app-button app-button--primary" type="button" :disabled="busy || !canCommit || !pushCapable" @click="commit(true)">{{ $t('surface.gitWorkflowControl.commitAndPush') }}</button></div>
       <div
         v-else-if="commitOperation.status === 'error'"
         class="app-dialog__footer"
@@ -404,11 +403,7 @@ import { Trash2Icon } from '../shared/icons/app-icons';
 
 const props = withDefaults(defineProps<{
   agent: Agent;
-  /** `headless` renders only the dialogs; the owner opens them through the exposed methods. */
-  presentation?: 'menu' | 'delivery' | 'headless';
-  /** Offer a single local commit action (no push) and emit `committed` once it succeeds. */
-  commitOnly?: boolean;
-  commitLabel?: string;
+  presentation?: 'menu' | 'delivery';
   gitStatus?: AgentGitStatus | null;
   getWorkflow?: (agentId: string) => Promise<AgentGitWorkflow>;
   generateMessage?: (agentId: string, input: AgentGitMessageGenerationInput) => Promise<AgentGitMessageGenerationResult>;
@@ -424,7 +419,6 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'open-git-diff': [];
-  committed: [];
   'delivery-complete': [result: { kind: 'pullRequest'; number: number; url: string } | { kind: 'merge' }];
 }>();
 const root = ref<HTMLElement | null>(null);
@@ -871,7 +865,6 @@ async function commit(pushAfter: boolean): Promise<void> {
     }
     commitMessage.value = '';
     showCommitSuccess(pushAfter);
-    if (props.commitOnly) emit('committed');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workflowError.value = message;
@@ -1294,11 +1287,7 @@ function clearDebugOperationTimers(): void {
   debugOperationTimers.splice(0).forEach((timer) => clearTimeout(timer));
 }
 
-async function openCommitDialog(): Promise<void> {
-  await loadWorkflow({ closeMenu: false });
-  await selectAction('commit');
-}
-defineExpose({ showDebugOperationProgress, openCommitDialog });
+defineExpose({ showDebugOperationProgress });
 
 let unsubscribeMainEvents: (() => void) | null = null;
 

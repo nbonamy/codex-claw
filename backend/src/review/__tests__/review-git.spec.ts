@@ -54,6 +54,18 @@ describe('automatic review git boundary', () => {
     expect(await readFile(path.join(folder, 'app.txt'), 'utf8')).toBe(change === 'contents' ? 'concurrent edit\n' : 'validated\n');
   });
 
+  it('reports tracked, staged, and untracked changes but not a clean workspace', async () => {
+    const { folder, git, service } = await repository();
+    expect(await service.hasChanges(folder)).toBe(false);
+    await writeFile(path.join(folder, 'new.txt'), 'new\n');
+    expect(await service.hasChanges(folder)).toBe(true);
+    await git('add', 'new.txt');
+    await git('commit', '-m', 'add new');
+    expect(await service.hasChanges(folder)).toBe(false);
+    await writeFile(path.join(folder, 'app.txt'), 'edited\n');
+    expect(await service.hasChanges(folder)).toBe(true);
+  });
+
   it('ignores embedded repositories instead of failing to fingerprint or committing them', async () => {
     const { folder, git, service } = await repository();
     await mkdir(path.join(folder, 'nested'));

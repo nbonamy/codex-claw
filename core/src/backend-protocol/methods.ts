@@ -14,6 +14,7 @@ export const backendMethods = {
   agentCodeReviewFindingDiscuss: 'agent/codeReview/finding/discuss',
   agentCodeReviewRoundSubmit: 'agent/codeReview/round/submit',
   agentCodeReviewFinish: 'agent/codeReview/finish',
+  agentCodeReviewCommit: 'agent/codeReview/commit',
   agentCodeReviewDiscard: 'agent/codeReview/discard',
   agentCodeReviewAgain: 'agent/codeReview/again',
   agentVisualizeStart: 'agent/visualize/start',

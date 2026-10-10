@@ -47,6 +47,36 @@ afterEach(() => {
 });
 
 describe('AppShell dialogs and commands', () => {
+  it('toggles the uncommitted-changes review simulation through the native command', async () => {
+    let listener!: (command: AppCommand) => void;
+    window.app = {
+      onAppCommand: vi.fn(next => { listener = next; return () => {}; }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<AppApi> as AppApi;
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.codeReview = {
+      id: 'review-1', targetAgentId: agent.id, reviewerAgentId: agent.id,
+      scope: { type: 'uncommitted' }, threadMode: 'current', status: 'readyToFinish', activeRoundId: 'round-1',
+      createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:01:00.000Z',
+      rounds: [{ id: 'round-1', number: 1, status: 'completed', startedAt: '2026-09-19T10:00:00.000Z', completedAt: '2026-09-19T10:01:00.000Z', findings: [] }],
+    };
+    const wrapper = mountRealShell({ snapshot, stubAgentWorkspace: false });
+    try {
+      await flushPromises();
+      listener({ type: 'debug-open-code-review' });
+      await flushPromises();
+      const commitOption = () => wrapper.find('.code-review-panel__footer input[type="checkbox"]').exists();
+      expect(commitOption()).toBe(false);
+      listener({ type: 'debug-review-uncommitted', enabled: true });
+      await flushPromises();
+      expect(commitOption()).toBe(true);
+      listener({ type: 'debug-review-uncommitted', enabled: false });
+      await flushPromises();
+      expect(commitOption()).toBe(false);
+    } finally { wrapper.unmount(); }
+  });
+
   it('toggles upgrade previews through the native command and restores actual versions in Settings', async () => {
     let command: (value: AppCommand) => void = () => {};
     const getProviderUpdate = vi.fn(async () => ({ backend: 'claude', status: 'current', installedVersion: '9.0.0', method: 'native', canUpgrade: false, busy: false }));
