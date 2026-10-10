@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AccountRateLimits, AppGeneralSettings, AppThemeSettings, Automation, RemoteConnection, SourceFolderState, SubagentNode, Team, WorkBacklogAssignment, WorkBacklogState } from '@workspace/core/contracts';
+import { isAgentBackend } from '@workspace/core/contracts/shared';
 import type { Mission } from '@workspace/core/missions';
 import { isVisualization } from '@workspace/core/visualize';
 import { StoreFormatError } from './store-format';
@@ -37,7 +38,7 @@ const agentSchema = z.custom<StoredRosterAgent>(
   (value) => {
     if (!isRecord(value) || typeof value.id !== 'string' || !isRecord(value.engine)
       || typeof value.engine.kind !== 'string' || !value.engine.kind.trim()) return false;
-    return value.engine.kind !== 'codex' && value.engine.kind !== 'claude'
+    return !isAgentBackend(value.engine.kind)
       || engineSchema.safeParse(value.engine).success;
   },
   'agent must have an id and a valid engine block',

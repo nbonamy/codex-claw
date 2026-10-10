@@ -26,7 +26,8 @@ afterEach(async () => {
 
 describe('state persistence', () => {
   it('roundtrips Antigravity session identity and isolated provider preferences through disk', async () => {
-    const store = new AppStateStore(await tempHome());
+    const home = await tempHome();
+    const store = new AppStateStore(home);
     const snapshot = createInitialSnapshot();
     const agent = snapshot.agents[0]!;
     agent.backend = 'antigravity';
@@ -44,6 +45,9 @@ describe('state persistence', () => {
     expect(restored.general.providerEnabled).toStrictEqual(snapshot.general.providerEnabled);
     expect(restored.general.providerModelDefaults).toStrictEqual(snapshot.general.providerModelDefaults);
     expect(restored.general.providerApprovalDefaults).toStrictEqual(snapshot.general.providerApprovalDefaults);
+    restored.agents.find(value => value.id === agent.id)!.name = 'Restored Antigravity';
+    await store.save(restored);
+    expect((await new AppStateStore(home).load()).agents).toStrictEqual(restored.agents);
   });
 
   it('defaults Pull to Git configuration and preserves explicit choices', () => {
