@@ -173,8 +173,8 @@ describe('AppShell work routing', () => {
     expect(sourceDialog.props('workItems')).toStrictEqual([]);
     expect(sourceDialog.props('selectedRepositoryId')).toBe(githubRepository.id);
     expect(sourceDialog.props('sessions')).toStrictEqual([
-      { agentId: 'agent-dina', label: 'Dina · main' },
-      { agentId: 'agent-jesse', label: 'Jesse · main' },
+      { agentId: 'agent-dina', branch: 'main', label: 'Dina · main' },
+      { agentId: 'agent-jesse', branch: 'main', label: 'Jesse · main' },
     ]);
 
     sourceDialog.vm.$emit('start-work-item', {
@@ -184,11 +184,7 @@ describe('AppShell work routing', () => {
       item: issue,
     });
     await flushPromises();
-    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
-      name: 'fix/gh-24',
-      createWorktree: false,
-      confirmed: true,
-    });
+    expect(createAgentGitBranch).not.toHaveBeenCalled();
     expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({
       agentId: 'agent-dina',
       item: issue,

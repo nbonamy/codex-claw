@@ -743,11 +743,7 @@ describe('AppShell workspace and plans', () => {
       workspace: { branchName: 'fix/12-backlog', kind: 'worktree' },
     });
 
-    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
-      name: 'fix/12-backlog',
-      createWorktree: true,
-      confirmed: true,
-    });
+    expect(createAgentGitBranch).not.toHaveBeenCalled();
     expect(assignWorkItemAction).toHaveBeenCalledWith({
       agentId: 'agent-dina',
       item,
@@ -833,12 +829,7 @@ describe('AppShell workspace and plans', () => {
       workspace: { kind: 'current' },
     });
 
-    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
-      name: 'feature/pull-request-43',
-      createWorktree: false,
-      pullRequestNumber: 43,
-      confirmed: true,
-    });
+    expect(createAgentGitBranch).not.toHaveBeenCalled();
     expect(assignWorkItemAction).toHaveBeenCalledWith({
       agentId: 'agent-dina',
       item: currentPullRequest,
@@ -859,12 +850,7 @@ describe('AppShell workspace and plans', () => {
       kind: 'pullRequest',
       state: 'all',
     });
-    expect(createAgentGitBranch).toHaveBeenCalledWith('agent-dina', {
-      name: 'feature/resolved-pr-44',
-      createWorktree: false,
-      pullRequestNumber: 44,
-      confirmed: true,
-    });
+    expect(createAgentGitBranch).not.toHaveBeenCalled();
     expect(assignWorkItemAction).toHaveBeenCalledWith(expect.objectContaining({ item: resolvedPullRequest }));
   });
 

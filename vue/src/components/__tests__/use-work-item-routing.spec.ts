@@ -42,16 +42,12 @@ describe('useWorkItemRouting', () => {
     await expect(harness.routing.createIsolatedAgent(listedItem, harness.teamId)).rejects.toThrow();
     expect(harness.createAgent).toHaveBeenCalledOnce();
   });
-  it('moves an existing session onto the issue branch before assigning prompted work', async () => {
+  it('assigns prompted work to an existing session without touching its branch', async () => {
     const harness = createHarness();
 
     await harness.routing.startInExistingSession(harness.agent.id, harness.item, 'fix');
 
-    expect(harness.createBranch).toHaveBeenCalledWith(harness.agent.id, {
-      name: 'fix/gh-12',
-      createWorktree: false,
-      confirmed: true,
-    });
+    expect(harness.createBranch).not.toHaveBeenCalled();
     expect(harness.assign).toHaveBeenCalledWith(expect.objectContaining({
       agentId: harness.agent.id,
       item: harness.item,
@@ -94,6 +90,17 @@ describe('useWorkItemRouting', () => {
       branchName: 'fix/gh-12',
       reuseExisting: true,
     });
+  });
+
+  it('creates the isolated agent with the chosen model and reasoning effort', async () => {
+    const harness = createHarness();
+
+    await harness.routing.createIsolatedAgent(harness.item, harness.teamId, { backend: 'codex', model: 'gpt-fast', reasoningEffort: 'high' });
+
+    expect(harness.createAgent).toHaveBeenCalledWith(expect.objectContaining({
+      backend: 'codex',
+      backendDefaults: { kind: 'codex', model: 'gpt-fast', userSelectedModel: true, reasoningEffort: 'high' },
+    }));
   });
 
   it('keeps a reassigned item out of the new-agent flow when the warning is declined', async () => {

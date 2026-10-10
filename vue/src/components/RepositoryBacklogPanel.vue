@@ -352,6 +352,7 @@ const virtualReference = ref({ getBoundingClientRect: () => new DOMRect() });
 
 const currentSessionOptions = computed<WorkItemAssignmentSession[]>(() => [{
   agentId: props.agent.id,
+  branch: props.branch ?? '',
   label: props.branch ? `${agentDisplayName(props.agent)} · ${props.branch}` : agentDisplayName(props.agent),
 }]);
 const operationWorkspaceLabel = computed(() => branchName.value || props.branch || t('repositoryBacklog.currentWorkspace'));

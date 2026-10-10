@@ -26,7 +26,7 @@ export function useRepositorySession(options: {
   createIsolatedWorkItemAgent: (
     item: WorkItem,
     teamId: string,
-    options?: { reuseExisting?: boolean; backend?: AgentBackend; repository?: SourceRepository; isCurrent?: () => boolean },
+    options?: { reuseExisting?: boolean; backend?: AgentBackend; model?: string; reasoningEffort?: string; repository?: SourceRepository; isCurrent?: () => boolean },
   ) => Promise<{ agent: Agent; item: WorkItem }>;
   createSourceWorktree: (input: CreateSourceWorktreeInput) => Promise<SourceWorktree>;
   getSnapshot: () => AppSnapshot;
@@ -70,6 +70,7 @@ export function useRepositorySession(options: {
         && agent.workspace.primaryWorktreeRoot === current.repositoryRoot)
       .map((agent) => ({
         agentId: agent.id,
+        branch: agent.workspace?.kind === 'git' ? agent.workspace.branch ?? '' : '',
         label: agent.workspace?.kind === 'git' && agent.workspace.branch
           ? `${agentDisplayName(agent)} · ${agent.workspace.branch}`
           : agentDisplayName(agent),
@@ -223,7 +224,8 @@ export function useRepositorySession(options: {
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
+          { backend: selection.backend ?? backend.value, ...(selection.model ? { model: selection.model } : {}),
+            ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}), ...(selection.reuseExisting ? { reuseExisting: true } : {}),
             repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
         );
         if (!isCurrent()) return;
@@ -259,7 +261,8 @@ export function useRepositorySession(options: {
         const { agent, item } = await options.createIsolatedWorkItemAgent(
           selection.item,
           teamId,
-          { backend: selection.backend ?? backend.value, ...(selection.reuseExisting ? { reuseExisting: true } : {}),
+          { backend: selection.backend ?? backend.value, ...(selection.model ? { model: selection.model } : {}),
+            ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}), ...(selection.reuseExisting ? { reuseExisting: true } : {}),
             repository: { name: current.repositoryName, path: current.repositoryRoot, worktrees: [] }, isCurrent },
         );
         if (!isCurrent()) return;

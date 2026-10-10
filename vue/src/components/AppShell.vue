@@ -415,6 +415,7 @@
       :selected-repository-id="repositorySession.workSourceId.value"
       :loading="repositorySessionSourceLoading"
       :error="repositorySessionSourceError"
+      :model-agent-id="repositorySessionSource?.agentId"
       :sessions="repositorySessionAssignmentSessions"
       :assignment-state="repositorySessionAssignmentState"
       :assignment-error="repositorySessionAssignmentError"

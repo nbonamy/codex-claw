@@ -106,7 +106,7 @@ describe('CodeReviewPanel', () => {
     expect(wrapper.find('textarea, [contenteditable="true"]').exists()).toBe(false);
     const style = getComputedStyle(preview.element);
     expect([style.whiteSpace, style.overflow, style.textOverflow]).toStrictEqual(['nowrap', 'hidden', 'ellipsis']);
-    const headings = wrapper.findAll('.code-review-panel__setup legend, .app-form-dialog__label');
+    const headings = wrapper.findAll('.code-review-panel__setup legend, .app-section-label');
     const titleStyles = headings.map(heading => {
       const computed = getComputedStyle(heading.element);
       return [computed.fontSize, computed.fontWeight, computed.color, computed.textTransform];

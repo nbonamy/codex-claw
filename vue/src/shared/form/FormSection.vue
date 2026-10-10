@@ -8,7 +8,7 @@
       v-if="title"
       class="form-section__header"
     >
-      <h3 :id="titleId">{{ title }}</h3>
+      <h3 :id="titleId" class="app-section-label">{{ title }}</h3>
       <div v-if="$slots.actions" class="form-section__actions">
         <slot name="actions" />
       </div>
@@ -50,16 +50,6 @@ defineProps<{
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
-}
-
-.form-section__header h3 {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-16);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .form-section__group {

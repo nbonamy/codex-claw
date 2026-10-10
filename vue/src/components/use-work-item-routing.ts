@@ -3,6 +3,7 @@ import { agentDisplayName } from '@workspace/core/agent-display';
 import type {
   Agent,
   AgentGitBranchInput,
+  BackendDefaults,
   AppSnapshot,
   CreateAgentInput,
   CreateSourceWorktreeInput,
@@ -108,19 +109,21 @@ export function useWorkItemRouting(options: {
       throw new Error(translate('surface.appShell.aDuplicatedAgentRequiresANewWorktree'));
     }
 
-    const pullRequestBranch = item.kind === 'pullRequest' ? item.branchName?.trim() : undefined;
-    if (item.kind === 'pullRequest' && !pullRequestBranch) {
-      throw new Error(translate('surface.appShell.gitHubDidNotReturnThePullRequestBranch'));
-    }
-    const checkoutBranch = pullRequestBranch
-      ?? (input.workspace.kind === 'worktree' ? input.workspace.branchName : undefined);
-    if (checkoutBranch) {
-      await options.actions.createBranch(targetAgent.id, {
-        name: checkoutBranch,
-        createWorktree: input.workspace.kind === 'worktree',
-        ...(item.kind === 'pullRequest' ? { pullRequestNumber: item.number } : {}),
-        confirmed: true,
-      });
+    // Work handed to the current agent stays on that agent's branch; only duplicates get a branch.
+    if (input.target === 'duplicate') {
+      const pullRequestBranch = item.kind === 'pullRequest' ? item.branchName?.trim() : undefined;
+      if (item.kind === 'pullRequest' && !pullRequestBranch) {
+        throw new Error(translate('surface.appShell.gitHubDidNotReturnThePullRequestBranch'));
+      }
+      const checkoutBranch = pullRequestBranch ?? (input.workspace.kind === 'worktree' ? input.workspace.branchName : undefined);
+      if (checkoutBranch) {
+        await options.actions.createBranch(targetAgent.id, {
+          name: checkoutBranch,
+          createWorktree: true,
+          ...(item.kind === 'pullRequest' ? { pullRequestNumber: item.number } : {}),
+          confirmed: true,
+        });
+      }
     }
     ensureCurrent(input.isCurrent);
     if (input.action === 'custom') prefill(targetAgent.id, item);
@@ -181,7 +184,7 @@ export function useWorkItemRouting(options: {
   async function createIsolatedAgent(
     listedItem: WorkItem,
     teamId: string,
-    creationOptions: { reuseExisting?: boolean; backend?: Agent['backend']; repository?: SourceRepository; isCurrent?: () => boolean } = {},
+    creationOptions: { reuseExisting?: boolean; backend?: Agent['backend']; model?: string; reasoningEffort?: string; repository?: SourceRepository; isCurrent?: () => boolean } = {},
   ): Promise<{ agent: Agent; item: WorkItem }> {
     const team = options.model.snapshot().teams.find((candidate) => candidate.id === teamId);
     if (!team) throw new Error(translate('surface.appShell.theSelectedTeamIsUnavailable'));
@@ -206,6 +209,11 @@ export function useWorkItemRouting(options: {
       name: null,
       folder: worktree.path,
       ...(creationOptions.backend ? { backend: creationOptions.backend } : {}),
+      ...(creationOptions.backend && (creationOptions.model || creationOptions.reasoningEffort) ? { backendDefaults: {
+        kind: creationOptions.backend,
+        ...(creationOptions.model ? { model: creationOptions.model, userSelectedModel: true } : {}),
+        ...(creationOptions.reasoningEffort ? { reasoningEffort: creationOptions.reasoningEffort } : {}),
+      } as BackendDefaults } : {}),
       sourceRepositoryName: repository.name,
       teamId: team.id,
     });
@@ -229,16 +237,6 @@ export function useWorkItemRouting(options: {
     }
     ensureCurrent(isCurrent);
 
-    const branchName = workItemBranchName(item);
-    if (agent.workspace?.kind !== 'git' || agent.workspace.branch !== branchName) {
-      await options.actions.createBranch(agent.id, {
-        name: branchName,
-        createWorktree: false,
-        ...(item.kind === 'pullRequest' ? { pullRequestNumber: item.number } : {}),
-        confirmed: true,
-      });
-    }
-    ensureCurrent(isCurrent);
     await assignWithPrompt(agent.id, item, action);
   }
 

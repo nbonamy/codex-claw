@@ -2,8 +2,8 @@
   <section class="work-item-assignment-picker">
     <template v-if="reuseAction && existingWorktreePath">
       <WorktreeReusePrompt :branch="branchName" :path="existingWorktreePath" />
+      <div class="work-item-assignment-picker__body"><slot /></div>
       <footer>
-        <BackendSelector v-if="destination === 'new'" v-model="backend" size="small" />
         <button class="app-button app-button--tertiary" type="button" @click="reuseAction = null">
           {{ t('common.cancel') }}
         </button>
@@ -13,73 +13,100 @@
       </footer>
     </template>
     <template v-else>
-      <div class="work-item-assignment-picker__target-options">
-        <button
-          type="button"
-          :class="{ 'is-selected': destination === 'new' }"
-          :aria-pressed="destination === 'new'"
-          :disabled="busy"
-          @click="destination = 'new'"
-        >
-          <IconCopy aria-hidden="true" />
-          <strong>{{ t('repositoryBacklog.newIsolatedSession') }}</strong>
-          <span>{{ t('repositoryBacklog.newIsolatedSessionDetail') }}</span>
-        </button>
-        <button
-          type="button"
-          :class="{ 'is-selected': destination === 'existing' }"
-          :aria-pressed="destination === 'existing'"
-          :disabled="busy || sessions.length === 0"
-          @click="destination = 'existing'"
-        >
-          <IconRobotFace aria-hidden="true" />
-          <strong>{{ t('repositoryBacklog.useExistingSession') }}</strong>
-          <span v-if="sessions.length === 0">{{ t('repositoryBacklog.noExistingSessions') }}</span>
-          <span v-else>{{ t('repositoryBacklog.useExistingSessionDetail') }}</span>
-        </button>
-      </div>
-
-      <div class="work-item-assignment-picker__workspace">
-        <label v-if="destination === 'existing'" class="work-item-assignment-picker__field">
-          <span>{{ t('repositoryBacklog.session') }}</span>
-          <el-select
-            v-model="selectedAgentId"
+      <section class="work-item-assignment-picker__section">
+        <h3 class="app-section-label">{{ t('repositoryBacklog.workIn') }}</h3>
+        <div class="work-item-assignment-picker__target-options">
+          <button
+            type="button"
+            :class="{ 'is-selected': destination === 'new' }"
+            :aria-pressed="destination === 'new'"
             :disabled="busy"
-            :aria-label="t('repositoryBacklog.existingSession')"
-            :placeholder="t('repositoryBacklog.chooseSession')"
+            @click="destination = 'new'"
           >
-            <el-option
-              v-for="session in sessions"
-              :key="session.agentId"
-              :label="session.label"
-              :value="session.agentId"
-            />
+            <IconCopy aria-hidden="true" />
+            <strong>{{ t('repositoryBacklog.newIsolatedSession') }}</strong>
+            <span>{{ t('repositoryBacklog.newIsolatedSessionDetail') }}</span>
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-selected': destination === 'existing' }"
+            :aria-pressed="destination === 'existing'"
+            :disabled="busy || eligibleSessions.length === 0"
+            @click="destination = 'existing'"
+          >
+            <IconRobotFace aria-hidden="true" />
+            <strong>{{ t('repositoryBacklog.useExistingSession') }}</strong>
+            <span v-if="sessions.length === 0">{{ t('repositoryBacklog.noExistingSessions') }}</span>
+            <span v-else-if="eligibleSessions.length === 0">{{ t('repositoryBacklog.noPullRequestSessions') }}</span>
+            <span v-else>{{ t('repositoryBacklog.useExistingSessionDetail') }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="work-item-assignment-picker__section">
+        <h3 class="app-section-label">{{ t('repositoryBacklog.session') }}</h3>
+        <div v-if="destination === 'new'" class="work-item-assignment-picker__model-selectors">
+          <BackendSelector v-model="backend" :disabled="busy" />
+          <el-select
+            v-model="model"
+            :empty-values="[null, undefined]"
+            :aria-label="t('automaticReview.model')"
+            :disabled="busy || modelsLoading"
+          >
+            <el-option value="" :label="t('automaticReview.defaultModel')" />
+            <el-option v-for="option in models" :key="option.id" :value="option.model" :label="option.displayName" />
           </el-select>
-        </label>
-        <label class="work-item-assignment-picker__field">
-          <span>{{ t('repositoryBacklog.branch') }}</span>
-          <el-input
-            class="work-item-assignment-picker__branch"
-            :model-value="branchName"
-            :aria-label="t('repositoryBacklog.branch')"
-            readonly
+          <el-select
+            v-model="reasoningEffort"
+            :empty-values="[null, undefined]"
+            :aria-label="t('automaticReview.effort')"
+            :disabled="busy || modelsLoading || !effortOptions.length"
           >
-            <template #prefix>
-              <IconGitPullRequest v-if="item.kind === 'pullRequest'" aria-hidden="true" />
-              <IconGitBranch v-else aria-hidden="true" />
-            </template>
-          </el-input>
-        </label>
-        <p v-if="destination === 'existing'" class="work-item-assignment-picker__branch-warning">
+            <el-option value="" :label="t('automaticReview.defaultEffort')" />
+            <el-option v-for="effort in effortOptions" :key="effort.reasoningEffort" :value="effort.reasoningEffort" :label="effort.reasoningEffort" />
+          </el-select>
+        </div>
+        <el-select
+          v-else
+          v-model="selectedAgentId"
+          :disabled="busy"
+          :aria-label="t('repositoryBacklog.existingSession')"
+          :placeholder="t('repositoryBacklog.chooseSession')"
+        >
+          <el-option
+            v-for="session in eligibleSessions"
+            :key="session.agentId"
+            :label="session.label"
+            :value="session.agentId"
+          />
+        </el-select>
+      </section>
+
+      <section class="work-item-assignment-picker__section">
+        <h3 class="app-section-label">{{ t('repositoryBacklog.branch') }}</h3>
+        <el-input
+          class="work-item-assignment-picker__branch"
+          :model-value="displayedBranch"
+          :aria-label="t('repositoryBacklog.branch')"
+          readonly
+        >
+          <template #prefix>
+            <IconGitPullRequest v-if="item.kind === 'pullRequest'" aria-hidden="true" />
+            <IconGitBranch v-else aria-hidden="true" />
+          </template>
+        </el-input>
+        <!-- Always laid out so switching destination does not shift the content below. -->
+        <p class="work-item-assignment-picker__branch-warning" :class="{ 'is-hidden': destination !== 'existing' }">
           <IconAlertTriangle aria-hidden="true" />
           <span>{{ t('repositoryBacklog.existingSessionBranchWarning') }}</span>
         </p>
-      </div>
+      </section>
+
+      <div class="work-item-assignment-picker__body"><slot /></div>
 
       <p v-if="error" class="work-item-assignment-picker__error" role="alert">{{ error }}</p>
 
       <footer>
-        <BackendSelector v-if="destination === 'new'" v-model="backend" size="small" :disabled="busy" />
         <button class="app-button app-button--tertiary" type="button" :disabled="!canSubmit" @click="requestCustom">
           {{ t('repositoryBacklog.custom') }}
         </button>
@@ -98,7 +125,8 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconAlertTriangle, IconCopy, IconGitBranch, IconGitPullRequest, IconRobotFace } from '@tabler/icons-vue';
-import type { WorkItem } from '@workspace/core/contracts';
+import type { BackendModelOption, WorkItem } from '@workspace/core/contracts';
+import { useCodeReviewSettings } from './code-review-settings';
 import type { WorkItemAssignmentAction } from '@workspace/core/work-item-prompts';
 import WorktreeReusePrompt from './WorktreeReusePrompt.vue';
 import BackendSelector from './BackendSelector.vue';
@@ -110,12 +138,15 @@ export type WorkItemAssignmentDestination = 'existing' | 'new';
 
 export type WorkItemAssignmentSession = {
   agentId: string;
+  branch?: string;
   label: string;
 };
 
 export type WorkItemAssignmentSelection = {
   isCurrent?: () => boolean;
   backend?: import('@workspace/core/contracts').AgentBackend;
+  model?: string;
+  reasoningEffort?: string;
   action: WorkItemAssignmentAction;
   agentId?: string;
   destination: WorkItemAssignmentDestination;
@@ -129,11 +160,13 @@ const props = withDefaults(defineProps<{
   error?: string | null;
   existingWorktreePath?: string;
   item: WorkItem;
+  modelAgentId?: string;
   sessions?: WorkItemAssignmentSession[];
 }>(), {
   busy: false,
   error: null,
   existingWorktreePath: '',
+  modelAgentId: '',
   sessions: () => [],
 });
 
@@ -143,20 +176,58 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { listModels } = useCodeReviewSettings();
 const destination = ref<WorkItemAssignmentDestination>('new');
 const selectedAgentId = ref('');
+const model = ref('');
+const reasoningEffort = ref('');
+const models = ref<BackendModelOption[]>([]);
+const modelsLoading = ref(false);
+const modelCatalogAgentId = computed(() => props.modelAgentId || props.sessions[0]?.agentId || '');
+const effortOptions = computed(() => models.value.find(option => option.model === model.value)?.supportedReasoningEfforts ?? []);
 const reuseAction = ref<WorkItemAssignmentAction | 'custom' | null>(null);
 const secondaryAction = computed<WorkItemAssignmentAction>(() => props.item.kind === 'pullRequest' ? 'addressFeedback' : 'investigate');
 const primaryAction = computed<WorkItemAssignmentAction>(() => props.item.kind === 'pullRequest' ? 'review' : 'fix');
+// A pull request needs its own code, so only agents already on its head branch can take it.
+const eligibleSessions = computed(() => {
+  if (props.item.kind !== 'pullRequest') return props.sessions;
+  const head = props.item.branchName?.trim();
+  return head ? props.sessions.filter(session => session.branch === head) : [];
+});
+const displayedBranch = computed(() => destination.value === 'existing'
+  ? eligibleSessions.value.find(session => session.agentId === selectedAgentId.value)?.branch ?? ''
+  : props.branchName);
 const canSubmit = computed(() => !props.busy
-  && props.branchName.trim().length > 0
-  && (destination.value === 'new' ? Boolean(backend.value) : Boolean(selectedAgentId.value)));
+  && (destination.value === 'new'
+    ? props.branchName.trim().length > 0 && Boolean(backend.value)
+    : Boolean(selectedAgentId.value)));
 
-watch(() => [props.item.id, props.sessions.map((session) => session.agentId).join('|')] as const, () => {
+watch(() => [props.item.id, eligibleSessions.value.map((session) => session.agentId).join('|')] as const, () => {
   destination.value = 'new';
-  selectedAgentId.value = props.sessions[0]?.agentId ?? '';
+  selectedAgentId.value = eligibleSessions.value[0]?.agentId ?? '';
   reuseAction.value = null;
 }, { immediate: true });
+
+watch([backend, modelCatalogAgentId], async ([nextBackend, agentId], _previous, cleanup) => {
+  let current = true;
+  cleanup(() => { current = false; });
+  models.value = [];
+  model.value = '';
+  reasoningEffort.value = '';
+  if (!nextBackend || !agentId) return;
+  modelsLoading.value = true;
+  try {
+    const catalog = await listModels(agentId, nextBackend);
+    if (current) models.value = catalog.filter(option => !option.hidden);
+  } catch {
+    // The provider default stays selectable when the catalog cannot be loaded.
+  } finally {
+    if (current) modelsLoading.value = false;
+  }
+}, { immediate: true });
+watch(model, () => {
+  if (!effortOptions.value.some(option => option.reasoningEffort === reasoningEffort.value)) reasoningEffort.value = '';
+});
 
 function requestCustom(): void {
   if (!canSubmit.value) return;
@@ -189,6 +260,8 @@ function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'ac
   return {
     destination: destination.value,
     ...(destination.value === 'new' ? { backend: backend.value } : {}),
+    ...(destination.value === 'new' && model.value ? { model: model.value } : {}),
+    ...(destination.value === 'new' && reasoningEffort.value ? { reasoningEffort: reasoningEffort.value } : {}),
     ...(destination.value === 'existing' ? { agentId: selectedAgentId.value } : {}),
     item: props.item,
     ...(reuseExisting ? { reuseExisting: true } : {}),
@@ -204,8 +277,34 @@ function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'ac
 
 .work-item-assignment-picker__target-options {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.work-item-assignment-picker__model-selectors {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.work-item-assignment-picker__model-selectors > *,
+.work-item-assignment-picker__model-selectors :deep(.el-select) {
+  min-width: 0;
+  width: 100%;
+}
+
+.work-item-assignment-picker__body {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+}
+
+.work-item-assignment-picker__body :deep(.work-item-detail__body) {
+  max-height: min(40vh, 420px);
+  overflow-y: auto;
+}
+
+.work-item-assignment-picker__body :deep(.work-item-detail) {
+  padding: 0;
 }
 
 .work-item-assignment-picker__target-options > button {
@@ -263,24 +362,14 @@ function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'ac
   line-height: 1.25;
 }
 
-.work-item-assignment-picker__workspace {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.work-item-assignment-picker__field {
+.work-item-assignment-picker__section {
   min-width: 0;
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-.work-item-assignment-picker__field > span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-}
-
-.work-item-assignment-picker__field :deep(.el-select),
-.work-item-assignment-picker__field :deep(.el-input) {
+.work-item-assignment-picker__section :deep(.el-select),
+.work-item-assignment-picker__section :deep(.el-input) {
   width: 100%;
   min-width: 0;
 }
@@ -307,6 +396,10 @@ function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'ac
   line-height: 1.3;
 }
 
+.work-item-assignment-picker__branch-warning.is-hidden {
+  visibility: hidden;
+}
+
 .work-item-assignment-picker__branch-warning svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
@@ -327,9 +420,5 @@ function selection(reuseExisting = false): Omit<WorkItemAssignmentSelection, 'ac
   margin: 0 calc(-1 * var(--space-8));
   padding: var(--space-6) var(--space-8) 0;
   border-top: 1px solid var(--color-border);
-}
-
-.work-item-assignment-picker footer .backend-selector {
-  margin-right: auto;
 }
 </style>

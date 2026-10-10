@@ -413,7 +413,7 @@ describe('RepositoryBacklogPanel', () => {
 
     await wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.trigger('click');
     expect(wrapper.findAll('.work-item-assignment-picker__target-options > button')[1]!.classes()).toContain('is-selected');
-    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('fix/gh-12');
+    expect(wrapper.find<HTMLInputElement>('input[aria-label="Branch"]').element.value).toBe('feature/current-work');
     await wrapper.get('.repository-backlog__start-work .app-button--primary').trigger('click');
 
     expect(startWorkAction).toHaveBeenCalledWith(expect.objectContaining({
@@ -444,9 +444,10 @@ describe('RepositoryBacklogPanel', () => {
     }));
   });
 
-  it('can check out the pull request branch in the current agent workspace', async () => {
+  it('reviews a pull request in the current agent without switching its branch', async () => {
     const startWorkAction = vi.fn().mockResolvedValue(undefined);
     const wrapper = await mountPanel({
+      branch: 'feature/current-pr',
       items: [workItem({ branchName: 'feature/current-pr', kind: 'pullRequest', number: 22, title: 'Update current workspace' })],
       startWorkAction,
     });

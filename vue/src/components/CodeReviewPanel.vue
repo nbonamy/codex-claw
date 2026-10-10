@@ -11,7 +11,7 @@
         <h2>{{ $t('surface.codeReviewPanel.reviewThisBranch') }}</h2>
         <div class="code-review-panel__setup">
           <fieldset>
-            <legend class="app-form-dialog__label">{{ $t('surface.codeReviewPanel.scope') }}</legend>
+            <legend class="app-section-label">{{ $t('surface.codeReviewPanel.scope') }}</legend>
             <div class="code-review-panel__choices" role="radiogroup">
               <button
                 class="code-review-panel__choice"
@@ -51,7 +51,7 @@
           </fieldset>
 
           <fieldset>
-            <legend class="app-form-dialog__label">{{ $t('surface.codeReviewPanel.reviewerThread') }}</legend>
+            <legend class="app-section-label">{{ $t('surface.codeReviewPanel.reviewerThread') }}</legend>
             <div class="code-review-panel__choices" role="radiogroup">
               <button
                 class="code-review-panel__choice"
@@ -89,7 +89,7 @@
             </div>
           </fieldset>
           <fieldset>
-            <legend class="app-form-dialog__label">{{ t('automaticReview.model') }}</legend>
+            <legend class="app-section-label">{{ t('automaticReview.model') }}</legend>
             <div class="code-review-panel__model-selectors">
               <BackendSelector v-model="reviewBackend" :team-id="agent.teamId" class="code-review-panel__backend" size="small" :disabled="busy || threadMode === 'current'" />
               <el-select :model-value="threadMode === 'current' ? '' : reviewModel" @update:model-value="reviewModel = $event" :empty-values="[null, undefined]" :aria-label="t('automaticReview.model')" :disabled="busy || modelsLoading || threadMode === 'current'" size="small">
@@ -103,12 +103,13 @@
             </div>
           </fieldset>
           <p v-if="modelsError" role="status">{{ t('automaticReview.modelError') }} <button type="button" class="app-button app-button--tertiary" @click="modelReload++">{{ t('automaticReview.retry') }}</button></p>
-          <FormField v-if="instructions.trim()" :label="t('surface.codeReviewPanel.additionalInstructions')">
+          <fieldset v-if="instructions.trim()">
+            <legend class="app-section-label">{{ t('surface.codeReviewPanel.additionalInstructions') }}</legend>
             <p class="code-review-panel__instructions" :title="instructions">{{ instructions.replace(/\s+/g, ' ').trim() }}</p>
-          </FormField>
+          </fieldset>
           <div class="code-review-panel__automatic">
             <div class="code-review-panel__toggle">
-              <span class="app-form-dialog__label">{{ t('automaticReview.title') }}</span>
+              <span class="app-section-label">{{ t('automaticReview.title') }}</span>
               <button v-if="automatic" class="code-review-panel__configure" type="button" :disabled="busy" @click="automaticSettingsOpen = true">{{ t('automaticReview.configure') }}</button>
               <el-switch v-model="automatic" :aria-label="t('automaticReview.title')" :disabled="busy" />
             </div>
@@ -754,15 +755,6 @@ function hasDiffChanges(summary: { addedLines: number; removedLines: number; cha
 
 .code-review-panel__setup legend {
   margin-bottom: var(--space-4);
-}
-
-.code-review-panel__setup :deep(.app-form-dialog__label) {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-16);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .code-review-panel__instructions {

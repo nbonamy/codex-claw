@@ -4,7 +4,7 @@
     :class="{ 'repository-session-source-dialog--assignment': selectedWorkItem, 'repository-session-source-dialog--issue-picker': purpose === 'missionIssue' }"
     :model-value="visible"
     :teleported="false"
-    :style="{ width: selectedWorkItem ? '440px' : '720px' }"
+    :style="{ width: '720px' }"
     destroy-on-close
     @update:model-value="onVisibilityChanged"
   >
@@ -52,7 +52,6 @@
       <p v-if="purpose === 'missionIssue' && error" class="repository-session-source-dialog__state repository-session-source-dialog__state--error" role="alert">{{ error }}</p>
       <template v-if="selectedWorkItem">
         <p v-if="!workProviderDefinition(selectedWorkItem.provider).repositoryBacked">{{ t('backlogSource.codeRepository') }}: {{ repositoryName }}</p>
-        <WorkItemDetail :item="selectedWorkItem" />
         <StagedOperationProgress
           v-if="preparationVisible && assignmentState !== 'error'"
           :state="assignmentState === 'success' ? 'success' : 'running'"
@@ -68,11 +67,14 @@
           :item="selectedWorkItem"
           :branch-name="assignmentBranchName"
           :existing-worktree-path="assignmentExistingWorktreePath"
+          :model-agent-id="modelAgentId"
           :sessions="sessions"
           :error="assignmentError"
           @custom="customWorkItem"
           @submit="startWorkItem"
-        />
+        >
+          <WorkItemDetail :item="selectedWorkItem" />
+        </WorkItemAssignmentPicker>
       </template>
       <p v-else-if="effectiveLoading" class="repository-session-source-dialog__state">{{ t('repositories.sessionSource.loading') }}</p>
       <p v-else-if="tab === 'issues' && backlog.error.value" role="alert">{{ backlog.error.value }} <button type="button" @click="backlog.refresh">{{ t('backlogSource.retry') }}</button></p>
@@ -148,6 +150,7 @@ type SourceTab = 'branches' | 'pullRequests' | 'issues';
 
 const props = withDefaults(defineProps<{
   location?: import('@workspace/core/contracts').AutomationLocation;
+  modelAgentId?: string;
   branches?: SourceBranch[];
   assignmentError?: string | null;
   assignmentState?: 'idle' | 'running' | 'success' | 'error';
@@ -164,6 +167,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   branches: () => [],
   assignmentError: null,
+  modelAgentId: '',
   assignmentState: 'idle',
   error: null,
   loading: false,
@@ -243,7 +247,6 @@ const preparationSteps = computed(() => {
   if (preparationSelection.value?.destination === 'existing') {
     const session = props.sessions.find((candidate) => candidate.agentId === preparationSelection.value?.agentId);
     return [
-      { title: t('repositoryBacklog.prepareWorkBranch'), detail: assignmentBranchName.value },
       { title: t('repositoryBacklog.switchExistingSession'), detail: session?.label ?? t('repositoryBacklog.existingSession') },
       { title: t('repositoryBacklog.handOverWorkContext'), detail: props.repositoryName },
     ];
@@ -332,14 +335,6 @@ function resetPreparation(clearSelection = true): void {
 }
 :global(.repository-session-source-dialog.el-dialog) {
   overflow: hidden;
-  transition: width 240ms ease;
-  will-change: width;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :global(.repository-session-source-dialog.el-dialog) {
-    transition-duration: 1ms;
-  }
 }
 
 .repository-session-source-dialog__search-row {
@@ -494,7 +489,7 @@ function resetPreparation(clearSelection = true): void {
 .repository-session-source-dialog--assignment
   .repository-session-source-dialog__results {
   min-height: 0;
-  max-height: min(70vh, 720px);
+  max-height: min(84vh, 880px);
   padding: var(--space-3) var(--space-8) var(--space-8);
 }
 

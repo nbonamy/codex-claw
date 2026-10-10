@@ -1,8 +1,15 @@
 <template>
   <section class="work-item-detail">
-    <a :href="item.url" target="_blank" rel="noopener noreferrer">{{ workItemDisplayIdentifier(item) }} · {{ item.title }}</a>
-    <p>{{ item.nativeState ?? item.state }}<span v-if="item.assignees?.length"> · {{ item.assignees.join(', ') }}</span></p>
-    <p v-if="item.labels.length">{{ item.labels.map(label => label.name).join(', ') }}</p>
+    <header class="work-item-detail__header">
+      <div class="work-item-detail__title">
+        <a :href="item.url" target="_blank" rel="noopener noreferrer">{{ workItemDisplayIdentifier(item) }} · {{ item.title }}</a>
+        <span class="work-item-detail__state">{{ item.nativeState ?? item.state }}</span>
+      </div>
+      <div v-if="item.assignees?.length || item.labels.length" class="work-item-detail__meta">
+        <span v-if="item.assignees?.length">{{ item.assignees.join(', ') }}</span>
+        <span v-for="label in item.labels" :key="label.name" class="work-item-detail__label">{{ label.name }}</span>
+      </div>
+    </header>
     <p class="work-item-detail__body">{{ item.body }}</p>
   </section>
 </template>
@@ -13,15 +20,61 @@ defineProps<{ item: WorkItem }>();
 </script>
 <style scoped>
 .work-item-detail {
+  display: grid;
+  gap: var(--space-4);
   padding: var(--space-8);
   color: var(--color-text);
 }
 
-.work-item-detail a {
+.work-item-detail__header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.work-item-detail__header a {
   color: var(--color-primary);
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.work-item-detail__header a:hover {
+  text-decoration: underline;
+}
+
+.work-item-detail__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.work-item-detail__title .work-item-detail__state {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.work-item-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.work-item-detail__state,
+.work-item-detail__label {
+  padding: 1px var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-base);
 }
 
 .work-item-detail__body {
+  margin: 0;
+  font-size: var(--font-size-13);
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

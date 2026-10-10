@@ -291,6 +291,16 @@ button,
   line-height: var(--line-height-22);
 }
 
+.app-section-label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-16);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .app-form-dialog__heading-separator {
   color: var(--color-text-muted);
   font-size: var(--font-size-12);
