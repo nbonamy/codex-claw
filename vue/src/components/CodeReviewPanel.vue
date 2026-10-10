@@ -139,8 +139,9 @@
       </header>
       <div v-if="session.automation" class="code-review-panel__automation-status" role="status">
         <span v-if="session.automation.state === 'running'">{{ t('automaticReview.running', { round: session.rounds.length, max: session.automation.maxRounds }) }}</span>
+        <span v-else-if="session.automation.state === 'manual'">{{ t('automaticReview.manual') }}</span>
         <span v-else>{{ session.automation.reason }}</span>
-        <button v-if="session.automation.state === 'running'" class="app-button app-button--secondary" type="button" :disabled="busy" @click="run(() => reviewSettings.stop(agent.id, session!.id))">{{ t('automaticReview.stop') }}</button>
+        <button v-if="session.automation.state === 'running'" class="app-button app-button--secondary" type="button" :disabled="busy" @click="run(() => reviewSettings.switchToManual(agent.id, session!.id))">{{ t('automaticReview.switchToManual') }}</button>
       </div>
 
       <div
@@ -661,7 +662,7 @@ function retryReview(): void {
     scope: automation?.baseRef ? { type: 'branch', baseRef: automation.baseRef } : reviewScope,
     threadMode: review.threadMode,
     ...(review.instructions ? { instructions: review.instructions } : {}),
-    ...(automation ? { automation: { enabled: true, maxPriority: automation.maxPriority, maxRounds: automation.maxRounds, autoCommit: automation.autoCommit ?? false } } : {}),
+    ...(automation ? { automation: { enabled: automation.enabled, maxPriority: automation.maxPriority, maxRounds: automation.maxRounds, autoCommit: automation.autoCommit ?? false } } : {}),
   }));
 }
 
