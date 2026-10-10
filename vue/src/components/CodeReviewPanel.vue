@@ -137,11 +137,12 @@
           sessionStatus
         }}</span>
       </header>
-      <div v-if="session.automation" class="code-review-panel__automation-status" role="status">
-        <span v-if="session.automation.state === 'running'">{{ t('automaticReview.running', { round: session.rounds.length, max: session.automation.maxRounds }) }}</span>
-        <span v-else-if="session.automation.state === 'manual'">{{ t('automaticReview.manual') }}</span>
+      <div v-if="session.automation || session.status !== 'finished'" class="code-review-panel__automation-status" role="status">
+        <span v-if="!session.automation || session.automation.state === 'manual'">{{ t('automaticReview.manual') }}</span>
+        <span v-else-if="session.automation.state === 'running'">{{ t('automaticReview.running', { round: session.rounds.length, max: session.automation.maxRounds }) }}</span>
         <span v-else>{{ session.automation.reason }}</span>
-        <button v-if="session.automation.state === 'running'" class="app-button app-button--secondary" type="button" :disabled="busy" @click="run(() => reviewSettings.switchToManual(agent.id, session!.id))">{{ t('automaticReview.switchToManual') }}</button>
+        <button v-if="session.automation?.state === 'running'" class="app-button app-button--secondary" type="button" :disabled="busy" @click="run(() => reviewSettings.switchToManual(agent.id, session!.id))">{{ t('automaticReview.switchToManual') }}</button>
+        <button v-else-if="session.status !== 'finished'" class="app-button app-button--secondary" type="button" :disabled="busy || !canStopTurn" @click="run(() => reviewSettings.stop(agent.id))">{{ t('automaticReview.stopReview') }}</button>
       </div>
 
       <div
@@ -431,6 +432,8 @@ watch(() => props.agent.id, () => {
 });
 const selectedRoundId = ref("");
 const session = computed(() => props.agent.codeReview ?? null);
+const canStopTurn = computed(() => session.value?.status === 'reviewing' || session.value?.status === 'fixing'
+  || props.agent.status.type === 'working' || props.agent.status.type === 'awaitingInput');
 const branchScope = computed(() => props.gitStatus?.diffCatalog?.branch);
 const scopeCatalogReady = computed(() => Boolean(props.gitStatus?.diffCatalog) && props.gitStatus?.state !== "unknown");
 const hasUncommittedChanges = computed(() => {

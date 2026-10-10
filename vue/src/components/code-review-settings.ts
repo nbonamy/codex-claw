@@ -7,6 +7,7 @@ type ReviewSettingsContext = {
   preferences: () => CodeReviewPreferences | undefined;
   listModels: (agentId: string, backend: AgentBackend) => Promise<BackendModelOption[]>;
   switchToManual: (agentId: string, sessionId: string) => Promise<unknown>;
+  stop: (agentId: string) => Promise<unknown>;
 };
 
 export const codeReviewSettingsKey: InjectionKey<ReviewSettingsContext> = Symbol('codeReviewSettings');
@@ -18,6 +19,10 @@ export function useCodeReviewSettings(): ReviewSettingsContext {
     switchToManual: async (agentId, sessionId) => {
       if (!appApi) throw new Error('Backend connection is unavailable.');
       return await appApi.switchCodeReviewToManual(agentId, sessionId);
+    },
+    stop: async agentId => {
+      if (!appApi) throw new Error('Backend connection is unavailable.');
+      return await appApi.interruptAgent(agentId);
     },
   });
 }
