@@ -512,8 +512,9 @@ Mission workflow tests exercise worker reuse, stage acceptance and restored evid
 Antigravity does not receive a synthetic `/compact` between tickets. Automation and
 worktree delegation tests retain the selected provider and isolated session.
 Native two-agent Korus MCP identity and approval isolation passed with ACP 1.3.0
-and Gemini 3.8 Flash Low. Native CodeReviewService proof remains pending; its
-fixture tests are not live model proof.
+and Gemini 3.8 Flash Low. Native CodeReviewService also completed finding counts
+`[1, 0]`, remediation with validation evidence, and reviewer disposal in a disposable
+repository. Mission, automation and delegation workflow evidence remains fixture-backed.
 
 - [x] Implement the provider-owned host/replica and bounded revisioned transport.
 - [x] Hydrate through native `session/load`, rebuild the provider replica atomically
@@ -542,8 +543,8 @@ implementation turn. Live host probes read synthetic image/WAV/PDF/text inputs;
 an approved PLAN.md write exactly matched the preview and left the source file
 unchanged. A denied plan write surfaced honestly. Full typechecks/lint and all
 five unchanged statement coverage gates passed (core 85.69%, backend 86.83%,
-Vue 87.71%, Electron 85.04%, Web 95.93%). Native collaboration verification
-remains pending; the branch Web flow is documented in the checkpoint below.
+Vue 87.71%, Electron 85.04%, Web 95.93%). Native collaboration and the branch
+Web flow are documented in the checkpoint below.
 
 - [x] Add backend icon, settings panel/navigation/i18n, conversation binding and
   model/effort options; reuse creation dialogs and shared controls.
@@ -555,25 +556,26 @@ remains pending; the branch Web flow is documented in the checkpoint below.
   flows. Verify persisted choices and unsupported-control behavior through UI.
 - [x] Exercise the actual provider boundary and one desktop/Web consumer flow.
 
-### Review checkpoint and remaining native proof (2026-10-06)
+### Native verification checkpoint
 
-The delegating agent approved review readiness with the following explicit live
-limitation, not merge/publication or a claim of fully live-validated support.
-Native **CodeReviewService** remediation remains outstanding. Native two-agent
-**Korus** MCP identity passed on 2026-10-09 using the production host and MCP
+Native two-agent **Korus** MCP identity passed using the production host and MCP
 service, separate same-cwd sessions, and Gemini 3.8 Flash Low. Both default and
 auto-edit sessions completed `set-status` and `finish_turn` without UI approvals;
 a terminal command still required approval and was denied. Evidence:
 `$TMPDIR/korus-acp-trust-oaCfYd/proof.json`.
-Verification passed 3,884 workspace tests, 47 script tests and full lint/typechecks;
-statement coverage passed all unchanged 85% gates (core 85.53%, backend 87.51%,
-Vue 88.10%, Electron 86.58%, Web 95.93%). No running app was restarted.
-Initial probes denied native MCP permission requests; corrected
-probes reached Google's usage limit (the runtime reported a reset in 3 days,
-5 hours). Both default Gemini 3.8 Flash and catalog-selected Gemini 3.1 Pro Low
-returned the limit message. No account change, token extraction or alternate
-transport was used. The review correctly paused without an accepted
-`finish_review_round`; no clean-review result was inferred from assistant text.
+
+Native **CodeReviewService**, real ReviewGit and scoped HTTP/stdio MCP passed
+against commit `cf06878b`, qualified ACP 1.3.0/protocol 2, and catalog-selected
+`gemini-3.8-flash-low`. A disposable addition fixture produced one finding, a native
+file edit, recorded remediation evidence with a passing unchanged Node test,
+and a clean second round (`[1, 0]`). The reviewer and scoped context were disposed,
+review sessions were absent from user history, and `autoCommit:false` preserved HEAD.
+Korus MCP calls required no UI approvals; fixture commands and file edits did.
+Evidence: `$TMPDIR/korus-acp-native-review-UqAnN2/{proof,success}.json`.
+An initial probe denied the edit because its approval handler omitted native
+`target_file`; the real service paused with the unresolved finding. Correcting only
+the scratch handler and rerunning in a fresh repository passed. No account change,
+credential extraction, application restart or production code fix was needed.
 
 Native cancellation through our session produced `interrupted`, followed by a
 completed quota-message turn in the same still-open process. This proves recovery
@@ -607,7 +609,7 @@ models. Its catalog pass-through test includes a synthetic GPT-OSS entry to
 ensure it will display one when the native contract supplies it. This requires
 an upstream-supported change before GPT-OSS can be advertised for Korus.
 
-Native verification procedure (two-agent MCP passed; review remains outstanding):
+Native verification procedure (two-agent MCP and CodeReviewService passed):
 
 1. Keep this worktree checked out and use an isolated scratch repository and
    APP_HOME. Revalidate paired ACP 1.3.0/protocol 2; use the user's native login
@@ -615,8 +617,8 @@ Native verification procedure (two-agent MCP passed; review remains outstanding)
 2. Bundle the production `AntigravityHost`, `AcpSession`, `AppMcpService`,
    `CodeReviewService`, `AgentCreationService` and `createEmptySnapshot` with Vite
    SSR (`ssr.noExternal: true`). The optional current entry and runners are
-   `/tmp/korus-acp-native-app-entry.ts`, `/tmp/korus-acp-native-app-proof.mjs`
-   and `/tmp/korus-acp-native-review-proof.mjs`; these are evidence helpers,
+   `/tmp/korus-acp-review-native-entry.ts`, `/tmp/korus-acp-native-app-proof.mjs`
+   and `/tmp/korus-acp-review-native-run.mjs`; these are evidence helpers,
    never production dependencies. Regenerate them from the service wiring in
    `backend/src/antigravity/__tests__/session.spec.ts` if scratch files expire.
 3. Run the MCP runner with two same-cwd agents and the actual AppMcpService URL.
@@ -630,8 +632,10 @@ Native verification procedure (two-agent MCP passed; review remains outstanding)
    ReviewGit and the scoped MCP bridge with `autoCommit:false`. Approve only
    fixture reads/test commands and the fixture-file edit; scoped Korus review
    ledger calls are pre-authorized. Require finding counts `[1,0]`, remediation
-   evidence, passing Node test and reviewer disposal. Stop on quota rather than retrying or changing
-   accounts. Capture synthetic results without credentials.
+   evidence, passing unchanged Node test, reviewer/context disposal and hidden
+   ephemeral history. Native edit approval uses `rawInput.target_file`; approve only
+   the fixture source. Stop on quota rather than retrying or changing accounts.
+   Capture synthetic results without credentials.
 5. Keep the deterministic review/Mission/delegation/automation workflow tests
    green; report native results separately. Remote/Web attachment transfer and
    the upstream third-party model gate remain separate follow-ups.
@@ -674,6 +678,9 @@ Phase 0 learnings:
 
 Implementation learnings:
 
+- Native workflow probes must approve captured argument shapes (`target_file` for
+  client edits), while restricting writes to the disposable source fixture. A denied
+  edit should pause the real review ledger; assistant completion cannot imply a fix.
 - Exercise session actions through the client and provider together: detach must
   evict the old frame, catalog reads must await history adoption, and adapter
   resume parameters must preserve the daemon's target contract. Gate compact
