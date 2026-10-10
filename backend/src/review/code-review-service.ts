@@ -982,13 +982,13 @@ function reviewReport(session: CodeReviewSession): string {
 
 function reviewOutcomeSummary(session: CodeReviewSession, fixedCount: number, remaining: CodeReviewFinding[]): string {
   const auto = session.automation;
-  const completed = !auto || auto.state === 'completed';
+  const completed = !auto || auto.state === 'completed' || auto.state === 'manual';
   const parts = [auto
-    ? completed ? 'Automatic review completed.' : 'Automatic review paused; it is not an approval to ship.'
+    ? auto.state === 'manual' ? 'Manual review completed.' : completed ? 'Automatic review completed.' : 'Automatic review paused; it is not an approval to ship.'
     : 'Independent review completed.'];
   if (fixedCount) parts.push(`${fixedCount} finding${fixedCount === 1 ? '' : 's'} fixed.`);
   if (remaining.length) {
-    if (auto && completed && remaining.every(finding => finding.priority > auto.maxPriority)) {
+    if (auto?.state === 'completed' && remaining.every(finding => finding.priority > auto.maxPriority)) {
       parts.push(`No ${auto.maxPriority === 'p0' ? 'P0' : `P0–${auto.maxPriority.toUpperCase()}`} findings.`);
     }
     const counts = (['p0', 'p1', 'p2', 'p3'] as const).flatMap(priority => {

@@ -211,6 +211,9 @@ describe('CodeReviewService', () => {
     await vi.waitFor(() => expect(session.status).toBe('ready'));
     expect(session.automation).toMatchObject({ enabled: false, state: 'manual' });
     expect(test.deleted).toEqual([]);
+    test.service.submit(visible, session.id);
+    await test.service.finish(visible, session.id);
+    expect(test.handoffs.at(-1)?.content.split('</context>')[1]?.trim()).toBe('Manual review completed. 1 finding fixed. No findings remain.');
   });
 
   it.each(['queuedFix', 'beforeFixTurn', 'checkpoint', 'commit', 'nextRound'] as const)('handles a switch at the %s async boundary without starting more automation', async boundary => {
