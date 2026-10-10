@@ -380,6 +380,8 @@ describe('useAppState', () => {
       .map(([type]) => type)
       .sort()).toStrictEqual([
       'agentCreation.progress',
+      'antigravity.conversationEventReceived',
+      'antigravity.conversationSnapshotChanged',
       'browser.annotationCreated',
       'client.celebrationRequested',
       'claude.conversationEventReceived',

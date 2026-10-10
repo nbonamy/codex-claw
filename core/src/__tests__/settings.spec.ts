@@ -318,10 +318,12 @@ describe('settings contracts', () => {
       providerModelDefaults: {
         codex: { model: ' gpt-x ', reasoningEffort: 'high', serviceTier: '' },
         claude: { model: '', reasoningEffort: 'low' },
+        antigravity: { model: 'gemini-low', reasoningEffort: 'high', serviceTier: 'fast' },
         other: { model: 'ignored' },
       },
     }).providerModelDefaults).toStrictEqual({
       codex: { model: 'gpt-x', reasoningEffort: 'high', serviceTier: null },
+      antigravity: { model: 'gemini-low', reasoningEffort: null, serviceTier: null },
     });
   });
 

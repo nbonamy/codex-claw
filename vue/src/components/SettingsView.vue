@@ -7,6 +7,7 @@
     
     <SettingsSidebar
       :active-tab="activeTab"
+      :available-backends="providerConnections?.map(provider => provider.backend) ?? []"
       class="settings-view__sidebar"
       @select="selectTab"
     />
@@ -51,6 +52,23 @@
           @cancel="cancelCodexLogin"
           :launch-chat-gpt-app="launchChatGptApp"
           :settings="generalSettings"
+        />
+        <SettingsAntigravityPanel
+          v-else-if="activeTab === 'antigravity'"
+          :installed="providerConnections?.find(engine => engine.backend === 'antigravity')?.installed ?? false"
+          @refresh="refreshProvider?.('antigravity')"
+          :connected="providerConnections?.some(engine => engine.backend === 'antigravity' && engine.connected)"
+          :authentication="providerConnections?.find(engine => engine.backend === 'antigravity')?.authentication"
+          :home="generalSettings.providerHomes?.antigravity"
+          :enabled="generalSettings.providerEnabled?.antigravity !== false"
+          :set-enabled="enabled => setProviderEnabled?.('antigravity', enabled)"
+          :busy="antigravityConnectionBusy || updatingProvider === 'antigravity'"
+          :pending="antigravityLoginPending"
+          :error="antigravityConnectionError || providerSetupError"
+          @customize="customizeProvider?.('antigravity')"
+          @connect="connectAntigravity"
+          @disconnect="disconnectProvider?.('antigravity')"
+          @cancel="cancelAntigravityLogin"
         />
         <SettingsClaudeCodePanel
           v-else-if="activeTab === 'claude-code'"
@@ -123,11 +141,13 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { AddSshConnectionInput, AppGeneralSettings, AppPluginStatus, AppThemeSettings, DaemonStatus, DevicePairingSession, DevicePairingStatus, PairedDevice, RemoteConnection, SourceFolderListing, SourceFolderListInput, SourceFolderState, SshHostCandidate, Team, UpdateRemoteConnectionInput, UpdateSettingsInput, WorkBacklogState, WorkIntegrationConnection, WorkProviderAuthorization, WorkProviderKind } from '@workspace/core/contracts';
 import { defaultGeneralSettings, defaultSourceFolderState } from '@workspace/core/settings';
 import SettingsAppearancePanel from './SettingsAppearancePanel.vue';
 import SettingsAppshotsPanel from './SettingsAppshotsPanel.vue';
 import SettingsClaudeCodePanel from './SettingsClaudeCodePanel.vue';
+import SettingsAntigravityPanel from './SettingsAntigravityPanel.vue';
 import SettingsCodexPanel from './SettingsCodexPanel.vue';
 import SettingsConnectionsPanel from './SettingsConnectionsPanel.vue';
 import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
@@ -145,15 +165,15 @@ import appPackage from '../../package.json';
 
 const appVersion = appPackage.version;
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   codexConnected?: boolean;
   providerConnections?: ProviderConnection[];
   refreshProvider?: (backend: AgentBackend) => Promise<void>;
   updatingProvider?: AgentBackend | null;
   providerSetupError?: string | null;
-  customizeProvider?: (backend: 'codex' | 'claude') => unknown;
-  setProviderEnabled?: (backend: 'codex' | 'claude', enabled: boolean) => unknown;
-  disconnectProvider?: (backend: 'codex' | 'claude') => Promise<void>;
+  customizeProvider?: (backend: AgentBackend) => unknown;
+  setProviderEnabled?: (backend: AgentBackend, enabled: boolean) => unknown;
+  disconnectProvider?: (backend: AgentBackend) => Promise<void>;
   claudeConnected?: boolean;
   codexConnectionBusy?: boolean;
   claudeConnectionBusy?: boolean;
@@ -162,6 +182,11 @@ withDefaults(defineProps<{
   claudeConnectionError?: string | null;
   connectCodex?: () => Promise<void>;
   connectClaude?: () => Promise<void>;
+  connectAntigravity?: () => Promise<void>;
+  cancelAntigravityLogin?: () => Promise<void>;
+  antigravityConnectionBusy?: boolean;
+  antigravityLoginPending?: boolean;
+  antigravityConnectionError?: string | null;
   cancelCodexLogin?: () => Promise<void>;
   activeTab?: SettingsTab;
   settings: AppThemeSettings;
@@ -237,6 +262,8 @@ withDefaults(defineProps<{
 const emit = defineEmits<{
   selectTab: [tab: SettingsTab];
 }>();
+
+const activeTab = computed(() => props.activeTab === 'antigravity' && !props.providerConnections?.some(provider => provider.backend === 'antigravity') ? 'general' : props.activeTab);
 
 function selectTab(tab: SettingsTab): void {
   emit('selectTab', tab);

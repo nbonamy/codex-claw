@@ -96,7 +96,7 @@ describe('backend protocol guards', () => {
     expectTypeOf<Pick<SubagentStatusEvent, 'agentId' | 'backend' | 'threadId' | 'turnId'>>()
       .toEqualTypeOf<{
         agentId: string;
-        backend: 'codex' | 'claude';
+      backend: 'codex' | 'claude' | 'antigravity';
         threadId?: string;
         turnId?: string;
       }>();

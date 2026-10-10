@@ -1,4 +1,5 @@
 import { product } from '../product';
+import { emptyAntigravitySnapshot } from '../antigravity-conversation-replica';
 import { approvalAgentRequest, approvalOutcome } from '@workspace/core/agent-request';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { AppBackendEvent as RpcAppBackendEvent } from '../backend-protocol/rpc';
@@ -105,6 +106,14 @@ function createFixtures(): EventFixtures {
   const turn = { ...codexThread, turnId: 'turn-1' };
 
   return {
+    'antigravity.conversationSnapshotChanged': {
+      ...base, type: 'antigravity.conversationSnapshotChanged', agentId: 'agent-1', backend: 'antigravity', backendSessionId: 'session-1',
+      payload: { revision: 1, snapshot: emptyAntigravitySnapshot('agent-1', 'session-1') },
+    },
+    'antigravity.conversationEventReceived': {
+      ...base, type: 'antigravity.conversationEventReceived', agentId: 'agent-1', backend: 'antigravity', backendSessionId: 'session-1',
+      payload: { revision: 2, event: { agentId: 'agent-1', sessionId: 'session-1', turnId: 'turn-1', occurredAt: base.occurredAt, type: 'turn.started', payload: { turn: { id: 'turn-1' } } } },
+    },
     'provider.authenticationChanged': {
       ...base, type: 'provider.authenticationChanged',
       payload: { kind: 'claude', connected: false, state: { loggedIn: false } },

@@ -5,6 +5,7 @@ import { AgentHandoffService } from '../agents/agent-handoff-service';
 import { createTestSnapshot } from './server-test-fixtures';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 
+
 function fixture() {
   const snapshot = createTestSnapshot();
   const source: Agent = {
@@ -31,15 +32,18 @@ function fixture() {
 }
 
 describe('agent handoff', () => {
-  it('saves the note before closing, preserves the workspace and linkage, and creates only one replacement', async () => {
+  it.each(['claude', 'antigravity'] as const)('hands off to %s once with a saved note and preserved workspace linkage', async backend => {
     const f = fixture();
-    await f.service.run(f.source.id, f.input);
+    f.snapshot.providerConnections?.push({ backend: 'antigravity', installed: true, connected: true, checking: false });
+    const input = { ...f.input, backend };
+    await f.service.run(f.source.id, input);
     const target = f.snapshot.agents[0]!;
     expect(f.snapshot.agents).toHaveLength(1);
-    expect(target).toMatchObject({ backend: 'claude', folder: '/repo/worktree', backendDefaults: { kind: 'claude', model: 'sonnet' }, handoff: { sourceAgentId: 'source', sourceRef: { backend: 'codex', threadId: 'original' }, phase: 'complete' } });
+    expect(target).toMatchObject({ backend, folder: '/repo/worktree', backendDefaults: { kind: backend, model: 'sonnet' }, handoff: { sourceAgentId: 'source', sourceRef: { backend: 'codex', threadId: 'original' }, phase: 'complete' } });
+    expect(f.note).toHaveBeenCalledWith(f.source, expect.stringContaining(backend === 'antigravity' ? 'Antigravity' : 'Claude Code'));
     expect(f.note).toHaveBeenCalledWith(f.source, expect.stringContaining('Mention the flaky test.'));
     expect(f.events.slice(f.events.indexOf('close') - 1, f.events.indexOf('close') + 3)).toEqual(['save', 'close', 'save', 'start']);
-    await f.service.run(f.source.id, f.input);
+    await f.service.run(f.source.id, input);
     expect(f.start).toHaveBeenCalledOnce();
     expect(f.retire).toHaveBeenCalledOnce();
     const restored = snapshotFromPersistedState(persistedStateFromSnapshot(f.snapshot));

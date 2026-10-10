@@ -1,4 +1,5 @@
 import { workProviderKinds } from './work-providers';
+import { isAgentBackend } from './contracts/shared';
 import { spokenAnnouncementVoices, type AppGeneralSettings, type AppPluginSettings, type AppshotSettings, type AppSnapshot, type AppThemeSettings, type ModelFavorite, type SavedPromptDraft, type SourceFolderState, type SpokenAnnouncementVoice, type UpdateSettingsInput, type WorkProviderSettings } from './contracts';
 import { repositoryIconKeyForRemote } from './git-remote';
 import { isApprovalPreset } from './approval-presets';
@@ -142,7 +143,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
     ...(typeof value.codexEnabled === 'boolean' ? { codexEnabled: value.codexEnabled } : {}),
     ...(value.providerOnboardingComplete === true || typeof value.codexEnabled === 'boolean' ? { providerOnboardingComplete: true } : {}),
     ...(isRecord(value.providerHomes) ? { providerHomes: normalizeProviderHomes(value.providerHomes) } : {}),
-    ...(isRecord(value.providerEnabled) ? { providerEnabled: Object.fromEntries(Object.entries(value.providerEnabled).filter(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && typeof enabled === 'boolean')) } : {}),
+    ...(isRecord(value.providerEnabled) ? { providerEnabled: Object.fromEntries(Object.entries(value.providerEnabled).filter(([backend, enabled]) => (isAgentBackend(backend)) && typeof enabled === 'boolean')) } : {}),
     ...(isRecord(value.providerModelDefaults) ? { providerModelDefaults: normalizeProviderModelDefaults(value.providerModelDefaults) } : {}),
     ...(isCodeReviewPreferences(value.codeReviewDefaults) ? { codeReviewDefaults: structuredClone(value.codeReviewDefaults) } : {}),
     ...(isRecord(value.providerApprovalDefaults) ? { providerApprovalDefaults: normalizeProviderApprovalDefaults(value.providerApprovalDefaults) } : {}),
@@ -161,7 +162,7 @@ export function normalizeGeneralSettings(value: unknown): AppGeneralSettings {
 
 function normalizeProviderHomes(value: Record<string, unknown>): NonNullable<AppGeneralSettings['providerHomes']> {
   const homes: NonNullable<AppGeneralSettings['providerHomes']> = {};
-  for (const backend of ['codex', 'claude'] as const) {
+  for (const backend of ['codex', 'claude', 'antigravity'] as const) {
     const entry = value[backend];
     if (isRecord(entry) && typeof entry.homePath === 'string' && entry.homePath.trim()
       && typeof entry.isolated === 'boolean' && typeof entry.shareSkills === 'boolean') {
@@ -173,24 +174,25 @@ function normalizeProviderHomes(value: Record<string, unknown>): NonNullable<App
 
 function normalizeProviderModelDefaults(value: Record<string, unknown>): NonNullable<AppGeneralSettings['providerModelDefaults']> {
   const defaults: NonNullable<AppGeneralSettings['providerModelDefaults']> = {};
-  for (const backend of ['codex', 'claude'] as const) {
+  for (const backend of ['codex', 'claude', 'antigravity'] as const) {
     const entry = value[backend];
     const model = isRecord(entry) ? normalizeString(entry.model) : undefined;
     if (!isRecord(entry) || !model) continue;
     defaults[backend] = {
       model,
-      reasoningEffort: normalizeString(entry.reasoningEffort) || null,
-      serviceTier: normalizeString(entry.serviceTier) || null,
+      reasoningEffort: backend === 'antigravity' ? null : normalizeString(entry.reasoningEffort) || null,
+      serviceTier: backend === 'antigravity' ? null : normalizeString(entry.serviceTier) || null,
     } as NonNullable<typeof defaults[typeof backend]>;
   }
   return defaults;
 }
 
 function normalizeProviderApprovalDefaults(value: Record<string, unknown>): NonNullable<AppGeneralSettings['providerApprovalDefaults']> {
-  const { codex, claude } = value;
+  const { codex, claude, antigravity } = value;
   return {
     ...(isApprovalPreset(codex) ? { codex } : {}),
     ...(typeof claude === 'string' && claudeBackendCapabilities.permissionModes?.some(option => option.id === claude) ? { claude } : {}),
+    ...(typeof antigravity === 'string' && ['default', 'auto_edit'].includes(antigravity) ? { antigravity } : {}),
   };
 }
 
@@ -233,7 +235,7 @@ function normalizeModelFavorites(value: unknown): ModelFavorite[] {
   const seen = new Set<string>();
   for (const candidate of value) {
     if (!isRecord(candidate)) continue;
-    const backend = candidate.backend === 'codex' || candidate.backend === 'claude'
+    const backend = candidate.backend === 'codex' || candidate.backend === 'claude' || candidate.backend === 'antigravity'
       ? candidate.backend
       : null;
     const modelId = normalizeFavoriteValue(candidate.modelId);

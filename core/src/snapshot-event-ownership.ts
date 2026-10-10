@@ -3,6 +3,8 @@ import type { MainToRendererEvent } from './contracts';
 export type SnapshotEventOwner = 'runtime' | 'coordination' | 'subagent' | 'renderer';
 
 export const snapshotEventOwnership = {
+  'antigravity.conversationSnapshotChanged': 'renderer',
+  'antigravity.conversationEventReceived': 'renderer',
   'provider.authenticationChanged': 'renderer',
   'backend.statusChanged': 'runtime',
   'client.connectionChanged': 'renderer',

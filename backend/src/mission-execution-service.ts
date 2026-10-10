@@ -1,6 +1,7 @@
 import type { Agent, AppSnapshot, CreateSourceWorktreeInput, SourceWorktree } from '@workspace/core/contracts';
 import { createAgentInSnapshot } from '@workspace/core/agent-manager';
 import { createEntityId } from '@workspace/core/ids';
+import { defaultBackendCommands } from '@workspace/core/backend-commands';
 import { isMissionArtifacts, missionTicketReady, type Mission, type MissionArtifacts, type MissionReviewFinding, type MissionStage } from '@workspace/core/missions';
 import { missionWorkflow } from '@workspace/core/mission-workflows';
 import { pendingMissionRun, type MissionArtifactReadResult, type MissionArtifactWriteInput, type MissionExecutionInput, type MissionImplementationStartProgress, type MissionResultInput, type MissionReviewFindingInput, type MissionReviewFindingUpdateInput, type MissionRun, type MissionTicketDraftInput, type MissionTicketDraftResult, type MissionToolContext } from '@workspace/core/mission-execution';
@@ -559,7 +560,7 @@ export class MissionExecutionService {
     await this.ports.publish();
     if (reusedWorker && worker.backendSession) {
       await this.ports.refreshConversationContext(worker);
-      if (shouldCompactBeforeRun(mission, run, worker.id)) {
+      if (defaultBackendCommands(worker.backend).some(command => command.name === 'compact') && shouldCompactBeforeRun(mission, run, worker.id)) {
         this.nonResultTurns.add(worker.id);
         try {
           await this.ports.continueStage(worker.id, '/compact');

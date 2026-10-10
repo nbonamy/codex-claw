@@ -2,7 +2,7 @@ import { product } from '@workspace/core/product';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 import { AppStateStore } from '../persistence/store';
 import { createEmptySnapshot, createInitialSnapshot } from '@workspace/core/snapshot';
@@ -14,6 +14,7 @@ import { defaultPluginSettings, defaultThemeSettings, updateSettingsInSnapshot }
 import { projectClientSnapshot } from '@workspace/core/client-preferences';
 import type { RemoteConnection } from '@workspace/core/contracts';
 
+
 let tempDir: string | null = null;
 
 afterEach(async () => {
@@ -24,6 +25,31 @@ afterEach(async () => {
 });
 
 describe('state persistence', () => {
+  it('roundtrips Antigravity session identity and isolated provider preferences through disk', async () => {
+    const home = await tempHome();
+    const store = new AppStateStore(home);
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backend = 'antigravity';
+    agent.backendSession = { kind: 'antigravity', sessionId: 'native-acp-session' };
+    agent.backendDefaults = { kind: 'antigravity', model: 'gemini-3.8-flash-low', permissionMode: 'default' };
+    snapshot.general.providerHomes = { antigravity: { homePath: '/private/acp', isolated: true, shareSkills: false } };
+    snapshot.general.providerEnabled = { codex: true, antigravity: false };
+    snapshot.general.providerModelDefaults = { antigravity: { model: 'gemini-3.8-flash-low', reasoningEffort: null, serviceTier: null } };
+    snapshot.general.providerApprovalDefaults = { antigravity: 'auto_edit' };
+    await store.save(snapshot);
+    const restored = await store.load();
+    expect(isAppSnapshot(restored)).toBe(true);
+    expect(restored.agents.find(value => value.id === agent.id)).toMatchObject({ backend: 'antigravity', backendSession: agent.backendSession, backendDefaults: agent.backendDefaults });
+    expect(restored.general.providerHomes).toStrictEqual(snapshot.general.providerHomes);
+    expect(restored.general.providerEnabled).toStrictEqual(snapshot.general.providerEnabled);
+    expect(restored.general.providerModelDefaults).toStrictEqual(snapshot.general.providerModelDefaults);
+    expect(restored.general.providerApprovalDefaults).toStrictEqual(snapshot.general.providerApprovalDefaults);
+    restored.agents.find(value => value.id === agent.id)!.name = 'Restored Antigravity';
+    await store.save(restored);
+    expect((await new AppStateStore(home).load()).agents).toStrictEqual(restored.agents);
+  });
+
   it('defaults Pull to Git configuration and preserves explicit choices', () => {
     const fresh = createEmptySnapshot();
     expect(fresh.general.git?.pull).toBe('git-config');
@@ -48,12 +74,12 @@ describe('state persistence', () => {
     expect(restored.automations).toEqual([]);
     expect(restored.agents.map(agent => agent.id)).toEqual(snapshot.agents.map(agent => agent.id));
   });
-  it('creates, updates and runs a remote prompt automation, then reloads its configuration and conversation', async () => {
+  it.each(['claude', 'antigravity'] as const)('creates, updates and runs a remote %s prompt automation, then reloads its configuration and conversation', async backend => {
     const persistence = new AppStateStore(await tempHome());
     const snapshot = createInitialSnapshot();
-    snapshot.providerConnections = [{ backend: 'claude', installed: true, connected: true, checking: false }];
+    snapshot.providerConnections = [{ backend, installed: true, connected: true, checking: false }];
     const runner = new AutomationRunner({ getSnapshot: () => snapshot,
-      sendPrompt: async () => ({ backend: 'claude', sessionId: 'remote-chat', folder: null }), saveSnapshot: () => persistence.save(snapshot), notifySnapshotUpdated: () => {},
+      sendPrompt: async () => ({ backend, sessionId: 'remote-chat', folder: null }), saveSnapshot: () => persistence.save(snapshot), notifySnapshotUpdated: () => {},
     });
     const remote = new AppBackendServer({ version: 'test', snapshot, automationRunner: runner, saveSnapshot: value => persistence.save(value) });
     const localSnapshot = createInitialSnapshot();
@@ -67,7 +93,7 @@ describe('state persistence', () => {
     } as never });
     const location = { kind: 'remote', remoteConnectionId: 'connection-devbox' };
     const input = { name: 'Engineering bugs', enabled: false,
-      prompt: 'Fix and verify', target: { kind: 'newQuickChat' as const, teamId: snapshot.teams[0]!.id, backend: 'claude' },
+      prompt: 'Fix and verify', target: { kind: 'newQuickChat' as const, teamId: snapshot.teams[0]!.id, backend },
         schedule: { intervalMinutes: 360 } };
     try {
       expect(await server.handleMessage({ jsonrpc: '2.0', id: 'create', method: 'automation/create', params: { input, location } })).not.toHaveProperty('error');
@@ -77,7 +103,7 @@ describe('state persistence', () => {
       const saved = await persistence.load();
       expect(isAppSnapshot(saved)).toBe(true);
       expect(saved.automations).toEqual([expect.objectContaining({ ...input, id, enabled: true })]);
-      expect(saved.automations[0]?.executionLog[0]).toMatchObject({ status: 'working', conversationRef: { backend: 'claude', sessionId: 'remote-chat', folder: null } });
+      expect(saved.automations[0]?.executionLog[0]).toMatchObject({ status: 'working', conversationRef: { backend, sessionId: 'remote-chat', folder: null } });
       expect(localSnapshot.automations).toEqual([]);
       expect(localSnapshot.workBacklog.assignments).toEqual({});
       const invalid = { ...input, prompt: '' };

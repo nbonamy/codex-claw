@@ -38,6 +38,10 @@
           <BackendIcon backend="claude" monochrome />
           <span>{{ $t('surface.settingsSidebar.claudeCode') }}</span>
         </el-menu-item>
+        <el-menu-item v-if="availableBackends?.includes('antigravity')" index="antigravity">
+          <BackendIcon backend="antigravity" monochrome />
+          <span>{{ $t('antigravity.name') }}</span>
+        </el-menu-item>
         <el-menu-item index="plugins">
           <PuzzleIcon aria-hidden="true" />
           <span>{{ $t('surface.settingsSidebar.plugins') }}</span>
@@ -63,12 +67,14 @@
 
 <script setup lang="ts">
 import type { SettingsTab } from './settings-tabs';
+import type { AgentBackend } from '@workspace/core/contracts';
 import { AffiliateIcon, GitBranchIcon, MicrophoneIcon, PaletteIcon, PuzzleIcon, ScreenshotIcon, SettingsIcon, TerminalIcon, UserIcon } from '../shared/icons/app-icons';
 import BackendIcon from './BackendIcon.vue';
 import { appHostCapabilities } from '../platform-api';
 
 defineProps<{
   activeTab: SettingsTab;
+  availableBackends?: AgentBackend[];
 }>();
 
 const emit = defineEmits<{
@@ -76,7 +82,7 @@ const emit = defineEmits<{
 }>();
 
 function selectTab(tab: string): void {
-  if (tab === 'personalization' || tab === 'voice' || tab === 'git' || tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
+  if (tab === 'antigravity' || tab === 'personalization' || tab === 'voice' || tab === 'git' || tab === 'general' || tab === 'codex' || tab === 'claude-code' || tab === 'appearance' || tab === 'appshots' || tab === 'plugins' || tab === 'integrations' || tab === 'connections') {
     emit('select', tab);
   }
 }

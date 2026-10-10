@@ -23,6 +23,26 @@ import type { Agent, WorkItem } from '../contracts';
 import { workItemAssignmentKey } from '../work-assignments';
 
 describe('agent-manager', () => {
+  it('keeps Antigravity model and permission defaults isolated when creating and switching agents', () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = (['codex', 'claude', 'antigravity'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
+    snapshot.general.providerModelDefaults = {
+      codex: { model: 'gpt-x', reasoningEffort: 'high', serviceTier: 'fast' },
+      antigravity: { model: 'gemini-3.8-flash-low', reasoningEffort: 'high', serviceTier: 'fast' },
+    };
+    snapshot.general.providerApprovalDefaults = { antigravity: 'auto_edit' };
+    createAgentInSnapshot(snapshot, { name: 'ACP', folder: '/repo', backend: 'antigravity' }, undefined, 'acp');
+    const agent = snapshot.agents.find(value => value.id === 'acp')!;
+    expect(agent.backend).toBe('antigravity');
+    expect(agent.backendDefaults).toStrictEqual({ kind: 'antigravity', model: 'gemini-3.8-flash-low', userSelectedModel: true, permissionMode: 'auto_edit' });
+    updateAgentFromInput(snapshot, { id: agent.id, backend: 'claude' });
+    expect(agent.backendDefaults).toStrictEqual({ kind: 'claude' });
+    updateAgentFromInput(snapshot, { id: agent.id, backend: 'antigravity' });
+    expect(agent.backendDefaults).toStrictEqual({ kind: 'antigravity', model: 'gemini-3.8-flash-low', userSelectedModel: true, permissionMode: 'auto_edit' });
+    updateAgentFromInput(snapshot, { id: agent.id, modelSelection: { model: 'gemini-high', reasoningEffort: 'low', serviceTier: 'fast' } });
+    expect(agent.backendDefaults).toStrictEqual({ kind: 'antigravity', model: 'gemini-high', userSelectedModel: true, permissionMode: 'auto_edit' });
+    expect(snapshot.general.providerModelDefaults.antigravity).toEqual({ model: 'gemini-high', reasoningEffort: null, serviceTier: null });
+  });
   it('seeds new agents and quick chats with per-provider approvals without overriding explicit settings or existing chats', () => {
     const snapshot = createInitialSnapshot();
     snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));

@@ -166,7 +166,7 @@ function registerCollaborationTools(
       requestId: z.string().trim().min(1).max(200).optional().describe('Required in task mode. Reuse the same stable ID when retrying this creation call.'),
       task: taskContractSchema.optional().describe('Durable assignment contract. Requires prompt and requestId. Returns taskId after startup acceptance, not task completion; inspect or wait with wait-tasks.'),
       name: z.string().optional().describe('Optional custom name. When omitted, the agent displays its branch or folder name.'),
-      backend: z.enum(['codex', 'claude']).optional().describe('Backend: codex or claude. Defaults to the caller’s backend.'),
+      backend: z.enum(['codex', 'claude', 'antigravity']).optional().describe('Coding backend. Defaults to the caller’s backend.'),
       model: z.string().optional().describe('Optional model override. Inherits the caller model when the backend matches.'),
       reasoningEffort: z.string().optional().describe('Optional reasoning effort override. Inherits the caller effort when the backend matches.'),
       repoPath: z.string().describe('Repository or worktree folder path.'),

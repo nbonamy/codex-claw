@@ -125,20 +125,24 @@ describe('scheduled prompts', () => {
     runner.handleEvent({ type: 'agent.statusChanged', agentId: 'existing', payload: { type: 'error', message: 'Session expired' } } as never);
     expect(automation.executionLog[0]).toMatchObject({ status: 'failed', error: 'Session expired' });
   });
-  it('creates a fresh quick chat without a repository or changing selection, retaining run history', async () => {
-    const { snapshot, automation, runner, sendPrompt } = setup();
+  it.each(['codex', 'claude', 'antigravity'] as const)('creates fresh %s quick chats without changing selection or provider, retaining run history', async backend => {
+    const { snapshot, automation, runner, sendPrompt } = setup({ kind: 'newQuickChat', teamId: 'team', backend });
+    snapshot.providerConnections = [{ backend, installed: true, connected: true, enabled: true, checking: false }];
+    const conversationRef = backend === 'codex' ? { backend, threadId: 'thread' } : { backend, sessionId: 'session', folder: null };
+    sendPrompt.mockResolvedValue(conversationRef);
     await runner.runAutomation('auto');
     const run = automation.executionLog[0]!;
     const chat = snapshot.agents.find(agent => agent.id === run.agentId)!;
-    expect(chat).toMatchObject({ sessionKind: 'quickChat', folder: null, teamId: 'team' });
+    expect(chat).toMatchObject({ backend, sessionKind: 'quickChat', folder: null, teamId: 'team' });
     expect(snapshot.activeAgentId).toBe('existing');
     expect(sendPrompt).toHaveBeenCalledWith(chat.id, 'Check my tasks');
-    expect(run).toMatchObject({ status: 'working', conversationRef: { backend: 'codex', threadId: 'thread' } });
+    expect(run).toMatchObject({ status: 'working', conversationRef });
     runner.handleEvent({ type: 'turn.completed', agentId: chat.id, payload: {} } as never);
     expect(run.status).toBe('completed');
     await runner.runAutomation('auto');
     expect(automation.executionLog).toHaveLength(2);
     expect(automation.executionLog[0]!.agentId).not.toBe(chat.id);
+    expect(snapshot.agents.find(agent => agent.id === automation.executionLog[0]!.agentId)?.backend).toBe(backend);
   });
 
   it('reuses the selected agent without changing its model or permissions and blocks overlapping runs', async () => {

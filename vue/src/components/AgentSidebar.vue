@@ -347,6 +347,7 @@ import { useBackendChoices } from './backend-selection';
 import { backendDisplayName } from '@workspace/core/backend-driver';
 import MissionContextMenu from './MissionContextMenu.vue';
 import { defaultBackendCapabilities } from '@workspace/core/backend-capabilities';
+import { defaultBackendCommands } from '@workspace/core/backend-commands';
 import type { AgentContextMenuAction } from './AgentContextMenu.vue';
 import RepositoryIconPicker from './RepositoryIconPicker.vue';
 import StartWorkMenu from './StartWorkMenu.vue';
@@ -452,7 +453,8 @@ const canCompressContextMenuAgent = computed(() => (
 ));
 const canCompactContextMenuAgent = computed(() => (
   contextMenuAgent.value?.status.type === 'idle' &&
-  Boolean(contextMenuAgent.value.backendSession)
+  Boolean(contextMenuAgent.value.backendSession) &&
+  defaultBackendCommands(contextMenuAgent.value.backend).some(command => command.slashName === 'compact')
 ));
 const canReplaceContextMenuConversation = computed(() => {
   const agent = contextMenuAgent.value;

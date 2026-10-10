@@ -293,6 +293,15 @@ describe('useAppState', () => {
     expect(setAgentApprovalPreset).not.toHaveBeenCalled();
   });
 
+  it('restores the selected Antigravity permission mode without borrowing Claude defaults', () => {
+    const state = useAppState();
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0] = { ...snapshot.agents[0]!, backend: 'antigravity', backendSession: undefined, backendDefaults: { kind: 'antigravity', permissionMode: 'auto_edit' } };
+    state.snapshot.value = snapshot;
+    expect(state.activePermissionMode.value).toBe('auto_edit');
+    expect(state.activeBackendCapabilities.value.permissionModes?.map(option => option.id)).toEqual(['default', 'auto_edit']);
+  });
+
   it('sets Claude permission modes through their separate backend contract', async () => {
     const remoteSnapshot = createInitialSnapshot();
     remoteSnapshot.agents[0] = {

@@ -13,14 +13,34 @@ function mountLanding(props: InstanceType<typeof CodexLoginLanding>['$props'] = 
 }
 
 describe('CodexLoginLanding', () => {
+  it('hides unreleased setup and ignores stale connection state when continuing', () => {
+    const wrapper = mountLanding({ providerSetup: [], antigravityConnected: true });
+    expect(wrapper.text()).not.toContain('Antigravity');
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+  });
+  it('offers native Antigravity sign-in and can continue with it as the only connected engine', async () => {
+    const wrapper = mountLanding({ antigravityConnected: false, providerSetup: [
+      { backend: 'antigravity', installed: true, isolated: true, shareSkills: false, homePath: '/app/acp', locked: false },
+    ] });
+    await wrapper.findAll('button').find(button => button.text() === 'Connect Antigravity')!.trigger('click');
+    expect(wrapper.emitted('connect-antigravity')).toEqual([[]]);
+    await wrapper.setProps({ antigravityPending: true });
+    await wrapper.findAll('button').find(button => button.text() === 'Cancel sign-in')!.trigger('click');
+    expect(wrapper.emitted('cancel-antigravity')).toEqual([[]]);
+    await wrapper.setProps({ antigravityPending: false, antigravityConnected: true });
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeUndefined();
+    await wrapper.get('.codex-login__continue').trigger('click');
+    expect(wrapper.emitted('continue')).toEqual([[]]);
+  });
   it('offers official Install links for missing CLIs and rechecks without starting login', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
-    const wrapper = mountLanding({ providerSetup: (['codex', 'claude'] as const).map(backend => ({
+    const wrapper = mountLanding({ providerSetup: (['codex', 'claude', 'antigravity'] as const).map(backend => ({
       backend, installed: false, isolated: true, shareSkills: true, homePath: '/home', locked: false,
     })) });
     expect(wrapper.findAll('a').map(link => [link.text(), link.attributes('href')])).toEqual([
       ['Install', 'https://learn.chatgpt.com/docs/codex/cli#getting-started'],
       ['Install', 'https://code.claude.com/docs/en/quickstart#step-1-install-claude-code'],
+      ['Install', 'https://github.com/agentclientprotocol/registry/blob/dc55a34900fdd60e5e97c1cbd7825c5a1df673fc/antigravity-acp/agent.json'],
     ]);
     expect(wrapper.findAll('.codex-login__provider .el-button').every(button => button.attributes('disabled') !== undefined)).toBe(true);
     for (const link of wrapper.findAll('a')) {
@@ -35,6 +55,9 @@ describe('CodexLoginLanding', () => {
     expect(wrapper.emitted('refresh-provider')).toEqual([['codex']]);
     expect(wrapper.emitted('login')).toBeUndefined();
     expect(wrapper.emitted('connect-claude')).toBeUndefined();
+    await wrapper.findAll('button[aria-label="Check again"]')[2]!.trigger('click');
+    expect(wrapper.emitted('refresh-provider')).toEqual([['codex'], ['antigravity']]);
+    expect(wrapper.emitted('connect-antigravity')).toBeUndefined();
     await wrapper.setProps({ updatingProvider: 'codex' });
     expect(wrapper.findAll('.provider-install-actions .is-loading')).toHaveLength(1);
     expect(wrapper.findAll('.provider-install-actions')[0]!.find('.is-loading').exists()).toBe(true);
@@ -66,7 +89,7 @@ describe('CodexLoginLanding', () => {
     await wrapper.setProps({ providerSetup: wrapper.props('providerSetup')!.map(setup => ({ ...setup, installed: true })) });
     await providers[1]!.get('.codex-login__detection button').trigger('click');
     expect(wrapper.emitted('customize')).toStrictEqual([['claude']]);
-    await wrapper.setProps({ codexConnected: true, claudeConnected: true });
+    await wrapper.setProps({ codexConnected: true, claudeConnected: true, antigravityConnected: true });
     for (const provider of providers) {
       expect(provider.get('.codex-login__detection span').text()).toBe('Connected');
       expect(provider.text()).not.toContain('Detected');

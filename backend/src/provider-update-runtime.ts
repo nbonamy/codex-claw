@@ -41,6 +41,7 @@ export class ProviderUpdateRuntime {
   }
 
   async inspect(backend: AgentBackend): Promise<ProviderInstallation> {
+    if (backend === 'antigravity') throw new Error('Antigravity updates are managed externally.');
     const executable = this.io.resolve(this.options.command(backend));
     if (!executable) return { method: 'manual', identity: 'missing' };
     const resolved = await this.io.realpath(executable);
@@ -120,7 +121,7 @@ export class ProviderUpdateRuntime {
     });
   }
 
-  private async registryVersion(backend: AgentBackend): Promise<string | undefined> {
+  private async registryVersion(backend: keyof typeof packages): Promise<string | undefined> {
     const data = JSON.parse(await this.io.fetchText(`https://registry.npmjs.org/${packages[backend]}/latest`)) as { version?: string };
     return exactVersion(data.version);
   }

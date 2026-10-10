@@ -138,6 +138,7 @@ export const ipcChannels = {
   getProviderUsage: 'provider:usage:get',
   setProviderEnabled: 'provider:enabled:set',
   disconnectProvider: 'provider:disconnect',
+  authenticateProvider: 'provider:authenticate',
   configureProviderSetup: 'provider:setup:configure',
   refreshProvider: 'provider:refresh',
   cancelCodexChatGptLogin: 'codex:authentication:chatgpt:cancel',

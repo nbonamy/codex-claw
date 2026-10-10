@@ -90,8 +90,8 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   clearAutomationHistory: [backendMethods.automationHistoryClear, namedOptional('automationId', 'location')],
   deleteAutomationExecution: [backendMethods.automationExecutionDelete, namedOptional('automationId', 'executionId', 'location')],
   deleteAutomation: [backendMethods.automationDelete, namedOptional('automationId', 'location')],
-  listAgentConversations: [backendMethods.agentConversationsList, named('agentId')],
-  resumeAgentConversation: [backendMethods.agentConversationResume, named('agentId', 'ref')],
+  listAgentConversations: [backendMethods.agentConversationsList, namedOptional('agentId', 'input')],
+  resumeAgentConversation: [backendMethods.agentConversationResume, named('agentId', 'target')],
   readConversationMessages: [backendMethods.agentConversationMessagesGet, namedOptional('ref', 'agentId', 'location')],
   createAgent: [backendMethods.agentCreate, named('input')],
   createProject: [backendMethods.projectCreate, named('input')],
@@ -129,6 +129,7 @@ const directOperations: Readonly<Record<string, readonly [string, ParamsFactory?
   getProviderUsage: [backendMethods.providerUsageGet, named('backend')],
   setProviderEnabled: [backendMethods.providerEnabledSet, (args) => ({ backend: args[0], enabled: args[1], ...(args[2] ? { remoteConnectionId: args[2] } : {}) })],
   disconnectProvider: [backendMethods.providerDisconnect, (args) => ({ backend: args[0], ...(args[1] ? { remoteConnectionId: args[1] } : {}) })],
+  authenticateProvider: [backendMethods.providerAuthenticate, (args) => ({ backend: args[0], action: args[1] })],
   configureProviderSetup: [backendMethods.providerSetupConfigure, named('backend', 'choice')],
   refreshProvider: [backendMethods.providerRefresh, named('backend', 'remoteConnectionId')],
   cancelCodexChatGptLogin: [backendMethods.codexLoginCancel, namedOptional('remoteConnectionId', 'loginId')],
@@ -166,6 +167,10 @@ export async function invokeAppWebOperation(
   operation: string,
   args: unknown[],
 ): Promise<unknown> {
+  if ((operation === 'sendPrompt' || operation === 'steerPrompt') && isRecord(args[2]) && args[2].attachments !== undefined
+    && (!Array.isArray(args[2].attachments) || args[2].attachments.length > 0)) {
+    throw new Error('Web attachments require a trusted upload service. Use the local desktop app.');
+  }
   if (operation === 'updateSettings') {
     const { policy, preferences } = splitSettingsInput(args[0] as UpdateSettingsInput);
     let result: unknown;

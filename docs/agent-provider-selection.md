@@ -1,14 +1,13 @@
 # Choosing The Coding Agent
 
-How Korus picks Codex or Claude Code for new work. Mission implementation and review
-role policy beyond the lead's backend is not decided.
+How Korus picks Codex, Claude Code or Antigravity for new work. Mission implementation
+and review role policy beyond the lead's backend is not decided.
 
 ## Rules
 
-- Codex and Claude Code are peers; either, both or neither may be connected on a
-  host. Installation, process health and authentication are distinct. Choices come
-  from the owning host's `providerConnections`, never from legacy enable flags or
-  backend process health.
+- Providers are peers; any subset may be connected on a host. Installation, process
+  health and authentication are distinct. Choices come from the owning host's
+  `providerConnections`, never legacy enable flags or backend process health.
 - With several connected engines, creation surfaces show a selector; with one, it is
   used automatically and the selector is hidden; with none, new work is rejected and
   Settings offers connection. Existing chats stay accessible.
@@ -44,7 +43,9 @@ cannot swap a label over another provider's session). It refreshes model catalog
 reasoning, permission and capability controls, clears incompatible defaults, keeps
 draft text and attachments (revalidating attachment support), and keeps model IDs and
 approval settings provider-scoped. Sending waits for an outstanding switch, and late
-catalog responses from the former provider are ignored.
+catalog responses from the former provider are ignored. Antigravity effort is encoded
+in native model IDs; separate effort, thinking-budget and service-tier settings do
+not apply.
 
 ## Connection State
 

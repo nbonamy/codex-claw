@@ -47,7 +47,7 @@ describe('split-screen conversations', () => {
     const panels = wrapper.findAllComponents({ name: 'CodeReviewPanel' });
     for (const [index, agent] of snapshot.agents.slice(0, 2).entries()) {
       const panel = panels.find(panel => panel.props('agent').id === agent.id)!;
-      expect(panel.get<HTMLTextAreaElement>('textarea').element.value).toBe(`Focus for pane ${index}`);
+      expect(panel.get('.code-review-panel__instructions').text()).toBe(`Focus for pane ${index}`);
     }
     const firstWorkspace = wrapper.findAllComponents({ name: 'RightWorkspacePanel' })
       .find(panel => panel.props('agent').id === snapshot.agents[0]!.id)!;
@@ -59,7 +59,7 @@ describe('split-screen conversations', () => {
     await firstEditor.trigger('input');
     await panes[0]!.get('form').trigger('submit');
     await flushPromises();
-    expect(firstWorkspace.get<HTMLTextAreaElement>('textarea').element.value).toBe('');
+    expect(firstWorkspace.find('.code-review-panel__instructions').exists()).toBe(false);
     const second = panels.find(panel => panel.props('agent').id === snapshot.agents[1]!.id)!;
     await second.get('.code-review-panel__start').trigger('click');
     await flushPromises();

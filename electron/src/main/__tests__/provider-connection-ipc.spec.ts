@@ -47,6 +47,10 @@ describe('provider sign-out IPC', () => {
     const api = bridge.exposed.get('app') as AppApi;
     await expect(api.disconnectProvider('claude', 'wall-e')).resolves.toEqual(result);
     expect(request).toHaveBeenLastCalledWith('provider/disconnect', { backend: 'claude', remoteConnectionId: 'wall-e' });
+    await api.authenticateProvider('antigravity', 'login');
+    expect(request).toHaveBeenLastCalledWith('provider/authenticate', { backend: 'antigravity', action: 'login' });
+    await api.authenticateProvider('antigravity', 'cancel');
+    expect(request).toHaveBeenLastCalledWith('provider/authenticate', { backend: 'antigravity', action: 'cancel' });
     request.mockRejectedValueOnce(new Error('Sign-out failed'));
     await expect(api.disconnectProvider('codex')).rejects.toThrow('Sign-out failed');
     expect(request).toHaveBeenLastCalledWith('provider/disconnect', { backend: 'codex', remoteConnectionId: undefined });

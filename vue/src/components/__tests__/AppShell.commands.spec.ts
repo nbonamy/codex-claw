@@ -75,13 +75,17 @@ describe('AppShell dialogs and commands', () => {
     const refreshProvider = vi.fn();
     const configureProviderSetup = vi.fn();
     const disconnectProvider = vi.fn();
+    const backends = ['codex', 'claude', 'antigravity'] as const;
     window.app = {
       onAppCommand: vi.fn(listener => { command = listener; return () => {}; }),
+      getProviderSetup: vi.fn().mockResolvedValue(backends.map(backend => ({
+        backend, installed: true, isolated: true, shareSkills: true, homePath: '/home', locked: false,
+      }))),
       refreshProvider, configureProviderSetup, disconnectProvider,
     } as unknown as AppApi;
     const snapshot = createInitialSnapshot();
-    snapshot.providerConnections = ['codex', 'claude'].map(backend => ({
-      backend: backend as 'codex' | 'claude', installed: true, connected: true, checking: false,
+    snapshot.providerConnections = backends.map(backend => ({
+      backend, installed: true, connected: true, checking: false,
     }));
     const wrapper = mountShell({ snapshot });
     await flushPromises();
@@ -89,8 +93,10 @@ describe('AppShell dialogs and commands', () => {
 
     command({ type: 'debug-missing-engines', enabled: true });
     await flushPromises();
-    expect(wrapper.findAll('.codex-login .provider-install-actions a')).toHaveLength(2);
-    expect(wrapper.findAll('.codex-login button').some(button => button.text() === 'Customize')).toBe(false);
+    expect(wrapper.findAll('.codex-login .provider-install-actions a')).toHaveLength(3);
+    expect(wrapper.findAll('.codex-login__provider').slice(0, 2).some(provider => provider.text().includes('Customize'))).toBe(false);
+    expect(wrapper.get('.codex-login__continue').attributes('disabled')).toBeDefined();
+    expect(wrapper.findAll('.codex-login__provider')[2]!.text()).toContain('Connect Antigravity');
     await wrapper.get('.codex-login .provider-install-actions button').trigger('click');
     expect(refreshProvider).not.toHaveBeenCalled();
 
@@ -553,6 +559,24 @@ describe('AppShell dialogs and commands', () => {
     expect(updateSettings).toHaveBeenCalledWith({
       general: { spokenAnnouncementsMuted: true },
     });
+  });
+
+  it('keeps Antigravity compaction disabled in the sidebar and ignores the native command', async () => {
+    let listener: (command: AppCommand) => void = () => undefined;
+    window.app = {
+      onAppCommand: vi.fn((nextListener: (command: AppCommand) => void) => { listener = nextListener; return () => undefined; }),
+      onEvent: vi.fn(() => vi.fn()),
+    } as Partial<AppApi> as AppApi;
+    const snapshot = createInitialSnapshot();
+    snapshot.agents[0]!.backend = 'antigravity';
+    snapshot.agents[0]!.backendSession = { kind: 'antigravity', sessionId: 'native' };
+    const wrapper = mountShell({ snapshot, realAgentSidebar: true });
+    listener({ type: 'compact-active-session' });
+    await nextTick();
+    expect(wrapper.emitted('send-agent-prompt')).toBeUndefined();
+    await wrapper.get('.agent-sidebar__agent').trigger('contextmenu');
+    const items = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.agent-context-menu [role="menuitem"]'));
+    expect(items.find(item => item.textContent?.startsWith('Compact Session'))?.disabled).toBe(true);
   });
 
   it('compacts the active session from the native shortcut and a targeted agent from its menu', async () => {

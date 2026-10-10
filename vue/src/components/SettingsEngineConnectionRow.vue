@@ -61,7 +61,7 @@ const { t } = useI18n();
 const saving = ref(false);
 const accountLabel = computed(() => {
   const auth = props.authentication;
-  if (!auth) return '';
+  if (!auth || auth.kind === 'antigravity') return '';
   const account = auth.state.account;
   if (!account) return '';
   if (account.type === 'apiKey') return t('engineConnection.apiKey');

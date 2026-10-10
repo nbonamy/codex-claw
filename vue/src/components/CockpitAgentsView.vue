@@ -69,6 +69,8 @@
     <AgentContextMenu
       v-if="contextMenuAgent"
       :fork-disabled="!canForkContextMenuAgent"
+      :compact-disabled="true"
+      :resume-disabled="true"
       :move-targets="contextMenuMoveTargets"
       :x="contextMenuPosition.x"
       :y="contextMenuPosition.y"

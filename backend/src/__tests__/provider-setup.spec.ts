@@ -33,6 +33,7 @@ beforeEach(async () => {
   vi.stubEnv('APP_HOME', path.join(root, 'app'));
   vi.stubEnv('CODEX_HOME', path.join(root, 'codex'));
   vi.stubEnv('CLAUDE_CONFIG_DIR', path.join(root, 'claude'));
+  vi.stubEnv('GEMINI_HOME', path.join(root, 'gemini'));
   vi.stubEnv('APP_BUNDLED_CODEX_PATH', '');
   vi.stubEnv('APP_CLAUDE_COMMAND', '');
   cli.installed.clear(); cli.installs = 0; cli.fail = false;
@@ -327,6 +328,7 @@ describe('provider onboarding setup', () => {
     expect(reloaded.general.providerHomes).toStrictEqual({
       codex: { isolated: true, shareSkills: true, homePath: path.join(root, 'app/codex-home') },
       claude: { isolated: true, shareSkills: true, homePath: path.join(root, 'app/claude-home') },
+      antigravity: { isolated: true, shareSkills: false, homePath: path.join(root, 'app/antigravity-home') },
     });
     await setup.configure('claude', { isolated: false, shareSkills: true });
     expect(process.env.CLAUDE_CONFIG_DIR).toBe(path.join(root, 'claude'));
@@ -390,7 +392,7 @@ describe('provider onboarding setup', () => {
     await setup.initialize();
     const server = new AppBackendServer({ version: 'test', snapshot, providerSetup: setup });
     const request = (method: string, params?: unknown) => server.handleMessage({ jsonrpc: '2.0', id: 1, method, params });
-    expect(await request('provider/setup/get')).toMatchObject({ result: [expect.objectContaining({ backend: 'codex', installed: true }), expect.objectContaining({ backend: 'claude', installed: false })] });
+    expect(await request('provider/setup/get')).toMatchObject({ result: [expect.objectContaining({ backend: 'codex', installed: true }), expect.objectContaining({ backend: 'claude', installed: false }), expect.objectContaining({ backend: 'antigravity', installed: false })] });
     expect(cli.installs).toBe(0);
     expect(await request('provider/refresh', { backend: 'claude' })).toMatchObject({ result: { backend: 'claude', installed: false } });
     cli.installed.add('claude');

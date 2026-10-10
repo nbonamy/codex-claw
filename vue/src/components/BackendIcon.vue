@@ -11,6 +11,7 @@ const props = defineProps<{ backend: AgentBackend; monochrome?: boolean }>();
 const icons = {
   codex: new URL('../shared/icons/chatgpt-icon.svg', import.meta.url).href,
   claude: new URL('../shared/icons/claude-code-icon.svg', import.meta.url).href,
+  antigravity: new URL('../shared/icons/antigravity-icon.svg', import.meta.url).href,
 };
 const source = computed(() => icons[props.backend]);
 const maskStyle = computed(() => ({ maskImage: `url(${JSON.stringify(source.value)})` }));

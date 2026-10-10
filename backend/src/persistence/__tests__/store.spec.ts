@@ -41,7 +41,7 @@ describe('AppStateStore', () => {
     const roster = await readJson('roster.json');
     roster.schemaVersion = schemaVersion;
     const unknown = { id: 'future-agent', name: null, folder: '/future', createdAt: '2026-10-09',
-      engine: { kind: 'antigravity', session: { opaque: ['future-session'] },
+      engine: { kind: 'future-provider', session: { opaque: ['future-session'] },
         settings: { model: 'gemini-3.6-flash-low', permissionMode: 'auto_edit' }, extra: true },
       futureField: { untouched: true } };
     (roster.data.agents as unknown[]).splice(1, 0, unknown);
@@ -86,7 +86,7 @@ describe('AppStateStore', () => {
     await new AppStateStore(home).save(snapshot);
     const roster = await readJson('roster.json');
     const agents = roster.data.agents as Array<{ id: string; engine: unknown }>;
-    const unknownA = { ...agents[0]!, id: 'unknown-a', engine: { kind: 'antigravity' } };
+    const unknownA = { ...agents[0]!, id: 'unknown-a', engine: { kind: 'future-alpha' } };
     const unknownB = { ...unknownA, id: 'unknown-b', engine: { kind: 'future-provider' } };
     agents.push(unknownA, unknownB);
     const teams = roster.data.teams as Array<{ id: string; agentIds: string[] }>;
@@ -115,6 +115,7 @@ describe('AppStateStore', () => {
   it.each([
     { kind: 'codex', session: { threadId: 123 } },
     { kind: 'claude', session: { sessionId: 'session', transport: 'invalid' } },
+    { kind: 'antigravity', session: { sessionId: 123 } },
     {},
   ])('still refuses corrupt engine data: %j', async engine => {
     await new AppStateStore(home).save(createInitialSnapshot());

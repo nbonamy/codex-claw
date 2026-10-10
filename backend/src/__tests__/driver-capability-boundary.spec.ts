@@ -3,7 +3,7 @@ import type { AgentBackendDriver } from '@workspace/core/backend-driver';
 import type { Agent } from '@workspace/core/contracts';
 import { claudeBackendCapabilities } from '@workspace/core/backend-capabilities';
 import { backendMethods } from '@workspace/core/backend-protocol/methods';
-import { BackendDriverRpc } from '../driver-rpc';
+import { BackendDriverRpc, createBackendDriver } from '../driver-rpc';
 
 const agent: Agent = { id: 'limited', name: 'Limited', folder: '/repo', backend: 'claude', status: { type: 'idle' }, createdAt: '', updatedAt: '' };
 
@@ -18,6 +18,13 @@ function fixture() {
 }
 
 describe('unified driver capability boundary', () => {
+  it('selects the Antigravity host explicitly and never creates Codex as a fallback', async () => {
+    const driver = createBackendDriver('antigravity');
+    try {
+      expect(driver.backend).toBe('antigravity');
+      expect(driver.getCapabilities({ ...agent, backend: 'antigravity' })).toMatchObject({ goals: false, conversationFork: false });
+    } finally { await driver.close(); }
+  });
   it.each([
     [backendMethods.driverTextGenerate, { prompt: 'draft', cwd: '/repo' }],
     [backendMethods.driverConversationReplaceWithSummary, {}],

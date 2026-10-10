@@ -194,7 +194,7 @@ function sameConversationRef(left: BackendConversationRef, right: BackendConvers
   return left.backend === right.backend && (
     left.backend === 'codex'
       ? right.backend === 'codex' && left.threadId === right.threadId
-      : right.backend === 'claude' && left.folder === right.folder && left.sessionId === right.sessionId
+      : right.backend === left.backend && left.folder === right.folder && left.sessionId === right.sessionId
   );
 }
 
@@ -204,6 +204,7 @@ function isBackendSession(value: unknown): value is BackendSession {
   if (session.kind === 'codex') {
     return typeof session.threadId === 'string' && session.threadId.trim().length > 0;
   }
+  if (session.kind === 'antigravity') return typeof session.sessionId === 'string' && session.sessionId.trim().length > 0;
   return session.kind === 'claude' &&
     typeof session.sessionId === 'string' &&
     session.sessionId.trim().length > 0 &&

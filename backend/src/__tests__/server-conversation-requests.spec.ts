@@ -510,15 +510,13 @@ describe('AppBackendServer', () => {
       type: 'agent.statusChanged',
       payload: { type: 'idle' },
     });
-    await flushMicrotasks();
-    await flushMicrotasks();
-    await flushMicrotasks();
-
-    expect(snapshot.queuedPrompts).toHaveLength(1);
-    expect(snapshot.queuedPrompts?.[0]).toMatchObject({
-      text: 'retry safely',
-      attempts: 1,
-      lastError: 'transport disconnected',
+    await vi.waitFor(() => {
+      expect(snapshot.queuedPrompts).toHaveLength(1);
+      expect(snapshot.queuedPrompts?.[0]).toMatchObject({
+        text: 'retry safely',
+        attempts: 1,
+        lastError: 'transport disconnected',
+      });
     });
     expect(snapshot.agents[0]?.status).toStrictEqual({ type: 'error', message: 'transport disconnected' });
     await vi.runOnlyPendingTimersAsync();

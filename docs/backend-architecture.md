@@ -1,8 +1,8 @@
 # Backend Architecture
 
 `daemon` is the Korus product backend: a separate Node process that orchestrates
-Codex app-server, Claude Code, the Korus MCP server, git, files, automations, work
-integrations and persistent state behind one app-owned protocol. It is not a
+Codex app-server, Claude Code, Antigravity ACP, the Korus MCP server, git, files,
+automations, work integrations and persistent state behind one app-owned protocol. It is not a
 replacement for Codex app-server. Ownership rules live in
 [architecture.md](architecture.md); message contracts in [protocol.md](protocol.md).
 
@@ -47,6 +47,31 @@ log and socket paths, npm scripts and launchd labels stay brand-neutral.
   user messages.
 - Agent creation (protocol, MCP delegation, independent review) goes through one
   `AgentCreationService`; callers only adapt their input.
+
+## Antigravity
+
+`backend/src/antigravity` detects the externally installed ACP runtime/harness and
+owns OAuth observations and the provider replica; the agy CLI is not the
+execution path. OAuth renewal stays native, background checks suppress login UI,
+and child environments sanitize Google credentials/projects with isolated
+`GEMINI_HOME` and temporary storage. Home routing is not a filesystem sandbox.
+Korus provides installation instructions and rechecks availability; it never
+downloads the runtime. Discovery accepts the paired executables on PATH, explicit
+runtime/harness environment paths, or an existing versioned runtime directory.
+
+Each agent owns a process/session with serialized prompts and bounded cancellation.
+Cold replay validates session identity and rebuilds atomically: replay tool IDs
+differ and later updates may reverse tool status. Unknown timestamps stay absent;
+the private prompt journal preserves presentation metadata, never a second transcript.
+Session MCP identity/review scope travels in bridge child environments under
+`product.mcpServerName`, never shared configuration. Auxiliary generation uses a
+separate session with MCP, built-ins and client filesystem requests disabled.
+
+Native catalogs remain authoritative; Korus never impersonates an allowlisted
+editor to expose third-party models. Native plan artifacts feed app-owned review,
+with implementation in a separate accepted turn. [The plan](../plans/antigravity.md)
+records transport evidence, model restrictions, attachment support and unsupported
+capabilities.
 
 ## Transports
 

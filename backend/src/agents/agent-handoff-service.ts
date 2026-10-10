@@ -4,6 +4,7 @@ import { agentHandoffBlocker, handoffInProgress, handoffNoteLimit, type AgentHan
 import { conversationRefFromAgent } from '@workspace/core/conversation-ref';
 import { resolveAgentBackend } from '@workspace/core/agent-backends';
 import { closeAgentInSnapshot } from '@workspace/core/agent-manager';
+import { backendDisplayName } from '@workspace/core/backend-driver';
 
 type Options = {
   snapshot: AppSnapshot;
@@ -114,7 +115,7 @@ export class AgentHandoffService {
 
 function notePrompt(input: AgentHandoffInput): string {
   return [
-    `The user is handing this work to a new ${input.backend === 'claude' ? 'Claude' : 'Codex'} agent in the same workspace.`,
+    `The user is handing this work to a new ${backendDisplayName(input.backend)} agent in the same workspace.`,
     'Write a self-contained handoff note as your final response, under 32,000 characters.',
     'Include the objective, user constraints and decisions, completed changes, verification evidence, relevant files, unfinished work, and the next action.',
     'Distinguish observed results from assumptions. Do not include secrets.',

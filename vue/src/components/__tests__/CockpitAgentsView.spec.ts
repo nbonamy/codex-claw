@@ -5,6 +5,29 @@ import { createInitialSnapshot } from '@workspace/core/snapshot';
 import CockpitAgentsView from '../CockpitAgentsView.vue';
 
 describe('CockpitAgentsView', () => {
+  it('keeps unwired session controls disabled in the Cockpit while routing restart', async () => {
+    const snapshot = createInitialSnapshot();
+    const agent = snapshot.agents[0]!;
+    agent.backend = 'antigravity';
+    agent.backendSession = { kind: 'antigravity', sessionId: 'native-session' };
+    const wrapper = mount(CockpitAgentsView, {
+      props: { agents: [agent], teams: snapshot.teams },
+      global: { stubs: { Teleport: true } },
+    });
+    try {
+      await wrapper.get('.cockpit-view__agent-card').trigger('contextmenu');
+      const items = wrapper.findAll('[role="menuitem"]');
+      for (const label of ['Compact Session', 'Resume Session']) {
+        const item = items.find(item => item.text().startsWith(label))!;
+        expect(item.attributes()).toHaveProperty('disabled');
+        await item.trigger('click');
+      }
+      expect(wrapper.emitted('restart-agent')).toBeUndefined();
+      await items.find(item => item.text() === 'Restart Agent')!.trigger('click');
+      expect(wrapper.emitted('restart-agent')).toStrictEqual([[agent.id]]);
+    } finally { wrapper.unmount(); }
+  });
+
   it('restores the team-grouped agent Cockpit and routes agent selection', async () => {
     const snapshot = createInitialSnapshot();
     const wrapper = mount(CockpitAgentsView, {

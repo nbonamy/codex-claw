@@ -387,10 +387,12 @@ native capabilities.
 - A normal end-turn response is likewise not enough to classify overlapping
   prompts as supported steering. The live stream contained an explicit connection
   error even though both prompt calls eventually returned end-turn.
-- PDF resource links read files on the provider host. Korus must resolve trusted
-  attachment references and transfer remote-host files through its existing
-  attachment boundary; never accept arbitrary renderer paths or assume a Mac
-  file URL exists on a remote daemon.
+- PDF resource links read files on the provider host. Korus resolves trusted
+  local desktop references through its registry. Implementation audit found no
+  existing remote transfer or Web upload/registry seam: the earlier plan overstated
+  that boundary. Per delegating-agent direction, those attachments stay unavailable
+  and are rejected before dispatch. A general transfer system is a separate follow-up;
+  never accept arbitrary renderer paths or assume a Mac URL exists remotely.
 - Independent assertions passed for exact image/audio/text/PDF/skill fixture
   results, PDF-blob rejection, absent-method responses, the concurrent-prompt
   failure, ordered review-tool ledger counts (1 then 0), executable corrected
@@ -446,48 +448,197 @@ Antigravity surface.
 
 ### Phase 1: contracts and lifecycle
 
+Implementation complete for review (2026-10-06): added Antigravity identity/session/default
+contracts, persisted generic preferences and disk schema, with creation/switch and
+disk-roundtrip regressions. Unavailable driver creation fails explicitly; default
+capabilities and commands do not inherit Codex features. Lifecycle registration,
+native authentication and all applicable admission paths are implemented.
+
+Validation so far: all five workspace tests plus script tests passed after refreshing
+the installed SDK build; affected contract/persistence tests and typechecks passed.
+This is foundation work, not shipped Antigravity support.
+
+Lifecycle foundation: externally installed paired-runtime discovery,
+private home and native skills links, sanitized process environment, and provider-owned
+OAuth checks. Native fresh-profile probing confirmed background authentication
+detects a missing login without opening a browser. Credentials remain exclusively
+owned by Google's runtime. Login expiry was not induced.
+The actual installer downloaded and checksum-verified the paired macOS ARM64
+archive into a fresh temporary APP_HOME; that installation initialized as ACP
+1.3.0/protocol 2. Authentication cancellation during startup and disconnected
+Settings retry now have regression coverage without changing enablement.
+
 - [x] Qualify ACP for the measured text/permissions/MCP/history/cancellation scope.
-- [ ] Extend backend/session/default/auth unions and all owning runtime decoders.
-- [ ] Extend generic settings normalization, connected choices, and remembered
+- [x] Extend backend/session/default/auth unions and all owning runtime decoders.
+- [x] Extend generic settings normalization, connected choices, and remembered
   selections without silently falling back from an explicitly selected provider.
-- [ ] Register discovery, installation, configured home, and connection observation.
-- [ ] Add contract tests for roundtrip persistence, unavailable-provider rejection,
+- [x] Register discovery, external installation instructions, configured home, and connection observation. Korus never downloads ACP binaries; setup and refresh only observe the installed pair.
+- [x] Add contract tests for roundtrip persistence, unavailable-provider rejection,
   disconnected retry, and cross-provider default isolation in this same milestone.
 
 ### Phase 2: selected transport and a minimal conversation slice
 
-- [ ] Spawn the qualified ACP runtime without a shell; implement request/response,
+Transport implemented: duplex JSONL framing handles colliding inbound
+request IDs, split frames, bounded buffers, EOF and request timeouts. Deterministic
+tests launch a real child process that supplies sanitized ACP shapes. A fresh-home
+initialization using the qualified native runtime reported protocol 2, version 1.3.0
+and loadSession support. The provider host now streams its own revisioned replica,
+handles native approvals/questions and cancellation, and atomically rebuilds history.
+Native prompt completion and cold replay passed using the qualified runtime and
+the existing probe login in place. Full workspace tests/typechecks passed. Scoped
+MCP bridge tests prove two child environments stay separate. Actual review/Mission
+services now have workflow tests with only the external provider boundary faked.
+
+- [x] Spawn the qualified ACP runtime without a shell; implement request/response,
   notification framing, bounded buffering, session routing and process cleanup.
-- [ ] Implement proven prompt/resume/load semantics, permission responses and
+- [x] Implement proven prompt/resume/load semantics, permission responses and
   native cancellation with bounded teardown fallback.
-- [ ] Surface tool denials, protocol errors and unexpected exit. CLI-specific
+- [x] Pre-authorize the session-supplied Korus MCP server using native MCP metadata
+  and exact allow-once option IDs; preserve questions, built-in and hosted-server
+  approvals, session identity checks and tool-free generation restrictions.
+- [x] Surface tool denials, protocol errors and unexpected exit. CLI-specific
   `denied_actions` handling applies only if a CLI fallback is explicitly chosen.
-- [ ] Add transport-boundary tests with captured sanitized protocol shapes;
+- [x] Add transport-boundary tests with captured sanitized protocol shapes;
   test success, denial, split lines, EOF, interruption and stale completion races.
 
 ### Phase 3: provider host, history and collaboration
 
-- [ ] Implement the provider-owned host/replica and bounded revisioned transport.
-- [ ] Hydrate through native `session/load`, rebuild the provider replica atomically
+History now validates native catalog session/cwd identity before replay, including
+canonical paths, and exposes folder-scoped listing and cross-provider history reads.
+Real CodeReviewService and scoped HTTP MCP tests run through the actual stdio bridge
+with an external ACP fixture: one finding, remediation with evidence, clean second
+round, and disposal. Two regular bridges update only their own same-repository agents.
+Mission workflow tests exercise worker reuse, stage acceptance and restored evidence;
+Antigravity does not receive a synthetic `/compact` between tickets. Automation and
+worktree delegation tests retain the selected provider and isolated session.
+Native two-agent Korus MCP identity and approval isolation passed with ACP 1.3.0
+and Gemini 3.8 Flash Low. Native CodeReviewService also completed finding counts
+`[1, 0]`, remediation with validation evidence, and reviewer disposal in a disposable
+repository. Mission, automation and delegation workflow evidence remains fixture-backed.
+
+- [x] Implement the provider-owned host/replica and bounded revisioned transport.
+- [x] Hydrate through native `session/load`, rebuild the provider replica atomically
   despite changed replay tool IDs, and validate session identity; prove reload
   does not lose or duplicate streamed messages or re-execute tools.
-- [ ] Add safely scoped MCP configuration and normal/review-session tool discovery.
-- [ ] Verify two agents sharing a workspace retain separate MCP identities and
+- [x] Add safely scoped MCP configuration and normal/review-session tool discovery.
+- [x] Verify two agents sharing a workspace retain separate MCP identities and
   sessions; test reconnection and credential/config cleanup at the owning seam.
-- [ ] Enable reviews/Missions only after their required MCP and lifecycle
+- [x] Enable reviews/Missions only after their required MCP and lifecycle
   contracts work, including review round completion and session disposal.
 
 ### Phase 4: UI and capability hardening
 
-- [ ] Add backend icon, settings panel/navigation/i18n, conversation binding and
+Settings/onboarding/navigation, icon, native authentication actions, provider
+replica binding and model selection are implemented with mounted tests. The
+isolated branch Web client/daemon loaded the native model catalog and connected
+account state. Trusted desktop attachments now map to native images, WAV,
+embedded text and PDF resource links. Web and remote attachments reject before
+dispatch because those clients do not yet have trusted ingestion/transfer.
+Provider-owned prompt metadata preserves the original prompt and attachment
+chips during cold native replay without storing a second transcript.
+
+Native `/plan` now feeds Korus's existing preview/confirmation flow. Mounted
+confirmation and daemon acceptance tests cover the transition to a separate
+implementation turn. Live host probes read synthetic image/WAV/PDF/text inputs;
+an approved PLAN.md write exactly matched the preview and left the source file
+unchanged. A denied plan write surfaced honestly. Full typechecks/lint and all
+five unchanged statement coverage gates passed (core 85.69%, backend 86.83%,
+Vue 87.71%, Electron 85.04%, Web 95.93%). Native collaboration and the branch
+Web flow are documented in the checkpoint below.
+
+- [x] Add backend icon, settings panel/navigation/i18n, conversation binding and
   model/effort options; reuse creation dialogs and shared controls.
-- [ ] Map the assessed capability matrix explicitly: native goals, steering,
+- [x] Map the assessed capability matrix explicitly: native goals, steering,
   forks and historical turn mutations stay disabled; enable measured attachments,
   approvals and adapted planning. Test the Korus plan preview/confirmation flow
   against native artifact writes and question choices before advertising it.
-- [ ] Mount representative selection, Settings, permission-denial and restart
+- [x] Mount representative selection, Settings, permission-denial and restart
   flows. Verify persisted choices and unsupported-control behavior through UI.
-- [ ] Exercise the actual provider boundary and one desktop/Web consumer flow.
+- [x] Exercise the actual provider boundary and one desktop/Web consumer flow.
+
+### Native verification checkpoint
+
+Native two-agent **Korus** MCP identity passed using the production host and MCP
+service, separate same-cwd sessions, and Gemini 3.8 Flash Low. Both default and
+auto-edit sessions completed `set-status` and `finish_turn` without UI approvals;
+a terminal command still required approval and was denied. Evidence:
+`$TMPDIR/korus-acp-trust-oaCfYd/proof.json`.
+
+Native **CodeReviewService**, real ReviewGit and scoped HTTP/stdio MCP passed
+against commit `cf06878b`, qualified ACP 1.3.0/protocol 2, and catalog-selected
+`gemini-3.8-flash-low`. A disposable addition fixture produced one finding, a native
+file edit, recorded remediation evidence with a passing unchanged Node test,
+and a clean second round (`[1, 0]`). The reviewer and scoped context were disposed,
+review sessions were absent from user history, and `autoCommit:false` preserved HEAD.
+Korus MCP calls required no UI approvals; fixture commands and file edits did.
+Evidence: `$TMPDIR/korus-acp-native-review-UqAnN2/{proof,success}.json`.
+An initial probe denied the edit because its approval handler omitted native
+`target_file`; the real service paused with the unresolved finding. Correcting only
+the scratch handler and rerunning in a fresh repository passed. No account change,
+credential extraction, application restart or production code fix was needed.
+
+Native cancellation through our session produced `interrupted`, followed by a
+completed quota-message turn in the same still-open process. This proves recovery
+of the protocol, not successful model work after cancellation. A separate branch
+Web session did return `WEB_NATIVE_PROOF`; its original user prompt and one
+assistant reply survived reload. Submission used the public WebSocket operation;
+the real browser DOM verified rendering. Restarting only the owned preview
+daemon proved cold native history hydration with no duplicate/lost messages.
+ACP supplies no original replay timestamps; these now remain absent instead of
+showing the reload time. The browser typing tool does
+not support the contenteditable composer and screenshot capture timed out, so
+neither physical typing nor screenshot verification is claimed. Settings showed
+the native account/catalog and rejected disabling the last available engine.
+An actual Web attachment request failed before dispatch with the trusted-upload
+explanation.
+
+Final automated gates: `npm run test:ai` passed all five workspaces (3,368
+Vitest tests) and 15 script tests. `npm run lint` passed architecture, all
+workspace typechecks, CSS, i18n and dead-code checks. `npm run test:coverage`
+passed every unchanged 85% statement gate; backend coverage was rerun after
+the final auth/replay fixes. Final statements: core **85.69%**, backend
+**87.08%**, Vue **87.71%**, Electron **85.04%**, Web **95.93%**. The branch Web
+build and final backend build passed. No signed package/release was attempted.
+
+The user's native-picker screenshot includes GPT-OSS 120B (Medium). A source audit
+of the **qualified runtime** explains why Korus does not: `acp_server/model_selection.py`
+allows third-party models only for client identities JetBrains, Zed and Xcode,
+then removes non-`gemini` IDs for everyone else. `client_info.py` has no general
+capability opt-in. Korus does not impersonate an editor or hardcode unavailable
+models. Its catalog pass-through test includes a synthetic GPT-OSS entry to
+ensure it will display one when the native contract supplies it. This requires
+an upstream-supported change before GPT-OSS can be advertised for Korus.
+
+Native verification procedure (two-agent MCP and CodeReviewService passed):
+
+1. Keep this worktree checked out and use an isolated scratch repository and
+   APP_HOME. Revalidate paired ACP 1.3.0/protocol 2; use the user's native login
+   in place or request a fresh native login. Never copy/read credential files.
+2. Bundle the production `AntigravityHost`, `AcpSession`, `AppMcpService`,
+   `CodeReviewService`, `AgentCreationService` and `createEmptySnapshot` with Vite
+   SSR (`ssr.noExternal: true`). The optional current entry and runners are
+   `/tmp/korus-acp-review-native-entry.ts`, `/tmp/korus-acp-native-app-proof.mjs`
+   and `/tmp/korus-acp-review-native-run.mjs`; these are evidence helpers,
+   never production dependencies. Regenerate them from the service wiring in
+   `backend/src/antigravity/__tests__/session.spec.ts` if scratch files expire.
+3. Run the MCP runner with two same-cwd agents and the actual AppMcpService URL.
+   Their session-supplied Korus MCP calls must not create approval requests.
+   A built-in command must still require approval; deny it.
+   Require distinct session IDs and both distinct status markers on the correct
+   agent records. A completed ACP response alone is insufficient.
+4. Give the review runner a **new** scratch directory each run. Initialize a
+   disposable Git repo with `add(a,b) = a+b` and a Node test, commit its baseline,
+   then change the implementation to subtraction. Use real CodeReviewService,
+   ReviewGit and the scoped MCP bridge with `autoCommit:false`. Approve only
+   fixture reads/test commands and the fixture-file edit; scoped Korus review
+   ledger calls are pre-authorized. Require finding counts `[1,0]`, remediation
+   evidence, passing unchanged Node test, reviewer/context disposal and hidden
+   ephemeral history. Native edit approval uses `rawInput.target_file`; approve only
+   the fixture source. Stop on quota rather than retrying or changing accounts.
+   Capture synthetic results without credentials.
+5. Keep the deterministic review/Mission/delegation/automation workflow tests
+   green; report native results separately. Remote/Web attachment transfer and
+   the upstream third-party model gate remain separate follow-ups.
 
 ## Verification and commit checkpoints
 
@@ -524,3 +675,41 @@ Phase 0 learnings:
 - Stable session IDs do not imply stable tool IDs across cold history replay.
 - Keep feasibility failures visible instead of replacing them with prompt-based
   imitations or unapproved API billing. No production feature code changed here.
+
+Implementation learnings:
+
+- Native workflow probes must approve captured argument shapes (`target_file` for
+  client edits), while restricting writes to the disposable source fixture. A denied
+  edit should pause the real review ledger; assistant completion cannot imply a fix.
+- Exercise session actions through the client and provider together: detach must
+  evict the old frame, catalog reads must await history adoption, and adapter
+  resume parameters must preserve the daemon's target contract. Gate compact
+  actions by the provider command catalog and disable unwired menu entries.
+- Trust native MCP metadata only when the daemon supplied that server to the
+  session. Selecting each call's exact allow-once option avoids broad native
+  allow-always caching; cancellation must reject later permission requests.
+- Antigravity uses ordinary installation, authentication and enablement admission;
+  its temporary developer release gate is removed. Native proof limitations remain
+  tracked independently of availability. Historical release-gate verification:
+  all 3,375 workspace tests and 15 script tests,
+  full lint/typechecks, Web build, and all-workspace coverage passed (statements:
+  core 85.66%, backend 87.10%, Vue 87.71%, Electron 85.04%, Web 95.93%).
+  An isolated branch Web preview showed only Codex/Claude onboarding and working
+  Codex customization. Its public WebSocket setup/connection operations omitted
+  Antigravity and rejected explicit enablement with the build-unavailable error.
+
+- Exercise the full provider-to-app boundary early. Native model generation,
+  MCP discovery, permission to invoke an MCP tool, and app-ledger completion
+  are separate assertions; an ACP `end_turn` proves none of the latter three.
+- Preserve app prompt presentation metadata beside native history rather than
+  persisting a competing transcript. Native replay can use different tool IDs
+  and include injected instructions or flattened attachment contents.
+- Test the external wire shapes with a real child process and run real owning
+  app services around it. This catches bidirectional ID collisions, teardown,
+  workflow completion and caller isolation without replacing production logic.
+- Treat the native catalog as authoritative. A desktop model picker and a
+  provider's shared model enum do not prove that an identified ACP client is
+  offered that model; audit client capability/identity gates explicitly.
+- Keep source-audited and fixture-backed behavior separate from native proof,
+  especially when subscription limits interrupt a live test. Preserve the
+  exact failed acceptance action and its rerun procedure rather than relaxing it.

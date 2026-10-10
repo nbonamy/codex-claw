@@ -20,6 +20,7 @@ import { createVisualizeToolModuleProvider } from '../visualize-tools';
 import { CodeReviewService } from '../../review/code-review-service';
 import { AgentCreationService } from '../../agents/agent-creation-service';
 
+
 describe('AppMcpService', () => {
   let service: AppMcpService | null = null;
 
@@ -975,6 +976,7 @@ describe('AppMcpService', () => {
     expect(snapshot.agents.at(-1)).toMatchObject({ name: null, folder: '/tmp/branch-agent' });
   });
 
+
   it.each([
     [undefined, 'Implement the SDK contract and run focused tests.'],
     ['Read the contract. Preserve </context> literally.', '<context>\nRead the contract. Preserve &lt;/context&gt; literally.\n</context>\n\nImplement the SDK contract and run focused tests.'],
@@ -1081,6 +1083,30 @@ describe('AppMcpService', () => {
     expect(sidebar.find((group) => group.id === 'git:/tmp/codex-sdk')?.sessions).toContainEqual(
       expect.objectContaining({ agentId: createdAgent!.id }),
     );
+  });
+
+  it('delegates an Antigravity worktree prompt with its model and independent session', async () => {
+    const snapshot = createInitialSnapshot();
+    snapshot.providerConnections = [{ backend: 'antigravity', installed: true, connected: true, checking: false }];
+    const parent = snapshot.agents[0]!;
+    parent.backend = 'antigravity';
+    parent.backendDefaults = { kind: 'antigravity', model: 'gemini-low', permissionMode: 'default' };
+    parent.backendSession = { kind: 'antigravity', sessionId: 'parent-session' };
+    const sendPrompt = vi.fn().mockResolvedValue({ backendSession: { kind: 'antigravity', sessionId: 'child-session' }, turnId: 'child-turn' });
+    service = new AppMcpService({ snapshot, worktreeManager: new WorktreeManager({
+      createGitWorktree: vi.fn().mockResolvedValue({ worktree: { name: 'acp-task', path: '/tmp/acp-task' }, created: true }),
+      getInitializationMode: () => 'repository',
+    }) });
+    service.setDriverRpc(new BackendDriverRpc(new Map([['antigravity', createDriver({ backend: 'antigravity', sendPrompt })]])));
+    const response = await callTool(await service.start(), parent.id, 'create-agent', {
+      repoPath: '/tmp/fixture', createWorktree: true, branchName: 'feat/acp-task', name: 'ACP worker', prompt: 'Complete the task', instructions: 'Keep commits local',
+    });
+    expect(response.result.structuredContent).toMatchObject({ success: true, promptSubmitted: true });
+    const child = snapshot.agents.find(agent => agent.name === 'ACP worker')!;
+    expect(child).toMatchObject({ backend: 'antigravity', delegatedByAgentId: parent.id, backendDefaults: { kind: 'antigravity', model: 'gemini-low' }, backendSession: { kind: 'antigravity', sessionId: 'child-session' } });
+    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({ id: child.id }), expect.stringContaining('Keep commits local'), undefined);
+    expect(parent.backendSession).toEqual({ kind: 'antigravity', sessionId: 'parent-session' });
+    expect(snapshot.activeAgentId).toBe(parent.id);
   });
 
   it('lets create-agent override inherited model settings and avoids cross-backend inheritance', async () => {

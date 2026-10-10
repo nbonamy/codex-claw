@@ -161,6 +161,7 @@ export function createClientApiMock(
     getProviderUsage: unscripted('getProviderUsage'),
     setProviderEnabled: unscripted('setProviderEnabled'),
     disconnectProvider: unscripted('disconnectProvider'),
+    authenticateProvider: unscripted('authenticateProvider'),
     configureProviderSetup: unscripted('configureProviderSetup'),
     refreshProvider: unscripted('refreshProvider'),
     cancelCodexChatGptLogin: unscripted('cancelCodexChatGptLogin'),

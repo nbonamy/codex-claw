@@ -28,7 +28,7 @@ import FormRow from '../shared/form/FormRow.vue';
 import { RefreshIcon } from '../shared/icons/app-icons';
 import { providerUpdatePreviewKey } from './provider-update-preview';
 
-const props = defineProps<{ backend: AgentBackend; remoteConnectionId?: string }>();
+const props = defineProps<{ backend: Exclude<AgentBackend, 'antigravity'>; remoteConnectionId?: string }>();
 const preview = inject(providerUpdatePreviewKey, ref(false));
 const { t } = useI18n();
 const state = ref<ProviderUpdateStatus>();

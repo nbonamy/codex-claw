@@ -4,6 +4,7 @@ import { previewAgentFolderFile } from './agent-files';
 import { backendHomeDir } from './state';
 import type { DocumentWorkspaceChange, DocumentSaveInput } from '@workspace/core/document-workspace';
 import { isWorkProviderKind } from '@workspace/core/work-providers';
+import { isAgentBackend } from '@workspace/core/contracts/shared';
 import { product } from '@workspace/core/product';
 import { normalizeGitSettings } from '@workspace/core/git-preferences';
 import { readWorktreeHead } from './git-worktrees';
@@ -611,7 +612,7 @@ export class AppBackendServer {
     return resolveAgentBackend(this.snapshot, backend);
   }
 
-  private async authenticateProvider(backend: Agent['backend'], action: 'check' | 'cancel' | 'logout' = 'check', loginId?: string): Promise<ProviderAuthentication> {
+  private async authenticateProvider(backend: Agent['backend'], action: 'check' | 'cancel' | 'logout' | 'login' = 'check', loginId?: string): Promise<ProviderAuthentication> {
     return await this.requireDriverRpc().handle(backendMethods.driverProviderAuthentication, { backend, action, ...(loginId ? { loginId } : {}) }) as ProviderAuthentication;
   }
 
@@ -680,7 +681,7 @@ export class AppBackendServer {
     const creation: { id?: string } = {};
     const startsWork = createsAgent || [backendMethods.agentPromptSend, backendMethods.agentPromptSteer,
       backendMethods.agentUpdate, backendMethods.sourceWorktreeCreate, backendMethods.missionExecute].some(method => method === message.method);
-    if (startsWork && this.providerConnections) {
+    if (startsWork) {
       const effectiveParams = isRecord(request.params) ? request.params : {};
       const input = isRecord(effectiveParams.input) ? effectiveParams.input : {};
       const agent = (before ?? this.remoteTeams.clientSnapshotFromKnownRemotes()).agents.find(candidate => candidate.id === (params?.agentId ?? input.id));
@@ -688,8 +689,8 @@ export class AppBackendServer {
       const remote = params?.remoteConnectionId || input.remoteConnectionId || this.snapshot.teams.find(team => team.id === teamId)?.remoteConnectionId;
       if (!remote && (message.method !== backendMethods.agentUpdate || input.backend !== undefined)) {
         try {
-          const requested = input.backend === 'codex' || input.backend === 'claude' ? input.backend : agent?.backend;
-          await this.requireConnectedEngine(requested);
+          const requested = isAgentBackend(input.backend) ? input.backend : agent?.backend;
+          if (this.providerConnections) await this.requireConnectedEngine(requested);
         } catch (error) {
           return createAppRpcError(message.id, appRpcErrorCodes.invalidParams, error instanceof Error ? error.message : String(error));
         }
@@ -1206,7 +1207,7 @@ export class AppBackendServer {
         const agentId = requireString(params.agentId, 'agentId');
         const value = requireRecord(params.input);
         const operationId = requireString(value.operationId, 'operationId');
-        if (!operationId.trim() || operationId.length > 128 || !['codex', 'claude'].includes(String(value.backend))) throw new Error('Invalid handoff request.');
+        if (!operationId.trim() || operationId.length > 128 || !isAgentBackend(value.backend)) throw new Error('Invalid handoff request.');
         if (value.instructions !== undefined && (typeof value.instructions !== 'string' || value.instructions.length > 4000)) throw new Error('Handoff instructions must be at most 4,000 characters.');
         const input: AgentHandoffInput = {
           operationId, backend: value.backend as Agent['backend'],
@@ -1421,7 +1422,7 @@ export class AppBackendServer {
       case backendMethods.agentModelsList: {
         const agentId = requireAgentId(message.params);
         const backend = requireRecord(message.params).backend;
-        if (backend !== undefined && backend !== 'codex' && backend !== 'claude') throw new Error('Invalid model provider.');
+        if (backend !== undefined && !isAgentBackend(backend)) throw new Error('Invalid model provider.');
         return this.routeAgentResultRequest(message.id, agentId, backendMethods.agentModelsList, { agentId, ...(backend ? { backend } : {}) }, (agent) => {
           const modelAgent = backend ? { ...agent, backend: resolveAgentBackend(this.snapshot, backend), backendSession: undefined, backendDefaults: undefined } : agent;
           return this.handleAgentDriverRequest(modelAgent, backendMethods.driverModelsList, { agent: modelAgent });
@@ -2128,6 +2129,15 @@ export class AppBackendServer {
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         return createAppRpcResult(message.id, this.providerSetup.list());
       }
+      case backendMethods.providerAuthenticate: {
+        const params = requireRecord(message.params);
+        const backend = requireAgentBackend(params.backend);
+        if (backend !== 'antigravity' || (params.action !== 'login' && params.action !== 'cancel')) throw new Error('Unsupported native authentication action.');
+        const authentication = await this.authenticateProvider(backend, params.action);
+        this.providerConnections?.observe(backend, authentication.connected, authentication);
+        await this.persistAndEmitSnapshot();
+        return createAppRpcResult(message.id, authentication);
+      }
       case backendMethods.providerUpdateGet:
       case backendMethods.providerUpdateSet: {
         const params = requireRecord(message.params);
@@ -2160,7 +2170,7 @@ export class AppBackendServer {
       }
       case backendMethods.providerEnabledSet: {
         const input = requireRecord(message.params);
-        if ((input.backend !== 'codex' && input.backend !== 'claude') || typeof input.enabled !== 'boolean') throw new Error('Invalid engine availability setting.');
+        if ((!isAgentBackend(input.backend)) || typeof input.enabled !== 'boolean') throw new Error('Invalid engine availability setting.');
         const connectionId = requireOptionalConnectionId(message.params);
         if (connectionId) {
           const providers = await this.remoteTeams.request(connectionId, message.method, { backend: input.backend, enabled: input.enabled });
@@ -2178,7 +2188,7 @@ export class AppBackendServer {
       }
       case backendMethods.providerUsageGet: {
         const backend = requireRecord(message.params).backend;
-        if (backend !== 'codex' && backend !== 'claude') throw new Error('Unknown provider.');
+        if (!isAgentBackend(backend)) throw new Error('Unknown provider.');
         if (!this.snapshot.providerConnections?.some(item => item.backend === backend && item.installed && item.connected && item.enabled !== false)) return createAppRpcResult(message.id, null);
         const result = await this.requireDriverRpc().handle(backendMethods.driverAccountRateLimitsGet, { backend }) as { supported: boolean; rateLimits?: import('@workspace/core/contracts').AccountRateLimits | null };
         const limits = result.supported ? result.rateLimits ?? null : this.snapshot.backendAccountRateLimits?.[backend] ?? (backend === 'codex' ? this.snapshot.accountRateLimits : undefined) ?? null;
@@ -2198,7 +2208,7 @@ export class AppBackendServer {
           return createAppRpcResult(message.id, providers);
         }
         if (!this.providerConnections) throw new Error('Engine connections are unavailable. Update the backend runtime.');
-        return createAppRpcResult(message.id, await this.providerConnections.refresh());
+        return createAppRpcResult(message.id, await this.providerConnections.refreshDisconnected());
       }
       case backendMethods.providerSetupConfigure:
       case backendMethods.providerRefresh: {
@@ -2210,7 +2220,7 @@ export class AppBackendServer {
         if (!this.providerSetup) throw new Error('Provider setup is unavailable.');
         if (this.options.providerUpdates?.isUpdating()) throw new Error('Wait for the provider upgrade to finish.');
         const input = requireRecord(message.params);
-        if (input.backend !== 'codex' && input.backend !== 'claude') throw new Error('Unknown provider.');
+        if (!isAgentBackend(input.backend)) throw new Error('Unknown provider.');
         let result;
         if (message.method === backendMethods.providerRefresh) result = await this.providerSetup.refresh(input.backend);
         else {
@@ -2698,6 +2708,10 @@ export class AppBackendServer {
         throw new Error('Wait for the handoff to finish.');
       }
       return createAppRpcResult(messageId, await localHandler(route.agent));
+    }
+    if (method === backendMethods.agentPromptSend || method === backendMethods.agentPromptSteer) {
+      const options = requireRecord(params).options as SendPromptOptions | undefined;
+      if (options?.attachments?.length) throw new Error('Remote attachments require a trusted file transfer. Send text or use a local agent.');
     }
     const result = await this.backendHandleForAgentLocation(route).request<AppSnapshot>(method, params, () => localHandler(route.agent));
     const decodedSnapshot = decodeAppSnapshot(result);
@@ -3250,7 +3264,7 @@ function requireQuickChatCreateInput(params: unknown): CreateQuickChatInput {
 }
 
 function requireAgentBackend(value: unknown): Agent['backend'] {
-  if (value !== 'codex' && value !== 'claude') throw new Error('Invalid agent backend.');
+  if (!isAgentBackend(value)) throw new Error('Invalid agent backend.');
   return value;
 }
 
@@ -3772,7 +3786,7 @@ function isBackendConversationRef(value: unknown): value is BackendConversationR
     return typeof candidate.threadId === 'string' && candidate.threadId.trim().length > 0;
   }
 
-  return candidate.backend === 'claude' &&
+  return (candidate.backend === 'claude' || candidate.backend === 'antigravity') &&
     (candidate.folder === null || (typeof candidate.folder === 'string' && candidate.folder.trim().length > 0)) &&
     typeof candidate.sessionId === 'string' &&
     candidate.sessionId.trim().length > 0;

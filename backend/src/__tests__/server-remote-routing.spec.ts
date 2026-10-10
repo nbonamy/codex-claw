@@ -502,6 +502,8 @@ describe('AppBackendServer', () => {
     snapshot.activeTeamId = 'team-pointer';
     snapshot.activeAgentId = 'agent-remote';
     const remoteAgent = createRemoteAgent();
+    remoteAgent.backend = 'antigravity';
+    remoteAgent.backendSession = { kind: 'antigravity', sessionId: 'remote-acp' };
     const remoteSnapshot = createRemoteTeamSnapshot([remoteAgent]);
     const remoteSnapshotAfterPrompt = structuredClone(remoteSnapshot);
     remoteSnapshotAfterPrompt.agents[0]!.status = { type: 'working' };
@@ -564,6 +566,11 @@ describe('AppBackendServer', () => {
       expect.any(Function),
     );
     expect(snapshot.agents).toStrictEqual([]);
+    const dispatched = remoteClients.request.mock.calls.length;
+    await expect(server.handleMessage({ jsonrpc: '2.0', id: 'remote-file', method: 'agent/prompt/send',
+      params: { agentId: 'agent-remote', prompt: 'Inspect', options: { attachments: [{ type: 'file', path: '/local-only.pdf' }] } },
+    })).rejects.toThrow('trusted file transfer');
+    expect(remoteClients.request.mock.calls.length).toBe(dispatched);
   });
 
   it('rejects malformed remote snapshots without adopting them', async () => {

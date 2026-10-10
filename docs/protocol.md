@@ -3,7 +3,7 @@
 The app-owned JSON-RPC 2.0 protocol between clients (Electron main, the web
 adapter, SSH peers) and `daemon`, one JSON message per line over stdio, the local
 Unix socket and SSH stdio. Provider protocols (Codex app-server, Claude stream
-messages, MCP) never cross it.
+messages, Antigravity ACP, MCP) never cross it.
 
 **The catalog is the code.** Methods are in `core/src/backend-protocol/methods.ts`,
 typed params/results in the shared request map, error codes in
@@ -61,8 +61,9 @@ because an app snapshot cannot replace a missed provider completion event.
 Clients ignore unknown event types.
 
 Provider conversations travel as one bounded reset followed by revisioned deltas in
-`codex.conversation*` / `claude.conversation*` frames. Electron forwards them
-unreduced; the renderer rejects stale or gapped revisions and rehydrates.
+`codex.conversation*`, `claude.conversation*` and `antigravity.conversation*` frames.
+Electron forwards them unreduced; clients validate session identity, reject stale
+or gapped revisions and rehydrate through app-owned conversation operations.
 
 Event ingress is untrusted on every transport (stdio, socket, SSH, WebSocket):
 decode the complete typed event before publishing. A malformed notification is
@@ -78,11 +79,16 @@ framing keeps each transport's own error and reconnect policy.
   responses route by agent and request ID, guard concurrent submissions, allow retry
   after transport failure, and are invalidated by release or resolution. An
   untargeted response is accepted only when its request ID is unambiguous.
+  Antigravity native questions/approvals use app-owned answered/decision/cancelled
+  outcomes; clients never interpret ACP frames.
 - **Plan review** persists proposal identity, content and decision status
   (`Agent.planReview`). Replaying a completion never reopens a resolved proposal;
   the response command rejects stale or conflicting decisions, accepts an identical
   one idempotently, and stays pending until prompt acceptance succeeds. Cancel
   submits nothing.
+- **Provider authentication:** `provider/authenticate` routes explicit Antigravity
+  native login/cancellation to the owning daemon. Connection observations remain
+  separate from saved enablement.
 - **Provider usage:** quota events update per-engine state; remote quota stays on
   its owning host. Missing utilization is not zero. `provider/usage/get` returning
   `null` means no subscription quota, not a failure. Authentication metadata on
@@ -90,6 +96,12 @@ framing keeps each transport's own error and reconnect policy.
 - **Reconnect:** a dropped established connection retries the same transport; it
   never starts a fresh bundled daemon (see
   [backend-architecture.md](backend-architecture.md#transports)).
+
+## Attachments
+
+Local desktop registry resolution is the trusted ingestion boundary; renderer paths
+are never provider input. Web prompts reject attachments until trusted upload exists;
+remote prompts reject them before forwarding until trusted transfer exists.
 
 ## Ownership
 

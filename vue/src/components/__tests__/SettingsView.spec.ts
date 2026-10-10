@@ -9,6 +9,31 @@ import { configureAppClient } from '../../platform-api';
 import { setElectronTestClient } from '../../test/client';
 
 describe('SettingsView', () => {
+  it('uses daemon availability for gated settings and falls back from a saved unavailable tab', async () => {
+    setElectronTestClient({});
+    const connectAntigravity = vi.fn();
+    const refreshProvider = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(SettingsView, { props: {
+      activeTab: 'antigravity', settings: defaultThemeSettings,
+      generalSettings: { ...defaultGeneralSettings, providerEnabled: { antigravity: true } },
+      providerConnections: [], connectAntigravity, refreshProvider,
+    } });
+    expect(wrapper.text()).not.toContain('Antigravity');
+    expect(wrapper.text()).toContain('Accessibility');
+    await wrapper.setProps({ providerConnections: [{ backend: 'antigravity', installed: false, connected: false, checking: false }] });
+    expect(wrapper.get('.engine-hero__copy strong').text()).toBe('Antigravity');
+    await wrapper.get('button[aria-label="Check again"]').trigger('click');
+    expect(refreshProvider).toHaveBeenCalledWith('antigravity');
+    expect(connectAntigravity).not.toHaveBeenCalled();
+    await wrapper.setProps({ providerConnections: [{ backend: 'antigravity', installed: true, connected: false, checking: false }] });
+    await wrapper.findAll('button').find(button => button.text() === 'Connect')!.trigger('click');
+    expect(connectAntigravity).toHaveBeenCalledOnce();
+    const agentGroup = wrapper.findAll('.el-menu-item-group').find(group => group.get('.el-menu-item-group__title').text() === 'Agents')!;
+    const antigravityTab = agentGroup.findAll('.el-menu-item').find(item => item.text() === 'Antigravity')!;
+    await antigravityTab.trigger('click');
+    await wrapper.findAll('.el-menu-item').find(item => item.text() === 'Voice')!.trigger('click');
+    expect(wrapper.emitted('selectTab')).toStrictEqual([['antigravity'], ['voice']]);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';

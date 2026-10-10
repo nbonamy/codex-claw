@@ -19,6 +19,13 @@
     :claude-error="claudeError"
     :continuing="continuing"
     @connect-claude="emit('connect-claude')"
+    :antigravity-connected="antigravityConnected"
+    :antigravity-loading="antigravityLoading"
+    :antigravity-pending="antigravityPending"
+    :antigravity-error="antigravityError"
+    :antigravity-enabled="snapshot.providerConnections?.find(engine => engine.backend === 'antigravity')?.enabled !== false"
+    @connect-antigravity="emit('connect-antigravity')"
+    @cancel-antigravity="emit('cancel-antigravity')"
     @continue="emit('continue')"
     @cancel="cancelChatGptLogin"
     @login="startChatGptLogin"
@@ -70,6 +77,10 @@ const props = defineProps<{
   claudeDialogVisible: boolean;
   codexConnected: boolean;
   claudeConnected: boolean;
+  antigravityConnected?: boolean;
+  antigravityLoading?: boolean;
+  antigravityPending?: boolean;
+  antigravityError?: string | null;
   claudeLoading: boolean;
   claudeError: string | null;
   continuing: boolean;
@@ -96,6 +107,8 @@ const emit = defineEmits<{
   complete: [];
   'connect-github': [];
   'connect-claude': [];
+  'connect-antigravity': [];
+  'cancel-antigravity': [];
   'refresh-claude': [];
   'update:claudeDialogVisible': [value: boolean];
   continue: [];

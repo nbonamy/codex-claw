@@ -40,11 +40,11 @@ function expectRequiredString(
 
 function expectRequiredBackend(
   event: Record<string, unknown>,
-  backend?: 'codex' | 'claude',
+  backend?: 'codex' | 'claude' | 'antigravity',
 ): void {
   expectLiteral(
     event.backend,
-    backend ? [backend] : ['codex', 'claude'],
+    backend ? [backend] : ['codex', 'claude', 'antigravity'],
     '$.backend',
   );
 }
@@ -55,7 +55,7 @@ function expectAgent(event: Record<string, unknown>): void {
 
 function expectAgentBackend(
   event: Record<string, unknown>,
-  backend?: 'codex' | 'claude',
+  backend?: 'codex' | 'claude' | 'antigravity',
 ): void {
   expectAgent(event);
   expectRequiredBackend(event, backend);
@@ -72,6 +72,15 @@ function expectTurnContext(
 
 function expectEventContext(event: EventRecord): void {
   switch (event.type) {
+    case 'antigravity.conversationSnapshotChanged':
+    case 'antigravity.conversationEventReceived': {
+      expectAgentBackend(event, 'antigravity');
+      expectRequiredString(event, 'backendSessionId');
+      const payload = event.payload as Record<string, unknown>;
+      const frame = (payload.event ?? payload.snapshot) as Record<string, unknown>;
+      if (frame.agentId !== event.agentId || frame.sessionId !== event.backendSessionId) failEventValidation('$.payload', 'expected the outer Antigravity identity');
+      return;
+    }
     case 'backend.statusChanged':
     case 'account.rateLimitsUpdated':
     case 'models.changed':
@@ -174,7 +183,7 @@ export function decodeAppBackendEvent(value: unknown): AppBackendEvent {
   const event = value as EventRecord;
   expectOptional(event, 'agentId', '$', expectString);
   expectOptional(event, 'backend', '$', (candidate, path) =>
-    expectLiteral(candidate, ['codex', 'claude'], path),
+    expectLiteral(candidate, ['codex', 'claude', 'antigravity'], path),
   );
   expectOptional(event, 'backendSessionId', '$', expectString);
   expectOptional(event, 'conversationId', '$', expectString);

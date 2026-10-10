@@ -491,7 +491,7 @@ export type AppGeneralSettings = {
   providerModelDefaults?: Partial<Record<AgentBackend, AgentModelSelection>>;
   codeReviewDefaults?: import('./code-review').CodeReviewPreferences;
   /** Last explicitly selected approval mode; seeds new chats without changing existing ones. */
-  providerApprovalDefaults?: { codex?: ApprovalPreset; claude?: string };
+  providerApprovalDefaults?: { codex?: ApprovalPreset; claude?: string; antigravity?: string };
   agentListCompact: boolean;
   cockpitAgentViewMode: CockpitAgentViewMode;
   collapsedRepositoryKeys: string[];
@@ -938,6 +938,7 @@ export type AppApi = {
   getProviderUsage(backend: AgentBackend): Promise<AccountRateLimits | null>;
   setProviderEnabled(backend: AgentBackend, enabled: boolean, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderConnection[]>;
   disconnectProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderAuthentication>;
+  authenticateProvider(backend: AgentBackend, action: 'login' | 'cancel'): Promise<import('./contracts/provider-setup').ProviderAuthentication>;
   configureProviderSetup(backend: AgentBackend, choice: import('./contracts/provider-setup').ProviderSetupChange): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
   refreshProvider(backend: AgentBackend, remoteConnectionId?: string): Promise<import('./contracts/provider-setup').ProviderSetupStatus>;
   cancelCodexChatGptLogin(remoteConnectionId?: string, loginId?: string): Promise<CodexAuthentication>;

@@ -29,7 +29,7 @@ export function createAutomaticReviewToolModuleProvider(options: {
                 z.strictObject({ type: z.literal('uncommitted') }),
                 z.strictObject({ type: z.literal('branch'), baseRef: z.string().trim().min(1).max(500) }),
               ]).describe('Explicit review scope: uncommitted changes, or the current branch against a known base reference (including working changes). Ask when the user’s intended scope is unclear.'),
-              backend: z.enum(['codex', 'claude']).optional().describe('Override only when requested. Otherwise use the calling thread’s backend.'),
+              backend: z.enum(['codex', 'claude', 'antigravity']).optional().describe('Override only when requested. Otherwise use the calling thread’s backend.'),
               model: z.string().trim().min(1).max(200).optional().describe('Optional requested model. Same-provider reviews inherit the caller’s model; a different provider uses its own defaults.'),
               reasoningEffort: z.string().trim().min(1).max(200).optional().describe('Optional requested effort. With no model override, same-provider reviews inherit the caller’s effort; an explicit model without effort uses that model’s default.'),
               maxPriority: findingPrioritySchema.optional().describe('Highest numerical priority to fix; defaults to saved settings or p2 (P0–P2).'),

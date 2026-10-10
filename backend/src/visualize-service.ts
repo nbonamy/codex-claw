@@ -510,7 +510,7 @@ function cloneConversationRef(ref: BackendConversationRef | null): BackendConver
 function sameConversation(left: BackendConversationRef, right: BackendConversationRef): boolean {
   return left.backend === 'codex' && right.backend === 'codex'
     ? left.threadId === right.threadId
-    : left.backend === 'claude' && right.backend === 'claude'
+    : left.backend !== 'codex' && right.backend === left.backend
       ? left.folder === right.folder && left.sessionId === right.sessionId
       : false;
 }

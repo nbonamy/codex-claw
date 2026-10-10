@@ -1,6 +1,7 @@
 import type { Agent, AppSnapshot, Automation, AutomationExecutionLogEntry, AutomationTarget, CreateAutomationInput, UpdateAutomationInput } from './contracts';
 import { createEntityId, type IdGenerator } from './ids';
 import { resolveAgentBackend } from './agent-backends';
+import { isAgentBackend } from './contracts/shared';
 import { normalizeAutomationSchedule } from './automation-schedule';
 
 export function isAutomationTarget(value: unknown): value is AutomationTarget {
@@ -8,7 +9,7 @@ export function isAutomationTarget(value: unknown): value is AutomationTarget {
   const target = value as Record<string, unknown>;
   if (target.kind === 'agent' || target.kind === 'quickChat') return typeof target.agentId === 'string' && Boolean(target.agentId.trim());
   return target.kind === 'newQuickChat' && typeof target.teamId === 'string' && Boolean(target.teamId.trim())
-    && (target.backend === 'codex' || target.backend === 'claude')
+    && isAgentBackend(target.backend)
     && (target.model === undefined || typeof target.model === 'string')
     && (target.reasoningEffort === undefined || typeof target.reasoningEffort === 'string');
 }

@@ -38,6 +38,9 @@ by mutating user-global tool config.
 - **Claude:** the Agent SDK gets the same URL in `mcpServers` and an
   `allowedTools: ["mcp__korus__*"]` rule. Hosted servers are added without
   allowlisting, so their normal permission flow remains.
+- **Antigravity:** the daemon selects native `allow_once` for MCP calls whose
+  metadata identifies the session-supplied Korus server. Questions, built-in tools
+  and other servers keep native approvals; tool titles never establish trust.
 - `daemon` appends developer instructions with the agent's ID, name and folder and
   the workflows models do not reliably infer from schemas. They distinguish
   engine-native subagents (inside the Codex/Claude session) from Korus co-agents

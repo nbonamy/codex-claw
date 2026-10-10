@@ -68,7 +68,7 @@ export type AppMcpServiceOptions = {
   resolveWorkspaceIdentity?: (folder: string) => Promise<AgentWorkspaceIdentity>;
   worktreeManager?: WorktreeManager;
   agentCreation?: AgentCreationService;
-  createProject?: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude') => Promise<CreatedProject>;
+  createProject?: (agentId: string, name: string, prompt: string, backend?: 'codex' | 'claude' | 'antigravity') => Promise<CreatedProject>;
   startAutomaticReview?: StartAutomaticReview;
   toolModuleProviders?: readonly AppMcpToolModuleProvider[];
 };
@@ -623,9 +623,7 @@ function delegatedBackendDefaults(caller: Agent, input: McpCreateAgentInput): Ba
     ...(model ? { model, userSelectedModel: true } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
   };
-  return backend === 'claude'
-    ? { kind: 'claude', ...settings }
-    : { kind: 'codex', ...settings };
+  return { kind: backend, ...settings };
 }
 
 async function readAgentMarkdownFile(filePath: string): Promise<string> {

@@ -9,9 +9,9 @@ import { provideBackendChoices } from '../backend-selection';
 afterEach(() => localStorage.removeItem('app:preferredEngines'));
 
 describe('host-scoped manual engine selection', () => {
-  it('remembers explicit choices per host, but not temporary availability fallback', async () => {
+  it.each(['claude', 'antigravity'] as const)('remembers explicit %s choices per host, but not temporary availability fallback', async backend => {
     const snapshot = reactive(createEmptySnapshot());
-    snapshot.providerConnections = (['codex', 'claude'] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
+    snapshot.providerConnections = (['codex', backend] as const).map(backend => ({ backend, installed: true, connected: true, checking: false }));
     snapshot.teams.push({ id: 'remote-team', name: 'Remote', agentIds: [], remoteConnectionId: 'remote' });
     snapshot.remoteConnections.connections = [{ id: 'remote', kind: 'ssh', host: 'box', name: 'Box', status: 'ready', createdAt: '', updatedAt: '', providerConnections: structuredClone(snapshot.providerConnections.map(engine => ({ ...engine }))) }];
     const team = ref(snapshot.activeTeamId);
@@ -22,18 +22,18 @@ describe('host-scoped manual engine selection', () => {
         return () => h(BackendSelector, { teamId: team.value, modelValue: model.value, 'onUpdate:modelValue': value => { model.value = value; } });
       },
     }));
-    await wrapper.get('select').setValue('claude');
-    expect(model.value).toBe('claude');
+    await wrapper.get('select').setValue(backend);
+    expect(model.value).toBe(backend);
     team.value = 'remote-team';
     await wrapper.vm.$nextTick();
     expect(model.value).toBe('codex');
     team.value = snapshot.activeTeamId;
     await wrapper.vm.$nextTick();
-    expect(model.value).toBe('claude');
+    expect(model.value).toBe(backend);
     snapshot.providerConnections[1]!.connected = false;
     await wrapper.vm.$nextTick();
     expect(model.value).toBe('codex');
-    expect(JSON.parse(localStorage.getItem('app:preferredEngines')!)).toEqual({ local: 'claude' });
+    expect(JSON.parse(localStorage.getItem('app:preferredEngines')!)).toEqual({ local: backend });
     snapshot.providerConnections[1]!.connected = true;
     wrapper.unmount();
     model.value = undefined;
@@ -42,6 +42,6 @@ describe('host-scoped manual engine selection', () => {
       return () => h(BackendSelector, { modelValue: model.value, 'onUpdate:modelValue': value => { model.value = value; } });
     } }));
     await reloaded.vm.$nextTick();
-    expect(model.value).toBe('claude');
+    expect(model.value).toBe(backend);
   });
 });

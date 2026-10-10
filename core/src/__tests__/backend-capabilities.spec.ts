@@ -6,6 +6,14 @@ import {
 } from '../backend-capabilities';
 
 describe('backend capabilities', () => {
+  it('never inherits unsupported Codex controls for Antigravity', () => {
+    expect(defaultBackendCapabilities('antigravity')).toMatchObject({
+      goals: false, serviceTier: false, thinkingBudget: false, reasoningEffort: false,
+      steerPrompt: false, conversationFork: false, deleteTurn: false, editTurn: false,
+      retryTurn: false, plugins: false, remoteControl: false,
+      conversationArchive: false, conversationReplaceWithSummary: false,
+    });
+  });
   it('returns the native Codex capability set', () => {
     expect(defaultBackendCapabilities('codex')).toBe(codexBackendCapabilities);
     expect(codexBackendCapabilities).toMatchObject({

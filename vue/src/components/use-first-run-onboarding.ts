@@ -25,6 +25,9 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
   const claudeLoading = ref(false);
   const claudeError = ref<string | null>(null);
   const claudeDialogVisible = ref(false);
+  const antigravityLoading = ref(false);
+  const antigravityPending = ref(false);
+  const antigravityError = ref<string | null>(null);
   const providersVisible = ref(false);
   const continuing = ref(false);
   const githubVisible = ref(false);
@@ -42,6 +45,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
 
   const codexConnected = computed(() => options.getConnections().some(provider => provider.backend === 'codex' && provider.connected));
   const claudeConnected = computed(() => options.getConnections().some(provider => provider.backend === 'claude' && provider.connected));
+  const antigravityConnected = computed(() => options.getConnections().some(provider => provider.backend === 'antigravity' && provider.connected));
   const canContinue = computed(() => options.getConnections().some(provider => provider.connected && provider.installed && provider.enabled !== false));
   const initialAuthenticationLoading = computed(() => discovering.value);
   const showLogin = computed(() => discovering.value || providersVisible.value);
@@ -126,8 +130,8 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
   }
 
   async function enableConnectedEngine(backend: AgentBackend): Promise<void> {
-    const busy = backend === 'codex' ? authenticationLoading : claudeLoading;
-    const error = backend === 'codex' ? authenticationError : claudeError;
+    const busy = backend === 'antigravity' ? antigravityLoading : backend === 'codex' ? authenticationLoading : claudeLoading;
+    const error = backend === 'antigravity' ? antigravityError : backend === 'codex' ? authenticationError : claudeError;
     busy.value = true;
     error.value = null;
     try { await requireApi().setProviderEnabled(backend, true); }
@@ -136,8 +140,8 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
   }
 
   async function disconnectProvider(backend: AgentBackend): Promise<void> {
-    const busy = backend === 'codex' ? authenticationLoading : claudeLoading;
-    const error = backend === 'codex' ? authenticationError : claudeError;
+    const busy = backend === 'antigravity' ? antigravityLoading : backend === 'codex' ? authenticationLoading : claudeLoading;
+    const error = backend === 'antigravity' ? antigravityError : backend === 'codex' ? authenticationError : claudeError;
     busy.value = true;
     error.value = null;
     try {
@@ -146,7 +150,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
       if (result.kind === 'codex') {
         stopPolling();
         authentication.value = result.state;
-      } else {
+      } else if (result.kind === 'claude') {
         claudeAuthentication.value = result.state;
         claudeDialogVisible.value = false;
       }
@@ -157,6 +161,21 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
 
   function isInstalled(backend: AgentBackend): boolean {
     return providerSetup.value.some(setup => setup.backend === backend && setup.installed);
+  }
+
+  async function connectAntigravity(): Promise<void> {
+    if (!isInstalled('antigravity')) return;
+    if (antigravityConnected.value) { await enableConnectedEngine('antigravity'); return; }
+    antigravityPending.value = true; antigravityError.value = null;
+    try { await requireApi().authenticateProvider('antigravity', 'login'); }
+    catch (error) { if (!disposed && antigravityPending.value) antigravityError.value = errorMessage(error); }
+    finally { antigravityPending.value = false; }
+  }
+
+  async function cancelAntigravityLogin(): Promise<void> {
+    antigravityPending.value = false;
+    try { await requireApi().authenticateProvider('antigravity', 'cancel'); }
+    catch (error) { if (!disposed) antigravityError.value = errorMessage(error); }
   }
 
   async function customizeProvider(backend: AgentBackend): Promise<void> {
@@ -195,12 +214,13 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
         && current.isolated === choice.isolated && current.shareSkills === choice.shareSkills;
       const next = unchangedLockedSetup ? current : await requireApi().configureProviderSetup(backend, choice);
       if (backend === 'codex') authentication.value = null;
-      else claudeAuthentication.value = null;
+      else if (backend === 'claude') claudeAuthentication.value = null;
       providerSetup.value = providerSetup.value.map(setup => setup.backend === backend ? next : setup);
       customizingProvider.value = null;
       if (!next.installed) return;
       if (backend === 'codex') await refreshCodex();
-      else await refreshClaude();
+      else if (backend === 'claude') await refreshClaude();
+      else await refreshConnections();
     } catch (error) {
       setupError.value = errorMessage(error);
     } finally { updatingProvider.value = null; }
@@ -305,6 +325,7 @@ export function useFirstRunOnboarding(options: FirstRunOnboardingOptions) {
   return {
     authentication, authenticationCancelling, authenticationError, authenticationLoading,
     claudeAuthentication, claudeLoading, claudeError, claudeDialogVisible,
+    antigravityConnected, antigravityLoading, antigravityPending, antigravityError, connectAntigravity, cancelAntigravityLogin,
     codexConnected, claudeConnected, canContinue, continuing,
     completeVisible, gated, githubVisible, initialAuthenticationLoading, showLogin,
     cancelChatGptLogin, completeGitHub, finish, load, startChatGptLogin,

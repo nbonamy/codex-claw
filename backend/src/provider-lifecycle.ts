@@ -5,6 +5,7 @@ import type { ProviderHomeSettings, ProviderSetupChoice } from '@workspace/core/
 import { backendHomeDir } from './state';
 import { createCodexLifecycle } from './codex/provider-lifecycle';
 import { createClaudeLifecycle } from './claude/provider-lifecycle';
+import { createAntigravityLifecycle } from './antigravity/provider-lifecycle';
 
 /** Provider-owned lifecycle policy; setup owns serialization and persistence. */
 export type ProviderLifecycle = {
@@ -19,7 +20,7 @@ export type ProviderLifecycle = {
 };
 
 export function createProviderLifecycles(): ReadonlyMap<AgentBackend, ProviderLifecycle> {
-  return new Map([['codex', createCodexLifecycle()], ['claude', createClaudeLifecycle()]]);
+  return new Map([['codex', createCodexLifecycle()], ['claude', createClaudeLifecycle()], ['antigravity', createAntigravityLifecycle()]]);
 }
 
 export function providerHomePaths(backend: AgentBackend, configured: string | undefined) {

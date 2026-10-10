@@ -3,7 +3,7 @@
     <template v-for="engine in engines" :key="engine.backend">
       <SettingsEngineConnectionRow compact :backend="engine.backend" :installed="engine.installed" :title="backendDisplayName(engine.backend)" :authentication="engine.authentication" :connected="engine.connected" :enabled="engine.enabled" :busy="busy" :set-enabled="enabled => setEnabled(engine.backend, enabled)" @refresh="refreshProvider(engine.backend)" @connect="connect(engine)" @disconnect="disconnect(engine.backend)" />
       <RemoteCodexAuthentication v-if="signingIn === engine.backend && engine.backend === 'codex'" :connection="connection" @connected="finishConnection" />
-      <ProviderUpdateRow v-if="engine.installed" :backend="engine.backend" :remote-connection-id="connection.id" />
+      <ProviderUpdateRow v-if="engine.installed && engine.backend !== 'antigravity'" :backend="engine.backend" :remote-connection-id="connection.id" />
       <RemoteClaudeAuthentication v-if="signingIn === engine.backend && engine.backend === 'claude'" :connection="connection" @connected="finishConnection" />
     </template>
     <p v-if="error" role="alert">{{ error }}</p>
@@ -61,6 +61,7 @@ async function setEnabled(backend: AgentBackend, enabled: boolean) {
   if (expected === revision) engines.value = result;
 }
 async function connect(engine: ProviderConnection) {
+  if (!engine.connected && engine.backend === 'antigravity') { error.value = translate('antigravity.remoteLogin'); return; }
   if (!engine.connected) { signingIn.value = engine.backend; return; }
   busy.value = true;
   error.value = '';

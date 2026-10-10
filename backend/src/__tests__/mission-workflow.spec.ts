@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { createInitialSnapshot } from '@workspace/core/snapshot-construction';
 import { createMission, type MissionArtifacts } from '@workspace/core/missions';
 import type { MissionExecutionInput } from '@workspace/core/mission-execution';
@@ -14,7 +14,8 @@ import { createSourceWorktree, readWorktreeHead } from '../git-worktrees';
 import { persistedStateFromSnapshot, snapshotFromPersistedState } from '../state-persistence';
 const exec = promisify(execFile);
 
-it('keeps one orchestrator through shaping, reuses repository workers, respects ticket dependencies, and restores accepted evidence', async () => {
+
+it.each(['codex', 'antigravity'] as const)('keeps %s orchestrators and workers through the full Mission without inventing unsupported compaction', async backend => {
   const folder = await mkdtemp(join(tmpdir(), 'app-mission-workflow-'));
   const repo = join(folder, 'repo');
   await exec('git', ['init', repo]);
@@ -28,6 +29,9 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
     const baseline = await readWorktreeHead(repo);
     const snapshot = createInitialSnapshot();
     snapshot.agents[0]!.folder = repo;
+    snapshot.agents[0]!.backend = backend;
+    snapshot.agents[0]!.backendDefaults = { kind: backend, model: 'selected-model' };
+    const prompts: string[] = [];
     const mission = createMission(snapshot, { outcome: 'Team billing', workflowType: 'shapeAndShipFeature', teamId: snapshot.teams[0]!.id, orchestratorMemberId: snapshot.agents[0]!.id });
     let disk: unknown;
     const store = new MissionService(snapshot, async value => { disk = persistedStateFromSnapshot(value); });
@@ -35,7 +39,14 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
     const service = new MissionExecutionService({ snapshot, missions: store, publish: async () => {}, ensureMissionHome: async () => folder,
       readArtifact: async (_missionId, stage) => artifactContents.get(stage) ?? '',
       writeArtifact: async (_missionId, stage, content) => { artifactContents.set(stage, content); return { size: content.length }; },
-      validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {}, refreshConversationContext: async () => {}, continueStage: async () => {}, startRemediation: async () => {},
+      validateRepository: async path => { await readWorktreeHead(path); }, refreshWorkspace: async () => {}, refreshConversationContext: async () => {},
+      continueStage: async (id, prompt) => {
+        const worker = snapshot.agents.find(agent => agent.id === id)!;
+        expect(worker.backend).toBe(backend);
+        expect(worker.backendDefaults).toEqual({ kind: backend, model: 'selected-model' });
+        worker.backendSession = backend === 'codex' ? { kind: backend, threadId: id } : { kind: backend, sessionId: id };
+        prompts.push(prompt);
+      }, startRemediation: async () => {},
       createWorktree: createSourceWorktree, getHead: readWorktreeHead,
       ensureStageSkills: async (_missionId, stage) => missionStageSkills(stage),
       interrupt: async () => {},
@@ -110,5 +121,6 @@ it('keeps one orchestrator through shaping, reuses repository workers, respects 
     expect(restored.missions).toEqual(snapshot.missions);
     expect(restored.missions![0]!.artifacts.tickets[1]!.reference).toBe('https://example.com/issues/2');
     expect(restored.missions![0]!.execution!.runs.every(run => run.status === 'accepted')).toBe(true);
+    expect(prompts.includes('/compact')).toBe(backend === 'codex');
   } finally { await rm(folder, { recursive: true, force: true }); }
 });

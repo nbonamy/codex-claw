@@ -4,6 +4,7 @@
     <button type="button" :aria-label="$t('auth.checkAgain')" :title="$t('auth.checkAgain')" :disabled="busy || disabled" :aria-busy="busy || undefined" @click="emit('refresh')">
       <ElIcon :size="12" :class="{ 'is-loading': busy }" aria-hidden="true"><RefreshIcon /></ElIcon>
     </button>
+    <span v-if="backend === 'antigravity'">{{ $t('antigravity.installInstructions') }}</span>
   </span>
 </template>
 
@@ -18,7 +19,9 @@ const props = defineProps<{ backend: AgentBackend; busy?: boolean; disabled?: bo
 const emit = defineEmits<{ refresh: [] }>();
 const url = computed(() => props.backend === 'codex'
   ? 'https://learn.chatgpt.com/docs/codex/cli#getting-started'
-  : 'https://code.claude.com/docs/en/quickstart#step-1-install-claude-code');
+  : props.backend === 'claude'
+    ? 'https://code.claude.com/docs/en/quickstart#step-1-install-claude-code'
+    : 'https://github.com/agentclientprotocol/registry/blob/dc55a34900fdd60e5e97c1cbd7825c5a1df673fc/antigravity-acp/agent.json');
 </script>
 
 <style scoped>

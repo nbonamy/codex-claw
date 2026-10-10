@@ -193,6 +193,7 @@ function isAgentWorkspaceIdentity(value: unknown): boolean {
 
 function isBackendSession(value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (value.kind === 'antigravity') return typeof value.sessionId === 'string';
   if (value.kind === 'codex') return typeof value.threadId === 'string';
   return value.kind === 'claude' &&
     typeof value.sessionId === 'string' &&
@@ -205,6 +206,8 @@ function isBackendSession(value: unknown): boolean {
 
 function isBackendDefaults(value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (value.kind === 'antigravity') return optional(value, 'model', isString)
+    && optional(value, 'userSelectedModel', isBoolean) && optional(value, 'permissionMode', isString);
   if (value.kind === 'codex') {
     return optional(value, 'model', isString) &&
       optional(value, 'userSelectedModel', isBoolean) &&
@@ -311,7 +314,7 @@ function isAutomationExecution(value: unknown): boolean {
 function isBackendConversationRef(value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (value.backend === 'codex') return typeof value.threadId === 'string';
-  return value.backend === 'claude' && isNullableString(value.folder) && typeof value.sessionId === 'string';
+  return (value.backend === 'claude' || value.backend === 'antigravity') && isNullableString(value.folder) && typeof value.sessionId === 'string';
 }
 
 function isBackendRuntimeStatus(value: unknown): boolean {
@@ -534,16 +537,16 @@ function isGeneralSettings(value: unknown): boolean {
     typeof value.claudeCodeEnabled === 'boolean' &&
     (value.codexEnabled === undefined || typeof value.codexEnabled === 'boolean') &&
     (value.providerOnboardingComplete === undefined || typeof value.providerOnboardingComplete === 'boolean') &&
-    optional(value, 'providerEnabled', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, enabled]) => (backend === 'codex' || backend === 'claude') && isBoolean(enabled))) &&
+    optional(value, 'providerEnabled', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, enabled]) => (backend === 'codex' || backend === 'claude' || backend === 'antigravity') && isBoolean(enabled))) &&
     optional(value, 'codeReviewDefaults', isCodeReviewPreferences) &&
     optional(value, 'providerApprovalDefaults', candidate => isRecord(candidate)
-      && optional(candidate, 'codex', isApprovalPreset) && optional(candidate, 'claude', isString)) &&
+      && optional(candidate, 'codex', isApprovalPreset) && optional(candidate, 'claude', isString) && optional(candidate, 'antigravity', isString)) &&
     optional(value, 'providerModelDefaults', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, selection]) =>
-      (backend === 'codex' || backend === 'claude') && isRecord(selection) && isString(selection.model)
+      (backend === 'codex' || backend === 'claude' || backend === 'antigravity') && isRecord(selection) && isString(selection.model)
       && (selection.reasoningEffort === null || isString(selection.reasoningEffort))
       && (selection.serviceTier === null || isString(selection.serviceTier)))) &&
     optional(value, 'providerHomes', candidate => isRecord(candidate) && Object.entries(candidate).every(([backend, home]) =>
-      (backend === 'codex' || backend === 'claude') && isRecord(home) && isString(home.homePath) && isBoolean(home.isolated) && isBoolean(home.shareSkills))) &&
+      (backend === 'codex' || backend === 'claude' || backend === 'antigravity') && isRecord(home) && isString(home.homePath) && isBoolean(home.isolated) && isBoolean(home.shareSkills))) &&
     typeof value.agentListCompact === 'boolean' &&
     includes(['teams', 'recent'], value.cockpitAgentViewMode) &&
     isArrayOf(value.collapsedRepositoryKeys, isString) &&

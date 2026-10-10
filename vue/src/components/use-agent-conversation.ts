@@ -11,6 +11,7 @@ import { useImageAnnotation } from './use-image-annotation';
 import { useChatTextAnnotations } from './use-chat-text-annotations';
 import { useVisualizationAnnotations } from './use-visualization-annotations';
 import { claudePaneClientRequests } from './claude-pane-client-requests';
+import { antigravityPaneClientRequests } from './antigravity-pane-client-requests';
 import { conversationCommandMenuItems } from './conversation-command-menu';
 
 export type AgentConversationActions = {
@@ -48,7 +49,7 @@ export function agentConversationState(view: () => AgentConversationView, extens
   mentionGroups?: () => NonNullable<CodexConversationPaneState['catalogs']>['mentionGroups'];
   modelMenuItems?: () => CodexComposerMenuItem[];
 } = {}): CodexConversationPaneState {
-  const provider = () => view().codexSnapshot ?? view().claudeSnapshot;
+  const provider = () => view().codexSnapshot ?? view().claudeSnapshot ?? view().antigravitySnapshot;
   const approvalPreset = () => {
     const allowed = view().capabilities.approvalPresets ?? [];
     const stored = approvalPresetFromDefaults(view().agent.backendDefaults);
@@ -56,7 +57,7 @@ export function agentConversationState(view: () => AgentConversationView, extens
   };
   return {
     identity: {
-      get conversationKey() { const agent = view().agent; const session = agent.backendSession; return session?.kind === 'codex' ? `codex:${session.threadId}` : session?.kind === 'claude' ? `claude:${session.sessionId}` : `agent:${agent.id}`; },
+      get conversationKey() { const agent = view().agent; const session = agent.backendSession; return session?.kind === 'codex' ? `codex:${session.threadId}` : session ? `${session.kind}:${session.sessionId}` : `agent:${agent.id}`; },
       get activeTurnId() { return provider()?.activeTurnId ?? null; },
       get turns() { return provider()?.turns; },
       get messages() { return (provider()?.messages ?? []); },
@@ -71,7 +72,11 @@ export function agentConversationState(view: () => AgentConversationView, extens
     },
     thread: {
       get approvals() { return view().codexSnapshot?.approvals ?? view().approvals; },
-      get clientRequests() { return view().codexSnapshot?.clientRequests ?? claudePaneClientRequests(view().claudeSnapshot); },
+      get clientRequests() {
+        const antigravity = view().antigravitySnapshot;
+        if (antigravity) return antigravityPaneClientRequests(antigravity);
+        return view().codexSnapshot?.clientRequests ?? claudePaneClientRequests(view().claudeSnapshot);
+      },
       get answeredClientRequestIds() { return new Set(provider()?.answeredClientRequestIds ?? view().answeredClientRequestIds); },
       get goal() { return view().codexSnapshot?.goal ?? view().agent.goal ?? null; },
       get queuedPrompts() { return view().queuedPrompts; },
@@ -217,7 +222,7 @@ function permissionMenuItems(view: AgentConversationView): CodexComposerMenuItem
   const modes = view.capabilities.permissionModes ?? [];
   if (!modes.length) return [];
   const defaults = view.agent.backendDefaults;
-  const selected = defaults?.kind === 'claude' ? defaults.permissionMode : undefined;
+  const selected = defaults && 'permissionMode' in defaults ? defaults.permissionMode : undefined;
   return [{ id: 'backend-permissions', type: 'submenu', label: translate('surface.appShell.permissions'),
     items: modes.map(mode => ({ id: `permission:${mode.id}`, type: 'radio', label: localizedText(mode.label, translate) ?? mode.id, checked: selected === mode.id,
       payload: { kind: 'permission-mode', mode: mode.id } })),

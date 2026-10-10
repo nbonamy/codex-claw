@@ -1,4 +1,5 @@
 import { product } from '../product';
+import { isAntigravityEvent, isAntigravitySnapshot } from '../antigravity-conversation-guards';
 import { isProviderAuthentication } from '../contracts/provider-setup';
 import { isAppTextDescriptor } from '../app-text';
 import { isAccountRateLimits } from '../snapshot-guard-collections';
@@ -74,7 +75,7 @@ function expectBackendCapabilities(value: unknown, path: string): void {
 
 function expectBackendRuntimeStatus(value: unknown, path: string): void {
   expectRecord(value, path);
-  expectLiteral(value.backend, ['codex', 'claude'], `${path}.backend`);
+  expectLiteral(value.backend, ['codex', 'claude', 'antigravity'], `${path}.backend`);
   expectLiteral(
     value.status,
     ['notConfigured', 'starting', 'running', 'error'],
@@ -219,7 +220,7 @@ function expectAgentCreationProgress(value: unknown, path: string): void {
   expectRecord(value, path);
   expectString(value.id, `${path}.id`);
   expectLiteral(value.state, ['running', 'success', 'error'], `${path}.state`);
-  expectLiteral(value.backend, ['codex', 'claude'], `${path}.backend`);
+  expectLiteral(value.backend, ['codex', 'claude', 'antigravity'], `${path}.backend`);
   expectString(value.repositoryName, `${path}.repositoryName`);
   expectBoolean(value.createWorktree, `${path}.createWorktree`);
   expectOptional(value, 'createProject', path, expectBoolean);
@@ -387,6 +388,16 @@ function expectClaudeConversationEvent(value: unknown, path: string): void {
 }
 
 export const runtimePayloadValidators = {
+  'antigravity.conversationSnapshotChanged': (value, path) => {
+    expectRecord(value, path);
+    expectNumber(value.revision, `${path}.revision`);
+    if (!isAntigravitySnapshot(value.snapshot)) throw new Error('Invalid Antigravity conversation snapshot.');
+  },
+  'antigravity.conversationEventReceived': (value, path) => {
+    expectRecord(value, path);
+    expectNumber(value.revision, `${path}.revision`);
+    if (!isAntigravityEvent(value.event)) throw new Error('Invalid Antigravity conversation event.');
+  },
   'provider.authenticationChanged': (value, path) => {
     if (!isProviderAuthentication(value)) {
       throw new Error(`Invalid ${product.name} backend event at ${path}: expected provider authentication.`);

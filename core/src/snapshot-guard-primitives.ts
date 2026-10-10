@@ -35,7 +35,7 @@ export function isNumber(value: unknown): boolean {
 }
 
 export function isAgentBackend(value: unknown): boolean {
-  return value === 'codex' || value === 'claude';
+  return value === 'codex' || value === 'claude' || value === 'antigravity';
 }
 
 export function isNullableString(value: unknown): boolean {

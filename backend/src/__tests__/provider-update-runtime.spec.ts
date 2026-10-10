@@ -21,6 +21,13 @@ function fixture(resolved: string) {
 }
 
 describe('installed provider updates', () => {
+  it('rejects Antigravity updates before probing another provider or looking up packages', async () => {
+    const f = fixture('/tools/lib/node_modules/@anthropic-ai/claude-code/cli.js');
+    await expect(f.runtime.inspect('antigravity')).rejects.toThrow('Antigravity updates are managed externally');
+    expect(f.run).not.toHaveBeenCalled();
+    expect(f.read).not.toHaveBeenCalled();
+    expect(f.fetchText).not.toHaveBeenCalled();
+  });
   it('checks and upgrades npm through its owning Node instead of the packaged Node on PATH', async () => {
     const f = fixture('/tools/lib/node_modules/@openai/codex/bin/codex.js');
     f.run.mockImplementation(async (file, args) => {

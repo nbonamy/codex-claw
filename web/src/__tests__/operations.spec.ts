@@ -13,6 +13,27 @@ it('routes document saves and layout changes through client-scoped operations', 
 });
 
 describe(`${product.name} web operations`, () => {
+  it('preserves history search options and the conversation resume target expected by the daemon', async () => {
+    const target = { storageState: 'active', ref: { backend: 'antigravity', folder: '/work', sessionId: 'native-history' } } as const;
+    const request = vi.fn().mockResolvedValue({ agents: [] });
+    await expect(invokeAppWebOperation({ request }, 'resumeAgentConversation', ['agent', target])).resolves.toStrictEqual({ agents: [] });
+    expect(request).toHaveBeenCalledExactlyOnceWith(backendMethods.agentConversationResume, { agentId: 'agent', target });
+    request.mockClear();
+    const input = { searchTerm: 'saved conversation', limit: 5 };
+    await invokeAppWebOperation({ request }, 'listAgentConversations', ['agent', input]);
+    expect(request).toHaveBeenCalledExactlyOnceWith(backendMethods.agentConversationsList, { agentId: 'agent', input });
+  });
+
+  it.each(['sendPrompt', 'steerPrompt'])('rejects untrusted Web attachments before %s dispatch and preserves text prompts', async operation => {
+    const request = vi.fn().mockResolvedValue({});
+    for (const attachment of [{ type: 'file', path: '/private/file' }, { type: 'image', reference: 'forged-registry-id' }]) {
+      await expect(invokeAppWebOperation({ request }, operation, ['agent', 'Inspect', { attachments: [attachment] }])).rejects.toThrow('trusted upload');
+    }
+    expect(request).not.toHaveBeenCalled();
+    await invokeAppWebOperation({ request }, operation, ['agent', 'Hello']);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
   it('routes prune inventory and confirmed selections to the owning agent', async () => {
     const request = vi.fn().mockResolvedValue({ deleted: [], failed: [] });
     const input = { confirmed: true, targets: [{ id: 'refs/heads/feature', revision: 'checked' }] };
@@ -92,6 +113,8 @@ describe(`${product.name} web operations`, () => {
     await invokeAppWebOperation({ request }, 'getProviderUsage', ['claude']);
     await invokeAppWebOperation({ request }, 'disconnectProvider', ['claude', 'wall-e']);
     await invokeAppWebOperation({ request }, 'disconnectProvider', ['codex']);
+    await invokeAppWebOperation({ request }, 'authenticateProvider', ['antigravity', 'login']);
+    await invokeAppWebOperation({ request }, 'authenticateProvider', ['antigravity', 'cancel']);
     expect(request.mock.calls).toEqual([
       [backendMethods.codexAuthenticationGet, { remoteConnectionId: 'wall-e' }],
       [backendMethods.claudeAuthenticationGet, { connectionId: 'wall-e' }],
@@ -100,6 +123,8 @@ describe(`${product.name} web operations`, () => {
       [backendMethods.providerUsageGet, { backend: 'claude' }],
       [backendMethods.providerDisconnect, { backend: 'claude', remoteConnectionId: 'wall-e' }],
       [backendMethods.providerDisconnect, { backend: 'codex' }],
+      [backendMethods.providerAuthenticate, { backend: 'antigravity', action: 'login' }],
+      [backendMethods.providerAuthenticate, { backend: 'antigravity', action: 'cancel' }],
     ]);
   });
   it('maps allowlisted product operations to daemon methods', async () => {
