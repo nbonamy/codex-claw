@@ -122,7 +122,7 @@ describe('AppBackendServer code review workflow', () => {
     await server.close();
   });
 
-  it('discards a review session through the app-owned request', async () => {
+  it.each(['discard', 'manual'] as const)('routes review %s through the app-owned request and persists the result', async action => {
     const snapshot = createTestSnapshot();
     const owner: Agent = {
       id: 'agent-owner', teamId: snapshot.teams[0]!.id, name: 'Owner', folder: '/repo',
@@ -130,9 +130,10 @@ describe('AppBackendServer code review workflow', () => {
       createdAt: '2026-09-19T10:00:00.000Z', updatedAt: '2026-09-19T10:00:00.000Z',
       codeReview: {
         id: 'review-1', targetAgentId: 'agent-owner', reviewerAgentId: 'agent-owner', scope: { type: 'uncommitted' },
-        threadMode: 'current', status: 'failed', activeRoundId: 'round-1',
-        rounds: [{ id: 'round-1', number: 1, status: 'failed', findings: [], startedAt: 'now' }],
+        threadMode: 'current', status: 'ready', activeRoundId: 'round-1',
+        rounds: [{ id: 'round-1', number: 1, status: 'ready', findings: [], startedAt: 'now' }],
         createdAt: 'now', updatedAt: 'now',
+        automation: { enabled: true, state: 'paused', maxPriority: 'p2', maxRounds: 3, commits: [], reason: 'Round limit.' },
       },
     };
     snapshot.agents.push(owner);
@@ -142,21 +143,27 @@ describe('AppBackendServer code review workflow', () => {
       changedFiles: 2, addedLines: 12, removedLines: 3, hasUntracked: false,
       state: 'dirty', updatedAt: '2026-09-19T10:00:00.000Z',
     };
+    const saveSnapshot = vi.fn().mockResolvedValue(undefined);
     const server = new AppBackendServer({
       version: 'test', snapshot,
       driverRpc: new BackendDriverRpc(new Map()),
-      saveSnapshot: vi.fn().mockResolvedValue(undefined),
+      saveSnapshot,
       codeReviewTools: {
         createReviewToolContext: () => ({ id: 'unused', url: 'http://review.test/mcp' }),
         closeReviewToolContext: vi.fn(),
       },
     });
 
-    await request(server, backendMethods.agentCodeReviewDiscard, {
+    await request(server, action === 'discard' ? backendMethods.agentCodeReviewDiscard : backendMethods.agentCodeReviewManual, {
       agentId: owner.id, sessionId: 'review-1',
     });
 
-    expect(owner.codeReview).toBeUndefined();
+    if (action === 'discard') expect(owner.codeReview).toBeUndefined();
+    else {
+      expect(owner.codeReview).toMatchObject({ id: 'review-1', status: 'ready', automation: { enabled: false, state: 'manual' } });
+      expect(owner.codeReview?.automation?.reason).toBeUndefined();
+      expect(saveSnapshot).toHaveBeenCalled();
+    }
     await server.close();
   });
 

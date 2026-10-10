@@ -150,8 +150,13 @@ export class CodeReviewService {
     if (input.backend && input.backend !== reviewer.backend) {
       throw new Error('Start a new review to change the backend of an existing reviewer.');
     }
-    if (reviewer.codeReview) this.closeReviewToolContext(reviewer.codeReview);
+    const previous = reviewer.codeReview;
+    if (previous) this.closeReviewToolContext(previous);
+    if (previous?.automation?.state === 'manual') {
+      input = { ...input, automation: { ...previous.automation, enabled: false } };
+    }
     const session = this.newSession(target, reviewer, input);
+    if (previous?.automation?.state === 'manual') session.automation = { ...previous.automation, commits: [...previous.automation.commits] };
     this.applySelection(reviewer, input);
     reviewer.codeReview = session;
     void this.options.changed();
@@ -181,14 +186,14 @@ export class CodeReviewService {
     } finally {
       this.activeRoundTurns.delete(round.id);
     }
-    if (reviewer.codeReview !== session || (wasAutomatic && session.automation?.state !== 'running')) return;
+    if (reviewer.codeReview !== session || (wasAutomatic && session.automation?.state === 'paused')) return;
     await this.executeRound(reviewer, session, round, undefined);
   }
 
   decide(agent: Agent, input: CodeReviewDecisionInput): void {
     const { session, finding } = this.findFinding(agent, input);
     this.requireArbitration(session);
-    if (session.automation?.state === 'running') throw new Error('Stop automatic review before selecting findings.');
+    if (session.automation?.state === 'running') throw new Error('Switch to manual before selecting findings.');
     const decidedAt = this.timestamp();
     finding.decision = input.decision === 'select'
       ? { state: 'selected', decidedAt }
@@ -204,7 +209,7 @@ export class CodeReviewService {
   discuss(agent: Agent, input: CodeReviewDiscussionInput): void {
     const { session, round, finding } = this.findFinding(agent, input);
     this.requireArbitration(session);
-    if (session.automation?.state === 'running') throw new Error('Stop automatic review before discussing findings.');
+    if (session.automation?.state === 'running') throw new Error('Switch to manual before discussing findings.');
     this.requireIdleRound(round);
     const question = requiredText(input.question, 'A finding question is required.');
     const createdAt = this.timestamp();
@@ -217,7 +222,7 @@ export class CodeReviewService {
 
   submit(agent: Agent, sessionId: string): void {
     const session = this.findSession(agent, sessionId);
-    if (session.automation?.state === 'running') throw new Error('Stop automatic review before submitting a manual round.');
+    if (session.automation?.state === 'running') throw new Error('Switch to manual before submitting a manual round.');
     this.requireArbitration(session);
     const round = activeCodeReviewRound(session);
     this.requireIdleRound(round);
@@ -315,6 +320,32 @@ export class CodeReviewService {
       this.activeRoundTurns.delete(round.id);
     }
     await this.options.changed();
+  }
+
+  async switchToManual(agent: Agent, sessionId: string): Promise<void> {
+    const session = this.findSession(agent, sessionId);
+    const auto = session.automation;
+    if (!auto || auto.state === 'manual') return;
+    auto.enabled = false;
+    auto.state = 'manual';
+    delete auto.reason;
+    session.updatedAt = this.timestamp();
+    // Arbitration may have been saved while automatic remediation was still queued.
+    const round = activeCodeReviewRound(session);
+    if (session.status === 'fixing' && !this.activeRoundTurns.has(round.id)) {
+      this.restoreManualArbitration(session, round);
+    }
+    await this.options.changed();
+  }
+
+  private restoreManualArbitration(session: CodeReviewSession, round: CodeReviewRound): void {
+    for (const finding of round.findings) {
+      if (finding.remediation.state === 'pending' || finding.remediation.state === 'fixing') {
+        finding.remediation = { state: 'notStarted' };
+      }
+    }
+    round.status = 'ready';
+    session.status = 'ready';
   }
 
   async discard(agent: Agent, sessionId: string): Promise<void> {
@@ -442,7 +473,7 @@ export class CodeReviewService {
           Object.assign(session.automation, await this.git.prepare(agent.folder!, session.scope));
           await this.options.changed();
         } else await this.assertReviewWorkspace(agent, session, true);
-        if (session.automation.state !== 'running' || agent.codeReview !== session) return;
+        if ((session.automation.state !== 'running' && session.automation.enabled) || agent.codeReview !== session) return;
       }
       const result = await this.options.runReview(agent, reviewPrompt(session), context.url, initialReviewerSession);
       if (agent.codeReview !== session) {
@@ -451,7 +482,7 @@ export class CodeReviewService {
       agent.backendSession = result.reviewerSession;
       round.reviewerSession = result.reviewerSession;
       round.summary = result.text;
-      if (wasAutomatic && session.automation?.state !== 'running') return;
+      if (wasAutomatic && session.automation?.state === 'paused') return;
       if (session.automation?.state === 'running') await this.assertReviewWorkspace(agent, session, true);
       const completion = (round as CodeReviewRound).inspectionCompletion;
       if (!completion || completion.findingCount !== round.findings.length) {
@@ -511,6 +542,7 @@ export class CodeReviewService {
   }
 
   private async executeFixes(agent: Agent, session: CodeReviewSession, round: CodeReviewRound): Promise<void> {
+    const wasAutomatic = session.automation?.state === 'running';
     this.activeRoundTurns.add(round.id);
     try {
       if (agent.codeReview !== session) return;
@@ -524,6 +556,13 @@ export class CodeReviewService {
         session.updatedAt = startedAt;
         await this.options.changed();
 
+        if (wasAutomatic && session.automation?.state !== 'running') {
+          if (session.automation?.state === 'manual') {
+            this.restoreManualArbitration(session, round);
+            await this.options.changed();
+          }
+          return;
+        }
         const context = this.reviewToolContext(agent, session);
         const result = await this.options.runReview(
           agent,
@@ -546,15 +585,15 @@ export class CodeReviewService {
             throw new Error('Validation evidence is missing. Inspect the fixes before continuing.');
           }
           let checkpoint = await this.assertReviewWorkspace(agent, session, false);
-          if (session.automation.state !== 'running' || agent.codeReview !== session) return;
-          if (session.automation.autoCommit === true) {
+          if (agent.codeReview !== session) return;
+          if (session.automation.state === 'running' && session.automation.autoCommit === true) {
             const committed = await this.git.commit(agent.folder!, checkpoint, round.number);
             checkpoint = committed;
             if (committed.commit) session.automation.commits.push(committed.commit);
           }
           Object.assign(session.automation, { head: checkpoint.head, branch: checkpoint.branch, fingerprint: checkpoint.fingerprint });
           await this.options.changed();
-          if (session.automation.state !== 'running' || agent.codeReview !== session) return;
+          if ((session.automation.state !== 'running' && session.automation.enabled) || agent.codeReview !== session) return;
         }
       }
       const completedAt = this.timestamp();
@@ -593,6 +632,7 @@ export class CodeReviewService {
         session.status = 'readyToFinish';
         auto.state = 'completed';
         await this.options.changed();
+        if (!auto.enabled || agent.codeReview !== session) return;
         await this.finish(agent, session.id);
         await this.options.changed();
         return;
@@ -620,7 +660,7 @@ export class CodeReviewService {
       round.status = 'submitted';
       session.status = 'fixing';
       await this.options.changed();
-      if (auto.state === 'running') await this.executeFixes(agent, session, round);
+      if (auto.state === 'running' && agent.codeReview === session) await this.executeFixes(agent, session, round);
     } catch (error) {
       await this.pauseAutomatic(agent, session, error instanceof Error ? error.message : String(error));
     }
@@ -628,7 +668,7 @@ export class CodeReviewService {
 
   private async pauseAutomatic(agent: Agent, session: CodeReviewSession, reason: string): Promise<void> {
     const auto = session.automation;
-    if (!auto || auto.state === 'paused') return;
+    if (!auto || auto.state === 'paused' || auto.state === 'manual') return;
     auto.state = 'paused';
     auto.reason = reason;
     const round = activeCodeReviewRound(session);
@@ -645,6 +685,7 @@ export class CodeReviewService {
 
   private async assertReviewWorkspace(agent: Agent, session: CodeReviewSession, unchanged: boolean) {
     const actual = await this.git.inspect(agent.folder!);
+    if (session.automation?.state !== 'running') return actual;
     if (actual.head !== session.automation!.head || actual.branch !== session.automation!.branch
       || (unchanged && actual.fingerprint !== session.automation!.fingerprint)) {
       throw new Error('The workspace changed outside remediation. Inspect the changes before continuing.');
