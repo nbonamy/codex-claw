@@ -290,10 +290,15 @@ export class CodeReviewService {
     this.requireIdleRound(round);
     const folder = agent.folder;
     if (!folder) throw new Error('The review agent has no folder to commit.');
-    const before = await this.git.inspect(folder);
-    if (!await this.git.hasChanges(folder)) return;
     this.activeRoundTurns.add(round.id);
     try {
+      const before = await this.git.inspect(folder);
+      const hasChanges = await this.git.hasChanges(folder);
+      this.requireOpenReviewSession(session);
+      if (session.status !== 'readyToFinish' || session.activeRoundId !== round.id) {
+        throw new Error('The review changed before committing. Inspect it before continuing.');
+      }
+      if (!hasChanges) return;
       const context = this.reviewToolContext(agent, session);
       const result = await this.options.runReview(agent, commitPrompt(), context.url, requiredReviewerSession(round));
       if (agent.codeReview !== session) return;
@@ -301,6 +306,11 @@ export class CodeReviewService {
       round.reviewerSession = result.reviewerSession;
       const after = await this.git.inspect(folder);
       if (after.head === before.head) throw new Error('The review agent did not create a commit. The review is unchanged.');
+      // Persist the pre-commit baseline through the existing branch scope so fresh
+      // rounds still inspect the reviewed work after it leaves the working tree.
+      if (session.scope.type === 'uncommitted' && !session.automation?.baseRef) {
+        session.scope = { type: 'branch', baseRef: before.head };
+      }
     } finally {
       this.activeRoundTurns.delete(round.id);
     }

@@ -342,7 +342,9 @@ target and reviewer agents) plus an opaque reviewer session reference.
   runs. Korus only verifies that HEAD advanced; it never pushes. The option is
   offered only while the folder has changes (automatic reviews that already committed
   leave nothing to offer). A failed or ineffective commit leaves the review untouched
-  and skips the chosen action.
+  and skips the chosen action. Committing an uncommitted manual review changes its
+  scope to the branch against the pre-commit HEAD, preserving the reviewed work
+  through subsequent rounds and reloads.
 - Finishing saves a report first, then removes the ledger and the review-owned
   agent. Discarding removes the ledger from any state. Reopening starts from zero.
 - Findings and the `finish_review_round` acknowledgment are model tools
